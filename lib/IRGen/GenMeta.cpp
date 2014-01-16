@@ -643,7 +643,7 @@ bool IRGenModule::isTrivialMetatype(CanMetatypeType metaTy) {
   return metaTy->isThin();
 }
 
-/// Emit a DeclRefExpr which refers to a metatype.
+/// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
   // Some metatypes have trivial representation.

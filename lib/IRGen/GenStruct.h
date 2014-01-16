@@ -22,7 +22,6 @@ namespace llvm {
 }
 
 namespace swift {
-  class MemberRefExpr;
   class CanType;
   class SILType;
   class VarDecl;

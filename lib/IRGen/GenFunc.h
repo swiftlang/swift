@@ -21,7 +21,6 @@
 #include "CallingConvention.h"
 
 namespace swift {
-  class ApplyExpr;
   class ApplyInst;
   class FuncDecl;
   template <class T> class Optional;

@@ -49,8 +49,8 @@ class IRGenModule;
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  /// ValueDecl*, AbstractClosureExpr*, SILFunction*, ProtocolConformance*, or
-  /// TypeBase*, depending on Kind.
+  /// ValueDecl*, SILFunction*, ProtocolConformance*, or TypeBase*,
+  /// depending on Kind.
   void *Pointer;
 
   /// A hand-rolled bitfield with the following layout:

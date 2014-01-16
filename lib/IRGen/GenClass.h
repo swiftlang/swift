@@ -27,7 +27,6 @@ namespace swift {
   class CanType;
   class ClassDecl;
   class ExtensionDecl;
-  class MemberRefExpr;
   class ProtocolDecl;
   class SILType;
   class Type;
