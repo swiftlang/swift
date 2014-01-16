@@ -72,6 +72,7 @@ public:
   types::ID getType() const { return Type; }
 
   ArrayRef<Action *> getInputs() const { return Inputs; }
+  void addInput(Action *Input) { Inputs.push_back(Input); }
 
   size_type size() const { return Inputs.size(); }
 
