@@ -755,53 +755,19 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
 
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
-static llvm::Function *findSwiftAsObjCThunk(IRGenModule &IGM, StringRef name) {
+static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
+                                            ResilienceExpansion expansion) {
   // Construct the thunk name.
   llvm::SmallString<128> buffer;
-  buffer.reserve(name.size() + 2);
-  buffer.append("_TTo");
-  assert(name.startswith("_T"));
-  buffer.append(name.substr(2));
+  ref.mangle(buffer, expansion);
 
   auto fn = IGM.Module.getFunction(buffer);
-  assert(fn && "no SIL function for swift-as-objc thunk");
+  assert(fn && "no IR function for swift-as-objc thunk");
   // FIXME: Should set the linkage of the SILFunction to 'internal'.
   fn->setLinkage(llvm::GlobalValue::InternalLinkage);
   fn->setUnnamedAddr(true);
-  return fn;
-}
 
-/// Produce a pointer to the objc_msgSend-compatible thunk wrapping the
-/// given Swift implementation, at the given explosion and uncurry levels.
-static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
-                                                  const Selector &selector,
-                                                        SILDeclRef declRef,
-                                                  llvm::Function *swiftImpl,
-                                               ResilienceExpansion explosionLevel) {
-
-  // Construct a callee and derive its ownership conventions.
-  auto origFormalType = IGM.SILMod->Types.getConstantFormalType(declRef);
-  auto origFnType =
-    IGM.SILMod->Types.getSILFunctionType(AbstractionPattern(origFormalType),
-                                         origFormalType, /*uncurry*/ 0);
-
-  auto callee = Callee::forMethod(origFnType,
-                                  origFnType,
-                                  ArrayRef<Substitution>{},
-                                  swiftImpl,
-                                  explosionLevel,
-                                  declRef.uncurryLevel);
-
-  llvm::Function *objcImpl
-    = findSwiftAsObjCThunk(IGM, swiftImpl->getName());
-  return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
-}
-
-static unsigned getNaturalUncurryLevel(ValueDecl *property) {
-  assert(property->getDeclContext()->isTypeContext());
-  if (isa<SubscriptDecl>(property))
-    return 2;
-  return 1;
+  return llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -809,26 +775,19 @@ static unsigned getNaturalUncurryLevel(ValueDecl *property) {
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
-                                            const Selector &selector,
                                             ValueDecl *property) {
   // Protocol properties have no impl.
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  
+
   // FIXME: Explosion level
-  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
-  
-  unsigned uncurryLevel = getNaturalUncurryLevel(property);
-  llvm::SmallString<32> swiftName;
-  
-  // Find the ObjC thunk for the property.
-  CodeRef getterCode =
-    CodeRef::forGetter(property, explosionLevel, uncurryLevel);
-  LinkEntity getterEntity = LinkEntity::forFunction(getterCode);
-  getterEntity.mangle(swiftName);
-  
-  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, swiftName);
-  return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
+
+  SILDeclRef getter = SILDeclRef(property, SILDeclRef::Kind::Getter,
+                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                 /*foreign*/ true);
+
+  return findSwiftAsObjCThunk(IGM, getter, expansion);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -836,7 +795,6 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
-                                            const Selector &selector,
                                             ValueDecl *property) {
   // Protocol properties have no impl.
   if (isa<ProtocolDecl>(property->getDeclContext()))
@@ -844,20 +802,12 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
 
   assert(property->isSettable() && "property is not settable?!");
   
-  // FIXME: Explosion level
-  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
-  
-  unsigned uncurryLevel = getNaturalUncurryLevel(property);
-  llvm::SmallString<32> swiftName;
-  
-  // Generate the name of the ObjC thunk for the setter.
-  CodeRef setterCode =
-    CodeRef::forSetter(property, explosionLevel, uncurryLevel);
-  LinkEntity setterEntity = LinkEntity::forFunction(setterCode);
-  setterEntity.mangle(swiftName);
-  
-  llvm::Function *objcImpl = findSwiftAsObjCThunk(IGM, swiftName);
-  return llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
+  SILDeclRef setter = SILDeclRef(property, SILDeclRef::Kind::Setter,
+                                 SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                 /*foreign*/ true);
+
+  return findSwiftAsObjCThunk(IGM, setter, expansion);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -865,26 +815,17 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
-                                            const Selector &selector,
                                             FuncDecl *method) {
   // Protocol methods have no impl.
   if (isa<ProtocolDecl>(method->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
-  auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
-                             absCallee.getMaxUncurryLevel());
-  ResilienceExpansion explosionLevel = fnRef.getExplosionLevel();
-  unsigned uncurryLevel = fnRef.getUncurryLevel();
-
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
-                                  uncurryLevel, /*foreign*/ true);
-    
-  llvm::Function *swiftImpl =
-    IGM.getAddrOfFunction(fnRef, ExtraData::None, NotForDefinition);
+                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                  /*foreign*/ true);
 
-  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
-                                          swiftImpl, explosionLevel);
+  return findSwiftAsObjCThunk(IGM, declRef, expansion);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -892,25 +833,17 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
-                                            const Selector &selector,
                                             ConstructorDecl *constructor) {
   // Protocol methods have no impl.
   if (isa<ProtocolDecl>(constructor->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  
-  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, constructor);
-  unsigned uncurryLevel = absCallee.getMaxUncurryLevel();
-  auto explosionLevel = absCallee.getBestExplosionLevel();
 
-  llvm::Function *swiftImpl
-    = IGM.getAddrOfConstructor(constructor, ConstructorKind::Initializing,
-                               explosionLevel, NotForDefinition);
-
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
-                                  uncurryLevel, /*foreign*/ true);
+                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                  /*foreign*/ true);
 
-  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
-                                          swiftImpl, explosionLevel);
+  return findSwiftAsObjCThunk(IGM, declRef, expansion);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -918,22 +851,13 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
-                                            const Selector &selector,
                                             DestructorDecl *destructor) {
-  auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, destructor);
-  unsigned uncurryLevel = absCallee.getMaxUncurryLevel();
-  auto explosionLevel = absCallee.getBestExplosionLevel();
-
-  auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
-  llvm::Function *swiftImpl
-    = IGM.getAddrOfDestructor(classDecl, DestructorKind::Deallocating,
-                              NotForDefinition, /*isForeign=*/true);
-
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
-                                  uncurryLevel, /*foreign*/ true);
+                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
+                                  /*foreign*/ true);
 
-  return getObjCMethodPointerForSwiftImpl(IGM, selector, declRef,
-                                          swiftImpl, explosionLevel);
+  return findSwiftAsObjCThunk(IGM, declRef, expansion);
 }
 
 /// True if the value is of class type, or of a type that is bridged to class
@@ -1076,11 +1000,11 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   
   /// The third element is the method implementation pointer.
   if (auto func = dyn_cast<FuncDecl>(method))
-    impl = getObjCMethodPointer(IGM, selector, func);
+    impl = getObjCMethodPointer(IGM, func);
   else if (auto ctor = dyn_cast<ConstructorDecl>(method))
-    impl = getObjCMethodPointer(IGM, selector, ctor);
+    impl = getObjCMethodPointer(IGM, ctor);
   else
-    impl = getObjCMethodPointer(IGM, selector, cast<DestructorDecl>(method));
+    impl = getObjCMethodPointer(IGM, cast<DestructorDecl>(method));
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -1097,7 +1021,7 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   atEncoding = isClassProperty
    ? IGM.getAddrOfGlobalString(GetterMethodSignature)
    : GetObjCEncodingForType(IGM, property->getType());
-  impl = getObjCGetterPointer(IGM, getterSel, property);
+  impl = getObjCGetterPointer(IGM, property);
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -1110,7 +1034,7 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   Selector getterSel(subscript, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  impl = getObjCGetterPointer(IGM, getterSel, subscript);
+  impl = getObjCGetterPointer(IGM, subscript);
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -1129,7 +1053,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   atEncoding = isClassProperty
      ? IGM.getAddrOfGlobalString(SetterMethodSignature)
      : GetObjCEncodingForType(IGM, property->getType());
-  impl = getObjCSetterPointer(IGM, setterSel, property);
+  impl = getObjCSetterPointer(IGM, property);
 }
 
 /// Emit the components of an Objective-C method descriptor for a
@@ -1144,7 +1068,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   Selector setterSel(subscript, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-  impl = getObjCSetterPointer(IGM, setterSel, subscript);
+  impl = getObjCSetterPointer(IGM, subscript);
 }
 
 /// Emit an Objective-C method descriptor for the given method.
