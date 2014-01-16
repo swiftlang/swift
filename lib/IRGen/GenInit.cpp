@@ -21,7 +21,6 @@
 #include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/IR/GlobalVariable.h"
 
-#include "ASTVisitor.h"
 #include "Explosion.h"
 #include "GenHeap.h"
 #include "GenTuple.h"

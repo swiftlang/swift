@@ -68,7 +68,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
-#include "ASTVisitor.h"
 #include "CallingConvention.h"
 #include "CallEmission.h"
 #include "Explosion.h"

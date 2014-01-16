@@ -27,7 +27,6 @@
 #include "swift/Basic/Optional.h"
 #include "llvm/IR/DerivedTypes.h"
 
-#include "ASTVisitor.h"
 #include "GenHeap.h"
 #include "GenSequential.h"
 #include "GenType.h"

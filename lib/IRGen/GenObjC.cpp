@@ -30,7 +30,6 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
-#include "ASTVisitor.h"
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FormalType.h"

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/SIL/SILInstruction.h"
@@ -22,7 +23,6 @@
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
-#include "ASTVisitor.h"
 #include "Explosion.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -310,12 +310,12 @@ bool irgen::differsByAbstractionInExplosion(IRGenModule &IGM,
 }
 
 /// A class for testing whether a type directly stores an archetype.
-struct EmbedsArchetype : irgen::DeclVisitor<EmbedsArchetype, bool>,
+struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
                          CanTypeVisitor<EmbedsArchetype, bool> {
   IRGenModule &IGM;
   EmbedsArchetype(IRGenModule &IGM) : IGM(IGM) {}
 
-  using irgen::DeclVisitor<EmbedsArchetype, bool>::visit;
+  using DeclVisitor<EmbedsArchetype, bool>::visit;
   using CanTypeVisitor<EmbedsArchetype, bool>::visit;
 
   bool visitTupleType(CanTupleType type) {
