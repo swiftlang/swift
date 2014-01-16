@@ -969,7 +969,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
-    .Case("self_downcast", ValueKind::SelfDowncastInst)
     .Case("sil_global_addr", ValueKind::SILGlobalAddrInst)
     .Case("strong_release", ValueKind::StrongReleaseInst)
     .Case("strong_retain", ValueKind::StrongRetainInst)
@@ -1367,8 +1366,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ArchetypeRefToSuperInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst:
-  case ValueKind::SelfDowncastInst: {
+  case ValueKind::UpcastExistentialRefInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -1426,9 +1424,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UpcastExistentialRefInst:
       ResultVal = B.createUpcastExistentialRef(InstLoc, Val, Ty);
-      break;
-    case ValueKind::SelfDowncastInst:
-      ResultVal = B.createSelfDowncast(InstLoc, Val, Ty);
       break;
     }
     break;

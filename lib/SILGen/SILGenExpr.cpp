@@ -3129,6 +3129,8 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
+  // FIXME: Use a different instruction from 'downcast'. IRGen can make
+  // "rebind this" into a no-op if the called constructor is a Swift one.
   auto selfDecl = E->getSelf();
   auto selfTy = selfDecl->getType()->getInOutObjectType();
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
@@ -3143,7 +3145,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
     CleanupHandle newSelfCleanup = newSelf.getCleanup();
-    SILValue newSelfValue = SGF.B.createSelfDowncast(E,
+    SILValue newSelfValue = SGF.B.createUnconditionalCheckedCast(E,
+                           CheckedCastKind::Downcast,
                            newSelf.getValue(),
                            SGF.getLoweredLoadableType(E->getSelf()->getType()));
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);

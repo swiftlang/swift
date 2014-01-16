@@ -759,9 +759,6 @@ public:
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }
-  void visitSelfDowncastInst(SelfDowncastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "self_downcast");
-  }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
     OS << "is_nonnull " << getIDAndType(I->getOperand());

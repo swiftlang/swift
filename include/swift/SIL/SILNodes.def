@@ -169,8 +169,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(BridgeToBlockInst, ConversionInst, None)
     INST(ThinToThickFunctionInst, ConversionInst, None)
     INST(UnconditionalCheckedCastInst, ConversionInst, None)
-    INST(SelfDowncastInst, ConversionInst, None)
-    VALUE_RANGE(ConversionInst, UpcastInst, SelfDowncastInst)
+    VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
 
   // Runtime failure

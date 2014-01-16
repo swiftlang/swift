@@ -3170,19 +3170,6 @@ unconditional_checked_cast
 Performs a checked conversion, causing a runtime failure if the conversion
 fails.
 
-self_downcast
-`````````````
-::
-
-  sil-instruction ::= 'self_downcast' sil-operand 'to' sil-type
-
-  %1 = self_downcast %0 : $B to $D
-  // $D and $B must be class types, with B a superclass of D
-  // %1 will have type $D
-
-Represents a conversion of the ``self`` returned from a ``super.init``
-call to the derived class ``self``.
-
 Runtime Failures
 ~~~~~~~~~~~~~~~~
 
