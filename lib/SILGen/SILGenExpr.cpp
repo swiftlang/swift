@@ -3145,13 +3145,33 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
     CleanupHandle newSelfCleanup = newSelf.getCleanup();
-    SILValue newSelfValue = SGF.B.createUnconditionalCheckedCast(E,
-                           CheckedCastKind::Downcast,
-                           newSelf.getValue(),
-                           SGF.getLoweredLoadableType(E->getSelf()->getType()));
+
+    auto selfClass = selfTy->getClassOrBoundGenericClass();
+    SILValue newSelfValue;
+    auto destTy = SGF.getLoweredLoadableType(E->getSelf()->getType());
+
+    if (usesObjCAllocator(selfClass)) {
+      // If the class uses the Objective-C allocation and initialization
+      // model, 'self' might have been replaced. Perform an
+      // unconditional checked cast to the proper type.
+      newSelfValue = SGF.B.createUnconditionalCheckedCast(
+                       E, 
+                       CheckedCastKind::Downcast,
+                       newSelf.getValue(), 
+                       destTy);
+    } else {
+      // For classes using the Swift allocation and initialization
+      // model, the returned 'self' is identical to the prior 'self',
+      // so just perform the equivalent of a bitcast.
+      SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
+      newSelfValue = SGF.B.createRefToObjectPointer(E, newSelf.getValue(),
+                                                    objectPtrTy);
+      newSelfValue = SGF.B.createObjectPointerToRef(E, newSelfValue, destTy);
+    }
+
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
-  
+
   SILValue selfAddr =
     SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
   newSelf.assignInto(SGF, E, selfAddr);
