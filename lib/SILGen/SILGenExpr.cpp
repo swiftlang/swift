@@ -3129,8 +3129,6 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
-  // FIXME: Use a different instruction from 'downcast'. IRGen can make
-  // "rebind this" into a no-op if the called constructor is a Swift one.
   auto selfDecl = E->getSelf();
   auto selfTy = selfDecl->getType()->getInOutObjectType();
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
@@ -3146,29 +3144,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
            "delegating ctor type mismatch for non-reference type?!");
     CleanupHandle newSelfCleanup = newSelf.getCleanup();
 
-    auto selfClass = selfTy->getClassOrBoundGenericClass();
     SILValue newSelfValue;
     auto destTy = SGF.getLoweredLoadableType(E->getSelf()->getType());
 
-    if (usesObjCAllocator(selfClass)) {
-      // If the class uses the Objective-C allocation and initialization
-      // model, 'self' might have been replaced. Perform an
-      // unconditional checked cast to the proper type.
-      newSelfValue = SGF.B.createUnconditionalCheckedCast(
-                       E, 
-                       CheckedCastKind::Downcast,
-                       newSelf.getValue(), 
-                       destTy);
-    } else {
-      // For classes using the Swift allocation and initialization
-      // model, the returned 'self' is identical to the prior 'self',
-      // so just perform the equivalent of a bitcast.
-      SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
-      newSelfValue = SGF.B.createRefToObjectPointer(E, newSelf.getValue(),
-                                                    objectPtrTy);
-      newSelfValue = SGF.B.createObjectPointerToRef(E, newSelfValue, destTy);
-    }
-
+    // Assume that the returned 'self' is the appropriate subclass
+    // type (or a derived class thereof). Only Objective-C classes can
+    // violate this assumption.
+    SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
+    newSelfValue = SGF.B.createRefToObjectPointer(E, newSelf.getValue(),
+                                                  objectPtrTy);
+    newSelfValue = SGF.B.createObjectPointerToRef(E, newSelfValue, destTy);
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
