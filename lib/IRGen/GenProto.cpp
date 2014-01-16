@@ -2203,7 +2203,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       if (isNeverAllocated(packing))
         return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       assert(isNeverAllocated(packing));
       return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
@@ -2212,7 +2212,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::Destroy:
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
     }
     goto standard;
@@ -2222,7 +2222,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     if (packing == FixedPacking::OffsetZero) {
       if (concreteTI.isPOD(ResilienceScope::Local)) {
         return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-      } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+      } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
         return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
       }
     }
@@ -2239,7 +2239,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getAssignWithCopyStrongFunction(IGM));
     }
     goto standard;
@@ -2247,7 +2247,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::AssignWithTake:
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getAssignWithTakeStrongFunction(IGM));
     }
     goto standard;
@@ -2255,7 +2255,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::InitializeWithCopy:
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleRetainablePointer(ResilienceScope::Local)) {
+    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
     }
     goto standard;

@@ -2226,7 +2226,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
       continue;
     }
       
-    if (ti.isSingleRetainablePointer(ResilienceScope::Local))
+    if (ti.isSingleSwiftRetainablePointer(ResilienceScope::Local))
       hasSingleSwiftRefcountedContext = Yes;
     else
       hasSingleSwiftRefcountedContext = No;

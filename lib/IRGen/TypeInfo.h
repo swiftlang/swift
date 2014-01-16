@@ -239,10 +239,17 @@ public:
   virtual void destroy(IRGenFunction &IGF, Address address, CanType T) const = 0;
   
   /// Should optimizations be enabled which rely on the representation
-  /// for this type being a single retainable object pointer?
+  /// for this type being a single Swift-retainable object pointer?
   ///
   /// \return false by default
-  virtual bool isSingleRetainablePointer(ResilienceScope scope) const;
+  virtual bool isSingleSwiftRetainablePointer(ResilienceScope scope) const;
+
+  /// Should optimizations be enabled which rely on the representation
+  /// for this type being a single, potentially Objective-C, retainable
+  /// object pointer?
+  ///
+  /// \return false by default. isSingleSwiftRetainablePointer implies this.
+  virtual bool isSingleUnknownRetainablePointer(ResilienceScope scope) const;
 
   /// Does this type statically have extra inhabitants, or may it dynamically
   /// have extra inhabitants based on type arguments?

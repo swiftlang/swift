@@ -73,8 +73,12 @@ public:
                Alignment align)
     : super(storage, size, spareBits, align) {}
 
-  bool isSingleRetainablePointer(ResilienceScope scope) const {
+  bool isSingleSwiftRetainablePointer(ResilienceScope scope) const override {
     return asDerived().hasSwiftRefcount();
+  }
+  
+  bool isSingleUnknownRetainablePointer(ResilienceScope scope) const override {
+    return true;
   }
 
   static const bool IsScalarPOD = false;

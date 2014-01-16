@@ -994,7 +994,7 @@ namespace {
       /// a single no-payload case which uses the null extra inhabitant, so
       /// copy and destroy can pass through to
       /// swift_unknownRetain/swift_unknownRelease.
-      ///TODO: NullableUnknownRefcounted,
+      NullableUnknownRefcounted,
     };
     
     CopyDestroyStrategy CopyDestroyKind;
@@ -1014,20 +1014,24 @@ namespace {
       assert(ElementsWithPayload.size() == 1);
       
       // If the payload is POD, then we can use POD value semantics.
-      if (ElementsWithPayload[0].ti->isPOD(ResilienceScope::Component))
+      auto &payloadTI = *ElementsWithPayload[0].ti;
+      if (payloadTI.isPOD(ResilienceScope::Component))
         CopyDestroyKind = POD;
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
       else if (tik >= TypeInfoKind::Loadable
-          && ElementsWithPayload[0].ti->isSingleRetainablePointer(
-                                                   ResilienceScope::Component)
+          && payloadTI.isSingleUnknownRetainablePointer(
+                                                     ResilienceScope::Component)
           && ElementsWithNoPayload.size() == 1
           // FIXME: All single-retainable-pointer types should eventually have
           // extra inhabitants.
-          && cast<FixedTypeInfo>(ElementsWithPayload[0].ti)
-            ->getFixedExtraInhabitantCount(IGM) > 0) {
-        CopyDestroyKind = NullableSwiftRefcounted;
+          && cast<FixedTypeInfo>(payloadTI)
+            .getFixedExtraInhabitantCount(IGM) > 0) {
+        CopyDestroyKind = payloadTI.isSingleSwiftRetainablePointer(
+                                                     ResilienceScope::Component)
+          ? NullableSwiftRefcounted
+          : NullableUnknownRefcounted;
       }
       
       // TODO: Same for single unknown-refcounted pointers.
@@ -1533,6 +1537,52 @@ namespace {
       return noPayloadBB;
     }
     
+    llvm::Type *getRefcountedPtrType(IRGenModule &IGM) const {
+      switch (CopyDestroyKind) {
+      case NullableSwiftRefcounted:
+        return IGM.RefCountedPtrTy;
+      case NullableUnknownRefcounted:
+        return IGM.UnknownRefCountedPtrTy;
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
+    
+    void retainRefcountedPayload(IRGenFunction &IGF,
+                                 llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case NullableSwiftRefcounted: {
+        IGF.emitRetainCall(ptr);
+        return;
+      }
+      case NullableUnknownRefcounted: {
+        IGF.emitUnknownRetainCall(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
+    
+    void releaseRefcountedPayload(IRGenFunction &IGF,
+                                  llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case NullableSwiftRefcounted: {
+        IGF.emitRelease(ptr);
+        return;
+      }
+      case NullableUnknownRefcounted: {
+        IGF.emitUnknownRelease(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
+    
   public:
     void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest)
     const override {
@@ -1569,12 +1619,13 @@ namespace {
         return;
       }
       
-      case NullableSwiftRefcounted: {
-        // Bitcast to swift.refcounted*, and hand to swift_retain.
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
+        // Bitcast to swift.refcounted*, and retain the pointer.
         llvm::Value *val = src.claimNext();
-        llvm::Value *ptr
-          = IGF.Builder.CreateIntToPtr(val, IGF.IGM.RefCountedPtrTy);
-        IGF.emitRetainCall(ptr);
+        llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
+                                                getRefcountedPtrType(IGF.IGM));
+        retainRefcountedPayload(IGF, ptr);
         dest.add(val);
         return;
       }
@@ -1610,12 +1661,13 @@ namespace {
         return;
       }
 
-      case NullableSwiftRefcounted: {
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
         // Bitcast to swift.refcounted*, and hand to swift_release.
         llvm::Value *val = src.claimNext();
-        llvm::Value *ptr
-          = IGF.Builder.CreateIntToPtr(val, IGF.IGM.RefCountedPtrTy);
-        IGF.emitRelease(ptr);
+        llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
+                                                getRefcountedPtrType(IGF.IGM));
+        releaseRefcountedPayload(IGF, ptr);
         return;
       }
       }
@@ -1641,12 +1693,13 @@ namespace {
         return;
       }
           
-      case NullableSwiftRefcounted: {
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
         // Load the value as swift.refcounted, then hand to swift_release.
         addr = IGF.Builder.CreateBitCast(addr,
-                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
+                                 getRefcountedPtrType(IGF.IGM)->getPointerTo());
         llvm::Value *ptr = IGF.Builder.CreateLoad(addr);
-        IGF.emitRelease(ptr);
+        releaseRefcountedPayload(IGF, ptr);
         return;
       }
       }
@@ -1752,21 +1805,23 @@ namespace {
         return;
       }
       
-      case NullableSwiftRefcounted: {
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
         // Do the assignment as for a refcounted pointer.
+        auto refCountedTy = getRefcountedPtrType(IGF.IGM);
         Address destAddr = IGF.Builder.CreateBitCast(dest,
-                                      IGF.IGM.RefCountedPtrTy->getPointerTo());
+                                                 refCountedTy->getPointerTo());
         Address srcAddr = IGF.Builder.CreateBitCast(src,
-                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
+                                                refCountedTy->getPointerTo());
         // Load the old pointer at the destination.
         llvm::Value *oldPtr = IGF.Builder.CreateLoad(destAddr);
         // Store the new pointer.
         llvm::Value *srcPtr = IGF.Builder.CreateLoad(srcAddr);
         if (!isTake)
-          IGF.emitRetainCall(srcPtr);
+          retainRefcountedPayload(IGF, srcPtr);
         IGF.Builder.CreateStore(srcPtr, destAddr);
         // Release the old value.
-        IGF.emitRelease(oldPtr);
+        releaseRefcountedPayload(IGF, oldPtr);
         return;
       }
       }
@@ -1816,16 +1871,19 @@ namespace {
         return;
       }
           
-      case NullableSwiftRefcounted: {
+      case NullableSwiftRefcounted:
+      case NullableUnknownRefcounted: {
+        auto refCountedTy = getRefcountedPtrType(IGF.IGM);
+
         // Do the initialization as for a refcounted pointer.
         Address destAddr = IGF.Builder.CreateBitCast(dest,
-                                      IGF.IGM.RefCountedPtrTy->getPointerTo());
+                                                 refCountedTy->getPointerTo());
         Address srcAddr = IGF.Builder.CreateBitCast(src,
-                                       IGF.IGM.RefCountedPtrTy->getPointerTo());
+                                                 refCountedTy->getPointerTo());
 
         llvm::Value *srcPtr = IGF.Builder.CreateLoad(srcAddr);
         if (!isTake)
-          IGF.emitRetainCall(srcPtr);
+          retainRefcountedPayload(IGF, srcPtr);
         IGF.Builder.CreateStore(srcPtr, destAddr);
         return;
       }
@@ -2069,7 +2127,7 @@ namespace {
       /// most one no-payload case with the tagged-zero representation. Copy
       /// and destroy can just mask out the tag bits and pass the result to
       /// swift_unknownRetain/swift_unknownRelease.
-      ///TODO: TaggedUnknownRefcounted,
+      TaggedUnknownRefcounted,
     };
     
     CopyDestroyStrategy CopyDestroyKind;
@@ -2092,19 +2150,26 @@ namespace {
       // optimize our value semantics.
       bool allPOD = true;
       bool allSingleSwiftRefcount = true;
+      bool allSingleUnknownRefcount = true;
       for (auto &elt : ElementsWithPayload) {
         if (!elt.ti->isPOD(ResilienceScope::Component))
           allPOD = false;
-        if (!elt.ti->isSingleRetainablePointer(ResilienceScope::Component))
+        if (!elt.ti->isSingleSwiftRetainablePointer(ResilienceScope::Component))
           allSingleSwiftRefcount = false;
+        if (!elt.ti->isSingleUnknownRetainablePointer(ResilienceScope::Component))
+          allSingleUnknownRefcount = false;
       }
       
       if (allPOD) {
-        assert(!allSingleSwiftRefcount && "pod *and* single-refcounted?!");
+        assert(!allSingleSwiftRefcount && !allSingleUnknownRefcount
+               && "pod *and* refcounted?!");
         CopyDestroyKind = POD;
       } else if (allSingleSwiftRefcount
                  && WithNoPayload.size() <= 1) {
         CopyDestroyKind = TaggedSwiftRefcounted;
+      } else if (allSingleUnknownRefcount
+                 && WithNoPayload.size() <= 1) {
+        CopyDestroyKind = TaggedUnknownRefcounted;
       }
     }
     
@@ -2154,6 +2219,52 @@ namespace {
       }
       assert(!extraTagBits);
       return tag;
+    }
+    
+    llvm::Type *getRefcountedPtrType(IRGenModule &IGM) const {
+      switch (CopyDestroyKind) {
+      case TaggedSwiftRefcounted:
+        return IGM.RefCountedPtrTy;
+      case TaggedUnknownRefcounted:
+        return IGM.UnknownRefCountedPtrTy;
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
+    
+    void retainRefcountedPayload(IRGenFunction &IGF,
+                                 llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case TaggedSwiftRefcounted: {
+        IGF.emitRetainCall(ptr);
+        return;
+      }
+      case TaggedUnknownRefcounted: {
+        IGF.emitUnknownRetainCall(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
+    }
+    
+    void releaseRefcountedPayload(IRGenFunction &IGF,
+                                  llvm::Value *ptr) const {
+      switch (CopyDestroyKind) {
+      case TaggedSwiftRefcounted: {
+        IGF.emitRelease(ptr);
+        return;
+      }
+      case TaggedUnknownRefcounted: {
+        IGF.emitUnknownRelease(ptr);
+        return;
+      }
+      case POD:
+      case Normal:
+        llvm_unreachable("not a refcounted payload");
+      }
     }
     
   public:
@@ -2510,7 +2621,8 @@ namespace {
         return;
       }
           
-      case TaggedSwiftRefcounted: {
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
         llvm::Value *payload = src.claimNext();
         llvm::Value *extraTagBits = ExtraTagBitCount > 0
           ? src.claimNext() : nullptr;
@@ -2519,10 +2631,10 @@ namespace {
         llvm::Value *ptrVal
           = maskTagBitsFromPayload(IGF, payload);
         
-        // Pass the pointer to swift_retain.
+        // Retain the pointer.
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
-                                              IGF.IGM.RefCountedPtrTy);
-        IGF.emitRetainCall(ptr);
+                                              getRefcountedPtrType(IGF.IGM));
+        retainRefcountedPayload(IGF, ptr);
         
         dest.add(payload);
         if (extraTagBits)
@@ -2557,7 +2669,8 @@ namespace {
         return;
       }
           
-      case TaggedSwiftRefcounted: {
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
         llvm::Value *payload = src.claimNext();
         if (ExtraTagBitCount > 0)
           src.claimNext();
@@ -2566,10 +2679,10 @@ namespace {
         llvm::Value *ptrVal
           = maskTagBitsFromPayload(IGF, payload);
 
-        // Pass the pointer to swift_retain.
+        // Release the pointer.
         auto ptr = IGF.Builder.CreateIntToPtr(ptrVal,
-                                              IGF.IGM.RefCountedPtrTy);
-        IGF.emitRelease(ptr);
+                                              getRefcountedPtrType(IGF.IGM));
+        releaseRefcountedPayload(IGF, ptr);
         return;
       }
       }
@@ -2587,6 +2700,7 @@ namespace {
         return emitPrimitiveCopy(IGF, dest, src, T);
       
       case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted:
       case Normal: {
         // If the enum is loadable, it's better to do this directly using values,
         // so we don't need to RMW tag bits in place.
@@ -2637,6 +2751,7 @@ namespace {
         return emitPrimitiveCopy(IGF, dest, src, T);
 
       case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted:
       case Normal: {
         // If the enum is loadable, it's better to do this directly using values,
         // so we don't need to RMW tag bits in place.
@@ -2773,7 +2888,8 @@ namespace {
         return;
           
       case Normal:
-      case TaggedSwiftRefcounted: {
+      case TaggedSwiftRefcounted:
+      case TaggedUnknownRefcounted: {
         // If loadable, it's better to do this directly to the value than
         // in place, so we don't need to RMW out the tag bits in memory.
         if (TI->isLoadable()) {

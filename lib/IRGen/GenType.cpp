@@ -46,8 +46,12 @@ TypeConverter::Types_t::getCacheFor(TypeBase *t) {
   return t->isDependentType() ? DependentCache : IndependentCache;
 }
 
-bool TypeInfo::isSingleRetainablePointer(ResilienceScope scope) const {
+bool TypeInfo::isSingleSwiftRetainablePointer(ResilienceScope scope) const {
   return false;
+}
+
+bool TypeInfo::isSingleUnknownRetainablePointer(ResilienceScope scope) const {
+  return isSingleSwiftRetainablePointer(scope);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
