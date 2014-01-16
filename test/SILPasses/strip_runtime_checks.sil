@@ -20,6 +20,33 @@ entry(%x : $Builtin.Int64, %y : $Builtin.Int64):
   return %z : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil @trunc_checked : $@thin (Builtin.Int64) -> Builtin.Int1 {
+// CHECK:       bb0([[X:%.*]] : $Builtin.Int64):
+// CHECK:         [[UNCHECKED_TRUNC:%.*]] = builtin_function_ref "trunc_Int64_Int32" : $@thin (Builtin.Int64) -> Builtin.Int32
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[UNCHECKED_RESULT:%.*]] = apply [[UNCHECKED_TRUNC]]([[X]])
+// CHECK:         [[UNCHECKED_TUPLE:%.*]] = tuple ([[UNCHECKED_RESULT]] : $Builtin.Int32, [[ZERO]] : $Builtin.Int1)
+sil @trunc_checked : $@thin (Builtin.Int64) -> Builtin.Int1 {
+entry(%x : $Builtin.Int64):
+  %f = builtin_function_ref "s_to_s_checked_trunc_Int64_Int32" : $@thin (Builtin.Int64) -> (Builtin.Int32, Builtin.Int1)
+  %r = apply %f(%x) : $@thin (Builtin.Int64) -> (Builtin.Int32, Builtin.Int1) 
+  %z = tuple_extract %r : $(Builtin.Int32, Builtin.Int1), 1
+  return %z : $Builtin.Int1
+}
+
+
+// CHECK-LABEL: sil @convert_checked : $@thin (Builtin.Int64) -> Builtin.Int1 {
+// CHECK:       bb0([[X:%.*]] : $Builtin.Int64):
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[UNCHECKED_TUPLE:%.*]] = tuple ([[X]] : $Builtin.Int64, [[ZERO]] : $Builtin.Int1)
+sil @convert_checked : $@thin (Builtin.Int64) -> Builtin.Int1 {
+entry(%x : $Builtin.Int64):
+  %f = builtin_function_ref "s_to_u_checked_conversion_Int64" : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+  %r = apply %f(%x) : $@thin (Builtin.Int64) -> (Builtin.Int64, Builtin.Int1) 
+  %z = tuple_extract %r : $(Builtin.Int64, Builtin.Int1), 1
+  return %z : $Builtin.Int1
+}
+
 // CHECK-LABEL: sil @condfail : $@thin (Builtin.Int1) -> () {
 // CHECK:       bb0(%0 : $Builtin.Int1):
 // CHECK-NOT:     cond_fail

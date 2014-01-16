@@ -17,7 +17,7 @@
 
 using namespace swift;
 
-static void convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB,
+static SILInstruction *convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB,
                                               BuiltinFunctionRefInst *BRI,
                                               StringRef name,
                                               StringRef uncheckedNameRoot) {
@@ -30,12 +30,10 @@ static void convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB,
                                               BRI->getName().str().size());
 
   // Get its type.
-  // (T, T, Int1) -> (T, Int1) to (T, T) -> T
+  // (T, T, Int1) -> (T, Int1) becomes (T, T) -> T
   auto type = BRI->getType().castTo<SILFunctionType>();
   CanType uncheckedResult
     = cast<TupleType>(type->getResult().getType()).getElementType(0);
-  SILType uncheckedSILResult
-    = SILType::getPrimitiveObjectType(uncheckedResult);
   auto uncheckedType = SILFunctionType::get(nullptr,
             type->getExtInfo(),
             type->getCalleeConvention(),
@@ -71,9 +69,6 @@ static void convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB,
     
     auto uncheckedApp = B.createApply(app->getLoc(),
                                       uncheckedBRI,
-                                      uncheckedSILType,
-                                      uncheckedSILResult,
-                                      {},
                                       uncheckedArgs);
     
     // Build a tuple with the unchecked result and our zero to replace the
@@ -87,10 +82,115 @@ static void convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB,
     app->eraseFromParent();
   }
   
+  auto next = BRI->getNextNode();
   BRI->eraseFromParent();
+  return next;;
 }
 
-static void processBuiltinFunctionRef(SILBasicBlock *BB,
+static SILInstruction *convertCheckedTruncToUncheckedBuiltin(SILBasicBlock *BB,
+                                                  BuiltinFunctionRefInst *BRI) {
+  ASTContext &C = BRI->getType().getSwiftRValueType()->getASTContext();
+  SILBuilder B(BB, SILBasicBlock::iterator(BRI));
+ 
+  // Get the name of the unchecked builtin.
+  // We should always be going from '?_to_?_checked_trunc_*' to 'trunc_*'.
+  auto name = BRI->getName().str();
+  assert(name.slice(1, 5).equals("_to_")
+         && name.slice(6, 20).equals("_checked_trunc"));
+  
+  llvm::SmallString<16> uncheckedName("trunc");
+  uncheckedName += name.slice(20, name.size());
+  
+  // Get its type.
+  // T -> (U, Int1) becomes T -> U
+  auto type = BRI->getType().castTo<SILFunctionType>();
+  CanType uncheckedResult
+    = cast<TupleType>(type->getResult().getType()).getElementType(0);
+  auto uncheckedType = SILFunctionType::get(nullptr,
+              type->getExtInfo(),
+              type->getCalleeConvention(),
+              type->getParameters(),
+              SILResultInfo(uncheckedResult, type->getResult().getConvention()),
+              C);
+  SILType uncheckedSILType = SILType::getPrimitiveObjectType(uncheckedType);
+
+  // Build the reference to the unchecked builtin.
+  auto uncheckedBRI = B.createBuiltinFunctionRef(BRI->getLoc(),
+                             uncheckedName,
+                             uncheckedSILType);
+  // Create a literal Int1 '0' we can use to replace the 'did overflow' bit.
+  auto zero = B.createIntegerLiteral(BRI->getLoc(),
+                     SILType::getBuiltinIntegerType(1, C),
+                     0);
+  
+  // Update the applications of the builtin.
+  for (auto use : BRI->getUses()) {
+    // The only supported use of a builtin ref is as the callee of an
+    // application.
+    auto app = cast<ApplyInst>(use->getUser());
+    assert(app->getCallee().getDef() == BRI);
+
+    B.setInsertionPoint(app->getParent(), app);
+
+    // Apply the unchecked builtin.
+    assert(app->getArguments().size() == 1);
+    auto uncheckedApp = B.createApply(app->getLoc(),
+                                      uncheckedBRI,
+                                      app->getArguments()[0]);
+    
+    // Build a tuple with the unchecked result and our zero to replace the
+    // overflow bit.
+    SILValue elts[] = {SILValue(uncheckedApp, 0), zero};
+    auto tuple = B.createTuple(app->getLoc(), app->getType(), elts);
+
+    // Replace references to the checked application with references to the
+    // tuple.
+    app->replaceAllUsesWith(tuple);
+    app->eraseFromParent();
+  }
+  
+  auto next = BRI->getNextNode();
+  BRI->eraseFromParent();
+  return next;
+}
+
+static SILInstruction *convertCheckedConversionToUncheckedBuiltin(
+                                                 SILBasicBlock *BB,
+                                                 BuiltinFunctionRefInst *BRI) {
+  ASTContext &C = BRI->getType().getSwiftRValueType()->getASTContext();
+  SILBuilder B(BB, SILBasicBlock::iterator(BRI));
+
+  // Create a literal Int1 '0' we can use to replace the 'did overflow' bit.
+  auto zero = B.createIntegerLiteral(BRI->getLoc(),
+                     SILType::getBuiltinIntegerType(1, C),
+                     0);
+
+  // Update applications of the builtin to refer to their operand directly.
+  for (auto use : BRI->getUses()) {
+    // The only supported use of a builtin ref is as the callee of an
+    // application.
+    auto app = cast<ApplyInst>(use->getUser());
+    assert(app->getCallee().getDef() == BRI);
+
+    // Wrap the operand in a tuple with 0 for the overflow bit.
+    B.setInsertionPoint(app->getParent(), app);
+    assert(app->getArguments().size() == 1);
+    SILValue val = app->getArguments()[0];
+    
+    SILValue elts[] = {val, zero};
+    auto tuple = B.createTuple(app->getLoc(), app->getType(), elts);
+    
+    // Replace references to the application with references to the tuple.
+    app->replaceAllUsesWith(tuple);
+    app->eraseFromParent();
+  }
+  
+  auto next = BRI->getNextNode();
+  BRI->eraseFromParent();
+  return next;
+}
+
+static SILInstruction *processBuiltinFunctionRef(SILBasicBlock *BB,
                                       BuiltinFunctionRefInst *BRI) {
   auto &builtinInfo = BRI->getBuiltinInfo();
   
@@ -103,8 +203,23 @@ static void processBuiltinFunctionRef(SILBasicBlock *BB,
   }
 #include "swift/AST/Builtins.def"
   
-  // TODO: Reduce checked conversions to their non-checked forms.
+  // Reduce checked truncation intrinsics unchecked 'trunc'.
+  if (builtinInfo.ID == BuiltinValueKind::UToSCheckedTrunc
+      || builtinInfo.ID == BuiltinValueKind::SToSCheckedTrunc
+      || builtinInfo.ID == BuiltinValueKind::SToUCheckedTrunc
+      || builtinInfo.ID == BuiltinValueKind::UToUCheckedTrunc) {
+    return convertCheckedTruncToUncheckedBuiltin(BB, BRI);
+  }
+  
+  // Reduce signed<->unsigned checked conversion intrinsics to no-ops.
+  if (builtinInfo.ID == BuiltinValueKind::SUCheckedConversion
+      || builtinInfo.ID == BuiltinValueKind::USCheckedConversion) {
+    return convertCheckedConversionToUncheckedBuiltin(BB, BRI);
+  }
+  
   // TODO: Turn traps into unreachables?
+  
+  return BRI->getNextNode();
 }
 
 static void processFunction(SILFunction &F) {
@@ -112,14 +227,15 @@ static void processFunction(SILFunction &F) {
     // NB: Mutates the basic block list.
     for (auto II = BB.begin(); II != BB.end();) {
       SILInstruction *I = &*II;
-      ++II;
       
       // Consider builtins for translation.
       if (auto BRI = dyn_cast<BuiltinFunctionRefInst>(I)) {
-        processBuiltinFunctionRef(&BB, BRI);
+        II = processBuiltinFunctionRef(&BB, BRI);
         continue;
       }
       
+      ++II;
+
       // Zap condfails.
       if (isa<CondFailInst>(I)) {
         I->eraseFromParent();
