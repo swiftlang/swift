@@ -202,7 +202,7 @@ namespace {
 
     /// Configure this result to carry a number of direct values at
     /// the given explosion level.
-    Explosion &initForDirectValues(ExplosionKind level) {
+    Explosion &initForDirectValues(ResilienceExpansion level) {
       assert(CurState == State::Invalid);
       CurState = State::Direct;
       return *new (&CurValue.Direct) Explosion(level);
@@ -211,13 +211,13 @@ namespace {
     /// As a potential efficiency, set that this is a direct result
     /// with no values.
     void setAsEmptyDirect() {
-      initForDirectValues(ExplosionKind::Maximal);
+      initForDirectValues(ResilienceExpansion::Maximal);
     }
 
     /// Set this result so that it carries a single directly-returned
     /// maximally-fragile value without management.
     void setAsSingleDirectUnmanagedFragileValue(llvm::Value *value) {
-      initForDirectValues(ExplosionKind::Maximal).add(value);
+      initForDirectValues(ResilienceExpansion::Maximal).add(value);
     }
 
     void setAsIndirectAddress(Address address) {
@@ -321,10 +321,10 @@ namespace {
     /// TODO: The ExtraData bit will be fully dependent on the formal type when
     /// we enable SIL witness tables.
     struct Currying {
-      Signature Signatures[unsigned(ExplosionKind::Last_ExplosionKind) + 1]
+      Signature Signatures[unsigned(ResilienceExpansion::Last_ResilienceExpansion) + 1]
                           [unsigned(ExtraData::Last_ExtraData) + 1];
 
-      Signature &select(ExplosionKind kind, ExtraData extraData) {
+      Signature &select(ResilienceExpansion kind, ExtraData extraData) {
         return Signatures[unsigned(kind)][unsigned(extraData)];
       }
     };
@@ -369,7 +369,7 @@ namespace {
     }
     
     Signature getSignature(IRGenModule &IGM,
-                           ExplosionKind explosionKind,
+                           ResilienceExpansion explosionKind,
                            ExtraData extraData) const;
 
     bool hasExtraData() const {
@@ -382,7 +382,7 @@ namespace {
       }
     }
     
-    unsigned getExplosionSize(ExplosionKind kind) const {
+    unsigned getExplosionSize(ResilienceExpansion kind) const {
       return hasExtraData() ? 2 : 1;
     }
 
@@ -713,14 +713,14 @@ namespace {
   class SignatureExpansion {
     IRGenModule &IGM;
     CanSILFunctionType FnType;
-    ExplosionKind ExplosionLevel;
+    ResilienceExpansion ExplosionLevel;
   public:
     SmallVector<llvm::Type*, 8> ParamIRTypes;
     llvm::AttributeSet Attrs;
     bool HasIndirectResult = false;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
-                       ExplosionKind explosionLevel)
+                       ResilienceExpansion explosionLevel)
       : IGM(IGM), FnType(fnType), ExplosionLevel(explosionLevel) {}
 
     llvm::Type *expandResult();
@@ -877,7 +877,7 @@ void SignatureExpansion::expandParameters() {
 }
 
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
-                                     ExplosionKind explosionLevel,
+                                     ResilienceExpansion explosionLevel,
                                      ExtraData extraData) const {
   // Compute a reference to the appropriate signature cache.
   Signature &signature = TheSignatures.select(explosionLevel, extraData);
@@ -914,7 +914,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
-                             ExplosionKind explosionKind,
+                             ResilienceExpansion explosionKind,
                              ExtraData extraData,
                              llvm::AttributeSet &attrs) {
   auto &fnTypeInfo = getTypeInfoForLowered(type).as<FuncTypeInfo>();
@@ -944,7 +944,7 @@ AbstractCC irgen::getAbstractCC(ValueDecl *fn) {
 }
 
 static AbstractCallee getAbstractDirectCallee(ValueDecl *val,
-                                              ExplosionKind level,
+                                              ResilienceExpansion level,
                                               ExtraData extraData) {
   unsigned minUncurry = 0;
   if (val->getDeclContext()->isTypeContext())
@@ -963,7 +963,7 @@ AbstractCallee AbstractCallee::forDirectGlobalFunction(IRGenModule &IGM,
   assert(!val->getDeclContext()->isLocalContext());
 
   // FIXME: be more aggressive about this.
-  ExplosionKind level = ExplosionKind::Minimal;
+  ResilienceExpansion level = ResilienceExpansion::Minimal;
 
   return getAbstractDirectCallee(val, level, ExtraData::None);
 }
@@ -1766,7 +1766,7 @@ void CallEmission::setFromCallee() {
 llvm::PointerType *
 irgen::requiresExternalIndirectResult(IRGenModule &IGM,
                                       CanSILFunctionType fnType,
-                                      ExplosionKind level) {
+                                      ResilienceExpansion level) {
   if (fnType->hasIndirectResult()) {
     return IGM.getStoragePointerType(fnType->getIndirectResult().getSILType());
   }
@@ -1800,7 +1800,7 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
 llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
                                                         SILType type) {
   // FIXME: we need to consider the target's C calling convention.
-  return IGM.requiresIndirectResult(type, ExplosionKind::Minimal);
+  return IGM.requiresIndirectResult(type, ResilienceExpansion::Minimal);
 }
 
 static void externalizeArgument(IRGenFunction &IGF,
@@ -1896,7 +1896,7 @@ void CallEmission::addArg(Explosion &arg) {
 /// Initialize an Explosion with the parameters of the current
 /// function.  All of the objects will be added unmanaged.  This is
 /// really only useful when writing prologue code.
-Explosion IRGenFunction::collectParameters(ExplosionKind explosionLevel) {
+Explosion IRGenFunction::collectParameters(ResilienceExpansion explosionLevel) {
   Explosion params(explosionLevel);
   for (auto i = CurFn->arg_begin(), e = CurFn->arg_end(); i != e; ++i)
     params.add(i);
@@ -2049,7 +2049,7 @@ static void emitApplyArgument(IRGenFunction &IGF,
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Function *staticFnPtr,
                                        llvm::Type *fnTy,
-                                       ExplosionKind explosionLevel,
+                                       ResilienceExpansion explosionLevel,
                                        CanSILFunctionType origType,
                                        CanSILFunctionType outType,
                                        ArrayRef<Substitution> subs,

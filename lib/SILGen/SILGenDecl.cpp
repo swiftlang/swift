@@ -2149,7 +2149,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     mangler.mangleProtocolConformance(conformance);
     assert(isa<FuncDecl>(requirement.getDecl())
            && "need to handle mangling of non-Func SILDeclRefs here");
-    mangler.mangleEntity(requirement.getDecl(), ExplosionKind::Minimal,
+    mangler.mangleEntity(requirement.getDecl(), ResilienceExpansion::Minimal,
                          requirement.uncurryLevel);
   }
   
@@ -2187,8 +2187,8 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
       stream << 'G';
       mangler.bindGenericParameters(generics, /*mangle*/ true);
     }
-    mangler.mangleType(fromType, ExplosionKind::Minimal, /*uncurry*/ 0);
-    mangler.mangleType(toType, ExplosionKind::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(fromType, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(toType, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
   return M.getOrCreateSharedFunction(loc, buffer.str(), thunkType,

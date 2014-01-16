@@ -116,7 +116,7 @@ namespace {
       return field.projectAddress(IGF, tuple, offsets);
     }
 
-    bool isIndirectArgument(ExplosionKind kind) const override {
+    bool isIndirectArgument(ResilienceExpansion kind) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,

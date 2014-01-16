@@ -83,7 +83,7 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   return FixedPacking::Allocate;
 }
 
-ExplosionSchema TypeInfo::getSchema(ExplosionKind kind) const {
+ExplosionSchema TypeInfo::getSchema(ResilienceExpansion kind) const {
   ExplosionSchema schema(kind);
   getSchema(schema);
   return schema;
@@ -115,10 +115,10 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        CanType T) const {
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
-  ExplosionSchema schema = getSchema(ExplosionKind::Maximal);
+  ExplosionSchema schema = getSchema(ResilienceExpansion::Maximal);
   if (!schema.containsAggregate() && schema.size() <= 2) {
     auto &loadableTI = cast<LoadableTypeInfo>(*this);
-    Explosion copy(ExplosionKind::Maximal);
+    Explosion copy(ResilienceExpansion::Maximal);
     loadableTI.loadAsTake(IGF, srcAddr, copy);
     loadableTI.initialize(IGF, copy, destAddr);
     return;
@@ -140,7 +140,7 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF,
   }
 
   // Otherwise explode and re-implode.
-  Explosion copy(ExplosionKind::Maximal);
+  Explosion copy(ResilienceExpansion::Maximal);
   loadAsCopy(IGF, srcAddr, copy);
   initialize(IGF, copy, destAddr);
 }
@@ -474,7 +474,7 @@ namespace {
   struct EmptyTypeInfo : ScalarTypeInfo<EmptyTypeInfo, LoadableTypeInfo> {
     EmptyTypeInfo(llvm::Type *ty)
       : ScalarTypeInfo(ty, Size(0), llvm::BitVector{}, Alignment(1), IsPOD) {}
-    unsigned getExplosionSize(ExplosionKind kind) const { return 0; }
+    unsigned getExplosionSize(ResilienceExpansion kind) const { return 0; }
     void getSchema(ExplosionSchema &schema) const {}
     void loadAsCopy(IRGenFunction &IGF, Address addr, Explosion &e) const {}
     void loadAsTake(IRGenFunction &IGF, Address addr, Explosion &e) const {}
@@ -1155,7 +1155,7 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
 }
 
 /// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(SILType type, ExplosionKind kind) {
+ExplosionSchema IRGenModule::getSchema(SILType type, ResilienceExpansion kind) {
   ExplosionSchema schema(kind);
   getSchema(type, schema);
   return schema;
@@ -1177,7 +1177,7 @@ void IRGenModule::getSchema(SILType type, ExplosionSchema &schema) {
 }
 
 /// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(SILType type, ExplosionKind kind) {
+unsigned IRGenModule::getExplosionSize(SILType type, ResilienceExpansion kind) {
   // As an optimization, avoid actually building a TypeInfo for any
   // obvious TupleTypes.  This assumes that a TupleType's explosion
   // schema is always the concatenation of its component's schemas.
@@ -1199,7 +1199,7 @@ unsigned IRGenModule::getExplosionSize(SILType type, ExplosionKind kind) {
 /// Determine whether this type is a single value that is passed
 /// indirectly at the given level.
 llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type,
-                                                      ExplosionKind kind) {
+                                                      ResilienceExpansion kind) {
   if (auto archetype = type.getAs<ArchetypeType>()) {
     if (!archetype->requiresClass())
       return OpaquePtrTy;
@@ -1214,7 +1214,7 @@ llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type,
 
 /// Determine whether this type requires an indirect result.
 llvm::PointerType *IRGenModule::requiresIndirectResult(SILType type,
-                                                       ExplosionKind kind) {
+                                                       ResilienceExpansion kind) {
   auto &ti = getTypeInfo(type);
   ExplosionSchema schema = ti.getSchema(kind);
   if (schema.requiresIndirectResult(*this))

@@ -54,14 +54,14 @@ namespace irgen {
     unsigned MaxUncurryLevel : 9;
 
   public:
-    AbstractCallee(AbstractCC convention, ExplosionKind level,
+    AbstractCallee(AbstractCC convention, ResilienceExpansion level,
                    unsigned minUncurry, unsigned maxUncurry, ExtraData data)
       : ExplosionLevel(unsigned(level)), Data(unsigned(data)),
         Convention(unsigned(convention)),
         MinUncurryLevel(minUncurry), MaxUncurryLevel(maxUncurry) {}
 
     static AbstractCallee forIndirect() {
-      return AbstractCallee(AbstractCC::Freestanding, ExplosionKind::Minimal,
+      return AbstractCallee(AbstractCC::Freestanding, ResilienceExpansion::Minimal,
                             /*min uncurry*/ 0, /*max uncurry*/ 0,
                             ExtraData::Retainable);
     }
@@ -72,8 +72,8 @@ namespace irgen {
 
     /// Returns the best explosion level at which we can emit this
     /// call.  We assume that we can call it at lower levels.
-    ExplosionKind getBestExplosionLevel() const {
-      return ExplosionKind(ExplosionLevel);
+    ResilienceExpansion getBestExplosionLevel() const {
+      return ResilienceExpansion(ExplosionLevel);
     }
 
     /// Whether the function requires a data pointer.
@@ -96,7 +96,7 @@ namespace irgen {
 
   class Callee {
     /// The explosion level to use for this function.
-    ExplosionKind ExplosionLevel;
+    ResilienceExpansion ExplosionLevel;
 
     /// The number of function applications at which this function is
     /// being called.
@@ -128,7 +128,7 @@ namespace irgen {
                                           CanSILFunctionType substFnType,
                                           ArrayRef<Substitution> subs,
                                           llvm::Constant *fn,
-                                          ExplosionKind explosionLevel,
+                                          ResilienceExpansion explosionLevel,
                                           unsigned uncurryLevel) {
       return forKnownFunction(origFnType, substFnType, subs,
                               fn, nullptr, explosionLevel, uncurryLevel);
@@ -141,7 +141,7 @@ namespace irgen {
                             CanSILFunctionType substFnType,
                             ArrayRef<Substitution> subs,
                             llvm::Constant *fn,
-                            ExplosionKind explosionLevel,
+                            ResilienceExpansion explosionLevel,
                             unsigned uncurryLevel) {
       return forKnownFunction(origFnType, substFnType, subs,
                               fn, nullptr, explosionLevel, uncurryLevel);
@@ -152,7 +152,7 @@ namespace irgen {
                                    CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
-                                   ExplosionKind explosionLevel) {
+                                   ResilienceExpansion explosionLevel) {
       return forKnownFunction(origFnType, substFnType, subs,
                               fn, data, explosionLevel,
                               0);
@@ -163,7 +163,7 @@ namespace irgen {
                                    CanSILFunctionType substFnType,
                                    ArrayRef<Substitution> subs,
                                    llvm::Value *fn, llvm::Value *data,
-                                   ExplosionKind explosionLevel,
+                                   ResilienceExpansion explosionLevel,
                                    unsigned uncurryLevel) {
       // Invariant on the function pointer.
       assert(cast<llvm::PointerType>(fn->getType())
@@ -188,7 +188,7 @@ namespace irgen {
     bool hasSubstitutions() const { return !Substitutions.empty(); }
     ArrayRef<Substitution> getSubstitutions() const { return Substitutions; }
 
-    ExplosionKind getExplosionLevel() const { return ExplosionLevel; }
+    ResilienceExpansion getExplosionLevel() const { return ExplosionLevel; }
     //unsigned getUncurryLevel() const { return UncurryLevel; }
     llvm::Value *getFunction() const { return FnPtr; }
 

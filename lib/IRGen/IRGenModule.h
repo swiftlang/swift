@@ -86,10 +86,6 @@ namespace swift {
 
   enum class AbstractCC : unsigned char;
   
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-
 namespace irgen {
   class Address;
   class CodeRef;
@@ -230,10 +226,10 @@ public:
   llvm::StructType *createNominalType(TypeDecl *D);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   void getSchema(SILType T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(SILType T, Mangle::ExplosionKind kind);
-  unsigned getExplosionSize(SILType T, Mangle::ExplosionKind kind);
-  llvm::PointerType *isSingleIndirectValue(SILType T, Mangle::ExplosionKind kind);
-  llvm::PointerType *requiresIndirectResult(SILType T, Mangle::ExplosionKind kind);
+  ExplosionSchema getSchema(SILType T, ResilienceExpansion kind);
+  unsigned getExplosionSize(SILType T, ResilienceExpansion kind);
+  llvm::PointerType *isSingleIndirectValue(SILType T, ResilienceExpansion kind);
+  llvm::PointerType *requiresIndirectResult(SILType T, ResilienceExpansion kind);
   bool isTrivialMetatype(CanMetatypeType type);
   bool isPOD(SILType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
@@ -357,7 +353,7 @@ public:
   void emitLocalDecls(DestructorDecl *dd);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      ExplosionKind explosionKind,
+                                      ResilienceExpansion expansion,
                                       ExtraData extraData,
                                       llvm::AttributeSet &attrs);
 
@@ -379,7 +375,7 @@ public:
                                              llvm::Type *definitionType = nullptr);
   llvm::Function *getAddrOfConstructor(ConstructorDecl *D,
                                        ConstructorKind kind,
-                                       Mangle::ExplosionKind explosionLevel,
+                                       ResilienceExpansion expansion,
                                        ForDefinition_t forDefinition);
   llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
                                       ForDefinition_t forDefinition,
@@ -404,7 +400,7 @@ public:
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ExplosionKind level,
+                                       ResilienceExpansion level,
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      ForDefinition_t forDefinition);

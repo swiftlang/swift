@@ -70,7 +70,7 @@ public:
   Callee &getMutableCallee() { return CurCallee; }
   const Callee &getCallee() const { return CurCallee; }
 
-  ExplosionKind getCurExplosionLevel() const {
+  ResilienceExpansion getCurExplosionLevel() const {
     return getCallee().getExplosionLevel();
   }
 

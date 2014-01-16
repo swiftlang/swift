@@ -1050,7 +1050,7 @@ namespace {
       
       // Execute the fill ops. Cast the parameters to word pointers because the
       // fill indexes are word-indexed.
-      Explosion params = IGF.collectParameters(ExplosionKind::Minimal);
+      Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
       llvm::Value *fullMeta = params.claimNext();
       llvm::Value *args = params.claimNext();
       
@@ -1788,11 +1788,11 @@ namespace {
       public CanTypeVisitor<IsIncompatibleOverride, bool, CanType> {
 
     IRGenModule &IGM;
-    ExplosionKind ExplosionLevel;
+    ResilienceExpansion ExplosionLevel;
     bool AsExplosion;
 
   public:
-    IsIncompatibleOverride(IRGenModule &IGM, ExplosionKind explosionLevel,
+    IsIncompatibleOverride(IRGenModule &IGM, ResilienceExpansion explosionLevel,
                            bool asExplosion)
       : IGM(IGM), ExplosionLevel(explosionLevel), AsExplosion(asExplosion) {}
 
@@ -1842,7 +1842,7 @@ namespace {
 static bool isIncompatibleOverrideArgument(IRGenModule &IGM,
                                            CanType overrideTy,
                                            CanType overriddenTy,
-                                           ExplosionKind explosionLevel) {
+                                           ResilienceExpansion explosionLevel) {
   return IsIncompatibleOverride(IGM, explosionLevel, /*as explosion*/ true)
     .visit(overriddenTy, overrideTy);  
 }
@@ -1850,7 +1850,7 @@ static bool isIncompatibleOverrideArgument(IRGenModule &IGM,
 static bool isIncompatibleOverrideResult(IRGenModule &IGM,
                                          CanType overrideTy,
                                          CanType overriddenTy,
-                                         ExplosionKind explosionLevel) {
+                                         ResilienceExpansion explosionLevel) {
   // Fast path.
   if (overrideTy == overriddenTy) return false;
 
@@ -1886,7 +1886,7 @@ static bool isIncompatibleOverrideResult(IRGenModule &IGM,
 /// method is?
 static bool isCompatibleOverride(IRGenModule &IGM, FuncDecl *override,
                                  FuncDecl *overridden,
-                                 ExplosionKind explosionLevel,
+                                 ResilienceExpansion explosionLevel,
                                  unsigned uncurryLevel) {
   CanType overrideTy = override->getType()->getCanonicalType();
   CanType overriddenTy = overridden->getType()->getCanonicalType();
@@ -1919,7 +1919,7 @@ static bool isCompatibleOverride(IRGenModule &IGM, FuncDecl *override,
 
 /// Does the given method require an override entry in the class v-table?
 bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
-                                           ExplosionKind explosionLevel,
+                                           ResilienceExpansion explosionLevel,
                                            unsigned uncurryLevel) {
   // Check each of the overridden declarations in turn.
   FuncDecl *overridden = fn->getOverriddenDecl();
@@ -2572,7 +2572,7 @@ namespace {
 AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
                                                FuncDecl *method) {
   // TODO: maybe use better versions in the v-table sometimes?
-  ExplosionKind bestExplosion = ExplosionKind::Minimal;
+  ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
   unsigned naturalUncurry = method->getNaturalArgumentCount() - 1;
 
   return AbstractCallee(AbstractCC::Method, bestExplosion,
@@ -2582,7 +2582,7 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
 /// Find the function which will actually appear in the virtual table.
 static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
                                         FuncDecl *method,
-                                        ExplosionKind explosionLevel,
+                                        ResilienceExpansion explosionLevel,
                                         unsigned uncurryLevel) {
   // 'method' is the most final method in the hierarchy which we
   // haven't yet found a compatible override for.  'cur' is the method
@@ -2606,9 +2606,9 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            SILType baseType,
                                            SILDeclRef method,
                                            CanSILFunctionType methodType,
-                                           ExplosionKind maxExplosion) {
+                                           ResilienceExpansion maxExplosion) {
   // TODO: maybe use better versions in the v-table sometimes?
-  ExplosionKind bestExplosion = ExplosionKind::Minimal;
+  ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
 
   // FIXME: Support property accessors.
   FuncDecl *methodDecl = cast<FuncDecl>(method.getDecl());

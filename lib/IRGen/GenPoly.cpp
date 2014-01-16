@@ -178,10 +178,10 @@ namespace {
   class DiffersByAbstraction
       : public SubstTypeVisitor<DiffersByAbstraction, bool> {
     IRGenModule &IGM;
-    ExplosionKind ExplosionLevel;
+    ResilienceExpansion ExplosionLevel;
     AbstractionDifference DiffKind;
   public:
-    DiffersByAbstraction(IRGenModule &IGM, ExplosionKind explosionLevel,
+    DiffersByAbstraction(IRGenModule &IGM, ResilienceExpansion explosionLevel,
                          AbstractionDifference kind)
       : IGM(IGM), ExplosionLevel(explosionLevel), DiffKind(kind) {}
 
@@ -296,14 +296,14 @@ namespace {
 
 bool irgen::differsByAbstractionInMemory(IRGenModule &IGM,
                                          CanType origTy, CanType substTy) {
-  return DiffersByAbstraction(IGM, ExplosionKind::Minimal,
+  return DiffersByAbstraction(IGM, ResilienceExpansion::Minimal,
                               AbstractionDifference::Memory)
            .visit(origTy, substTy);
 }
 
 bool irgen::differsByAbstractionInExplosion(IRGenModule &IGM,
                                             CanType origTy, CanType substTy,
-                                            ExplosionKind explosionLevel) {
+                                            ResilienceExpansion explosionLevel) {
   return DiffersByAbstraction(IGM, explosionLevel,
                               AbstractionDifference::Explosion)
            .visit(origTy, substTy);

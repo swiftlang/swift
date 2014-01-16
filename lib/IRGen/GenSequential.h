@@ -82,11 +82,11 @@ public:
     return Layout.getByteOffset();
   }
 
-  std::pair<unsigned, unsigned> getProjectionRange(ExplosionKind kind) const {
+  std::pair<unsigned, unsigned> getProjectionRange(ResilienceExpansion kind) const {
     switch (kind) {
-    case ExplosionKind::Maximal:
+    case ResilienceExpansion::Maximal:
       return std::make_pair(MaximalBegin, MaximalEnd);
-    case ExplosionKind::Minimal:
+    case ResilienceExpansion::Minimal:
       return std::make_pair(MinimalBegin, MinimalEnd);
     }
     llvm_unreachable("bad explosion kind!");
@@ -265,10 +265,10 @@ public:
     forAllFields<&LoadableTypeInfo::initialize>(IGF, e, addr);
   }
 
-  unsigned getExplosionSize(ExplosionKind level) const {
+  unsigned getExplosionSize(ResilienceExpansion level) const {
     switch (level) {
-    case ExplosionKind::Minimal: return MinimalExplosionSize;
-    case ExplosionKind::Maximal: return MaximalExplosionSize;
+    case ResilienceExpansion::Minimal: return MinimalExplosionSize;
+    case ResilienceExpansion::Maximal: return MaximalExplosionSize;
     }
     llvm_unreachable("bad explosion level");
   }
@@ -367,12 +367,12 @@ public:
       auto &fieldInfo = fields.back();
       fieldInfo.MaximalBegin = maximalExplosionSize;
       maximalExplosionSize +=
-        loadableFieldTI->getExplosionSize(ExplosionKind::Maximal);
+        loadableFieldTI->getExplosionSize(ResilienceExpansion::Maximal);
       fieldInfo.MaximalEnd = maximalExplosionSize;
 
       fieldInfo.MinimalBegin = minimalExplosionSize;
       minimalExplosionSize +=
-        loadableFieldTI->getExplosionSize(ExplosionKind::Minimal);
+        loadableFieldTI->getExplosionSize(ResilienceExpansion::Minimal);
       fieldInfo.MinimalEnd = minimalExplosionSize;
     }
 

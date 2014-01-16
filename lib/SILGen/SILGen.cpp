@@ -14,7 +14,6 @@
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Diagnostics.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"

@@ -25,12 +25,9 @@ namespace swift {
   class ApplyInst;
   class FuncDecl;
   template <class T> class Optional;
+  enum class ResilienceExpansion : unsigned;
   class Substitution;
   class SILType;
-  
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
 
 namespace irgen {
   class Address;
@@ -67,7 +64,7 @@ namespace irgen {
   /// require an sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,
                                                     CanSILFunctionType fnType,
-                                                    Mangle::ExplosionKind level);
+                                                    ResilienceExpansion level);
   
   /// Does an argument of this type need to be passed by value on the stack to
   /// C or ObjC arguments?

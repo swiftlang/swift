@@ -849,7 +849,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
 
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
-                                                  ExplosionKind level,
+                                                  ResilienceExpansion level,
                                                   ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forSILFunction(f, level);
 
@@ -935,7 +935,7 @@ static SILDeclRef::Kind getSILDeclRefKind(DestructorKind dtorKind) {
 /// Fetch the declaration of the given known function.
 llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *ctor,
                                                   ConstructorKind ctorKind,
-                                                  ExplosionKind explodeLevel,
+                                                  ResilienceExpansion explodeLevel,
                                                ForDefinition_t forDefinition) {
   unsigned uncurryLevel = 1;
   auto codeRef = CodeRef::forConstructor(ctor, explodeLevel, uncurryLevel);
@@ -1236,7 +1236,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
                                                  ForDefinition_t forDefinition,
                                                  bool isForeign) {
   auto dd = cd->getDestructor();
-  auto codeRef = CodeRef::forDestructor(dd, Mangle::ExplosionKind::Minimal, 0);
+  auto codeRef = CodeRef::forDestructor(dd, ResilienceExpansion::Minimal, 0);
   LinkEntity entity = LinkEntity::forDestructor(codeRef, kind);
 
   // Check whether we've cached this.
@@ -1252,7 +1252,7 @@ llvm::Function *IRGenModule::getAddrOfDestructor(ClassDecl *cd,
   auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType =
-    getFunctionType(silFnType, ExplosionKind::Minimal, ExtraData::None, attrs);
+    getFunctionType(silFnType, ResilienceExpansion::Minimal, ExtraData::None, attrs);
 
   auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
 
@@ -1278,7 +1278,7 @@ Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
   // once per definition of an Objective-C-derived class.
   for (auto &silFn : SILMod->getFunctions()) {
     if (silFn.getName() == ivarInitDestroyName)
-      return getAddrOfSILFunction(&silFn, ExplosionKind::Minimal,
+      return getAddrOfSILFunction(&silFn, ResilienceExpansion::Minimal,
                                   forDefinition);
   }
 
@@ -1368,7 +1368,7 @@ Address IRGenModule::getAddrOfWitnessTableOffset(CodeRef code,
 Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(field, ExplosionKind::Minimal, 0);
+    LinkEntity::forWitnessTableOffset(field, ResilienceExpansion::Minimal, 0);
   return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                    SizeTy, getPointerAlignment(),
                                    forDefinition);

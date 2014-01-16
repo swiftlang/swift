@@ -697,7 +697,7 @@ namespace {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
-    unsigned getExplosionSize(ExplosionKind kind) const override {
+    unsigned getExplosionSize(ResilienceExpansion kind) const override {
       return 1 + NumProtocols;
     }
     
@@ -2443,7 +2443,7 @@ namespace {
       
       llvm::Constant *witness
         = IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
-                                   ExplosionKind::Minimal, NotForDefinition);
+                                   ResilienceExpansion::Minimal, NotForDefinition);
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
       Table.push_back(witness);
       
@@ -3222,7 +3222,7 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
   MetadataForDepths.push_back(selfMeta);
 
   // All our archetypes should be satisfiable from the source.
-  Explosion empty(ExplosionKind::Minimal);
+  Explosion empty(ResilienceExpansion::Minimal);
   emitWithSourceBound(empty);
 }
 

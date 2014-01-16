@@ -36,12 +36,7 @@ namespace llvm {
   class FunctionType;
 }
 
-namespace swift {
-
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-  
+namespace swift {  
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
@@ -218,7 +213,7 @@ class LinkEntity {
   }
 
   void setForDecl(Kind kind, 
-                  ValueDecl *decl, Mangle::ExplosionKind explosionKind,
+                  ValueDecl *decl, ResilienceExpansion explosionKind,
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
@@ -229,7 +224,7 @@ class LinkEntity {
 
   void setForAbstractClosureExpr(Kind kind,
                                  AbstractClosureExpr *expr,
-                                 Mangle::ExplosionKind explosionKind,
+                                 ResilienceExpansion explosionKind,
                                  unsigned uncurryLevel) {
     assert(isAbstractClosureExprKind(kind));
     Pointer = expr;
@@ -271,7 +266,7 @@ public:
   }
   
   static LinkEntity forAnonymousFunction(AbstractClosureExpr *expr,
-                                         Mangle::ExplosionKind explosionLevel,
+                                         ResilienceExpansion explosionLevel,
                                          unsigned uncurryLevel) {
     LinkEntity entity;
     entity.setForAbstractClosureExpr(Kind::AnonymousFunction,
@@ -283,12 +278,12 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl, Mangle::ExplosionKind(0), 0);
+    entity.setForDecl(Kind::Other, decl, ResilienceExpansion(0), 0);
     return entity;
   }
 
   static LinkEntity forWitnessTableOffset(ValueDecl *decl,
-                                          Mangle::ExplosionKind explosionKind,
+                                          ResilienceExpansion explosionKind,
                                           unsigned uncurryLevel) {
     LinkEntity entity;
     entity.setForDecl(Kind::WitnessTableOffset, decl,
@@ -322,20 +317,20 @@ public:
 
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClass, decl, Mangle::ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::ObjCClass, decl, ResilienceExpansion::Minimal, 0);
     return entity;
   }
 
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCMetaclass, decl, Mangle::ExplosionKind::Minimal, 0);
+    entity.setForDecl(Kind::ObjCMetaclass, decl, ResilienceExpansion::Minimal, 0);
     return entity;
   }
 
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::SwiftMetaclassStub,
-                      decl, Mangle::ExplosionKind::Minimal, 0);
+                      decl, ResilienceExpansion::Minimal, 0);
     return entity;
   }
 
@@ -352,14 +347,14 @@ public:
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor,
-                      decl, Mangle::ExplosionKind::Minimal, 0);
+                      decl, ResilienceExpansion::Minimal, 0);
     return entity;
   }
   
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor,
-                      decl, Mangle::ExplosionKind::Minimal, 0);
+                      decl, ResilienceExpansion::Minimal, 0);
     return entity;
   }
 
@@ -389,7 +384,7 @@ public:
     return entity;
   }
 
-  static LinkEntity forSILFunction(SILFunction *F, Mangle::ExplosionKind level)
+  static LinkEntity forSILFunction(SILFunction *F, ResilienceExpansion level)
   {
     LinkEntity entity;
     entity.Pointer = F;
@@ -442,9 +437,9 @@ public:
     return reinterpret_cast<ProtocolConformance*>(Pointer);
   }
   
-  Mangle::ExplosionKind getExplosionKind() const {
+  ResilienceExpansion getResilienceExpansion() const {
     assert(isDeclKind(getKind()) || isAbstractClosureExprKind(getKind()));
-    return Mangle::ExplosionKind(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
+    return ResilienceExpansion(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
   }
   unsigned getUncurryLevel() const {
     return LINKENTITY_GET_FIELD(Data, UncurryLevel);

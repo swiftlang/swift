@@ -19,7 +19,7 @@
 #define SWIFT_IRGEN_IRGEN_H
 
 #include "llvm/Support/DataTypes.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include <cassert>
 
@@ -30,13 +30,8 @@ namespace llvm {
 namespace swift {
   class CanType;
   
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-
 namespace irgen {
   using Lowering::AbstractionPattern;
-  using Mangle::ExplosionKind;
 
 class Size;
 

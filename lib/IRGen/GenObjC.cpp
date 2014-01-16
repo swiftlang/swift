@@ -468,7 +468,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               CanSILFunctionType origFnType,
                                               CanSILFunctionType substFnType,
                                               ArrayRef<Substitution> subs,
-                                              ExplosionKind maxExplosion,
+                                              ResilienceExpansion maxExplosion,
                                               ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Func
@@ -478,7 +478,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
           || method.kind == SILDeclRef::Kind::Deallocator)
          && "objc method call must be to a func/initializer/getter/setter/dtor");
 
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
 
   llvm::AttributeSet attrs;
   auto fnTy = IGF.IGM.getFunctionType(origFnType,
@@ -590,7 +590,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
                                             CanType classType) {
   // Compute the formal type that we expect +allocWithZone: to have.
   auto formalType = getAllocObjectFormalType(IGF.IGM.Context, classType);
-  auto explosionLevel = ExplosionKind::Minimal;
+  auto explosionLevel = ResilienceExpansion::Minimal;
   unsigned uncurryLevel = 0;
 
   // Compute the appropriate LLVM type for the function.
@@ -634,7 +634,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   llvm::AttributeSet attrs;
   llvm::FunctionType *fwdTy = IGM.getFunctionType(resultType,
-                                                  ExplosionKind::Minimal,
+                                                  ResilienceExpansion::Minimal,
                                                   ExtraData::Retainable,
                                                   attrs);
   // FIXME: Give the thunk a real name.
@@ -663,12 +663,12 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   }
   
   // Recover 'self' from the context.
-  Explosion params = subIGF.collectParameters(ExplosionKind::Minimal);
+  Explosion params = subIGF.collectParameters(ResilienceExpansion::Minimal);
   llvm::Value *context = params.takeLast();
   Address dataAddr = layout.emitCastTo(subIGF, context);
   auto &fieldLayout = layout.getElements()[0];
   Address selfAddr = fieldLayout.project(subIGF, dataAddr, Nothing);
-  Explosion selfParams(ExplosionKind::Minimal);
+  Explosion selfParams(ResilienceExpansion::Minimal);
   if (retainsSelf)
     cast<LoadableTypeInfo>(selfTI).loadAsCopy(subIGF, selfAddr, selfParams);
   else
@@ -679,7 +679,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *indirectReturn = nullptr;
   SILType appliedResultTy = origMethodType->getSemanticResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
-  if (appliedResultTI.getSchema(ExplosionKind::Minimal)
+  if (appliedResultTI.getSchema(ResilienceExpansion::Minimal)
         .requiresIndirectResult(IGM)) {
     indirectReturn = params.claimNext();
   }
@@ -687,7 +687,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   // Prepare the call to the underlying method.
   CallEmission emission
     = prepareObjCMethodRootCall(subIGF, method, origMethodType, origMethodType,
-                                ArrayRef<Substitution>{}, ExplosionKind::Minimal,
+                                ArrayRef<Substitution>{}, ResilienceExpansion::Minimal,
                                 ObjCMessageKind::Normal);
   
   Explosion args(params.getKind());
@@ -702,7 +702,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     subIGF.emitRelease(context);
     subIGF.Builder.CreateRetVoid();
   } else {
-    Explosion result(ExplosionKind::Minimal);
+    Explosion result(ResilienceExpansion::Minimal);
     emission.emitToExplosion(result);
     subIGF.emitRelease(context);
     auto &callee = emission.getCallee();
@@ -733,7 +733,7 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   auto &fieldLayout = layout.getElements()[0];
   auto &fieldType = layout.getElementTypes()[0];
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-  Explosion selfParams(ExplosionKind::Minimal);
+  Explosion selfParams(ResilienceExpansion::Minimal);
   selfParams.add(self);
   fieldLayout.getType().initializeFromParams(IGF, selfParams,
                                              fieldAddr, fieldType);
@@ -777,7 +777,7 @@ static llvm::Constant *getObjCMethodPointerForSwiftImpl(IRGenModule &IGM,
                                                   const Selector &selector,
                                                         SILDeclRef declRef,
                                                   llvm::Function *swiftImpl,
-                                               ExplosionKind explosionLevel) {
+                                               ResilienceExpansion explosionLevel) {
 
   // Construct a callee and derive its ownership conventions.
   auto origFormalType = IGM.SILMod->Types.getConstantFormalType(declRef);
@@ -816,7 +816,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   // FIXME: Explosion level
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
   
   unsigned uncurryLevel = getNaturalUncurryLevel(property);
   llvm::SmallString<32> swiftName;
@@ -845,7 +845,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   assert(property->isSettable() && "property is not settable?!");
   
   // FIXME: Explosion level
-  ExplosionKind explosionLevel = ExplosionKind::Minimal;
+  ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
   
   unsigned uncurryLevel = getNaturalUncurryLevel(property);
   llvm::SmallString<32> swiftName;
@@ -874,7 +874,7 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   auto absCallee = AbstractCallee::forDirectGlobalFunction(IGM, method);
   auto fnRef = FunctionRef(method, absCallee.getBestExplosionLevel(),
                              absCallee.getMaxUncurryLevel());
-  ExplosionKind explosionLevel = fnRef.getExplosionLevel();
+  ResilienceExpansion explosionLevel = fnRef.getExplosionLevel();
   unsigned uncurryLevel = fnRef.getUncurryLevel();
 
   SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,

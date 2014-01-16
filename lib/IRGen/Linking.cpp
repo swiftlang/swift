@@ -98,19 +98,19 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "_Tw";
     buffer << mangleValueWitness(getValueWitness());
    
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   //   global ::= 'WV' type                       // value witness
   case Kind::ValueWitnessTable:
     buffer << "_TWV";
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   //   global ::= 't' type
   // Abstract type manglings just follow <type>.
   case Kind::TypeMangling:
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   //   global ::= 'M' directness type             // type metadata
@@ -120,7 +120,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     bool isPattern = isMetadataPattern();
     if (isPattern) buffer << 'P';
     mangler.mangleDirectness(isMetadataIndirect());
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
   }
 
@@ -128,7 +128,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::SwiftMetaclassStub:
     buffer << "_TMm";
     mangler.mangleNominalType(cast<ClassDecl>(getDecl()),
-                              ExplosionKind::Minimal,
+                              ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
     return;
       
@@ -136,7 +136,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   case Kind::NominalTypeDescriptor:
     buffer << "_TMn";
     mangler.mangleNominalType(cast<NominalTypeDecl>(getDecl()),
-                              ExplosionKind::Minimal,
+                              ResilienceExpansion::Minimal,
                               Mangler::BindGenerics::None);
     return;
 
@@ -149,14 +149,14 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
     buffer << "_TWo";
-    mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+    mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
     return;
 
   //   global ::= 'Wv' directness entity
   case Kind::FieldOffset:
     buffer << "_TWv";
     mangler.mangleDirectness(isOffsetIndirect());
-    mangler.mangleEntity(getDecl(), ExplosionKind::Minimal, 0);
+    mangler.mangleEntity(getDecl(), ResilienceExpansion::Minimal, 0);
     return;
       
   //   global ::= 'WP' protocol-conformance
@@ -192,7 +192,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'Tb' type
   case Kind::BridgeToBlockConverter:
     buffer << "_TTb";
-    mangler.mangleType(getType(), ExplosionKind::Minimal, 0);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
   // For all the following, this rule was imposed above:
@@ -212,7 +212,7 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     buffer << "_T";
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
                                     isAllocating(getConstructorKind()),
-                                    getExplosionKind(), getUncurryLevel());
+                                    getResilienceExpansion(), getUncurryLevel());
     return;
   }
 
@@ -243,23 +243,23 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
     buffer << "_T";
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
-      mangler.mangleNominalType(type, getExplosionKind(),
+      mangler.mangleNominalType(type, getResilienceExpansion(),
                                 Mangler::BindGenerics::None);
     } else {
-      mangler.mangleEntity(getDecl(), getExplosionKind(), getUncurryLevel());
+      mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
     }
     return;
 
   //   entity ::= declaration 'g'                 // getter
   case Kind::Getter:
     buffer << "_T";
-    mangler.mangleGetterEntity(getDecl(), getExplosionKind());
+    mangler.mangleGetterEntity(getDecl(), getResilienceExpansion());
     return;
 
   //   entity ::= declaration 's'                 // setter
   case Kind::Setter:
     buffer << "_T";
-    mangler.mangleSetterEntity(getDecl(), getExplosionKind());
+    mangler.mangleSetterEntity(getDecl(), getResilienceExpansion());
     return;
 
   // An Objective-C class reference;  not a swift mangling.

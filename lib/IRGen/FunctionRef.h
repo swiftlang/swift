@@ -43,7 +43,7 @@ private:
   unsigned ExplosionLevel : 2;
   unsigned UncurryLevel : 28;
 
-  CodeRef(Kind kind, ValueDecl *theDecl, ExplosionKind explosionLevel,
+  CodeRef(Kind kind, ValueDecl *theDecl, ResilienceExpansion explosionLevel,
           unsigned uncurryLevel)
     : TheDecl(theDecl),
       TheKind(unsigned(kind)),
@@ -55,39 +55,39 @@ public:
   CodeRef() = default;
 
   static CodeRef forFunction(FuncDecl *fn,
-                             ExplosionKind explosionLevel,
+                             ResilienceExpansion explosionLevel,
                              unsigned uncurryLevel) {
     assert(!fn || !fn->isGetterOrSetter());
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
   static CodeRef forEnumElement(EnumElementDecl *fn,
-                                 ExplosionKind explosionLevel,
+                                 ResilienceExpansion explosionLevel,
                                  unsigned uncurryLevel) {
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
   static CodeRef forConstructor(ConstructorDecl *fn,
-                                ExplosionKind explosionLevel,
+                                ResilienceExpansion explosionLevel,
                                 unsigned uncurryLevel) {
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
   static CodeRef forDestructor(DestructorDecl *fn,
-                               ExplosionKind explosionLevel,
+                               ResilienceExpansion explosionLevel,
                                unsigned uncurryLevel) {
     return CodeRef(Kind::Function, fn, explosionLevel, uncurryLevel);
   }
 
   static CodeRef forGetter(ValueDecl *value,
-                           ExplosionKind explosionLevel,
+                           ResilienceExpansion explosionLevel,
                            unsigned uncurryLevel) {
     assert(isa<VarDecl>(value) || isa<SubscriptDecl>(value));
     return CodeRef(Kind::Getter, value, explosionLevel, uncurryLevel);
   }
 
   static CodeRef forSetter(ValueDecl *value,
-                           ExplosionKind explosionLevel,
+                           ResilienceExpansion explosionLevel,
                            unsigned uncurryLevel) {
     assert(isa<VarDecl>(value) || isa<SubscriptDecl>(value));
     return CodeRef(Kind::Setter, value, explosionLevel, uncurryLevel);
@@ -96,8 +96,8 @@ public:
   ValueDecl *getDecl() const { return TheDecl; }
   Kind getKind() const { return Kind(TheKind); }
   unsigned getUncurryLevel() const { return UncurryLevel; }
-  ExplosionKind getExplosionLevel() const {
-    return ExplosionKind(ExplosionLevel);
+  ResilienceExpansion getExplosionLevel() const {
+    return ResilienceExpansion(ExplosionLevel);
   }
   
   friend bool operator==(CodeRef left, CodeRef right) {
@@ -115,7 +115,7 @@ public:
 class FunctionRef : public CodeRef {
 public:
   FunctionRef() = default;
-  FunctionRef(FuncDecl *fn, ExplosionKind explosionLevel, unsigned uncurryLevel)
+  FunctionRef(FuncDecl *fn, ResilienceExpansion explosionLevel, unsigned uncurryLevel)
     : CodeRef(CodeRef::forFunction(fn, explosionLevel, uncurryLevel)) {}
   
   FuncDecl *getDecl() const {

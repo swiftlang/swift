@@ -53,10 +53,6 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-
 namespace irgen {
   enum class CheckedCastMode : unsigned char;
   class Explosion;
@@ -105,7 +101,7 @@ public:
 
 //--- Function prologue and epilogue -------------------------------------------
 public:
-  Explosion collectParameters(ExplosionKind explosionLevel);
+  Explosion collectParameters(ResilienceExpansion explosionLevel);
   void emitScalarReturn(SILType resultTy, Explosion &scalars);
   
   void emitBBForReturn();

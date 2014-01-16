@@ -34,7 +34,7 @@ const unsigned NumHeapMetadataFields = 3;
 /// on overriding generally prevent this, but it can happen when a
 /// class overrides a method from a generic class.
 bool doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
-                                    ExplosionKind explosionLevel,
+                                    ResilienceExpansion explosionLevel,
                                     unsigned uncurryLevel);
 
 /// A CRTP class for laying out class metadata.  Note that this does
@@ -201,13 +201,13 @@ private:
     
     // TODO: consider emitting at different explosion levels and
     // uncurryings.
-    auto explosionLevel = ExplosionKind::Minimal;
+    auto explosionLevel = ResilienceExpansion::Minimal;
     unsigned uncurryLevel = 1; // whether static or not
     
     maybeAddMethod(fn, explosionLevel, uncurryLevel);
   }
 
-  void maybeAddMethod(FuncDecl *fn, ExplosionKind explosionLevel,
+  void maybeAddMethod(FuncDecl *fn, ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
     // Ignore getters and setters.  This is probably wrong!
     if (fn->isGetterOrSetter())

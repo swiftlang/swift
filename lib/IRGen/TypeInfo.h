@@ -34,11 +34,6 @@ namespace llvm {
 }
 
 namespace swift {
-  
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-
 namespace irgen {
   class Address;
   class ContainedAddress;
@@ -194,14 +189,14 @@ public:
 
   /// Is this type passed indirectly as an argument at the given
   /// explosion level?
-  virtual bool isIndirectArgument(Mangle::ExplosionKind level) const = 0;
+  virtual bool isIndirectArgument(ResilienceExpansion level) const = 0;
   
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
 
   /// A convenience for getting the schema of a single type.
-  ExplosionSchema getSchema(Mangle::ExplosionKind kind) const;
+  ExplosionSchema getSchema(ResilienceExpansion kind) const;
 
   /// Allocate a variable of this type on the stack.
   virtual ContainedAddress allocateStack(IRGenFunction &IGF,

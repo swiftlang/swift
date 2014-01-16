@@ -16,35 +16,13 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {
 class AbstractClosureExpr;
 
 namespace Mangle {
   
-/// ExplosionKind - A policy for choosing what types should be
-/// exploded, as informed by the resilience model.
-enum class ExplosionKind : unsigned {
-  /// A minimal explosion does not explode types that do not have a
-  /// universally fragile representation.  This provides a baseline
-  /// for what all components can possibly support.
-  ///   - All exported functions must be compiled to at least provide
-  ///     a minimally-exploded entrypoint, or else it will be
-  ///     impossible for components that do not have that type
-  ///     to call the function.
-  ///   - Similarly, any sort of opaque function call must be through
-  ///     a minimally-exploded entrypoint.
-  Minimal,
-  
-  /// A maximal explosion explodes all types with fragile
-  /// representation, even when they're not universally fragile.  This
-  /// is useful when internally manipulating objects or when working
-  /// with specialized entry points for a function.
-  Maximal,
-  
-  Last_ExplosionKind = Maximal
-};
- 
 enum class IncludeType : bool { No, Yes };
 
 enum class OperatorFixity {
@@ -107,24 +85,25 @@ public:
   void mangleContext(DeclContext *ctx, BindGenerics shouldBind);
   void mangleModule(Module *module);
   void mangleDeclName(ValueDecl *decl);
-  void mangleDeclType(ValueDecl *decl, ExplosionKind kind,
+  void mangleDeclType(ValueDecl *decl, ResilienceExpansion expansion,
                       unsigned uncurryingLevel);
-  void mangleEntity(ValueDecl *decl, ExplosionKind kind,
+  void mangleEntity(ValueDecl *decl, ResilienceExpansion expansion,
                     unsigned uncurryingLevel);
   void mangleConstructorEntity(ConstructorDecl *ctor, bool isAllocating,
-                               ExplosionKind kind, unsigned uncurryingLevel);
+                               ResilienceExpansion kind, unsigned uncurryingLevel);
   void mangleDestructorEntity(DestructorDecl *decl, bool isDeallocating);
   void mangleIVarInitDestroyEntity(ClassDecl *decl, bool isDestroyer);
-  void mangleGetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
-  void mangleSetterEntity(ValueDecl *decl, ExplosionKind explosionKind);
+  void mangleGetterEntity(ValueDecl *decl, ResilienceExpansion expansion);
+  void mangleSetterEntity(ValueDecl *decl, ResilienceExpansion expansion);
   void mangleAddressorEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index);
   void mangleInitializerEntity(VarDecl *var);
   void mangleClosureEntity(AbstractClosureExpr *closure,
-                           ExplosionKind explosion, unsigned uncurryingLevel);
-  void mangleNominalType(NominalTypeDecl *decl, ExplosionKind explosionKind,
+                           ResilienceExpansion explosion, unsigned uncurryingLevel);
+  void mangleNominalType(NominalTypeDecl *decl, ResilienceExpansion expansion,
                          BindGenerics shouldBind);
-  void mangleType(CanType type, ExplosionKind kind, unsigned uncurryingLevel);
+  void mangleType(CanType type, ResilienceExpansion expansion,
+                  unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(ProtocolDecl *protocol);
   void mangleProtocolConformance(ProtocolConformance *conformance);
@@ -136,14 +115,14 @@ public:
   void mangleTypeForDebugger(Type decl, DeclContext *DC);
   
 private:
-  void mangleFunctionType(CanAnyFunctionType fn, ExplosionKind explosionKind,
+  void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
                           unsigned uncurryingLevel);
   void mangleProtocolList(ArrayRef<ProtocolDecl*> protocols);
   void mangleProtocolList(ArrayRef<Type> protocols);
   void mangleIdentifier(Identifier ident,
                         OperatorFixity fixity = OperatorFixity::NotOperator);
   void manglePolymorphicType(const GenericParamList *genericParams, CanType T,
-                             ExplosionKind explosion, unsigned uncurryLevel,
+                             ResilienceExpansion expansion, unsigned uncurryLevel,
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(NominalTypeDecl *type);
   bool tryMangleSubstitution(void *ptr);

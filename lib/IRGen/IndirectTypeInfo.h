@@ -51,7 +51,7 @@ public:
                                               this->getBestKnownAlignment()));
   }
 
-  bool isIndirectArgument(ExplosionKind level) const override {
+  bool isIndirectArgument(ResilienceExpansion level) const override {
     return true;
   }
 

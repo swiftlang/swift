@@ -28,15 +28,12 @@ namespace swift {
   class ClassDecl;
   class FuncDecl;
   class NominalTypeDecl;
+  enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
   class SILType;
   class StructDecl;
   class Substitution;
   
-namespace Mangle {
-  enum class ExplosionKind : unsigned;
-}
-
 namespace irgen {
   class AbstractCallee;
   class Callee;
@@ -162,7 +159,7 @@ namespace irgen {
                                       SILType baseType,
                                       SILDeclRef method,
                                       CanSILFunctionType methodType,
-                                      Mangle::ExplosionKind maxExplosion);
+                                      ResilienceExpansion maxExplosion);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///

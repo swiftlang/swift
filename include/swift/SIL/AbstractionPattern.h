@@ -18,7 +18,7 @@
 #ifndef SWIFT_SIL_ABSTRACTIONPATTERN_H
 #define SWIFT_SIL_ABSTRACTIONPATTERN_H
 
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 
 namespace swift {
 namespace Lowering {

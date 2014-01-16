@@ -294,7 +294,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     if (!c.hasDecl()) {
       buffer << introducer;
       mangler.mangleClosureEntity(c.getAbstractClosureExpr(),
-                                  ExplosionKind::Minimal,
+                                  ResilienceExpansion::Minimal,
                                   c.uncurryLevel);
       return;
     }
@@ -328,7 +328,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     }
 
     buffer << introducer;
-    mangler.mangleEntity(c.getDecl(), ExplosionKind::Minimal, c.uncurryLevel);
+    mangler.mangleEntity(c.getDecl(), ResilienceExpansion::Minimal, c.uncurryLevel);
     return;
       
   //   entity ::= context 'D'                     // deallocating destructor
@@ -350,7 +350,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     buffer << introducer;
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ true,
-                                    ExplosionKind::Minimal,
+                                    ResilienceExpansion::Minimal,
                                     c.uncurryLevel);
     return;
 
@@ -359,7 +359,7 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
     buffer << introducer;
     mangler.mangleConstructorEntity(cast<ConstructorDecl>(c.getDecl()),
                                     /*allocating*/ false,
-                                    ExplosionKind::Minimal,
+                                    ResilienceExpansion::Minimal,
                                     c.uncurryLevel);
     return;
 
@@ -376,13 +376,13 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer) {
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
     buffer << introducer;
-    mangler.mangleGetterEntity(c.getDecl(), ExplosionKind::Minimal);
+    mangler.mangleGetterEntity(c.getDecl(), ResilienceExpansion::Minimal);
     return;
 
   //   entity ::= declaration 's'                 // setter
   case SILDeclRef::Kind::Setter:
     buffer << introducer;
-    mangler.mangleSetterEntity(c.getDecl(), ExplosionKind::Minimal);
+    mangler.mangleSetterEntity(c.getDecl(), ResilienceExpansion::Minimal);
     return;
 
   //   entity ::= declaration 'a'                 // addressor

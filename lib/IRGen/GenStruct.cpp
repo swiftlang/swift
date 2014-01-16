@@ -138,7 +138,7 @@ namespace {
                            align, isPOD)
     {}
 
-    bool isIndirectArgument(ExplosionKind kind) const override { return false; }
+    bool isIndirectArgument(ResilienceExpansion kind) const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, CanType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);

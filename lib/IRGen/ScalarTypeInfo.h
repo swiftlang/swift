@@ -22,7 +22,7 @@
 #include "Explosion.h"
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
-#include "swift/AST/Mangle.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "GenEnum.h"
 
 namespace swift {
@@ -43,7 +43,7 @@ protected:
 
 public:
   /// Efficiently-scalarizable types are always passed directly.
-  bool isIndirectArgument(ExplosionKind kind) const override { return false; }
+  bool isIndirectArgument(ResilienceExpansion kind) const override { return false; }
 
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                             Address dest, CanType T) const override {
@@ -52,21 +52,21 @@ public:
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           CanType T) const {
-    Explosion temp(ExplosionKind::Maximal);
+    Explosion temp(ResilienceExpansion::Maximal);
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::initialize(IGF, temp, dest);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                       CanType T) const {
-    Explosion temp(ExplosionKind::Maximal);
+    Explosion temp(ResilienceExpansion::Maximal);
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                       CanType T) const {
-    Explosion temp(ExplosionKind::Maximal);
+    Explosion temp(ResilienceExpansion::Maximal);
     asDerived().Derived::loadAsTake(IGF, src, temp);
     asDerived().Derived::assign(IGF, temp, dest);
   }
@@ -110,7 +110,7 @@ public:
   // Make the scalar -1.
   // void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const;
 
-  unsigned getExplosionSize(ExplosionKind kind) const {
+  unsigned getExplosionSize(ResilienceExpansion kind) const {
     return 1;
   }
 

@@ -35,11 +35,11 @@ namespace irgen {
 /// as arguments in exactly this way.
 class Explosion {
   unsigned NextValue;
-  ExplosionKind Kind;
+  ResilienceExpansion Kind;
   SmallVector<llvm::Value*, 8> Values;
 
 public:
-  Explosion(ExplosionKind kind) : NextValue(0), Kind(kind) {}
+  Explosion(ResilienceExpansion kind) : NextValue(0), Kind(kind) {}
 
   // We want to be a move-only type.
   Explosion(const Explosion &) = delete;
@@ -68,7 +68,7 @@ public:
   }
 
   /// Return the type of explosion this represents.
-  ExplosionKind getKind() const { return Kind; }
+  ResilienceExpansion getKind() const { return Kind; }
 
   bool empty() const {
     return NextValue == Values.size();
@@ -172,7 +172,7 @@ public:
     Values.clear();
   }
 
-  void reset(ExplosionKind level) {
+  void reset(ResilienceExpansion level) {
     Kind = level;
     reset();
   }
@@ -222,14 +222,14 @@ public:
   
 private:
   SmallVector<Element, 8> Elements;
-  ExplosionKind Kind;
+  ResilienceExpansion Kind;
   bool ContainsAggregate;
 
 public:
-  ExplosionSchema(ExplosionKind kind)
+  ExplosionSchema(ResilienceExpansion kind)
     : Kind(kind), ContainsAggregate(false) {}
 
-  ExplosionKind getKind() const { return Kind; }
+  ResilienceExpansion getKind() const { return Kind; }
 
   /// Return the number of elements in this schema.
   unsigned size() const { return Elements.size(); }
