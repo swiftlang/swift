@@ -3131,10 +3131,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
   // FIXME: Use a different instruction from 'downcast'. IRGen can make
   // "rebind this" into a no-op if the called constructor is a Swift one.
-  ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
-  if (!newSelf.getType().getSwiftRValueType()
-        ->isEqual(E->getSelf()->getType()->getInOutObjectType())) {
+  auto selfDecl = E->getSelf();
+  auto selfTy = selfDecl->getType()->getInOutObjectType();
+  bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
+
+  // Emit the subexpression.
+  ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(
+                                                  SGF, E->getSubExpr());
+
+  // If we called a superclass constructor, cast down to the subclass.
+  if (isSuper) {
     assert(newSelf.getType().isObject() &&
            newSelf.getType().hasReferenceSemantics() &&
            "delegating ctor type mismatch for non-reference type?!");
@@ -3149,7 +3155,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   SILValue selfAddr =
     SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
   newSelf.assignInto(SGF, E, selfAddr);
-  
+
   return SGF.emitEmptyTupleRValue(E);
 }
 
