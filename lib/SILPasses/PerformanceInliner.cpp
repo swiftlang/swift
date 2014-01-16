@@ -78,6 +78,7 @@ static SILFunction *validateGetReturnCalleeFromApplyInst(ApplyInst *AI) {
     return nullptr;
   }
 
+  DEBUG(llvm::dbgs() << "  We can inline " << F->getName() << ".\n");
   return F;
 }
 
@@ -169,6 +170,8 @@ static unsigned instructionInlineCost(SILInstruction &I) {
 
 /// Just sum over all of the instructions.
 static unsigned functionInlineCost(SILFunction *F) {
+  DEBUG(llvm::dbgs() << "  Calculating cost for " << F->getName() << ".\n");
+
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
     return 0;
 
@@ -180,10 +183,14 @@ static unsigned functionInlineCost(SILFunction *F) {
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
-      if (Cost > InlineCostThreshold)
+      if (Cost > InlineCostThreshold) {
+        DEBUG(llvm::dbgs() << "  Cost too high.\n");
         return Cost;
+      }
     }
   }
+
+  DEBUG(llvm::dbgs() << "  Found cost: " << Cost << "\n");
   return Cost;
 }
 
