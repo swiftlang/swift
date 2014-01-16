@@ -179,6 +179,7 @@ set(SWIFT_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
+option(SWIFT_RUNTIME_CHECKS "Enable overflow checks for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 
@@ -286,6 +287,10 @@ function(compile_swift_files)
     list(APPEND swift_flags "-O2")
   else()
     list(APPEND swift_flags "-O0")
+  endif()
+
+  if(NOT SWIFT_RUNTIME_CHECKS)
+    list(APPEND swift_flags "-disable-all-runtime-checks")
   endif()
 
   # Allow import of other Swift modules we just built.
