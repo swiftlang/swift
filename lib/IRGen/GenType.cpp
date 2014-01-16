@@ -780,11 +780,11 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
       && cast<SILFunctionType>(contextTy)->isPolymorphic())
     exemplarTy = contextTy;
   else
-    exemplarTy = CanType(contextTy.transform([&](Type t) -> Type {
+    exemplarTy = contextTy.transform([&](Type t) -> Type {
       if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
         return Types.getExemplarArchetype(arch);
       return t;
-    }));
+    })->getCanonicalType();
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != contextTy) {
