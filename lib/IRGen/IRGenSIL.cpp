@@ -2582,32 +2582,31 @@ void IRGenSILFunction::visitSelfDowncastInst(swift::SelfDowncastInst *i) {
   auto cd = i->getType().getSwiftRValueType()->getClassOrBoundGenericClass();
   assert(cd && "Result of self_downcast is not a class?");
   
-  // A self downcast for a Swift-rooted class hierarchy never fails.
+  // Emit the operand.
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *fromValue = from.claimNext();
+  llvm::Value *toValue;
+
+  // Emit the downcast.
   if (!Lowering::usesObjCAllocator(cd)) {
-    Explosion from = getLoweredExplosion(i->getOperand());
-    llvm::Value *fromValue = from.claimNext();
-    
+    // A self downcast for a Swift-rooted class hierarchy never fails.
     // Just bitcast the result.
     llvm::Type *toTy = getTypeInfo(i->getType()).StorageType;
-    llvm::Value *toValue;
     if (fromValue->getType() != toTy)
       toValue = Builder.CreateBitCast(fromValue, toTy);
     else
       toValue = fromValue;
-
-    Explosion result(ResilienceExpansion::Maximal);
-    result.add(toValue);
-    setLoweredExplosion(SILValue(i, 0), result);
-    return;
+  } else {
+    // Objective-C-rooted class hierarchies allow replacement of
+    // 'self', so we need to perform an unconditional checked
+    // downcast.
+    toValue = emitDowncast(fromValue, i->getType(), 
+                           CheckedCastMode::Unconditional);
   }
 
-  Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
-                                CheckedCastKind::Downcast,
-                                CheckedCastMode::Unconditional);
-  assert(!i->getType().isAddress());
-  Explosion ex(ResilienceExpansion::Maximal);
-  ex.add(val.getAddress());
-  setLoweredExplosion(SILValue(i,0), ex);
+  Explosion result(ResilienceExpansion::Maximal);
+  result.add(toValue);
+  setLoweredExplosion(SILValue(i, 0), result);
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
