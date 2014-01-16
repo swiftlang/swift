@@ -24,6 +24,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -205,6 +206,26 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
   return emitDeallocatingCall(*this, IGM.getSlowRawDeallocFn(), pointer, size);
 }
 
+void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
+                                      Explosion &explosion) {
+  if (!isa<LoadableTypeInfo>(type)) {
+    explosion.add(llvm::UndefValue::get(type.getStorageType()->getPointerTo()));
+    return;
+  }
+
+  ExplosionSchema schema =
+    cast<LoadableTypeInfo>(type).getSchema(explosion.getKind());
+  for (auto &element : schema) {
+    llvm::Type *elementType;
+    if (element.isAggregate()) {
+      elementType = element.getAggregateType()->getPointerTo();
+    } else {
+      elementType = element.getScalarType();
+    }
+    
+    explosion.add(llvm::UndefValue::get(elementType));
+  }
+}
 
 void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
   return IGM.unimplemented(Loc, Message);

@@ -508,6 +508,57 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   llvm_unreachable("bad field-access strategy");
 }
 
+/// Emit a checked unconditional downcast.
+llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
+                                         CheckedCastMode mode) {
+  // Emit the value we're casting from.
+  if (from->getType() != IGM.Int8PtrTy)
+    from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
+  
+  // Emit a reference to the metadata.
+  bool isConcreteClass = toType.is<ClassType>();
+  llvm::Value *metadataRef;
+  llvm::Constant *castFn;
+  if (isConcreteClass) {
+    // If the dest type is a concrete class, get the full class metadata
+    // and call dynamicCastClass directly.
+    metadataRef
+      = IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(), false, false);
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGM.getDynamicCastClassUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGM.getDynamicCastClassFn();
+      break;
+    }
+  } else {
+    // Otherwise, get the type metadata, which may be local, and go through
+    // the more general dynamicCast entry point.
+    metadataRef = emitTypeMetadataRef(toType);
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGM.getDynamicCastUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGM.getDynamicCastFn();
+      break;
+    }
+  }
+  
+  if (metadataRef->getType() != IGM.Int8PtrTy)
+    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
+  
+  // Call the (unconditional) dynamic cast.
+  auto call
+    = Builder.CreateCall2(castFn, from, metadataRef);
+  // FIXME: Eventually, we may want to throw.
+  call->setDoesNotThrow();
+  
+  llvm::Type *subTy = getTypeInfo(toType).StorageType;
+  return Builder.CreateBitCast(call, subTy);
+}
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc) {

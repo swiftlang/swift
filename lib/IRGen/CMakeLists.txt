@@ -4,7 +4,6 @@ add_swift_library(swiftIRGen
   GenClass.cpp
   GenControl.cpp
   GenDecl.cpp
-  GenExpr.cpp
   GenFunc.cpp
   GenHeap.cpp
   GenInit.cpp
