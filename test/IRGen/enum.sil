@@ -1937,8 +1937,8 @@ enum MultiPayloadClasses {
   case w
 }
 
-// CHECK: define void @multi_payload_classes_switch(i64) {
-// CHECK:   %1 = lshr i64 %0, 1
+// CHECK-LABEL: define void @multi_payload_classes_switch(i64) {
+// CHECK:   %1 = lshr i64 %0, 61
 // CHECK:   %2 = trunc i64 %1 to i2
 // CHECK:   switch i2 %2, label {{%.*}} [
 // CHECK:     i2 0, label {{%.*}}
@@ -1946,14 +1946,16 @@ enum MultiPayloadClasses {
 // CHECK:     i2 -2, label {{%.*}}
 // CHECK:   ]
 // CHECK:   switch i64 %0, label {{%.*}} [
-// CHECK:     i64 4, label {{%.*}}
-// CHECK:     i64 5, label {{%.*}}
+// --             0x4000000000000000
+// CHECK:     i64 4611686018427387904, label {{%.*}}
+// --             0x4000000000000001
+// CHECK:     i64 4611686018427387905, label {{%.*}}
 // CHECK:   ]
 // -- Extract x(C)
 // CHECK:   inttoptr i64 %0 to %C4enum1C*
 // -- Extract y(D)
-// --                                     0xfffffffffffffff9
-// CHECK:   [[MASKED:%.*]] = and i64 %0, -7
+// --                                     0x9fffffffffffffff
+// CHECK:   [[MASKED:%.*]] = and i64 %0, -6917529027641081857
 // CHECK:   inttoptr i64 [[MASKED]] to %C4enum1D*
 
 sil @multi_payload_classes_switch : $(MultiPayloadClasses) -> () {
@@ -1988,8 +1990,8 @@ enum StringOwnerLike {
   case w
 }
 
-// CHECK: define void @string_owner_like_switch(i64) {
-// CHECK:   %1 = lshr i64 %0, 1
+// CHECK-LABEL: define void @string_owner_like_switch(i64) {
+// CHECK:   %1 = lshr i64 %0, 61
 // CHECK:   %2 = trunc i64 %1 to i2
 // CHECK:   switch i2 %2, label {{%.*}} [
 // CHECK:     i2 0, label {{%.*}}
@@ -1997,13 +1999,16 @@ enum StringOwnerLike {
 // CHECK:     i2 -2, label {{%.*}}
 // CHECK:   ]
 // CHECK:   switch i64 %0, label {{%.*}} [
-// CHECK:     i64 4, label {{%.*}}
-// CHECK:     i64 5, label {{%.*}}
+// --             0x4000000000000000
+// CHECK:     i64 4611686018427387904, label {{%.*}}
+// --             0x4000000000000001
+// CHECK:     i64 4611686018427387905, label {{%.*}}
 // CHECK:   ]
 // -- Extract x(C)
 // CHECK:   inttoptr i64 %0 to %C4enum1C*
 // -- Extract y(CP)
-// CHECK:   [[MASKED:%.*]] = and i64 %0, -7
+// --                                     0x9fffffffffffffff
+// CHECK:   [[MASKED:%.*]] = and i64 %0, -6917529027641081857
 // CHECK:   inttoptr i64 [[MASKED]] to %objc_object*
 
 sil @string_owner_like_switch : $(StringOwnerLike) -> () {
@@ -2040,8 +2045,8 @@ enum MultiPayloadSpareBitAggregates {
   case z(S)
 }
 
-// CHECK: define void @multi_payload_spare_bit_aggregate_switch(i128) {
-// CHECK:   [[T0:%.*]] = lshr i128 %0, 47
+// CHECK-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {
+// CHECK:   [[T0:%.*]] = lshr i128 %0, 61
 // CHECK:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
 // CHECK:   switch i2 [[TAG]], label {{%.*}} [
 // CHECK:     i2 0, label %[[X_DEST:[0-9]+]]
@@ -2053,16 +2058,16 @@ enum MultiPayloadSpareBitAggregates {
 // CHECK:   [[T1:%.*]] = lshr i128 %0, 64
 // CHECK:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
 // CHECK: ; <label>:[[Y_DEST]]
-// --                                        0xfffe7fffffffffff
-// CHECK:   [[Y_MASKED:%.*]] = and i128 %0, -422212465065985
+// --                                        0x9fffffffffffffff
+// CHECK:   [[Y_MASKED:%.*]] = and i128 %0, -6917529027641081857
 // CHECK:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i64
 // CHECK:   [[Y_0:%.*]] = inttoptr i64 [[T2]] to %C4enum1C*
 // CHECK:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 64
 // CHECK:   [[T4:%.*]] = trunc i128 [[T3]] to i64
 // CHECK:   [[Y_1:%.*]] = inttoptr i64 [[T4]] to %C4enum1C*
 // CHECK: ; <label>:[[Z_DEST]]
-// --                                        0xfffe7fffffffffff
-// CHECK:   [[Z_MASKED:%.*]] = and i128 %0, -422212465065985
+// --                                        0x9fffffffffffffff
+// CHECK:   [[Z_MASKED:%.*]] = and i128 %0, -6917529027641081857
 // CHECK:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
 // CHECK:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
 // CHECK:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
@@ -2098,7 +2103,7 @@ enum MultiPayloadNested {
 // CHECK-LABEL: define void @multi_payload_nested_switch
 // CHECK:   %1 = bitcast %O4enum18MultiPayloadNested* %0 to i72*
 // CHECK:   %2 = load i72* %1, align 8
-// CHECK:   %3 = lshr i72 %2, 65
+// CHECK:   %3 = lshr i72 %2, 71
 // CHECK:   %4 = trunc i72 %3 to i1
 // CHECK:   switch i1 %4, label {{%.*}} [
 // CHECK:     i1 false, label {{%.*}}
@@ -2134,7 +2139,7 @@ enum MultiPayloadNestedSpareBits {
 // CHECK: entry:
 // CHECK:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to i64*
 // CHECK:   %2 = load i64* %1, align 8
-// CHECK:   %3 = lshr i64 %2, 47
+// CHECK:   %3 = lshr i64 %2, 60
 // CHECK:   %4 = trunc i64 %3 to i1
 // CHECK:   switch i1 %4, label {{%.*}} [
 // CHECK:     i1 false, label {{%.*}}

@@ -253,7 +253,9 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
     spareIndex = (index >> occupiedBitCount) + 1;
   }
 
-  return interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
+  APInt val
+    = interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), val);
 }
 
 llvm::Value *

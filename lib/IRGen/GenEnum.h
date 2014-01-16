@@ -156,7 +156,7 @@ APInt getAPIntFromBitVector(const llvm::BitVector &bits);
   
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
-llvm::ConstantInt *
+APInt
 interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
                     unsigned bits, unsigned spareValue, unsigned occupiedValue);
 

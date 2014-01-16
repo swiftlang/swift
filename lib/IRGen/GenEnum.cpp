@@ -2103,7 +2103,7 @@ namespace {
     // The spare bits shared by all payloads, if any.
     // Invariant: The size of the bit vector is the size of the payload in bits,
     // rounded up to a byte boundary.
-    llvm::BitVector CommonUnusedBits;
+    llvm::BitVector CommonSpareBits;
     
     // The common spare bits actually used for a tag in the payload area.
     llvm::BitVector PayloadTagBits;
@@ -2180,7 +2180,7 @@ namespace {
     
   private:
     unsigned getNumCaseBits() const {
-      return CommonUnusedBits.size() - CommonUnusedBits.count();
+      return CommonSpareBits.size() - CommonSpareBits.count();
     }
     
     /// The number of empty cases representable by each tag value.
@@ -2267,6 +2267,16 @@ namespace {
       }
     }
     
+    llvm::ConstantInt *getEmptyCasePayload(IRGenModule &IGM,
+                                       unsigned tagIndex, unsigned idx) const {
+      APInt v = interleaveSpareBits(IGM, PayloadTagBits,
+                                    PayloadTagBits.size(),
+                                    tagIndex, 0);
+      v |= interleaveSpareBits(IGM, CommonSpareBits,
+                               CommonSpareBits.size(),
+                               0, idx);
+      return llvm::ConstantInt::get(IGM.getLLVMContext(), v);
+    }
   public:
     void emitValueSwitch(IRGenFunction &IGF,
                          Explosion &value,
@@ -2334,10 +2344,15 @@ namespace {
         IGF.Builder.emitBlock(tagBB);
         auto *caseSwitch = IGF.Builder.CreateSwitch(payload, unreachableBB);
         for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
-          auto v = interleaveSpareBits(IGF.IGM, CommonUnusedBits,
-                                       CommonUnusedBits.size(),
-                                       tagIndex, idx);
-          caseSwitch->addCase(v, blockForCase(elti->decl));
+          APInt v = interleaveSpareBits(IGF.IGM, PayloadTagBits,
+                                        PayloadTagBits.size(),
+                                        tagIndex, 0);
+          v |= interleaveSpareBits(IGF.IGM, CommonSpareBits,
+                                   CommonSpareBits.size(),
+                                   0, idx);
+          
+          auto val = getEmptyCasePayload(IGF.IGM, tagIndex, idx);
+          caseSwitch->addCase(val, blockForCase(elti->decl));
           ++elti;
         }
         
@@ -2429,7 +2444,7 @@ namespace {
       pack.addAtOffset(src.claimNext(), offset);
       // Pack the extra bits, if any.
       if (ExtraTagBitCount > 0) {
-        pack.addAtOffset(src.claimNext(), CommonUnusedBits.size() + offset);
+        pack.addAtOffset(src.claimNext(), CommonSpareBits.size() + offset);
       }
       return pack.get();
     }
@@ -2442,7 +2457,7 @@ namespace {
       // Unpack the extra bits, if any.
       if (ExtraTagBitCount > 0) {
         dest.add(unpack.claimAtOffset(extraTagTy,
-                                      CommonUnusedBits.size() + offset));
+                                      CommonSpareBits.size() + offset));
       }
     }
     
@@ -2454,15 +2469,17 @@ namespace {
       // Pack the payload.
       auto &loadablePayloadTI = cast<LoadableTypeInfo>(payloadTI); // FIXME
       llvm::Value *payload = loadablePayloadTI.packEnumPayload(IGF, params,
-                                                    CommonUnusedBits.size(), 0);
+                                                    CommonSpareBits.size(), 0);
       
       // If we have spare bits, pack tag bits into them.
       unsigned numSpareBits = PayloadTagBits.count();
       if (numSpareBits > 0) {
-        llvm::ConstantInt *tagMask
+        APInt tagMaskVal
           = interleaveSpareBits(IGF.IGM, PayloadTagBits,
                                 PayloadTagBits.size(),
                                 tag, 0);
+        auto tagMask
+          = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), tagMaskVal);
         payload = IGF.Builder.CreateOr(payload, tagMask);
       }
       
@@ -2492,16 +2509,14 @@ namespace {
       
       llvm::ConstantInt *payload;
       llvm::ConstantInt *extraTag = nullptr;
-      unsigned numSpareBits = CommonUnusedBits.count();
+      unsigned numSpareBits = CommonSpareBits.count();
       if (numSpareBits > 0) {
         // If we have spare bits, pack tag bits into them.
-        payload = interleaveSpareBits(IGM,
-                                      CommonUnusedBits, CommonUnusedBits.size(),
-                                      tag, tagIndex);
+        payload = getEmptyCasePayload(IGM, tag, tagIndex);
       } else {
         // Otherwise the payload is just the index.
         payload = llvm::ConstantInt::get(IGM.getLLVMContext(),
-                                     APInt(CommonUnusedBits.size(), tagIndex));
+                                     APInt(CommonSpareBits.size(), tagIndex));
       }
       
       // If we have extra tag bits, pack the remaining tag bits into them.
@@ -2953,9 +2968,12 @@ namespace {
         llvm::Value *payloadBits = IGF.Builder.CreateLoad(payloadAddr);
         auto *spareBitMask = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
                                       ~getAPIntFromBitVector(PayloadTagBits));
-        llvm::Value *tagBitMask
+        APInt tagBitMaskVal
           = interleaveSpareBits(IGF.IGM, PayloadTagBits, PayloadTagBits.size(),
                                 spareTagBits, 0);
+        auto tagBitMask
+          = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), tagBitMaskVal);
+        
         payloadBits = IGF.Builder.CreateAnd(payloadBits, spareBitMask);
         if (spareTagBits != 0)
           payloadBits = IGF.Builder.CreateOr(payloadBits, tagBitMask);
@@ -3621,20 +3639,20 @@ namespace {
     // See if the payload types have any spare bits in common.
     // At the end of the loop CommonSpareBits.size() will be the size (in bits)
     // of the largest payload.
-    CommonUnusedBits = {};
+    CommonSpareBits = {};
     Alignment worstAlignment(1);
     IsPOD_t isPOD = IsPOD;
     for (auto &elt : ElementsWithPayload) {
       auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
-      fixedPayloadTI.applyFixedSpareBitsMask(CommonUnusedBits);
+      fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
       if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
         worstAlignment = fixedPayloadTI.getFixedAlignment();
       if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
         isPOD = IsNotPOD;
     }
     
-    unsigned commonSpareBitCount = CommonUnusedBits.count();
-    unsigned usedBitCount = CommonUnusedBits.size() - commonSpareBitCount;
+    unsigned commonSpareBitCount = CommonSpareBits.count();
+    unsigned usedBitCount = CommonSpareBits.size() - commonSpareBitCount;
     
     // Determine how many tags we need to accommodate the empty cases, if any.
     if (ElementsWithNoPayload.empty()) {
@@ -3660,39 +3678,43 @@ namespace {
     // Create the type. We need enough bits to store the largest payload plus
     // extra tag bits we need.
     setTaggedEnumBody(TC.IGM, enumTy,
-                       CommonUnusedBits.size(),
+                       CommonSpareBits.size(),
                        ExtraTagBitCount);
     
     // The enum has the worst alignment of its payloads. The size includes the
     // added tag bits.
-    auto sizeWithTag = (CommonUnusedBits.size() + 7U)/8U;
+    auto sizeWithTag = (CommonSpareBits.size() + 7U)/8U;
     unsigned extraTagByteCount = (ExtraTagBitCount+7U)/8U;
     sizeWithTag += extraTagByteCount;
     
-    // Determine spare bits.
+    // Determine tag bits.
     llvm::BitVector spareBits;
     // We may have bits left over that we didn't use in the payload.
     if (numTagBits < commonSpareBitCount) {
       assert(ExtraTagBitCount == 0
              && "spilled extra tag bits with spare bits available?!");
-      spareBits = CommonUnusedBits;
-      PayloadTagBits.resize(CommonUnusedBits.size());
-      // Mark the bits we'll use as occupied.
-      int bit;
-      unsigned i;
-      for (i = 0, bit = spareBits.find_first(); i < numTagBits;
-           ++i, bit = spareBits.find_next(bit)) {
-        assert(bit != -1 && "ran out of spare bits?!");
+      spareBits = CommonSpareBits;
+      PayloadTagBits.resize(CommonSpareBits.size());
+      // Mark the bits we'll use as occupied. Take bits starting from the most
+      // significant.
+      for (unsigned i = 0, bit = CommonSpareBits.size() - 1;
+           i < numTagBits; ++i) {
+        while (!CommonSpareBits[bit]) {
+          assert(bit > 0 && "ran out of spare bits?!");
+          --bit;
+        }
         spareBits[bit] = false;
         PayloadTagBits[bit] = true;
+        --bit;
       }
+      assert(PayloadTagBits.count() == numTagBits);
     // If we spilled into extra tag bits, there may be spare bits in that
     // byte.
     } else {
-      PayloadTagBits = CommonUnusedBits;
+      PayloadTagBits = CommonSpareBits;
       if (ExtraTagBitCount < extraTagByteCount*8) {
-        spareBits.resize(CommonUnusedBits.size() + ExtraTagBitCount, false);
-        spareBits.resize(CommonUnusedBits.size() + extraTagByteCount*8, true);
+        spareBits.resize(CommonSpareBits.size() + ExtraTagBitCount, false);
+        spareBits.resize(CommonSpareBits.size() + extraTagByteCount*8, true);
       }
     }
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
@@ -3720,6 +3742,10 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
     DEBUG(llvm::dbgs() << "Layout for enum ";
           type->print(llvm::dbgs());
           llvm::dbgs() << ":\n";);
+
+    llvm::BitVector spareBits;
+    fixedTI->applyFixedSpareBitsMask(spareBits);
+    
     for (auto &elt : strategy->getElementsWithNoPayload()) {
       auto bitPattern = strategy->getBitPatternForNoPayloadElement(IGM, elt.decl);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
@@ -3729,6 +3755,9 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
               llvm::dbgs() << (bitPattern[i] ? '1' : '0');
             }
             llvm::dbgs() << '\n');
+      
+      bitPattern &= spareBits;
+      assert(bitPattern.none() && "no-payload case occupies spare bits?!");
     }
     auto tagBits = strategy->getTagBitsForPayloads(IGM);
     assert(tagBits.count() >= 32
@@ -3739,6 +3768,9 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
             llvm::dbgs() << (tagBits[i] ? '1' : '0');
           }
           llvm::dbgs() << '\n');
+    
+    tagBits &= spareBits;
+    assert(tagBits.none() && "tag bits overlap spare bits?!");
   }
 #endif
   return ti;
@@ -4088,7 +4120,7 @@ llvm::Value *irgen::emitScatterSpareBits(IRGenFunction &IGF,
 
 /// Interleave the occupiedValue and spareValue bits, taking a bit from one
 /// or the other at each position based on the spareBits mask.
-llvm::ConstantInt *
+APInt
 irgen::interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
                            unsigned bits,
                            unsigned spareValue, unsigned occupiedValue) {
@@ -4120,8 +4152,7 @@ irgen::interleaveSpareBits(IRGenModule &IGM, const llvm::BitVector &spareBits,
   }
   
   // Create the value.
-  llvm::APInt value(bits, valueParts);
-  return llvm::ConstantInt::get(IGM.getLLVMContext(), value);
+  return llvm::APInt(bits, valueParts);
 }
 
 static void setAlignmentBits(llvm::BitVector &v, Alignment align) {
