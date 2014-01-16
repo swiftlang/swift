@@ -26,99 +26,35 @@ static llvm::cl::opt<unsigned>
 InlineCostThreshold("sil-inline-threshold", llvm::cl::Hidden,
                     llvm::cl::init(50));
 
-STATISTIC(NumApply, "Total number of ApplyInst");
-STATISTIC(NumApplyInlined, "Number of ApplyInst inlined");
-STATISTIC(NumApplyNotValidForInlining,
-          "Number of ApplyInst that are not valid for inlining");
-STATISTIC(NumTimesHitCostLimit,
-          "Number of times the cost limit was hit when inlining");
-STATISTIC(CostIncrease, "Total increased cost in all functions from inlining");
+STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 
 //===----------------------------------------------------------------------===//
 //                            Call Graph Creation
 //===----------------------------------------------------------------------===//
 
-namespace {
-  typedef std::vector<ApplyInst *> AIList;
-  typedef llvm::MapVector<SILFunction *, AIList> FunctionToCallMapTy;
-}
+/// \brief Returns a SILFunction if this ApplyInst calls a recognizable function
+/// that is legal to inline.
+static SILFunction *getInlinableFunction(ApplyInst *AI) {
+  // Avoid substituion lists, we don't support them.
+  if (AI->hasSubstitutions())
+    return nullptr;
 
-/// General way to get a SILFunction from an apply inst.
-///
-/// The reason to have a separate function from getInlineableCalleeFromApplyInst
-/// is that we want a way to get the actual value vs checking that the value is
-/// legal. This will allow us to perform tricks like looking through partial
-/// applies and thin to thick function insts.
-///
-/// TODO: See if we can add some of the tricks from the Mandatory Inlining here
-/// vis-a-vis handling partial apply and friends.
-static SILFunction *getCalleeFromApplyInst(ApplyInst *AI) {
   auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
   if (!FRI)
     return nullptr;
-  return FRI->getReferencedFunction();
-}
 
-/// A general way to get a SILFunction from an ApplyInst that additionally
-/// performs checks to ensure that the SILFunction is ok for inlining.
-static SILFunction *validateGetReturnCalleeFromApplyInst(ApplyInst *AI) {
-  // Avoid substituion lists, we don't support them.
-  if (AI->hasSubstitutions()) {
-    ++NumApplyNotValidForInlining;
-    return nullptr;
-  }
+  SILFunction *F = FRI->getReferencedFunction();
 
-  SILFunction *F = getCalleeFromApplyInst(AI);
-
-  if (!F || F->empty() ||
+  if (F->empty() ||
       (F->getAbstractCC() != AbstractCC::Freestanding &&
        F->getAbstractCC() != AbstractCC::Method) ||
       F->isExternalDeclaration()) {
-    ++NumApplyNotValidForInlining;
+    DEBUG(llvm::dbgs() << "  Can't inline " << F->getName() << ".\n");
     return nullptr;
   }
 
-  DEBUG(llvm::dbgs() << "  We can inline " << F->getName() << ".\n");
+  DEBUG(llvm::dbgs() << "  Can inline " << F->getName() << ".\n");
   return F;
-}
-
-/// Go through F looking for ApplyInsts that we can inline. Store them in F's
-/// list in the FunctionToCallMap.
-static void collectApplyInst(SILFunction &F,
-                             FunctionToCallMapTy &FunctionToCallMap) {
-  // For now we do not inline when the Caller is a transparent function due to
-  // it creating DI issues of unknown provenance when inlining the transparent
-  // function into a different translation unit from the one in which we are
-  // compiling.
-  //
-  // TODO: Investigate where the DI issue comes from.
-  if (F.isTransparent())
-    return;
-
-  // For all basic blocks...
-  for (auto &BB : F) {
-    // For all instructions...
-    for (auto &I : BB) {
-
-      // If it is not an apply inst, skip it...
-      ApplyInst *AI = dyn_cast<ApplyInst>(&I);
-      if (!AI)
-        continue;
-
-      ++NumApply;
-
-      // Get the callee from the ApplyInst if both the apply inst and the callee
-      // pass the conditions needed for inlining.
-      SILFunction *Callee = validateGetReturnCalleeFromApplyInst(AI);
-
-      // If the conditions were not satisfied, continue...
-      if (!Callee)
-        continue;
-
-      // Otherwise save the ApplyInst into the Caller -> ApplyInstList map.
-      FunctionToCallMap[&F].push_back(AI);
-    }
-  }
 }
 
 /// Return the bottom up call-graph order for module M. Notice that we don't
@@ -168,8 +104,8 @@ static unsigned instructionInlineCost(SILInstruction &I) {
   }
 }
 
-/// Just sum over all of the instructions.
-static unsigned functionInlineCost(SILFunction *F) {
+/// \brief Returns the inlining cost of the function.
+static unsigned getFunctionCost(SILFunction *F) {
   DEBUG(llvm::dbgs() << "  Calculating cost for " << F->getName() << ".\n");
 
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
@@ -200,77 +136,69 @@ static unsigned functionInlineCost(SILFunction *F) {
 
 /// Attempt to inline all calls in ApplyInstList into F until we run out of cost
 /// budge.
-///
-/// TODO: This should be refactored to use a worklist approach so we process any
-/// additional functions that we may uncover via inlining. If we have a bunch of
-/// extra cost in our budget, we may be able to inline those.
-static void inlineCallsIntoFunction(SILFunction *Caller, AIList &ApplyInstList) {
+static void inlineCallsIntoFunction(SILFunction *Caller) {
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
-  // Get the initial cost of the function in question.
-  unsigned CurrentCost = functionInlineCost(Caller);
-  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() <<
-        ". Initial Cost: " << CurrentCost << "\n");
+  // Initialize the budget.
+  unsigned InlineBudget = InlineCostThreshold;
+  DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
-  bool HitCostLimit = false;
+  llvm::SmallVector<ApplyInst*, 8> CallSites;
 
-  // For each apply in our list...
-  for (ApplyInst *AI : ApplyInstList) {
-    DEBUG(llvm::dbgs() << "  Visiting Apply Inst " << *AI);
+  // Collect all of the ApplyInsts in this function. We will be changing the
+  // control flow and collecting the AIs simplifies the scan.
+  for (auto &BB : *Caller) {
+    auto I = BB.begin(), E = BB.end();
+    while (I != E) {
+      // Check if this is a call site.
+      ApplyInst *AI = dyn_cast<ApplyInst>(I++);
+      if (AI)
+        CallSites.push_back(AI);
+    }
+  }
 
-    // Get its callee.
-    SILFunction *Callee = getCalleeFromApplyInst(AI);
-    assert(Callee && "We already know at this point that callees are valid for "
-           "inlining.");
+  for (auto AI : CallSites) {
+    DEBUG(llvm::dbgs() << "  Found call site:" <<  *AI);
+
+    // Get the callee.
+    SILFunction *Callee = getInlinableFunction(AI);
+    if (!Callee)
+      continue;
+
+    DEBUG(llvm::dbgs() << "  Found callee:" <<  Callee->getName() << ".\n");
 
     // Prevent circular inlining.
     if (Callee == Caller) {
-      DEBUG(llvm::dbgs() << "  Recursive Call... Skipping...\n");
+      DEBUG(llvm::dbgs() << "  Skipping recursive calls.\n");
       continue;
     }
 
-    // Calculate the cost for the new callee.
-    unsigned CalleeCost = functionInlineCost(Callee);
+    // Calculate the inlining cost of the callee.
+    unsigned CalleeCost = getFunctionCost(Callee);
 
-    // If our CalleeCost is over the InlineCostThreshold, skip it.
-    if (CalleeCost > InlineCostThreshold)
-      continue;
-
-    // Compute the new cost for the caller given we inlined the callee into the
-    // caller...
-    unsigned NewCost = CalleeCost + CurrentCost;
-
-    DEBUG(llvm::dbgs() << "  Old Cost = " << CurrentCost << "; CalleeCost = "
-          << CalleeCost << "; New Cost: " << NewCost << "\n");
-
-    // If we would go over our threshold, continue. There may be other functions
-    // of less weight further on.
-    if (NewCost > InlineCostThreshold) {
-      HitCostLimit = true;
+    if (CalleeCost > InlineBudget) {
+      DEBUG(llvm::dbgs() << "  Budget exceeded.\n");
       continue;
     }
 
     // Add the arguments from AI into a SILValue list.
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI->getArguments())
-      Args.push_back(Arg);
+    Args.push_back(Arg);
 
     // Ok, we are within budget. Attempt to inline.
-    DEBUG(llvm::dbgs() << " Inlining...");
+    DEBUG(llvm::dbgs() << "  Inlining " << Callee->getName() << " Into " <<
+          Caller->getName() << "\n");
+
+    // We already moved the iterator to the next instruction because the AI
+    // will be erased by the inliner. Notice that we will skip all of the
+    // newly inlined ApplyInsts. That's okay because we will visit them in
+    // our next invocation of the inliner.
     Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
-
-    CurrentCost = NewCost;
-    NumApplyInlined++;
-    CostIncrease += CalleeCost;
-
-    // If the new current cost is equal to our threshold, exit.
-    if (CurrentCost == InlineCostThreshold) {
-      HitCostLimit = true;
-      break;
-    }
+    NumFunctionsInlined++;
+    InlineBudget -= CalleeCost;
+    DEBUG(llvm::dbgs() << "  Remaining budget " << InlineBudget << "\n");
   }
-
-  NumTimesHitCostLimit += unsigned(HitCostLimit);
 }
 
 //===----------------------------------------------------------------------===//
@@ -280,11 +208,10 @@ static void inlineCallsIntoFunction(SILFunction *Caller, AIList &ApplyInstList) 
 void swift::performSILPerformanceInlining(SILModule *M) {
   DEBUG(llvm::dbgs() << "*** SIL Performance Inlining ***\n\n");
 
-  FunctionToCallMapTy FunctionToCallMap;
-
-  // Gather apply instructions.
-  for (auto &Fn : *M)
-    collectApplyInst(Fn, FunctionToCallMap);
+  if (InlineCostThreshold == 0) {
+    DEBUG(llvm::dbgs() << "*** The SIL performance Inliner is disabled ***\n");
+    return;
+  }
 
   // Collect a call-graph bottom-up list of functions.
   std::vector<SILFunction *> Worklist;
@@ -298,7 +225,6 @@ void swift::performSILPerformanceInlining(SILModule *M) {
 
     // If we have any applies in F, it will have an entry in
     // FunctionsToCallMap. If it does, attempt to inline those applies.
-    if (FunctionToCallMap.count(F))
-      inlineCallsIntoFunction(F, FunctionToCallMap[F]);
+      inlineCallsIntoFunction(F);
   }
 }

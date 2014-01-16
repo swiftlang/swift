@@ -305,20 +305,6 @@ sil @trivial_fun : $@thin () -> (Builtin.Int64) {
   return %0 : $Builtin.Int64
 }
 
-// Once the DI issues have been resolved, look into this.
-// CHECK-LABEL: sil [transparent] @dont_inline_into_transparent_functions
-// CHECK: bb0:
-// CHECK-NEXT: function_ref trivial_fun
-// CHECK-NEXT: [[FUN_REF:%[0-9]+]] = function_ref @trivial_fun : $@thin () -> Builtin.Int64
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[FUN_REF]]() : $@thin () -> Builtin.Int64
-// CHECK-NEXT: return [[RESULT]] : $Builtin.Int64
-sil [transparent] @dont_inline_into_transparent_functions : $@thin () -> Builtin.Int64 {
-bb0:
-  %0 = function_ref @trivial_fun : $@thin () -> Builtin.Int64
-  %1 = apply %0() : $@thin () -> Builtin.Int64
-  return %1 : $Builtin.Int64
-}
-
 //////////////////////
 // Cost Model Check //
 //////////////////////
