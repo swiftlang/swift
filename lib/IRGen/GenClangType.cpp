@@ -62,6 +62,16 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   auto &swiftCtx = type->getASTContext();
   auto *CI = static_cast<ClangImporter*>(&*swiftCtx.getClangModuleLoader());
   auto const &clangCtx = CI->getClangASTContext();
+  
+  // Special casing for those for which there are no type aliases.
+  if (type->getDecl()->getName().str().equals("COpaquePointer"))
+    return clangCtx.VoidPtrTy;
+  if (type->getDecl()->getName().str().equals("UnicodeScalar"))
+    return clangCtx.IntTy;
+  if (type->getDecl()->getName().str().equals("Bool"))
+    return clangCtx.SignedCharTy;\
+  if (type->getDecl()->getName().str().equals("CBool"))
+    return clangCtx.BoolTy;
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) {                \
     auto lookupTy = getNamedSwiftType(decl->getDeclContext(),                  \
