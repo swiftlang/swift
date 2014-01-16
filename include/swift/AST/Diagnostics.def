@@ -83,7 +83,7 @@ ERROR(lex_hashbang_not_allowed,lexing,none,
 ERROR(lex_unprintable_ascii_character,lexing,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8_character,lexing,none,
-      "invalid UTF8-encoded character found in source file", ())
+      "input files must be encoded as UTF-8 instead of UTF-16", ())
 
 ERROR(lex_unterminated_block_comment,lexing,none,
       "unterminated '/*' comment", ())
