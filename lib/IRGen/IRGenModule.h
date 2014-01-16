@@ -373,10 +373,6 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              llvm::Type *definitionType = nullptr);
-  llvm::Function *getAddrOfConstructor(ConstructorDecl *D,
-                                       ConstructorKind kind,
-                                       ResilienceExpansion expansion,
-                                       ForDefinition_t forDefinition);
   llvm::Function *getAddrOfDestructor(ClassDecl *D, DestructorKind kind,
                                       ForDefinition_t forDefinition,
                                       bool isForeign);

@@ -523,11 +523,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getNonUniqueSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   case Kind::WitnessTableOffset:
-  case Kind::Constructor:
   case Kind::Destructor:
   case Kind::Function:
-  case Kind::Getter:
-  case Kind::Setter:
   case Kind::Other:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
@@ -547,9 +544,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DependentProtocolWitnessTableTemplate:
     return SILLinkage::Private;
   
-  case Kind::AnonymousFunction:
-    return SILLinkage::Private;
-
   case Kind::BridgeToBlockConverter:
     // Bridge-to-block shims are currently always provided from a stub.
     return SILLinkage::PublicExternal;
@@ -916,51 +910,12 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   return entry;
 }
 
-static SILDeclRef::Kind getSILDeclRefKind(ConstructorKind ctorKind) {
-  switch (ctorKind) {
-  case ConstructorKind::Allocating: return SILDeclRef::Kind::Allocator;
-  case ConstructorKind::Initializing: return SILDeclRef::Kind::Initializer;
-  }
-  llvm_unreachable("bad constructor kind");
-}
-
 static SILDeclRef::Kind getSILDeclRefKind(DestructorKind dtorKind) {
   switch (dtorKind) {
   case DestructorKind::Destroying: return SILDeclRef::Kind::Destroyer;
   case DestructorKind::Deallocating: return SILDeclRef::Kind::Deallocator;
   }
   llvm_unreachable("bad denstructor kind");
-}
-
-/// Fetch the declaration of the given known function.
-llvm::Function *IRGenModule::getAddrOfConstructor(ConstructorDecl *ctor,
-                                                  ConstructorKind ctorKind,
-                                                  ResilienceExpansion explodeLevel,
-                                               ForDefinition_t forDefinition) {
-  unsigned uncurryLevel = 1;
-  auto codeRef = CodeRef::forConstructor(ctor, explodeLevel, uncurryLevel);
-  LinkEntity entity = LinkEntity::forConstructor(codeRef, ctorKind);
-
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(entry, entity);
-    return cast<llvm::Function>(entry);
-  }
-
-  SILDeclRef silFn = SILDeclRef(ctor, getSILDeclRefKind(ctorKind),
-                                uncurryLevel, /*foreign*/ false);
-  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
-
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType =
-    getFunctionType(silFnType, explodeLevel, ExtraData::None, attrs);
-
-  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
-
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
 }
 
 /// Get or create a llvm::GlobalVariable.

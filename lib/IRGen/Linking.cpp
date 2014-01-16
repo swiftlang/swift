@@ -35,14 +35,6 @@ static bool isDeallocating(DestructorKind kind) {
   llvm_unreachable("bad destructor kind");
 }
 
-static bool isAllocating(ConstructorKind kind) {
-  switch (kind) {
-  case ConstructorKind::Allocating: return true;
-  case ConstructorKind::Initializing: return false;
-  }
-  llvm_unreachable("bad constructor kind");
-}
-
 static StringRef mangleValueWitness(ValueWitness witness) {
   // The ones with at least one capital are the composite ops, and the
   // capitals correspond roughly to the positions of buffers (as
@@ -88,11 +80,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   mangled-name ::= '_T' global
   Mangler mangler(buffer);
   switch (getKind()) {
-  // FIXME: Mangle a more descriptive symbol name for anonymous funcs.
-  case Kind::AnonymousFunction:
-    buffer << "closure";
-    return;
-      
   //   global ::= 'w' value-witness-kind type     // value witness
   case Kind::ValueWitness:
     buffer << "_Tw";
@@ -206,16 +193,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
                                    isDeallocating(getDestructorKind()));
     return;
 
-  //   entity ::= context 'C' type                // allocating constructor
-  //   entity ::= context 'c' type                // non-allocating constructor
-  case Kind::Constructor: {
-    buffer << "_T";
-    mangler.mangleConstructorEntity(cast<ConstructorDecl>(getDecl()),
-                                    isAllocating(getConstructorKind()),
-                                    getResilienceExpansion(), getUncurryLevel());
-    return;
-  }
-
   //   entity ::= declaration                     // other declaration
   case Kind::Function:
     // As a special case, functions can have external asm names.
@@ -248,18 +225,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     } else {
       mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
     }
-    return;
-
-  //   entity ::= declaration 'g'                 // getter
-  case Kind::Getter:
-    buffer << "_T";
-    mangler.mangleGetterEntity(getDecl(), getResilienceExpansion());
-    return;
-
-  //   entity ::= declaration 's'                 // setter
-  case Kind::Setter:
-    buffer << "_T";
-    mangler.mangleSetterEntity(getDecl(), getResilienceExpansion());
     return;
 
   // An Objective-C class reference;  not a swift mangling.

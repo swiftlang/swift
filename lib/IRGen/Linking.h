@@ -66,9 +66,6 @@ class LinkEntity {
     // This field appears in the Destructor kind.
     DtorKindShift = 24, DtorKindMask = 0x01000000,
 
-    // This field appears in the Constructor kind.
-    CtorKindShift = 24, CtorKindMask = 0x01000000,
-
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
     
@@ -84,22 +81,6 @@ class LinkEntity {
     /// The pointer is a FuncDecl*.
     Function,
     
-    /// An anonymous function.
-    /// The pointer is a AbstractClosureExpr*.
-    AnonymousFunction,
-
-    /// The getter for an entity.
-    /// The pointer is a VarDecl* or SubscriptDecl*.
-    Getter,
-
-    /// The setter for an entity.
-    /// The pointer is a VarDecl* or SubscriptDecl*.
-    Setter,
-
-    /// A constructor for a class.
-    /// The pointer is a ConstructorDecl*.
-    Constructor,
-
     /// The destructor for a class.
     /// The pointer is a ClassDecl*.
     Destructor,
@@ -196,13 +177,8 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return !isTypeKind(k) && !isAbstractClosureExprKind(k)
-      && !isProtocolConformanceKind(k);
+    return !isTypeKind(k) && !isProtocolConformanceKind(k);
   }
-  static bool isAbstractClosureExprKind(Kind k) {
-    return k == Kind::AnonymousFunction;
-  }
-  
   static bool isTypeKind(Kind k) {
     return k >= Kind::ValueWitness;
   }
@@ -222,17 +198,6 @@ class LinkEntity {
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
-  void setForAbstractClosureExpr(Kind kind,
-                                 AbstractClosureExpr *expr,
-                                 ResilienceExpansion explosionKind,
-                                 unsigned uncurryLevel) {
-    assert(isAbstractClosureExprKind(kind));
-    Pointer = expr;
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
-         | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
-         | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
-  }
-  
   void setForProtocolConformance(Kind kind,
                                  ProtocolConformance *c) {
     assert(isProtocolConformanceKind(kind));
@@ -246,34 +211,16 @@ class LinkEntity {
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
-  static Kind getKindForFunction(FunctionRef::Kind fn) {
-    switch (fn) {
-    case FunctionRef::Kind::Function: return Kind::Function;
-    case FunctionRef::Kind::Getter: return Kind::Getter;
-    case FunctionRef::Kind::Setter: return Kind::Setter;
-    }
-    llvm_unreachable("bad FunctionRef kind");
-  }
-
   LinkEntity() = default;
 
 public:
   static LinkEntity forFunction(CodeRef fn) {
     LinkEntity entity;
-    entity.setForDecl(getKindForFunction(fn.getKind()), fn.getDecl(),
+    entity.setForDecl(Kind::Function, fn.getDecl(),
                       fn.getExplosionLevel(), fn.getUncurryLevel());
     return entity;
   }
   
-  static LinkEntity forAnonymousFunction(AbstractClosureExpr *expr,
-                                         ResilienceExpansion explosionLevel,
-                                         unsigned uncurryLevel) {
-    LinkEntity entity;
-    entity.setForAbstractClosureExpr(Kind::AnonymousFunction,
-                                     expr, explosionLevel, uncurryLevel);
-    return entity;
-  }
-
   static LinkEntity forNonFunction(ValueDecl *decl) {
     assert(!isFunction(decl));
 
@@ -296,14 +243,6 @@ public:
     entity.Pointer = decl;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::FieldOffset))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect));
-    return entity;
-  }
-
-  static LinkEntity forConstructor(CodeRef fn, ConstructorKind kind) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::Constructor, fn.getDecl(),
-                      fn.getExplosionLevel(), fn.getUncurryLevel());
-    entity.Data |= LINKENTITY_SET_FIELD(CtorKind, unsigned(kind));
     return entity;
   }
 
@@ -417,11 +356,6 @@ public:
     return reinterpret_cast<ValueDecl*>(Pointer);
   }
   
-  AbstractClosureExpr *getAbstractClosureExpr() const {
-    assert(isAbstractClosureExprKind(getKind()));
-    return reinterpret_cast<AbstractClosureExpr*>(Pointer);
-  }
-
   SILFunction *getSILFunction() const {
     assert(getKind() == Kind::SILFunction);
     return reinterpret_cast<SILFunction*>(Pointer);
@@ -438,7 +372,7 @@ public:
   }
   
   ResilienceExpansion getResilienceExpansion() const {
-    assert(isDeclKind(getKind()) || isAbstractClosureExprKind(getKind()));
+    assert(isDeclKind(getKind()));
     return ResilienceExpansion(LINKENTITY_GET_FIELD(Data, ExplosionLevel));
   }
   unsigned getUncurryLevel() const {
@@ -448,11 +382,6 @@ public:
   DestructorKind getDestructorKind() const {
     assert(getKind() == Kind::Destructor);
     return DestructorKind(LINKENTITY_GET_FIELD(Data, DtorKind));
-  }
-
-  ConstructorKind getConstructorKind() const {
-    assert(getKind() == Kind::Constructor);
-    return ConstructorKind(LINKENTITY_GET_FIELD(Data, CtorKind));
   }
 
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
