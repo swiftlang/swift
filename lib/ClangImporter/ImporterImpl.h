@@ -148,6 +148,8 @@ public:
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
+  bool hasValidSDK() const;
+
 private:
   /// \brief A count of the number of load module operations.
   /// FIXME: Horrible, horrible hack for \c loadModule().

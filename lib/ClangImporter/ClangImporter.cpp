@@ -105,10 +105,14 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   // FIXME: Figure out an appropriate OS deployment version to pass along.
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-fobjc-arc", "-fmodules", "-fblocks",
-    "-fsyntax-only", "-w",
-    "-isysroot", searchPathOpts.SDKPath, "-triple", targetTriple.str(),
+    "-fsyntax-only", "-w", "-triple", targetTriple.str(),
     "swift.m"
   };
+
+  if (!searchPathOpts.SDKPath.empty()) {
+    invocationArgStrs.push_back("-isysroot");
+    invocationArgStrs.push_back(searchPathOpts.SDKPath);
+  }
 
   for (auto path : searchPathOpts.ImportSearchPaths) {
     invocationArgStrs.push_back("-I");
@@ -237,9 +241,16 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   return importer.release();
 }
 
+bool ClangImporter::Implementation::hasValidSDK() const {
+  return !SwiftContext.SearchPathOpts.SDKPath.empty();
+}
+
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  if (!Impl.hasValidSDK())
+    return nullptr;
+
   // Convert the Swift import path over to a Clang import path.
   // FIXME: Map source locations over. Fun, fun!
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>

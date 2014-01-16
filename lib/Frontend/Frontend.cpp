@@ -47,15 +47,11 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   SML = SerializedModuleLoader::create(*Context);
   Context->addModuleLoader(SML);
 
-  // If the user has specified an SDK, wire up the Clang module importer
-  // and point it at that SDK.
-  if (!Invocation.getSDKPath().empty()) {
-    auto ImporterCtor = swift::getClangImporterCtor();
-    if (!ImporterCtor) {
-      Diagnostics.diagnose(SourceLoc(),
-                           diag::error_clang_importer_not_linked_in);
-      return true;
-    }
+  // Wire up the Clang importer. If the user has specified an SDK, use it.
+  // Otherwise, we just keep it around as our interface to Clang's ABI
+  // knowledge.
+  auto ImporterCtor = swift::getClangImporterCtor();
+  if (ImporterCtor) {
     auto clangImporter =
         ImporterCtor(*Context, Invocation.getTargetTriple(),
                      Invocation.getClangImporterOptions());
@@ -65,6 +61,10 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     }
 
     Context->addModuleLoader(clangImporter, /*isClang*/true);
+  } else if (!Invocation.getSDKPath().empty()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::error_clang_importer_not_linked_in);
+    return true;
   }
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
