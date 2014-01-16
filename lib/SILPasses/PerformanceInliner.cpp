@@ -168,25 +168,23 @@ static unsigned instructionInlineCost(SILInstruction &I) {
 }
 
 /// Just sum over all of the instructions.
-///
-/// TODO: Memoize.
 static unsigned functionInlineCost(SILFunction *F) {
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
     return 0;
 
-  unsigned i = 0;
+  unsigned Cost = 0;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      i += instructionInlineCost(I);
+      Cost += instructionInlineCost(I);
 
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
-      if (i > InlineCostThreshold)
-        return i;
+      if (Cost > InlineCostThreshold)
+        return Cost;
     }
   }
-  return i;
+  return Cost;
 }
 
 //===----------------------------------------------------------------------===//
@@ -275,7 +273,6 @@ static void inlineCallsIntoFunction(SILFunction *F, AIList &ApplyInstList) {
 //===----------------------------------------------------------------------===//
 
 void swift::performSILPerformanceInlining(SILModule *M) {
-
   DEBUG(llvm::dbgs() << "*** SIL Performance Inlining ***\n\n");
 
   FunctionToCallMapTy FunctionToCallMap;
