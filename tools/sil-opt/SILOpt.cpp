@@ -48,6 +48,7 @@ enum class PassKind {
   SROA,
   ARCOpts,
   StripRuntimeChecks,
+  StripDebugInfo,
 };
 
 static llvm::cl::opt<std::string>
@@ -127,6 +128,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::StripRuntimeChecks,
                                    "strip-runtime-checks",
                                    "Strip intrinsic runtime safety checks."),
+                        clEnumValN(PassKind::StripDebugInfo,
+                                   "strip-debug-info",
+                                   "Strip debug info."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -257,6 +261,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::StripRuntimeChecks:
       performSILStripRuntimeChecks(CI.getSILModule());
+      break;
+    case PassKind::StripDebugInfo:
+      performSILStripDebugInfo(CI.getSILModule());
       break;
     }
 

@@ -109,6 +109,9 @@ namespace swift {
 
   /// \brief Ruthlessly eliminate runtime checks.
   void performSILStripRuntimeChecks(SILModule *M);
+
+  /// \brief Eliminate debug info instructions.
+  void performSILStripDebugInfo(SILModule *M);
   
 } // end namespace swift
 
