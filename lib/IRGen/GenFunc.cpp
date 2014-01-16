@@ -1176,7 +1176,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     return out->add(v); \
   }
 
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
 if (Builtin.ID == BuiltinValueKind::id) { \
   SmallVector<llvm::Type*, 2> ArgTys; \
   auto opType = Builtin.Types[0]->getCanonicalType(); \

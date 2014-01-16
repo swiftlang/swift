@@ -47,6 +47,7 @@ enum class PassKind {
   LowerAggregateInstrs,
   SROA,
   ARCOpts,
+  StripRuntimeChecks,
 };
 
 static llvm::cl::opt<std::string>
@@ -123,6 +124,9 @@ Passes(llvm::cl::desc("Passes:"),
                                    "arc-opts",
                                    "Perform automatic reference counting "
                                    "optimizations."),
+                        clEnumValN(PassKind::StripRuntimeChecks,
+                                   "strip-runtime-checks",
+                                   "Strip intrinsic runtime safety checks."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -250,6 +254,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::ARCOpts:
       performSILARCOpts(CI.getSILModule());
+      break;
+    case PassKind::StripRuntimeChecks:
+      performSILStripRuntimeChecks(CI.getSILModule());
       break;
     }
 

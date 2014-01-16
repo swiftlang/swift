@@ -569,7 +569,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
 
 // Check and fold binary arithmetic with overflow.
 #define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, attrs, overload) \
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
   case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     return constantFoldBinaryWithOverflow(AI, Builtin.ID, ResultsInError);
