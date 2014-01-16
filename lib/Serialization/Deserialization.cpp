@@ -1156,7 +1156,6 @@ Module *ModuleFile::getModule(Identifier name) {
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
                                             std::make_pair(name, SourceLoc()));
-      assert(ShadowedModule && "missing shadowed module");
     }
 
     return ShadowedModule;

@@ -938,6 +938,8 @@ ERROR(serialization_missing_single_dependency,sema,none,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,sema,none,
       "missing required modules: %0", (StringRef))
+ERROR(serialization_missing_shadowed_module,sema,none,
+      "cannot load underlying module for %0", (Identifier))
 
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))

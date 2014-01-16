@@ -102,6 +102,9 @@ enum class ModuleStatus {
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
 
+  /// The module file is an overlay for a Clang module, which can't be found.
+  MissingShadowedModule,
+
   /// The module file is malformed in some way.
   Malformed
 };

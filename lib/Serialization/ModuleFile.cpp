@@ -504,6 +504,14 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
            "invalid module name (submodules not yet supported)");
     auto module = getModule(moduleID);
     if (!module) {
+      // If we're missing the module we're shadowing, treat that specially.
+      if (moduleID == file->getParentModule()->Name) {
+        error(ModuleStatus::MissingShadowedModule);
+        return false;
+      }
+
+      // Otherwise, continue trying to load dependencies, so that we can list
+      // everything that's missing.
       missingDependency = true;
       continue;
     }

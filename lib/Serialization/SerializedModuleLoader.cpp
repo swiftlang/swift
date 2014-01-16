@@ -118,6 +118,7 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
       Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
     return nullptr;
   case ModuleStatus::MissingDependency:
+  case ModuleStatus::MissingShadowedModule:
     llvm_unreachable("dependencies haven't been loaded yet");
   }
 
@@ -133,25 +134,42 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
 
   // We failed to bring the module file into the AST.
   M.removeFile(*fileUnit);
-  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency);
+  assert(loadedModuleFile->getStatus() == ModuleStatus::MissingDependency ||
+         loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule);
 
   if (!diagLoc)
     return nullptr;
 
+  if (loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule) {
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
+                       M.Name);
+    if (Ctx.SearchPathOpts.SDKPath.empty())
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+    return nullptr;
+  }
+
   // Figure out /which/ dependencies are missing.
-  SmallVector<ModuleFile::Dependency, 4> missing;
+  // FIXME: Dependencies should be de-duplicated at serialization time, not now.
+  llvm::StringMap<bool> duplicates;
+  llvm::SmallVector<ModuleFile::Dependency, 4> missing;
   std::copy_if(loadedModuleFile->getDependencies().begin(),
                loadedModuleFile->getDependencies().end(),
                std::back_inserter(missing),
-               [](const ModuleFile::Dependency &dependency) {
-    return !dependency.isLoaded();
+               [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
+    if (dependency.isLoaded())
+      return false;
+    bool &seen = duplicates[dependency.RawAccessPath];
+    if (seen)
+      return false;
+    seen = true;
+    return true;
   });
 
   // FIXME: only show module part of RawAccessPath
   assert(!missing.empty() && "unknown missing dependency?");
   if (missing.size() == 1) {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_single_dependency,
-                       missing.front().RawAccessPath);
+                       missing.begin()->RawAccessPath);
   } else {
     llvm::SmallString<64> missingNames;
     missingNames += '\'';
@@ -165,6 +183,9 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_dependencies,
                        missingNames);
   }
+
+  if (Ctx.SearchPathOpts.SDKPath.empty())
+    Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
 
   return nullptr;
 }
