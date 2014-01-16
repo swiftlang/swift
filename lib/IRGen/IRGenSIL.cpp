@@ -2582,14 +2582,10 @@ void IRGenSILFunction::visitSelfDowncastInst(swift::SelfDowncastInst *i) {
   Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
                                 CheckedCastKind::Downcast,
                                 CheckedCastMode::Unconditional);
-  
-  if (i->getType().isAddress()) {
-    setLoweredAddress(SILValue(i,0), val);
-  } else {
-    Explosion ex(ResilienceExpansion::Maximal);
-    ex.add(val.getAddress());
-    setLoweredExplosion(SILValue(i,0), ex);
-  }
+  assert(!i->getType().isAddress());
+  Explosion ex(ResilienceExpansion::Maximal);
+  ex.add(val.getAddress());
+  setLoweredExplosion(SILValue(i,0), ex);
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
