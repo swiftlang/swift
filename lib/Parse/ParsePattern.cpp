@@ -336,7 +336,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                bool &HasSelectorStyleSignature) {
   // Parse the first function argument clause.
   ParserResult<Pattern> FirstPattern = parsePatternTuple(&DefaultArgs,
-                                       /*IsLet*/ Context.LangOpts.LetArguments);
+                                                         /*IsLet*/ true);
   if (FirstPattern.isNull()) {
     // Recover by creating a '()' pattern.
     auto EmptyTuplePattern =
