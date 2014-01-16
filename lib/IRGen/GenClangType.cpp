@@ -83,7 +83,6 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
       return clangCtx.FIELD;
 
   CHECK_CLANG_TYPE_MATCH(type, "COpaquePointer", VoidPtrTy);
-  CHECK_CLANG_TYPE_MATCH(type, "CUnicodeScalar", IntTy);
   CHECK_CLANG_TYPE_MATCH(type, "Bool", SignedCharTy);
   CHECK_CLANG_TYPE_MATCH(type, "ObjCBool", ObjCBuiltinBoolTy);
   // FIXME: This is sufficient for ABI type generation, but should probably
