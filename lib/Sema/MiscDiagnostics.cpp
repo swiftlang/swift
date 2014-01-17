@@ -173,7 +173,9 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
       } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
         // Handle instance and type computed variables.
+        // Find MemberRefExprs that have an implicit "self" base.
         if (MRE->getMember().getDecl() == Var &&
+            isa<DeclRefExpr>(MRE->getBase()) &&
             MRE->getBase()->isImplicit()) {
           bool shouldDiagnose = true;
           if (IsSetter)
