@@ -1558,9 +1558,14 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
         return depMemTy;
       
       // If the base remains dependent after substitution, so do we.
-      if (newBase->isDependentType())
-        return DependentMemberType::get(newBase, depMemTy->getName(),
-                                        depMemTy->getASTContext());
+      if (newBase->isDependentType()) {
+        if (depMemTy->getAssocType())
+          return DependentMemberType::get(newBase, depMemTy->getAssocType(),
+                                          depMemTy->getASTContext());
+        else
+          return DependentMemberType::get(newBase, depMemTy->getName(),
+                                          depMemTy->getASTContext());
+      }
 
       // Resolve the member relative to the substituted base.
       return substMemberType(type, newBase, depMemTy->getAssocType(),
