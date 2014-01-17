@@ -14,6 +14,7 @@
 #define SWIFT_DRIVER_TYPES_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -40,5 +41,24 @@ namespace types {
 } // end namespace types
 } // end namespace driver
 } // end namespace swift
+
+namespace llvm {
+  template<>
+  struct DenseMapInfo<swift::driver::types::ID> {
+    static inline swift::driver::types::ID getEmptyKey() {
+      return swift::driver::types::ID::TY_INVALID;
+    }
+    static inline swift::driver::types::ID getTombstoneKey() {
+      return swift::driver::types::ID::TY_LAST;
+    }
+    static unsigned getHashValue(const swift::driver::types::ID &Val) {
+      return (unsigned)Val * 37U;
+    }
+    static bool isEqual(const swift::driver::types::ID &LHS,
+                        const swift::driver::types::ID &RHS) {
+      return LHS == RHS;
+    }
+  };
+}
 
 #endif
