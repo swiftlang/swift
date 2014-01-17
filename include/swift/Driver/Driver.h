@@ -57,6 +57,10 @@ public:
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
+  /// Whether or not the driver should treat a generated module as a top-level
+  /// output.
+  bool ShouldTreatModuleAsTopLevelOutput = false;
+
   /// The name of the module which we are building.
   std::string ModuleName;
 };
@@ -134,10 +138,11 @@ public:
   /// Construct the OutputInfo for the driver from the given arguments.
   ///
   /// \param Args The input arguments.
+  /// \param Inputs The inputs to the driver.
   /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
-  void buildOutputInfo(const llvm::opt::DerivedArgList &Args, OutputInfo &OI)
-    const;
+  void buildOutputInfo(const llvm::opt::DerivedArgList &Args,
+                       const InputList &Inputs, OutputInfo &OI) const;
 
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.

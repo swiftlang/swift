@@ -94,20 +94,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
-  buildOutputInfo(*TranslatedArgList, OI);
+  buildOutputInfo(*TranslatedArgList, Inputs, OI);
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
-
-  if (!Lexer::isIdentifier(OI.ModuleName)) {
-    if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
-      OI.ModuleName = "main";
-    else {
-      // TODO: emit diagnostic
-      llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
-      OI.ModuleName = "__bad__";
-    }
-  }
 
   // Construct the graph of Actions.
   ActionList Actions;
@@ -272,10 +262,27 @@ void Driver::buildInputs(const ToolChain &TC,
 }
 
 void Driver::buildOutputInfo(const DerivedArgList &Args,
-                             OutputInfo &OI) const {
+                             const InputList &Inputs, OutputInfo &OI) const {
+  // By default, the driver does not link its output; this will be updated
+  // appropariately below if linking is required.
   OI.ShouldLink = false;
-  OI.ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
-                                          options::OPT_module_output_path);
+
+  if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path)) {
+    // The user has requested a module, so generate one and treat it as
+    // top-level output.
+    OI.ShouldGenerateModule = true;
+    OI.ShouldTreatModuleAsTopLevelOutput = true;
+  } else if (Args.hasArg(options::OPT_g)) {
+    // An option has been passed which requires a module, but the user hasn't
+    // requested one. Generate a module, but treat it as an intermediate output.
+    OI.ShouldGenerateModule = true;
+    OI.ShouldTreatModuleAsTopLevelOutput = false;
+  } else {
+    // No options require a module, so don't generate one.
+    OI.ShouldGenerateModule = false;
+    OI.ShouldTreatModuleAsTopLevelOutput = false;
+  }
+
   types::ID CompileOutputType = types::TY_INVALID;
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
@@ -325,6 +332,16 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     OI.ModuleName = A->getValue();
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
+  }
+
+  if (!Lexer::isIdentifier(OI.ModuleName)) {
+    if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
+      OI.ModuleName = "main";
+    else {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
+      OI.ModuleName = "__bad__";
+    }
   }
 }
 
@@ -523,6 +540,26 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       if (Arg *A = C.getArgs().getLastArg(options::OPT_module_output_path))
         Output.reset(new CommandOutput(JA->getType(), A->getValue(),
                                        BaseInput));
+      else if (OI.ShouldTreatModuleAsTopLevelOutput) {
+        if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
+          // Put the module next to the top-level output.
+          llvm::SmallString<128> Path(A->getValue());
+          llvm::sys::path::remove_filename(Path);
+          llvm::sys::path::append(Path, OI.ModuleName);
+          llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+          Output.reset(new CommandOutput(JA->getType(),
+                                         C.getArgs().MakeArgString(Path.str()),
+                                         BaseInput));
+        } else {
+          // A top-level output wasn't specified, so just output to
+          // <ModuleName>.swiftmodule.
+          llvm::SmallString<128> Path(OI.ModuleName);
+          llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+          Output.reset(new CommandOutput(JA->getType(),
+                                         C.getArgs().MakeArgString(Path.str()),
+                                         BaseInput));
+        }
+      }
     }
 
     if (!Output) {
