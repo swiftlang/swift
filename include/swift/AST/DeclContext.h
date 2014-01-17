@@ -288,6 +288,7 @@ public:
 
   void dumpContext() const;
   unsigned printContext(llvm::raw_ostream &OS) const;
+  void dump() const { dumpContext(); }
   
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,

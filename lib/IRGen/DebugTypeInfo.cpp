@@ -117,9 +117,10 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
 }
 
 void DebugTypeInfo::dump() const {
-  llvm::errs()<<"[Size "<<size.getValue()<<" Alignment "<<align.getValue()<<"] ";
+  llvm::errs() << "[Size " << size.getValue() << " Alignment "
+               << align.getValue() << "] ";
   if (getDecl())
-    getDecl()->dump(llvm::errs());
+    getDecl()->dump();
   else
     getType()->dump();
 }

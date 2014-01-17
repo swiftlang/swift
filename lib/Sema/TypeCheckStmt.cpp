@@ -417,7 +417,7 @@ public:
     
     // Compute the expression that advances the generator.
     Expr *GenNext
-      = TC.callWitness(TC.buildCheckedRefExpr(Stream, S->getInLoc(),
+      = TC.callWitness(TC.buildCheckedRefExpr(Stream, DC, S->getInLoc(),
                                               /*implicit*/true),
                        DC, StreamProto, GenConformance,
                        TC.Context.getIdentifier("next"),
