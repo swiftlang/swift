@@ -567,10 +567,11 @@ bool ExprTypeCheckListener::suppressDiagnostics() const {
 }
 
 static void diagnoseExpr(TypeChecker &TC, const Expr *E,
+                         const DeclContext *DC,
                          const ExprTypeCheckListener *listener) {
   if (listener && listener->suppressDiagnostics())
     return;
-  performExprDiagnostics(TC, E);
+  performExprDiagnostics(TC, E, DC);
 }
 
 #pragma mark High-level entry points
@@ -624,7 +625,7 @@ bool TypeChecker::typeCheckExpression(
 
     // Try to provide a decent diagnostic.
     if (cs.diagnose()) {
-      diagnoseExpr(*this, expr, listener);
+      diagnoseExpr(*this, expr, dc, listener);
       return true;
     }
 
@@ -632,7 +633,7 @@ bool TypeChecker::typeCheckExpression(
     diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());
 
-    diagnoseExpr(*this, expr, listener);
+    diagnoseExpr(*this, expr, dc, listener);
     return true;
   }
 
@@ -651,7 +652,7 @@ bool TypeChecker::typeCheckExpression(
   // Apply the solution to the expression.
   auto result = cs.applySolution(solution, expr);
   if (!result) {
-    diagnoseExpr(*this, expr, listener);
+    diagnoseExpr(*this, expr, dc, listener);
     // Failure already diagnosed, above, as part of applying the solution.
    return true;
   }
@@ -662,7 +663,7 @@ bool TypeChecker::typeCheckExpression(
     result = solution.coerceToType(result, convertType,
                                    cs.getConstraintLocator(expr, { }));
     if (!result) {
-      diagnoseExpr(*this, expr, listener);
+      diagnoseExpr(*this, expr, dc, listener);
       return true;
     }
   } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
@@ -692,12 +693,12 @@ bool TypeChecker::typeCheckExpression(
   if (listener) {
     result = listener->appliedSolution(solution, result);
     if (!result) {
-      diagnoseExpr(*this, expr, listener);
+      diagnoseExpr(*this, expr, dc, listener);
       return true;
     }
   }
 
-  diagnoseExpr(*this, result, listener);
+  diagnoseExpr(*this, result, dc, listener);
 
   expr = result;
   cleanup.disable();

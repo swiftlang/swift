@@ -594,6 +594,12 @@ ERROR(self_assignment_var,tce_sema,none,
 ERROR(self_assignment_prop,tce_sema,none,
       "assigning a property to itself", ())
 
+WARNING(recursive_accessor_reference,tce_sema,none,
+        "attempting to %select{access|modify}1 %0 within its own "
+        "%select{getter|setter}1", (Identifier, bool))
+NOTE(recursive_accessor_reference_silence,tce_sema,none,
+     "access 'self' explicitly to silence this warning", ())
+
 WARNING(unindented_code_after_return,tce_sema,none,
         "expression following 'return' is treated as an argument of "
         "the 'return'", ())

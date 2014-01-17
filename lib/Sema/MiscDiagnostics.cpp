@@ -132,12 +132,73 @@ static void diagModuleValue(TypeChecker &TC, const Expr *E) {
 }
 
 //===--------------------------------------------------------------------===//
+// Diagnose recursive use of properties within their own accessors
+//===--------------------------------------------------------------------===//
+
+static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
+                                        const DeclContext *DC) {
+  auto fn = dyn_cast<FuncDecl>(DC);
+  if (!fn || !fn->isGetterOrSetter())
+    return;
+
+  auto var = dyn_cast<VarDecl>(fn->getGetterOrSetterDecl());
+  if (!var)
+    return;
+
+  // FIXME: Diagnose self-mutation in setters as well.
+  if (fn->getSetterDecl())
+    return;
+
+  class DiagnoseWalker : public ASTWalker {
+    TypeChecker &TC;
+    VarDecl *Var;
+    bool IsSetter;
+
+  public:
+    explicit DiagnoseWalker(TypeChecker &TC, VarDecl *var, bool isSetter)
+      : TC(TC), Var(var), IsSetter(isSetter) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (DRE->getDecl() == Var) {
+          bool shouldDiagnose = true;
+          if (auto *ParentExpr = Parent.getAsExpr()) {
+            if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr))
+              shouldDiagnose = false;
+          }
+          if (shouldDiagnose) {
+            TC.diagnose(DRE->getLoc(), diag::recursive_accessor_reference,
+                        Var->getName(), IsSetter);
+          }
+        }
+      } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        if (MRE->getMember().getDecl() == Var &&
+            MRE->getBase()->isImplicit()) {
+          TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
+                      Var->getName(), IsSetter);
+          TC.diagnose(E->getLoc(),
+                      diag::recursive_accessor_reference_silence)
+            .fixItInsert(E->getStartLoc(), "self.");
+        }
+      }
+
+      return { true, E };
+    }
+  };
+
+  DiagnoseWalker walker(TC, var, fn->getSetterDecl());
+  const_cast<Expr *>(E)->walk(walker);
+}
+
+//===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
 
-void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E) {
+void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
+                                   const DeclContext *DC) {
   diagSelfAssignment(TC, E);
   diagModuleValue(TC, E);
+  diagRecursivePropertyAccess(TC, E, DC);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {

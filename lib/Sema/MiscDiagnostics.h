@@ -14,12 +14,14 @@
 #define SWIFT_SEMA_MISC_DIAGNOSTICS_H
 
 namespace swift {
+  class DeclContext;
   class Expr;
   class Stmt;
   class TypeChecker;
 
 /// \brief Emit diagnostics for a given expression.
-void performExprDiagnostics(TypeChecker &TC, const Expr *E);
+void performExprDiagnostics(TypeChecker &TC, const Expr *E,
+                            const DeclContext *DC);
   /// \brief Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
