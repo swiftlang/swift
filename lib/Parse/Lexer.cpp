@@ -290,7 +290,7 @@ void Lexer::skipToEndOfLine() {
         --CurPtr;
         const char *CharStart = CurPtr;
         if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8_character);
+          diagnose(CharStart, diag::lex_invalid_utf8);
       }
       break;   // Otherwise, eat other characters.
     case 0:
@@ -360,7 +360,7 @@ void Lexer::skipSlashStarComment() {
         --CurPtr;
         const char *CharStart = CurPtr;
         if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8_character);
+          diagnose(CharStart, diag::lex_invalid_utf8);
       }
 
       break;   // Otherwise, eat other characters.
@@ -862,7 +862,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     unsigned CharValue = validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
     if (CharValue != ~0U) return CharValue;
     if (EmitDiagnostics)
-      diagnose(CharStart, diag::lex_invalid_utf8_character);
+      diagnose(CharStart, diag::lex_invalid_utf8);
     return ~1U;
   }
   case '"':
@@ -1323,8 +1323,10 @@ Restart:
       while (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd));
     } else {
       // This character isn't allowed in Swift source.
-      validateUTF8CharacterAndAdvance(tmp, BufferEnd);
-      diagnose(CurPtr-1, diag::lex_invalid_character);
+      if (validateUTF8CharacterAndAdvance(tmp, BufferEnd) == ~0U)
+        diagnose(CurPtr-1, diag::lex_invalid_utf8);
+      else
+        diagnose(CurPtr-1, diag::lex_invalid_character);
     }
 
     CurPtr = tmp;
