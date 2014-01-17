@@ -364,7 +364,7 @@ static StringRef getBaseInputForJob(Job *J) {
 
 static void printJobOutputs(const Job *J) {
   if (const Command *Cmd = dyn_cast<Command>(J)) {
-    llvm::outs() << '"' << Cmd->getOutput().getFilename() << '"';
+    llvm::outs() << '"' << Cmd->getOutput().getPrimaryOutputFilename() << '"';
   } else if (const JobList *JL = dyn_cast<JobList>(J)) {
     for (unsigned long i = 0, e = JL->size(); i != e; ++i) {
       printJobOutputs(JL->getJobs()[i]);
@@ -425,12 +425,12 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   std::unique_ptr<CommandOutput> Output;
   if (JA->getType() == types::TY_Nothing) {
-    Output.reset(new CommandOutput(types::TY_Nothing, BaseInput));
+    Output.reset(new CommandOutput(BaseInput));
   } else {
     if (AtTopLevel) {
       if (Arg *FinalOutput = C.getArgs().getLastArg(options::OPT_o)) {
-        Output.reset(new CommandOutput(JA->getType(), BaseInput,
-                                       FinalOutput->getValue()));
+        Output.reset(new CommandOutput(JA->getType(), FinalOutput->getValue(),
+                                       BaseInput));
       }
     }
 
@@ -448,12 +448,13 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
           llvm::errs() << "error: unable to make temporary file" <<EC.message();
           Path = "";
         }
-        Output.reset(new CommandOutput(JA->getType(), BaseInput,
-                                      C.getArgs().MakeArgString(Path.str())));
+        Output.reset(new CommandOutput(JA->getType(),
+                                       C.getArgs().MakeArgString(Path.str()),
+                                       BaseInput));
       } else {
         if (JA->getType() == types::TY_Image) {
-          Output.reset(new CommandOutput(JA->getType(), BaseInput,
-                                         DefaultImageName));
+          Output.reset(new CommandOutput(JA->getType(), DefaultImageName,
+                                         BaseInput));
         } else {
           StringRef Suffix = types::getTypeTempSuffix(JA->getType());
           assert(Suffix.data() &&
@@ -461,8 +462,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
           llvm::SmallString<128> Suffixed(llvm::sys::path::filename(BaseInput));
           llvm::sys::path::replace_extension(Suffixed, Suffix);
-          Output.reset(new CommandOutput(JA->getType(), BaseInput,
-                                         C.getArgs().MakeArgString(Suffixed)));
+          Output.reset(new CommandOutput(JA->getType(),
+                                         C.getArgs().MakeArgString(Suffixed),
+                                         BaseInput));
         }
       }
     }
@@ -482,7 +484,8 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
         llvm::outs() << ", ";
     }
     printJobOutputs(InputJobs.get());
-    llvm::outs() << "], output: \"" << Output->getFilename() << "\"\n";
+    llvm::outs() << "], output: \"" << Output->getPrimaryOutputFilename()
+                 << "\"\n";
   }
 
   // 5. Construct a Job which produces the right CommandOutput.

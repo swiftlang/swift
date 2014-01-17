@@ -14,9 +14,11 @@
 #define SWIFT_DRIVER_JOB_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Option.h"
@@ -85,18 +87,29 @@ public:
 };
 
 class CommandOutput {
-  types::ID Type;
+  types::ID PrimaryOutputType;
+  std::string PrimaryOutputFilename;
+
+  llvm::DenseMap<types::ID, std::string> AdditionalOutputsMap;
+
   StringRef BaseInput;
-  std::string Filename;
 
 public:
-  CommandOutput(types::ID Type, StringRef BaseInput,
-                StringRef Filename = StringRef())
-    : Type(Type), BaseInput(BaseInput), Filename(Filename) {}
+  CommandOutput(StringRef BaseInput) : CommandOutput(types::ID::TY_Nothing,
+                                                     StringRef(), BaseInput) {}
 
-  types::ID getType() const { return Type; }
+  CommandOutput(types::ID PrimaryOutputType, StringRef PrimaryOutputFilename,
+                StringRef BaseInput)
+    : PrimaryOutputType(PrimaryOutputType),
+      PrimaryOutputFilename(PrimaryOutputFilename), BaseInput(BaseInput) {}
+
+  types::ID getPrimaryOutputType() const { return PrimaryOutputType; }
+  StringRef getPrimaryOutputFilename() const { return PrimaryOutputFilename; }
+
+  void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
+  Optional<StringRef> getAdditionalOutputForType(types::ID type) const;
+
   StringRef getBaseInput() const { return BaseInput; }
-  StringRef getFilename() const { return Filename; }
 };
 
 class Command : public Job {

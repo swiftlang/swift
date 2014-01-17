@@ -45,7 +45,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Arguments.push_back(Args.MakeArgString(TripleStr));
   
   const char *OutputOption = nullptr;
-  switch (Output->getType()) {
+  switch (Output->getPrimaryOutputType()) {
   case types::TY_Object:
     OutputOption = "-c";
     break;
@@ -129,9 +129,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
 
   // Add the output file argument if necessary.
-  if (Output->getType() != types::TY_Nothing) {
+  if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     Arguments.push_back("-o");
-    Arguments.push_back(Output->getFilename().data());
+    Arguments.push_back(Output->getPrimaryOutputFilename().data());
   } else if (Args.getLastArg(options::OPT_modes_Group)->getOption().matches(
                options::OPT_i)) {
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
@@ -174,7 +174,8 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                                   const ActionList &InputActions,
                                   const ArgList &Args,
                                   StringRef LinkingOutput) const {
-  assert(Output->getType() == types::TY_Image && "Invalid linker output type.");
+  assert(Output->getPrimaryOutputType() == types::TY_Image &&
+         "Invalid linker output type.");
   ArgStringList Arguments;
   Arguments.push_back("-v");
 

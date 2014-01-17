@@ -33,3 +33,15 @@ void JobList::clear() {
     Jobs.clear();
   }
 }
+
+void CommandOutput::setAdditionalOutputForType(types::ID type,
+                                               StringRef OutputFilename) {
+  AdditionalOutputsMap[type] = OutputFilename;
+}
+
+Optional<StringRef> CommandOutput::getAdditionalOutputForType(types::ID type) const {
+  auto iter = AdditionalOutputsMap.find(type);
+  if (iter != AdditionalOutputsMap.end())
+    return iter->second;
+  return Optional<StringRef>();
+}
