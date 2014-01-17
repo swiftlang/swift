@@ -21,7 +21,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"

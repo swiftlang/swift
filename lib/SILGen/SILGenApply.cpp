@@ -16,7 +16,7 @@
 #include "Initialization.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"

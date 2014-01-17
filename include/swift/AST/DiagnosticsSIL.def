@@ -1,0 +1,185 @@
+//===- DiagnosticsSILAnalysis.def - Diagnostics Text ------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during SIL (dataflow) analysis.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+
+// SILGen issues.
+ERROR(bridging_module_missing,sil_gen,none,
+      "unable to find module '%0' for implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_missing,sil_gen,none,
+      "unable to find implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_overloaded,sil_gen,none,
+      "multiple definitions of implicit conversion function '%0.%1'",
+      (StringRef, StringRef))
+ERROR(bridging_function_not_function,sil_gen,none,
+      "definition of implicit conversion function '%0.%1' is not a function",
+      (StringRef, StringRef))
+ERROR(bridging_function_not_correct_type,sil_gen,none,
+      "definition of implicit conversion function '%0.%1' is not of the correct"
+      " type",
+      (StringRef, StringRef))
+ERROR(invalid_sil_builtin,sil_gen,none,
+      "INTERNAL ERROR: invalid use of builtin: %0",
+      (StringRef))
+
+
+// Definite initialization diagnostics.
+NOTE(variable_defined_here,sil_analysis,none,
+     "variable defined here", ())
+ERROR(variable_used_before_initialized,sil_analysis,none,
+      "variable '%0' used before being initialized", (StringRef))
+ERROR(variable_inout_before_initialized,sil_analysis,none,
+      "variable '%0' passed by reference before being initialized", (StringRef))
+ERROR(variable_escape_before_initialized,sil_analysis,none,
+      "variable '%0' captured by a closure before being initialized",
+      (StringRef))
+ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
+      "use of '%0' in delegating initializer before self.init is called",
+      (StringRef))
+ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
+      "address of variable '%0' taken before it is initialized",
+      (StringRef))
+ERROR(ivar_in_base_object_use_before_initialized,sil_analysis,none,
+      "use of property '%0' in base object before super.init"
+      " initializes it",
+      (StringRef))
+ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
+      "property '%0' not initialized at super.init call",
+      (StringRef))
+ERROR(ivar_not_initialized_at_selfinit,sil_analysis,none,
+      "property '%0' not initialized at self.init call",
+      (StringRef))
+ERROR(ivar_not_initialized_at_init_return,sil_analysis,none,
+      "property '%0' not initialized", (StringRef))
+ERROR(selfinit_multiple_times,sil_analysis,none,
+      "%select{super|self}0.init called multiple times in initializer",
+      (unsigned))
+ERROR(superselfinit_not_called_before_return,sil_analysis,none,
+      "%select{super|self}0.init isn't called before returning from "
+      "initializer", (unsigned))
+ERROR(self_before_superselfinit,sil_analysis,none,
+      "'self' used before %select{super|self}0.init call",
+     (unsigned))
+ERROR(return_from_init_without_initing_self,sil_analysis,none,
+      "return from enum initializer method without storing to 'self'", ())
+ERROR(return_from_init_without_self_init,sil_analysis,none,
+      "self.init isn't called on all paths in delegating initializer", ())
+
+ERROR(global_variable_function_use_uninit,sil_analysis,none,
+      "variable '%0' used by function definition before being initialized",
+      (StringRef))
+ERROR(struct_not_fully_initialized,sil_analysis,none,
+      "struct '%0' must be completely initialized before a member is stored to",
+      (StringRef))
+
+
+// Control flow diagnostics.
+ERROR(missing_return,sil_analysis,none,
+      "missing return in the function expected to return %0", (Type))
+ERROR(return_from_noreturn,sil_analysis,none, 
+      "return from a 'noreturn' function", ())
+ERROR(non_exhaustive_switch,sil_analysis,none, 
+      "switch must be exhaustive, consider adding a default clause", ())
+WARNING(unreachable_code,sil_analysis,none, "will never be executed", ())
+NOTE(unreachable_code_branch,sil_analysis,none,
+     "condition always evaluates to %select{false|true}0", (bool))
+NOTE(call_to_noreturn_note,sil_analysis,none,
+     "a call to a noreturn function", ())
+WARNING(unreachable_code_after_stmt,sil_analysis,none,
+        "code after '%select{return|continue}0' will never be executed", 
+        (unsigned))
+WARNING(switch_on_a_constant,sil_analysis,none,
+        "switch condition evaluates to a constant", ())
+NOTE(unreachable_code_note,sil_analysis,none, "will never be executed", ())
+
+// 'transparent' diagnostics
+ERROR(circular_transparent,sil_analysis,none,
+      "inlining 'transparent' functions forms circular loop", ())
+NOTE(note_while_inlining,sil_analysis,none,
+     "while inlining here", ())
+
+// Arithmetic diagnostics.
+ERROR(integer_conversion_overflow,sil_analysis,none,
+      "integer overflows when converted from %0 to %1",
+      (Type, Type))
+ERROR(integer_conversion_overflow_builtin_types,sil_analysis,none,
+      "integer overflows when converted from %select{unsigned|signed}0 "
+      "%1 to %select{unsigned|signed}2 %3",
+      (bool, Type, bool, Type))
+WARNING(integer_conversion_overflow_warn,sil_analysis,none,
+      "integer overflows when converted from %0 to %1",
+      (Type, Type))
+ERROR(integer_conversion_sign_error,sil_analysis,none,
+      "negative integer cannot be converted to unsigned type %0",
+      (Type))
+ERROR(integer_literal_overflow,sil_analysis,none,
+      "integer literal overflows when stored into %0",
+      (Type))
+ERROR(integer_literal_overflow_builtin_types,sil_analysis,none,
+      "integer literal overflows when stored into %select{unsigned|signed}0 %1",
+      (bool, Type))
+WARNING(integer_literal_overflow_warn,sil_analysis,none,
+      "integer literal overflows when stored into %0",
+      (Type))
+ERROR(arithmetic_operation_overflow,sil_analysis,none,
+      "arithmetic operation '%0 %1 %2' (on type %3) results in an overflow",
+      (StringRef, StringRef, StringRef, Type))
+ERROR(arithmetic_operation_overflow_generic_type,sil_analysis,none,
+      "arithmetic operation '%0 %1 %2' (on %select{unsigned|signed}3 "
+      "%4-bit integer type) results in an overflow",
+      (StringRef, StringRef, StringRef, bool, unsigned))
+ERROR(division_overflow,sil_analysis,none,
+      "division '%0 %1 %2' results in an overflow",
+      (StringRef, StringRef, StringRef))
+ERROR(division_by_zero,sil_analysis,none, "division by zero", ())
+
+// FIXME: We won't need this as it will be replaced with user-generated strings.
+// staticReport diagnostics.
+ERROR(static_report_error, sil_analysis, none,
+      "static report error", ())
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

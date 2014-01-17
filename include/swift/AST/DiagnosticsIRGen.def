@@ -1,0 +1,57 @@
+//===- DiagnosticsIRGen.def - Diagnostics Text ------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during IR generation.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+
+ERROR(no_llvm_target,irgen,none,
+      "error loading LLVM target for triple '%0': %1", (StringRef, StringRef))
+ERROR(error_codegen_init_fail,irgen,none,
+      "cannot initialize code generation passes for target", ())
+
+ERROR(irgen_unimplemented,irgen,none,
+      "unimplemented IR generation feature %0", (StringRef))
+ERROR(irgen_failure,irgen,none, "IR generation failure: %0", (StringRef))
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

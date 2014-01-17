@@ -1,4 +1,4 @@
-//===- Diagnostics.h - Diagnostic Definitions -------------------*- C++ -*-===//
+//===- DiagnosticsIRGen.h - Diagnostic Definitions --------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,32 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines all of the diagnostics emitted by Swift.
+/// \file
+/// \brief This file defines diagnostics for IR generation.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DIAGNOSTICS_H
-#define SWIFT_DIAGNOSTICS_H
+#ifndef SWIFT_DIAGNOSTICSIRGEN_H
+#define SWIFT_DIAGNOSTICSIRGEN_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 
 namespace swift {
-  namespace detail {
-    template<typename T>
-    struct DiagWithArguments;
-    
-    template<typename ...ArgTypes>
-    struct DiagWithArguments<void(ArgTypes...)> {
-      typedef Diag<ArgTypes...> type;
-    };
-  }
-  
   namespace diag {
-  // Declare all of the diagnostics objects with their appropriate types.
+  // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
   extern detail::DiagWithArguments<void Signature>::type ID;
-#include "Diagnostics.def"  
+#include "DiagnosticsIRGen.def"
   }
 }
 

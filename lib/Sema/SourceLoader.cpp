@@ -18,7 +18,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"

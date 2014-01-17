@@ -18,7 +18,7 @@
 #include "RValue.h"
 #include "swift/AST/AST.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 
 using namespace swift;
 using namespace Lowering;

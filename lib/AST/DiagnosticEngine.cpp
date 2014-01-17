@@ -62,7 +62,7 @@ static StoredDiagnosticInfo StoredDiagnosticInfos[] = {
   { DiagnosticKind::Warning, DiagnosticOptions::Options, Text },
 #define NOTE(ID,Category,Options,Text,Signature) \
   { DiagnosticKind::Note, DiagnosticOptions::Options, Text },
-#include "swift/AST/Diagnostics.def"
+#include "swift/AST/DiagnosticsAll.def"
   { DiagnosticKind::Error, DiagnosticOptions::none, "<not a diagnostic>" }
 };
 

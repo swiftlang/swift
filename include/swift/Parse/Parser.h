@@ -18,7 +18,7 @@
 #define SWIFT_PARSER_H
 
 #include "swift/AST/AST.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"

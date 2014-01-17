@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"

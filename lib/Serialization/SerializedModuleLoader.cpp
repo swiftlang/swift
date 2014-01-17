@@ -14,7 +14,7 @@
 #include "ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"

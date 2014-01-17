@@ -19,7 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"

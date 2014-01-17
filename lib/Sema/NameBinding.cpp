@@ -18,7 +18,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/ClangImporter/ClangModule.h"

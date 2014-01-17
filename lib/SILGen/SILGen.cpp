@@ -13,7 +13,7 @@
 #include "SILGenFunction.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ResilienceExpansion.h"

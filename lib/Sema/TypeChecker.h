@@ -20,7 +20,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/Basic/Fallthrough.h"

@@ -1,0 +1,74 @@
+//===- DiagnosticsFrontend.def - Diagnostics Text ---------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted in processing command-line arguments
+//  and setting up compilation.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+
+ERROR(cannot_open_serialized_file,frontend,none,
+  "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
+ERROR(error_open_input_file,frontend,none,
+  "error opening input file '%0' (%1)", (StringRef, StringRef))
+ERROR(error_clang_importer_not_linked_in,frontend,none,
+  "clang importer not available", ())
+ERROR(error_clang_importer_create_fail,frontend,none,
+  "clang importer creation failed", ())
+ERROR(error_missing_arg_value,frontend,none,
+  "missing argument value for '%0', expected %1 argument(s)",
+  (StringRef, unsigned))
+ERROR(error_unknown_arg,frontend,none,
+  "unknown argument: '%0'", (StringRef))
+ERROR(error_invalid_arg_value,frontend,none,
+  "invalid value '%1' in '%0'", (StringRef, StringRef))
+ERROR(error_immediate_mode_missing_stdlib,frontend,none,
+  "could not load the swift standard library", ())
+ERROR(error_immediate_mode_missing_library,frontend,none,
+  "could not load %select{shared library|framework}0 '%1'",
+  (unsigned, StringRef))
+
+ERROR(repl_must_be_initialized,sema,none,
+      "variables currently must have an initial value when entered at the "
+      "top level of the REPL", ())
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

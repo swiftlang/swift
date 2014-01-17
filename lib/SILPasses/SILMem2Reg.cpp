@@ -20,8 +20,7 @@
 
 #define DEBUG_TYPE "sil-mem2reg"
 #include "swift/SILPasses/Passes.h"
-#include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"

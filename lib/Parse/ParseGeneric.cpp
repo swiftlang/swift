@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Parser.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 

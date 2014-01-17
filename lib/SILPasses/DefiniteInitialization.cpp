@@ -14,7 +14,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/Fallthrough.h"

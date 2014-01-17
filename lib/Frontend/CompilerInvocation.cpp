@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/Frontend.h"
 
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Subsystems.h"
 #include "swift/Driver/Options.h"
 #include "llvm/ADT/STLExtras.h"

@@ -1,0 +1,791 @@
+//===- DiagnosticsSema.def - Diagnostics Text -------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during semantic analysis and type
+//  checking.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+
+NOTE(type_declared_here,sema,none,
+     "type declared here", ())
+NOTE(decl_declared_here,sema,none,
+     "%0 declared here", (Identifier))
+
+NOTE(while_converting_default_tuple_value,sema,none,
+     "while converting default tuple value to element type %0", (Type))
+NOTE(while_converting_subscript_index,sema,none,
+     "while converting subscript index to expected type %0", (Type))
+
+ERROR(constraint_type_check_fail,sema,none,
+      "expression does not type-check", ())
+
+//------------------------------------------------------------------------------
+// Name Binding
+//------------------------------------------------------------------------------
+
+ERROR(sema_no_import,sema_nb,none,
+      "no such module '%0'", (StringRef))
+ERROR(sema_no_import_submodule,sema_nb,none,
+      "no such module", ())
+NOTE(sema_no_import_no_sdk,sema_nb,none,
+     "did you forget to set an SDK using -sdk or SDKROOT?", ())
+ERROR(sema_opening_import,sema_nb,none,
+      "opening import file '%0.swift': %1", (StringRef, StringRef))
+
+ERROR(serialization_malformed_module,sema,none,
+      "malformed module file", ())
+ERROR(serialization_module_too_new,sema,none,
+      "module file was created by a newer version of the compiler", ())
+ERROR(serialization_missing_single_dependency,sema,none,
+      "missing required module '%0'", (StringRef))
+ERROR(serialization_missing_dependencies,sema,none,
+      "missing required modules: %0", (StringRef))
+ERROR(serialization_missing_shadowed_module,sema,none,
+      "cannot load underlying module for %0", (Identifier))
+
+ERROR(unknown_name_in_type,sema_nb,none,
+      "use of unknown scope %0 in type reference", (Identifier))
+
+ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration",())
+NOTE(invalid_redecl_prev,sema_nb,none,
+     "%0 previously declared here", (Identifier))
+
+ERROR(ambiguous_type_base,sema_nb,none,
+      "%0 is ambiguous for type look up in this context", (Identifier))
+ERROR(invalid_member_type,sema_nb,none,
+      "%0 is not a member type of %1", (Identifier, Type))
+ERROR(ambiguous_member_type,sema_nb,none,
+      "ambiguous type name %0 in %1", (Identifier, Type))
+ERROR(no_module_type,sema_nb,none,
+      "no type named %0 in module %1", (Identifier, Identifier))
+ERROR(ambiguous_module_type,sema_nb,none,
+      "ambiguous type name %0 in module %1", (Identifier, Identifier))
+ERROR(use_nonmatching_operator,sema_nb,none,
+      "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
+      (Identifier, unsigned))
+ERROR(use_unresolved_identifier,sema_nb,none,
+      "use of unresolved identifier %0", (Identifier))
+ERROR(use_undeclared_type,sema_nb,none,
+      "use of undeclared type %0", (Identifier))
+ERROR(use_module_as_type,sema_nb,none,
+      "use of module %0 as a type", (Identifier))
+ERROR(use_non_type_value,sema_nb,none,
+      "%0 is not a type", (Identifier))
+NOTE(use_non_type_value_prev,sema_nb,none,
+     "%0 declared here", (Identifier))
+
+ERROR(no_decl_in_module,sema_nb,none,
+      "no such decl in module", ())
+ERROR(imported_decl_is_wrong_kind,sema_nb,none,
+      "%0 was imported as '%1', but is a "
+      "%select{**MODULE**|type|struct|class|enum|protocol|variable|function}2",
+      (Identifier, StringRef, /*ImportKind*/ unsigned))
+ERROR(ambiguous_decl_in_module,sema_nb,none,
+      "ambiguous name %0 in module %1", (Identifier, Identifier))
+
+// Operator decls
+ERROR(ambiguous_operator_decls,sema_nb,none,
+      "ambiguous operator declarations found for operator", ())
+NOTE(found_this_operator_decl,sema_nb,none,
+     "found this matching operator declaration", ())
+ERROR(operator_redeclared,sema_nb,none,
+      "operator redeclared", ())
+NOTE(previous_operator_decl,sema_nb,none,
+     "previous operator declaration here", ())
+ERROR(declared_operator_without_operator_decl,sema_nb,none,
+      "operator implementation without matching operator declaration", ())
+ERROR(declared_unary_op_without_attribute,sema_nb,none,
+      "unary operator implementation must have a 'prefix' or 'postfix' attribute", ())
+ERROR(unary_op_missing_prepos_attribute,sema_nb,none,
+      "%select{prefix|postfix}0 unary operator missing "
+      "'%select{prefix|postfix}0' attribute", (bool))
+NOTE(unary_operator_declaration_here,sema_nb,none,
+   "%select{prefix|postfix}0 operator found here", (bool))
+ERROR(invalid_arg_count_for_operator,sema_nb,none,
+      "operators must have one or two arguments", ())
+
+//------------------------------------------------------------------------------
+// Type Check Coercions
+//------------------------------------------------------------------------------
+
+ERROR(tuple_conversion_not_expressible,sema_tcc,none,
+      "lame: cannot express tuple conversion %0 to %1", (Type, Type))
+ERROR(load_of_explicit_lvalue,sema_tcc,none,
+      "%0 variable is not being passed by reference", (Type))
+
+//------------------------------------------------------------------------------
+// Expression Type Checking Errors
+//------------------------------------------------------------------------------
+ERROR(invalid_relation,sema_tcc,none,
+  "%1 is not %select{identical to|a trivial subtype of|a subtype of|"
+  "convertible to|constructible with|identical to}0 %2", (unsigned, Type, Type))
+ERROR(invalid_tuple_size,sema_tcc,none,
+  "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
+  (Type, Type, unsigned, unsigned))
+ERROR(invalid_tuple_element_unused,sema_tcc,none,
+  "tuple element of type %0 unused when converting tuple to %1",
+  (Type, Type))
+ERROR(does_not_have_member,sema_tcc,none,
+  "%0 does not have a member named %1",
+  (Type, Identifier))
+ERROR(isa_is_always_true,sema_tcc,none,
+      "'is' test is always true",
+      (Type, Type))
+ERROR(downcast_to_unrelated,sema_tcc,none,
+      "downcast from %0 to unrelated type %1", (Type, Type))
+ERROR(downcast_to_non_objc_existential,sema_tcc,none,
+      "cannot downcast from %0 to non-@objc protocol type %1",
+      (Type, Type))
+ERROR(downcast_from_existential_to_unrelated,sema_tcc,none,
+      "cannot cast from protocol type %0 to non-conforming type %1",
+      (Type, Type))
+ERROR(downcast_from_archetype_to_unrelated,sema_tcc,none,
+      "cannot cast from type variable %0 to type %1 that does not match "
+      "its constraints",
+      (Type, Type))
+ERROR(downcast_from_concrete_to_unrelated_archetype,sema_tcc,none,
+      "cannot cast from concrete type %0 to type variable %1 for which it "
+      "does not match constraints",
+      (Type, Type))
+ERROR(pattern_in_expr,sema_tcc,none,
+      "%0 cannot appear in an expression", (PatternKind))
+NOTE(note_call_to_operator,sema_tcc,none,
+     "in call to operator %0", (Identifier))
+NOTE(note_call_to_func,sema_tcc,none,
+     "in call to function %0", (Identifier))
+NOTE(note_call_to_initializer,sema_tcc,none,
+     "in call to initializer", ())
+NOTE(note_init_parameter,sema_tcc,none,
+     "in initialization of parameter %0", (Identifier))
+
+
+//------------------------------------------------------------------------------
+// Type Check Declarations
+//------------------------------------------------------------------------------
+
+ERROR(operator_not_func,sema_tcd,none,
+      "operators must be declared with 'func'", ())
+ERROR(custom_operator_addressof,sema_tcd,none,
+      "cannot declare a custom unary '&' operator", ())
+ERROR(var_type_not_materializable,sema_tcd,none,
+      "type %0 of variable is not materializable", (Type))
+ERROR(enum_element_not_materializable,sema_tcd,none,
+      "type of enum case is not materializable", ())
+
+// Attributes
+ERROR(invalid_infix_input,sema_tcd,none,
+  "function with 'infix' specified must take a two element tuple as input",
+     ())
+ERROR(infix_not_an_operator,sema_tcd,none,
+      "only operator functions may be declared with an infix attribute", ())
+ERROR(postfix_not_an_operator,sema_tcd,none,
+      "only operator functions can be declared 'postfix'", ())
+ERROR(invalid_postfix_input,sema_tcd,none,
+      "only unary operators can be declared 'postfix'", ())
+ERROR(prefix_not_an_operator,sema_tcd,none,
+      "only operator functions can be declared 'prefix'", ())
+ERROR(invalid_prefix_input,sema_tcd,none,
+      "only unary operators can be declared 'prefix'", ())
+ERROR(assignment_without_inout,sema_tcd,none,
+      "assignment operator must have an initial @inout argument", ())
+ERROR(mutating_invalid,sema_tcd,none,
+      "@mutating is not valid on this declaration", ())
+ERROR(conversion_not_function,sema_tcd,none,
+      "conversion should be applied to an instance method", ())
+ERROR(conversion_not_instance_method,sema_tcd,none,
+      "conversion function %0 is not an instance method",
+      (Identifier))
+ERROR(transparent_not_valid,sema_tcd,none,
+      "'transparent' attribute cannot be applied to this declaration", ())
+ERROR(transparent_on_invalid_extension,sema_tcd,none,
+      "'transparent' attribute is only supported on struct and enum extensions", ())
+ERROR(transparent_in_protocols_not_supported,sema_tcd,none,
+      "'transparent' attribute is not supported on declarations within protocols",
+      ())
+ERROR(transparent_in_classes_not_supported,sema_tcd,none,
+      "'transparent' attribute is not supported on declarations within classes",
+      ())
+
+ERROR(conversion_params,sema_tcd,none,
+      "conversion function %0 has non-defaulted parameters", (Identifier))
+ERROR(invalid_iboutlet,sema_tcd,none,
+      "only properties can be declared 'IBOutlet'", ())
+ERROR(invalid_ibinspectable,sema_tcd,none,
+      "only properties can be declared 'IBInspectable'", ())
+ERROR(invalid_ibaction_decl,sema_tcd,none,
+      "only methods can be declared 'IBAction'", ())
+ERROR(invalid_ibaction_result,sema_tcd,none,
+      "methods declared 'IBAction' must return 'Void' (not %0)", (Type))
+ERROR(invalid_ibliveview_decl,sema_tcd,none,
+      "only classes can be declared 'IBLiveView'", ())
+ERROR(class_protocol_not_protocol,sema_tcd,none,
+      "'class_protocol' attribute can only be applied to protocols", ())
+      
+ERROR(invalid_decl_attribute,sema_tcd,none,
+      "attribute cannot be applied to declaration", ())
+ERROR(attribute_does_not_apply_to_type,type_parsing,none,
+      "attribute does not apply to type", ())
+ERROR(optional_attribute_non_protocol,sema_tcd,none,
+      "'optional' attribute can only be applied to protocol members", ())
+ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
+      "'optional' attribute can only be applied to members of an @objc protocol", 
+      ())
+ERROR(missing_in_class_init_1,sema_tcd,none,
+      "stored property %0 requires an initial value", (Identifier))
+ERROR(missing_in_class_init_2,sema_tcd,none,
+      "stored properties %0 and %1 require initial values", 
+      (Identifier, Identifier))
+ERROR(missing_in_class_init_3plus,sema_tcd,none,
+      "stored properties %0, %1, %select{and %2|%2, and others}3 "
+      "require initial values", (Identifier, Identifier, Identifier, bool))
+NOTE(requires_stored_property_inits_here,sema_tcd,none,
+     "%select{superclass|class}1 %0 requires all stored properties to have "
+     "initial values", (Type, bool))
+ERROR(inout_attribute_non_parameter,sema_tcd,none,
+      "'inout' attribute can only be applied to function parameters", ())
+
+// Extensions
+ERROR(non_nominal_extension,sema_tcd,none,
+      "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))
+
+// Protocols
+ERROR(type_does_not_conform,sema_tcd,none,
+      "type %0 does not conform to protocol %1", (Type, Type))
+ERROR(protocol_derivation_is_broken,sema_tcd,none,
+      "protocol %1 is broken; cannot derive conformance for type %0", (Type, Type))
+ERROR(type_does_not_inherit,sema_tcd,none,
+      "type %0 does not inherit from %1", (Type, Type))
+ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
+      "non-class type %0 cannot conform to class protocol %1",
+      (Type, Type))
+NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
+     "type %0 does not conform to inherited protocol %1", (Type, Type))
+NOTE(no_witnesses,sema_tcd,none,
+     "protocol requires %select{function %1|property %1|subscript operator}0 "
+     "with type %2", (int, Identifier, Type))
+NOTE(ambiguous_witnesses,sema_tcd,none,
+     "multiple matching "
+     "%select{functions named %1|properties named %1|subscript operators}0 "
+     "with type %2", (int, Identifier, Type))
+NOTE(no_witnesses_type,sema_tcd,none,
+     "protocol requires nested type %0", (Identifier))
+NOTE(default_assocated_type_req_fail,sema_tcd,none,
+     "default associated type definition %0 does not conform to %1", 
+     (Type, Type))
+NOTE(ambiguous_witnesses_type,sema_tcd,none,
+     "multiple matching types named %0", (Identifier))
+NOTE(protocol_witness_exact_match,sema_tcd,none,
+     "candidate exactly matches%0", (StringRef))
+NOTE(protocol_witness_renamed,sema_tcd,none,
+     "candidate matches (with renaming)%0", (StringRef))
+NOTE(protocol_witness_kind_conflict,sema_tcd,none,
+     "candidate has is not a %select{function|variable|subscript operator}0",
+     (unsigned))
+NOTE(protocol_witness_type_conflict,sema_tcd,none,
+     "candidate has non-matching type %0%1", (Type, StringRef))
+NOTE(protocol_witness_static_conflict,sema_tcd,none,
+     "candidate operates on %select{a type|an instance}0, not "
+     "%select{an instance|a type}0 as required", (bool))
+NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
+     "candidate is %select{|prefix, |postfix, }1not "
+     "%select{prefix|postfix}0 as required", (bool, unsigned))
+NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
+     "candidate is marked @mutating but protocol does not allow it", ())
+
+NOTE(protocol_witness_type,sema_tcd,none,
+     "possibly intended match", ())
+NOTE(protocol_witness_nonconform_type,sema_tcd,none,
+     "possibly intended match %0 does not conform to %1", (Type, Type))
+
+// Protocols and existentials
+NOTE(protocol_existential_assoc_type,sema_tcd,none,
+     "associated type %0 prevents protocol from conforming to itself",
+     (Identifier))
+NOTE(protocol_existential_refers_to_this,sema_tcd,none,
+     "%0 requirement refers to 'Self' type", (Identifier))
+
+ERROR(circular_protocol_def,sema_tcd,none,
+      "circular protocol inheritance %0", (StringRef))
+NOTE(protocol_here,sema_tcd,none,
+     "protocol %0 declared here", (Identifier))
+ERROR(protocol_composition_not_protocol,sema_tcd,none, 
+      "non-protocol type %0 cannot be used within 'protocol<...>'", (Type))
+ERROR(objc_protocol_inherits_non_objc_protocol,sema_tcd,none,
+      "[objc] protocol %0 cannot refine non-[objc] protocol %1", (Type, Type))
+
+ERROR(protocol_composition_dynamic_lookup,sema_tcd,none,
+      "'AnyObject' cannot be part of a protocol composition", ())
+ERROR(dynamic_lookup_conformance,sema_tcd,none,
+      "cannot declare explicit conformance to the 'AnyObject' protocol", ())
+
+ERROR(requires_conformance_nonprotocol,sema_tcd,none,
+      "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
+ERROR(requires_not_suitable_archetype,sema_tcd,none,
+      "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
+      "requirement does not refer to a generic parameter or associated type",
+      (int, TypeLoc, int))
+ERROR(requires_generic_param_equal,sema_tcd,none,
+      "same-type requirement makes generic parameters %0 and %1 equivalent",
+      (Identifier, Identifier))
+ERROR(requires_superclass_conflict,sema_tcd,none,
+      "generic parameter %0 cannot be a subclass of both %1 and %2",
+      (Identifier, Type, Type))
+
+ERROR(override_multiple_decls_base,sema_tcd,none,
+      "declaration cannot override more than one superclass declaration", ())
+ERROR(override_multiple_decls_derived,sema_tcd,none,
+      "declaration cannot be overridden by more than one subclass "
+      "declaration", ())
+ERROR(override_decl_extension,sema_tcd,none,
+      "declarations %select{in extensions|from extensions}0 cannot "
+      "%select{override|be overridden}0 yet", (bool))
+NOTE(overridden_here,sema_tcd,none,
+     "overridden declaration is here", ())
+ERROR(overload_base_decl,sema_tcd,none,
+      "cannot overload a declaration from a superclass", ())
+
+ERROR(decl_no_default_init,sema_tcd,none,
+      "cannot default-initialize variable of type %0", (Type))
+ERROR(decl_no_default_init_ivar_hole,sema_tcd,none,
+      "cannot use initial value when one of the variables is '_'", ())
+NOTE(decl_init_here,sema_tcd,none,
+     "initial value is here", ())
+
+// Inheritance
+ERROR(duplicate_inheritance,sema_tcd,none,
+  "duplicate inheritance from %0", (Type))
+ERROR(multiple_inheritance,sema_tcd,none,
+  "multiple inheritance from classes %0 and %1", (Type, Type))
+ERROR(non_class_inheritance,sema_tcd,none,
+  "non-class type %0 cannot inherit from class %1", (Type, Type))
+ERROR(extension_class_inheritance,sema_tcd,none,
+  "extension of type %0 cannot inherit from class %1", (Type, Type))
+ERROR(inheritance_from_non_protocol_or_class,sema_tcd,none,
+  "inheritance from non-protocol, non-class type %0", (Type))
+ERROR(inheritance_from_non_protocol,sema_tcd,none,
+  "inheritance from non-protocol type %0", (Type))
+ERROR(superclass_not_first,sema_tcd,none,
+  "superclass %0 must appear first in the inheritance clause", (Type))
+ERROR(circular_class_inheritance,sema_tcd,none,
+      "circular class inheritance %0", (StringRef))
+NOTE(class_here,sema_tcd,none,
+     "class %0 declared here", (Identifier))
+
+// Enum raw types
+ERROR(multiple_enum_raw_types,sema_tcd,none,
+  "multiple enum raw types %0 and %1", (Type, Type))
+ERROR(circular_enum_inheritance,sema_tcd,none,
+      "circular enum raw types %0", (StringRef))
+ERROR(raw_type_not_first,sema_tcd,none,
+  "raw type %0 must appear first in the enum inheritance clause", (Type))
+ERROR(raw_type_not_literal_convertible,sema_tcd,none,
+      "raw type %0 is not integer-, float-, char-, or string-literal-convertible",
+      (Type))
+NOTE(enum_here,sema_tcd,none,
+     "enum %0 declared here", (Identifier))
+ERROR(empty_enum_raw_type,sema_tcd,none,
+      "an enum with no cases cannot declare a raw type", ())
+ERROR(enum_raw_value_without_raw_type,sema_tcd,none,
+      "enum case cannot have a raw value if the enum does not have a raw type", ())
+ERROR(enum_with_raw_type_case_with_argument,sema_tcd,none,
+      "enum with raw type cannot have cases with arguments", ())
+NOTE(enum_raw_type_here,sema_tcd,none,
+     "declared raw type %0 here", (Type))
+ERROR(enum_non_integer_raw_value_auto_increment,sema_tcd,none,
+      "enum case must declare a raw value when the preceding raw value is not an integer", ())
+ERROR(enum_non_integer_convertible_raw_type_no_value,sema_tcd,none,
+      "enum cases require explicit raw values when the raw type is not integer literal convertible", ())
+ERROR(enum_raw_value_not_unique,sema_tcd,none,
+      "raw value for enum case is not unique", ())
+NOTE(enum_raw_value_used_here,sema_tcd,none,
+     "raw value previously used here", ())
+NOTE(enum_raw_value_incrementing_from_here,sema_tcd,none,
+     "raw value auto-incremented from here",())
+NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
+     "raw value implicitly auto-incremented from zero",())
+     
+ERROR(broken_raw_representable_requirement,sema_tcd,none,
+      "RawRepresentable protocol is broken: unexpected requirement", ())
+
+// Duplicate declarations
+ERROR(duplicate_enum_element,sema_tcd,none,
+      "duplicate definition of enum element",())
+
+//------------------------------------------------------------------------------
+// Type Check Expressions
+//------------------------------------------------------------------------------
+
+NOTE(found_candidate,sema_tce,none,
+     "found this candidate", ())
+NOTE(found_candidate_type,sema_tce,none,
+     "found candidate with type %0", (Type))
+NOTE(first_declaration,sema_tce,none,
+     "first declaration", ())
+NOTE(second_declaration,sema_tce,none,
+     "second declaration", ())
+
+ERROR(no_IntegerLiteralType_found,sema_tce,none,
+      "standard library error: IntegerLiteralType not defined", ())
+ERROR(no_FloatLiteralType_found,sema_tce,none,
+      "standard library error: FloatLiteralType not defined", ())
+ERROR(no_CharacterLiteralType_found,sema_tce,none,
+      "standard library error: CharacterLiteralType not defined", ())
+ERROR(no_StringLiteralType_found,sema_tce,none,
+      "standard library error: StringLiteralType not defined", ())
+ERROR(no_MaxBuiltinIntegerType_found,sema_tce,none,
+   "standard library error: MaxBuiltinIntegerType is not properly defined", ())
+ERROR(no_MaxBuiltinFloatType_found,sema_tce,none,
+   "standard library error: MaxBuiltinFloatType is not properly defined", ())
+
+ERROR(no_member_of_module,sema_tce,none,
+      "module %0 has no member named %1", (Identifier, Identifier))
+
+ERROR(super_with_no_base_class,sema_tce,none,
+      "'super' members cannot be referenced in a root class", ())
+
+ERROR(bad_init_ref_base,sema_tce, none,
+      "'init' can only refer to the initializers of "
+      "'self'%select{| or 'super'}0", (bool))
+ERROR(init_delegation_outside_initializer,sema_tce,none,
+      "initializer delegation can only occur within an initiailizer", ())
+ERROR(init_delegates_and_chains,sema_tce,none,
+      "initializer cannot both delegate ('self.init') and chain to a "
+      "superclass initializer ('super.init')", ())
+NOTE(init_delegation_or_chain,sema_tce,none,
+      "previous %select{delegation|chaining}0 call is here", (bool))
+ERROR(non_delegating_init_outside_module,sema_tce,none,
+      "initializer for %0 defined outside module %1 must delegate "
+      "(with 'self.init')", (Type, Identifier))
+
+// Operators
+ERROR(unknown_binop,sema_tce,none,
+       "operator is not a known binary operator", ())
+ERROR(non_assoc_adjacent,sema_tce,none,
+      "non-associative operator is adjacent to operator of same precedence", ())
+ERROR(incompatible_assoc,sema_tce,none,
+      "operator is adjacent to operator of same precedence"
+      " but incompatible associativity", ())
+ERROR(reference_non_inout,sema_tce,none,
+      "reference to %0 not used to initialize a @inout parameter", (Type))
+NOTE(subscript_decl_here,sema_tca,none,
+     "subscript operator declared here", ())
+ERROR(condition_broken_proto,sema_tce,none,
+      "protocol 'LogicValue' is broken", ())
+ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
+ERROR(binding_injected_optional,sema_tce,none,
+      "operand of postfix '?' should have optional type; type is %0", (Type))
+
+ERROR(forcing_injected_optional,sema_tce,none,
+      "operand of postfix '!' should have optional type; type is %0", (Type))
+
+ERROR(new_array_bound_zero,sema_tce,none,
+      "array type cannot have zero length", ())
+ERROR(non_constant_array,type_parsing,none,
+      "array has non-constant size", ())
+ERROR(broken_array_bound_proto,sema_tce,none,
+      "protocol 'ArrayBound' is broken", ())
+ERROR(broken_builtin_array_bound,sema_tce,none,
+      "builtin 'ArrayBound' type is broken", ())
+
+ERROR(interpolation_missing_proto,sema_tce,none,
+      "string interpolation requires the protocol 'StringInterpolationConvertible' to be defined",
+      ())
+ERROR(interpolation_broken_proto,sema_tce,none,
+      "protocol 'StringInterpolationConvertible' is broken",
+      ())
+
+ERROR(discard_expr_outside_of_assignment,sema_tce,none,
+      "'_' can only appear in a pattern or on the left side of an assignment",
+      ())
+
+ERROR(missing_protocol,sema_tce,none,
+      "missing protocol %0", (Identifier))
+      
+ERROR(builtin_integer_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinIntegerLiteralConvertible' is broken", ())
+ERROR(integer_literal_broken_proto,sema_tce,none,
+      "protocol 'IntegerLiteralConvertible' is broken", ())
+
+ERROR(builtin_float_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinFloatLiteralConvertible' is broken", ())
+ERROR(float_literal_broken_proto,sema_tce,none,
+      "protocol 'FloatLiteralConvertible' is broken", ())
+
+ERROR(builtin_character_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinCharacterLiteralConvertible' is broken", ())
+ERROR(character_literal_broken_proto,sema_tce,none,
+      "protocol 'CharacterLiteralConvertible' is broken", ())
+
+ERROR(builtin_string_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinStringLiteralConvertible' is broken", ())
+ERROR(string_literal_broken_proto,sema_tce,none,
+      "protocol 'StringLiteralConvertible' is broken", ())
+
+ERROR(bool_type_broken,sema_tce,none,
+      "could not find a Bool type defined for 'is'", ())
+
+// Array literals
+ERROR(array_protocol_broken,sema_tce,none,
+      "ArrayLiteralConvertible protocol definition is broken", ())
+
+// Dictionary literals
+ERROR(dictionary_protocol_broken,sema_tce,none,
+      "DictionaryLiteralConvertible protocol definition is broken", ())
+      
+// Generic specializations
+ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
+      "cannot explicitly specialize a generic function", ())
+ERROR(not_a_generic_definition,tce_sema,none,
+      "cannot specialize a non-generic definition", ())
+ERROR(not_a_generic_type,tce_sema,none,
+      "cannot specialize non-generic type %0", (Type))
+ERROR(type_parameter_count_mismatch,tce_sema,none,
+      "generic type %0 specialized with %select{too many|too few}3 type "
+      "parameters (got %2, but expected %1)",
+      (Identifier, unsigned, unsigned, bool))
+ERROR(generic_type_requires_arguments,tce_sema,none,
+      "reference to generic type %0 requires arguments in <...>", (Type))
+NOTE(generic_type_declared_here,tce_sema,none,
+     "generic type %0 declared here", (Identifier))
+
+// Ambiguities
+ERROR(ambiguous_decl_ref,tce_sema,none,
+      "ambiguous use of %0", (Identifier))
+ERROR(ambiguous_operator_ref,tce_sema,none,
+      "ambiguous use of operator %0", (Identifier))
+
+ERROR(partial_application_of_value_type_method,tce_sema,none,
+      "partial application of %select{struct|enum|generic|protocol}0 method is not allowed", (unsigned))
+
+ERROR(self_assignment_var,tce_sema,none,
+      "assigning a variable to itself", ())
+ERROR(self_assignment_prop,tce_sema,none,
+      "assigning a property to itself", ())
+
+WARNING(unindented_code_after_return,tce_sema,none,
+        "expression following 'return' is treated as an argument of "
+        "the 'return'", ())
+NOTE(indent_expression_to_silence,tce_sema,none,
+     "indent the expression to silence this warning", ())
+
+ERROR(value_of_module_type,tce_sema,none,
+      "expected module member name after module name", ())
+
+//------------------------------------------------------------------------------
+// Type Check Statements
+//------------------------------------------------------------------------------
+
+ERROR(return_invalid_outside_func,sema_tcs,none,
+      "return invalid outside of a func", ())
+ERROR(return_expr_missing,sema_tcs,none,
+      "non-void function should return a value", ())
+ERROR(expression_unused_function,sema_tcs,none,
+      "expression resolves to an unused function", ())
+ERROR(expression_unused_lvalue,sema_tcs,none,
+      "expression resolves to an unused l-value", ())
+ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
+      "cannot assign to the result of this expression", ())
+
+// ForEach Stmt
+ERROR(sequence_protocol_broken,sema_tcs,none,
+      "Sequence protocol definition is broken", ())
+ERROR(generator_protocol_broken,sema_tcs,none,
+      "Stream protocol definition is broken", ())
+
+ERROR(break_outside_loop,sema_tcs,none,
+      "'break' is only allowed inside a loop", ())
+ERROR(continue_outside_loop,sema_tcs,none,
+      "'continue' is only allowed inside a loop", ())
+
+// Switch Stmt
+ERROR(no_match_operator,sema_tcs,none,
+      "no binary '~=' operator available for 'switch' statement", ())
+ERROR(fallthrough_outside_switch,sema_tcs,none,
+      "'fallthrough' is only allowed inside a switch", ())
+ERROR(fallthrough_from_last_case,sema_tcs,none,
+      "'fallthrough' without a following 'case' or 'default' block", ())
+ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
+      "'fallthrough' cannot transfer control to a case label that declares variables",
+      ())
+
+//------------------------------------------------------------------------------
+// Type Check Patterns
+//------------------------------------------------------------------------------
+
+ERROR(cannot_infer_type_for_pattern,sema_tcp,none,
+      "type annotation missing in pattern", ())
+ERROR(pattern_type_mismatch_context,sema_tcp,none,
+      "type annotation does not match contextual type %0", (Type))
+ERROR(tuple_pattern_in_non_tuple_context,sema_tcp,none,
+      "tuple pattern cannot match values of the non-tuple type %0", (Type))
+ERROR(tuple_pattern_length_mismatch,sema_tcp,none,
+      "tuple pattern has the wrong length for tuple type %0", (Type))
+ERROR(enum_element_pattern_member_not_found,sema_tcp,none,
+      "enum case '%0' not found in type %1", (StringRef, Type))
+ERROR(enum_element_pattern_not_enum,sema_tcp,none,
+      "enum case pattern cannot match values of the non-enum type %0", (Type))
+ERROR(enum_element_pattern_not_member_of_enum,sema_tcp,none,
+      "enum case '%0' is not a member of type %1", (StringRef, Type))
+ERROR(nominal_type_pattern_not_nominal_type,sema_tcp,none,
+      "non-nominal type %0 cannot be used with property pattern syntax", (Type))
+ERROR(nominal_type_pattern_type_mismatch,sema_tcp,none,
+      "type %0 of pattern does not match deduced type %1", (Type, Type))
+ERROR(nominal_type_pattern_property_not_found,sema_tcp,none,
+      "property '%0' not found in type %1", (StringRef, Type))
+ERROR(nominal_type_pattern_property_ambiguous,sema_tcp,none,
+      "property name '%0' in type %1 is ambiguous", (StringRef, Type))
+ERROR(nominal_type_pattern_not_property,sema_tcp,none,
+      "member '%0' of type %1 is not a property", (StringRef, Type))
+ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
+      "subpattern of a struct or class pattern must have a keyword name", ())
+
+
+//------------------------------------------------------------------------------
+// Type Check Types
+//------------------------------------------------------------------------------
+
+ERROR(sugar_type_not_found,sema_tct,none,
+      "broken standard library: cannot find "
+      "%select{Array|Optional|UncheckedOptional}0 type",
+      (/*SugarImplTypeKind*/ unsigned))
+ERROR(optional_intrinsics_not_found,sema_tct,none,
+      "broken standard library: cannot find intrinsic operations on "
+      "Optional<T>", ())
+ERROR(bool_intrinsics_not_found,sema_tct,none,
+      "broken standard library: cannot find intrinsic operations on Bool", ())
+ERROR(unchecked_not_optional_type,sema_tct,none,
+      "type following '@unchecked' must be an optional type", ())
+
+// Ownership
+ERROR(invalid_ownership_decl,attribute_parsing,none,
+      "'%select{strong|weak|unowned}0' attribute only applies to 'var' "
+      "declarations", (unsigned))
+ERROR(invalid_ownership_type,attribute_parsing,none,
+      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "non-class type %1", (unsigned, Type))
+ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
+      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "non-class type %1; consider adding a class bound", (unsigned, Type))
+ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
+      "'weak' variable should have Optional type %0", (Type))
+
+// requires_stored_property_inits
+ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
+      "'requires_stored_property_inits' attribute can only be applied to a class", ())
+
+// Functions
+ERROR(attribute_requires_function_type,attribute_parsing,none,
+      "attribute only applies to syntactic function types", ())
+ERROR(first_class_generic_function,type_parsing,PointsToFirstBadToken,
+      "generic types cannot be used as first-class types", ())
+ERROR(autoclosure_function_input_nonunit,attribute_parsing,none,
+      "auto_closure argument type must be '()'", ())
+
+// SIL
+ERROR(sil_local_storage_nested, decl_parsing,none,
+      "local storage types cannot be in nested positions", ())
+ERROR(sil_self_non_protocol, decl_parsing,none,
+      "@sil_self cannot be applied to non-protocol type %0", (Type))
+ERROR(sil_function_ellipsis,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot be variadic", ())
+ERROR(sil_function_label,type_parsing,PointsToFirstBadToken,
+      "SIL function types cannot have labeled inputs", ())
+ERROR(sil_function_repeat_convention,type_parsing,PointsToFirstBadToken,
+      "repeated %select{parameter|result|callee}0 convention attribute",
+      (unsigned))
+
+// SIL Metatypes
+ERROR(sil_metatype_without_thinness_attribute,type_parsing,none,
+      "metatypes in SIL must have @thin or @thick attribute", ())
+ERROR(sil_metatype_thin_and_thick,type_parsing,none,
+      "metatypes in SIL cannot be both @thin and @thick", ())
+
+//------------------------------------------------------------------------------
+// @objc
+//------------------------------------------------------------------------------
+
+ERROR(invalid_objc_decl,sema_tcd,none,
+      "only classes, protocols, methods, properties, and subscript "
+      "declarations can be declared 'objc'", ())
+ERROR(objc_class_not_top_level,sema_tcd,none,
+      "only classes at file scope can be declared 'objc'", ())
+ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
+      "only [class_protocol] protocols can be declared 'objc'", ())
+ERROR(objc_invalid_on_static_var,sema_tcd,none,
+      "type properties cannot be declared '@objc'", ())
+
+ERROR(objc_invalid_on_var,sema_objc,none,
+      "property cannot be marked %select{@objc|@IBOutlet}0 because its type "
+      "cannot be represented in Objective-C", (unsigned))
+NOTE(not_objc_empty_protocol_composition,sema_objc,none,
+     "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
+NOTE(not_objc_protocol,sema_objc,none,
+     "protocol %0 is not '@objc'", (Type))
+NOTE(not_objc_empty_tuple,sema_objc,none,
+      "empty tuple type cannot be represented in Objective-C", ())
+NOTE(not_objc_tuple,sema_objc,none,
+      "tuples cannot be represented in Objective-C", ())
+NOTE(not_objc_swift_struct,sema_objc,none,
+      "Swift structs cannot be represented in Objective-C", ())
+NOTE(not_objc_swift_enum,sema_objc,none,
+      "Swift enums cannot be represented in Objective-C", ())
+NOTE(not_objc_generic_type_param,sema_objc,none,
+     "generic type parameters cannot be represented in Objective-C", ())
+
+ERROR(objc_invalid_on_func_curried,sema_objc,none,
+      "method cannot be marked @objc because curried functions cannot be "
+      "represented in Objective-C", ())
+ERROR(objc_invalid_on_tuple_style,sema_objc,none,
+      "method cannot be marked @objc because it is not using selector-style "
+      "declaration syntax", ())
+ERROR(objc_invalid_on_func_param_type,sema_objc,none,
+      "method cannot be marked @objc because the type of the parameter %0 "
+      "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_on_func_single_param_type,sema_objc,none,
+      "method cannot be marked @objc because the type of the parameter "
+      "cannot be represented in Objective-C", ())
+ERROR(objc_invalid_on_func_result_type,sema_objc,none,
+      "method cannot be marked @objc because its result type cannot be "
+      "represented in Objective-C", ())
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

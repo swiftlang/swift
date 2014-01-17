@@ -18,7 +18,7 @@
 
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"

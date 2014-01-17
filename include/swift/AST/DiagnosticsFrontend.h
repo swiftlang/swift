@@ -1,4 +1,4 @@
-//===- DiagnosticList.cpp - Diagnostic Definitions --------------*- C++ -*-===//
+//===- DiagnosticsFrontend.h - Diagnostic Definitions -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,24 +10,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines all of the diagnostics emitted by Swift.
+/// \file
+/// \brief This file defines diagnostics for the frontend.
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_DIAGNOSTICSFRONTEND_H
+#define SWIFT_DIAGNOSTICSFRONTEND_H
+
 #include "swift/AST/DiagnosticsCommon.h"
-using namespace swift;
 
-enum class swift::DiagID : uint32_t {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
-#include "swift/AST/DiagnosticsAll.def"
-};
-
-// Define all of the diagnostic objects and initialize them with their 
-// diagnostic IDs.
 namespace swift {
   namespace diag {
+  // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
-    detail::DiagWithArguments<void Signature>::type ID = { DiagID::ID };
-#include "swift/AST/DiagnosticsAll.def"
+  extern detail::DiagWithArguments<void Signature>::type ID;
+#include "DiagnosticsFrontend.def"
   }
 }
+
+#endif

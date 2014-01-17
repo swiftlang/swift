@@ -1,0 +1,812 @@
+//===- DiagnosticsParse.def - Diagnostics Text ------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during lexing and parsing.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+//==============================================================================
+// Lexing and Parsing diagnostics
+//==============================================================================
+
+NOTE(opening_brace,parsing,none,
+     "to match this opening '{'", ())
+NOTE(opening_bracket,parsing,none,
+     "to match this opening '['", ())
+NOTE(opening_paren,parsing,none,
+     "to match this opening '('", ())
+NOTE(opening_angle,parsing,none,
+     "to match this opening '<'", ())
+NOTE(previous_declaration,parsing,none,
+     "previous declaration of %0 is here", (Identifier))
+NOTE(previous_definition,parsing,none,
+     "previous definition of %0 is here", (Identifier))
+
+ERROR(extra_rbrace,parsing,none,
+      "extraneous '}' at top level", ())
+      
+//------------------------------------------------------------------------------
+// Lexer diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(lex_nul_character,lexing,none,
+        "nul character embedded in middle of file", ())
+WARNING(lex_missing_newline_eof,lexing,none,
+        "missing newline at end of file", ())
+ERROR(lex_utf16_bom_marker,lexing,none,
+        "UTF-16 BOM marker is not valid UTF-8", ())
+
+ERROR(lex_hashbang_not_allowed,lexing,none,
+      "hashbang line is allowed only in the main file", ())
+
+ERROR(lex_unprintable_ascii_character,lexing,none,
+      "unprintable ASCII character found in source file", ())
+ERROR(lex_invalid_utf8_character,lexing,none,
+      "input files must be encoded as UTF-8 instead of UTF-16", ())
+
+ERROR(lex_unterminated_block_comment,lexing,none,
+      "unterminated '/*' comment", ())
+NOTE(lex_comment_start,lexing,none,
+     "comment started here", ())
+
+ERROR(lex_invalid_multi_code_point_character_literal,lexing,none,
+      "invalid multiple-code-point character literal", ())
+ERROR(lex_unterminated_character_literal,lexing,none,
+      "unterminated character literal", ())
+ERROR(lex_invalid_character_literal,lexing,none,
+      "invalid character literal", ())
+
+ERROR(lex_unterminated_string,lexing,none,
+      "unterminated string literal", ())
+ERROR(lex_unexpected_quote_string_interpolation,lexing,none,
+      "unexpected '\"' character in string interpolation", ())
+ERROR(lex_invalid_escape,lexing,none,
+       "invalid escape sequence in literal", ())
+ERROR(lex_invalid_x_escape,lexing,none,
+       "\\x escape sequence expects 2 hex digits to follow it", ())
+ERROR(lex_invalid_u_escape,lexing,none,
+       "\\u escape sequence expects 4 hex digits to follow it", ())
+ERROR(lex_invalid_U_escape,lexing,none,
+       "\\U escape sequence expects 8 hex digits to follow it", ())
+ERROR(lex_invalid_unicode_code_point,lexing,none,
+       "invalid unicode code point", ())
+ERROR(lex_invalid_hex_escape,lexing,none,
+       "invalid hex escape, use \\u00XX for values over \\x7F", ())
+
+
+ERROR(lex_invalid_character,lexing,none,
+       "invalid character in source file", ())
+ERROR(lex_invalid_identifier_start_character,lexing,none,
+       "an identifier cannot begin with this character", ())
+ERROR(lex_expected_digit_in_fp_exponent,lexing,none,
+       "expected a digit in floating point exponent", ())
+ERROR(lex_expected_digit_in_int_literal,lexing,none,
+       "expected a digit after integer literal prefix", ())
+ERROR(lex_expected_binary_exponent_in_hex_float_literal,lexing,none,
+      "hexadecimal floating point literal must end with an exponent", ())
+ERROR(lex_unexpected_block_comment_end,lexing,none,
+      "unexpected end of block comment", ())
+ERROR(lex_unary_equal_is_reserved,lexing,none,
+      "prefix/postfix '=' is reserved", ())
+ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
+      "postfix '.' is reserved", ())
+ERROR(lex_unexpected_long_period_series,lexing,none,
+      "unexpected long series of '.'", ())
+
+
+//------------------------------------------------------------------------------
+// Declaration parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(bad_module_name,decl_parsing,none,
+      "module name \"%0\" is not a valid identifier"
+      "%select{|; use -module-name flag to specify an alternate name}1",
+      (StringRef, bool))
+
+ERROR(declaration_same_line_without_semi,decl_parsing,none,
+      "consecutive declarations on a line must be separated by ';'", ())
+
+ERROR(expected_decl,decl_parsing,none,
+      "expected declaration", ())
+ERROR(expected_identifier_in_decl,decl_parsing,none,
+      "expected identifier in %0 declaration", (StringRef))
+ERROR(expected_identifier_after_case_comma,decl_parsing,none,
+      "expected identifier after comma in enum 'case' declaration", ())
+ERROR(decl_redefinition,decl_parsing,none,
+      "%select{declaration|definition}0 conflicts with previous value", 
+      (bool))
+ERROR(let_requires_initializer,decl_parsing,none,
+      "'let' declarations require an initializer expression", ())
+ERROR(let_cannot_be_computed_property,decl_parsing,none,
+      "'let' declarations cannot be a computed property", ())
+ERROR(disallowed_stored_var_decl,decl_parsing,none,
+      "'var' declarations without getter/setter not allowed here", ())
+ERROR(disallowed_computed_var_decl,decl_parsing,none,
+      "'var' declarations with getter/setter not allowed here", ())
+ERROR(disallowed_var_multiple_getset,decl_parsing,none,
+      "'var' declarations with multiple variables cannot have explicit getters/setters", ())
+ERROR(disallowed_type,decl_parsing,none,
+      "type not allowed here", ())
+ERROR(disallowed_init,decl_parsing,none,
+      "initial value is not allowed here", ())
+ERROR(var_init_self_referential,expr_parsing,none,
+      "variable used within its own initial value", ())
+ERROR(disallowed_enum_element,decl_parsing,none,
+      "enum 'case' is not allowed outside of an enum", ())
+ERROR(decl_inner_scope,decl_parsing,none,
+      "declaration is only valid at file scope", ())
+
+ERROR(decl_not_type,decl_parsing,none,
+      "declaration cannot be marked 'type'", ())
+ERROR(static_is_type,decl_parsing,none,
+      "the 'static' keyword has been renamed to 'type'", ())
+
+// Var Name
+ERROR(unimplemented_type_var,decl_parsing,none,
+     "type variables not yet supported in "
+     "%select{this context|generic types|classes|protocols}0", (unsigned))
+
+// Variable getters/setters
+ERROR(getset_missing_type,decl_parsing,none,
+      "variable with getter/setter must have an explicit type", ())
+ERROR(getset_nontrivial_pattern,decl_parsing,none,
+      "getter/setter can only be defined for a single variable", ())
+ERROR(expected_rbrace_in_getset,decl_parsing,none,
+      "expected '}' at end of variable get/set clause", ())
+ERROR(duplicate_getset,decl_parsing,none,
+      "duplicate definition of %select{getter|setter}0",
+      (bool))
+NOTE(previous_getset,decl_parsing,none,
+     "previous definition of %select{getter|setter}0 is here", (bool))
+ERROR(expected_colon_get,decl_parsing,none,
+      "expected ':' to start getter definition", ())
+ERROR(expected_setname,decl_parsing,none,
+      "expected the name of the setter value",())
+ERROR(expected_rparen_setname,decl_parsing,none,
+      "expected ')' after setter value name",())
+ERROR(expected_colon_set,decl_parsing,none,
+      "expected ':' to start setter definition", ())
+ERROR(var_set_without_get,decl_parsing,none,
+      "variable with a setter must also have a getter", ())
+ERROR(getset_init,decl_parsing,none,
+      "variable with getter/setter cannot have an initial value", ())
+ERROR(getset_cannot_be_implied,decl_parsing,none,
+      "variable with implied type cannot have implied getter/setter", ())
+
+// Import
+ERROR(decl_expected_module_name,decl_parsing,none,
+      "expected module name in import declaration", ())
+
+// Extension
+ERROR(expected_lbrace_extension,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in extension", ())
+ERROR(expected_rbrace_extension,decl_parsing,none,
+      "expected '}' at end of extension", ())
+ERROR(expected_ident_type_in_extension,decl_parsing,none,
+      "non-nominal type %0 cannot be extended", (TypeLoc))
+
+// TypeAlias
+ERROR(expected_equal_in_typealias,decl_parsing,PointsToFirstBadToken,
+      "expected '=' in typealias declaration", ())
+ERROR(expected_type_in_typealias,decl_parsing,PointsToFirstBadToken,
+      "expected type in typealias declaration", ())
+
+// Func
+ERROR(func_decl_nonglobal_operator,decl_parsing,none,
+      "operators are only allowed at global scope", ())
+ERROR(func_decl_without_paren,decl_parsing,PointsToFirstBadToken,
+      "expected '(' in argument list of function declaration", ())
+ERROR(static_func_decl_global_scope,decl_parsing,none,
+      "type functions may only be declared on a type", ())
+ERROR(static_functions_not_mutating,sema_tcd,none,
+      "type functions may not be declared @mutating", ())
+ERROR(func_selector_without_paren,decl_parsing,PointsToFirstBadToken,
+      "expected '(' after identifier in argument list of selector-style function declaration", ())
+ERROR(func_selector_with_not_one_argument,decl_parsing,none,
+      "selector-style function arguments may only be used with one-argument patterns", ())
+ERROR(func_selector_with_curry,decl_parsing,none,
+      "funcs with selector-style arguments may not be curried", ())
+ERROR(func_decl_expected_arrow,decl_parsing,none,
+      "expected '->' after function parameter tuple", ())
+
+// Enum
+ERROR(expected_lbrace_enum,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in enum", ())
+ERROR(expected_rbrace_enum,decl_parsing,none,
+      "expected '}' at end of enum", ())
+
+// Struct
+ERROR(expected_lbrace_struct,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in struct", ())
+ERROR(expected_rbrace_struct,decl_parsing,none,
+      "expected '}' in struct", ())
+
+// Class
+ERROR(expected_lbrace_class,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in class", ())
+ERROR(expected_rbrace_class,decl_parsing,none,
+      "expected '}' in class", ())
+
+// Protocol
+ERROR(expected_lbrace_protocol,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in protocol type", ())
+ERROR(expected_rbrace_protocol,decl_parsing,none,
+      "expected '}' in protocol", ())
+
+// Subscripting
+ERROR(subscript_decl_wrong_scope,decl_parsing,none,
+      "'subscript' functions may only be declared within a type", ())
+ERROR(expected_lparen_subscript,decl_parsing,PointsToFirstBadToken,
+      "expected '(' for subscript parameters", ())
+ERROR(expected_arrow_subscript,decl_parsing,PointsToFirstBadToken,
+      "expected '->' for subscript element type", ())
+ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
+      "expected subscripting element type", ())
+ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
+      "expected '{' for subscripting", ())
+ERROR(subscript_without_get,decl_parsing,none,
+      "subscripting must have a getter", ())
+ERROR(subscript_static,decl_parsing,none,
+     "subscript cannot be marked 'type'", ())
+
+// initializer
+ERROR(initializer_decl_wrong_scope,decl_parsing,none,
+      "initializers may only be declared within a class, struct, or enum", ())
+ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
+      "expected '(' or parameter name for initializer parameters", ())
+ERROR(expected_lbrace_initializer,decl_parsing,PointsToFirstBadToken,
+      "expected '{' for initializer", ())
+
+// Destructor
+ERROR(destructor_decl_outside_class,decl_parsing,none,
+      "'destructor' functions may only be declared within a class", ())
+ERROR(expected_lparen_destructor,decl_parsing,none,
+      "expected an empty parameter list for destructor", ())
+ERROR(destructor_parameter_nonempty_tuple,decl_parsing,none,
+      "destructors don't have parameters", ())
+ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
+      "expected '{' for destructor", ())
+
+// Operator
+ERROR(operator_decl_inner_scope,decl_parsing,none,
+      "'operator' may only be declared at file scope", ())
+ERROR(expected_operator_name_after_operator,decl_parsing,PointsToFirstBadToken,
+      "expected operator name after fixity in 'operator' declaration", ())
+ERROR(expected_lbrace_after_operator,decl_parsing,PointsToFirstBadToken,
+      "expected '{' after operator name in 'operator' declaration", ())
+ERROR(expected_operator_attribute,decl_parsing,none,
+      "expected operator attribute identifier in 'operator' declaration body", ())
+ERROR(unknown_prefix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid prefix operator attribute", (StringRef))
+ERROR(unknown_postfix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid postfix operator attribute", (StringRef))
+ERROR(unknown_infix_operator_attribute,decl_parsing,none,
+      "'%0' is not a valid infix operator attribute", (StringRef))
+ERROR(operator_associativity_redeclared,decl_parsing,none,
+      "'associativity' for infix operator declared multiple times", ())
+ERROR(expected_infix_operator_associativity,decl_parsing,none,
+      "expected identifier after 'associativity' in 'operator' declaration body", ())
+ERROR(unknown_infix_operator_associativity,decl_parsing,none,
+      "'%0' is not a valid infix operator associativity; must be 'none', 'left', or 'right'", (StringRef))
+ERROR(operator_precedence_redeclared,decl_parsing,none,
+      "'precedence' for infix operator declared multiple times", ())
+ERROR(expected_infix_operator_precedence,decl_parsing,none,
+      "expected integer literal after 'precedence' in 'operator' declaration body", ())
+ERROR(invalid_infix_operator_precedence,decl_parsing,none,
+      "'precedence' must be in the range of 0 to 255", ())
+
+// SIL
+ERROR(only_allowed_in_sil, decl_parsing,none,
+      "'%0' only allowed in SIL modules", (StringRef))
+ERROR(expected_sil_type, decl_parsing,none,
+      "expected type in SIL code", ())
+ERROR(expected_sil_colon_value_ref,decl_parsing,none,
+      "expected ':' before type in SIL value reference", ())
+ERROR(expected_sil_value_name,decl_parsing,none,
+      "expected SIL value name", ())
+ERROR(expected_sil_value_name_result_number,decl_parsing,none,
+      "expected result number in SIL value name", ())
+ERROR(invalid_sil_value_name_result_number,decl_parsing,none,
+      "invalid result number in SIL value", ())
+ERROR(expected_sil_type_kind, decl_parsing,none,
+      "expected SIL type to %0", (StringRef))
+ERROR(expected_sil_constant, decl_parsing,none,
+      "expected constant in SIL code", ())
+ERROR(sil_local_storage_non_address, decl_parsing,none,
+      "can only work with the address of local storage", ())
+
+// SIL Values
+ERROR(sil_value_redefinition, decl_parsing,none,
+      "redefinition of value '%0'", (StringRef))
+ERROR(sil_value_use_type_mismatch, decl_parsing,none,
+      "value '%0' defined with mismatching type %1", (StringRef, Type))
+ERROR(sil_value_def_type_mismatch, decl_parsing,none,
+      "value '%0' used with mismatching type %1", (StringRef, Type))
+ERROR(sil_use_of_undefined_value, decl_parsing,none,
+      "use of undefined value '%0'", (StringRef))
+NOTE(sil_prior_reference,parsing,none,
+     "prior reference was here", ())
+
+
+// SIL Instructions
+ERROR(expected_sil_instr_start_of_line,decl_parsing,none,
+      "SIL instructions must be at the start of a line", ())
+ERROR(expected_equal_in_sil_instr,decl_parsing,none,
+      "expected '=' in SIL instruction", ())
+ERROR(expected_sil_instr_opcode,decl_parsing,none,
+      "expected SIL instruction opcode", ())
+ERROR(expected_tok_in_sil_instr,decl_parsing,none,
+      "expected '%0' in SIL instruction", (StringRef))
+ERROR(sil_string_no_encoding,decl_parsing,none,
+      "string_literal instruction requires an encoding", ())
+ERROR(sil_string_invalid_encoding,decl_parsing,none,
+      "unknown string literal encoding '%0'", (StringRef))
+ERROR(expected_tuple_type_in_tuple,decl_parsing,none,
+      "tuple instruction requires a tuple type", ())
+ERROR(sil_tuple_inst_wrong_value_count,decl_parsing,none,
+      "tuple instruction requires %0 values", (unsigned))
+ERROR(sil_tuple_inst_wrong_field,decl_parsing,none,
+      "tuple instruction requires a field number", ())
+ERROR(sil_struct_inst_wrong_field,decl_parsing,none,
+      "struct instruction requires a field name", ())
+ERROR(sil_ref_inst_wrong_field,decl_parsing,none,
+      "ref_element_addr instruction requires a field name", ())
+ERROR(sil_invalid_instr_operands,decl_parsing,none,
+      "invalid instruction operands", ())
+ERROR(sil_operand_not_address,decl_parsing,none,
+      "%0 operand of '%1' must have address type", (StringRef, StringRef))
+ERROR(sil_operand_not_weak_address,decl_parsing,none,
+      "%0 operand of '%1' must have address of [weak] type",
+      (StringRef, StringRef))
+ERROR(sil_integer_literal_not_integer_type,decl_parsing,none,
+      "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
+ERROR(sil_float_literal_not_float_type,decl_parsing,none,
+      "float_literal instruction requires a 'Builtin.FP<n>' type", ())
+ERROR(sil_apply_archetype_not_found,decl_parsing,none,
+      "archetype name not found in polymorphic function type of apply instruction", ())
+ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
+      "apply of non-polymorphic function cannot have substitutions", ())
+ERROR(sil_archetype_method_not_protocol,decl_parsing,none,
+      "archetype_method is not a protocol method", ())
+ERROR(sil_archetype_method_type_does_not_conform,decl_parsing,none,
+      "archetype_method type does not conform to protocol", ())
+
+// SIL Basic Blocks
+ERROR(expected_sil_block_name, decl_parsing,none,
+      "expected basic block name or '}'", ())
+ERROR(expected_sil_block_colon, decl_parsing,none,
+      "expected ':' after basic block name", ())
+ERROR(sil_undefined_basicblock_use, decl_parsing,none,
+      "use of undefined basic block %0", (Identifier))
+ERROR(sil_basicblock_redefinition, decl_parsing,none,
+      "redefinition of basic block %0", (Identifier))
+ERROR(sil_basicblock_arg_rparen, decl_parsing,none,
+      "expected ')' in basic block argument list", ())
+
+// SIL Functions
+ERROR(expected_sil_linkage_or_function, decl_parsing,none,
+      "expected SIL linkage type or function name", ())
+ERROR(expected_sil_function_name, decl_parsing,none,
+      "expected SIL function name", ())
+ERROR(expected_sil_rbrace, decl_parsing,none,
+      "expected '}' at the end of a sil body", ())
+ERROR(expected_sil_function_type, decl_parsing, none,
+      "sil function expected to have SIL function type", ())
+
+// SIL Stage
+ERROR(expected_sil_stage_name, decl_parsing, none,
+      "expected 'raw' or 'canonical' after 'sil_stage'", ())
+ERROR(multiple_sil_stage_decls, decl_parsing, none,
+      "sil_stage declared multiple times", ())
+
+// SIL VTable
+ERROR(expected_sil_vtable_colon, decl_parsing,none,
+      "expected ':' in a vtable entry", ())
+ERROR(sil_vtable_func_not_found, decl_parsing,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_vtable_class_not_found, decl_parsing,none,
+      "sil class not found %0", (Identifier))
+
+// SIL Global
+ERROR(sil_global_variable_not_found, decl_parsing,none,
+      "sil global not found %0", (Identifier))
+
+//------------------------------------------------------------------------------
+// Type parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(expected_type,type_parsing,PointsToFirstBadToken,
+      "expected type", ())
+ERROR(expected_init_value,expr_parsing,PointsToFirstBadToken,
+      "expected initial value after '='", ())
+
+// Named types
+ERROR(expected_identifier_in_dotted_type,expr_parsing,PointsToFirstBadToken,
+      "expected identifier in dotted type", ())
+ERROR(expected_identifier_for_type,expr_parsing,PointsToFirstBadToken,
+      "expected identifier for type name", ())
+ERROR(expected_rangle_generic_arg_list,type_parsing,PointsToFirstBadToken,
+      "expected '>' to complete generic argument list", ())
+
+
+// Function types
+ERROR(expected_type_function_result,type_parsing,PointsToFirstBadToken,
+      "expected type for function result", ())
+ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
+      "only syntactic function types can be generic", ())
+
+// Enum Types
+ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+      "expected expression after '=' in 'case'", ())
+ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
+      "raw value for enum case must be an integer, float, character, or string literal", ())
+
+// Array Types
+ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,
+      "expected expression for size of array type", ())
+ERROR(expected_rbracket_array_type,type_parsing,PointsToFirstBadToken,
+      "expected ']' in array type", ())
+      
+// Tuple Types
+ERROR(expected_rparen_tuple_type_list,type_parsing,none,
+      "expected ')' at end of tuple list", ())
+ERROR(empty_tuple_ellipsis,type_parsing,none,
+      "varargs used in tuple type with no fields", ())
+ERROR(tuple_ellipsis_init,type_parsing,none,
+      "varargs used with tuple field with default value", ())
+ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
+      "unexpected '...' before the end of a tuple list", ())
+ERROR(tuple_type_init,pattern_parsing,none,
+      "default argument not permitted in a tuple type", ())
+
+// Protocol Types
+ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,
+      "expected '<' in protocol composition type", ())
+ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
+      "expected '>' to complete protocol composition type", ())
+
+// Optional Types
+ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
+      "optional array type requires parentheses", ())
+
+//------------------------------------------------------------------------------
+// Pattern parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(expected_pattern,pattern_parsing,none,
+      "expected pattern", ())
+ERROR(expected_pattern_is_keyword,pattern_parsing,none,
+      "keyword '%0' cannot be used as an identifier", (StringRef))
+ERROR(expected_rparen_tuple_pattern_list,pattern_parsing,none,
+      "expected ')' at end of tuple pattern", ())
+ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
+      "'...' cannot be applied to a subpattern which is not explicitly typed", ())
+ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
+      "variadic arguments '...' must come at the end of the pattern", ())
+ERROR(non_func_decl_pattern_init,pattern_parsing,none,
+      "default argument is only permitted for a non-curried function parameter",())
+ERROR(var_pattern_in_var,pattern_parsing,none,
+      "'%select{var|let}0' cannot appear nested inside another 'var' or "
+      "'let' pattern", (unsigned))
+
+//------------------------------------------------------------------------------
+// Statement parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_stmt,stmt_parsing,none,
+      "expected statement", ())
+ERROR(illegal_top_level_stmt,stmt_parsing,none,
+      "statements are not allowed at the top level", ())
+ERROR(illegal_top_level_expr,stmt_parsing,none,
+      "expressions are not allowed at the top level", ())
+ERROR(illegal_semi_stmt,stmt_parsing,none,
+      "';' statements are not allowed", ())
+ERROR(statement_same_line_without_semi,stmt_parsing,none,
+      "consecutive statements on a line must be separated by ';'", ())
+ERROR(brace_stmt_invalid,stmt_parsing,none,
+      "braced block of statements is an unused closure", ())
+
+
+// Assignment statement
+ERROR(expected_expr_assignment,stmt_parsing,none,
+      "expected expression in assignment", ())
+
+// Brace Statement
+ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
+      "expected '}' at end of brace statement", ())
+
+// Return Statement
+ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'return' statement", ())
+
+// If Statement
+ERROR(expected_expr_if,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'if' condition", ())
+ERROR(missing_condition_after_if,stmt_parsing,none,
+      "missing condition in an 'if' statement", ())
+ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'if' condition", ())
+ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'else'", ())
+
+// While Statement
+ERROR(expected_expr_while,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'while' condition", ())
+ERROR(missing_condition_after_while,stmt_parsing,none,
+      "missing condition in a 'while' statement", ())
+ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'while' condition", ())
+
+// Do/While Statement
+ERROR(expected_lbrace_after_do,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'do'", ())
+ERROR(expected_while_in_dowhile,stmt_parsing,PointsToFirstBadToken,
+      "expected 'while' in 'do-while' loop", ())
+ERROR(expected_expr_do_while,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'do-while' condition", ())
+
+// C-Style For Stmt
+ERROR(expected_init_for_stmt,stmt_parsing,PointsToFirstBadToken,
+      "expected initialization in a 'for' statement", ())
+ERROR(missing_init_for_stmt,stmt_parsing,none,
+      "missing initialization in a 'for' statement", ())
+ERROR(expected_semi_for_stmt,stmt_parsing,PointsToFirstBadToken,
+      "expected ';' in 'for' statement", ())
+ERROR(expected_cond_for_stmt,stmt_parsing,none,
+      "expected condition in 'for' statement", ())
+ERROR(expected_rparen_for_stmt,stmt_parsing,none,
+      "expected ')' in 'for' statement", ())
+ERROR(expected_lbrace_after_for,stmt_parsing,none,
+      "expected '{' in 'for' statement", ())
+
+// For-each Stmt
+ERROR(expected_foreach_in,stmt_parsing,none,
+      "expected 'in' after for-each pattern", ())
+ERROR(expected_foreach_container,stmt_parsing,none,
+      "expected container expression for for-each loop", ())
+ERROR(expected_foreach_lbrace,stmt_parsing,none,
+      "expected '{' to start the body of for-each loop", ())
+
+// Switch Stmt
+ERROR(expected_switch_expr,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'switch' statement", ())
+ERROR(expected_lbrace_after_switch,stmt_parsing,PointsToFirstBadToken,
+      "expected '{' after 'switch' subject expression", ())
+ERROR(expected_rbrace_switch,stmt_parsing,none,
+      "expected '}' at end of 'switch' statement", ())
+ERROR(case_outside_of_switch,stmt_parsing,none,
+      "'%0' label can only appear inside a 'switch' statement", (StringRef))
+ERROR(stmt_in_switch_not_covered_by_case,stmt_parsing,none,
+      "all statements inside a switch must be covered by a 'case' or 'default'",
+      ())
+ERROR(case_after_default,stmt_parsing,none,
+      "additional 'case' blocks cannot appear after the 'default' block of a 'switch'",
+      ())
+ERROR(empty_switch_stmt,stmt_parsing,none,
+      "'switch' statement body must have at least one 'case' or 'default' block",
+      ())
+
+// Case Stmt
+ERROR(expected_case_where_expr,stmt_parsing,PointsToFirstBadToken,
+      "expected expression for 'where' guard of 'case'", ())
+ERROR(expected_case_colon,stmt_parsing,PointsToFirstBadToken,
+      "expected ':' after '%0'", (StringRef))
+ERROR(default_with_other_labels,stmt_parsing,none,
+      "'default' cannot appear with other 'case' or 'default' labels over the same block",
+      ())
+ERROR(default_with_where,stmt_parsing,none,
+      "'default' cannot be used with a 'where' guard expression",
+      ())
+ERROR(var_binding_with_multiple_case_patterns,stmt_parsing,none,
+      "'case' labels with multiple patterns cannot declare variables",
+      ())
+
+//------------------------------------------------------------------------------
+// Expression parsing diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(expected_expr,expr_parsing,none,
+      "expected expression", ())
+ERROR(expected_separator,expr_parsing,none,
+      "expected '%0' separator", (StringRef))
+ERROR(unexpected_separator,expr_parsing,none,
+      "unexpected '%0' separator", (StringRef))
+
+ERROR(expected_expr_after_operator,expr_parsing,none,
+      "expected expression after operator", ())
+ERROR(expected_expr_after_unary_operator,expr_parsing,none,
+      "expected expression after unary operator", ())
+ERROR(expected_prefix_operator,expr_parsing,none,
+      "unary operator cannot be separated from its operand", ())
+ERROR(expected_operator_ref,expr_parsing,none,
+      "expected operator name in operator reference", ())
+ERROR(invalid_postfix_operator,expr_parsing,none,
+      "operator with postfix spacing cannot start a subexpression", ())
+
+ERROR(expected_member_name,expr_parsing,PointsToFirstBadToken,
+      "expected member name following '.'", ())
+ERROR(expected_dollar_numeric,expr_parsing,none,
+      "expected numeric value following '$'", ())
+ERROR(dollar_numeric_too_large,expr_parsing,none,
+      "numeric value following '$' is too large", ())
+ERROR(numeric_literal_numeric_member,expr_parsing,none,
+   "expected named member of numeric literal", ())
+
+ERROR(anon_closure_arg_not_in_closure,expr_parsing,none,
+      "anonymous closure argument not contained in a closure", ())
+ERROR(anon_closure_arg_in_closure_with_args,expr_parsing,none,
+      "anonymous closure arguments cannot be used inside a closure that has "
+      "explicit arguments", ())
+ERROR(expected_closure_parameter_name,expr_parsing,none,
+      "expected the name of a closure parameter", ())
+ERROR(expected_closure_result_type,expr_parsing,none,
+      "expected closure result type after '->'", ())
+ERROR(expected_closure_in,expr_parsing,none,
+   "expected 'in' after the closure signature", ())
+ERROR(unexpected_tokens_before_closure_in,expr_parsing,none,
+   "unexpected tokens prior to 'in'", ())
+ERROR(expected_closure_rbrace,expr_parsing,none,
+      "expected '}' at end of closure", ())
+
+ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
+      "expected identifier after '.' expression", ())
+ERROR(expected_field_spec_name_tuple_expr,expr_parsing,none,
+      "expected field specifier name in tuple expression", ())
+
+ERROR(expected_identifier_after_super_dot_expr,expr_parsing,
+      PointsToFirstBadToken,
+      "expected identifier or 'init' after super '.' expression", ())
+ERROR(expected_dot_or_subscript_after_super,expr_parsing,PointsToFirstBadToken,
+      "expected '.' or '[' after 'super'", ())
+ERROR(super_initializer_not_in_initializer,expr_parsing,none,
+      "'super.init' cannot be called outside of an initializer", ())
+ERROR(super_initializer_must_be_called,expr_parsing,none,
+      "'super.init' cannot be referenced without arguments", ())
+ERROR(init_ref_must_be_called,expr_parsing,none,
+      "initializer cannot be referenced without arguments", ())
+
+// New expressions
+ERROR(array_new_missing_first_bound,expr_parsing,none,
+      "must specify length of array to allocate", ())
+ERROR(expected_expr_new_array_bound,expr_parsing,none,
+      "expected expression for new array bound", ())
+ERROR(expected_bracket_array_new,expr_parsing,none,
+      "expected ']' in new expression", ())
+ERROR(new_array_multidimensional,expr_parsing,none,
+      "sized multidimensional arrays are not supported", ())
+
+// Tuples and parenthesized expressions
+ERROR(expected_expr_in_expr_list,expr_parsing,none,
+      "expected expression in list of expressions", ())
+ERROR(expected_expr_in_collection_literal,expr_parsing,none,
+      "expected expression in container literal", ())
+ERROR(expected_key_in_dictionary_literal,expr_parsing,none,
+      "expected key expression in dictionary literal", ())
+ERROR(expected_value_in_dictionary_literal,expr_parsing,none,
+      "expected value in dictionary literal", ())
+ERROR(expected_colon_in_dictionary_literal,expr_parsing,none,
+      "expected ':' in dictionary literal", ())
+ERROR(expected_rparen_expr_list,expr_parsing,none,
+      "expected ')' in expression list", ())
+ERROR(expected_rsquare_expr_list,expr_parsing,none,
+      "expected ']' in expression list", ())
+
+// Array literal expressions
+ERROR(expected_rsquare_array_expr,expr_parsing,none,
+      "expected ']' in container literal expression", ())
+
+// If expressions
+ERROR(expected_expr_after_if_question,expr_parsing,none,
+      "expected expression after '?' in ternary expression", ())
+ERROR(expected_colon_after_if_question,expr_parsing,none,
+      "expected ':' after '? ...' in ternary expression", ())
+ERROR(expected_expr_after_if_colon,expr_parsing,none,
+      "expected expression after '? ... :' in ternary expression", ())
+
+// Cast expressions
+ERROR(expected_type_after_is,expr_parsing,none,
+      "expected type after 'is'", ())
+ERROR(expected_type_after_as,expr_parsing,none,
+      "expected type after 'as'", ())
+
+//------------------------------------------------------------------------------
+// Attribute-parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_attribute_name,attribute_parsing,none,
+      "expected an attribute name", ())
+ERROR(unknown_attribute,attribute_parsing,none,
+      "unknown attribute '%0'", (StringRef))
+ERROR(duplicate_attribute,attribute_parsing,none,
+      "duplicate attribute", ())
+ERROR(invalid_attribute_inversion,attribute_parsing,none,
+      "attribute may not be inverted", ())
+ERROR(cannot_combine_attribute,attribute_parsing,none,
+      "attribute '%0' cannot be combined with this attribute", (StringRef))
+ERROR(expected_in_attribute_list,attribute_parsing,none,
+      "expected ']' or ',' in attribute list", ())
+
+ERROR(type_attribute_applied_to_decl,attribute_parsing,none,
+      "attribute can only be applied to types, not declarations", ())
+ERROR(decl_attribute_applied_to_type,attribute_parsing,none,
+      "attribute can only be applied to declarations, not types", ())
+
+ERROR(import_attributes,attribute_parsing,none,
+      "invalid attributes specified for import", ())
+ERROR(typealias_attributes,attribute_parsing,none,
+      "invalid attributes specified for typealias", ())
+ERROR(operator_attributes,attribute_parsing,none,
+      "invalid attributes specified for operator", ())
+
+// asmname
+ERROR(asmname_expected_equals,attribute_parsing,none,
+      "expected '=' in asmname attribute", ())
+ERROR(asmname_expected_string_literal,attribute_parsing,none,
+      "expected string literal in asmname attribute", ())
+ERROR(asmname_interpolated_string,attribute_parsing,none,
+      "asmname cannot be an interpolated string literal", ())
+
+// cc
+ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
+      "expected '(' after 'cc' attribute", ())
+ERROR(cc_attribute_expected_name,attribute_parsing,none,
+      "expected calling convention name identifier in 'cc' attribute", ())
+ERROR(cc_attribute_unknown_cc_name,attribute_parsing,none,
+      "unknown calling convention name '%0' for 'cc' attribute", (StringRef))
+ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
+      "expected ')' after calling convention name for 'cc' attribute", ())
+
+//------------------------------------------------------------------------------
+// Generics parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(expected_rangle_generics_param,parsing,PointsToFirstBadToken,
+      "expected '>' to complete generic parameter list", ())
+ERROR(expected_generics_parameter_name,parsing,PointsToFirstBadToken,
+      "expected an identifier to name generic parameter", ())
+ERROR(expected_generics_type_restriction,parsing,none,
+      "expected a type name or protocol composition restricting %0",
+      (Identifier))
+ERROR(requires_single_equal,parsing,none,
+      "use '==' for same-type requirements rather than '='", ())
+ERROR(expected_requirement_delim,parsing,none,
+      "expected ':' or '==' to indicate a conformance or same-type requirement",
+      ())
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

@@ -15,7 +15,7 @@
 #include "Serialization.h"
 #include "SILFormat.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/Fallthrough.h"

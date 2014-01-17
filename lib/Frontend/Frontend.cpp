@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Diagnostics.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"

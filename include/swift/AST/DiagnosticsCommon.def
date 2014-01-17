@@ -1,0 +1,85 @@
+//===- DiagnosticsCommon.def - Diagnostics Text -----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics that can be emitted across the whole compiler.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+ERROR(invalid_diagnostic,common,none,
+      "INTERNAL ERROR: this diagnostic should not be produced", ())
+
+ERROR(not_implemented,TODO,none,
+      "INTERNAL ERROR: feature not implemented", ())
+
+ERROR(error_opening_output,common,none,
+      "error opening '%0' for output: %1", (StringRef, StringRef))
+
+
+NOTE(previous_decldef,common,none,
+     "previous %select{declaration|definition}0 of %1 is here", 
+     (bool, Identifier))
+
+
+// Generic disambiguation
+NOTE(while_parsing_as_left_angle_bracket,common,none,
+     "while parsing this '<' as a type parameter bracket", ())
+NOTE(while_parsing_as_less_operator,common,none,
+     "while parsing this '<' as an operator", ())
+
+
+// FIXME: This is used both as a parse error (a literal "super" outside a
+// method) and a type-checker error ("super" in a method of a non-class type).
+ERROR(super_not_in_class_method,common,none,
+      "'super' members cannot be referenced in a non-class type", ())
+
+// FIXME: This is used by the parser to reject "operator postfix !" and by
+// the type-checker to reject "@postfix func !".
+ERROR(custom_operator_postfix_exclaim,common,none,
+      "cannot declare a custom postfix '!' operator", ())
+
+// FIXME: Used by both the parser and the type-checker.
+ERROR(func_decl_without_brace,decl_parsing,PointsToFirstBadToken,
+      "expected '{' in body of function declaration", ())
+ERROR(unsupported_fixed_length_array,type_parsing,none,
+      "fixed-length arrays are not yet supported", ())
+
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif
