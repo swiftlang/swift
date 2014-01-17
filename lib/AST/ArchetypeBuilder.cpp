@@ -766,10 +766,11 @@ Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
   auto genericParams = dc->getGenericParamsOfContext();
   assert(genericParams && "Missing generic parameters for dependent context");
   
-  return mapTypeIntoContext(genericParams, type);
+  return mapTypeIntoContext(*dc->getParentModule(), genericParams, type);
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(GenericParamList *genericParams,
+Type ArchetypeBuilder::mapTypeIntoContext(Module &M,
+                                          GenericParamList *genericParams,
                                           Type type) {
   // If the type is not dependent, there's nothing to map.
   if (!type->isDependentType())
@@ -802,10 +803,9 @@ Type ArchetypeBuilder::mapTypeIntoContext(GenericParamList *genericParams,
 
     // Map a dependent member to the corresponding nested archetype.
     if (auto dependentMember = type->getAs<DependentMemberType>()) {
-      auto base = mapTypeIntoContext(genericParams,
+      auto base = mapTypeIntoContext(M, genericParams,
                                      dependentMember->getBase());
-      auto baseArchetype = base->castTo<ArchetypeType>();
-      return baseArchetype->getNestedType(dependentMember->getName());
+      return dependentMember->substBaseType(&M, base);
     }
 
     return type;

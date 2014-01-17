@@ -1482,64 +1482,83 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   return FunctionType::get(input, result, getExtInfo());
 }
 
+static Type getMemberForBaseType(Module *module,
+                                 Type substBase,
+                                 AssociatedTypeDecl *assocType,
+                                 Identifier name,
+                                 LazyResolver *resolver) {
+  // If the parent is an archetype, extract the child archetype with the
+  // given name.
+  if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
+    return archetypeParent->getNestedType(name);
+  }
+  
+  // Retrieve the member type with the given name.
+
+  // Tuples don't have member types.
+  if (substBase->is<TupleType>()) {
+    return Type();
+  }
+
+  // If we know the associated type, look in the witness table.
+  if (assocType) {
+    // If the parent is dependent, create a dependent member type.
+    if (substBase->isDependentType()) {
+      return DependentMemberType::get(substBase, assocType,
+                                      substBase->getASTContext());
+    }
+
+    auto proto = assocType->getProtocol();
+    // FIXME: Introduce substituted type node here?
+    auto conformance = module->lookupConformance(substBase, proto,
+                                                 resolver);
+    switch (conformance.getInt()) {
+    case ConformanceKind::DoesNotConform:
+    case ConformanceKind::UncheckedConforms:
+      return Type();
+
+    case ConformanceKind::Conforms:
+      return conformance.getPointer()->getTypeWitness(assocType,
+                                                      resolver).Replacement;
+    }
+  }
+
+  // FIXME: This is a fallback. We want the above, conformance-based
+  // result to be the only viable path.
+  if (resolver) {
+    if (Type memberType = resolver->resolveMemberType(module, substBase, name)){
+      return memberType;
+    }
+  }
+
+  return Type();
+}
+
+Type DependentMemberType::substBaseType(Module *module,
+                                        Type substBase,
+                                        LazyResolver *resolver) {
+  if (substBase.getPointer() == getBase().getPointer())
+    return this;
+
+  // If the base remains dependent after substitution, so do we.
+  if (substBase->isDependentType()) {
+    if (getAssocType())
+      return DependentMemberType::get(substBase, getAssocType(),
+                                      getASTContext());
+    else
+      return DependentMemberType::get(substBase, getName(),
+                                      getASTContext());
+  }
+
+  return getMemberForBaseType(module, substBase, getAssocType(), getName(),
+                              resolver);
+}
+
 Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  bool ignoreMissing, LazyResolver *resolver) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
   auto failed = [&](Type t){ return ignoreMissing? t : Type(); };
-  
-  /// Look up a dependent member type in a non-dependent substituted base.
-  auto substMemberType = [&](Type origChild,
-                             Type substParent,
-                             AssociatedTypeDecl *assocType,
-                             Identifier name) -> Type {
-    // If the parent is an archetype, extract the child archetype with the
-    // given name.
-    if (auto archetypeParent = substParent->getAs<ArchetypeType>()) {
-      return archetypeParent->getNestedType(name);
-    }
-    
-    // Retrieve the member type with the given name.
-
-    // Tuples don't have member types.
-    if (substParent->is<TupleType>()) {
-      return failed(origChild);
-    }
-
-    // If we know the associated type, look in the witness table.
-    if (assocType) {
-      // If the parent is dependent, create a dependent member type.
-      if (substParent->isDependentType()) {
-        return DependentMemberType::get(substParent, assocType,
-                                        substParent->getASTContext());
-      }
-
-      auto proto = assocType->getProtocol();
-      // FIXME: Introduce substituted type node here?
-      auto conformance = module->lookupConformance(substParent, proto,
-                                                   resolver);
-      switch (conformance.getInt()) {
-      case ConformanceKind::DoesNotConform:
-      case ConformanceKind::UncheckedConforms:
-        return failed(origChild);
-
-      case ConformanceKind::Conforms:
-        return conformance.getPointer()->getTypeWitness(assocType,
-                                                        resolver).Replacement;
-      }
-    }
-
-    // FIXME: This is a fallback. We want the above, conformance-based
-    // result to be the only viable path.
-    if (resolver) {
-      if (Type memberType = resolver->resolveMemberType(module, substParent,
-                                                        name)) {
-        return memberType;
-      }
-    }
-
-    return failed(origChild);
-  };
   
   return transform([&](Type type) -> Type {
     assert(!isa<SILFunctionType>(type.getPointer()) &&
@@ -1554,22 +1573,10 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
       auto newBase = depMemTy->getBase()
         .subst(module, substitutions, ignoreMissing, resolver);
       
-      if (newBase.getPointer() == depMemTy->getBase().getPointer())
-        return depMemTy;
-      
-      // If the base remains dependent after substitution, so do we.
-      if (newBase->isDependentType()) {
-        if (depMemTy->getAssocType())
-          return DependentMemberType::get(newBase, depMemTy->getAssocType(),
-                                          depMemTy->getASTContext());
-        else
-          return DependentMemberType::get(newBase, depMemTy->getName(),
-                                          depMemTy->getASTContext());
-      }
-
       // Resolve the member relative to the substituted base.
-      return substMemberType(type, newBase, depMemTy->getAssocType(),
-                             depMemTy->getName());
+      if (Type r = depMemTy->substBaseType(module, newBase, resolver))
+        return r;
+      return failed(type);
     }
     
     auto substOrig = type->getAs<SubstitutableType>();
@@ -1604,8 +1611,10 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     if (auto archetype = substOrig->getAs<ArchetypeType>())
       assocType = archetype->getAssocType();
     
-    return substMemberType(type, substParent, assocType,
-                           substOrig->getName());
+    if (Type r = getMemberForBaseType(module, substParent, assocType,
+                                      substOrig->getName(), resolver))
+      return r;
+    return failed(type);
   });
 }
 

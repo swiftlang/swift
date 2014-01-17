@@ -261,7 +261,8 @@ private:
   /// SILFunction::mapTypeIntoContext.
   friend class SILFunction;
   
-  static Type mapTypeIntoContext(GenericParamList *genericParams,
+  static Type mapTypeIntoContext(Module &M,
+                                 GenericParamList *genericParams,
                                  Type type);
 };
 

@@ -2856,6 +2856,13 @@ public:
   AssociatedTypeDecl *getAssocType() const {
     return NameOrAssocType.dyn_cast<AssociatedTypeDecl *>();
   }
+  
+  /// Substitute the base type, looking up our associated type in it if it is
+  /// non-dependent. Returns null if the member could not be found in the new
+  /// base.
+  Type substBaseType(Module *M,
+                     Type base,
+                     LazyResolver *resolver = nullptr);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
