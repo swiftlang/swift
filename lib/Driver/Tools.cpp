@@ -61,6 +61,10 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   case types::TY_LLVM_BC:
     OutputOption = "-emit-bc";
     break;
+  case types::TY_SwiftModuleFile:
+    // Since this is our primary output, we need to specify the option here.
+    OutputOption = "-emit-module";
+    break;
   case types::TY_Nothing:
     // We were told to output nothing, so get the last mode option and use that.
     OutputOption =
@@ -121,6 +125,14 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
+
+  Optional<StringRef> ModuleOutputPath =
+    Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
+  if (ModuleOutputPath.hasValue()) {
+    Arguments.push_back("-emit-module");
+    Arguments.push_back("-module-output-path");
+    Arguments.push_back(ModuleOutputPath->data());
+  }
 
   if (Args.hasArg(options::OPT_serialize_diagnostics)) {
     Arguments.push_back("-serialize-diagnostics");
