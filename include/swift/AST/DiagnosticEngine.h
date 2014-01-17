@@ -42,10 +42,7 @@ namespace swift {
   ///
   /// Each of the diagnostics described in Diagnostics.def has an entry in
   /// this enumeration type that uniquely identifies it.
-  enum class DiagID : unsigned {
-#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
-  #include "Diagnostics.def"
-  };
+  enum class DiagID : uint32_t;
 
   /// \brief Describes a diagnostic along with its argument types.
   ///
@@ -208,6 +205,16 @@ namespace swift {
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
+
+    /// Returns true if this object represents a particular diagnostic.
+    ///
+    /// \code
+    /// someDiag.is(diag::invalid_diagnostic)
+    /// \endcode
+    template<typename ...OtherArgTypes>
+    bool is(Diag<OtherArgTypes...> Other) const {
+      return ID == Other.ID;
+    }
 
     void addRange(CharSourceRange R) {
       Ranges.push_back(R);

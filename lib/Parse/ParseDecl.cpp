@@ -833,7 +833,7 @@ static ParserStatus parseIdentifierDeclName(Parser &P, Identifier &Result,
     return makeParserSuccess();
 
   default:
-    if (D.getID() != DiagID::invalid_diagnostic)
+    if (!D.is(diag::invalid_diagnostic))
       P.diagnose(P.Tok, D);
     if (P.Tok.isKeyword() &&
         (P.peekToken().is(ResyncT1) || P.peekToken().is(ResyncT2) ||

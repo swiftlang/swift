@@ -17,6 +17,11 @@
 #include "swift/AST/Diagnostics.h"
 using namespace swift;
 
+enum class swift::DiagID : uint32_t {
+#define DIAG(KIND,ID,Category,Options,Text,Signature) ID,
+#include "swift/AST/Diagnostics.def"
+};
+
 // Define all of the diagnostic objects and initialize them with their 
 // diagnostic IDs.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
