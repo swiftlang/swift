@@ -42,6 +42,20 @@ public:
                             StringRef LinkingOutput) const;
 };
 
+class LLVM_LIBRARY_VISIBILITY MergeModule : public Tool {
+public:
+  MergeModule(const ToolChain &TC) : Tool("merge-module", "merge-module", TC) {}
+
+  virtual bool hasGoodDiagnostics() const { return true; }
+
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            StringRef LinkingOutput) const;
+};
+
 namespace darwin {
 
 llvm::Triple::ArchType getArchTypeForDarwinArchName(StringRef DarwinArchName);

@@ -37,6 +37,7 @@ public:
   enum ActionClass {
     Input = 0,
     CompileJob,
+    MergeModuleJob,
     LinkJob,
 
     JobFirst=CompileJob,
@@ -117,6 +118,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::CompileJob;
+  }
+};
+
+class MergeModuleJobAction : public JobAction {
+  virtual void anchor();
+public:
+  MergeModuleJobAction(ArrayRef<Action *> Inputs)
+      : JobAction(Action::MergeModuleJob, Inputs, types::TY_SwiftModuleFile) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::MergeModuleJob;
   }
 };
 

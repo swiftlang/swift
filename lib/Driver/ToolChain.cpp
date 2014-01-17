@@ -25,6 +25,12 @@ Tool *ToolChain::getSwift() const {
   return Swift.get();
 }
 
+Tool *ToolChain::getMergeModule() const {
+  if (!MergeModule)
+    MergeModule.reset(new tools::MergeModule(*this));
+  return MergeModule.get();
+}
+
 Tool *ToolChain::getLinker() const {
   if (!Linker)
     Linker = buildLinker();
@@ -33,10 +39,12 @@ Tool *ToolChain::getLinker() const {
 
 Tool *ToolChain::getTool(Action::ActionClass AC) const {
   switch (AC) {
-  case Action::LinkJob:
-    return getLinker();
   case Action::CompileJob:
     return getSwift();
+  case Action::MergeModuleJob:
+    return getMergeModule();
+  case Action::LinkJob:
+    return getLinker();
 
   case Action::Input:
     llvm_unreachable("Invalid tool kind.");

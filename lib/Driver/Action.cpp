@@ -28,6 +28,7 @@ const char *Action::getClassName(ActionClass AC) {
   switch (AC) {
     case Input: return "input";
     case CompileJob: return "compile";
+    case MergeModuleJob: return "merge-module";
     case LinkJob: return "link";
   }
 
@@ -39,5 +40,7 @@ void InputAction::anchor() {}
 void JobAction::anchor() {}
 
 void CompileJobAction::anchor() {}
+
+void MergeModuleJobAction::anchor() {}
 
 void LinkJobAction::anchor() {}

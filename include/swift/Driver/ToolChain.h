@@ -39,8 +39,10 @@ class ToolChain {
   const llvm::Triple Triple;
 
   mutable std::unique_ptr<Tool> Swift;
+  mutable std::unique_ptr<Tool> MergeModule;
   mutable std::unique_ptr<Tool> Linker;
   Tool *getSwift() const;
+  Tool *getMergeModule() const;
   Tool *getLinker() const;
 
 protected:

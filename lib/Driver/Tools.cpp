@@ -141,6 +141,25 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                      Arguments);
 }
 
+Job *MergeModule::constructJob(const JobAction &JA,
+                               std::unique_ptr<JobList> Inputs,
+                               std::unique_ptr<CommandOutput> Output,
+                               const ActionList &InputActions,
+                               const ArgList &Args,
+                               StringRef LinkingOutput) const {
+  ArgStringList Arguments;
+
+  const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
+
+  // Invoke ourself in -frontend mode.
+  Arguments.push_back("-frontend");
+
+  Arguments.push_back("-help");
+
+  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                     Arguments);
+}
+
 /// Darwin Tools
 
 llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
