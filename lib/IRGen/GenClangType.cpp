@@ -100,7 +100,34 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
   return clang::CanQualType();
 }
 
+clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitClassType(CanClassType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitBoundGenericStructType(
+  CanBoundGenericStructType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
+  return clang::CanQualType();
+}
+
 clang::CanQualType GenClangType::visitType(CanType type) {
+  llvm_unreachable("Unhandled type in Clang type generation.");
+
   return clang::CanQualType();
 }
 
