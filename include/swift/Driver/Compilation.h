@@ -17,6 +17,8 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
+#include "llvm/ADT/DenseSet.h"
+
 #include <memory>
 
 namespace llvm {
@@ -28,6 +30,7 @@ namespace opt {
 
 namespace swift {
 namespace driver {
+  class Command;
   class Driver;
   class Job;
   class JobList;
@@ -90,8 +93,16 @@ public:
 private:
   /// \brief Perform the Jobs in \p JL if necessary.
   ///
+  /// \param JL the list of Jobs to perform
+  /// \param ScheduledCommands a set of Commands which have been previously
+  /// scheduled
+  /// \param FinishedCommands a set of Commands which have finished execution,
+  /// or which are known not to need to execute.
+  ///
   /// \returns exit code of the first failed Job, or 0 on success
-  int performJobsInList(const JobList &JL);
+  int performJobsInList(const JobList &JL,
+                        llvm::DenseSet<const Command *> &ScheduledCommands,
+                        llvm::DenseSet<const Command *> &FinishedCommands);
 };
 
 } // end namespace driver

@@ -40,7 +40,27 @@ void Compilation::addJob(Job *J) {
   Jobs->addJob(J);
 }
 
-int Compilation::performJobsInList(const JobList &JL) {
+typedef llvm::DenseSet<const Command *> CommandSet;
+
+static bool allJobsInListHaveFinished(const JobList &JL,
+                                      const CommandSet &FinishedCommands) {
+  for (const Job *J : JL) {
+    if (const Command *Cmd = dyn_cast<Command>(J)) {
+      if (!FinishedCommands.count(Cmd))
+        return false;
+    } else if (const JobList *List = dyn_cast<JobList>(J)) {
+      if (!allJobsInListHaveFinished(*List, FinishedCommands))
+        return false;
+    } else {
+      llvm_unreachable("Unknown Job class!");
+    }
+  }
+  return true;
+}
+
+int Compilation::performJobsInList(const JobList &JL,
+                                   CommandSet &ScheduledCommands,
+                                   CommandSet &FinishedCommands) {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
   if (SkipTaskExecution)
@@ -48,34 +68,46 @@ int Compilation::performJobsInList(const JobList &JL) {
   else
     TQ.reset(new TaskQueue(NumberOfParallelCommands));
 
-  // Store pointers to the Commands which have already been scheduled
-  // to execute.
-  llvm::DenseSet<const Command *> ScheduledCommands;
-
-  // Set up scheduleCommandIfNecessary and supportsBufferingOutput.
-  auto scheduleCommandIfNecessary = [&] (const Command *Cmd) {
-    if (ScheduledCommands.insert(Cmd).second) {
-      TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
-                 (void *)Cmd);
+  // Set up scheduleCommandIfNecessaryAndPossible.
+  // This will only schedule the given command if it has not been scheduled
+  // and if all of its inputs are in FinishedCommands.
+  auto scheduleCommandIfNecessaryAndPossible = [&] (const Command *Cmd) {
+    if (!ScheduledCommands.count(Cmd)) {
+      if (allJobsInListHaveFinished(Cmd->getInputs(), FinishedCommands)) {
+        ScheduledCommands.insert(Cmd);
+        TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
+                    (void *)Cmd);
+      }
     }
+  };
+
+  // Set up handleCommandWhichDoesNotNeedToExecute.
+  // This will mark the Command as both scheduled and finished, which meets the
+  // definitions of Commands which should be in those sets.
+  auto handleCommandWhichDoesNotNeedToExecute = [&] (const Command *Cmd) {
+    ScheduledCommands.insert(Cmd);
+    FinishedCommands.insert(Cmd);
   };
 
   // Perform all inputs to the Jobs in our JobList, and schedule any Commands
   // which we know need to execute.
   for (const Job *J : JL) {
     if (const Command *Cmd = dyn_cast<Command>(J)) {
-      int result = performJobsInList(Cmd->getInputs());
-      if (result != 0)
-        return result;
+      int res = performJobsInList(Cmd->getInputs(), ScheduledCommands,
+                                  FinishedCommands);
+      if (res != 0)
+        return res;
 
       // TODO: replace with a real check once available.
       bool needsToExecute = true;
       if (needsToExecute)
-        scheduleCommandIfNecessary(Cmd);
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+      else
+        handleCommandWhichDoesNotNeedToExecute(Cmd);
     } else if (const JobList *List = dyn_cast<JobList>(J)) {
-      int result = performJobsInList(*List);
-      if (result != 0)
-        return result;
+      int res = performJobsInList(*List, ScheduledCommands, FinishedCommands);
+      if (res != 0)
+        return res;
     } else {
       llvm_unreachable("Unknown Job class!");
     }
@@ -128,12 +160,17 @@ int Compilation::performJobsInList(const JobList &JL) {
 
     // TODO: use the Command which just finished to evaluate other Commands.
     const Command *FinishedCmd = (const Command *)Context;
+    FinishedCommands.insert(FinishedCmd);
     for (const Job *J : JL) {
       if (const Command *Cmd = dyn_cast<Command>(J)) {
         // TODO: replace with a real check once available.
-        bool needsToExecute = Cmd != FinishedCmd;
-        if (needsToExecute)
-          scheduleCommandIfNecessary(Cmd);
+        if (Cmd != FinishedCmd) {
+          bool needsToExecute = true;
+          if (needsToExecute)
+            scheduleCommandIfNecessaryAndPossible(Cmd);
+          else
+            handleCommandWhichDoesNotNeedToExecute(Cmd);
+        }
       } else {
         assert(isa<JobList>(J) && "Unknown Job class!");
       }
@@ -154,5 +191,14 @@ int Compilation::performJobs() {
     llvm::errs() << "warning: parallel execution not supported; "
                  << "falling back to serial execution\n";
   }
-  return performJobsInList(*Jobs);
+  // Set up a set for storing all Commands which have been scheduled for
+  // execution (whether or not they've finished execution),
+  // or which have been determined that they don't need to run.
+  CommandSet ScheduledCommands;
+
+  // Set up a set for storing all Commands which have finished execution or
+  // which have been determined that they don't need to run.
+  CommandSet FinishedCommands;
+
+  return performJobsInList(*Jobs, ScheduledCommands, FinishedCommands);
 }
