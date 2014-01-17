@@ -1376,7 +1376,7 @@ namespace {
       // FIXME: Emit attributes for (nonatomic, strong) if the property has a
       // setter, or (nonatomic, readonly) if the property has only a getter.
       // Are these attributes always appropriate?
-      outs << (prop->isSettable()
+      outs << (prop->isSettable(prop->getDeclContext())
         ? ",&,N" // strong, nonatomic
         : ",R,N"); // readonly, nonatomic
       

@@ -424,13 +424,6 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
 
-/// isReferencedAsLValue - Returns 'true' if references to this
-/// declaration are l-values.
-bool ValueDecl::isReferencedAsLValue() const {
-  if (auto *VD = dyn_cast<VarDecl>(this))
-    return VD->isSettable();
-  return false;
-}
 
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {
@@ -1039,6 +1032,17 @@ bool ProtocolDecl::requiresClassSlow() {
 GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams()[0].getAsTypeParam();
 }
+
+/// \brief Returns whether the var is settable in the specified context: this
+/// is either because it is a stored var, because it has a custom setter, or
+/// is a let member in an initializer.
+bool VarDecl::isSettable(DeclContext *UseDC) const {
+  // 'let' properties are always immutable.
+  if (isLet()) return false;
+
+  return !GetSet || GetSet->Set;
+}
+
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (!getParentPattern())

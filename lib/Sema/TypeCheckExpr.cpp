@@ -334,9 +334,6 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   else
     type = value->getType();
 
-  if (!value->isReferencedAsLValue())
-    return type;
-
   // Look at the canonical type just for efficiency.  We won't
   // use this as the source of the result.
   CanType canType = type->getCanonicalType();
@@ -367,14 +364,14 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
 
     return optTy;
 
+  }
+
   // Ignore @unowned qualification.
-  } else if (isa<UnownedStorageType>(canType)) {
+  if (isa<UnownedStorageType>(canType))
     return type->castTo<UnownedStorageType>()->getReferentType();
 
   // No other transforms necessary.
-  } else {
-    return type;
-  }
+  return type;
 }
 
 bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
@@ -388,9 +385,10 @@ bool TypeChecker::requireOptionalIntrinsics(SourceLoc loc) {
 /// doesVarDeclMemberProduceLValue - Return true if a reference to the specified
 /// VarDecl should produce an lvalue.  If present, baseType indicates the base
 /// type of a member reference.
-static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType) {
+static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
+                                           DeclContext *UseDC) {
   // Get-only VarDecls always produce rvalues.
-  if (!VD->isSettable())
+  if (!VD->isSettable(UseDC))
     return false;
 
   // If there is no base, or if the base isn't being used, it is settable.
@@ -426,6 +424,7 @@ static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType) {
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+                                             DeclContext *UseDC,
                                              bool wantInterfaceType) {
   if (!value->hasType())
     typeCheckDecl(value, true);
@@ -437,7 +436,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // has lvalue type.  If we are accessing a var member on an rvalue, it is
   // returned as an rvalue (and the access must be a load).
   if (auto *VD = dyn_cast<VarDecl>(value))
-    if (doesVarDeclMemberProduceLValue(VD, baseType))
+    if (doesVarDeclMemberProduceLValue(VD, baseType, UseDC))
       return LValueType::get(getTypeOfRValue(value, wantInterfaceType));
 
 
@@ -458,9 +457,9 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   return requestedType;
 }
 
-Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, SourceLoc loc,
-                                       bool Implicit) {
-  auto type = getUnopenedTypeOfReference(value);
+Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
+                                       SourceLoc loc, bool Implicit) {
+  auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
   return new (Context) DeclRefExpr(value, loc, Implicit, type);
 }
 

@@ -799,7 +799,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  assert(property->isSettable() && "property is not settable?!");
+  assert(property->isSettable(property->getDeclContext()) &&
+         "property is not settable?!");
   
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef setter = SILDeclRef(property, SILDeclRef::Kind::Setter,
@@ -1043,7 +1044,8 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                           llvm::Constant *&selectorRef,
                                           llvm::Constant *&atEncoding,
                                           llvm::Constant *&impl) {
-  assert(property->isSettable() && "not a settable property?!");
+  assert(property->isSettable(property->getDeclContext()) &&
+         "not a settable property?!");
 
   bool isClassProperty = hasObjCClassRepresentation(IGM, property->getType());
   
@@ -1133,7 +1135,7 @@ irgen::emitObjCPropertyMethodDescriptors(IRGenModule &IGM,
                                                          getterFields);
   llvm::Constant *setter = nullptr;
   
-  if (property->isSettable()) {
+  if (property->isSettable(property->getDeclContext())) {
     emitObjCSetterDescriptorParts(IGM, property,
                                   selectorRef, atEncoding, impl);
     

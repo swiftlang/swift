@@ -647,7 +647,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  Type valueType = TC.getUnopenedTypeOfReference(value, Type(),
+  Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC,
                                                  /*wantInterfaceType=*/true);
 
   // Adjust the type of the reference.
@@ -843,7 +843,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     openedType = openType(genericFn, dc, /*skipProtocolSelfConstraint=*/true,
                           opener);
   } else {
-    openedType = TC.getUnopenedTypeOfReference(value, baseTy,
+    openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC,
                                                /*wantInterfaceType=*/true);
 
     Type selfTy;

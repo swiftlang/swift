@@ -187,7 +187,7 @@ public:
     llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
     IGF.Builder.CreateCall(class_replaceMethod, getterArgs);
 
-    if (prop->isSettable()) {
+    if (prop->isSettable(prop->getDeclContext())) {
       emitObjCSetterDescriptorParts(IGF.IGM, prop,
                                     name, types, imp);
       sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),

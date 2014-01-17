@@ -648,8 +648,12 @@ public:
   /// \param baseType if non-null, return the type of a member reference to
   ///   this value when the base has the given type
   ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
-  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType = Type(),
+  Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
+                                  DeclContext *UseDC,
                                   bool wantInterfaceType = false);
 
   /// Return the non-lvalue type-of-reference of the given value.
@@ -835,7 +839,8 @@ public:
                                  ValueDecl *decl2);
 
   /// \brief Build a type-checked reference to the given value.
-  Expr *buildCheckedRefExpr(ValueDecl *D, SourceLoc nameLoc, bool Implicit);
+  Expr *buildCheckedRefExpr(ValueDecl *D, DeclContext *UseDC,
+                            SourceLoc nameLoc, bool Implicit);
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.

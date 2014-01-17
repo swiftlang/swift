@@ -144,7 +144,7 @@ void StmtBuilder::printStruct(VarDecl *Arg, Type SugarT, StructDecl *SD,
 
 Expr *StmtBuilder::getArgRefExpr(VarDecl *Arg, ArrayRef<unsigned> MemberIndexes,
                                  SourceLoc Loc) const {
-  Expr *ArgRef = TC.buildCheckedRefExpr(Arg, Loc, /*Implicit=*/true);
+  Expr *ArgRef = TC.buildCheckedRefExpr(Arg, DC, Loc, /*Implicit=*/true);
   ArgRef = TC.coerceToRValue(ArgRef);
   for (unsigned i : MemberIndexes) {
     bool failed = TC.typeCheckExpression(ArgRef, Arg->getDeclContext(), Type(),
@@ -254,7 +254,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
     pattern = new (Context) TypedPattern(pattern, TypeLoc::withoutLoc(boolTy));
     pattern->setType(boolTy);
 
-    Expr *init = TC.buildCheckedRefExpr(trueDecl, Loc, /*Implicit=*/true);
+    Expr *init = TC.buildCheckedRefExpr(trueDecl, DC, Loc, /*Implicit=*/true);
     addToBody(new (Context) PatternBindingDecl(SourceLoc(),
                                                Loc, pattern, init,
                                                DC));
@@ -315,8 +315,10 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
   // First, print the ", " between elements.
   if (firstVar) {
     // if branch: set first to false
-    Expr *firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
-    Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, Loc, /*Implicit=*/true);
+    Expr *firstRef = TC.buildCheckedRefExpr(firstVar, DC,
+                                            Loc, /*Implicit=*/true);
+    Expr *falseRef = TC.buildCheckedRefExpr(falseDecl, DC,
+                                            Loc, /*Implicit=*/true);
     Expr *setFirstToFalse
       = new (Context) AssignExpr(firstRef, Loc, falseRef, /*Implicit=*/true);
     Stmt *thenStmt = BraceStmt::create(Context, Loc,
@@ -329,7 +331,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
     Stmt *elseStmt = elseBuilder.createBodyStmt(Loc, Loc);
 
     // if-then-else statement.
-    firstRef = TC.buildCheckedRefExpr(firstVar, Loc, /*Implicit=*/true);
+    firstRef = TC.buildCheckedRefExpr(firstVar, DC, Loc, /*Implicit=*/true);
     loopBuilder.addToBody(new (Context) IfStmt(Loc, firstRef, thenStmt,
                                                Loc, elseStmt));
   } else {
@@ -662,7 +664,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
-  E = TC.buildCheckedRefExpr(vd, E->getStartLoc(), /*Implicit=*/true);
+  E = TC.buildCheckedRefExpr(vd, &SF, E->getStartLoc(), /*Implicit=*/true);
   generatePrintOfExpression(vd->getName().str(), E);
 }
 
@@ -685,7 +687,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   // Decl to print it.
   if (auto *NP = dyn_cast<NamedPattern>(PBD->getPattern()->
                                            getSemanticsProvidingPattern())) {
-    Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), PBD->getStartLoc(),
+    Expr *E = TC.buildCheckedRefExpr(NP->getDecl(), &SF, PBD->getStartLoc(),
                                      /*Implicit=*/true);
     generatePrintOfExpression(PatternString, E);
     return;
@@ -729,13 +731,14 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
 
   
   // Replace the initializer of PBD with a reference to our repl temporary.
-  Expr *E = TC.buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
+  Expr *E = TC.buildCheckedRefExpr(vd, &SF,
+                                   vd->getStartLoc(), /*Implicit=*/true);
   E = TC.coerceToMaterializable(E);
   PBD->setInit(E, /*checked=*/true);
   SF.Decls.push_back(PBTLCD);
 
   // Finally, print out the result, by referring to the repl temp.
-  E = TC.buildCheckedRefExpr(vd, vd->getStartLoc(), /*Implicit=*/true);
+  E = TC.buildCheckedRefExpr(vd, &SF, vd->getStartLoc(), /*Implicit=*/true);
   generatePrintOfExpression(PatternString, E);
 }
 

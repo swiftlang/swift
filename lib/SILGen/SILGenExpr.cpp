@@ -459,7 +459,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     }
 
     if (var->isComputed()) {
-      assert(!var->isSettable() &&
+      assert(!var->getSetter() &&
              "computed lvalue decls are handled by lvalue machinery");
       // Global properties have no base or subscript.
       return emitGetAccessor(loc, var,

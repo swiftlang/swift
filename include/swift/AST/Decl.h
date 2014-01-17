@@ -1352,15 +1352,11 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-
-  /// isReferencedAsLValue - Returns 'true' if references to this
-  /// declaration are l-values.
-  bool isReferencedAsLValue() const;
   
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or @assignment operator.
-  bool isSettable() const;
+  bool isSettable(DeclContext *UseDC) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -2376,15 +2372,11 @@ public:
   Type getSetterType() const;
   Type getSetterInterfaceType() const;
 
-  /// \brief Returns whether the var is settable, either because it is a
-  /// stored var or because it has a custom setter.
-  bool isSettable() const {
-    // 'let' properties are always immutable.
-    if (isLet()) return false;
-    
-    return !GetSet || GetSet->Set;
-  }
-  
+  /// \brief Returns whether the var is settable in the specified context: this
+  /// is either because it is a stored var, because it has a custom setter, or
+  /// is a let member in an initializer.
+  bool isSettable(DeclContext *UseDC) const;
+
   VarDecl *getOverriddenDecl() const {
     return OverriddenDecl;
   }
@@ -3454,9 +3446,9 @@ inline void GenericParam::setDeclContext(DeclContext *DC) {
   TypeParam->setDeclContext(DC);
 }
 
-inline bool ValueDecl::isSettable() const {
+inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
   if (auto vd = dyn_cast<VarDecl>(this)) {
-    return vd->isSettable();
+    return vd->isSettable(UseDC);
   } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
     return sd->isSettable();
   } else

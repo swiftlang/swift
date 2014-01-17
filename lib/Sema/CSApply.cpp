@@ -412,7 +412,7 @@ namespace {
         // No substitutions required; the declaration reference is simple.
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
-        refTy = tc.getUnopenedTypeOfReference(member);
+        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc);
       }
 
       // If we're referring to the member of a module, it's just a simple
@@ -1207,7 +1207,7 @@ namespace {
         return MetatypeType::get(type, cs.getASTContext());
       }
 
-      return cs.TC.getUnopenedTypeOfReference(decl, Type(),
+      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
                                               /*wantInterfaceType=*/true);
     }
 

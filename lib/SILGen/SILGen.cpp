@@ -657,7 +657,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(VarDecl *prop) {
   postEmitFunction(getter, f);
   }
 
-  if (!prop->isSettable())
+  if (!prop->isSettable(prop->getDeclContext()))
     return;
 
   // FIXME: Add proper location.
