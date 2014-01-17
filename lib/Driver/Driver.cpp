@@ -26,6 +26,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
 #include "swift/Driver/ToolChain.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Option/Arg.h"
@@ -517,14 +518,17 @@ void Driver::printActions(const ActionList &Actions) const {
   }
 }
 
-static void printJob(const Job *J) {
+static void printJob(const Job *J, llvm::DenseSet<const Job *> &VisitedJobs) {
+  if (!VisitedJobs.insert(J).second)
+    return;
+  
   if (const JobList *JL = dyn_cast<JobList>(J)) {
     for (const Job *Job : *JL) {
-      printJob(Job);
+      printJob(Job, VisitedJobs);
     }
   } else if (const Command *Cmd = dyn_cast<Command>(J)) {
     const JobList &Inputs = Cmd->getInputs();
-    printJob(&Inputs);
+    printJob(&Inputs, VisitedJobs);
     llvm::outs() << Cmd->getExecutable();
     for (const char *Arg : Cmd->getArguments()) {
       llvm::outs() << ' ' << Arg;
@@ -536,8 +540,9 @@ static void printJob(const Job *J) {
 }
 
 void Driver::printJobs(const JobList &Jobs) const {
+  llvm::DenseSet<const Job *> VisitedJobs;
   for (const Job *J : Jobs) {
-    printJob(J);
+    printJob(J, VisitedJobs);
   }
 }
 
