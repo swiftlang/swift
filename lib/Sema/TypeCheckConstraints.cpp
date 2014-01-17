@@ -923,7 +923,9 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
       if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
         Diag<Identifier> d;
-        if (VD->isLet())
+        if (VD->isImplicit() && VD->getName().str() == "self")
+          d = diag::assignment_to_self;
+        else if (VD->isLet())
           d = diag::assignment_lhs_is_let;
         else if (VD->isComputed() && !VD->getSetter())
           d = diag::assignment_get_only_property;

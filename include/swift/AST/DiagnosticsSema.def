@@ -627,6 +627,9 @@ ERROR(assignment_lhs_is_let,sema_tcs,none,
       "cannot assign to 'let' value %0", (Identifier))
 ERROR(assignment_get_only_property,sema_tcs,none,
       "cannot assign to a get-only property %0", (Identifier))
+ERROR(assignment_to_self,sema_tcs,none,
+      "cannot assign to %0 in a method", (Identifier))
+
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
