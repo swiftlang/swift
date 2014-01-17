@@ -518,44 +518,61 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   if (JA->getType() == types::TY_Nothing) {
     Output.reset(new CommandOutput(BaseInput));
   } else {
-    if (AtTopLevel) {
-      if (Arg *FinalOutput = C.getArgs().getLastArg(options::OPT_o)) {
-        Output.reset(new CommandOutput(JA->getType(), FinalOutput->getValue(),
+    // Process Action-specific output-specifying options first.
+    if (isa<MergeModuleJobAction>(JA)) {
+      if (Arg *A = C.getArgs().getLastArg(options::OPT_module_output_path))
+        Output.reset(new CommandOutput(JA->getType(), A->getValue(),
                                        BaseInput));
-      }
     }
 
     if (!Output) {
-      // We don't yet have a name, assign one.
-      if (!AtTopLevel) {
-        // We should output to a temporary file, since we're not at
-        // the top level.
-        StringRef Stem = llvm::sys::path::stem(BaseInput);
-        StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-        llvm::SmallString<128> Path;
-        llvm::error_code EC = llvm::sys::fs::createTemporaryFile(Stem,
-                                                                 Suffix, Path);
-        if (EC) {
-          llvm::errs() << "error: unable to make temporary file" <<EC.message();
-          Path = "";
+      // We don't have an output from an Action-specific command line option,
+      // so figure one out using the defaults.
+      if (AtTopLevel) {
+        if (Arg *FinalOutput = C.getArgs().getLastArg(options::OPT_o)) {
+          Output.reset(new CommandOutput(JA->getType(), FinalOutput->getValue(),
+                                         BaseInput));
         }
-        Output.reset(new CommandOutput(JA->getType(),
-                                       C.getArgs().MakeArgString(Path.str()),
-                                       BaseInput));
-      } else {
-        if (JA->getType() == types::TY_Image) {
-          Output.reset(new CommandOutput(JA->getType(), DefaultImageName,
+      }
+
+      if (!Output) {
+        StringRef BaseName(BaseInput);
+        if (isa<MergeModuleJobAction>(JA))
+          BaseName = OM.ModuleName;
+
+        // We don't yet have a name, assign one.
+        if (!AtTopLevel) {
+          // We should output to a temporary file, since we're not at
+          // the top level.
+          StringRef Stem = llvm::sys::path::stem(BaseName);
+          StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+          llvm::SmallString<128> Path;
+          llvm::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix,
+                                                                   Path);
+          if (EC) {
+            llvm::errs() << "error: unable to make temporary file"
+                         << EC.message();
+            Path = "";
+          }
+          Output.reset(new CommandOutput(JA->getType(),
+                                         C.getArgs().MakeArgString(Path.str()),
                                          BaseInput));
         } else {
-          StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-          assert(Suffix.data() &&
-                 "All types used for output should have a suffix.");
+          if (JA->getType() == types::TY_Image) {
+            Output.reset(new CommandOutput(JA->getType(), DefaultImageName,
+                                           BaseInput));
+          } else {
+            StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+            assert(Suffix.data() &&
+                   "All types used for output should have a suffix.");
 
-          llvm::SmallString<128> Suffixed(llvm::sys::path::filename(BaseInput));
-          llvm::sys::path::replace_extension(Suffixed, Suffix);
-          Output.reset(new CommandOutput(JA->getType(),
-                                         C.getArgs().MakeArgString(Suffixed),
-                                         BaseInput));
+            llvm::SmallString<128> Suffixed(
+              llvm::sys::path::filename(BaseName));
+            llvm::sys::path::replace_extension(Suffixed, Suffix);
+            Output.reset(new CommandOutput(JA->getType(),
+                                           C.getArgs().MakeArgString(Suffixed),
+                                           BaseInput));
+          }
         }
       }
     }
