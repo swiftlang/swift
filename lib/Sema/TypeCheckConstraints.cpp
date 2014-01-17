@@ -901,6 +901,9 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   }
 
   Type destTy = simplifyType(dest->getType());
+  if (destTy->is<ErrorType>())
+    return Type();
+
   if (LValueType *destLV = destTy->getAs<LValueType>()) {
     destTy = destLV->getObjectType();
   } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
@@ -916,9 +919,24 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     addConstraint(ConstraintKind::Bind, typeVar, refTv);
     destTy = objectTv;
   } else {
-    if (!destTy->is<ErrorType>())
-      getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
+    // Give a more specific diagnostic depending on what we're assigning to.
+    if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
+      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        Diag<Identifier> d;
+        if (VD->isLet())
+          d = diag::assignment_lhs_is_let;
+        else if (VD->isComputed() && !VD->getSetter())
+          d = diag::assignment_get_only_property;
+        else
+          d = diag::assignment_lhs_is_vardecl;
+        getTypeChecker().diagnose(equalLoc, d, VD->getName())
         .highlight(dest->getSourceRange());
+        return Type();
+      }
+
+    // Otherwise, emit an unhelpful message.
+    getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
+      .highlight(dest->getSourceRange());
 
     return Type();
   }

@@ -623,6 +623,12 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
+ERROR(assignment_lhs_is_let,sema_tcs,none,
+      "cannot assign to a 'let' value %0", (Identifier))
+ERROR(assignment_get_only_property,sema_tcs,none,
+      "cannot assign to a get-only property %0", (Identifier))
+ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
+      "cannot assign to %0", (Identifier))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
