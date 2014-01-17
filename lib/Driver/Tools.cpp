@@ -32,7 +32,7 @@ using namespace llvm::opt;
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
                          const ActionList &InputActions, const ArgList &Args,
-                         StringRef LinkingOutput) const {
+                         const OutputMode &OM) const {
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
@@ -158,7 +158,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
                                std::unique_ptr<CommandOutput> Output,
                                const ActionList &InputActions,
                                const ArgList &Args,
-                               StringRef LinkingOutput) const {
+                               const OutputMode &OM) const {
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
@@ -204,7 +204,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                                   std::unique_ptr<CommandOutput> Output,
                                   const ActionList &InputActions,
                                   const ArgList &Args,
-                                  StringRef LinkingOutput) const {
+                                  const OutputMode &OM) const {
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
   ArgStringList Arguments;

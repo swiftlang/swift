@@ -44,6 +44,23 @@ namespace driver {
   class JobList;
   class ToolChain;
 
+/// \brief A class encapsulating information about the outputs the driver
+/// is expected to generate.
+class OutputMode {
+public:
+  /// The output type which should be used for compile actions.
+  types::ID CompilerOutputType = types::ID::TY_INVALID;
+
+  /// Whether or not the output of compile actions should be linked together.
+  bool ShouldLink = false;
+
+  /// Whether or not the driver should generate a module.
+  bool ShouldGenerateModule = false;
+
+  /// The name of the module which we are building.
+  std::string ModuleName;
+};
+
 class Driver {
   /// The default image name (e.g. "a.out")
   static const char *const DefaultImageName;
@@ -77,23 +94,6 @@ class Driver {
 public:
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   typedef SmallVector<InputPair, 16> InputList;
-
-  /// \brief A class encapsulating information about the outputs the driver
-  /// is expected to generate.
-  class OutputMode {
-  public:
-    /// The output type which should be used for compile actions.
-    types::ID CompilerOutputType = types::ID::TY_INVALID;
-
-    /// Whether or not the output of compile actions should be linked together.
-    bool ShouldLink = false;
-
-    /// Whether or not the driver should generate a module.
-    bool ShouldGenerateModule = false;
-
-    /// The name of the module which we are building.
-    std::string ModuleName;
-  };
 
   Driver(StringRef DriverExecutable,
          DiagnosticEngine &Diags);

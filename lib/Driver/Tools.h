@@ -39,7 +39,7 @@ public:
                             std::unique_ptr<CommandOutput> Output,
                             const ActionList &InputActions,
                             const llvm::opt::ArgList &Args,
-                            StringRef LinkingOutput) const;
+                            const OutputMode &OM) const;
 };
 
 class LLVM_LIBRARY_VISIBILITY MergeModule : public Tool {
@@ -53,7 +53,7 @@ public:
                             std::unique_ptr<CommandOutput> Output,
                             const ActionList &InputActions,
                             const llvm::opt::ArgList &Args,
-                            StringRef LinkingOutput) const;
+                            const OutputMode &OM) const;
 };
 
 namespace darwin {
@@ -85,7 +85,7 @@ public:
                             std::unique_ptr<CommandOutput> Output,
                             const ActionList &InputActions,
                             const llvm::opt::ArgList &Args,
-                            StringRef LinkingOutput) const;
+                            const OutputMode &OM) const;
 };
 
 } // end namespace darwin

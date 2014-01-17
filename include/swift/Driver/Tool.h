@@ -34,6 +34,7 @@ namespace driver {
   class JobAction;
   class Job;
   class JobList;
+  class OutputMode;
   class ToolChain;
 
 class Tool {
@@ -65,14 +66,14 @@ public:
   /// Construct a Job to perform \p JA for the given input Jobs \p Inputs.
   ///
   /// \param Args The argument list for this tool chain.
-  /// \param LinkingOutput If this output will eventually feed the linker,
-  /// then this is the output name of the linked image.
+  /// \param OM information about the output which the driver will create,
+  /// which may influence the creation of this Job.
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,
                             std::unique_ptr<CommandOutput> Output,
                             const ActionList &InputActions,
                             const llvm::opt::ArgList &Args,
-                            StringRef LinkingOutput) const = 0;
+                            const OutputMode &OM) const = 0;
 };
 } // end namespace driver
 } // end namespace swift

@@ -592,7 +592,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   // 5. Construct a Job which produces the right CommandOutput.
   Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
-                           InputActions, C.getArgs(), "");
+                           InputActions, C.getArgs(), OM);
 
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
