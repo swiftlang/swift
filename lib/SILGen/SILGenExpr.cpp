@@ -2626,10 +2626,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // properties on stored properties.
   MarkUninitializedInst::Kind MUKind;
   
+  bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
   if (isDelegating)
     MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() &&
-           usesObjCAllocator(selfClassDecl)) {
+  else if (selfClassDecl->requiresStoredPropertyInits() && usesObjCAllocator) {
     // Stored properties will be initialized in a separate .cxx_construct method
     // called by the Objective-C runtime.
     assert(selfClassDecl->hasSuperclass() &&
@@ -2663,8 +2663,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (isDelegating) {
     // A delegating initializer does not initialize instance
     // variables.
-  } else if (selfClassDecl->requiresStoredPropertyInits() &&
-             usesObjCAllocator(selfClassDecl)) {
+  } else if (selfClassDecl->requiresStoredPropertyInits() && usesObjCAllocator) {
     // When the class requires all stored properties to have initial
     // values and we're using Objective-C's allocation, stored
     // properties are initialized via the .cxx_construct method, which
@@ -3160,6 +3159,27 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   SILValue selfAddr =
     SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
   newSelf.assignInto(SGF, E, selfAddr);
+
+  // If we are using Objective-C allocation, the caller can return
+  // nil. When this happens with an explicitly-written super.init or
+  // self.init invocation, return early if we did get nil.
+  auto classDecl = selfTy->getClassOrBoundGenericClass();
+  if (classDecl && !E->getSubExpr()->isImplicit() &&
+      usesObjCAllocator(classDecl)) {
+    // Check whether the new self is null.
+    SILValue isNonnullSelf = SGF.B.createIsNonnull(E, newSelf.getValue());
+    Condition cond = SGF.emitCondition(isNonnullSelf, E, 
+                                       /*hasFalseCode=*/false,
+                                       /*invertValue=*/true,
+                                       { });
+
+    // If self is null, branch to the epilog.
+    cond.enterTrue(SGF.B);
+    SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, E, { });
+    cond.exitTrue(SGF.B);
+
+    cond.complete(SGF.B);
+  }
 
   return SGF.emitEmptyTupleRValue(E);
 }
