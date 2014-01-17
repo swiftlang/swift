@@ -269,3 +269,36 @@ bb0:
 // CHECK-NEXT: return %3 : $Builtin.FPIEEE64
 }
 
+// rdar://15729207 - Verify that constant folding doesn't leave around obviously
+// dead cond_fail instructions.
+sil @fold_condfail_instructions : $@thin () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int2048, 1        // user: %2
+  %1 = builtin_function_ref "s_to_s_checked_trunc_Int2048_Int64" : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %2
+  %2 = apply %1(%0) : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %3
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0 // user: %4
+  %4 = struct $Int64 (%3 : $Builtin.Int64)        // users: %14, %5
+  %6 = integer_literal $Builtin.Int2048, 2        // user: %8
+  %7 = builtin_function_ref "s_to_s_checked_trunc_Int2048_Int64" : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = apply %7(%6) : $@thin (Builtin.Int2048) -> (Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0 // user: %10
+  %10 = struct $Int64 (%9 : $Builtin.Int64)       // users: %15, %11
+  %12 = integer_literal $Builtin.Int1, -1         // user: %16
+  %13 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // user: %16
+  %14 = struct_extract %4 : $Int64, #value        // user: %16
+  %15 = struct_extract %10 : $Int64, #value       // user: %16
+  %16 = apply %13(%14, %15, %12) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // users: %18, %17
+  %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 0 // user: %19
+  %18 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1 // user: %20
+  %19 = struct $Int64 (%17 : $Builtin.Int64)      // user: %21
+  cond_fail %18 : $Builtin.Int1                   // id: %20
+  return %19 : $Int64                             // id: %21
+  
+  
+// CHECK-LABEL: sil @fold_condfail_instructions
+// CHECK-NEXT: bb0
+// CHECK-NEXT: integer_literal{{.*}}3
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+}
+

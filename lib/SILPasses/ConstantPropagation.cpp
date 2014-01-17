@@ -748,6 +748,13 @@ static bool CCPFunctionBody(SILFunction &F) {
         continue;
       }
 
+      // Always consider cond_fail instructions as potential for DCE.  If the
+      // expression feeding them is false, they are dead.  We can't handle this
+      // as part of the constant folding logic, because there is no value
+      // they can produce (other than empty tuple, which is wasteful).
+      if (isa<CondFailInst>(User))
+        FoldedUsers.insert(User);
+
       // Try to fold the user.
       bool ResultsInError = false;
       SILValue C = constantFoldInstruction(*User, ResultsInError);
