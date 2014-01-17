@@ -78,6 +78,20 @@ public:
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   typedef SmallVector<InputPair, 16> InputList;
 
+  /// \brief A class encapsulating information about the outputs the driver
+  /// is expected to generate.
+  class OutputMode {
+  public:
+    /// The output type which should be used for compile actions.
+    types::ID CompilerOutputType = types::ID::TY_INVALID;
+
+    /// Whether or not the output of compile actions should be linked together.
+    bool ShouldLink = false;
+
+    /// Whether or not the driver should generate a module.
+    bool ShouldGenerateModule = false;
+  };
+
   Driver(StringRef DriverExecutable,
          DiagnosticEngine &Diags);
   ~Driver();
@@ -114,15 +128,25 @@ public:
   void buildInputs(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                    InputList &Inputs) const;
 
+  /// Construct the OutputMode for the driver from the given arguments.
+  ///
+  /// \param Args The input arguments.
+  /// \param[out] OM The OutputMode in which to store the resulting output
+  /// information.
+  void buildOutputMode(const llvm::opt::DerivedArgList &Args, OutputMode &OM)
+    const;
+
   /// Construct the list of Actions to perform for the given arguments,
   /// which are only done for a single architecture.
   ///
   /// \param TC the default host tool chain.
   /// \param Args The input arguments.
   /// \param Inputs The inputs for which Actions should be generated.
+  /// \param OM The OutputMode for which Actions should be generated.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                    const InputList &Inputs, ActionList &Actions) const;
+                    const InputList &Inputs, const OutputMode &OM,
+                    ActionList &Actions) const;
 
   /// Add top-level Jobs to Compilation \p C for the given \p Actions.
   void buildJobs(Compilation &C, const ActionList &Actions) const;
@@ -174,25 +198,6 @@ public:
 private:
   const ToolChain &getToolChain(const llvm::opt::ArgList &Args,
                                 StringRef DarwinArchName = "") const;
-
-  class OutputMode {
-  public:
-    /// The output type which should be used for compile actions.
-    types::ID CompilerOutputType;
-
-    /// Whether or not the output of compile actions should be linked together.
-    bool ShouldLink;
-
-    /// Whether or not the driver should generate a module.
-    bool ShouldGenerateModule;
-
-    OutputMode(types::ID CompilerOutputType, bool ShouldLink,
-               bool ShouldGenerateModule)
-        : CompilerOutputType(CompilerOutputType), ShouldLink(ShouldLink),
-          ShouldGenerateModule(ShouldGenerateModule) {}
-  };
-  OutputMode getOutputMode(const llvm::opt::ArgList &Args) const;
-
 };
 
 } // end namespace driver

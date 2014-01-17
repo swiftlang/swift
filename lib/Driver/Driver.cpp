@@ -90,8 +90,16 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   InputList Inputs;
   buildInputs(TC, *TranslatedArgList, Inputs);
 
+  // Determine the OutputMode for the driver.
+  OutputMode OM;
+  buildOutputMode(*TranslatedArgList, OM);
+
+  assert(OM.CompilerOutputType != types::ID::TY_INVALID &&
+         "buildOutputMode() must set a valid output type!");
+
+  // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(TC, *TranslatedArgList, Inputs, Actions);
+  buildActions(TC, *TranslatedArgList, Inputs, OM, Actions);
 
   if (DriverPrintActions) {
     printActions(Actions);
@@ -251,12 +259,61 @@ void Driver::buildInputs(const ToolChain &TC,
   }
 }
 
+void Driver::buildOutputMode(const DerivedArgList &Args,
+                             OutputMode &OM) const {
+  OM.ShouldLink = false;
+  OM.ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
+                                          options::OPT_module_output_path);
+  types::ID CompileOutputType = types::TY_INVALID;
+
+  const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
+  if (!OutputModeArg) {
+    if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
+      CompileOutputType = types::TY_SwiftModuleFile;
+    else {
+      OM.ShouldLink = true;
+      CompileOutputType = types::TY_Object;
+    }
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
+    OM.ShouldLink = true;
+    CompileOutputType = types::TY_Object;
+  } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
+    // The user has requested an object file.
+    CompileOutputType = types::TY_Object;
+  } else if (OutputModeArg->getOption().matches(options::OPT_S)) {
+    // The user has requested an assembly file.
+    CompileOutputType = types::TY_Assembly;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_sil)) {
+    // The user has requested a SIL file.
+    CompileOutputType = types::TY_SIL;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_silgen)) {
+    // The user has requested a raw SIL file.
+    CompileOutputType = types::TY_RawSIL;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_ir)) {
+    // The user has requested LLVM IR.
+    CompileOutputType = types::TY_LLVM_IR;
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_bc)) {
+    // The user has requested LLVM BC.
+    CompileOutputType = types::TY_LLVM_BC;
+  } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
+             OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
+             OutputModeArg->getOption().matches(options::OPT_dump_ast) ||
+             OutputModeArg->getOption().matches(options::OPT_print_ast) ||
+             OutputModeArg->getOption().matches(options::OPT_i) ||
+             OutputModeArg->getOption().matches(options::OPT_repl)) {
+    // These modes don't have any output.
+    CompileOutputType = types::TY_Nothing;
+  } else {
+    llvm_unreachable("Unknown output mode option!");
+  }
+
+  OM.CompilerOutputType = CompileOutputType;
+}
+
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
-                          const InputList &Inputs, ActionList &Actions) const {
-  OutputMode Mode = getOutputMode(Args);
-  types::ID CompilerOutputType = Mode.CompilerOutputType;
-
+                          const InputList &Inputs, const OutputMode &OM,
+                          ActionList &Actions) const {
   if (Inputs.empty()) {
     // FIXME: emit diagnostic
     llvm::errs() << "error: no input files\n";
@@ -269,18 +326,19 @@ void Driver::buildActions(const ToolChain &TC,
     const Arg *InputArg = Input.second;
 
     std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
-    Current.reset(new CompileJobAction(Current.release(), CompilerOutputType));
+    Current.reset(new CompileJobAction(Current.release(),
+                                       OM.CompilerOutputType));
     // We've been told to link, so this action will be a linker input,
     // not a top-level action.
     CompileActions.push_back(Current.release());
   }
 
   std::unique_ptr<Action> MergeModuleAction;
-  if (Mode.ShouldGenerateModule) {
+  if (OM.ShouldGenerateModule) {
     MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
   }
 
-  if (Mode.ShouldLink) {
+  if (OM.ShouldLink) {
     Action *LinkAction = new LinkJobAction(CompileActions);
     if (MergeModuleAction) {
       // We have a MergeModuleJobAction; this needs to be an input to the
@@ -290,7 +348,7 @@ void Driver::buildActions(const ToolChain &TC,
       LinkAction->addInput(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
-  } else if (Mode.ShouldGenerateModule) {
+  } else if (OM.ShouldGenerateModule) {
     assert(MergeModuleAction);
     Actions.push_back(MergeModuleAction.release());
   } else {
@@ -651,54 +709,4 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
     }
   }
   return *TC;
-}
-
-Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
-  bool ShouldLink = false;
-  bool ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
-                                          options::OPT_module_output_path);
-  types::ID CompileOutputType = types::TY_INVALID;
-
-  const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
-  if (!OutputModeArg) {
-    if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
-      CompileOutputType = types::TY_SwiftModuleFile;
-    else {
-      ShouldLink = true;
-      CompileOutputType = types::TY_Object;
-    }
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
-    ShouldLink = true;
-    CompileOutputType = types::TY_Object;
-  } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
-    // The user has requested an object file.
-    CompileOutputType = types::TY_Object;
-  } else if (OutputModeArg->getOption().matches(options::OPT_S)) {
-    // The user has requested an assembly file.
-    CompileOutputType = types::TY_Assembly;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_sil)) {
-    // The user has requested a SIL file.
-    CompileOutputType = types::TY_SIL;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_silgen)) {
-    // The user has requested a raw SIL file.
-    CompileOutputType = types::TY_RawSIL;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_ir)) {
-    // The user has requested LLVM IR.
-    CompileOutputType = types::TY_LLVM_IR;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_bc)) {
-    // The user has requested LLVM BC.
-    CompileOutputType = types::TY_LLVM_BC;
-  } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
-             OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
-             OutputModeArg->getOption().matches(options::OPT_dump_ast) ||
-             OutputModeArg->getOption().matches(options::OPT_print_ast) ||
-             OutputModeArg->getOption().matches(options::OPT_i) ||
-             OutputModeArg->getOption().matches(options::OPT_repl)) {
-    // These modes don't have any output.
-    CompileOutputType = types::TY_Nothing;
-  } else {
-    llvm_unreachable("Unknown output mode option!");
-  }
-
-  return OutputMode(CompileOutputType, ShouldLink, ShouldGenerateModule);
 }
