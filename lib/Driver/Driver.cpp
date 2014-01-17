@@ -27,6 +27,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
 #include "swift/Driver/ToolChain.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
@@ -97,6 +98,16 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   assert(OM.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputMode() must set a valid output type!");
+
+  if (!Lexer::isIdentifier(OM.ModuleName)) {
+    if (OM.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
+      OM.ModuleName = "main";
+    else {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: bad module name '" << OM.ModuleName << "'\n";
+      OM.ModuleName = "__bad__";
+    }
+  }
 
   // Construct the graph of Actions.
   ActionList Actions;
@@ -309,6 +320,12 @@ void Driver::buildOutputMode(const DerivedArgList &Args,
   }
 
   OM.CompilerOutputType = CompileOutputType;
+
+  if (const Arg *A = Args.getLastArg(options::OPT_module_name)) {
+    OM.ModuleName = A->getValue();
+  } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
+    OM.ModuleName = llvm::sys::path::stem(A->getValue());
+  }
 }
 
 void Driver::buildActions(const ToolChain &TC,

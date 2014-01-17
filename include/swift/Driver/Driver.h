@@ -90,6 +90,9 @@ public:
 
     /// Whether or not the driver should generate a module.
     bool ShouldGenerateModule = false;
+
+    /// The name of the module which we are building.
+    std::string ModuleName;
   };
 
   Driver(StringRef DriverExecutable,
