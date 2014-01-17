@@ -317,6 +317,7 @@ void Driver::buildJobs(Compilation &C, const ActionList &Actions) const {
 
   const DerivedArgList &Args = C.getArgs();
   const ToolChain &TC = C.getDefaultToolChain();
+  JobCacheMap JobCache;
 
   Arg *FinalOutput = Args.getLastArg(options::OPT_o);
   if (FinalOutput) {
@@ -346,9 +347,8 @@ void Driver::buildJobs(Compilation &C, const ActionList &Actions) const {
   }
 
   for (const Action *A : Actions) {
-    std::unique_ptr<Job> J = buildJobsForAction(C, A, C.getDefaultToolChain(),
-                                                true);
-    C.addJob(J.release());
+    Job *J = buildJobsForAction(C, A, C.getDefaultToolChain(), true, JobCache);
+    C.addJob(J);
   }
 }
 
@@ -377,29 +377,38 @@ static void printJobOutputs(const Job *J) {
   }
 }
 
-std::unique_ptr<Job> Driver::buildJobsForAction(const Compilation &C,
-                                                const Action *A,
-                                                const ToolChain &TC,
-                                                bool AtTopLevel) const {
-  // 1. Build up the list of input jobs.
+Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
+                                const ToolChain &TC, bool AtTopLevel,
+                                JobCacheMap &JobCache) const {
+  // 1. See if we've already got this cached.
+  std::pair<const Action *, const ToolChain *> Key(A, &TC);
+  {
+    auto CacheIter = JobCache.find(Key);
+    if (CacheIter != JobCache.end()) {
+      return CacheIter->second;
+    }
+  }
+
+  // 2. Build up the list of input jobs.
   ActionList InputActions;
   std::unique_ptr<JobList> InputJobs(new JobList);
+  InputJobs->setOwnsJobs(A->getOwnsInputs());
   for (Action *Input : *A) {
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
     } else {
       InputJobs->addJob(buildJobsForAction(C, Input, C.getDefaultToolChain(),
-                                           false).release());
+                                           false, JobCache));
     }
   }
 
-  // 2. Select the right tool for the job.
+  // 3. Select the right tool for the job.
   const JobAction *JA = cast<JobAction>(A);
   const Tool *T = TC.selectTool(*JA);
   if (!T)
     return nullptr;
 
-  // 3. Determine the CommandOutput for the job.
+  // 4. Determine the CommandOutput for the job.
   StringRef BaseInput;
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput.
@@ -476,9 +485,15 @@ std::unique_ptr<Job> Driver::buildJobsForAction(const Compilation &C,
     llvm::outs() << "], output: \"" << Output->getFilename() << "\"\n";
   }
 
-  // 4. Construct a Job which produces the right CommandOutput.
-  return T->constructJob(*JA, std::move(InputJobs), std::move(Output),
-                         InputActions, C.getArgs(), "");
+  // 5. Construct a Job which produces the right CommandOutput.
+  Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
+                           InputActions, C.getArgs(), "");
+
+  // 6. Add it to the JobCache, so we don't construct the same Job multiple
+  // times.
+  JobCache[Key] = J;
+
+  return J;
 }
 
 static unsigned printActions(const Action *A,

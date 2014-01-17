@@ -67,11 +67,12 @@ public:
   /// \param Args The argument list for this tool chain.
   /// \param LinkingOutput If this output will eventually feed the linker,
   /// then this is the output name of the linked image.
-  virtual std::unique_ptr<Job>
-  constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
-               std::unique_ptr<CommandOutput> Output,
-               const ActionList &InputActions, const llvm::opt::ArgList &Args,
-               StringRef LinkingOutput) const = 0;
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            StringRef LinkingOutput) const = 0;
 };
 } // end namespace driver
 } // end namespace swift

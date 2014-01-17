@@ -29,12 +29,10 @@ using namespace llvm::opt;
 
 /// Swift Tool
 
-std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
-                                         std::unique_ptr<JobList> Inputs,
-                                         std::unique_ptr<CommandOutput> Output,
-                                         const ActionList &InputActions,
-                                         const ArgList &Args,
-                                         StringRef LinkingOutput) const {
+Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
+                         std::unique_ptr<CommandOutput> Output,
+                         const ActionList &InputActions, const ArgList &Args,
+                         StringRef LinkingOutput) const {
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
@@ -139,10 +137,8 @@ std::unique_ptr<Job> Swift::constructJob(const JobAction &JA,
     Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
   }
 
-  std::unique_ptr<Job> Cmd(new Command(JA, *this, std::move(Inputs),
-                                       std::move(Output),
-                                       Exec, Arguments));
-  return Cmd;
+  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                     Arguments);
 }
 
 /// Darwin Tools
@@ -172,13 +168,12 @@ void darwin::DarwinTool::AddDarwinArch(const ArgList &Args,
   CmdArgs.push_back(Args.MakeArgString(ArchName));
 }
 
-std::unique_ptr<Job>
-darwin::Linker::constructJob(const JobAction &JA,
-                             std::unique_ptr<JobList> Inputs,
-                             std::unique_ptr<CommandOutput> Output,
-                             const ActionList &InputActions,
-                             const ArgList &Args,
-                             StringRef LinkingOutput) const {
+Job *darwin::Linker::constructJob(const JobAction &JA,
+                                  std::unique_ptr<JobList> Inputs,
+                                  std::unique_ptr<CommandOutput> Output,
+                                  const ActionList &InputActions,
+                                  const ArgList &Args,
+                                  StringRef LinkingOutput) const {
   assert(Output->getType() == types::TY_Image && "Invalid linker output type.");
   ArgStringList Arguments;
   Arguments.push_back("-v");
@@ -186,8 +181,6 @@ darwin::Linker::constructJob(const JobAction &JA,
   std::string Exec = getToolChain().getDriver().getProgramPath("ld",
                                                                getToolChain());
 
-  std::unique_ptr<Job>Cmd (new Command(JA, *this, std::move(Inputs),
-                                       std::move(Output),
-                                       Args.MakeArgString(Exec), Arguments));
-  return Cmd;
+  return new Command(JA, *this, std::move(Inputs), std::move(Output),
+                     Args.MakeArgString(Exec), Arguments);
 }

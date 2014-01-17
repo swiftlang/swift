@@ -34,13 +34,12 @@ public:
 
   virtual bool hasGoodDiagnostics() const { return true; }
 
-  virtual std::unique_ptr<Job>
-  constructJob(const JobAction &JA,
-               std::unique_ptr<JobList> Inputs,
-               std::unique_ptr<CommandOutput> Output,
-               const ActionList &InputActions,
-               const llvm::opt::ArgList &Args,
-               StringRef LinkingOutput) const;
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            StringRef LinkingOutput) const;
 };
 
 namespace darwin {
@@ -67,13 +66,12 @@ class LLVM_LIBRARY_VISIBILITY Linker : public DarwinTool {
 public:
   Linker(const ToolChain &TC) : DarwinTool("darwin::Linker", "linker", TC) {}
 
-  virtual std::unique_ptr<Job>
-  constructJob(const JobAction &JA,
-               std::unique_ptr<JobList> Inputs,
-               std::unique_ptr<CommandOutput> Output,
-               const ActionList &InputActions,
-               const llvm::opt::ArgList &Args,
-               StringRef LinkingOutput) const;
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            StringRef LinkingOutput) const;
 };
 
 } // end namespace darwin

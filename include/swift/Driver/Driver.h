@@ -127,6 +127,10 @@ public:
   /// Add top-level Jobs to Compilation \p C for the given \p Actions.
   void buildJobs(Compilation &C, const ActionList &Actions) const;
 
+  /// \brief A map for caching Jobs for a given Action/ToolChain pair
+  typedef llvm::DenseMap<std::pair<const Action *, const ToolChain *>, Job *>
+    JobCacheMap;
+
   /// Create a Job for the given Action \p A, including creating any necessary
   /// input Jobs.
   ///
@@ -134,9 +138,12 @@ public:
   /// \param A The Action for which a Job should be created
   /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
-  std::unique_ptr<Job> buildJobsForAction(const Compilation &C, const Action *A,
-                                          const ToolChain &TC,
-                                          bool AtTopLevel) const;
+  /// \param JobCache maps existing Action/ToolChain pairs to Jobs
+  ///
+  /// \returns a Job for the given Action/ToolChain pair
+  Job *buildJobsForAction(const Compilation &C, const Action *A,
+                          const ToolChain &TC, bool AtTopLevel,
+                          JobCacheMap &JobCache) const;
 
   /// Handle any arguments which should be treated before building actions or
   /// binding tools.
