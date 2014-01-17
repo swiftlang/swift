@@ -1037,8 +1037,8 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
 bool VarDecl::isSettable(DeclContext *UseDC) const {
-  // 'let' properties are generally immutable, unless they are an 'let' ivar
-  // and we are in init().
+  // 'let' properties are generally immutable, unless they are a 'let' ivar
+  // and we are in the init() for the type that holds the ivar.
   if (isLet()) {
     if (auto *CD = dyn_cast<ConstructorDecl>(UseDC))
       if (CD->getDeclContext() == getDeclContext())
