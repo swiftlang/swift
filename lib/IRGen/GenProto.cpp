@@ -907,6 +907,16 @@ namespace {
                                                    protocols);
     }
 
+    /// Class existentials are single refcounted pointers if they have no
+    /// witness tables. Right now we have no way of constraining an existential
+    /// to Swift-refcounted types.
+    bool isSingleSwiftRetainablePointer(ResilienceScope scope) const override {
+      return false;
+    }
+    bool isSingleUnknownRetainablePointer(ResilienceScope scope) const override{
+      return NumProtocols == 0;
+    }
+    
     /// Returns the protocols that values of this type are known to
     /// implement.  This can be empty, meaning that values of this
     /// type are not know to implement any protocols, although we do
