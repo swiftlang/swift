@@ -18,6 +18,7 @@
 
 #include "Tools.h"
 #include "ToolChains.h"
+#include "swift/Subsystems.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
@@ -121,7 +122,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  NumberOfParallelCommands,
                                                  DriverSkipExecution));
 
-  buildJobs(*C, Actions);
+  buildJobs(Actions, OM, *C);
   if (DriverPrintBindings) {
     return nullptr;
   }
@@ -382,7 +383,8 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-void Driver::buildJobs(Compilation &C, const ActionList &Actions) const {
+void Driver::buildJobs(const ActionList &Actions, const OutputMode &OM,
+                       Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
@@ -417,7 +419,8 @@ void Driver::buildJobs(Compilation &C, const ActionList &Actions) const {
   }
 
   for (const Action *A : Actions) {
-    Job *J = buildJobsForAction(C, A, C.getDefaultToolChain(), true, JobCache);
+    Job *J = buildJobsForAction(C, A, OM, C.getDefaultToolChain(), true,
+                                JobCache);
     C.addJob(J);
   }
 }
@@ -448,8 +451,8 @@ static void printJobOutputs(const Job *J) {
 }
 
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
-                                const ToolChain &TC, bool AtTopLevel,
-                                JobCacheMap &JobCache) const {
+                                const OutputMode &OM, const ToolChain &TC,
+                                bool AtTopLevel, JobCacheMap &JobCache) const {
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
   {
@@ -467,8 +470,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
     } else {
-      InputJobs->addJob(buildJobsForAction(C, Input, C.getDefaultToolChain(),
-                                           false, JobCache));
+      InputJobs->addJob(buildJobsForAction(C, Input, OM,
+                                           C.getDefaultToolChain(), false,
+                                           JobCache));
     }
   }
 
@@ -541,6 +545,17 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   }
 
   assert(Output && "No CommandOutput was created!");
+
+  if (OM.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
+      Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
+    // We need to generate a module, and this is a CompileJobAction,
+    // so add an additional output for the swiftmodule, based on the primary
+    // output's name. (Only do this if our primary output isn't a swiftmodule,
+    // though.)
+    llvm::SmallString<128> Path(Output->getPrimaryOutputFilename());
+    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+    Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+  }
 
   if (DriverPrintBindings) {
     llvm::outs() << "# \"" << T->getToolChain().getTripleString() << '"'
