@@ -40,10 +40,6 @@
 
 using namespace swift;
 
-#ifndef SWIFT_MODULES_SDK
-#define SWIFT_MODULES_SDK ""
-#endif
-
 static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath);
   Name += " -frontend";
@@ -286,11 +282,6 @@ int frontend_main(ArrayRef<const char *>Args,
 
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
     enableDiagnosticVerifier(Instance.getSourceMgr());
-  }
-
-  // TODO: remove once we properly handle no -sdk argument
-  if (Invocation.getSDKPath() == "") {
-    Invocation.setSDKPath(SWIFT_MODULES_SDK);
   }
 
   if (Instance.setup(Invocation)) {
