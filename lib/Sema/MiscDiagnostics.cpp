@@ -145,10 +145,6 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
   if (!var)
     return;
 
-  // FIXME: Diagnose self-mutation in setters as well.
-  if (fn->getSetterDecl())
-    return;
-
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
     VarDecl *Var;
@@ -160,26 +156,42 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        // Handle local and top-level computed variables.
         if (DRE->getDecl() == Var) {
           bool shouldDiagnose = true;
           if (auto *ParentExpr = Parent.getAsExpr()) {
             if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr))
               shouldDiagnose = false;
+            else if (IsSetter)
+              shouldDiagnose = !isa<LoadExpr>(ParentExpr);
           }
           if (shouldDiagnose) {
-            TC.diagnose(DRE->getLoc(), diag::recursive_accessor_reference,
+            TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
                         Var->getName(), IsSetter);
           }
         }
+
       } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        // Handle instance and type computed variables.
         if (MRE->getMember().getDecl() == Var &&
             MRE->getBase()->isImplicit()) {
-          TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
-                      Var->getName(), IsSetter);
-          TC.diagnose(E->getLoc(),
-                      diag::recursive_accessor_reference_silence)
-            .fixItInsert(E->getStartLoc(), "self.");
+          bool shouldDiagnose = true;
+          if (IsSetter)
+            shouldDiagnose = !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr());
+
+          if (shouldDiagnose) {
+            TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
+                        Var->getName(), IsSetter);
+            TC.diagnose(E->getLoc(),
+                        diag::recursive_accessor_reference_silence)
+              .fixItInsert(E->getStartLoc(), "self.");
+          }
         }
+
+      } else if (auto *PE = dyn_cast<ParenExpr>(E)) {
+        // Look through ParenExprs because a function argument of a single
+        // rvalue will have a LoadExpr /outside/ the ParenExpr.
+        return { true, PE->getSubExpr() };
       }
 
       return { true, E };
