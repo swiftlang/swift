@@ -183,8 +183,13 @@ private:
     /// Whether or not the output of compile actions should be linked together.
     bool ShouldLink;
 
-    OutputMode(types::ID CompilerOutputType, bool ShouldLink)
-      : CompilerOutputType(CompilerOutputType), ShouldLink(ShouldLink) {}
+    /// Whether or not the driver should generate a module.
+    bool ShouldGenerateModule;
+
+    OutputMode(types::ID CompilerOutputType, bool ShouldLink,
+               bool ShouldGenerateModule)
+        : CompilerOutputType(CompilerOutputType), ShouldLink(ShouldLink),
+          ShouldGenerateModule(ShouldGenerateModule) {}
   };
   OutputMode getOutputMode(const llvm::opt::ArgList &Args) const;
 

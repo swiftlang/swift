@@ -254,10 +254,8 @@ void Driver::buildInputs(const ToolChain &TC,
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
                           const InputList &Inputs, ActionList &Actions) const {
-  // TODO: implement this function
-  OutputMode mode = getOutputMode(Args);
-  types::ID CompilerOutputType = mode.CompilerOutputType;
-  bool ShouldLink = mode.ShouldLink;
+  OutputMode Mode = getOutputMode(Args);
+  types::ID CompilerOutputType = Mode.CompilerOutputType;
 
   if (Inputs.empty()) {
     // FIXME: emit diagnostic
@@ -265,26 +263,40 @@ void Driver::buildActions(const ToolChain &TC,
     return;
   }
 
-  ActionList LinkerInputs;
+  ActionList CompileActions;
   for (const InputPair &Input : Inputs) {
     types::ID InputType = Input.first;
     const Arg *InputArg = Input.second;
 
     std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
     Current.reset(new CompileJobAction(Current.release(), CompilerOutputType));
-    if (ShouldLink) {
-      // We've been told to link, so this action will be a linker input,
-      // not a top-level action.
-      LinkerInputs.push_back(Current.release());
-    } else {
-      // We're not linking, so this is a top-level action.
-      Actions.push_back(Current.release());
-    }
+    // We've been told to link, so this action will be a linker input,
+    // not a top-level action.
+    CompileActions.push_back(Current.release());
   }
 
-  if (!LinkerInputs.empty()) {
-    Action *LinkAction = new LinkJobAction(LinkerInputs);
+  std::unique_ptr<Action> MergeModuleAction;
+  if (Mode.ShouldGenerateModule) {
+    MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
+  }
+
+  if (Mode.ShouldLink) {
+    Action *LinkAction = new LinkJobAction(CompileActions);
+    if (MergeModuleAction) {
+      // We have a MergeModuleJobAction; this needs to be an input to the
+      // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
+      // no longer owns its inputs.
+      MergeModuleAction->setOwnsInputs(false);
+      LinkAction->addInput(MergeModuleAction.release());
+    }
     Actions.push_back(LinkAction);
+  } else if (Mode.ShouldGenerateModule) {
+    assert(MergeModuleAction);
+    Actions.push_back(MergeModuleAction.release());
+  } else {
+    assert(!MergeModuleAction && "MergeModuleAction should be nullptr "
+                                 "if we shouldn't generate a module");
+    Actions = CompileActions;
   }
 }
 
@@ -643,13 +655,19 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
 
 Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
   bool ShouldLink = false;
+  bool ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
+                                          options::OPT_module_output_path);
   types::ID CompileOutputType = types::TY_INVALID;
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
-  if (!OutputModeArg ||
-      OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
-    // Default to producing a linked executable. As a result, the compile
-    // action should produce an object file suitable for linking.
+  if (!OutputModeArg) {
+    if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
+      CompileOutputType = types::TY_SwiftModuleFile;
+    else {
+      ShouldLink = true;
+      CompileOutputType = types::TY_Object;
+    }
+  } else if (OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
     ShouldLink = true;
     CompileOutputType = types::TY_Object;
   } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
@@ -682,5 +700,5 @@ Driver::OutputMode Driver::getOutputMode(const ArgList &Args) const {
     llvm_unreachable("Unknown output mode option!");
   }
 
-  return OutputMode(CompileOutputType, ShouldLink);
+  return OutputMode(CompileOutputType, ShouldLink, ShouldGenerateModule);
 }
