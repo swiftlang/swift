@@ -19,9 +19,11 @@
 #ifndef SWIFT_IRGEN_GENCLANGTYPE_H
 #define SWIFT_IRGEN_GENCLANGTYPE_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/CanonicalType.h"
 
 namespace swift {
@@ -31,7 +33,12 @@ namespace irgen {
 /// CanQualType for the purpose of generating correct code for the
 /// ABI.
 class GenClangType : public CanTypeVisitor<GenClangType, clang::CanQualType> {
+  ASTContext &Context;
 public:
+  GenClangType(ASTContext &context) : Context(context) {}
+
+  const clang::ASTContext &getClangASTContext() const;
+
   /// Return the Clang struct type which was imported and resulted in
   /// this Swift struct type. We do not currently handle generating a
   /// new Clang struct type for Swift struct types that are created

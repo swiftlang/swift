@@ -900,7 +900,7 @@ static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
   auto &clangASTContext = CI->getClangASTContext();
   
   // TODO. encode types 'T'.
-  GenClangType CTG;
+  GenClangType CTG(Context);
   auto clangType = CTG.visit(T->getCanonicalType());
   if (!clangType.isNull()) {
     std::string TypeStr;
@@ -916,7 +916,7 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
   auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
   assert(CI && "no clang module loader");
   auto &clangASTContext = CI->getClangASTContext();
-  GenClangType CTG;
+  GenClangType CTG(Context);
   llvm::Constant *cnull = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.

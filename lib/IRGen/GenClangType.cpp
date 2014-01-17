@@ -60,9 +60,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
     return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
   }
 
-  auto &swiftCtx = type->getASTContext();
-  auto *CI = static_cast<ClangImporter*>(&*swiftCtx.getClangModuleLoader());
-  auto const &clangCtx = CI->getClangASTContext();
+  auto const &clangCtx = getClangASTContext();
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) {                \
     auto lookupTy = getNamedSwiftType(decl->getDeclContext(),                  \
@@ -95,12 +93,8 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 }
 
 clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
-  if (type->getNumElements() == 0) {
-    auto &swiftCtx = type->getASTContext();
-    auto *CI = static_cast<ClangImporter*>(&*swiftCtx.getClangModuleLoader());
-    auto &clangCtx = CI->getClangASTContext();
-    return clangCtx.VoidTy;
-  }
+  if (type->getNumElements() == 0)
+    return getClangASTContext().VoidTy;
 
   llvm_unreachable("Unexpected tuple type in Clang type generation!");
   return clang::CanQualType();
@@ -108,4 +102,9 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 
 clang::CanQualType GenClangType::visitType(CanType type) {
   return clang::CanQualType();
+}
+
+const clang::ASTContext &GenClangType::getClangASTContext() const {
+  auto *CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  return CI->getClangASTContext();
 }

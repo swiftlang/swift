@@ -765,7 +765,7 @@ llvm::Type *SignatureExpansion::expandResult() {
     if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
       return addIndirectResult();
 
-    GenClangType GCT;
+    GenClangType GCT(IGM.Context);
     auto clangType = GCT.visit(resultType.getSwiftRValueType());
 
     // Fall back on native Swift type lowering for things that we
@@ -1771,7 +1771,7 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   }
 
   auto resultTy = fnType->getResult().getSILType();
-  GenClangType GCT;
+  GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
 
   // We are unable to produce an appropriate Clang type in some cases,
