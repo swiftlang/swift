@@ -166,7 +166,42 @@ Job *MergeModule::constructJob(const JobAction &JA,
   // Invoke ourself in -frontend mode.
   Arguments.push_back("-frontend");
 
-  Arguments.push_back("-help");
+  // Tell all files to parse as library, which is necessary to load them as
+  // serialized ASTs.
+  Arguments.push_back("-parse-as-library");
+
+  // We just want to emit a module, so pa
+  Arguments.push_back("-emit-module");
+
+  assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
+         "The MergeModule tool only produces swiftmodule files!");
+
+  Arguments.push_back("-o");
+  Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
+
+  std::function<void(const Job *)> addSwiftmoduleInputs = [&] (const Job *J) {
+    if (const Command *Cmd = dyn_cast<Command>(J)) {
+      if (Cmd->getOutput().getPrimaryOutputType() == types::TY_SwiftModuleFile)
+        Arguments.push_back(Cmd->getOutput().getPrimaryOutputFilename().data());
+      else {
+        Optional<StringRef> SwiftmoduleOutput =
+        Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftModuleFile);
+        assert(SwiftmoduleOutput.hasValue() &&
+               "All inputs to this command must generate a swiftmodule!");
+        Arguments.push_back(SwiftmoduleOutput->data());
+      }
+    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+      for (const Job *JobInList : *JL) {
+        addSwiftmoduleInputs(JobInList);
+      }
+    } else {
+      llvm_unreachable("Unknown Job class!");
+    }
+  };
+
+  for (Job *J : *Inputs) {
+    addSwiftmoduleInputs(J);
+  }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
