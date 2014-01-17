@@ -353,7 +353,6 @@ public:
   void print(raw_ostream &OS) const;
   void dump() const;
 
-private:
   static CodeCompletionDeclKind getCodeCompletionDeclKind(const Decl *D);
 };
 
