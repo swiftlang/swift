@@ -3106,7 +3106,7 @@ public:
 /// \code
 /// struct X {
 ///   var x : Int
-///   constructor(i : Int) {
+///   init(i : Int) {
 ///      x = i
 ///   }
 /// }
