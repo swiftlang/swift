@@ -2254,9 +2254,8 @@ namespace {
         }
       }
 
-      if (getter && getterIndices)
-        getterThunk = buildGetterThunk(getter, dc, getterIndices);
-      if (setter && setterIndices)
+      getterThunk = buildGetterThunk(getter, dc, getterIndices);
+      if (setter)
         setterThunk = buildSetterThunk(setter, dc, setterIndices);
 
       // Build the subscript declaration.
@@ -2322,7 +2321,7 @@ namespace {
         subscript->setOverriddenDecl(parentSub);
         if (auto parentGetter = parentSub->getGetter()) {
           if (getterThunk)
-              getterThunk->setOverriddenDecl(parentGetter);
+            getterThunk->setOverriddenDecl(parentGetter);
         }
         if (auto parentSetter = parentSub->getSetter()) {
           if (setterThunk)
