@@ -80,6 +80,9 @@ public:
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
   void dump() const;
+
+  /// Clone the given type representation.
+  TypeRepr *clone(ASTContext &ctx) const;
 };
 
 /// \brief A TypeRepr for a type with a syntax error.  Can be used both as a

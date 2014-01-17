@@ -17,6 +17,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -81,6 +82,74 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   }
   llvm_unreachable("unknown kind!");
 }
+
+namespace {
+  class CloneVisitor : public TypeReprVisitor<CloneVisitor, TypeRepr *> {
+    ASTContext &Ctx;
+
+  public:
+    explicit CloneVisitor(ASTContext &ctx) : Ctx(ctx) { }
+
+#define TYPEREPR(CLASS, PARENT) \
+    TypeRepr *visit##CLASS##TypeRepr(CLASS##TypeRepr* type);
+#include "swift/AST/TypeReprNodes.def"
+  };
+}
+
+TypeRepr *CloneVisitor::visitErrorTypeRepr(ErrorTypeRepr *T) {
+  return new (Ctx) ErrorTypeRepr(T->getSourceRange());
+}
+
+TypeRepr *CloneVisitor::visitAttributedTypeRepr(AttributedTypeRepr *T) {
+  return new (Ctx) AttributedTypeRepr(T->getAttrs(), visit(T->getTypeRepr()));
+}
+
+TypeRepr *CloneVisitor::visitIdentTypeRepr(IdentTypeRepr *T) {
+  return new (Ctx) IdentTypeRepr(Ctx.AllocateCopy(T->Components));
+}
+
+TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
+  return new (Ctx) FunctionTypeRepr(/*FIXME: Clone?*/T->getGenericParams(),
+                                    visit(T->getArgsTypeRepr()),
+                                    visit(T->getResultTypeRepr()));
+}
+
+TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
+  return new (Ctx) ArrayTypeRepr(visit(T->getBase()), T->getSize(),
+                                 T->getBrackets());
+}
+
+TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
+  return new (Ctx) OptionalTypeRepr(visit(T->getBase()), T->getQuestionLoc());
+}
+
+TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
+  return new (Ctx) TupleTypeRepr(Ctx.AllocateCopy(T->getElements()),
+                                 T->getParens(), T->getEllipsisLoc());
+}
+
+TypeRepr *CloneVisitor::visitNamedTypeRepr(NamedTypeRepr *T) {
+  return new (Ctx) NamedTypeRepr(T->getName(), visit(T->getTypeRepr()),
+                                 T->getNameLoc());
+}
+
+TypeRepr *CloneVisitor::visitProtocolCompositionTypeRepr(
+                          ProtocolCompositionTypeRepr *T) {
+  return new (Ctx) ProtocolCompositionTypeRepr(
+                     Ctx.AllocateCopy(T->getProtocols()),
+                     T->getProtocolLoc(),
+                     T->getAngleBrackets());
+}
+
+TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
+  return new (Ctx) MetatypeTypeRepr(visit(T->getBase()), T->getMetaLoc());
+}
+
+TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
+  CloneVisitor visitor(ctx);
+  return visitor.visit(const_cast<TypeRepr *>(this));
+}
+
 
 void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {

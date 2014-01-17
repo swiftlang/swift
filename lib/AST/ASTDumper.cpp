@@ -375,7 +375,7 @@ namespace {
 
         if (VD->getInterfaceType().getPointer() != VD->getType().getPointer()) {
           OS << "' interface type='";
-          VD->getInterfaceType().print(OS);
+          VD->getInterfaceType()->getCanonicalType().print(OS);
         }
       } else
         OS << "<null type>";

@@ -199,14 +199,14 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     auto typed = cast<TypedPattern>(this);
     result = new(context) TypedPattern(typed->getSubPattern()->clone(context,
                                                                      Implicit),
-                                       typed->getTypeLoc());
+                                       typed->getTypeLoc().clone(context));
     break;
   }
       
   case PatternKind::Isa: {
     auto isa = cast<IsaPattern>(this);
     result = new(context) IsaPattern(isa->getLoc(),
-                                     isa->getCastTypeLoc(),
+                                     isa->getCastTypeLoc().clone(context),
                                      isa->getCastKind());
     break;
   }
@@ -223,7 +223,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
                                                                     Implicit)));
     }
     
-    result = NominalTypePattern::create(nom->getCastTypeLoc(),
+    result = NominalTypePattern::create(nom->getCastTypeLoc().clone(context),
                                         nom->getLParenLoc(),
                                         elts,
                                         nom->getRParenLoc(), context);
@@ -235,7 +235,8 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
       sub = oof->getSubPattern()->clone(context, Implicit);
-    result = new (context) EnumElementPattern(oof->getParentType(),
+    result = new (context) EnumElementPattern(oof->getParentType()
+                                                .clone(context),
                                               oof->getLoc(),
                                               oof->getNameLoc(),
                                               oof->getName(),

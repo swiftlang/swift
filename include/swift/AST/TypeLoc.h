@@ -19,11 +19,12 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
-  class ASTContext;
-  class TypeRepr;
+
+class ASTContext;
 
 /// TypeLoc - Provides source location information for a parsed type.
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
@@ -59,6 +60,13 @@ public:
   void setInvalidType(ASTContext &C);
   void setType(Type Ty, bool validated = false) {
     TAndValidBit.setPointerAndInt(Ty, validated);
+  }
+
+  TypeLoc clone(ASTContext &ctx) const {
+    if (TyR)
+      return TypeLoc(TyR->clone(ctx));
+
+    return *this;
   }
 };
 

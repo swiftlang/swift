@@ -1197,7 +1197,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       // Start the function.
       Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
-                             Type(), Params, Params, ElementTy,
+                             Type(), Params, Params, ElementTy.clone(Context),
                              CurDeclContext);
       if (StaticLoc.isValid())
         Get->setStatic(true);
@@ -1296,7 +1296,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 
       Pattern *ValuePattern
         = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     ElementTy);
+                                     ElementTy.clone(Context));
       // The TypedPattern is always implicit because the ElementTy is not
       // spelled inside the parameter list.  It comes from elsewhere, and its
       // source location should be ignored.
