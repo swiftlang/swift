@@ -46,7 +46,7 @@ namespace driver {
 
 /// \brief A class encapsulating information about the outputs the driver
 /// is expected to generate.
-class OutputMode {
+class OutputInfo {
 public:
   /// The output type which should be used for compile actions.
   types::ID CompilerOutputType = types::ID::TY_INVALID;
@@ -131,12 +131,12 @@ public:
   void buildInputs(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                    InputList &Inputs) const;
 
-  /// Construct the OutputMode for the driver from the given arguments.
+  /// Construct the OutputInfo for the driver from the given arguments.
   ///
   /// \param Args The input arguments.
-  /// \param[out] OM The OutputMode in which to store the resulting output
+  /// \param[out] OI The OutputInfo in which to store the resulting output
   /// information.
-  void buildOutputMode(const llvm::opt::DerivedArgList &Args, OutputMode &OM)
+  void buildOutputInfo(const llvm::opt::DerivedArgList &Args, OutputInfo &OI)
     const;
 
   /// Construct the list of Actions to perform for the given arguments,
@@ -145,19 +145,19 @@ public:
   /// \param TC the default host tool chain.
   /// \param Args The input arguments.
   /// \param Inputs The inputs for which Actions should be generated.
-  /// \param OM The OutputMode for which Actions should be generated.
+  /// \param OI The OutputInfo for which Actions should be generated.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
-                    const InputList &Inputs, const OutputMode &OM,
+                    const InputList &Inputs, const OutputInfo &OI,
                     ActionList &Actions) const;
 
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
-  /// OutputMode.
+  /// OutputInfo.
   ///
   /// \param Actions The Actions for which Jobs should be generated.
-  /// \param OM The OutputMode for which Jobs should be generated
+  /// \param OI The OutputInfo for which Jobs should be generated
   /// \param[out] C The Compilation to which Jobs should be added
-  void buildJobs(const ActionList &Actions, const OutputMode &OM,
+  void buildJobs(const ActionList &Actions, const OutputInfo &OI,
                  Compilation &C) const;
 
   /// \brief A map for caching Jobs for a given Action/ToolChain pair
@@ -169,14 +169,14 @@ public:
   ///
   /// \param C The Compilation which this Job will eventually be part of
   /// \param A The Action for which a Job should be created
-  /// \param OM The OutputMode for which a Job should be created
+  /// \param OI The OutputInfo for which a Job should be created
   /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
   Job *buildJobsForAction(const Compilation &C, const Action *A,
-                          const OutputMode &OM, const ToolChain &TC,
+                          const OutputInfo &OI, const ToolChain &TC,
                           bool AtTopLevel, JobCacheMap &JobCache) const;
 
   /// Handle any arguments which should be treated before building actions or

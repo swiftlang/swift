@@ -32,7 +32,7 @@ using namespace llvm::opt;
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
                          const ActionList &InputActions, const ArgList &Args,
-                         const OutputMode &OM) const {
+                         const OutputInfo &OI) const {
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
@@ -102,7 +102,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
 
   Arguments.push_back("-module-name");
-  Arguments.push_back(Args.MakeArgString(OM.ModuleName));
+  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
 
   Args.AddLastArg(Arguments, options::OPT_g);
 
@@ -153,7 +153,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
                                std::unique_ptr<CommandOutput> Output,
                                const ActionList &InputActions,
                                const ArgList &Args,
-                               const OutputMode &OM) const {
+                               const OutputInfo &OI) const {
   ArgStringList Arguments;
 
   const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
@@ -166,7 +166,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-parse-as-library");
 
   Arguments.push_back("-module-name");
-  Arguments.push_back(Args.MakeArgString(OM.ModuleName));
+  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
 
   // We just want to emit a module, so pa
   Arguments.push_back("-emit-module");
@@ -237,7 +237,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                                   std::unique_ptr<CommandOutput> Output,
                                   const ActionList &InputActions,
                                   const ArgList &Args,
-                                  const OutputMode &OM) const {
+                                  const OutputInfo &OI) const {
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
   ArgStringList Arguments;

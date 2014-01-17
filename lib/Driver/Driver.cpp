@@ -92,26 +92,26 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   InputList Inputs;
   buildInputs(TC, *TranslatedArgList, Inputs);
 
-  // Determine the OutputMode for the driver.
-  OutputMode OM;
-  buildOutputMode(*TranslatedArgList, OM);
+  // Determine the OutputInfo for the driver.
+  OutputInfo OI;
+  buildOutputInfo(*TranslatedArgList, OI);
 
-  assert(OM.CompilerOutputType != types::ID::TY_INVALID &&
-         "buildOutputMode() must set a valid output type!");
+  assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
+         "buildOutputInfo() must set a valid output type!");
 
-  if (!Lexer::isIdentifier(OM.ModuleName)) {
-    if (OM.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
-      OM.ModuleName = "main";
+  if (!Lexer::isIdentifier(OI.ModuleName)) {
+    if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
+      OI.ModuleName = "main";
     else {
       // TODO: emit diagnostic
-      llvm::errs() << "error: bad module name '" << OM.ModuleName << "'\n";
-      OM.ModuleName = "__bad__";
+      llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
+      OI.ModuleName = "__bad__";
     }
   }
 
   // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(TC, *TranslatedArgList, Inputs, OM, Actions);
+  buildActions(TC, *TranslatedArgList, Inputs, OI, Actions);
 
   if (DriverPrintActions) {
     printActions(Actions);
@@ -133,7 +133,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  NumberOfParallelCommands,
                                                  DriverSkipExecution));
 
-  buildJobs(Actions, OM, *C);
+  buildJobs(Actions, OI, *C);
   if (DriverPrintBindings) {
     return nullptr;
   }
@@ -271,10 +271,10 @@ void Driver::buildInputs(const ToolChain &TC,
   }
 }
 
-void Driver::buildOutputMode(const DerivedArgList &Args,
-                             OutputMode &OM) const {
-  OM.ShouldLink = false;
-  OM.ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
+void Driver::buildOutputInfo(const DerivedArgList &Args,
+                             OutputInfo &OI) const {
+  OI.ShouldLink = false;
+  OI.ShouldGenerateModule = Args.hasArg(options::OPT_emit_module,
                                           options::OPT_module_output_path);
   types::ID CompileOutputType = types::TY_INVALID;
 
@@ -283,11 +283,11 @@ void Driver::buildOutputMode(const DerivedArgList &Args,
     if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
       CompileOutputType = types::TY_SwiftModuleFile;
     else {
-      OM.ShouldLink = true;
+      OI.ShouldLink = true;
       CompileOutputType = types::TY_Object;
     }
   } else if (OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
-    OM.ShouldLink = true;
+    OI.ShouldLink = true;
     CompileOutputType = types::TY_Object;
   } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
     // The user has requested an object file.
@@ -319,18 +319,18 @@ void Driver::buildOutputMode(const DerivedArgList &Args,
     llvm_unreachable("Unknown output mode option!");
   }
 
-  OM.CompilerOutputType = CompileOutputType;
+  OI.CompilerOutputType = CompileOutputType;
 
   if (const Arg *A = Args.getLastArg(options::OPT_module_name)) {
-    OM.ModuleName = A->getValue();
+    OI.ModuleName = A->getValue();
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
-    OM.ModuleName = llvm::sys::path::stem(A->getValue());
+    OI.ModuleName = llvm::sys::path::stem(A->getValue());
   }
 }
 
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
-                          const InputList &Inputs, const OutputMode &OM,
+                          const InputList &Inputs, const OutputInfo &OI,
                           ActionList &Actions) const {
   if (Inputs.empty()) {
     // FIXME: emit diagnostic
@@ -345,18 +345,18 @@ void Driver::buildActions(const ToolChain &TC,
 
     std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
     Current.reset(new CompileJobAction(Current.release(),
-                                       OM.CompilerOutputType));
+                                       OI.CompilerOutputType));
     // We've been told to link, so this action will be a linker input,
     // not a top-level action.
     CompileActions.push_back(Current.release());
   }
 
   std::unique_ptr<Action> MergeModuleAction;
-  if (OM.ShouldGenerateModule) {
+  if (OI.ShouldGenerateModule) {
     MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
   }
 
-  if (OM.ShouldLink) {
+  if (OI.ShouldLink) {
     Action *LinkAction = new LinkJobAction(CompileActions);
     if (MergeModuleAction) {
       // We have a MergeModuleJobAction; this needs to be an input to the
@@ -366,7 +366,7 @@ void Driver::buildActions(const ToolChain &TC,
       LinkAction->addInput(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
-  } else if (OM.ShouldGenerateModule) {
+  } else if (OI.ShouldGenerateModule) {
     assert(MergeModuleAction);
     Actions.push_back(MergeModuleAction.release());
   } else {
@@ -400,7 +400,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
-void Driver::buildJobs(const ActionList &Actions, const OutputMode &OM,
+void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
                        Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
@@ -436,7 +436,7 @@ void Driver::buildJobs(const ActionList &Actions, const OutputMode &OM,
   }
 
   for (const Action *A : Actions) {
-    Job *J = buildJobsForAction(C, A, OM, C.getDefaultToolChain(), true,
+    Job *J = buildJobsForAction(C, A, OI, C.getDefaultToolChain(), true,
                                 JobCache);
     C.addJob(J);
   }
@@ -468,7 +468,7 @@ static void printJobOutputs(const Job *J) {
 }
 
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
-                                const OutputMode &OM, const ToolChain &TC,
+                                const OutputInfo &OI, const ToolChain &TC,
                                 bool AtTopLevel, JobCacheMap &JobCache) const {
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
@@ -487,7 +487,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
     } else {
-      InputJobs->addJob(buildJobsForAction(C, Input, OM,
+      InputJobs->addJob(buildJobsForAction(C, Input, OI,
                                            C.getDefaultToolChain(), false,
                                            JobCache));
     }
@@ -538,7 +538,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       if (!Output) {
         StringRef BaseName(BaseInput);
         if (isa<MergeModuleJobAction>(JA))
-          BaseName = OM.ModuleName;
+          BaseName = OI.ModuleName;
 
         // We don't yet have a name, assign one.
         if (!AtTopLevel) {
@@ -580,7 +580,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   assert(Output && "No CommandOutput was created!");
 
-  if (OM.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
+  if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
       Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
     // We need to generate a module, and this is a CompileJobAction,
     // so add an additional output for the swiftmodule, based on the primary
@@ -609,7 +609,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   // 5. Construct a Job which produces the right CommandOutput.
   Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
-                           InputActions, C.getArgs(), OM);
+                           InputActions, C.getArgs(), OI);
 
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
