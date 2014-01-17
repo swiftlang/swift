@@ -1953,6 +1953,7 @@ public:
   }
 
   using DeclContext::operator new;
+  using Expr::dump;
 };
 
 /// \brief An explicit unnamed function expression, which can optionally have
