@@ -7,6 +7,21 @@
     - set SDKROOT in your environment
     - run swift through xcrun, which sets SDKROOT for you
 
+* 'let' declarations can now be used as struct/class ivars.  A 'let' ivar is
+  mutable within init(), and immutable everywhere else.
+
+    class C {
+      let x = 42
+      let y : Int
+      init(y : Int) {
+        self.y = y   // ok, self.y is mutable in init()
+      }
+      
+      func test() {
+        y = 42       // error: 'y' isn't mutable
+      }
+    }
+
 * The immutability model for structs and enums is complete, and arguments are
   immutable by default.  This allows the compiler to reject mutations of
   temporary objects, catching common bugs.  For example, this is rejected:
