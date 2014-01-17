@@ -50,6 +50,7 @@ static std::pair<Decl *, Decl *> findReferencedDecl(const Expr *E) {
   return std::make_pair(nullptr, nullptr);
 }
 
+/// Diagnose assigning variable to itself.
 static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
   auto *AE = dyn_cast<AssignExpr>(E);
   if (!AE)
@@ -65,15 +66,15 @@ static void diagSelfAssignment(TypeChecker &TC, const Expr *E) {
   }
 }
 
-//===--------------------------------------------------------------------===//
-// Diagnose unreachable code.
-//===--------------------------------------------------------------------===//
 
-/// Issue a warning on code containing retrun expression on a differnt line than
-/// the return keyword and both have the same indentation:
-///  ...
-///  return
-///  foo()
+/// Issue a warning on code where a returned expression is on a different line
+/// than the return keyword, but both have the same indentation.
+///
+/// \code
+///   ...
+///   return
+///   foo()
+/// \endcode
 static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
   auto *RS = dyn_cast<ReturnStmt>(S);
   if (!RS)
@@ -98,10 +99,8 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
   return;
 }
 
-//===--------------------------------------------------------------------===//
-// Diagnose use of module values outside of dot expressions.
-//===--------------------------------------------------------------------===//
 
+/// Diagnose use of module values outside of dot expressions.
 static void diagModuleValue(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
   public:
@@ -131,10 +130,8 @@ static void diagModuleValue(TypeChecker &TC, const Expr *E) {
   const_cast<Expr *>(E)->walk(Walker);
 }
 
-//===--------------------------------------------------------------------===//
-// Diagnose recursive use of properties within their own accessors
-//===--------------------------------------------------------------------===//
 
+/// Diagnose recursive use of properties within their own accessors
 static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
                                         const DeclContext *DC) {
   auto fn = dyn_cast<FuncDecl>(DC);
