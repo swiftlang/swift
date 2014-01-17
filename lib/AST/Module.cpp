@@ -951,6 +951,16 @@ bool Module::isStdlibModule() const {
   return !getParent() && Name == Ctx.StdlibModuleName;
 }
 
+bool Module::isSystemModule() const {
+  if (isStdlibModule())
+    return true;
+  if (getFiles().size() == 1) {
+    if (auto LF = dyn_cast<LoadedFile>(getFiles().front()))
+      return LF->isSystemModule();
+  }
+  return false;
+}
+
 template<bool respectVisibility, typename Callback>
 static bool forAllImportedModules(Module *topLevel,
                                   Optional<Module::AccessPathTy> thisPath,

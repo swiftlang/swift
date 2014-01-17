@@ -47,6 +47,8 @@ public:
   /// Returns true if this is a top-level Clang module (not a submodule).
   bool isTopLevel() const;
 
+  virtual bool isSystemModule() const;
+
   virtual void lookupValue(Module::AccessPathTy accessPath,
                            Identifier name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;

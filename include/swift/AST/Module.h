@@ -345,6 +345,10 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module is a system module; note that the StdLib is
+  /// considered a system module.
+  bool isSystemModule() const;
+
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
 
@@ -719,6 +723,8 @@ public:
   virtual OperatorDecl *lookupOperator(Identifier name, DeclKind fixity) const {
     return nullptr;
   }
+
+  virtual bool isSystemModule() const { return false; }
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||

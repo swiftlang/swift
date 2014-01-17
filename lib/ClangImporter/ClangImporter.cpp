@@ -1014,6 +1014,10 @@ bool ClangModuleUnit::isTopLevel() const {
   return !clangModule->isSubModule();
 }
 
+bool ClangModuleUnit::isSystemModule() const {
+  return clangModule->IsSystem;
+}
+
 clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
   return owner.getClangASTContext();
 }
