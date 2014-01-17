@@ -101,13 +101,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     }
   }
 
-  if (Args.hasArg(options::OPT_module_name)) {
-    Args.AddLastArg(Arguments, options::OPT_module_name);
-  } else if (const Arg *A = Args.getLastArgNoClaim(options::OPT_o)) {
-      Arguments.push_back("-module-name");
-      StringRef InferredModuleName = llvm::sys::path::stem(A->getValue());
-      Arguments.push_back(Args.MakeArgString(InferredModuleName));
-  }
+  Arguments.push_back("-module-name");
+  Arguments.push_back(Args.MakeArgString(OM.ModuleName));
 
   Args.AddLastArg(Arguments, options::OPT_g);
 
@@ -169,6 +164,9 @@ Job *MergeModule::constructJob(const JobAction &JA,
   // Tell all files to parse as library, which is necessary to load them as
   // serialized ASTs.
   Arguments.push_back("-parse-as-library");
+
+  Arguments.push_back("-module-name");
+  Arguments.push_back(Args.MakeArgString(OM.ModuleName));
 
   // We just want to emit a module, so pa
   Arguments.push_back("-emit-module");
