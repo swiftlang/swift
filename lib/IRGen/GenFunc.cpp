@@ -992,7 +992,8 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
   // coerce the result back from the ABI type before extracting the
   // elements.
   if (bodyType != callType)
-    returned = IGF.coerceValue(returned, callType, bodyType);
+    returned = IGF.coerceValue(returned, callType, bodyType,
+                               IGF.IGM.DataLayout);
 
   if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
@@ -1951,7 +1952,8 @@ void IRGenFunction::emitEpilogue() {
 }
 
 llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *fromTy,
-                                        llvm::Type *toTy)
+                                        llvm::Type *toTy,
+                                        const llvm::DataLayout &DL)
 {
   assert(fromTy != toTy && "Unexpected same types in type coercion!");
   assert(!fromTy->isVoidTy()
@@ -1964,8 +1966,9 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *fromTy,
   if (toTy->isPointerTy() && fromTy->isPointerTy())
     return Builder.CreateBitCast(value, toTy);
 
-  // FIXME: Deal properly with numeric types, i.e. extending and
-  // truncating.
+  assert(DL.getTypeSizeInBits(fromTy) == DL.getTypeSizeInBits(toTy)
+         && "Coerced types should not differ in size!");
+
   auto address = createAlloca(fromTy, Alignment(0),
                               value->getName() + ".coerced");
   Builder.CreateStore(value, address.getAddress());
@@ -1989,7 +1992,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   if (result.size() == 1) {
     auto *returned = result.claimNext();
     if (ABIType != bodyType)
-      returned = coerceValue(returned, bodyType, ABIType);
+      returned = coerceValue(returned, bodyType, ABIType, IGM.DataLayout);
 
     Builder.CreateRet(returned);
     return;
@@ -2004,7 +2007,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   }
 
   if (ABIType != bodyType)
-    resultAgg = coerceValue(resultAgg, bodyType, ABIType);
+    resultAgg = coerceValue(resultAgg, bodyType, ABIType, IGM.DataLayout);
 
   Builder.CreateRet(resultAgg);
 }
