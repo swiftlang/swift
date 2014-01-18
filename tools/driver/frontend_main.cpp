@@ -26,6 +26,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/Immediate/Immediate.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -63,7 +64,8 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
-                           CompilerInvocation &Invocation) {
+                           CompilerInvocation &Invocation,
+                           ArrayRef<const char *> Args) {
   FrontendOptions::ActionType Action =
     Invocation.getFrontendOptions().RequestedAction;
 
@@ -71,6 +73,11 @@ static bool performCompile(CompilerInstance &Instance,
   ASTContext &Context = Instance.getASTContext();
   if (Context.hadError())
     return true;
+
+  if (Action == FrontendOptions::REPL) {
+    REPLRunLoop(Instance, ProcessCmdLine(Args.begin(), Args.end()));
+    return false;
+  }
 
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse)
@@ -290,17 +297,15 @@ int frontend_main(ArrayRef<const char *>Args,
 
   FrontendOptions::ActionType Action =
     Invocation.getFrontendOptions().RequestedAction;
-  if (Action == FrontendOptions::REPL || Action == FrontendOptions::Immediate) {
-    // TODO: remove once the integrated frontend supports REPL, Immediate modes
-    llvm::errs() << "error: integrated frontend does not support "
-                 << (Action == FrontendOptions::REPL ? "REPL" :
-                                                       "immediate mode")
+  if (Action == FrontendOptions::Immediate) {
+    // TODO: remove once the integrated frontend supports immediate mode
+    llvm::errs() << "error: integrated frontend does not support immediate mode"
                  << '\n';
 
     return 1;
   }
 
-  bool HadError = performCompile(Instance, Invocation) ||
+  bool HadError = performCompile(Instance, Invocation, Args) ||
                   Instance.getASTContext().hadError();
 
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {

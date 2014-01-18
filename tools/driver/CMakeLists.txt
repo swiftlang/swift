@@ -1,10 +1,14 @@
 add_swift_executable(swift_driver
   driver.cpp
   frontend_main.cpp
-  DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses
+  DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
           swiftSerialization swiftFrontend swiftClangImporter swiftIDE
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
                     irreader selectiondag ${LLVM_TARGETS_TO_BUILD})
+
+find_library(CORE_FOUNDATION NAMES CoreFoundation)
+
+target_link_libraries(swift_driver edit ${CORE_FOUNDATION})
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
