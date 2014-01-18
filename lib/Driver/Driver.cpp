@@ -349,7 +349,7 @@ void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
                           const InputList &Inputs, const OutputInfo &OI,
                           ActionList &Actions) const {
-  if (Inputs.empty()) {
+  if (!SuppressNoInputFilesError && Inputs.empty()) {
     // FIXME: emit diagnostic
     llvm::errs() << "error: no input files\n";
     return;

@@ -88,6 +88,9 @@ class Driver {
   /// Indicates whether the driver should print bindings.
   bool DriverPrintBindings;
 
+  /// Indicates whether the driver should suppress the "no input files" error.
+  bool SuppressNoInputFilesError = false;
+
   /// \brief Cache of all the ToolChains in use by the driver.
   ///
   /// This maps from the string representation of a triple to a ToolChain
