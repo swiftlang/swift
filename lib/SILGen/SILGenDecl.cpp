@@ -931,19 +931,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
-bool SILGenModule::requiresObjCSubscriptEntryPoints(SubscriptDecl *subscript) {
-  // We don't export generic methods or subclasses to IRGen yet.
-  if (subscript->getDeclContext()->getDeclaredTypeInContext()
-        ->is<BoundGenericType>() &&
-      !isa<ProtocolDecl>(subscript->getDeclContext()))
-    return false;
-  
-  if (auto override = subscript->getOverriddenDecl())
-    return requiresObjCSubscriptEntryPoints(override);
-
-  return subscript->isObjC();
-}
-
 bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign.
@@ -954,10 +941,8 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd))
     return requiresObjCMethodEntryPoint(cd);
-  if (auto *pd = dyn_cast<VarDecl>(vd))
-    return pd->usesObjCGetterAndSetter();
-  if (auto *sd = dyn_cast<SubscriptDecl>(vd))
-    return requiresObjCSubscriptEntryPoints(sd);
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
+    return asd->usesObjCGetterAndSetter();
   return vd->isObjC();
 }
 
@@ -1154,7 +1139,7 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
     // FIXME: Default implementations in protocols.
-    if (SGM.requiresObjCSubscriptEntryPoints(sd) &&
+    if (sd->usesObjCGetterAndSetter() &&
         !isa<ProtocolDecl>(sd->getDeclContext()))
       SGM.emitObjCSubscriptMethodThunks(sd);
   }
@@ -1295,7 +1280,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    if (SGM.requiresObjCSubscriptEntryPoints(sd))
+    if (sd->usesObjCGetterAndSetter())
       SGM.emitObjCSubscriptMethodThunks(sd);
   }
 };

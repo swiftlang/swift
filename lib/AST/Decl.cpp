@@ -521,15 +521,10 @@ bool ValueDecl::needsCapture() const {
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
-  if (auto fd = dyn_cast<FuncDecl>(this)) {
+  if (auto fd = dyn_cast<FuncDecl>(this))
     return fd->getOverriddenDecl();
-  }
-  if (auto vd = dyn_cast<VarDecl>(this)) {
-    return vd->getOverriddenDecl();
-  }
-  if (auto sd = dyn_cast<SubscriptDecl>(this)) {
-    return sd->getOverriddenDecl();
-  }
+  if (auto sdd = dyn_cast<AbstractStorageDecl>(this))
+    return sdd->getOverriddenDecl();
   return nullptr;
 }
 
@@ -1200,7 +1195,7 @@ Type VarDecl::getSetterInterfaceType() const {
 
 /// Return true if this stored property needs to be accessed with getters and
 /// setters for Objective-C.
-bool VarDecl::usesObjCGetterAndSetter() const {
+bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
   // We don't export generic methods or subclasses to IRGen yet.
   auto *DC = getDeclContext();
   if (DC->getDeclaredTypeInContext() &&

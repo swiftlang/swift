@@ -2316,8 +2316,38 @@ public:
   }
 };
 
+/// AbstractStorageDecl - This is the common superclass for VarDecl and
+/// SubscriptDecl, representing potentially settable memory locations.
+class AbstractStorageDecl : public ValueDecl {
+  AbstractStorageDecl *OverriddenDecl = nullptr;
+protected:
+  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, Identifier Name,
+                      SourceLoc NameLoc)
+    : ValueDecl(Kind, DC, Name, NameLoc) {
+  }
+public:
+  
+  AbstractStorageDecl *getOverriddenDecl() const {
+    return OverriddenDecl;
+  }
+  void setOverriddenDecl(AbstractStorageDecl *over) {
+    OverriddenDecl = over;
+  }
+
+  /// Return true if this storage needs to be accessed with getters and
+  /// setters for Objective-C.
+  bool usesObjCGetterAndSetter() const;
+  
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) {
+    return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
+           D->getKind() <= DeclKind::Last_AbstractStorageDecl;
+  }
+};
+
 /// VarDecl - 'var' and 'let' declarations.
-class VarDecl : public ValueDecl {
+class VarDecl : public AbstractStorageDecl {
 private:
   struct GetSetRecord {
     SourceRange Braces;
@@ -2329,12 +2359,11 @@ private:
   // for patterns. We should refactor to a new node.
   GetSetRecord *GetSet = nullptr;
   PatternBindingDecl *ParentPattern = nullptr;
-  VarDecl *OverriddenDecl = nullptr;
 
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
-    : ValueDecl(DeclKind::Var, DC, Name, NameLoc) {
+    : AbstractStorageDecl(DeclKind::Var, DC, Name, NameLoc) {
     VarDeclBits.Static = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
@@ -2379,26 +2408,19 @@ public:
   /// is a let member in an initializer.
   bool isSettable(DeclContext *UseDC) const;
 
-  VarDecl *getOverriddenDecl() const {
-    return OverriddenDecl;
-  }
-  void setOverriddenDecl(VarDecl *over) {
-    OverriddenDecl = over;
-  }
-  
   PatternBindingDecl *getParentPattern() const {
     return ParentPattern;
   }
   void setParentPattern(PatternBindingDecl *PBD) {
     ParentPattern = PBD;
   }
+  
+  VarDecl *getOverriddenDecl() const {
+    return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
+  }
 
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
-
-  /// Return true if this stored property needs to be accessed with getters and
-  /// setters for Objective-C.
-  bool usesObjCGetterAndSetter() const;
 
   /// Given that this is an Objective-C property declaration, produce
   /// its getter selector in the given buffer (as UTF-8).
@@ -2469,23 +2491,22 @@ enum class ObjCSubscriptKind {
 ///
 /// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
 /// to get name lookup to find it with a bogus name.
-class SubscriptDecl : public ValueDecl {
+class SubscriptDecl : public AbstractStorageDecl {
   SourceLoc ArrowLoc;
   Pattern *Indices;
   TypeLoc ElementTy;
   SourceRange Braces;
   FuncDecl *Get;
   FuncDecl *Set;
-  SubscriptDecl *OverriddenDecl;
 
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy,
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
-    : ValueDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
+    : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
+      Braces(Braces), Get(Get), Set(Set) { }
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }
@@ -2534,8 +2555,10 @@ public:
   /// its setter selector.
   StringRef getObjCSetterSelector() const;
 
-  SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
+  SubscriptDecl *getOverriddenDecl() const {
+    return cast_or_null<SubscriptDecl>(
+                                  AbstractStorageDecl::getOverriddenDecl());
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Subscript;

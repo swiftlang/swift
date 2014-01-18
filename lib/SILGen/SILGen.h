@@ -240,10 +240,6 @@ public:
   /// True if the given constructor requires an entry point for ObjC method
   /// dispatch.
   bool requiresObjCMethodEntryPoint(ConstructorDecl *constructor);
-
-  /// True if the given subscript requires entry points for ObjC
-  /// subscript operations
-  bool requiresObjCSubscriptEntryPoints(SubscriptDecl *subscript);
   
   /// True if calling the given method or property should use ObjC dispatch.
   bool requiresObjCDispatch(ValueDecl *vd);
