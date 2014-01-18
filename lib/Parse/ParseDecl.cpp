@@ -1192,8 +1192,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                             SourceLoc(), /*hasVararg=*/false,
                                             SourceLoc(), /*Implicit=*/true));
 
-      Scope S(this, ScopeKind::FunctionBody);
-
       // Start the function.
       Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
                              Identifier(), GetLoc, /*GenericParams=*/nullptr,
@@ -1201,6 +1199,9 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                              CurDeclContext);
       if (StaticLoc.isValid())
         Get->setStatic(true);
+      
+      Scope S(this, ScopeKind::FunctionBody);
+
       addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
 
       // Establish the new context.
@@ -1273,9 +1274,8 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Params.push_back(buildImplicitSelfParameter(SetLoc));
 
     // Add the index parameters, if necessary.
-    if (Indices) {
+    if (Indices)
       Params.push_back(Indices->clone(Context, /*Implicit=*/true));
-    }
 
     bool IsNameImplicit = false;
     // Add the parameter. If no name was specified, the name defaults to
@@ -1312,8 +1312,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       Params.push_back(ValueParamsPattern);
     }
 
-    Scope S(this, ScopeKind::FunctionBody);
-
     // Start the function.
     Type SetterRetTy = TupleType::getEmpty(Context);
     Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
@@ -1325,6 +1323,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
     else  // non-static setters default to @mutating.
       Set->setMutating();
 
+    Scope S(this, ScopeKind::FunctionBody);
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
     // Establish the new context.
