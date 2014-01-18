@@ -294,8 +294,10 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   if (!OutputModeArg) {
     if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
       CompileOutputType = types::TY_SwiftModuleFile;
-    else if (Inputs.empty()) {
+    else if (Inputs.empty() && !Args.hasArg(options::OPT_v)) {
       // No inputs and no mode arguments imply REPL mode
+      // (Treat -v as a mode, since -v and no other mode arguments means
+      // "print the version and exit".)
       CompileOutputType = types::TY_Nothing;
       CompileMode = OutputInfo::Mode::REPL;
     }
@@ -364,7 +366,9 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   if (!Lexer::isIdentifier(OI.ModuleName)) {
     if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
       OI.ModuleName = "main";
-    else {
+    else if (!Inputs.empty() || OI.CompilerMode == OutputInfo::Mode::REPL) {
+      // Having an improper module name is only bad if we have inputs or if
+      // we're in REPL mode.
       // TODO: emit diagnostic
       llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
       OI.ModuleName = "__bad__";
@@ -421,6 +425,11 @@ void Driver::buildActions(const ToolChain &TC,
   }
   }
 
+  if (CompileActions.empty())
+    // If there are no compile actions, don't attempt to set up any downstream
+    // actions.
+    return;
+
   std::unique_ptr<Action> MergeModuleAction;
   if (OI.ShouldGenerateModule) {
     MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
@@ -465,6 +474,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
 
   if (Args.hasArg(options::OPT_v)) {
     printVersion(TC, llvm::errs());
+    SuppressNoInputFilesError = true;
   }
 
   return true;
