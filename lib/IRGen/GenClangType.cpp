@@ -105,7 +105,11 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
 }
 
 clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
-  return clang::CanQualType();
+  auto const &clangCtx = getClangASTContext();
+  clang::QualType clangType =
+    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, 0, 0);
+  clangType = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(clangType);
 }
 
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
