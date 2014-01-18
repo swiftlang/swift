@@ -459,7 +459,7 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 }
 
-static StringRef getBaseInputForJob(Job *J) {
+static Optional<StringRef> getBaseInputForJob(Job *J) {
   if (Command *Cmd = dyn_cast<Command>(J)) {
     return Cmd->getOutput().getBaseInput();
   } else if (JobList *JL = dyn_cast<JobList>(J)) {
@@ -517,7 +517,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     return nullptr;
 
   // 4. Determine the CommandOutput for the job.
-  StringRef BaseInput;
+  Optional<StringRef> BaseInput;
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput.
     InputAction *IA = cast<InputAction>(InputActions[0]);
@@ -527,9 +527,6 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     Job *J = InputJobs->getJobs()[0];
     BaseInput = getBaseInputForJob(J);
   }
-
-  assert(BaseInput.data() &&
-         "Unable to get BaseInput for the current JobAction");
 
   std::unique_ptr<CommandOutput> Output;
   if (JA->getType() == types::TY_Nothing) {
@@ -573,7 +570,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       }
 
       if (!Output) {
-        StringRef BaseName(BaseInput);
+        assert(BaseInput.hasValue() &&
+               "A Command which produces output must have a BaseInput!");
+        StringRef BaseName(BaseInput.getValue());
         if (isa<MergeModuleJobAction>(JA))
           BaseName = OI.ModuleName;
 
