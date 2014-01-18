@@ -2326,19 +2326,50 @@ public:
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
   AbstractStorageDecl *OverriddenDecl = nullptr;
+
+  struct GetSetRecord {
+    SourceRange Braces;
+    FuncDecl *Get;       // User-defined getter
+    FuncDecl *Set;       // User-defined setter
+  };
+
+  GetSetRecord *GetSetInfo = nullptr;
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, Identifier Name,
                       SourceLoc NameLoc)
     : ValueDecl(Kind, DC, Name, NameLoc) {
   }
 public:
-  
+
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl;
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
     OverriddenDecl = over;
   }
+  
+  /// \brief Determine whether this variable is computed, which means it
+  /// has no storage but does have a user-defined getter or setter.
+  ///
+  /// The opposite of "computed" is "stored".
+  bool isComputed() const { return GetSetInfo != nullptr; }
+  
+  
+  /// \brief Turn this into a computed variable, providing a getter and setter.
+  void setComputedAccessors(SourceLoc LBraceLoc,
+                            FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
+  
+  /// \brief Retrieve the getter used to access the value of this variable.
+  FuncDecl *getGetter() const { return GetSetInfo ? GetSetInfo->Get : nullptr; }
+  
+  /// \brief Retrieve the setter used to mutate the value of this variable.
+  FuncDecl *getSetter() const { return GetSetInfo ? GetSetInfo->Set : nullptr; }
+  
+  SourceRange getBracesRange() const {
+    assert(GetSetInfo && "Not computed!");
+    return GetSetInfo->Braces;
+  }
+
 
   /// Return true if this storage needs to be accessed with getters and
   /// setters for Objective-C.
@@ -2354,18 +2385,7 @@ public:
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
-private:
-  struct GetSetRecord {
-    SourceRange Braces;
-    FuncDecl *Get;       // User-defined getter
-    FuncDecl *Set;       // User-defined setter
-  };
-  
-  // FIXME: These fields are useless for most of the VarDecls that are created
-  // for patterns. We should refactor to a new node.
-  GetSetRecord *GetSet = nullptr;
   PatternBindingDecl *ParentPattern = nullptr;
-
 public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
@@ -2384,22 +2404,6 @@ public:
   /// Only for use in diagnostics.  It is not always possible to always
   /// precisely point to the variable type because of type aliases.
   SourceRange getTypeSourceRangeForDiagnostics() const;
-
-  /// \brief Determine whether this variable is computed, which means it
-  /// has no storage but does have a user-defined getter or setter.
-  ///
-  /// The opposite of "computed" is "stored".
-  bool isComputed() const { return GetSet != nullptr; }
-  
-  /// \brief Turn this into a computed variable, providing a getter and setter.
-  void setComputedAccessors(SourceLoc LBraceLoc,
-                            FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
-
-  /// \brief Retrieve the getter used to access the value of this variable.
-  FuncDecl *getGetter() const { return GetSet? GetSet->Get : nullptr; }
-
-  /// \brief Retrieve the setter used to mutate the value of this variable.
-  FuncDecl *getSetter() const { return GetSet? GetSet->Set : nullptr; }
 
   /// Retrieve the type of the getter.
   Type getGetterType() const;
@@ -2495,15 +2499,10 @@ enum class ObjCSubscriptKind {
 /// A given type can have multiple subscript declarations, so long as the
 /// signatures (indices and element type) are distinct.
 ///
-/// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
-/// to get name lookup to find it with a bogus name.
 class SubscriptDecl : public AbstractStorageDecl {
   SourceLoc ArrowLoc;
   Pattern *Indices;
   TypeLoc ElementTy;
-  SourceRange Braces;
-  FuncDecl *Get;
-  FuncDecl *Set;
 
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
@@ -2511,8 +2510,9 @@ public:
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
-      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set) { }
+      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy) {
+    setComputedAccessors(Braces.Start, Get, Set, Braces.End);
+  }
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }
@@ -2528,18 +2528,8 @@ public:
   Type getElementType() const { return ElementTy.getType(); }
   TypeLoc &getElementTypeLoc() { return ElementTy; }
 
-  /// \brief Retrieve the subscript getter, a function that takes the indices
-  /// and produces a value of the element type.
-  FuncDecl *getGetter() const { return Get; }
-  
-  /// \brief Retrieve the subscript setter, a function that takes the indices
-  /// and a new value of the lement type and updates the corresponding value.
-  ///
-  /// The subscript setter is optional.
-  FuncDecl *getSetter() const { return Set; }
-  
   /// \brief Returns whether the subscript operation has a setter.
-  bool isSettable() const { return Set; }
+  bool isSettable() const { return getSetter() != nullptr; }
 
   /// Retrieve the type of the getter.
   Type getGetterType() const;

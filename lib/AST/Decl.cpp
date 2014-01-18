@@ -1049,6 +1049,24 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams()[0].getAsTypeParam();
 }
 
+void AbstractStorageDecl::setComputedAccessors(SourceLoc LBraceLoc,
+                                               FuncDecl *Get, FuncDecl *Set,
+                                               SourceLoc RBraceLoc) {
+  auto &Context = getASTContext();
+  assert(!GetSetInfo && "Variable already has accessors?");
+  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
+  GetSetInfo = new (Mem) GetSetRecord;
+  GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  GetSetInfo->Get = Get;
+  GetSetInfo->Set = Set;
+  
+  if (Get)
+    Get->makeGetter(this);
+  if (Set)
+    Set->makeSetter(this);
+}
+
+
 /// \brief Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
@@ -1064,7 +1082,7 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   }
 
   // vars are settable unless they are computed and have no setter.
-  return !GetSet || GetSet->Set;
+  return !isComputed() || getSetter();
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
@@ -1077,23 +1095,6 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (auto *TP = dyn_cast<TypedPattern>(Pat))
     return TP->getTypeLoc().getTypeRepr()->getSourceRange();
   return getSourceRange();
-}
-
-void VarDecl::setComputedAccessors(SourceLoc LBraceLoc,
-                                   FuncDecl *Get, FuncDecl *Set,
-                                   SourceLoc RBraceLoc) {
-  auto &Context = getASTContext();
-  assert(!GetSet && "Variable already has accessors?");
-  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSet = new (Mem) GetSetRecord;
-  GetSet->Braces = SourceRange(LBraceLoc, RBraceLoc);
-  GetSet->Get = Get;
-  GetSet->Set = Set;
-  
-  if (Get)
-    Get->makeGetter(this);
-  if (Set)
-    Set->makeSetter(this);
 }
 
 Type VarDecl::getGetterType() const {
@@ -1501,8 +1502,8 @@ StringRef SubscriptDecl::getObjCSetterSelector() const {
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  if (Braces.isValid())
-    return { getSubscriptLoc(), Braces.End };
+  if (getBracesRange().isValid())
+    return { getSubscriptLoc(), getBracesRange().End };
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
