@@ -198,9 +198,25 @@ static bool performCompile(CompilerInstance &Instance,
   case FrontendOptions::EmitObject:
     IRGenOpts.OutputKind = IRGenOutputKind::ObjectFile;
     break;
-  case FrontendOptions::Immediate:
-    llvm_unreachable("Immediate mode is not yet implemented");
-    return true;
+  case FrontendOptions::Immediate: {
+    assert(!PrimarySourceFile && "-i doesn't work in -primary-file mode");
+    IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
+    IRGenOpts.OutputKind = IRGenOutputKind::Module;
+    IRGenOpts.UseJIT = true;
+    // FIXME: Debug info is temporarily disabled, because
+    // JITCodeEmitter doesn't support it. This can be fixed by
+    // migrating to MCJIT.
+    IRGenOpts.DebugInfo = false;
+    const std::vector<std::string> &ImmediateArgv =
+      Invocation.getFrontendOptions().ImmediateArgv;
+    const ProcessCmdLine &CmdLine = ImmediateArgv.empty() ?
+                                      ProcessCmdLine(Args.begin(), Args.end()) :
+                                      ProcessCmdLine(ImmediateArgv.begin(),
+                                                     ImmediateArgv.end());
+    Instance.setSILModule(std::move(SM));
+    RunImmediately(Instance, CmdLine, IRGenOpts);
+    return false;
+  }
   default:
     llvm_unreachable("Unknown ActionType which requires IRGen");
     return true;
@@ -292,16 +308,6 @@ int frontend_main(ArrayRef<const char *>Args,
   }
 
   if (Instance.setup(Invocation)) {
-    return 1;
-  }
-
-  FrontendOptions::ActionType Action =
-    Invocation.getFrontendOptions().RequestedAction;
-  if (Action == FrontendOptions::Immediate) {
-    // TODO: remove once the integrated frontend supports immediate mode
-    llvm::errs() << "error: integrated frontend does not support immediate mode"
-                 << '\n';
-
     return 1;
   }
 
