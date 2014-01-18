@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef HELPERS_H
-#define HELPERS_H
+#ifndef SWIFT_IMMEDIATE_HELPERS_H
+#define SWIFT_IMMEDIATE_HELPERS_H
 
 #include "swift/Basic/LLVM.h"
 

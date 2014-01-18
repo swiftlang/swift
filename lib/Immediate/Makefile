@@ -1,5 +1,5 @@
-##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
-# 
+##===- swift/lib/Immediate/Makefile ------------------------*- Makefile -*-===##
+#
 # This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -9,10 +9,10 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 ##===----------------------------------------------------------------------===##
-SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL SILGen SILPasses IRGen ClangImporter \
-                NullClangImporter ASTSectionImporter Serialization IDE \
-                Driver Frontend Immediate
+SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
+
+LIBRARYNAME := swiftImmediate
 
 include $(SWIFT_LEVEL)/Makefile

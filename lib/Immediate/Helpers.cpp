@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Helpers.h"
-#include "Immediate.h"
+#include "swift/Immediate/Helpers.h"
+
+#include "swift/Immediate/Immediate.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"

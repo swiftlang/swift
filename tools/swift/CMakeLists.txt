@@ -1,9 +1,7 @@
 add_swift_executable(swift
-  Helpers.cpp
-  Immediate.cpp
   swift.cpp
   DEPENDS swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftSerialization
-          swiftFrontend swiftClangImporter swiftIDE
+          swiftFrontend swiftClangImporter swiftIDE swiftImmediate
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
                     irreader selectiondag ${LLVM_TARGETS_TO_BUILD})
 

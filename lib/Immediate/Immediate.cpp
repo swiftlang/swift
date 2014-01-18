@@ -15,8 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Immediate.h"
-#include "Helpers.h"
+#include "swift/Immediate/Immediate.h"
+
+#include "swift/Immediate/Helpers.h"
 #include "swift/Subsystems.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/Lexer.h"
