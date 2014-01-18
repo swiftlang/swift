@@ -173,6 +173,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
   Opts.RequestedAction = Action;
 
+  if (Opts.RequestedAction == FrontendOptions::REPL &&
+      !Opts.InputFilenames.empty()) {
+    // TODO: emit diagnostic
+    llvm::errs() << "error: REPL mode requires no input files\n";
+    return true;
+  }
+
   if (Args.hasArg(OPT_parse_sil) ||
       (Opts.InputFilenames.size() == 1 &&
        llvm::sys::path::extension(Opts.InputFilenames[0]) == SIL_EXTENSION))
