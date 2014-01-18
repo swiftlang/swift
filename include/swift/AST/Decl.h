@@ -2426,6 +2426,122 @@ public:
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
 };
 
+  
+/// Describes the kind of subscripting used in Objective-C.
+enum class ObjCSubscriptKind {
+  /// Not an Objective-C subscripting kind.
+  None,
+  /// Objective-C indexed subscripting, which is based on an integral
+  /// index.
+  Indexed,
+  /// Objective-C keyed subscripting, which is based on an object
+  /// argument or metatype thereof.
+  Keyed
+};
+
+/// \brief Declares a subscripting operator for a type.
+///
+/// A subscript declaration is defined as a get/set pair that produces a
+/// specific type. For example:
+///
+/// \code
+/// subscript (i : Int) -> String {
+///   get: /* return ith String */
+///   set: /* set ith string to value */
+/// }
+/// \endcode
+///
+/// A type with a subscript declaration can be used as the base of a subscript
+/// expression a[i], where a is of the subscriptable type and i is the type
+/// of the index. A subscript can have multiple indices:
+///
+/// \code
+/// struct Matrix {
+///   subscript (i : Int, j : Int) -> Double {
+///     get: /* return element at position (i, j) */
+///     set: /* set element at position (i, j) */
+///   }
+/// }
+/// \endcode
+///
+/// A given type can have multiple subscript declarations, so long as the
+/// signatures (indices and element type) are distinct.
+///
+/// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
+/// to get name lookup to find it with a bogus name.
+class SubscriptDecl : public ValueDecl {
+  SourceLoc ArrowLoc;
+  Pattern *Indices;
+  TypeLoc ElementTy;
+  SourceRange Braces;
+  FuncDecl *Get;
+  FuncDecl *Set;
+  SubscriptDecl *OverriddenDecl;
+
+public:
+  SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
+                SourceLoc ArrowLoc, TypeLoc ElementTy,
+                SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
+                DeclContext *Parent)
+    : ValueDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
+      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
+      Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
+  
+  SourceLoc getSubscriptLoc() const { return getNameLoc(); }
+  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
+  SourceRange getSourceRange() const;
+
+  /// \brief Retrieve the indices for this subscript operation.
+  Pattern *getIndices() { return Indices; }
+  const Pattern *getIndices() const { return Indices; }
+  void setIndices(Pattern *p) { Indices = p; }
+
+  /// \brief Retrieve the type of the element referenced by a subscript
+  /// operation.
+  Type getElementType() const { return ElementTy.getType(); }
+  TypeLoc &getElementTypeLoc() { return ElementTy; }
+
+  /// \brief Retrieve the subscript getter, a function that takes the indices
+  /// and produces a value of the element type.
+  FuncDecl *getGetter() const { return Get; }
+  
+  /// \brief Retrieve the subscript setter, a function that takes the indices
+  /// and a new value of the lement type and updates the corresponding value.
+  ///
+  /// The subscript setter is optional.
+  FuncDecl *getSetter() const { return Set; }
+  
+  /// \brief Returns whether the subscript operation has a setter.
+  bool isSettable() const { return Set; }
+
+  /// Retrieve the type of the getter.
+  Type getGetterType() const;
+  Type getGetterInterfaceType() const;
+
+  /// Retrieve the type of the setter.
+  Type getSetterType() const;
+  Type getSetterInterfaceType() const;
+
+  /// Determine the kind of Objective-C subscripting this declaration
+  /// implies.
+  ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its getter selector.
+  StringRef getObjCGetterSelector() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its setter selector.
+  StringRef getObjCSetterSelector() const;
+
+  SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
+  void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::Subscript;
+  }
+};
+
 /// \brief Base class for function-like declarations.
 class AbstractFunctionDecl : public ValueDecl, public DeclContext {
 public:
@@ -2991,121 +3107,6 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
     return {CaseLoc, subRange.End};
   return {};
 }
-
-/// Describes the kind of subscripting used in Objective-C.
-enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
-  /// Objective-C indexed subscripting, which is based on an integral
-  /// index.
-  Indexed,
-  /// Objective-C keyed subscripting, which is based on an object
-  /// argument or metatype thereof.
-  Keyed
-};
-
-/// \brief Declares a subscripting operator for a type.
-///
-/// A subscript declaration is defined as a get/set pair that produces a
-/// specific type. For example:
-///
-/// \code
-/// subscript (i : Int) -> String {
-///   get: /* return ith String */
-///   set: /* set ith string to value */
-/// }
-/// \endcode
-///
-/// A type with a subscript declaration can be used as the base of a subscript
-/// expression a[i], where a is of the subscriptable type and i is the type
-/// of the index. A subscript can have multiple indices:
-///
-/// \code
-/// struct Matrix {
-///   subscript (i : Int, j : Int) -> Double {
-///     get: /* return element at position (i, j) */
-///     set: /* set element at position (i, j) */
-///   }
-/// }
-/// \endcode
-///
-/// A given type can have multiple subscript declarations, so long as the
-/// signatures (indices and element type) are distinct.
-///
-/// FIXME: SubscriptDecl isn't naturally a ValueDecl, but it's currently useful
-/// to get name lookup to find it with a bogus name.
-class SubscriptDecl : public ValueDecl {
-  SourceLoc ArrowLoc;
-  Pattern *Indices;
-  TypeLoc ElementTy;
-  SourceRange Braces;
-  FuncDecl *Get;
-  FuncDecl *Set;
-  SubscriptDecl *OverriddenDecl;
-
-public:
-  SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
-                SourceLoc ArrowLoc, TypeLoc ElementTy,
-                SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
-                DeclContext *Parent)
-    : ValueDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
-      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy),
-      Braces(Braces), Get(Get), Set(Set), OverriddenDecl(nullptr) { }
-  
-  SourceLoc getSubscriptLoc() const { return getNameLoc(); }
-  SourceLoc getStartLoc() const { return getSubscriptLoc(); }
-  SourceRange getSourceRange() const;
-
-  /// \brief Retrieve the indices for this subscript operation.
-  Pattern *getIndices() { return Indices; }
-  const Pattern *getIndices() const { return Indices; }
-  void setIndices(Pattern *p) { Indices = p; }
-
-  /// \brief Retrieve the type of the element referenced by a subscript
-  /// operation.
-  Type getElementType() const { return ElementTy.getType(); }
-  TypeLoc &getElementTypeLoc() { return ElementTy; }
-
-  /// \brief Retrieve the subscript getter, a function that takes the indices
-  /// and produces a value of the element type.
-  FuncDecl *getGetter() const { return Get; }
-  
-  /// \brief Retrieve the subscript setter, a function that takes the indices
-  /// and a new value of the lement type and updates the corresponding value.
-  ///
-  /// The subscript setter is optional.
-  FuncDecl *getSetter() const { return Set; }
-  
-  /// \brief Returns whether the subscript operation has a setter.
-  bool isSettable() const { return Set; }
-
-  /// Retrieve the type of the getter.
-  Type getGetterType() const;
-  Type getGetterInterfaceType() const;
-
-  /// Retrieve the type of the setter.
-  Type getSetterType() const;
-  Type getSetterInterfaceType() const;
-
-  /// Determine the kind of Objective-C subscripting this declaration
-  /// implies.
-  ObjCSubscriptKind getObjCSubscriptKind() const;
-
-  /// Given that this is an Objective-C subscript declaration, produce
-  /// its getter selector.
-  StringRef getObjCGetterSelector() const;
-
-  /// Given that this is an Objective-C subscript declaration, produce
-  /// its setter selector.
-  StringRef getObjCSetterSelector() const;
-
-  SubscriptDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(SubscriptDecl *over) { OverriddenDecl = over; }
-
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::Subscript;
-  }
-};
 
 /// ConstructorDecl - Declares a constructor for a type.  For example:
 ///

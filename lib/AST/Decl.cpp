@@ -1051,7 +1051,6 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   return !GetSet || GetSet->Set;
 }
 
-
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (!getParentPattern())
     return getSourceRange();
@@ -1235,6 +1234,261 @@ bool VarDecl::isAnonClosureParam() const {
 
   return nameStr[0] == '$';
 }
+
+
+/// Determine whether the given type is (or bridges to) an
+/// Objective-C object type.
+static bool isObjCObjectOrBridgedType(Type type) {
+  // FIXME: Bridged types info should be available here in the AST
+  // library, rather than hard-coding them.
+  if (auto structTy = type->getAs<StructType>()) {
+    auto structDecl = structTy->getDecl();
+    const DeclContext *DC = structDecl->getDeclContext();
+    if (DC->isModuleScopeContext() && DC->getParentModule()->isStdlibModule()) {
+      if (structDecl->getName().str() == "String")
+        return true;
+    }
+   
+    return false;
+  }
+
+  // Unwrap metatypes for remaining checks.
+  if (auto metaTy = type->getAs<MetatypeType>())
+    type = metaTy->getInstanceType();
+
+  // Class types are Objective-C object types.
+  if (type->is<ClassType>())
+    return true;
+
+  // [objc] protocols
+  if (auto protoTy = type->getAs<ProtocolType>()) {
+    auto proto = protoTy->getDecl();
+    return proto->requiresClass() && proto->isObjC();
+  }
+
+  return false;
+}
+
+/// Determine whether the given Swift type is an integral type, i.e.,
+/// a type that wraps a builtin integer.
+static bool isIntegralType(Type type) {
+  // Consider structs in the "swift" module that wrap a builtin
+  // integer type to be integral types.
+  if (auto structTy = type->getAs<StructType>()) {
+    auto structDecl = structTy->getDecl();
+    const DeclContext *DC = structDecl->getDeclContext();
+    if (!DC->isModuleScopeContext() || !DC->getParentModule()->isStdlibModule())
+      return false;
+
+    // Find the single ivar.
+    VarDecl *singleVar = nullptr;
+    for (auto member : structDecl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var || var->isComputed())
+        continue;
+
+      if (singleVar)
+        return false;
+
+      singleVar = var;
+    }
+
+    if (!singleVar)
+      return false;
+
+    // Check whether it has integer type.
+    return singleVar->getType()->is<BuiltinIntegerType>();
+  }
+
+  return false;
+}
+
+Type SubscriptDecl::getGetterType() const {
+  // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*@mutating*/false,
+                                                       &outerParams);
+
+  // Form the () -> element function type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getElementType());
+
+  // Prepend the indices.
+  getterTy = FunctionType::get(getIndices()->getType(), getterTy);
+  
+  // Prepend the 'self' type.
+  if (outerParams)
+    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams);
+  else
+    getterTy = FunctionType::get(selfTy, getterTy);
+
+  return getterTy;
+}
+
+Type SubscriptDecl::getGetterInterfaceType() const {
+  // If we have a getter, use its type.
+  if (auto getter = getGetter())
+    return getter->getInterfaceType();
+
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
+                                                       /*@mutating*/ false);
+
+  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
+  auto indicesTy = interfaceTy->getInput();
+  auto elementTy = interfaceTy->getResult();
+  
+  // Form the () -> element function type.
+  auto &ctx = getASTContext();
+  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), elementTy);
+
+  // Prepend the indices.
+  getterTy = FunctionType::get(indicesTy, getterTy);
+  
+  // Prepend the 'self' type.
+  ArrayRef<GenericTypeParamType*> genericParams;
+  ArrayRef<Requirement> requirements;
+  std::tie(genericParams, requirements)
+    = getDeclContext()->getGenericSignatureOfContext();
+  
+  if (genericParams.empty() && requirements.empty())
+    getterTy = FunctionType::get(selfTy, getterTy);
+  else
+    getterTy = GenericFunctionType::get(genericParams, requirements,
+                                        selfTy, getterTy,
+                                        AnyFunctionType::ExtInfo());
+
+  return getterTy;
+}
+
+Type SubscriptDecl::getSetterType() const {
+  // If we have a setter, use its type.
+  if (auto setter = getSetter())
+    return setter->getType();
+
+  // Otherwise, compute the type.
+  GenericParamList *outerParams = nullptr;
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
+                                                       /*@mutating*/true,
+                                                       &outerParams);
+
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  TupleTypeElt valueElt(getElementType(), ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
+                                    TupleType::getEmpty(ctx));
+
+  // Prepend the indices.
+  setterTy = FunctionType::get(getIndices()->getType(), setterTy);
+
+  // Prepend the 'self' type.
+  if (outerParams)
+    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams);
+  else
+    setterTy = FunctionType::get(selfTy, setterTy);
+
+  return setterTy;
+}
+
+Type SubscriptDecl::getSetterInterfaceType() const {
+  // If we have a setter, use its type.
+  if (auto setter = getSetter())
+    return setter->getInterfaceType();
+
+  // Otherwise, compute the type.
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
+                                                       /*@mutating*/ true);
+
+  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
+  auto indicesTy = interfaceTy->getInput();
+  auto elementTy = interfaceTy->getResult();
+
+  // Form the element -> () function type.
+  auto &ctx = getASTContext();
+  TupleTypeElt valueElt(elementTy, ctx.getIdentifier("value"));
+  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
+                                    TupleType::getEmpty(ctx));
+
+  // Prepend the indices.
+  setterTy = FunctionType::get(indicesTy, setterTy);
+
+  // Prepend the 'self' type.
+  ArrayRef<GenericTypeParamType*> genericParams;
+  ArrayRef<Requirement> requirements;
+  std::tie(genericParams, requirements)
+    = getDeclContext()->getGenericSignatureOfContext();
+  
+  if (genericParams.empty() && requirements.empty())
+    setterTy = FunctionType::get(selfTy, setterTy);
+  else
+    setterTy = GenericFunctionType::get(genericParams, requirements,
+                                        selfTy, setterTy,
+                                        AnyFunctionType::ExtInfo());
+
+  return setterTy;
+}
+
+ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
+  auto indexTy = getIndices()->getType();
+
+  // Look through a named 1-tuple.
+  if (auto tupleTy = indexTy->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == 1 &&
+        !tupleTy->getFields()[0].isVararg()) {
+      indexTy = tupleTy->getElementType(0);
+    }
+  }
+
+  // If the index type is an integral type, we have an indexed
+  // subscript.
+  if (isIntegralType(indexTy))
+    return ObjCSubscriptKind::Indexed;
+
+  // If the index type is an object type in Objective-C, we have a
+  // keyed subscript.
+  if (isObjCObjectOrBridgedType(indexTy))
+    return ObjCSubscriptKind::Keyed;
+
+  return ObjCSubscriptKind::None;
+}
+
+StringRef SubscriptDecl::getObjCGetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "objectAtIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "objectForKeyedSubscript:";
+  }
+}
+
+StringRef SubscriptDecl::getObjCSetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "setObject:atIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "setObject:forKeyedSubscript:";
+  }
+}
+
+SourceRange SubscriptDecl::getSourceRange() const {
+  if (Braces.isValid())
+    return { getSubscriptLoc(), Braces.End };
+  return { getSubscriptLoc(), ElementTy.getSourceRange().End };
+}
+
 
 Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
@@ -1495,253 +1749,6 @@ SourceRange FuncDecl::getSourceRange() const {
   return { FuncLoc, LastPat->getEndLoc() };
 }
 
-/// Determine whether the given type is (or bridges to) an
-/// Objective-C object type.
-static bool isObjCObjectOrBridgedType(Type type) {
-  // FIXME: Bridged types info should be available here in the AST
-  // library, rather than hard-coding them.
-  if (auto structTy = type->getAs<StructType>()) {
-    auto structDecl = structTy->getDecl();
-    const DeclContext *DC = structDecl->getDeclContext();
-    if (DC->isModuleScopeContext() && DC->getParentModule()->isStdlibModule()) {
-      if (structDecl->getName().str() == "String")
-        return true;
-    }
-   
-    return false;
-  }
-
-  // Unwrap metatypes for remaining checks.
-  if (auto metaTy = type->getAs<MetatypeType>())
-    type = metaTy->getInstanceType();
-
-  // Class types are Objective-C object types.
-  if (type->is<ClassType>())
-    return true;
-
-  // [objc] protocols
-  if (auto protoTy = type->getAs<ProtocolType>()) {
-    auto proto = protoTy->getDecl();
-    return proto->requiresClass() && proto->isObjC();
-  }
-
-  return false;
-}
-
-/// Determine whether the given Swift type is an integral type, i.e.,
-/// a type that wraps a builtin integer.
-static bool isIntegralType(Type type) {
-  // Consider structs in the "swift" module that wrap a builtin
-  // integer type to be integral types.
-  if (auto structTy = type->getAs<StructType>()) {
-    auto structDecl = structTy->getDecl();
-    const DeclContext *DC = structDecl->getDeclContext();
-    if (!DC->isModuleScopeContext() || !DC->getParentModule()->isStdlibModule())
-      return false;
-
-    // Find the single ivar.
-    VarDecl *singleVar = nullptr;
-    for (auto member : structDecl->getMembers()) {
-      auto var = dyn_cast<VarDecl>(member);
-      if (!var || var->isComputed())
-        continue;
-
-      if (singleVar)
-        return false;
-
-      singleVar = var;
-    }
-
-    if (!singleVar)
-      return false;
-
-    // Check whether it has integer type.
-    return singleVar->getType()->is<BuiltinIntegerType>();
-  }
-
-  return false;
-}
-
-Type SubscriptDecl::getGetterType() const {
-  // If we have a getter, use its type.
-  if (auto getter = getGetter())
-    return getter->getType();
-
-  // Otherwise, compute the type.
-  GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*@mutating*/false,
-                                                       &outerParams);
-
-  // Form the () -> element function type.
-  auto &ctx = getASTContext();
-  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), getElementType());
-
-  // Prepend the indices.
-  getterTy = FunctionType::get(getIndices()->getType(), getterTy);
-  
-  // Prepend the 'self' type.
-  if (outerParams)
-    getterTy = PolymorphicFunctionType::get(selfTy, getterTy, outerParams);
-  else
-    getterTy = FunctionType::get(selfTy, getterTy);
-
-  return getterTy;
-}
-
-Type SubscriptDecl::getGetterInterfaceType() const {
-  // If we have a getter, use its type.
-  if (auto getter = getGetter())
-    return getter->getInterfaceType();
-
-  // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*@mutating*/ false);
-
-  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
-  auto indicesTy = interfaceTy->getInput();
-  auto elementTy = interfaceTy->getResult();
-  
-  // Form the () -> element function type.
-  auto &ctx = getASTContext();
-  Type getterTy = FunctionType::get(TupleType::getEmpty(ctx), elementTy);
-
-  // Prepend the indices.
-  getterTy = FunctionType::get(indicesTy, getterTy);
-  
-  // Prepend the 'self' type.
-  ArrayRef<GenericTypeParamType*> genericParams;
-  ArrayRef<Requirement> requirements;
-  std::tie(genericParams, requirements)
-    = getDeclContext()->getGenericSignatureOfContext();
-  
-  if (genericParams.empty() && requirements.empty())
-    getterTy = FunctionType::get(selfTy, getterTy);
-  else
-    getterTy = GenericFunctionType::get(genericParams, requirements,
-                                        selfTy, getterTy,
-                                        AnyFunctionType::ExtInfo());
-
-  return getterTy;
-}
-
-Type SubscriptDecl::getSetterType() const {
-  // If we have a setter, use its type.
-  if (auto setter = getSetter())
-    return setter->getType();
-
-  // Otherwise, compute the type.
-  GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/false,
-                                                       /*@mutating*/true,
-                                                       &outerParams);
-
-  // Form the element -> () function type.
-  auto &ctx = getASTContext();
-  TupleTypeElt valueElt(getElementType(), ctx.getIdentifier("value"));
-  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
-                                    TupleType::getEmpty(ctx));
-
-  // Prepend the indices.
-  setterTy = FunctionType::get(getIndices()->getType(), setterTy);
-
-  // Prepend the 'self' type.
-  if (outerParams)
-    setterTy = PolymorphicFunctionType::get(selfTy, setterTy, outerParams);
-  else
-    setterTy = FunctionType::get(selfTy, setterTy);
-
-  return setterTy;
-}
-
-Type SubscriptDecl::getSetterInterfaceType() const {
-  // If we have a setter, use its type.
-  if (auto setter = getSetter())
-    return setter->getInterfaceType();
-
-  // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/false,
-                                                       /*@mutating*/ true);
-
-  auto interfaceTy = getInterfaceType()->castTo<AnyFunctionType>();
-  auto indicesTy = interfaceTy->getInput();
-  auto elementTy = interfaceTy->getResult();
-
-  // Form the element -> () function type.
-  auto &ctx = getASTContext();
-  TupleTypeElt valueElt(elementTy, ctx.getIdentifier("value"));
-  Type setterTy = FunctionType::get(TupleType::get(valueElt, ctx), 
-                                    TupleType::getEmpty(ctx));
-
-  // Prepend the indices.
-  setterTy = FunctionType::get(indicesTy, setterTy);
-
-  // Prepend the 'self' type.
-  ArrayRef<GenericTypeParamType*> genericParams;
-  ArrayRef<Requirement> requirements;
-  std::tie(genericParams, requirements)
-    = getDeclContext()->getGenericSignatureOfContext();
-  
-  if (genericParams.empty() && requirements.empty())
-    setterTy = FunctionType::get(selfTy, setterTy);
-  else
-    setterTy = GenericFunctionType::get(genericParams, requirements,
-                                        selfTy, setterTy,
-                                        AnyFunctionType::ExtInfo());
-
-  return setterTy;
-}
-
-ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
-  auto indexTy = getIndices()->getType();
-
-  // Look through a named 1-tuple.
-  if (auto tupleTy = indexTy->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1 &&
-        !tupleTy->getFields()[0].isVararg()) {
-      indexTy = tupleTy->getElementType(0);
-    }
-  }
-
-  // If the index type is an integral type, we have an indexed
-  // subscript.
-  if (isIntegralType(indexTy))
-    return ObjCSubscriptKind::Indexed;
-
-  // If the index type is an object type in Objective-C, we have a
-  // keyed subscript.
-  if (isObjCObjectOrBridgedType(indexTy))
-    return ObjCSubscriptKind::Keyed;
-
-  return ObjCSubscriptKind::None;
-}
-
-StringRef SubscriptDecl::getObjCGetterSelector() const {
-  switch (getObjCSubscriptKind()) {
-  case ObjCSubscriptKind::None:
-    llvm_unreachable("Not an Objective-C subscript");
-   
-  case ObjCSubscriptKind::Indexed:
-    return "objectAtIndexedSubscript:";
-
-  case ObjCSubscriptKind::Keyed:
-    return "objectForKeyedSubscript:";
-  }
-}
-
-StringRef SubscriptDecl::getObjCSetterSelector() const {
-  switch (getObjCSubscriptKind()) {
-  case ObjCSubscriptKind::None:
-    llvm_unreachable("Not an Objective-C subscript");
-   
-  case ObjCSubscriptKind::Indexed:
-    return "setObject:atIndexedSubscript:";
-
-  case ObjCSubscriptKind::Keyed:
-    return "setObject:forKeyedSubscript:";
-  }
-}
-
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
@@ -1749,13 +1756,6 @@ SourceRange EnumElementDecl::getSourceRange() const {
     return {getStartLoc(), ArgumentType.getSourceRange().End};
   return {getStartLoc(), getNameLoc()};
 }
-
-SourceRange SubscriptDecl::getSourceRange() const {
-  if (Braces.isValid())
-    return { getSubscriptLoc(), Braces.End };
-  return { getSubscriptLoc(), ElementTy.getSourceRange().End };
-}
-
 SourceRange ConstructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
