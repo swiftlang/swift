@@ -105,7 +105,27 @@ TypeRepr *CloneVisitor::visitAttributedTypeRepr(AttributedTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitIdentTypeRepr(IdentTypeRepr *T) {
-  return new (Ctx) IdentTypeRepr(Ctx.AllocateCopy(T->Components));
+  // Clone the components.
+  auto componentsMem = (IdentTypeRepr::Component*)
+    Ctx.Allocate(sizeof(IdentTypeRepr::Component) * T->Components.size(),
+                 alignof(IdentTypeRepr::Component));
+  
+  MutableArrayRef<IdentTypeRepr::Component> components(componentsMem,
+                                                       T->Components.size());
+  for (unsigned i : indices(components)) {
+    auto &old = T->Components[i];
+    
+    // Clone the generic arguments.
+    auto genericArgs = Ctx.Allocate<TypeRepr*>(old.getGenericArgs().size());
+    for (unsigned argI : indices(genericArgs)) {
+      genericArgs[argI] = visit(old.getGenericArgs()[argI]);
+    }
+    
+    new (&components[i]) IdentTypeRepr::Component(old.getIdLoc(),
+                                                  old.getIdentifier(),
+                                                  genericArgs);
+  }
+  return new (Ctx) IdentTypeRepr(components);
 }
 
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
