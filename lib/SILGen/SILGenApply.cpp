@@ -1205,8 +1205,8 @@ public:
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
 
-      // Attach the existential cleanup to the projection so that it gets consumed
-      // (or not) when the call is applied to it (or isn't).
+      // Attach the existential cleanup to the projection so that it gets
+      // consumed (or not) when the call is applied to it (or isn't).
       val = gen.B.createProjectExistentialRef(dynamicMemberRef,
                       existential.getValue(),
                       getSelfTypeForDynamicLookup(gen, existential.getValue()));

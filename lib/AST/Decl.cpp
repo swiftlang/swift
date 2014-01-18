@@ -1199,6 +1199,31 @@ Type VarDecl::getSetterInterfaceType() const {
   return setterTy;
 }
 
+/// Return true if this stored property needs to be accessed with getters and
+/// setters for Objective-C.
+bool VarDecl::usesObjCGetterAndSetter() const {
+  // We don't export generic methods or subclasses to IRGen yet.
+  auto *DC = getDeclContext();
+  if (DC->getDeclaredTypeInContext() &&
+      DC->getDeclaredTypeInContext()->is<BoundGenericType>() &&
+      !isa<ProtocolDecl>(DC))
+    return false;
+
+  if (auto override = getOverriddenDecl())
+    return override->usesObjCGetterAndSetter();
+
+  if (!isObjC())
+    return false;
+
+  // Don't expose objc properties for function types. We can't autorelease them,
+  // and eventually we want to map them back to blocks.
+  if (getType()->is<AnyFunctionType>())
+    return false;
+
+  return true;
+}
+
+
 bool VarDecl::isAnonClosureParam() const {
   auto name = getName();
   if (name.empty())

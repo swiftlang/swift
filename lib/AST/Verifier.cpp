@@ -431,21 +431,21 @@ struct ASTNodeBase {};
     void verifyCheckedAlways(ValueDecl *D) {
       if (D->hasType() && D->getType()->hasTypeVariable()) {
         Out << "a type variable escaped the type checker";
-        D->dumpImpl(Out);
+        D->dump(Out);
         abort();
       }
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
           Out << "can not override a decl in the same DeclContext";
-          D->dumpImpl(Out);
-          Overridden->dumpImpl(Out);
+          D->dump(Out);
+          Overridden->dump(Out);
           abort();
         }
       }
       if (D->conformsToProtocolRequirement()) {
         if (D->getConformances().empty()) {
           Out << "conforms bit set but no conformances found\n";
-          D->dumpImpl(Out);
+          D->dump(Out);
           abort();
         }
       }
@@ -1175,7 +1175,7 @@ struct ASTNodeBase {};
       auto genericParams = dc->getGenericParamsOfContext();
       if (!genericParams) {
         Out << "Missing generic parameters\n";
-        decl->dumpImpl(Out);
+        decl->dump(Out);
         abort();
       }
 
@@ -1224,7 +1224,7 @@ struct ASTNodeBase {};
           return;
 
         Out << "Generic requirements don't match all archetypes\n";
-        decl->dumpImpl(Out);
+        decl->dump(Out);
 
         Out << "\nGeneric type: " << genericTy->getString() << "\n";
         Out << "Expected requirements: ";
@@ -1340,7 +1340,7 @@ struct ASTNodeBase {};
             AFD->getDeclContext()->getGenericParamsOfContext()))
           && !AFD->getInterfaceType()->is<GenericFunctionType>()) {
         Out << "Missing interface type for generic function\n";
-        AFD->dumpImpl(Out);
+        AFD->dump(Out);
         abort();
       }
 
@@ -1839,12 +1839,12 @@ struct ASTNodeBase {};
         return;
       if (D->isInvalid() && !D->getType()->is<ErrorType>()) {
         Out << "Invalid decl has non-error type!\n";
-        D->dumpImpl(Out);
+        D->dump(Out);
         abort();
       }
       if (D->getType()->is<ErrorType>() && !D->isInvalid()) {
         Out << "Valid decl has error type!\n";
-        D->dumpImpl(Out);
+        D->dump(Out);
         abort();
       }
     }

@@ -917,7 +917,7 @@ static void printOrDumpDecl(Decl *d, PrintOrDump which) {
     d->print(llvm::outs());
     llvm::outs() << '\n';
   } else
-    d->dumpImpl(llvm::outs());
+    d->dump(llvm::outs());
 }
 
 /// The compiler and execution environment for the REPL.

@@ -87,7 +87,7 @@ namespace {
         ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
     }
 
-    void printRec(Decl *D) { D->dumpImpl(OS, Indent + 2); }
+    void printRec(Decl *D) { D->dump(OS, Indent + 2); }
     void printRec(Expr *E) { E->print(OS, Indent + 2); }
     void printRec(Stmt *S) { S->print(OS, Indent + 2); }
     void printRec(TypeRepr *T);
@@ -625,10 +625,10 @@ namespace {
 } // end anonymous namespace.
 
 void Decl::dump() const {
-  dumpImpl(llvm::errs(), 0);
+  dump(llvm::errs(), 0);
 }
 
-void Decl::dumpImpl(raw_ostream &OS, unsigned Indent) const {
+void Decl::dump(raw_ostream &OS, unsigned Indent) const {
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
@@ -767,7 +767,7 @@ public:
     Indent -= 2;
   }
 
-  void printRec(Decl *D) { D->dumpImpl(OS, Indent + 2); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->print(OS, Indent + 2); }
   void printRec(Pattern *P) {  PrintPattern(OS, Indent+2).visit(P); }
 
@@ -933,7 +933,7 @@ public:
 
   /// FIXME: This should use ExprWalker to print children.
 
-  void printRec(Decl *D) { D->dumpImpl(OS, Indent + 2); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Stmt *S) { S->print(OS, Indent + 2); }
   void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
   void printRec(TypeRepr *T);
@@ -1479,7 +1479,7 @@ public:
       ShowColors = llvm::errs().has_colors() && llvm::outs().has_colors();
   }
 
-  void printRec(Decl *D) { D->dumpImpl(OS, Indent + 2); }
+  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->print(OS, Indent + 2); }
   void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent + 2).visit(T); }
 

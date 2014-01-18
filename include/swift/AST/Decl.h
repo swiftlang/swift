@@ -394,8 +394,10 @@ public:
 
   SourceLoc TrailingSemiLoc;
 
-  void dump() const LLVM_ATTRIBUTE_USED;
-  void dumpImpl(raw_ostream &OS, unsigned Indent = 0) const;
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  void dump(raw_ostream &OS, unsigned Indent = 0) const;
 
   /// \brief Pretty-print the given declaration.
   ///
@@ -2393,6 +2395,10 @@ public:
 
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
+
+  /// Return true if this stored property needs to be accessed with getters and
+  /// setters for Objective-C.
+  bool usesObjCGetterAndSetter() const;
 
   /// Given that this is an Objective-C property declaration, produce
   /// its getter selector in the given buffer (as UTF-8).

@@ -931,28 +931,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
-bool SILGenModule::requiresObjCPropertyEntryPoints(VarDecl *property) {
-  // We don't export generic methods or subclasses to IRGen yet.
-  if (property->getDeclContext()->getDeclaredTypeInContext() &&
-      property->getDeclContext()->getDeclaredTypeInContext()
-        ->is<BoundGenericType>() &&
-      !isa<ProtocolDecl>(property->getDeclContext()))
-    return false;
-  
-  if (auto override = property->getOverriddenDecl())
-    return requiresObjCPropertyEntryPoints(override);
-
-  if (!property->isObjC())
-    return false;
-  
-  // Don't expose objc properties for function types. We can't autorelease them,
-  // and eventually we want to map them back to blocks.
-  if (property->getType()->is<AnyFunctionType>())
-    return false;
-  
-  return true;
-}
-
 bool SILGenModule::requiresObjCSubscriptEntryPoints(SubscriptDecl *subscript) {
   // We don't export generic methods or subclasses to IRGen yet.
   if (subscript->getDeclContext()->getDeclaredTypeInContext()
@@ -977,7 +955,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   if (auto *cd = dyn_cast<ConstructorDecl>(vd))
     return requiresObjCMethodEntryPoint(cd);
   if (auto *pd = dyn_cast<VarDecl>(vd))
-    return requiresObjCPropertyEntryPoints(pd);
+    return pd->usesObjCGetterAndSetter();
   if (auto *sd = dyn_cast<SubscriptDecl>(vd))
     return requiresObjCSubscriptEntryPoints(sd);
   return vd->isObjC();
@@ -1165,12 +1143,11 @@ public:
              && "only value type static properties are implemented");
       
       SGM.addGlobalVariable(vd);
-      
       return;
     }
     
     // FIXME: Default implementations in protocols.
-    if (SGM.requiresObjCPropertyEntryPoints(vd) &&
+    if (vd->usesObjCGetterAndSetter() &&
         !isa<ProtocolDecl>(vd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(vd);
   }
@@ -1313,7 +1290,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *) {}
   
   void visitVarDecl(VarDecl *vd) {
-    if (SGM.requiresObjCPropertyEntryPoints(vd))
+    if (vd->usesObjCGetterAndSetter())
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 
