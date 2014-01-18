@@ -168,7 +168,8 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-module-name");
   Arguments.push_back(Args.MakeArgString(OI.ModuleName));
 
-  // We just want to emit a module, so pa
+  // We just want to emit a module, so pass -emit-module without any other
+  // mode options.
   Arguments.push_back("-emit-module");
 
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
