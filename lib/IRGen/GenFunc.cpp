@@ -991,22 +991,8 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
   // elsewhere in the caller due to ABI type coercion, we need to
   // coerce the result back from the ABI type before extracting the
   // elements.
-  if (bodyType != callType) {
-    assert(!callType->isVoidTy() && "Unexpected void type in call result!");
-
-    // If both are pointers, we can simply insert a bitcast, otherwise
-    // we need to store, bitcast, and load.
-    if (bodyType->isPointerTy() && callType->isPointerTy()) {
-      returned = IGF.Builder.CreateBitCast(call, bodyType);
-    } else {
-      auto address = IGF.createAlloca(callType, Alignment(0),
-                                      "call.coerced");
-      IGF.Builder.CreateStore(call, address.getAddress());
-      auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
-                                                bodyType->getPointerTo());
-      returned = IGF.Builder.CreateLoad(coerced);
-    }
-  }
+  if (bodyType != callType)
+    returned = IGF.coerceValue(returned, callType, bodyType);
 
   if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
@@ -1964,45 +1950,63 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
+llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *fromTy,
+                                        llvm::Type *toTy)
+{
+  assert(fromTy != toTy && "Unexpected same types in type coercion!");
+  assert(!fromTy->isVoidTy()
+         && "Unexpected void source type in type coercion!");
+  assert(!toTy->isVoidTy()
+         && "Unexpected void destination type in type coercion!");
+
+  // If both are pointers, we can simply insert a bitcast, otherwise
+  // we need to store, bitcast, and load.
+  if (toTy->isPointerTy() && fromTy->isPointerTy())
+    return Builder.CreateBitCast(value, toTy);
+
+  // FIXME: Deal properly with numeric types, i.e. extending and
+  // truncating.
+  auto address = createAlloca(fromTy, Alignment(0),
+                              value->getName() + ".coerced");
+  Builder.CreateStore(value, address.getAddress());
+  auto *coerced = Builder.CreateBitCast(address.getAddress(),
+                                        toTy->getPointerTo());
+  return Builder.CreateLoad(coerced);
+}
+
 void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   if (result.size() == 0) {
     Builder.CreateRetVoid();
     return;
   }
 
+  auto *ABIType = CurFn->getReturnType();
+
+  auto &resultTI = IGM.getTypeInfo(resultType);
+  auto schema = resultTI.getSchema(result.getKind());
+  auto *bodyType = schema.getScalarResultType(IGM);
+
   if (result.size() == 1) {
-    Builder.CreateRet(result.claimNext());
+    auto *returned = result.claimNext();
+    if (ABIType != bodyType)
+      returned = coerceValue(returned, bodyType, ABIType);
+
+    Builder.CreateRet(returned);
     return;
   }
 
   // Multiple return values are returned as a struct.
-  auto &resultTI = IGM.getTypeInfo(resultType);
-  auto schema = resultTI.getSchema(result.getKind());
-  auto *bodyType = cast<llvm::StructType>(schema.getScalarResultType(IGM));
-
-  assert(bodyType->getNumElements() == result.size());
+  assert(cast<llvm::StructType>(bodyType)->getNumElements() == result.size());
   llvm::Value *resultAgg = llvm::UndefValue::get(bodyType);
   for (unsigned i = 0, e = result.size(); i != e; ++i) {
     llvm::Value *elt = result.claimNext();
     resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
   }
 
-  // The typical case - the result IR type used within the function
-  // matches the ABI result type of the function.
-  auto *ABIType = CurFn->getReturnType();
-  if (bodyType == ABIType) {
-    Builder.CreateRet(resultAgg);
-    return;
-  }
+  if (ABIType != bodyType)
+    resultAgg = coerceValue(resultAgg, bodyType, ABIType);
 
-  // Otherwise we need to store the return value, bitcast a pointer
-  // to the location we stored to, and load it back with the ABI
-  // return type.
-  auto *storage = new llvm::AllocaInst(bodyType, "return.coerced", AllocaIP);
-  Builder.CreateStore(resultAgg, storage);
-  auto *coerced = Builder.CreateBitCast(storage, ABIType->getPointerTo());
-  auto *returned = Builder.CreateLoad(coerced);
-  Builder.CreateRet(returned);
+  Builder.CreateRet(resultAgg);
 }
 
 static void emitApplyArgument(IRGenFunction &IGF,

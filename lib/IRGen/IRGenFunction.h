@@ -160,6 +160,8 @@ public:
 
   /// Return the SILDebugScope for this function.
   SILDebugScope* getDebugScope() const { return DbgScope; }
+  llvm::Value *coerceValue(llvm::Value *value, llvm::Type *fromTy,
+                           llvm::Type *toTy);
 
 private:
   llvm::Instruction *AllocaIP;
