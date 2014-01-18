@@ -2929,8 +2929,7 @@ namespace {
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->setComputedAccessors(Impl.SwiftContext, SourceLoc(),
-                                   getterThunk, setterThunk,
+      result->setComputedAccessors(SourceLoc(), getterThunk, setterThunk,
                                    SourceLoc());
       result->setIsObjC(true);
 
@@ -3380,7 +3379,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Write the function up as the getter.
   func->makeGetter(var);
-  var->setComputedAccessors(context, SourceLoc(), func, nullptr, SourceLoc());
+  var->setComputedAccessors(SourceLoc(), func, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
   SwiftContext.addedExternalDecl(func);

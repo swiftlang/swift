@@ -1079,9 +1079,10 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return getSourceRange();
 }
 
-void VarDecl::setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
+void VarDecl::setComputedAccessors(SourceLoc LBraceLoc,
                                    FuncDecl *Get, FuncDecl *Set,
                                    SourceLoc RBraceLoc) {
+  auto &Context = getASTContext();
   assert(!GetSet && "Variable already has accessors?");
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   GetSet = new (Mem) GetSetRecord;

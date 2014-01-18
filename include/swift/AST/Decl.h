@@ -2392,7 +2392,7 @@ public:
   bool isComputed() const { return GetSet != nullptr; }
   
   /// \brief Turn this into a computed variable, providing a getter and setter.
-  void setComputedAccessors(ASTContext &Context, SourceLoc LBraceLoc,
+  void setComputedAccessors(SourceLoc LBraceLoc,
                             FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
 
   /// \brief Retrieve the getter used to access the value of this variable.

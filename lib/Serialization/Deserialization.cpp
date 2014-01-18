@@ -1508,7 +1508,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->setInterfaceType(interfaceType);
 
     if (getterID || setterID) {
-      var->setComputedAccessors(ctx, SourceLoc(),
+      var->setComputedAccessors(SourceLoc(),
                                 cast_or_null<FuncDecl>(getDecl(getterID)),
                                 cast_or_null<FuncDecl>(getDecl(setterID)),
                                 SourceLoc());

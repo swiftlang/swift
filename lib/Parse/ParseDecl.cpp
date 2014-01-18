@@ -1416,7 +1416,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
 
   // If things went well, turn this into a computed variable.
   if (!Invalid && PrimaryVar && (Set || Get))
-    PrimaryVar->setComputedAccessors(Context, LBLoc, Get, Set, RBLoc);
+    PrimaryVar->setComputedAccessors(LBLoc, Get, Set, RBLoc);
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
