@@ -43,62 +43,97 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Arguments.push_back("-target");
   std::string TripleStr = getToolChain().getTripleString();
   Arguments.push_back(Args.MakeArgString(TripleStr));
-  
-  const char *OutputOption = nullptr;
-  switch (Output->getPrimaryOutputType()) {
-  case types::TY_Object:
-    OutputOption = "-c";
+
+  // Determine the frontend mode option.
+  const char *FrontendModeOption = nullptr;
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile: {
+    switch (Output->getPrimaryOutputType()) {
+    case types::TY_Object:
+      FrontendModeOption = "-c";
+      break;
+    case types::TY_RawSIL:
+      FrontendModeOption = "-emit-silgen";
+      break;
+    case types::TY_SIL:
+      FrontendModeOption = "-emit-sil";
+      break;
+    case types::TY_LLVM_IR:
+      FrontendModeOption = "-emit-ir";
+      break;
+    case types::TY_LLVM_BC:
+      FrontendModeOption = "-emit-bc";
+      break;
+    case types::TY_SwiftModuleFile:
+      // Since this is our primary output, we need to specify the option here.
+      FrontendModeOption = "-emit-module";
+      break;
+    case types::TY_Nothing:
+      // We were told to output nothing, so get the last mode option and use that.
+      if (const Arg *A = Args.getLastArg(options::OPT_modes_Group))
+        FrontendModeOption = A->getSpelling().data();
+      else
+        llvm_unreachable("We were told to perform a standard compile, "
+                         "but no mode option was passed to the driver.");
+      break;
+    default:
+      llvm_unreachable("Invalid output type");
+    }
     break;
-  case types::TY_RawSIL:
-    OutputOption = "-emit-silgen";
-    break;
-  case types::TY_SIL:
-    OutputOption = "-emit-sil";
-    break;
-  case types::TY_LLVM_IR:
-    OutputOption = "-emit-ir";
-    break;
-  case types::TY_LLVM_BC:
-    OutputOption = "-emit-bc";
-    break;
-  case types::TY_SwiftModuleFile:
-    // Since this is our primary output, we need to specify the option here.
-    OutputOption = "-emit-module";
-    break;
-  case types::TY_Nothing:
-    // We were told to output nothing, so get the last mode option and use that.
-    OutputOption =
-      Args.getLastArg(options::OPT_modes_Group)->getSpelling().data();
-    break;
-  default:
-    llvm_unreachable("Invalid output type");
   }
+  case OutputInfo::Mode::Immediate:
+    FrontendModeOption = "-i";
+    break;
+  case OutputInfo::Mode::REPL:
+    FrontendModeOption = "-repl";
+    break;
+  }
+
+  assert(FrontendModeOption != nullptr && "No frontend mode option specified!");
   
-  assert(OutputOption != nullptr && "No output option specified!");
-  
-  Arguments.push_back(OutputOption);
+  Arguments.push_back(FrontendModeOption);
   
   assert(Inputs->empty() &&
          "The Swift frontend does not expect to be fed any input Jobs!");
-  assert(InputActions.size() == 1 &&
-         "The Swift frontend expects exactly one input (the primary file)!");
 
-  const InputAction *IA = dyn_cast<InputAction>(InputActions[0]);
-  assert(IA && "Only InputActions can be passed as inputs!");
-  const Arg &PrimaryInputArg = IA->getInputArg();
-  bool FoundPrimaryInput = false;
+  // Add input arguments.
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile: {
+    assert(InputActions.size() == 1 &&
+           "The Swift frontend expects exactly one input (the primary file)!");
 
-  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_INPUT),
-                                 Args.filtered_end())) {
-    Option Opt = A->getOption();
-    if (A->getOption().matches(options::OPT_INPUT)) {
-      // See if this input should be passed with -primary-file.
-      if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
-        Arguments.push_back("-primary-file");
-        FoundPrimaryInput = true;
+    const InputAction *IA = dyn_cast<InputAction>(InputActions[0]);
+    assert(IA && "Only InputActions can be passed as inputs!");
+    const Arg &PrimaryInputArg = IA->getInputArg();
+    bool FoundPrimaryInput = false;
+
+    for (const Arg *A : make_range(Args.filtered_begin(options::OPT_INPUT),
+                                   Args.filtered_end())) {
+      Option Opt = A->getOption();
+      if (A->getOption().matches(options::OPT_INPUT)) {
+        // See if this input should be passed with -primary-file.
+        if (!FoundPrimaryInput && PrimaryInputArg.getIndex() == A->getIndex()) {
+          Arguments.push_back("-primary-file");
+          FoundPrimaryInput = true;
+        }
+        Arguments.push_back(A->getValue());
       }
-      Arguments.push_back(A->getValue());
     }
+    break;
+  }
+  case OutputInfo::Mode::Immediate: {
+    for (const Action *A : InputActions) {
+      const InputAction *IA = dyn_cast<InputAction>(A);
+      assert(IA && "Only InputActions can be passed as inputs!");
+
+      IA->getInputArg().render(Args, Arguments);
+    }
+    break;
+  }
+  case OutputInfo::Mode::REPL: {
+    assert(InputActions.empty() && "REPL mode accepts no inputs!");
+    break;
+  }
   }
 
   Arguments.push_back("-module-name");
@@ -139,10 +174,10 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     Arguments.push_back("-o");
     Arguments.push_back(Output->getPrimaryOutputFilename().data());
-  } else if (Args.getLastArg(options::OPT_modes_Group)->getOption().matches(
-               options::OPT_i)) {
-    Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
   }
+
+  if (OI.CompilerMode == OutputInfo::Mode::Immediate)
+    Args.AddLastArg(Arguments, options::OPT__DASH_DASH);
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);

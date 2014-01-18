@@ -48,6 +48,21 @@ namespace driver {
 /// is expected to generate.
 class OutputInfo {
 public:
+  enum class Mode {
+    /// A standard compilation, using multiple frontend invocations and
+    /// -primary-file.
+    StandardCompile,
+
+    /// Invoke the REPL
+    REPL,
+
+    /// Compile and execute the inputs immediately
+    Immediate,
+  };
+
+  /// The mode in which the driver should invoke the frontend.
+  Mode CompilerMode = Mode::StandardCompile;
+
   /// The output type which should be used for compile actions.
   types::ID CompilerOutputType = types::ID::TY_INVALID;
 

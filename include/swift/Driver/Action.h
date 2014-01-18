@@ -113,6 +113,8 @@ public:
 class CompileJobAction : public JobAction {
   virtual void anchor();
 public:
+  CompileJobAction(types::ID OutputType)
+      : JobAction(Action::CompileJob, llvm::None, OutputType) {}
   CompileJobAction(Action *Input, types::ID OutputType)
       : JobAction(Action::CompileJob, Input, OutputType) {}
 

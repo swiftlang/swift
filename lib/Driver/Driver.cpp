@@ -99,6 +99,10 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
 
+  if (OI.CompilerMode == OutputInfo::Mode::REPL)
+    // REPL mode expects no input files, so suppress the error.
+    SuppressNoInputFilesError = true;
+
   // Construct the graph of Actions.
   ActionList Actions;
   buildActions(TC, *TranslatedArgList, Inputs, OI, Actions);
@@ -284,11 +288,17 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   }
 
   types::ID CompileOutputType = types::TY_INVALID;
+  OutputInfo::Mode CompileMode = OutputInfo::Mode::StandardCompile;
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
   if (!OutputModeArg) {
     if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
       CompileOutputType = types::TY_SwiftModuleFile;
+    else if (Inputs.empty()) {
+      // No inputs and no mode arguments imply REPL mode
+      CompileOutputType = types::TY_Nothing;
+      CompileMode = OutputInfo::Mode::REPL;
+    }
     else {
       OI.ShouldLink = true;
       CompileOutputType = types::TY_Object;
@@ -317,19 +327,36 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
              OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
              OutputModeArg->getOption().matches(options::OPT_dump_ast) ||
-             OutputModeArg->getOption().matches(options::OPT_print_ast) ||
-             OutputModeArg->getOption().matches(options::OPT_i) ||
-             OutputModeArg->getOption().matches(options::OPT_repl)) {
+             OutputModeArg->getOption().matches(options::OPT_print_ast)) {
     // These modes don't have any output.
     CompileOutputType = types::TY_Nothing;
+  } else if (OutputModeArg->getOption().matches(options::OPT_i)) {
+    // Immediate mode has been explicitly requested by the user.
+    CompileOutputType = types::TY_Nothing;
+    CompileMode = OutputInfo::Mode::Immediate;
+  } else if (OutputModeArg->getOption().matches(options::OPT_repl)) {
+    // REPL mode has been explicitly requested by the user.
+    CompileOutputType = types::TY_Nothing;
+    CompileMode = OutputInfo::Mode::REPL;
   } else {
     llvm_unreachable("Unknown output mode option!");
   }
 
   OI.CompilerOutputType = CompileOutputType;
+  OI.CompilerMode = CompileMode;
+
+  if (OI.ShouldGenerateModule &&
+      (OI.CompilerMode == OutputInfo::Mode::REPL ||
+       OI.CompilerMode == OutputInfo::Mode::Immediate)) {
+    // FIXME: emit diagnostics
+    llvm::errs() << "error: this mode does not support emitting modules\n";
+  }
 
   if (const Arg *A = Args.getLastArg(options::OPT_module_name)) {
     OI.ModuleName = A->getValue();
+  } else if (OI.CompilerMode == OutputInfo::Mode::REPL) {
+    // REPL mode should always use the REPL module.
+    OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
   }
@@ -356,16 +383,42 @@ void Driver::buildActions(const ToolChain &TC,
   }
 
   ActionList CompileActions;
-  for (const InputPair &Input : Inputs) {
-    types::ID InputType = Input.first;
-    const Arg *InputArg = Input.second;
+  switch (OI.CompilerMode) {
+  case OutputInfo::Mode::StandardCompile: {
+    for (const InputPair &Input : Inputs) {
+      types::ID InputType = Input.first;
+      const Arg *InputArg = Input.second;
 
-    std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
-    Current.reset(new CompileJobAction(Current.release(),
-                                       OI.CompilerOutputType));
-    // We've been told to link, so this action will be a linker input,
-    // not a top-level action.
-    CompileActions.push_back(Current.release());
+      std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
+      Current.reset(new CompileJobAction(Current.release(),
+                                         OI.CompilerOutputType));
+      // We've been told to link, so this action will be a linker input,
+      // not a top-level action.
+      CompileActions.push_back(Current.release());
+    }
+    break;
+  }
+  case OutputInfo::Mode::Immediate: {
+    std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
+    for (const InputPair &Input : Inputs) {
+      types::ID InputType = Input.first;
+      const Arg *InputArg = Input.second;
+
+      CA->addInput(new InputAction(*InputArg, InputType));
+    }
+    CompileActions.push_back(CA.release());
+    break;
+  }
+  case OutputInfo::Mode::REPL: {
+    if (!Inputs.empty()) {
+      // REPL mode requires no inputs.
+      // FIXME: emit diagnostic
+      llvm::errs() << "error: REPL mode requires no input files\n";
+      return;
+    }
+    CompileActions.push_back(new CompileJobAction(OI.CompilerOutputType));
+    break;
+  }
   }
 
   std::unique_ptr<Action> MergeModuleAction;
