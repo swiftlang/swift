@@ -145,7 +145,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     auto origComponent = components.back();
     components.back() = new (C) GenericIdentTypeRepr(origComponent->getIdLoc(),
       origComponent->getIdentifier(),
-      C.AllocateCopy(argTypeReprs));
+      C.AllocateCopy(argTypeReprs),
+      SourceRange(use->getLAngleLoc(), use->getRAngleLoc()));
 
     return true;
   }

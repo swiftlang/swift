@@ -245,16 +245,19 @@ private:
 /// \endcode
 class GenericIdentTypeRepr : public ComponentIdentTypeRepr {
   ArrayRef<TypeRepr*> GenericArgs;
+  SourceRange AngleBrackets;
 
 public:
   GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
-                       ArrayRef<TypeRepr*> GenericArgs)
+                       ArrayRef<TypeRepr*> GenericArgs,
+                       SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-      GenericArgs(GenericArgs) {
+      GenericArgs(GenericArgs), AngleBrackets(AngleBrackets) {
     assert(!GenericArgs.empty());
   }
 
   ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
+  SourceRange getAngleBrackets() const { return AngleBrackets; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::GenericIdent;
@@ -263,7 +266,7 @@ public:
 
 private:
   SourceLoc getStartLocImpl() const { return getIdLoc(); }
-  SourceLoc getEndLocImpl() const { return GenericArgs.back()->getEndLoc(); }
+  SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };
 

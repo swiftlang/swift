@@ -115,7 +115,7 @@ TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
     genericArgs[argI] = visit(T->getGenericArgs()[argI]);
   }
   return new (Ctx) GenericIdentTypeRepr(T->getIdLoc(), T->getIdentifier(),
-                                        genericArgs);
+                                        genericArgs, T->getAngleBrackets());
 }
 
 TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
