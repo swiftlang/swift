@@ -367,7 +367,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   if (startsWithGreater(Tok)) {
     SourceLoc RAngleLoc = consumeStartingGreater();
     return makeParserResult(new (Context) ProtocolCompositionTypeRepr(
-                                             MutableArrayRef<IdentTypeRepr *>(),
+                                             ArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
                                              SourceRange(LAngleLoc, RAngleLoc)));
   }

@@ -492,7 +492,7 @@ class DeclRefExpr : public Expr {
   /// hold information about the generic arguments.
   struct SpecializeInfo {
     ConcreteDeclRef D;
-    MutableArrayRef<TypeRepr*> GenericArgs;
+    ArrayRef<TypeRepr*> GenericArgs;
   };
 
   /// \brief The declaration pointer or SpecializeInfo pointer if it was
@@ -537,12 +537,9 @@ public:
   /// Returns the generic arguments if it was specialized or an empty array
   /// otherwise.
   ArrayRef<TypeRepr *> getGenericArgs() const {
-    return const_cast<DeclRefExpr*>(this)->getGenericArgs();
-  }
-  MutableArrayRef<TypeRepr *> getGenericArgs() {
     if (auto Spec = getSpecInfo())
       return Spec->GenericArgs;
-    return MutableArrayRef<TypeRepr *>();
+    return ArrayRef<TypeRepr *>();
   }
   SourceRange getSourceRange() const { return Loc; }
   
