@@ -178,6 +178,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     // TODO: emit diagnostic
     llvm::errs() << "error: REPL mode requires no input files\n";
     return true;
+  } else if (Opts.RequestedAction == FrontendOptions::Immediate &&
+             Opts.PrimaryInput.hasValue()) {
+    // TODO: emit diagnostic
+    llvm::errs() << "error: immediate mode is incompatible with -primary-file"
+                 << '\n';
+    return true;
   }
 
   if (Args.hasArg(OPT_parse_sil) ||
