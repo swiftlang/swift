@@ -195,7 +195,7 @@ public:
   void emitObjCMethodThunk(FuncDecl *method);
   
   /// Emit the ObjC-compatible getter and setter for a property.
-  void emitObjCPropertyMethodThunks(VarDecl *prop);
+  void emitObjCPropertyMethodThunks(AbstractStorageDecl *prop);
 
   /// Emit the ObjC-compatible entry point for a constructor.
   void emitObjCConstructorThunk(ConstructorDecl *constructor);
@@ -203,10 +203,6 @@ public:
   /// Emit the ObjC-compatible entry point for a destructor (i.e., -dealloc).
   void emitObjCDestructorThunk(DestructorDecl *destructor);
 
-  /// Emit the ObjC-compatible getter and setter for a subscript
-  /// declaration.
-  void emitObjCSubscriptMethodThunks(SubscriptDecl *subscript);
-  
   /// Get or emit the witness table for a protocol conformance.
   /// Return null if the conformance does not have a witness table directly
   /// associated with itself.

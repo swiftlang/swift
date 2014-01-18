@@ -395,17 +395,11 @@ public:
   /// Generate an ObjC-compatible thunk for a method.
   void emitObjCMethodThunk(SILDeclRef thunk);
   
-  /// Generate an ObjC-compatible getter for a property.
-  void emitObjCPropertyGetter(SILDeclRef getter);
+  /// Generate an ObjC-compatible getter for a property or subscript.
+  void emitObjCGetter(SILDeclRef getter);
   
-  /// Generate an ObjC-compatible setter for a property.
-  void emitObjCPropertySetter(SILDeclRef setter);
-
-  /// Generate an ObjC-compatible getter for a subscript.
-  void emitObjCSubscriptGetter(SILDeclRef getter);
-  
-  /// Generate an ObjC-compatible setter for a subscript.
-  void emitObjCSubscriptSetter(SILDeclRef setter);
+  /// Generate an ObjC-compatible setter for a property or subscript.
+  void emitObjCSetter(SILDeclRef setter);
 
   /// Generate an ObjC-compatible destructor (-dealloc).
   void emitObjCDestructor(SILDeclRef dtor);
