@@ -728,11 +728,10 @@ void NominalTypeDecl::computeType() {
       auto selfId = ctx.getIdentifier("Self");
       auto selfDecl = new (ctx) GenericTypeParamDecl(proto, selfId,
                                                      proto->getLoc(), 0, 0);
-      IdentTypeRepr::Component protoRef(proto->getLoc(), proto->getName(), { });
-      protoRef.setValue(proto);
-      TypeLoc selfInherited[1] = {
-        TypeLoc(IdentTypeRepr::create(ctx, protoRef))
-      };
+      auto protoRef = new (ctx) SimpleIdentTypeRepr(proto->getLoc(),
+                                                    proto->getName());
+      protoRef->setValue(proto);
+      TypeLoc selfInherited[1] = { TypeLoc(protoRef) };
       selfInherited[0].setType(DeclaredTy);
       selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
       selfDecl->setImplicit();

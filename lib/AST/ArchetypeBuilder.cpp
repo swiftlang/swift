@@ -649,17 +649,17 @@ public:
       return true;
 
     // For each of the components...
-    for (auto &comp : identRepr->Components) {
+    for (auto comp : identRepr->getComponentRange()) {
       // If there is no type binding, we don't care.
-      if (!comp.isBoundType())
+      if (!comp->isBoundType())
         continue;
 
       // If there are no generic arguments, we don't care.
-      if (comp.getGenericArgs().empty())
+      if (!isa<GenericIdentTypeRepr>(comp))
         continue;
 
       // If it's not a bound generic type, we don't care.
-      auto boundGeneric = comp.getBoundType()->getAs<BoundGenericType>();
+      auto boundGeneric = comp->getBoundType()->getAs<BoundGenericType>();
       if (!boundGeneric)
         continue;
 

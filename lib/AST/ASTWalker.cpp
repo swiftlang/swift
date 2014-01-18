@@ -1066,12 +1066,22 @@ bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitIdentTypeRepr(IdentTypeRepr *T) {
-  for (auto &comp : T->Components) {
-    for (auto genArg : comp.getGenericArgs()) {
-      if (doIt(genArg))
-        return true;
-    }
+bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
+  return false;
+}
+
+bool Traversal::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
+  for (auto genArg : T->getGenericArgs()) {
+    if (doIt(genArg))
+      return true;
+  }
+  return false;
+}
+
+bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
+  for (auto comp : T->Components) {
+    if (doIt(comp))
+      return true;
   }
   return false;
 }

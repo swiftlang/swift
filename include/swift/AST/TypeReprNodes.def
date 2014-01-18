@@ -21,9 +21,25 @@
 # error Included TypeReprNodes.def without defining TYPEREPR!
 #endif
 
+/// An abstract node is an abstract base class in the hierarchy;
+/// it is never a most-derived type, and it does not have an enumerator in
+/// TypeReprKind.
+///
+/// Most metaprograms do not care about abstract classes, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_TYPEREPR
+#define ABSTRACT_TYPEREPR(Id, Parent)
+#endif
+
 TYPEREPR(Error, TypeRepr)
 TYPEREPR(Attributed, TypeRepr)
-TYPEREPR(Ident, TypeRepr)
+
+ABSTRACT_TYPEREPR(Ident, TypeRepr)
+  ABSTRACT_TYPEREPR(ComponentIdent, IdentTypeRepr)
+	TYPEREPR(SimpleIdent, ComponentIdentTypeRepr)
+	TYPEREPR(GenericIdent, ComponentIdentTypeRepr)
+  TYPEREPR(CompoundIdent, IdentTypeRepr)
+
 TYPEREPR(Function, TypeRepr)
 TYPEREPR(Array, TypeRepr)
 TYPEREPR(Optional, TypeRepr)
@@ -32,4 +48,5 @@ TYPEREPR(Named, TypeRepr)
 TYPEREPR(ProtocolComposition, TypeRepr)
 TYPEREPR(Metatype, TypeRepr)
 
+#undef ABSTRACT_TYPEREPR
 #undef TYPEREPR

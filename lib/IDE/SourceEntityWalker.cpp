@@ -185,13 +185,11 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (isDone())
     return false;
 
-  if (IdentTypeRepr *IdT = dyn_cast<IdentTypeRepr>(T)) {
-    for (auto &Comp : IdT->Components) {
-      if (ValueDecl *VD = Comp.getBoundDecl())
-        return passReference(VD, Comp.getIdLoc());
-      if (TypeDecl *TyD = getTypeDecl(Comp.getBoundType()))
-        return passReference(TyD, Comp.getIdLoc());
-    }
+  if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
+    if (ValueDecl *VD = IdT->getBoundDecl())
+      return passReference(VD, IdT->getIdLoc());
+    if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType()))
+      return passReference(TyD, IdT->getIdLoc());
   }
   return true;
 }

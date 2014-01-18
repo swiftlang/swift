@@ -1515,19 +1515,21 @@ public:
   void visitIdentTypeRepr(IdentTypeRepr *T) {
     printCommon(T, "type_ident");
     Indent += 2;
-    for (auto &comp : T->Components) {
+    for (auto comp : T->getComponentRange()) {
       OS << '\n';
       printCommon(nullptr, "component");
-      OS << " id='" << comp.getIdentifier() << '\'';
+      OS << " id='" << comp->getIdentifier() << '\'';
       OS << " bind=";
-      if (comp.isBoundDecl()) OS << "decl";
-      else if (comp.isBoundModule()) OS << "module";
-      else if (comp.isBoundType()) OS << "type";
+      if (comp->isBoundDecl()) OS << "decl";
+      else if (comp->isBoundModule()) OS << "module";
+      else if (comp->isBoundType()) OS << "type";
       else OS << "none";
       OS << ')';
-      for (auto genArg : comp.getGenericArgs()) {
-        OS << '\n';
-        printRec(genArg);
+      if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        for (auto genArg : GenIdT->getGenericArgs()) {
+          OS << '\n';
+          printRec(genArg);
+        }
       }
     }
     OS << ')';

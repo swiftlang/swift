@@ -78,7 +78,7 @@ namespace {
 // Build up an IdentTypeRepr and see what it resolves to.
 struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 {
-  SmallVectorImpl<IdentTypeRepr::Component> &components;
+  SmallVectorImpl<ComponentIdentTypeRepr *> &components;
   ASTContext &C;
 
   ExprToIdentTypeRepr(decltype(components) &components, ASTContext &C)
@@ -93,8 +93,9 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
-      components.push_back({dre->getLoc(), dre->getDecl()->getName(), {}});
-      components.back().setValue(td);
+      components.push_back(
+        new (C) SimpleIdentTypeRepr(dre->getLoc(), dre->getDecl()->getName()));
+      components.back()->setValue(td);
       return true;
     }
     return false;
@@ -105,15 +106,17 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     
     // Add the declared module.
     auto module = me->getType()->getAs<ModuleType>()->getModule();
-    components.push_back({me->getLoc(), module->Name, {}});
-    components.back().setValue(module);
+    components.push_back(
+      new (C) SimpleIdentTypeRepr(me->getLoc(), module->Name));
+    components.back()->setValue(module);
     return true;
   }
   
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.
-    components.push_back({udre->getLoc(), udre->getName(), {}});
+    components.push_back(
+      new (C) SimpleIdentTypeRepr(udre->getLoc(), udre->getName()));
     return true;
   }
   
@@ -124,7 +127,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(!components.empty() && "no components before dot expr?!");
 
     // Track the AST location of the new component.
-    components.push_back({ude->getLoc(), ude->getName(), {}});
+    components.push_back(
+      new (C) SimpleIdentTypeRepr(ude->getLoc(), ude->getName()));
     return true;
   }
   
@@ -139,9 +143,9 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     for (auto &arg : use->getUnresolvedParams())
       argTypeReprs.push_back(arg.getTypeRepr());
     auto origComponent = components.back();
-    components.back() = {origComponent.getIdLoc(),
-      origComponent.getIdentifier(),
-      C.AllocateCopy(argTypeReprs)};
+    components.back() = new (C) GenericIdentTypeRepr(origComponent->getIdLoc(),
+      origComponent->getIdentifier(),
+      C.AllocateCopy(argTypeReprs));
 
     return true;
   }
@@ -259,12 +263,11 @@ public:
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
     DependentGenericTypeResolver resolver;
-    SmallVector<IdentTypeRepr::Component, 2> components;
+    SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ude->getBase()))
       return nullptr;
     
-    auto *repr
-      = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+    auto *repr = IdentTypeRepr::create(TC.Context, components);
       
     // See if the repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr,
@@ -334,12 +337,13 @@ public:
   Pattern *visitCallExpr(CallExpr *ce) {
     DependentGenericTypeResolver resolver;
         
-    SmallVector<IdentTypeRepr::Component, 2> components;
+    SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
       return nullptr;
     
-    auto *repr
-      = new (TC.Context) IdentTypeRepr(TC.Context.AllocateCopy(components));
+    if (components.empty())
+      return nullptr;
+    auto *repr = IdentTypeRepr::create(TC.Context, components);
     
     // See first if the entire repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr,
@@ -386,11 +390,10 @@ public:
     }
 
     // If we had a single component, try looking up an enum element in context.
-    if (repr->Components.size() == 1) {
-      auto &backComp = repr->Components.back();
+    if (auto compId = dyn_cast<ComponentIdentTypeRepr>(repr)) {
       // Try looking up an enum element in context.
       EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(TC, DC, backComp.getIdentifier());
+        = lookupUnqualifiedEnumMemberElement(TC, DC, compId->getIdentifier());
       
       if (!referencedElement)
         return nullptr;
@@ -402,44 +405,48 @@ public:
       auto *subPattern = getSubExprPattern(ce->getArg());
       return new (TC.Context) EnumElementPattern(loc,
                                                  SourceLoc(),
-                                                 backComp.getIdLoc(),
-                                                 backComp.getIdentifier(),
+                                                 compId->getIdLoc(),
+                                                 compId->getIdentifier(),
                                                  referencedElement,
                                                  subPattern);
     }
     
     // Otherwise, see whether we had an enum type as the penultimate component,
     // and look up an element inside it.
-    if (repr->Components.empty())
-      return nullptr;
-    if (!repr->Components.end()[-2].isBoundType())
+    auto compoundR = cast<CompoundIdentTypeRepr>(repr);
+    if (!compoundR->Components.end()[-2]->isBoundType())
       return nullptr;
     
-    Type enumTy = repr->Components.end()[-2].getBoundType();
+    Type enumTy = compoundR->Components.end()[-2]->getBoundType();
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
     if (!enumDecl)
       return nullptr;
     
-    auto &tailComponent = repr->Components.back();
+    auto tailComponent = compoundR->Components.back();
     
     EnumElementDecl *referencedElement
       = lookupEnumMemberElement(TC, enumDecl, enumTy,
-                                tailComponent.getIdentifier());
+                                tailComponent->getIdentifier());
     if (!referencedElement)
       return nullptr;
     
     // Build a TypeRepr from the head of the full path.
     TypeLoc loc;
-    auto subRepr = new (TC.Context) IdentTypeRepr(
-                    repr->Components.slice(0, repr->Components.size() - 1));
+    IdentTypeRepr *subRepr;
+    auto headComps =
+      compoundR->Components.slice(0, compoundR->Components.size() - 1);
+    if (headComps.size() == 1)
+      subRepr = headComps.front();
+    else
+      subRepr = new (TC.Context) CompoundIdentTypeRepr(headComps);
     loc = TypeLoc(subRepr);
     loc.setType(enumTy);
     
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (TC.Context) EnumElementPattern(loc,
                                                SourceLoc(),
-                                               tailComponent.getIdLoc(),
-                                               tailComponent.getIdentifier(),
+                                               tailComponent->getIdLoc(),
+                                               tailComponent->getIdentifier(),
                                                referencedElement,
                                                subPattern);
   }

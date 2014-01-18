@@ -135,6 +135,7 @@ public:
     return static_cast<ImplClass*>(this)->visit##PARENT(T, \
                                                  ::std::forward<Args>(AA)...); \
   }
+#define ABSTRACT_TYPEREPR(CLASS, PARENT) TYPEREPR(CLASS, PARENT)
 #include "swift/AST/TypeReprNodes.def"
 };
   

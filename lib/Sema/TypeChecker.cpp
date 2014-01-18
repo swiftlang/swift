@@ -418,12 +418,13 @@ static bool mayConformToKnownProtocol(const DeclTy *D) {
     if (!identRepr)
       continue;
 
-    const IdentTypeRepr::Component &lastID = identRepr->Components.back();
-    if (!lastID.getGenericArgs().empty())
+    auto lastSimpleID =
+        dyn_cast<SimpleIdentTypeRepr>(identRepr->getComponentRange().back());
+    if (!lastSimpleID)
       continue;
 
     bool matchesKnownProtocol =
-      llvm::StringSwitch<bool>(lastID.getIdentifier().str())
+      llvm::StringSwitch<bool>(lastSimpleID->getIdentifier().str())
 #define PROTOCOL(Name) \
         .Case(#Name, true)
 #include "swift/AST/KnownProtocols.def"

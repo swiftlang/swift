@@ -244,7 +244,7 @@ Type TypeChecker::applyGenericArguments(Type type,
 
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
                                      DeclContext *dc,
-                                     MutableArrayRef<TypeRepr *> genericArgs,
+                                     ArrayRef<TypeRepr *> genericArgs,
                                      GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
@@ -267,7 +267,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
-                            MutableArrayRef<TypeRepr *> genericArgs,
+                            ArrayRef<TypeRepr *> genericArgs,
                             bool allowUnboundGenerics,
                             GenericTypeResolver *resolver) {
   TC.validateDecl(typeDecl);
@@ -304,17 +304,17 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
 static llvm::PointerUnion<Type, Module *>
 resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
-                          MutableArrayRef<IdentTypeRepr::Component> components,
+                          ArrayRef<ComponentIdentTypeRepr *> components,
                           bool allowUnboundGenerics,
                           bool diagnoseErrors,
                           GenericTypeResolver *resolver) {
   auto &comp = components.back();
-  if (!comp.isBound()) {
+  if (!comp->isBound()) {
     auto parentComps = components.slice(0, components.size()-1);
     if (parentComps.empty()) {
       // Resolve the first component, which is the only one that requires
       // unqualified name lookup.
-      UnqualifiedLookup Globals(comp.getIdentifier(), DC, &TC, comp.getIdLoc(),
+      UnqualifiedLookup Globals(comp->getIdentifier(), DC, &TC,comp->getIdLoc(),
                                 /*TypeLookup*/true);
 
       // Process the names we found.
@@ -331,7 +331,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
           // Save this result.
           current = result.getNamedModule();
-          comp.setValue(result.getNamedModule());
+          comp->setValue(result.getNamedModule());
           continue;
         }
 
@@ -340,19 +340,22 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         if (!typeDecl)
           continue;
 
-        Type type = resolveTypeDecl(TC, typeDecl, comp.getIdLoc(),
-                                    DC, comp.getGenericArgs(),
+        ArrayRef<TypeRepr *> genericArgs;
+        if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+          genericArgs = genComp->getGenericArgs();
+        Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
+                                    DC, genericArgs,
                                     allowUnboundGenerics,
                                     resolver);
         if (type->is<ErrorType>()) {
-          comp.setValue(type);
+          comp->setValue(type);
           return type;
         }
 
         // If this is the first result we found, record it.
         if (current.isNull()) {
           current = type;
-          comp.setValue(type);
+          comp->setValue(type);
           continue;
         }
 
@@ -369,13 +372,13 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // If we found nothing, complain and fail.
       if (current.isNull()) {
         if (diagnoseErrors)
-          TC.diagnose(comp.getIdLoc(), components.size() == 1 ?
+          TC.diagnose(comp->getIdLoc(), components.size() == 1 ?
                       diag::use_undeclared_type : diag::unknown_name_in_type,
-                      comp.getIdentifier())
-            .highlight(SourceRange(comp.getIdLoc(),
-                                   components.back().getIdLoc()));
+                      comp->getIdentifier())
+            .highlight(SourceRange(comp->getIdLoc(),
+                                   components.back()->getIdLoc()));
         Type ty = ErrorType::get(TC.Context);
-        comp.setValue(ty);
+        comp->setValue(ty);
         return ty;
       }
 
@@ -383,19 +386,19 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // FIXME: We could recover by looking at later components.
       if (isAmbiguous) {
         if (diagnoseErrors) {
-          TC.diagnose(comp.getIdLoc(), diag::ambiguous_type_base,
-                      comp.getIdentifier())
-            .highlight(SourceRange(comp.getIdLoc(),
-                                   components.back().getIdLoc()));
+          TC.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
+                      comp->getIdentifier())
+            .highlight(SourceRange(comp->getIdLoc(),
+                                   components.back()->getIdLoc()));
           for (auto Result : Globals.Results) {
             if (Globals.Results[0].hasValueDecl())
               TC.diagnose(Result.getValueDecl(), diag::found_candidate);
             else
-              TC.diagnose(comp.getIdLoc(), diag::found_candidate);
+              TC.diagnose(comp->getIdLoc(), diag::found_candidate);
           }
         }
         Type ty = ErrorType::get(TC.Context);
-        comp.setValue(ty);
+        comp->setValue(ty);
         return ty;
       }
 
@@ -408,8 +411,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // If the last resolved component is a type, perform member type lookup.
       if (parent.is<Type>()) {
         // FIXME: Want the end of the back range.
-        SourceRange parentRange(parentComps.front().getIdLoc(),
-                                parentComps.back().getIdLoc());
+        SourceRange parentRange(parentComps.front()->getIdLoc(),
+                                parentComps.back()->getIdLoc());
 
         auto parentTy = parent.get<Type>();
         if (parentTy->is<ErrorType>())
@@ -422,36 +425,36 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           Type memberType = resolver->resolveDependentMemberType(
                                         parentTy, DC,
                                         parentRange,
-                                        comp.getIdentifier(),
-                                        comp.getIdLoc());
+                                        comp->getIdentifier(),
+                                        comp->getIdLoc());
           assert(memberType && "Received null dependent member type");
 
-          if (!comp.getGenericArgs().empty() && !memberType->is<ErrorType>()) {
+          if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
             // FIXME: Highlight generic arguments and introduce a Fix-It to
             // remove them.
             if (diagnoseErrors)
-              TC.diagnose(comp.getIdLoc(), diag::not_a_generic_type, memberType);
+              TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
 
             // Drop the arguments.
           }
 
-          comp.setValue(memberType);
+          comp->setValue(memberType);
           return memberType;
         }
 
         // Look for member types with the given name.
-        auto memberTypes = TC.lookupMemberType(parentTy, comp.getIdentifier(),
+        auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
                                                DC);
 
         // If we didn't find anything, complain.
         // FIXME: Typo correction!
         if (!memberTypes) {
           if (diagnoseErrors)
-            TC.diagnose(comp.getIdLoc(), diag::invalid_member_type,
-                        comp.getIdentifier(), parent.get<Type>())
+            TC.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                        comp->getIdentifier(), parent.get<Type>())
               .highlight(parentRange);
           Type ty = ErrorType::get(TC.Context);
-          comp.setValue(ty);
+          comp->setValue(ty);
           return ty;
         }
 
@@ -462,47 +465,48 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           if (diagnoseErrors)
             TC.diagnoseAmbiguousMemberType(parent.get<Type>(),
                                            parentRange,
-                                           comp.getIdentifier(),
-                                           comp.getIdLoc(),
+                                           comp->getIdentifier(),
+                                           comp->getIdLoc(),
                                            memberTypes);
           Type ty = ErrorType::get(TC.Context);
-          comp.setValue(ty);
+          comp->setValue(ty);
           return ty;
         }
 
         auto memberType = memberTypes.back().second;
 
         // If there are generic arguments, apply them now.
-        if (!comp.getGenericArgs().empty())
-          memberType = applyGenericTypeReprArgs(TC, memberType, comp.getIdLoc(),
-                                                DC, comp.getGenericArgs(),
+        if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+          memberType = applyGenericTypeReprArgs(TC, memberType,
+                                                genComp->getIdLoc(),
+                                                DC, genComp->getGenericArgs(),
                                                 resolver);
 
-        comp.setValue(memberType);
+        comp->setValue(memberType);
         return memberType;
       }
 
       // Lookup into a module.
       auto module = parent.get<Module *>();
       LookupTypeResult foundModuleTypes =
-        TC.lookupMemberType(ModuleType::get(module), comp.getIdentifier(), DC);
+        TC.lookupMemberType(ModuleType::get(module), comp->getIdentifier(), DC);
 
       // If we didn't find a type, complain.
       if (!foundModuleTypes) {
         // FIXME: Fully-qualified module name?
         if (diagnoseErrors)
-          TC.diagnose(comp.getIdLoc(), diag::no_module_type, comp.getIdentifier(),
-                      module->Name);
+          TC.diagnose(comp->getIdLoc(), diag::no_module_type,
+                      comp->getIdentifier(), module->Name);
         Type ty = ErrorType::get(TC.Context);
-        comp.setValue(ty);
+        comp->setValue(ty);
         return ty;
       }
 
       // If lookup was ambiguous, complain.
       if (foundModuleTypes.isAmbiguous()) {
         if (diagnoseErrors) {
-          TC.diagnose(comp.getIdLoc(), diag::ambiguous_module_type,
-                      comp.getIdentifier(), module->Name);
+          TC.diagnose(comp->getIdLoc(), diag::ambiguous_module_type,
+                      comp->getIdentifier(), module->Name);
           for (auto foundType : foundModuleTypes) {
             // Only consider type declarations.
             auto typeDecl = foundType.first;
@@ -514,44 +518,48 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           }
         }
         Type ty = ErrorType::get(TC.Context);
-        comp.setValue(ty);
+        comp->setValue(ty);
         return ty;
       }
       Type foundType = foundModuleTypes[0].second;
 
       // If there are generic arguments, apply them now.
-      if (!comp.getGenericArgs().empty()) {
-        foundType = applyGenericTypeReprArgs(TC, foundType, comp.getIdLoc(),
-                                             DC, comp.getGenericArgs(),
+      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+        foundType = applyGenericTypeReprArgs(TC, foundType, genComp->getIdLoc(),
+                                             DC, genComp->getGenericArgs(),
                                              resolver);
       }
 
-      comp.setValue(foundType);
+      comp->setValue(foundType);
     }
   }
 
-  assert(comp.isBound());
-  if (Type ty = comp.getBoundType())
+  assert(comp->isBound());
+  if (Type ty = comp->getBoundType())
     return ty;
-  if (Module *mod = comp.getBoundModule())
+  if (Module *mod = comp->getBoundModule())
     return mod;
 
-  ValueDecl *VD = comp.getBoundDecl();
+  ValueDecl *VD = comp->getBoundDecl();
   auto typeDecl = dyn_cast<TypeDecl>(VD);
   if (!typeDecl) {
     if (diagnoseErrors) {
-      TC.diagnose(comp.getIdLoc(), diag::use_non_type_value, VD->getName());
+      TC.diagnose(comp->getIdLoc(), diag::use_non_type_value, VD->getName());
       TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
     }
     Type ty = ErrorType::get(TC.Context);
-    comp.setValue(ty);
+    comp->setValue(ty);
     return ty;
   }
 
-  Type type = resolveTypeDecl(TC, typeDecl, comp.getIdLoc(), nullptr,
-                              comp.getGenericArgs(), allowUnboundGenerics,
+  ArrayRef<TypeRepr *> genericArgs;
+  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+    genericArgs = genComp->getGenericArgs();
+
+  Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), nullptr,
+                              genericArgs, allowUnboundGenerics,
                               resolver);
-  comp.setValue(type);
+  comp->setValue(type);
   return type;
 }
 
@@ -563,17 +571,20 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
                                         GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
+  auto ComponentRange = IdType->getComponentRange();
+  auto Components = llvm::makeArrayRef(ComponentRange.begin(),
+                                       ComponentRange.end());
   llvm::PointerUnion<Type, Module *>
-    result = resolveIdentTypeComponent(*this, DC, IdType->Components,
+    result = resolveIdentTypeComponent(*this, DC, Components,
                                        allowUnboundGenerics,
                                        diagnoseErrors,
                                        resolver);
   if (auto mod = result.dyn_cast<Module*>()) {
     if (diagnoseErrors)
-      diagnose(IdType->Components.back().getIdLoc(),
+      diagnose(Components.back()->getIdLoc(),
                diag::use_module_as_type, mod->Name);
     Type ty = ErrorType::get(Context);
-    IdType->Components.back().setValue(ty);
+    Components.back()->setValue(ty);
     return ty;
   }
 
@@ -667,7 +678,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, bool isSILType) {
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), isSILType);
 
-  case TypeReprKind::Ident:
+  case TypeReprKind::SimpleIdent:
+  case TypeReprKind::GenericIdent:
+  case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr),
                                     AllowUnboundGenerics,
                                     /*diagnoseErrors*/ true,

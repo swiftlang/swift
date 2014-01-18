@@ -651,13 +651,13 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
       if (!identType)
         return true;
 
-      for (auto &comp : identType->Components) {
+      for (auto &comp : identType->getComponentRange()) {
         // If it's not a bound type, we're done.
-        if (!comp.isBoundType())
+        if (!comp->isBoundType())
           return true;
 
         // If the bound type isn't dependent, there's nothing to do.
-        auto type = comp.getBoundType();
+        auto type = comp->getBoundType();
         if (!type->isDependentType())
           return true;
 
@@ -666,10 +666,10 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
         if (auto genericParamType
             = dyn_cast<GenericTypeParamType>(type.getPointer())) {
           // FIXME: Assert that it has a decl.
-          comp.setValue(genericParamType->getDecl());
+          comp->setValue(genericParamType->getDecl());
         } else {
           // FIXME: Often, we could revert to a decl here.
-          comp.revert();
+          comp->revert();
         }
       }
 

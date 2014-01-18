@@ -294,14 +294,12 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
     if (!handleAttrs(AttrT->getAttrs()))
       return false;
 
-  } else if (auto IdT = dyn_cast<IdentTypeRepr>(T)) {
-    for (auto &comp : IdT->Components) {
-      if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
-                              CharSourceRange(comp.getIdLoc(),
-                                              comp.getIdentifier().getLength())
-                            }))
-        return false;
-    }
+  } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
+    if (!passNonTokenNode({ SyntaxNodeKind::TypeId,
+                            CharSourceRange(IdT->getIdLoc(),
+                                            IdT->getIdentifier().getLength())
+                          }))
+      return false;
   }
   return true;
 }

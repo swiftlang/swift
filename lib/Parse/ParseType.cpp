@@ -262,7 +262,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   }
 
   ParserStatus Status;
-  SmallVector<IdentTypeRepr::Component, 4> ComponentsR;
+  SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
     SourceLoc Loc;
@@ -292,7 +292,13 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
       }
       EndLoc = Loc;
 
-      ComponentsR.push_back({Loc, Name, Context.AllocateCopy(GenericArgs)});
+      ComponentIdentTypeRepr *CompT;
+      if (!GenericArgs.empty())
+        CompT = new (Context) GenericIdentTypeRepr(Loc, Name,
+                                             Context.AllocateCopy(GenericArgs));
+      else
+        CompT = new (Context) SimpleIdentTypeRepr(Loc, Name);
+      ComponentsR.push_back(CompT);
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -314,11 +320,11 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   }
 
   IdentTypeRepr *ITR = nullptr;
-  if (ComponentsR.size() != 0) {
+  if (!ComponentsR.empty()) {
     // Lookup element #0 through our current scope chains in case it is some thing
     // local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0].getIdentifier()))
-      ComponentsR[0].setValue(Entry);
+    if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
+      ComponentsR[0]->setValue(Entry);
 
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }

@@ -104,28 +104,27 @@ TypeRepr *CloneVisitor::visitAttributedTypeRepr(AttributedTypeRepr *T) {
   return new (Ctx) AttributedTypeRepr(T->getAttrs(), visit(T->getTypeRepr()));
 }
 
-TypeRepr *CloneVisitor::visitIdentTypeRepr(IdentTypeRepr *T) {
-  // Clone the components.
-  auto componentsMem = (IdentTypeRepr::Component*)
-    Ctx.Allocate(sizeof(IdentTypeRepr::Component) * T->Components.size(),
-                 alignof(IdentTypeRepr::Component));
-  
-  MutableArrayRef<IdentTypeRepr::Component> components(componentsMem,
-                                                       T->Components.size());
-  for (unsigned i : indices(components)) {
-    auto &old = T->Components[i];
-    
-    // Clone the generic arguments.
-    auto genericArgs = Ctx.Allocate<TypeRepr*>(old.getGenericArgs().size());
-    for (unsigned argI : indices(genericArgs)) {
-      genericArgs[argI] = visit(old.getGenericArgs()[argI]);
-    }
-    
-    new (&components[i]) IdentTypeRepr::Component(old.getIdLoc(),
-                                                  old.getIdentifier(),
-                                                  genericArgs);
+TypeRepr *CloneVisitor::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
+  return new (Ctx) SimpleIdentTypeRepr(T->getIdLoc(), T->getIdentifier());
+}
+
+TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
+  // Clone the generic arguments.
+  auto genericArgs = Ctx.Allocate<TypeRepr*>(T->getGenericArgs().size());
+  for (unsigned argI : indices(genericArgs)) {
+    genericArgs[argI] = visit(T->getGenericArgs()[argI]);
   }
-  return new (Ctx) IdentTypeRepr(components);
+  return new (Ctx) GenericIdentTypeRepr(T->getIdLoc(), T->getIdentifier(),
+                                        genericArgs);
+}
+
+TypeRepr *CloneVisitor::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
+  // Clone the components.
+  auto components = Ctx.Allocate<ComponentIdentTypeRepr*>(T->Components.size());
+  for (unsigned I : indices(components)) {
+    components[I] = cast<ComponentIdentTypeRepr>(visit(T->Components[I]));
+  }
+  return new (Ctx) CompoundIdentTypeRepr(components);
 }
 
 TypeRepr *CloneVisitor::visitFunctionTypeRepr(FunctionTypeRepr *T) {
@@ -207,14 +206,12 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
-                                     ArrayRef<Component> Components) {
-  return new (C) IdentTypeRepr(C.AllocateCopy(Components));
-}
+                                ArrayRef<ComponentIdentTypeRepr *> Components) {
+  assert(!Components.empty());
+  if (Components.size() == 1)
+    return Components.front();
 
-IdentTypeRepr *IdentTypeRepr::createSimple(ASTContext &C, SourceLoc Loc,
-                                           Identifier Id) {
-  IdentTypeRepr::Component IdTypeComponent(Loc, Id, {});
-  return create(C, llvm::makeArrayRef(IdTypeComponent));
+  return new (C) CompoundIdentTypeRepr(C.AllocateCopy(Components));
 }
 
 static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
@@ -234,26 +231,28 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
   Printer << ">";
 }
 
-void IdentTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
-  bool isFirst = true;
-  for (const Component &C : Components) {
-    if (!isFirst)
-      Printer << ".";
+void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
+                                       const PrintOptions &Opts) const {
+  if (Module *Mod = getBoundModule()) {
+    Printer.printModuleRef(Mod, getIdentifier().str());
+  } else if (Type Ty = getBoundType()) {
+    if (auto NTD = Ty->getAnyNominal())
+      Printer.printTypeRef(NTD, getIdentifier().str());
     else
-      isFirst = false;
+      Printer << getIdentifier().str();
+  } else {
+    Printer << getIdentifier().str();
+  }
+  if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
+    printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());
+}
 
-    if (Module *Mod = C.getBoundModule()) {
-      Printer.printModuleRef(Mod, C.getIdentifier().str());
-    } else if (Type Ty = C.getBoundType()) {
-      if (auto NTD = Ty->getAnyNominal())
-        Printer.printTypeRef(NTD, C.getIdentifier().str());
-      else
-        Printer << C.getIdentifier().str();
-    } else {
-      Printer << C.getIdentifier().str();
-    }
-    printGenericArgs(Printer, Opts, C.getGenericArgs());
+void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
+                                      const PrintOptions &Opts) const {
+  Components.front()->print(Printer, Opts);
+  for (auto C : Components.slice(1)) {
+    Printer << ".";
+    C->print(Printer, Opts);
   }
 }
 

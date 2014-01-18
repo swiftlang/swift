@@ -144,88 +144,187 @@ private:
   friend class TypeRepr;
 };
 
+class ComponentIdentTypeRepr;
+
+/// \brief This is the abstract base class for types with identifier components.
+/// \code
+///   Foo.Bar<Gen>
+/// \endcode
+class IdentTypeRepr : public TypeRepr {
+protected:
+  explicit IdentTypeRepr(TypeReprKind K) : TypeRepr(K) {}
+
+public:
+  /// Copies the provided array and creates a CompoundIdentTypeRepr or just
+  /// returns the single entry in the array if it contains only one.
+  static IdentTypeRepr *create(ASTContext &C,
+                               ArrayRef<ComponentIdentTypeRepr *> Components);
+  
+  class ComponentRange;
+  inline ComponentRange getComponentRange();
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SimpleIdent  ||
+           T->getKind() == TypeReprKind::GenericIdent ||
+           T->getKind() == TypeReprKind::CompoundIdent;
+  }
+  static bool classof(const IdentTypeRepr *T) { return true; }
+};
+
+class ComponentIdentTypeRepr : public IdentTypeRepr {
+  SourceLoc Loc;
+  Identifier Id;
+
+  /// Value is the decl, type, or module that this refers to.
+  ///
+  /// After name binding, the value is set to the decl being referenced.
+  ///
+  /// FIXME: Can we sneak the Id into this union?
+  llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
+
+protected:
+  ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
+    : IdentTypeRepr(K), Loc(Loc), Id(Id) {}
+
+public:
+  SourceLoc getIdLoc() const { return Loc; }
+  Identifier getIdentifier() const { return Id; }
+
+  /// Return true if this has been name-bound already.
+  bool isBound() const { return !Value.isNull(); }
+  bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }
+  bool isBoundType() const { return Value.is<Type>() && isBound(); }
+  bool isBoundModule() const { return Value.is<Module*>() && isBound(); }
+
+  ValueDecl *getBoundDecl() const {
+    return Value.dyn_cast<ValueDecl*>();
+  }
+  Type getBoundType() const {
+    return Value.dyn_cast<Type>();
+  }
+  Module *getBoundModule() const {
+    return Value.dyn_cast<Module*>();
+  }
+
+  void setValue(ValueDecl *VD) { Value = VD; }
+  void setValue(Type T) { Value = T; }
+  void setValue(Module *M) { Value = M; }
+
+  void revert() { Value = (ValueDecl*)nullptr; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SimpleIdent ||
+           T->getKind() == TypeReprKind::GenericIdent;
+  }
+  static bool classof(const ComponentIdentTypeRepr *T) { return true; }
+
+protected:
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+};
+
+/// \brief A simple identifier type like "Int".
+class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
+public:
+  SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
+    : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::SimpleIdent;
+  }
+  static bool classof(const SimpleIdentTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return getIdLoc(); }
+  SourceLoc getEndLocImpl() const { return getIdLoc(); }
+  friend class TypeRepr;
+};
+
+/// \brief An identifier type with generic arguments.
+/// \code
+///   Bar<Gen>
+/// \endcode
+class GenericIdentTypeRepr : public ComponentIdentTypeRepr {
+  ArrayRef<TypeRepr*> GenericArgs;
+
+public:
+  GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
+                       ArrayRef<TypeRepr*> GenericArgs)
+    : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
+      GenericArgs(GenericArgs) {
+    assert(!GenericArgs.empty());
+  }
+
+  ArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::GenericIdent;
+  }
+  static bool classof(const GenericIdentTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return getIdLoc(); }
+  SourceLoc getEndLocImpl() const { return GenericArgs.back()->getEndLoc(); }
+  friend class TypeRepr;
+};
+
 /// \brief A type with identifier components.
 /// \code
 ///   Foo.Bar<Gen>
 /// \endcode
-/// FIXME: Investigate splitting into a TypeRepr for each component,
-/// so that "Int" does not need an allocation for the components array and the
-/// generic arguments info.
-class IdentTypeRepr : public TypeRepr {
+class CompoundIdentTypeRepr : public IdentTypeRepr {
 public:
-  class Component {
-    SourceLoc Loc;
-    Identifier Id;
-    MutableArrayRef<TypeRepr*> GenericArgs;
+  const ArrayRef<ComponentIdentTypeRepr *> Components;
 
-    /// Value is the decl, type, or module that this refers to.
-    ///
-    /// After name binding, the value is set to the decl being referenced, and
-    /// the last entry in the component list is known to be a Type.
-    ///
-    /// FIXME: Can we sneak the Id into this union?
-    llvm::PointerUnion3<ValueDecl*, Type, Module*> Value;
-
-  public:
-    Component(SourceLoc Loc, Identifier Id,
-              MutableArrayRef<TypeRepr*> GenericArgs) :
-      Loc(Loc), Id(Id), GenericArgs(GenericArgs) {}
-
-    SourceLoc getIdLoc() const { return Loc; }
-    Identifier getIdentifier() const { return Id; }
-    MutableArrayRef<TypeRepr*> getGenericArgs() const { return GenericArgs; }
-
-    /// Return true if this Component has been name-bound already.
-    bool isBound() const { return !Value.isNull(); }
-    bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }
-    bool isBoundType() const { return Value.is<Type>() && isBound(); }
-    bool isBoundModule() const { return Value.is<Module*>() && isBound(); }
-
-    ValueDecl *getBoundDecl() const {
-      return Value.dyn_cast<ValueDecl*>();
-    }
-    Type getBoundType() const {
-      return Value.dyn_cast<Type>();
-    }
-    Module *getBoundModule() const {
-      return Value.dyn_cast<Module*>();
-    }
-
-    void setValue(ValueDecl *VD) { Value = VD; }
-    void setValue(Type T) { Value = T; }
-    void setValue(Module *M) { Value = M; }
-
-    void revert() { Value = (ValueDecl*)nullptr; }
-  };
-
-public:
-  const MutableArrayRef<Component> Components;
-
-  IdentTypeRepr(MutableArrayRef<Component> Components)
-    : TypeRepr(TypeReprKind::Ident), Components(Components) {
-    assert(!Components.empty());
+  explicit CompoundIdentTypeRepr(ArrayRef<ComponentIdentTypeRepr *> Components)
+    : IdentTypeRepr(TypeReprKind::CompoundIdent),
+      Components(Components) {
+    assert(Components.size() > 1 &&
+           "should have just used the single ComponentIdentTypeRepr directly");
   }
-
-  static IdentTypeRepr *create(ASTContext &C, ArrayRef<Component> Components);
-
-  static IdentTypeRepr *createSimple(ASTContext &C, SourceLoc Loc,
-                                     Identifier Id);
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Ident;
+    return T->getKind() == TypeReprKind::CompoundIdent;
   }
-  static bool classof(const IdentTypeRepr *T) { return true; }
+  static bool classof(const CompoundIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Components.front().getIdLoc(); }
-  SourceLoc getEndLocImpl() const {
-    if (!Components.back().getGenericArgs().empty())
-      return Components.back().getGenericArgs().back()->getEndLoc();
-    return Components.back().getIdLoc();
-  }
+  SourceLoc getStartLocImpl() const { return Components.front()->getStartLoc();}
+  SourceLoc getEndLocImpl() const { return Components.back()->getEndLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+
+/// This wraps an IdentTypeRepr and provides an iterator interface for the
+/// components (or the single component) it represents.
+class IdentTypeRepr::ComponentRange {
+  IdentTypeRepr *IdT;
+
+public:
+  explicit ComponentRange(IdentTypeRepr *T) : IdT(T) {}
+
+  typedef ComponentIdentTypeRepr * const* iterator;
+
+  iterator begin() const {
+    if (isa<ComponentIdentTypeRepr>(IdT))
+      return reinterpret_cast<iterator>(&IdT);
+    return cast<CompoundIdentTypeRepr>(IdT)->Components.begin();
+  }
+
+  iterator end() const {
+    if (isa<ComponentIdentTypeRepr>(IdT))
+      return reinterpret_cast<iterator>(&IdT) + 1;
+    return cast<CompoundIdentTypeRepr>(IdT)->Components.end();
+  }
+
+  bool empty() const { return begin() == end(); }
+
+  ComponentIdentTypeRepr *front() const { return *begin(); }
+  ComponentIdentTypeRepr *back() const { return *(end()-1); }
+};
+
+inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
+  return ComponentRange(this);
+}
 
 /// \brief A function type.
 /// \code
@@ -469,7 +568,9 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Function:
   case TypeReprKind::Array:
     return false;
-  case TypeReprKind::Ident:
+  case TypeReprKind::SimpleIdent:
+  case TypeReprKind::GenericIdent:
+  case TypeReprKind::CompoundIdent:
   case TypeReprKind::Metatype:
   case TypeReprKind::Named:
   case TypeReprKind::Optional:
