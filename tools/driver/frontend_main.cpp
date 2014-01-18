@@ -175,7 +175,7 @@ static bool performCompile(CompilerInstance &Instance,
   assert(Action >= FrontendOptions::Immediate &&
          "All actions not requiring IRGen must have been handled!");
   assert(Action != FrontendOptions::REPL &&
-         "REPL mode must be handled separate from a normal compile");
+         "REPL mode must be handled immediately after Instance.performParse()");
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())
