@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -365,8 +366,14 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam,
 
 bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
                                            Optional<unsigned> Index) {
+  auto name = GenericParam->getName();
+  // Trim '$' so that archetypes are more readily discernible from abstract
+  // parameters.
+  if (name.str().startswith("$"))
+    name = Context.getIdentifier(name.str().slice(1, name.str().size()));
+  
   PotentialArchetype *PA = addGenericParameter(nullptr,
-                                               GenericParam->getName(),
+                                               name,
                                                GenericParam->getDepth(),
                                                GenericParam->getIndex());
   return !PA;
@@ -766,14 +773,15 @@ Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type) {
   auto genericParams = dc->getGenericParamsOfContext();
   assert(genericParams && "Missing generic parameters for dependent context");
   
-  return mapTypeIntoContext(*dc->getParentModule(), genericParams, type);
+  return mapTypeIntoContext(dc->getParentModule(), genericParams, type);
 }
 
-Type ArchetypeBuilder::mapTypeIntoContext(Module &M,
+Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
                                           GenericParamList *genericParams,
                                           Type type) {
-  // If the type is not dependent, there's nothing to map.
-  if (!type->isDependentType())
+  // If the type is not dependent, or we have no generic params, there's nothing
+  // to map.
+  if (!genericParams || !type->isDependentType())
     return type;
 
   unsigned genericParamsDepth = genericParams->getDepth();
@@ -805,7 +813,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module &M,
     if (auto dependentMember = type->getAs<DependentMemberType>()) {
       auto base = mapTypeIntoContext(M, genericParams,
                                      dependentMember->getBase());
-      return dependentMember->substBaseType(&M, base);
+      return dependentMember->substBaseType(M, base);
     }
 
     return type;
@@ -857,6 +865,7 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
     assert(!base->is<ArchetypeType>()
            && "archetype base should have been handled above by "
               "ArchetypeBuilder");
+    assert(!base->isDependentType());
     
     auto assocType = depType->getAssocType();
     auto proto = assocType->getProtocol();

@@ -841,6 +841,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   // Just use the generic parameters from the context.
   // This isn't necessarily optimal.
   auto generics = gen.F.getLoweredFunctionType()->getGenericParams();
+  auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllArchetypes())
       subs.push_back({ archetype, archetype, { }});
@@ -856,18 +857,35 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
 
   auto extInfo = expectedType->getExtInfo().withIsThin(true);
 
+  // Map the parameter and expected types out of context to get the interface
+  // type of the thunk.
+  SmallVector<SILParameterInfo, 4> interfaceParams;
+  interfaceParams.reserve(params.size());
+  auto &Types = gen.SGM.M.Types;
+  for (auto &param : params) {
+    interfaceParams.push_back(
+      SILParameterInfo(Types.getInterfaceTypeInContext(param.getType(), generics),
+                       param.getConvention()));
+  }
+  
+  auto interfaceResult = SILResultInfo(
+    Types.getInterfaceTypeInContext(expectedType->getResult().getType(), generics),
+    expectedType->getResult().getConvention());
+  
   // The type of the thunk function.
-  auto thunkType = SILFunctionType::get(generics, extInfo,
+  auto thunkType = SILFunctionType::get(generics, genericSig, extInfo,
                                         ParameterConvention::Direct_Unowned,
                                         params, expectedType->getResult(),
+                                        interfaceParams, interfaceResult,
                                         gen.getASTContext());
 
   // Define the substituted function type for partial_apply's purposes.
   if (!generics) {
     substFnType = thunkType;
   } else {
-    substFnType = SILFunctionType::get(nullptr, extInfo,
+    substFnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                        ParameterConvention::Direct_Unowned,
+                                       params, expectedType->getResult(),
                                        params, expectedType->getResult(),
                                        gen.getASTContext());
   }

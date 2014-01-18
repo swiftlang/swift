@@ -362,7 +362,8 @@ NON_SIL_TYPE(LValue)
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                             CanType orig,
-                                            CanAnyFunctionType subst);
+                                            CanAnyFunctionType subst,
+                                            CanAnyFunctionType substInterface);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

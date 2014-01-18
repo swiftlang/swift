@@ -1267,13 +1267,25 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::SILFunction:
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
   {
     CanSILFunctionType FunctionTy;
     if (auto SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
       FunctionTy = CanSILFunctionType(SILFnTy);
-    else
+    // FIXME: Handling of generic parameters in SIL type lowering is in flux.
+    // DebugInfo doesn't appear to care about the generic context, so just
+    // throw it away before lowering.
+    else if (isa<GenericFunctionType>(BaseTy) || isa<PolymorphicFunctionType>(BaseTy)) {
+      auto fTy = cast<AnyFunctionType>(BaseTy);
+      auto nongenericTy = FunctionType::get(fTy->getInput(),
+                                            fTy->getResult(),
+                                            fTy->getExtInfo());
+                                            
+      FunctionTy = IGM.SILMod->Types.getLoweredType(nongenericTy)
+                              .castTo<SILFunctionType>();
+    } else
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
-                                    .castTo<SILFunctionType>();
+                              .castTo<SILFunctionType>();
     auto Params = createParameterTypes(FunctionTy, Scope, DbgTy.getDeclContext());
     auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
@@ -1386,7 +1398,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::AssociatedType:
   case TypeKind::DependentMember:
   case TypeKind::Error:
-  case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::LValue:
   case TypeKind::Module:

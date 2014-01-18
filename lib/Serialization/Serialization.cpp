@@ -1727,14 +1727,28 @@ void Serializer::writeType(Type ty) {
 
     auto callingConvention = fnTy->getAbstractCC();
     auto result = fnTy->getResult();
+    auto interfaceResult = fnTy->getInterfaceResult();
     auto stableResultConvention =
       getRawStableResultConvention(result.getConvention());
+    auto stableInterfaceResultConvention =
+      getRawStableResultConvention(interfaceResult.getConvention());
 
     SmallVector<TypeID, 8> paramTypes;
     for (auto param : fnTy->getParameters()) {
       paramTypes.push_back(addTypeRef(param.getType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       paramTypes.push_back(TypeID(conv));
+    }
+    for (auto param : fnTy->getInterfaceParameters()) {
+      paramTypes.push_back(addTypeRef(param.getType()));
+      unsigned conv = getRawStableParameterConvention(param.getConvention());
+      paramTypes.push_back(TypeID(conv));
+    }
+    
+    auto sig = fnTy->getGenericSignature();
+    if (sig) {
+      for (auto param : sig->getGenericParams())
+        paramTypes.push_back(addTypeRef(param));
     }
 
     auto stableCalleeConvention =
@@ -1744,6 +1758,8 @@ void Serializer::writeType(Type ty) {
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(result.getType()),
                                       stableResultConvention,
+                                      addTypeRef(interfaceResult.getType()),
+                                      stableInterfaceResultConvention,
                                       // FIXME: Always serialize a new
                                       // GenericParamList for now.
                                       // Interface types will kill this soon.
@@ -1752,7 +1768,12 @@ void Serializer::writeType(Type ty) {
                                       getRawStableCC(callingConvention),
                                       fnTy->isThin(),
                                       fnTy->isNoReturn(),
+                                      sig ? sig->getGenericParams().size() : 0,
                                       paramTypes);
+    if (sig)
+      writeRequirements(sig->getRequirements());
+    else
+      writeRequirements({});
     if (genericParams)
       writeGenericParams(genericParams);
     break;

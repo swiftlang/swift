@@ -211,12 +211,16 @@ DeclContext::getGenericSignatureOfContext()const {
     if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>()) {
       return {GFT->getGenericParams(), GFT->getRequirements()};
     }
-    return {{}, {}};
+    return AFD->getDeclContext()->getGenericSignatureOfContext();
   }
 
   case DeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
-    return {nominal->getGenericParamTypes(), nominal->getGenericRequirements()};
+    auto genericParams = nominal->getGenericParamTypes();
+    auto reqts = nominal->getGenericRequirements();
+    if (!genericParams.empty() || !reqts.empty())
+      return {genericParams, reqts};
+    return nominal->getDeclContext()->getGenericSignatureOfContext();
   }
 
   case DeclContextKind::ExtensionDecl: {
@@ -225,7 +229,7 @@ DeclContext::getGenericSignatureOfContext()const {
     // FIXME: What if the extended type is bound, or the extension has
     // constraints?
     auto nomDecl = extendedType->getNominalOrBoundGenericNominal();
-    return {nomDecl->getGenericParamTypes(), nomDecl->getGenericRequirements()};
+    return nomDecl->getGenericSignatureOfContext();
   }
   }
 }

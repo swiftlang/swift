@@ -281,6 +281,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   } while (M.lookUpFunction(ClonedName));
 
   SmallVector<SILParameterInfo, 4> ClonedArgTys;
+  SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
   auto OrigParams = OrigFTI->getParameters();
@@ -308,14 +309,37 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     }
     ++Index;
   }
+  
+  Index = 0;
+  for (auto &param : OrigFTI->getInterfaceParameters()) {
+    if (Index && PromotableIndices.count(Index - 1)) {
+      assert(param.getConvention() == ParameterConvention::Indirect_Inout);
+      auto &paramTL = M.Types.getTypeLowering(param.getSILType());
+      ParameterConvention convention;
+      if (paramTL.isPassedIndirectly()) {
+        convention = ParameterConvention::Indirect_In;
+      } else if (paramTL.isTrivial()) {
+        convention = ParameterConvention::Direct_Unowned;
+      } else {
+        convention = ParameterConvention::Direct_Owned;
+      }
+      ClonedInterfaceArgTys.push_back(SILParameterInfo(param.getType(), convention));
+    } else if (!PromotableIndices.count(Index)) {
+      ClonedInterfaceArgTys.push_back(param);
+    }
+    ++Index;
+  }
 
-  // Create the thin function type for the cloned closure
+  // Create the thin function type for the cloned closure.
   auto ClonedTy =
     SILFunctionType::get(OrigFTI->getGenericParams(),
+                         OrigFTI->getGenericSignature(),
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
                          ClonedArgTys,
                          OrigFTI->getResult(),
+                         ClonedInterfaceArgTys,
+                         OrigFTI->getInterfaceResult(),
                          M.getASTContext());
   
   // This inserts the new cloned function before the original function.

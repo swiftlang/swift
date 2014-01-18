@@ -1421,6 +1421,53 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
   return FunctionType::get(input, result, getExtInfo());
 }
 
+AnyFunctionType *
+GenericFunctionType::partialSubstGenericArgs(Module *M, ArrayRef<Type> args)
+const {
+  auto params = getGenericParams();
+  
+  // If we're fully applying the generic params, fall through to
+  // substGenericArgs.
+  if (args.size() == params.size())
+    return substGenericArgs(M, args);
+  
+  assert(args.size() < params.size());
+  
+  TypeSubstitutionMap subs;
+  for (size_t i = 0, e = args.size(); i != e; ++i) {
+    subs.insert(std::make_pair(params[i], args[i]));
+  }
+
+  // Get the slice of the generic parameters and requirements we haven't
+  // applied.
+  auto unappliedParams = params.slice(args.size());
+  
+  // Requirements are in parameter order.
+  // FIXME: Except for same-type requirements. Those need to be substituted
+  // and propagated somehow.
+  auto unappliedReqts = getRequirements();
+  auto rootType = [](Type t) -> Type {
+    while (auto dmt = t->getAs<DependentMemberType>()) {
+      t = dmt->getBase();
+    }
+    return t;
+  };
+  
+  for (auto appliedParam : params.slice(0, args.size())) {
+    while (!unappliedReqts.empty()
+           && rootType(unappliedReqts[0].getFirstType())
+               ->isEqual(appliedParam)) {
+      unappliedReqts = unappliedReqts.slice(1);
+    }
+  }
+  
+  Type input = getInput().subst(M, subs, true, nullptr);
+  Type result = getResult().subst(M, subs, true, nullptr);
+  return GenericFunctionType::get(unappliedParams, unappliedReqts,
+                                  input, result,
+                                  getExtInfo());
+}
+
 TypeSubstitutionMap
 GenericSignature::getSubstitutionMap(
                                 ArrayRef<GenericTypeParamType *> genericParams,
@@ -1744,12 +1791,21 @@ case TypeKind::Id:
 
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
+    bool changed = false;
+
     SILResultInfo origResult = fnTy->getResult();
     Type transResult = origResult.getType().transform(fn);
     if (!transResult)
       return Type();
-    auto canTransResult = transResult->getCanonicalType();
-    bool changed = (canTransResult != origResult.getType());
+    CanType canTransResult = transResult->getCanonicalType();
+    changed = changed || (canTransResult != origResult.getType());
+    
+    SILResultInfo origInterfaceResult = fnTy->getResult();
+    Type transInterfaceResult = origResult.getType().transform(fn);
+    if (!transInterfaceResult)
+      return Type();
+    CanType canTransInterfaceResult = transInterfaceResult->getCanonicalType();
+    changed = changed || (canTransInterfaceResult != origResult.getType());
 
     SmallVector<SILParameterInfo, 8> transParams;
     for (auto origParam : fnTy->getParameters()) {
@@ -1761,14 +1817,30 @@ case TypeKind::Id:
                                              origParam.getConvention()));
       changed = changed || (canTransParam != origParam.getType());
     }
+    
+    SmallVector<SILParameterInfo, 8> transInterfaceParams;
+    for (auto origParam : fnTy->getInterfaceParameters()) {
+      Type transParam = origParam.getType().transform(fn);
+      if (!transParam) return Type();
+
+      CanType canTransParam = transParam->getCanonicalType();
+      transInterfaceParams.push_back(SILParameterInfo(canTransParam,
+                                             origParam.getConvention()));
+      changed = changed || (canTransParam != origParam.getType());
+    }
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericParams(), fnTy->getExtInfo(),
+    return SILFunctionType::get(fnTy->getGenericParams(),
+                                fnTy->getGenericSignature(),
+                                fnTy->getExtInfo(),
                                 fnTy->getCalleeConvention(),
                                 transParams,
                                 SILResultInfo(canTransResult,
                                               origResult.getConvention()),
+                                transInterfaceParams,
+                                SILResultInfo(canTransInterfaceResult,
+                                          origInterfaceResult.getConvention()),
                                 Ptr->getASTContext());
   }
 

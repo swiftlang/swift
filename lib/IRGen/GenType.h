@@ -128,13 +128,6 @@ public:
   const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
 
-  /// Enter a generic context for lowering the parameters of a generic function
-  /// type.
-  void pushGenericContext(GenericSignature *signature);
-  
-  /// Exit a generic context.
-  void popGenericContext();
-  
 private:
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
@@ -149,12 +142,12 @@ private:
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
-    friend void TypeConverter::popGenericContext();
+    //friend void TypeConverter::popGenericContext();
   };
   Types_t Types;
-  Optional<ArchetypeBuilder> Archetypes;
 };
-  
+
+/*
 /// An RAII interface for entering a generic context for type conversion in
 /// a scope.
 class GenericContextScope {
@@ -171,6 +164,7 @@ public:
     TC.popGenericContext();
   }
 };
+ */
   
 } // end namespace irgen
 } // end namespace swift

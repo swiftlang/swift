@@ -2998,9 +2998,21 @@ namespace {
                              ParameterConvention::Direct_Owned);
       SILResultInfo result(TupleType::getEmpty(ctx),
                            ResultConvention::Unowned);
-      return SILFunctionType::get(D->getGenericParamsOfContext(), extInfo,
+      SILParameterInfo iparam(D->getDeclaredInterfaceType()->getCanonicalType(),
+                              ParameterConvention::Direct_Owned);
+      
+      GenericSignature *sig = nullptr;
+      auto sigArrays = D->getGenericSignatureOfContext();
+      if (!sigArrays.first.empty() || !sigArrays.second.empty())
+        sig = GenericSignature::getCanonical(sigArrays.first,
+                                             sigArrays.second,
+                                             ctx);
+      
+      return SILFunctionType::get(D->getGenericParamsOfContext(),
+                                  sig,
+                                  extInfo,
                                   ParameterConvention::Direct_Unowned,
-                                  param, result, ctx);
+                                  param, result, iparam, result, ctx);
     }
 
     SourceKind considerParameter(SILParameterInfo param) {

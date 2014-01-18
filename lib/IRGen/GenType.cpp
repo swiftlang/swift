@@ -541,27 +541,6 @@ TypeConverter::~TypeConverter() {
   }
 }
 
-void TypeConverter::pushGenericContext(GenericSignature *signature) {
-  assert(!Archetypes && "already have generic context?!");
-  
-  // If the generic signature is empty, this is a no-op.
-  if (!signature)
-    return;
-  
-  Archetypes.emplace(*IGM.SILMod->getSwiftModule(), IGM.Context.Diags);
-  if (Archetypes->addGenericSignature(signature))
-    llvm_unreachable("error adding generic signature to archetype builder?!");
-  Archetypes->assignArchetypes();
-}
-
-void TypeConverter::popGenericContext() {
-  if (!Archetypes.hasValue())
-    return;
-  
-  Types.DependentCache.clear();
-  Archetypes.reset();
-}
-
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
@@ -774,8 +753,11 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
   if (contextTy->isDependentType())
-    contextTy = Archetypes->substDependentType(contextTy)
+    llvm_unreachable("dependent type lowering not implemented");
+  /*
+    contextTy = getArchetypes()->substDependentType(contextTy)
                             ->getCanonicalType();
+   */
   
   // Fold archetypes to unique exemplars. Any archetype with the same
   // constraints is equivalent for type lowering purposes.

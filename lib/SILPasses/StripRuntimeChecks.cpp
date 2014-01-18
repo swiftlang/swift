@@ -34,9 +34,11 @@ static SILInstruction *convertBinaryOverflowToUncheckedBuiltin(SILBasicBlock *BB
   auto type = BRI->getType().castTo<SILFunctionType>();
   CanType uncheckedResult
     = cast<TupleType>(type->getResult().getType()).getElementType(0);
-  auto uncheckedType = SILFunctionType::get(nullptr,
+  auto uncheckedType = SILFunctionType::get(nullptr, nullptr,
             type->getExtInfo(),
             type->getCalleeConvention(),
+            type->getParameters().slice(0, type->getParameters().size() - 1),
+            SILResultInfo(uncheckedResult, type->getResult().getConvention()),
             type->getParameters().slice(0, type->getParameters().size() - 1),
             SILResultInfo(uncheckedResult, type->getResult().getConvention()),
             type->getASTContext());
@@ -106,9 +108,11 @@ static SILInstruction *convertCheckedTruncToUncheckedBuiltin(SILBasicBlock *BB,
   auto type = BRI->getType().castTo<SILFunctionType>();
   CanType uncheckedResult
     = cast<TupleType>(type->getResult().getType()).getElementType(0);
-  auto uncheckedType = SILFunctionType::get(nullptr,
+  auto uncheckedType = SILFunctionType::get(nullptr, nullptr,
               type->getExtInfo(),
               type->getCalleeConvention(),
+              type->getParameters(),
+              SILResultInfo(uncheckedResult, type->getResult().getConvention()),
               type->getParameters(),
               SILResultInfo(uncheckedResult, type->getResult().getConvention()),
               C);

@@ -1734,7 +1734,8 @@ END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
 /// FIXME: \c GenericFunctionType is meant as a replacement for
 /// \c PolymorphicFunctionType.
 class GenericFunctionType : public AnyFunctionType,
-                            public llvm::FoldingSetNode {
+                            public llvm::FoldingSetNode
+{
   unsigned NumGenericParams;
   unsigned NumRequirements;
 
@@ -1780,7 +1781,7 @@ public:
              NumRequirements };
   }
                               
-  /// Substitute the given generic arguments into this generic
+  /// Substitute all of the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(Module *M, ArrayRef<Type> args) const;
 
@@ -1790,6 +1791,11 @@ public:
   /// The order of Substitutions must match the order of generic parameters.
   FunctionType *substGenericArgs(Module *M, ArrayRef<Substitution> subs);
 
+  /// Substitute the given generic arguments into this generic
+  /// function type, possibly leaving some of the generic parameters
+  /// unsubstituted, and return the resulting function type.
+  AnyFunctionType *partialSubstGenericArgs(Module *M, ArrayRef<Type> args) const;
+                              
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericParams(), getRequirements(), getInput(), getResult(),
             getExtInfo());
@@ -2076,19 +2082,29 @@ private:
     return MutableArrayRef<SILParameterInfo>(ptr, n);
   }
 
-  SILFunctionType(GenericParamList *genericParams, ExtInfo ext,
+  SILFunctionType(GenericParamList *genericParams,
+                  GenericSignature *genericSig,
+                  ExtInfo ext,
                   ParameterConvention calleeConvention,
-                  ArrayRef<SILParameterInfo> params, SILResultInfo result,
+                  ArrayRef<SILParameterInfo> params,
+                  SILResultInfo result,
+                  ArrayRef<SILParameterInfo> interfaceParams,
+                  SILResultInfo interfaceResult,
                   const ASTContext &ctx,
                   RecursiveTypeProperties properties);
 
   static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
 public:
-  static CanSILFunctionType get(GenericParamList *genericParams, ExtInfo ext,
+  static CanSILFunctionType get(GenericParamList *genericParams,
+                                GenericSignature *genericSig,
+                                ExtInfo ext,
                                 ParameterConvention calleeConvention,
                                 ArrayRef<SILParameterInfo> params,
-                                SILResultInfo result, const ASTContext &ctx);
+                                SILResultInfo result,
+                                ArrayRef<SILParameterInfo> interfaceParams,
+                                SILResultInfo interfaceResult,
+                                const ASTContext &ctx);
 
   // in SILType.h
   SILType getSILResult() const SIL_FUNCTION_TYPE_DEPRECATED;
@@ -2755,8 +2771,12 @@ private:
                             RecursiveTypeProperties::IsDependent),
       ParamOrDepthIndex(depth << 16 | index) { }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
-
+BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
+  static CanGenericTypeParamType get(unsigned depth, unsigned index,
+                                     const ASTContext &C) {
+    return CanGenericTypeParamType(GenericTypeParamType::get(depth, index, C));
+  }
+END_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
 
 /// Describes the type of an associated type.
 ///
@@ -2869,7 +2889,13 @@ public:
     return T->getKind() == TypeKind::DependentMember;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(DependentMemberType, Type)
+BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
+  static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType,
+                                    const ASTContext &C) {
+    return CanDependentMemberType(DependentMemberType::get(base, assocType, C));
+  }
+END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
+
 
 /// \brief The storage type of a variable with non-strong reference
 /// ownership semantics.
@@ -3138,6 +3164,10 @@ inline unsigned SubstitutableType::getPrimaryIndex() const {
   llvm_unreachable("Not a substitutable type");
 }
 
+inline CanType Type::getCanonicalTypeOrNull() const {
+  return isNull() ? CanType() : getPointer()->getCanonicalType();
+}
+
 } // end namespace swift
 
 namespace llvm {
@@ -3163,6 +3193,7 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
     return a == b;
   }
 };
+
 
 }
   

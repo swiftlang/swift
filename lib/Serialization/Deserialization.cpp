@@ -2588,23 +2588,28 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::SIL_FUNCTION_TYPE: {
-    TypeID resultID;
+    TypeID resultID, interfaceResultID;
     uint8_t rawResultConvention;
+    uint8_t rawInterfaceResultConvention;
     uint8_t rawCallingConvention;
     uint8_t rawCalleeConvention;
     bool thin;
     bool noreturn = false;
+    unsigned numGenericParams;
     DeclID genericContextID;
     ArrayRef<uint64_t> paramIDs;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
                                                    resultID,
                                                    rawResultConvention,
+                                                   interfaceResultID,
+                                                   rawInterfaceResultConvention,
                                                    genericContextID,
                                                    rawCalleeConvention,
                                                    rawCallingConvention,
                                                    thin,
                                                    noreturn,
+                                                   numGenericParams,
                                                    paramIDs);
 
     // Process the ExtInfo.
@@ -2624,15 +2629,25 @@ Type ModuleFile::getType(TypeID TID) {
     }
     SILResultInfo result(getType(resultID)->getCanonicalType(),
                          resultConvention.getValue());
-
-    // Process the parameters.
-    if (paramIDs.size() & 1) {
+    
+    auto interfaceResultConvention
+      = getActualResultConvention(rawResultConvention);
+    if (!interfaceResultConvention.hasValue()) {
       error();
       return nullptr;
     }
-    SmallVector<SILParameterInfo, 8> params;
-    params.reserve(paramIDs.size() / 2);
-    for (size_t i = 0, e = paramIDs.size(); i != e; i += 2) {
+    SILResultInfo interfaceResult(getType(resultID)->getCanonicalType(),
+                                  interfaceResultConvention.getValue());
+
+    // Process the parameters.
+    unsigned numParamIDs = paramIDs.size() - numGenericParams;
+    if (numParamIDs % 2 != 0) {
+      error();
+      return nullptr;
+    }
+    SmallVector<SILParameterInfo, 8> allParams;
+    allParams.reserve(numParamIDs / 2);
+    for (size_t i = 0, e = numParamIDs; i != e; i += 2) {
       auto type = getType(paramIDs[i])->getCanonicalType();
       auto convention = getActualParameterConvention(paramIDs[i+1]);
       if (!convention.hasValue()) {
@@ -2640,8 +2655,12 @@ Type ModuleFile::getType(TypeID TID) {
         return nullptr;
       }
       SILParameterInfo param(type, convention.getValue());
-      params.push_back(param);
+      allParams.push_back(param);
     }
+    
+    ArrayRef<SILParameterInfo> params{allParams.data(), allParams.size()/2U};
+    ArrayRef<SILParameterInfo> interfaceParams
+      {params.end(), allParams.size()/2U};
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
@@ -2650,13 +2669,30 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
 
-    // Read the generic parameters.
+    // Process the generic signature parameters.
+    SmallVector<GenericTypeParamType *, 8> genericParamTypes;
+    for (auto id : paramIDs.slice(numParamIDs)) {
+      genericParamTypes.push_back(
+                  cast<GenericTypeParamType>(getType(id)->getCanonicalType()));
+    }
+    
+    // Read the generic requirements, if any.
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements);
+    
+    GenericSignature *genericSig = nullptr;
+    if (!genericParamTypes.empty() || !requirements.empty())
+      genericSig = GenericSignature::get(genericParamTypes, requirements, ctx);
+
+    // Read the context generic parameters.
     auto genericParams =
       maybeGetOrReadGenericParams(genericContextID, FileContext);
 
-    typeOrOffset = SILFunctionType::get(genericParams, extInfo,
+    typeOrOffset = SILFunctionType::get(genericParams, genericSig, extInfo,
                                         calleeConvention.getValue(),
-                                        params, result, ctx);
+                                        params, result,
+                                        interfaceParams, interfaceResult,
+                                        ctx);
     break;
   }
 

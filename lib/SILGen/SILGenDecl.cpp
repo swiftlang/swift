@@ -2017,6 +2017,34 @@ SILGenModule::getWitnessTable(ProtocolConformance *conformance) {
   return table;
 }
 
+/// FIXME: This should just be a call down to Types.getLoweredType(), but I
+/// really don't want to thread an old-type/interface-type pair through all
+/// of TypeLowering.
+static SILType
+getWitnessFunctionType(SILModule &M,
+                       AbstractionPattern origRequirementTy,
+                       CanAnyFunctionType witnessSubstTy,
+                       CanAnyFunctionType witnessSubstIfaceTy,
+                       unsigned uncurryLevel) {
+  // Lower the types to uncurry and get ExtInfo.
+  CanType origLoweredTy;
+  if (auto origFTy = dyn_cast<AnyFunctionType>(origRequirementTy.getAsType()))
+    origLoweredTy = M.Types.getLoweredASTFunctionType(origFTy,
+                                                      uncurryLevel);
+  else
+    origLoweredTy = origRequirementTy.getAsType();
+  auto witnessLoweredTy
+    = M.Types.getLoweredASTFunctionType(witnessSubstTy, uncurryLevel);
+  auto witnessLoweredIfaceTy
+    = M.Types.getLoweredASTFunctionType(witnessSubstIfaceTy, uncurryLevel);
+  
+  // Convert to SILFunctionType.
+  auto fnTy = getNativeSILFunctionType(M, origLoweredTy,
+                                       witnessLoweredTy,
+                                       witnessLoweredIfaceTy);
+  return SILType::getPrimitiveObjectType(fnTy);
+}
+
 SILFunction *
 SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILDeclRef requirement,
@@ -2078,25 +2106,75 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   
   // The witness SIL function has the type of the AST-level witness, at the
   // abstraction level of the original protocol requirement.
-  // FIXME: Should have @cc(witness) convention.
   assert(requirement.uncurryLevel == witnessUncurryLevel
          && "uncurry level of requirement and witness do not match");
       
   // In addition to the usual bevy of abstraction differences, protocol
-  // witnesses have potential differences in @inout-ness of self. Value type
-  // methods may reassign 'self' as an @inout parameter, but class methods may
-  // not. Handle this special case in the witness type before applying the
+  // witnesses have potential differences in @inout-ness of self. @mutating
+  // value type methods may reassign 'self' as an @inout parameter, but may be
+  // conformed to by non-@mutating or class methods that cannot.
+  // Handle this special case in the witness type before applying the
   // abstraction change.
   auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;
   if (!isa<InOutType>(witnessOrigTy.getInput()) &&
       isa<InOutType>(requirementTy.getInput())) {
     inOutSelf = HasInOutSelfAbstractionDifference;
   }
-      
+  
+  // Work out the interface type for the witness.
+  auto reqtIfaceTy
+    = cast<GenericFunctionType>(Types.getConstantInfo(requirement)
+                                     .FormalInterfaceType);
+  // Substitute the 'self' type into the requirement to get the concrete witness
+  // type, leaving the other generic parameters open.
+  CanAnyFunctionType witnessSubstIfaceTy = cast<AnyFunctionType>(
+    reqtIfaceTy->partialSubstGenericArgs(conformance->getDeclContext()->getParentModule(),
+                                         conformance->getInterfaceType())
+               ->getCanonicalType());
+  
+  // If the conformance is generic, its generic parameters apply to the witness.
+  ArrayRef<GenericTypeParamType*> ifaceGenericParams;
+  ArrayRef<Requirement> ifaceReqts;
+  std::tie(ifaceGenericParams, ifaceReqts)
+    = conformance->getGenericSignature();
+  if (!ifaceGenericParams.empty() && !ifaceReqts.empty()) {
+    if (auto gft = dyn_cast<GenericFunctionType>(witnessSubstIfaceTy)) {
+      SmallVector<GenericTypeParamType*, 4> allParams(ifaceGenericParams.begin(),
+                                                      ifaceGenericParams.end());
+      allParams.append(gft->getGenericParams().begin(),
+                       gft->getGenericParams().end());
+      SmallVector<Requirement, 4> allReqts(ifaceReqts.begin(),
+                                           ifaceReqts.end());
+      allReqts.append(gft->getRequirements().begin(),
+                      gft->getRequirements().end());
+      witnessSubstIfaceTy = cast<GenericFunctionType>(
+        GenericFunctionType::get(allParams, allReqts,
+                                 gft.getInput(), gft.getResult(),
+                                 gft->getExtInfo())
+          ->getCanonicalType());
+    } else {
+      assert(isa<FunctionType>(witnessSubstIfaceTy));
+      witnessSubstIfaceTy = cast<GenericFunctionType>(
+        GenericFunctionType::get(ifaceGenericParams, ifaceReqts,
+                                 witnessSubstIfaceTy.getInput(),
+                                 witnessSubstIfaceTy.getResult(),
+                                 witnessSubstIfaceTy->getExtInfo())
+          ->getCanonicalType());
+    }
+  }
   // Lower the witness type with the requirement's abstraction level.
+  // FIXME: We should go through TypeConverter::getLoweredType once we settle
+  // on interface types.
+  /*
   SILType witnessSILType = Types.getLoweredType(
                                               AbstractionPattern(requirementTy),
                                               witnessSubstTy,
+                                              requirement.uncurryLevel);
+   */
+  SILType witnessSILType = getWitnessFunctionType(M,
+                                              AbstractionPattern(requirementTy),
+                                              witnessSubstTy,
+                                              witnessSubstIfaceTy,
                                               requirement.uncurryLevel);
 
   // TODO: emit with shared linkage if the type and protocol are non-local.

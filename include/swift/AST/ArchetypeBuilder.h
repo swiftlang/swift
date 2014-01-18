@@ -256,12 +256,8 @@ public:
       void dump(),
       "only for use within the debugger");
   
-private:
   /// FIXME: Share the guts of our mapTypeIntoContext implementation with
-  /// SILFunction::mapTypeIntoContext.
-  friend class SILFunction;
-  
-  static Type mapTypeIntoContext(Module &M,
+  static Type mapTypeIntoContext(Module *M,
                                  GenericParamList *genericParams,
                                  Type type);
 };

@@ -1716,9 +1716,11 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                   .withCallingConv(pft->getAbstractCC())
                   .withIsThin(true);
 
-    auto specialized = SILFunctionType::get(nullptr,
+    auto specialized = SILFunctionType::get(nullptr, nullptr,
                                             info,
                                             pft->getCalleeConvention(),
+                                            pft->getParameters(),
+                                            pft->getResult(),
                                             pft->getParameters(),
                                             pft->getResult(),
                                             F.getASTContext());

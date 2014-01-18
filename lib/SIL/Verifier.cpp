@@ -802,8 +802,13 @@ public:
     require(selfGenericParam->getDepth() == 0
             && selfGenericParam->getIndex() == 0,
             "method should be polymorphic on Self parameter at depth 0 index 0");
-    auto selfRequirement
+    auto selfMarker
       = methodType->getGenericSignature()->getRequirements()[0];
+    require(selfMarker.getKind() == RequirementKind::WitnessMarker
+            && selfMarker.getFirstType()->isEqual(selfGenericParam),
+            "method's Self parameter should appear first in requirements");
+    auto selfRequirement
+      = methodType->getGenericSignature()->getRequirements()[1];
     require(selfRequirement.getKind() == RequirementKind::Conformance
             && selfRequirement.getFirstType()->isEqual(selfGenericParam)
             && selfRequirement.getSecondType()->getAs<ProtocolType>()

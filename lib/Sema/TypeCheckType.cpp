@@ -944,8 +944,47 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   if (hasError)
     return ErrorType::get(Context);
 
-  return SILFunctionType::get(repr->getGenericParams(), extInfo, callee,
-                              params, result, Context);
+  // FIXME: Remap the parsed context types to interface types.
+  GenericSignature *genericSig = nullptr;
+  SmallVector<SILParameterInfo, 4> interfaceParams;
+  SILResultInfo interfaceResult;
+  if (repr->getGenericParams()) {
+    llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
+    genericSig
+      = repr->getGenericParams()->getAsCanonicalGenericSignature(archetypeMap,
+                                                                Context);
+    
+    auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
+      if (!t) return t;
+      if (auto arch = t->getAs<ArchetypeType>()) {
+        // As a kludge, we allow Self archetypes of protocol_methods to be
+        // unapplied.
+        if (arch->getSelfProtocol() && !archetypeMap.count(arch))
+          return arch;
+        return arch->getAsDependentType(archetypeMap);
+      }
+      return t;
+    };
+    
+    for (auto &param : params) {
+      CanType interfaceTy = param.getType()
+        .transform(getArchetypesAsDependentTypes)
+        ->getCanonicalType();
+      interfaceParams.push_back(SILParameterInfo(interfaceTy,
+                                                 param.getConvention()));
+    }
+    CanType resultTy
+      = result.getType().transform(getArchetypesAsDependentTypes)
+                        ->getCanonicalType();
+    interfaceResult = SILResultInfo(resultTy, result.getConvention());
+  } else {
+    interfaceParams = params;
+    interfaceResult = result;
+  }
+  return SILFunctionType::get(repr->getGenericParams(), genericSig, extInfo,
+                              callee,
+                              params, result, interfaceParams, interfaceResult,
+                              Context);
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(TypeRepr *repr) {

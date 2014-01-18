@@ -101,6 +101,9 @@ public:
   /// Get the conforming type.
   Type getType() const { return ConformingType; }
 
+  /// Get the conforming interface type.
+  Type getInterfaceType() const;
+  
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const;
 
@@ -186,8 +189,13 @@ public:
   const InheritedConformanceMap &getInheritedConformances() const;
   
   /// Get the generic parameters open on the conforming type.
-  /// FIXME: Return a dependent generic signature instead.
+  /// FIXME: Retire in favor of getGenericSignature().
   GenericParamList *getGenericParams() const;
+  
+  /// Get the generic signature containing the parameters open on the conforming
+  /// interface type.
+  std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
+  getGenericSignature() const;
 
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;

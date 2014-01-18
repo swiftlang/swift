@@ -115,6 +115,35 @@ GenericParamList *ProtocolConformance::getGenericParams() const {
   }
 }
 
+Type ProtocolConformance::getInterfaceType() const {
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    // FIXME: This should be the type stored in the protocol conformance.
+    // Assuming a generic conformance is always for the DeclaredTypeInContext
+    // is unsound if we ever add constrained extensions.
+    return getType()->getNominalOrBoundGenericNominal()
+      ->getDeclaredInterfaceType();
+  
+  case ProtocolConformanceKind::Inherited:
+    return cast<InheritedProtocolConformance>(this)->getInheritedConformance()
+      ->getInterfaceType();
+
+  case ProtocolConformanceKind::Specialized:
+    // Assume a specialized conformance is fully applied.
+    return getType();
+  }
+}
+
+std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
+ProtocolConformance::getGenericSignature() const {
+  // FIXME: Should be an independent property of the conformance.
+  // Assuming a BoundGenericType conformance is always for the
+  // DeclaredTypeInContext is unsound if we ever add constrained extensions.
+
+  return getType()->getNominalOrBoundGenericNominal()
+    ->getGenericSignatureOfContext();
+}
+
 const Substitution &NormalProtocolConformance::getTypeWitness(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {

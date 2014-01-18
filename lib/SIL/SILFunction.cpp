@@ -98,7 +98,7 @@ ASTContext &SILFunction::getASTContext() const {
 }
 
 Type SILFunction::mapTypeIntoContext(Type type) const {
-  return ArchetypeBuilder::mapTypeIntoContext(*getModule().getSwiftModule(),
+  return ArchetypeBuilder::mapTypeIntoContext(getModule().getSwiftModule(),
                                               getContextGenericParams(),
                                               type);
 }

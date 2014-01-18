@@ -1783,6 +1783,12 @@ public:
                                ArrayRef<Requirement> requirements,
                                ASTContext &ctx);
 
+  /// Create a new generic signature with the given type parameters and
+  /// requirements, first canonicalizing the types.
+  static GenericSignature *getCanonical(ArrayRef<GenericTypeParamType *> params,
+                                        ArrayRef<Requirement> requirements,
+                                        ASTContext &ctx);
+
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
     return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),

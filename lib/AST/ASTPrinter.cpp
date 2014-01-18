@@ -1557,6 +1557,7 @@ public:
   }
 
   void visitArchetypeType(ArchetypeType *T) {
+    
     Printer << T->getFullName();
   }
 

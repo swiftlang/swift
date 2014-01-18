@@ -810,9 +810,10 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
                          ParameterConvention::Direct_Unowned);
   SILResultInfo Result(gen.getASTContext().TheRawPointerType,
                        ResultConvention::Unowned);
-  auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
+  auto bfrFnType = SILFunctionType::get(nullptr, nullptr, bfrInfo,
                                         ParameterConvention::Direct_Owned,
-                                        Param, Result, gen.getASTContext());
+                                        Param, Result, Param, Result,
+                                        gen.getASTContext());
   auto bfr = gen.B.createBuiltinFunctionRef(loc, "inttoptr_Word",
                                     SILType::getPrimitiveObjectType(bfrFnType));
   // %3 = apply %2(%1) : $@thin (Builtin.Word) -> Builtin.RawPointer

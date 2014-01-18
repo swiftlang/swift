@@ -364,9 +364,11 @@ struct SILConstantInfo {
   /// function, this is just its declared type; for a getter or
   /// setter, computing this can be more involved.
   CanAnyFunctionType FormalType;
+  CanAnyFunctionType FormalInterfaceType;
 
   /// The uncurried and bridged type of the constant.
   CanAnyFunctionType LoweredType;
+  CanAnyFunctionType LoweredInterfaceType;
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
@@ -377,7 +379,9 @@ struct SILConstantInfo {
 
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalType == rhs.FormalType &&
+           lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
            lhs.LoweredType == rhs.LoweredType &&
+           lhs.LoweredInterfaceType == rhs.LoweredInterfaceType &&
            lhs.SILFnType == rhs.SILFnType;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
@@ -455,6 +459,8 @@ class TypeConverter {
   Optional<ArchetypeBuilder> GenericArchetypes;
   
   CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
+  CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant,
+                                               bool addCaptures);
   
   // Types converted during foreign bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
@@ -586,14 +592,16 @@ public:
   /// \param substFormalType - a valid substitution of the
   ///   still-curried type of the function.
   CanSILFunctionType getConstantFunctionType(SILDeclRef constant,
-                                             CanAnyFunctionType substFormalType,
-                                             bool thin);
+                                   CanAnyFunctionType substFormalType,
+                                   CanAnyFunctionType substFormalInterfaceType,
+                                   bool thin);
 
   /// Substitute the given function type so that it implements the
   /// given substituted type.
   CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
-                                       CanAnyFunctionType origLoweredType,
-                                       CanAnyFunctionType substLoweredType);
+                                 CanAnyFunctionType origLoweredType,
+                                 CanAnyFunctionType substLoweredType,
+                                 CanAnyFunctionType substLoweredInterfaceType);
   
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
@@ -602,6 +610,10 @@ public:
   
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
+                                                 ArrayRef<ValueDecl*> captures,
+                                                 DeclContext *parentContext);
+  CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
+                                                 CanAnyFunctionType funcType,
                                                  ArrayRef<ValueDecl*> captures,
                                                  DeclContext *parentContext);
   
@@ -627,8 +639,11 @@ public:
   /// \return - always an address type
   SILType getSubstitutedStorageType(ValueDecl *value, Type lvalueType);
 
-  /// Retrieve the set of generic parameters considered for the given context.
+  /// Retrieve the set of archetypes open in the given context.
   GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
+
+  /// Retrieve the set of generic parameters for the given context.
+  GenericSignature *getEffectiveGenericSignatureForContext(DeclContext *dc);
 
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
@@ -641,7 +656,8 @@ public:
   
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
-  void popGenericContext();
+  void popGenericContext(ArrayRef<GenericTypeParamType*> genericParams,
+                         ArrayRef<Requirement> requirements);
   
   /// Return the archetype builder for the current generic context. Fails if no
   /// generic context has been pushed.
@@ -649,6 +665,16 @@ public:
     return *GenericArchetypes;
   }
   
+  // Map a type involving context archetypes out of its context into a
+  // dependent type.
+  CanType getInterfaceTypeInContext(CanType contextTy,
+                                    DeclContext *context) const;
+  
+  // Map a type involving context archetypes out of its context into a
+  // dependent type.
+  CanType getInterfaceTypeInContext(CanType contextTy,
+                                    GenericParamList *contextParams) const;
+
   /// Known types for bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
   CanType get##BridgedType##Type(); \
@@ -668,15 +694,28 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
 /// RAII interface to push a generic context.
 class GenericContextScope {
   TypeConverter &TC;
+  ArrayRef<GenericTypeParamType*> genericParams;
+  ArrayRef<Requirement> requirements;
 public:
   GenericContextScope(TypeConverter &TC,
                       ArrayRef<GenericTypeParamType*> genericParams,
-                      ArrayRef<Requirement> requirements) : TC(TC) {
+                      ArrayRef<Requirement> requirements)
+    : TC(TC), genericParams(genericParams), requirements(requirements)
+  {
     TC.pushGenericContext(genericParams, requirements);
   }
   
+  GenericContextScope(TypeConverter &TC,
+                      GenericSignature *sig)
+    : GenericContextScope(TC,
+                          sig ? sig->getGenericParams()
+                              : ArrayRef<GenericTypeParamType*>{},
+                          sig ? sig->getRequirements()
+                              : ArrayRef<Requirement>{})
+  {}
+  
   ~GenericContextScope() {
-    TC.popGenericContext();
+    TC.popGenericContext(genericParams, requirements);
   }
   
 private:

@@ -98,7 +98,7 @@ private:
     } method;
   };
   ArrayRef<Substitution> substitutions;
-  CanType OrigFormalType;
+  CanType OrigFormalOldType, OrigFormalInterfaceType;
   CanAnyFunctionType SubstFormalType;
   Optional<SILLocation> specializeLoc;
   bool isTransparent;
@@ -110,11 +110,14 @@ private:
   static SpecializedEmitter getSpecializedEmitterForSILBuiltin(SILDeclRef c,
                                                                SILModule &M);
 
-  Callee(ManagedValue indirectValue, CanType origFormalType,
-         CanAnyFunctionType substFormalType, bool isTransparent, SILLocation L)
+  Callee(ManagedValue indirectValue,
+         CanType origFormalType,
+         CanAnyFunctionType substFormalType,
+         bool isTransparent, SILLocation L)
     : kind(Kind::IndirectValue),
       indirectValue(indirectValue),
-      OrigFormalType(origFormalType),
+      OrigFormalOldType(origFormalType),
+      OrigFormalInterfaceType(origFormalType),
       SubstFormalType(substFormalType),
       isTransparent(isTransparent),
       Loc(L)
@@ -122,13 +125,20 @@ private:
 
   static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
                                                   SILDeclRef fn) {
-    return gen.SGM.Types.getConstantFormalType(fn.atUncurryLevel(0));
+    return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
+  }
+
+  static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &gen,
+                                                  SILDeclRef fn) {
+    return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalInterfaceType;
   }
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction,
-         CanAnyFunctionType substFormalType, SILLocation l)
+         CanAnyFunctionType substFormalType,
+         SILLocation l)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
-      OrigFormalType(getConstantFormalType(gen, standaloneFunction)),
+      OrigFormalOldType(getConstantFormalType(gen, standaloneFunction)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, standaloneFunction)),
       SubstFormalType(substFormalType),
       isTransparent(standaloneFunction.isTransparent()),
       Loc(l)
@@ -142,7 +152,8 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), method{selfValue, methodName},
-      OrigFormalType(getConstantFormalType(gen, methodName)),
+      OrigFormalOldType(getConstantFormalType(gen, methodName)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
       SubstFormalType(substFormalType),
       isTransparent(false),
       Loc(l)
@@ -193,8 +204,12 @@ private:
     auto substLoweredType =
       SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
                                           origLoweredType->getExtInfo());
+    auto substLoweredInterfaceType =
+      SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
+                                          origLoweredType->getExtInfo());
     return SGM.Types.substFunctionType(origFnType, origLoweredType,
-                                       substLoweredType);
+                                       substLoweredType,
+                                       substLoweredInterfaceType);
   }
 
   /// Return the value being passed as 'self' for this protocol callee.
@@ -226,7 +241,7 @@ private:
 
     // Add the 'self' parameter back.  We want it to look like a
     // substitution of the appropriate clause from the original type.
-    auto polyFormalType = cast<PolymorphicFunctionType>(OrigFormalType);
+    auto polyFormalType = cast<PolymorphicFunctionType>(OrigFormalOldType);
     auto selfType = getProtocolSelfType(SGM);
     auto substSelfType =
       buildSubstSelfType(polyFormalType.getInput(), selfType, ctx);
@@ -267,7 +282,7 @@ private:
     // of the archetype method to the expected archetype.
     CanAnyFunctionType partialSubstFormalType =
       cast<FunctionType>(
-        cast<PolymorphicFunctionType>(OrigFormalType)
+        cast<PolymorphicFunctionType>(OrigFormalOldType)
           ->substGenericArgs(SGM.SwiftModule, archetype)
             ->getCanonicalType());
     
@@ -288,8 +303,17 @@ private:
         = CanFunctionType::get(partialSubstFormalType.getInput(), polyMethod);
     }
 
+    // Same thing for the interface type.
+
+    auto partialSubstInterfaceType =
+      cast<AnyFunctionType>(
+        cast<GenericFunctionType>(OrigFormalInterfaceType)
+          ->partialSubstGenericArgs(SGM.SwiftModule, archetype)
+            ->getCanonicalType());
+    
     auto partialSubstUncurriedType =
       SGM.Types.getConstantFunctionType(constant, partialSubstFormalType,
+                                        partialSubstInterfaceType,
                                         isThin);
     return SILType::getPrimitiveObjectType(partialSubstUncurriedType);
   }
@@ -300,18 +324,20 @@ private:
     assert(kind == Kind::DynamicMethod);
 
     // Drop the original self clause.
-    CanType methodType = OrigFormalType;
+    CanType methodType = OrigFormalOldType;
     methodType = cast<AnyFunctionType>(methodType).getResult();
 
     // Replace it with the dynamic self type.
-    OrigFormalType = getDynamicMethodType(SGM, method.selfValue,
-                                          method.methodName, methodType);
+    OrigFormalOldType = OrigFormalInterfaceType
+      = getDynamicMethodType(SGM, method.selfValue,
+                             method.methodName, methodType);
 
     // Add a self clause to the substituted type.
-    auto origFormalType = cast<AnyFunctionType>(OrigFormalType);
+    auto origFormalType = cast<AnyFunctionType>(OrigFormalOldType);
     auto selfType = origFormalType.getInput();
-    SubstFormalType = CanFunctionType::get(selfType, SubstFormalType,
-                                           origFormalType->getExtInfo());
+    SubstFormalType
+      = CanFunctionType::get(selfType, SubstFormalType,
+                             origFormalType->getExtInfo());
   }
 
 public:
@@ -320,45 +346,59 @@ public:
                             CanAnyFunctionType substFormalType,
                             bool isTransparent,
                             SILLocation l) {
-    return Callee(indirectValue, origFormalType, substFormalType, isTransparent, l);
+    return Callee(indirectValue,
+                  origFormalType,
+                  substFormalType,
+                  isTransparent, l);
   }
   static Callee forDirect(SILGenFunction &gen, SILDeclRef c,
-                          CanAnyFunctionType substFormalType, SILLocation l) {
+                          CanAnyFunctionType substFormalType,
+                          SILLocation l) {
     return Callee(gen, c, substFormalType, l);
   }
   static Callee forClassMethod(SILGenFunction &gen, SILValue selfValue,
-                               SILDeclRef name, CanAnyFunctionType substFormalType,
+                               SILDeclRef name,
+                               CanAnyFunctionType substFormalType,
                                SILLocation l) {
-    return Callee(Kind::ClassMethod, gen, selfValue, name, substFormalType, l);
+    return Callee(Kind::ClassMethod, gen, selfValue, name,
+                  substFormalType, l);
   }
   static Callee forSuperMethod(SILGenFunction &gen, SILValue selfValue,
-                               SILDeclRef name, CanAnyFunctionType substFormalType,
+                               SILDeclRef name,
+                               CanAnyFunctionType substFormalType,
                                SILLocation l) {
-    return Callee(Kind::SuperMethod, gen, selfValue, name, substFormalType, l);
+    return Callee(Kind::SuperMethod, gen, selfValue, name,
+                  substFormalType, l);
   }
   static Callee forPeerMethod(SILGenFunction &gen, SILValue selfValue,
-                               SILDeclRef name, CanAnyFunctionType substFormalType,
-                               SILLocation l) {
-    return Callee(Kind::PeerMethod, gen, selfValue, name, substFormalType, l);
+                              SILDeclRef name,
+                              CanAnyFunctionType substFormalType,
+                              SILLocation l) {
+    return Callee(Kind::PeerMethod, gen, selfValue, name,
+                  substFormalType, l);
   }
   static Callee forArchetype(SILGenFunction &gen, SILValue value,
-                             SILDeclRef name, CanAnyFunctionType substFormalType,
+                             SILDeclRef name,
+                             CanAnyFunctionType substFormalType,
                              SILLocation l) {
-    Callee callee(Kind::ArchetypeMethod, gen, value, name, substFormalType, l);
+    Callee callee(Kind::ArchetypeMethod, gen, value, name,
+                  substFormalType, l);
     callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
   }
   static Callee forProtocol(SILGenFunction &gen, SILValue proto,
                             SILDeclRef name, CanAnyFunctionType substFormalType,
                             SILLocation l) {
-    Callee callee(Kind::ProtocolMethod, gen, proto, name, substFormalType, l);
+    Callee callee(Kind::ProtocolMethod, gen, proto, name,
+                  substFormalType, l);
     callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
   }
   static Callee forDynamic(SILGenFunction &gen, SILValue proto,
                            SILDeclRef name, CanAnyFunctionType substFormalType,
                            SILLocation l) {
-    Callee callee(Kind::DynamicMethod, gen, proto, name, substFormalType, l);
+    Callee callee(Kind::DynamicMethod, gen, proto, name,
+                  substFormalType, l);
     callee.addDynamicSelfToFormalType(gen.SGM);
     return callee;
   }
@@ -384,7 +424,7 @@ public:
   }
 
   CanType getOrigFormalType() const {
-    return OrigFormalType;
+    return OrigFormalOldType;
   };
 
   CanAnyFunctionType getSubstFormalType() const {
@@ -547,8 +587,9 @@ public:
 
       auto closureType =
         gen.SGM.Types.getConstantFunctionType(method.methodName,
-                                         cast<AnyFunctionType>(OrigFormalType),
-                                              /*thin*/ true);
+                                 cast<AnyFunctionType>(OrigFormalOldType),
+                                 cast<AnyFunctionType>(OrigFormalInterfaceType),
+                                 /*thin*/ true);
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           method.selfValue,

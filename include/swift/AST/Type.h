@@ -28,6 +28,7 @@ namespace swift {
 
 class ASTPrinter;
 class ArchetypeType;
+class CanType;
 class LazyResolver;
 class Module;
 class TypeBase;
@@ -107,6 +108,9 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
 
+  /// Get the canonical type, or return null if the type is null.
+  CanType getCanonicalTypeOrNull() const; // in Types.h
+  
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
   void operator==(Type T) const = delete;

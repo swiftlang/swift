@@ -40,7 +40,7 @@ ERROR(invalid_diagnostic,common,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
 ERROR(not_implemented,TODO,none,
-      "INTERNAL ERROR: feature not implemented", ())
+      "INTERNAL ERROR: feature not implemented: %0", (StringRef))
 
 ERROR(error_opening_output,common,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
