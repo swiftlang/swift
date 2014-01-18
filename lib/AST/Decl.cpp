@@ -1230,9 +1230,9 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
   if (!isObjC())
     return false;
 
-  // Don't expose objc properties for function types. We can't autorelease them,
-  // and eventually we want to map them back to blocks.
-  if (getType()->is<AnyFunctionType>())
+  // Don't expose objc properties for variables with function type. We can't
+  // autorelease them, and eventually we want to map them back to blocks.
+  if (isa<VarDecl>(this) && getType()->is<AnyFunctionType>())
     return false;
 
   return true;
