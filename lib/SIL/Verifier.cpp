@@ -126,10 +126,12 @@ public:
                                      const Twine &what) {
     require(type1->getInterfaceResult() == type2->getInterfaceResult(),
             "result types of " + what + " do not match");
-    require(type1->getInterfaceParameters().size() == type2->getInterfaceParameters().size(),
+    require(type1->getInterfaceParameters().size() ==
+            type2->getInterfaceParameters().size(),
             "inputs of " + what + " do not match in count");
     for (auto i : indices(type1->getInterfaceParameters())) {
-      require(type1->getInterfaceParameters()[i] == type2->getInterfaceParameters()[i],
+      require(type1->getInterfaceParameters()[i] ==
+              type2->getInterfaceParameters()[i],
               "input " + Twine(i) + " of " + what + " do not match");
     }
   }
@@ -312,7 +314,8 @@ public:
             "substituted callee type does not match substitutions");
     
     // Check that the arguments and result match.
-    require(AI->getArguments().size() == substTy->getInterfaceParameters().size(),
+    require(AI->getArguments().size() ==
+            substTy->getInterfaceParameters().size(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = AI->getArguments().size(); i < size; ++i) {
       requireSameType(AI->getArguments()[i].getType(),
@@ -340,12 +343,14 @@ public:
 
     // The arguments must match the suffix of the original function's input
     // types.
-    require(PAI->getArguments().size() + resultInfo->getInterfaceParameters().size()
+    require(PAI->getArguments().size() +
+              resultInfo->getInterfaceParameters().size()
               == substTy->getInterfaceParameters().size(),
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
     
-    unsigned offset = substTy->getInterfaceParameters().size() - PAI->getArguments().size();
+    unsigned offset =
+      substTy->getInterfaceParameters().size() - PAI->getArguments().size();
     
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i].getType()
@@ -358,7 +363,8 @@ public:
     // original function's input types.
     for (unsigned i = 0, size = resultInfo->getInterfaceParameters().size();
          i < size; ++i) {
-      require(resultInfo->getInterfaceParameters()[i] == substTy->getInterfaceParameters()[i],
+      require(resultInfo->getInterfaceParameters()[i] ==
+              substTy->getInterfaceParameters()[i],
               "inputs to result function type do not match unapplied inputs "
               "of original function");
     }
@@ -375,7 +381,8 @@ public:
   }
   
   void checkFunctionRefInst(FunctionRefInst *FRI) {
-    auto fnType = requireObjectType(SILFunctionType, FRI, "result of function_ref");
+    auto fnType = requireObjectType(SILFunctionType, FRI,
+                                    "result of function_ref");
     require(fnType->isThin(),
             "function_ref should have a thin function result");
   }
