@@ -429,19 +429,19 @@ private:
 ///   (Foo, Bar)
 /// \endcode
 class TupleTypeRepr : public TypeRepr {
-  MutableArrayRef<TypeRepr *> Elements;
+  ArrayRef<TypeRepr *> Elements;
   SourceRange Parens;
   // FIXME: Tail allocation.
   SourceLoc Ellipsis;
 
 public:
-  TupleTypeRepr(MutableArrayRef<TypeRepr *> Elements, SourceRange Parens,
-               SourceLoc Ellipsis)
+  TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
+                SourceLoc Ellipsis)
     : TypeRepr(TypeReprKind::Tuple), Elements(Elements),
       Parens(Parens), Ellipsis(Ellipsis) {
   }
 
-  MutableArrayRef<TypeRepr *> getElements() const { return Elements; }
+  ArrayRef<TypeRepr *> getElements() const { return Elements; }
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
   bool hasEllipsis() const { return Ellipsis.isValid(); }
@@ -500,19 +500,19 @@ private:
 ///   protocol<Foo, Bar>
 /// \endcode
 class ProtocolCompositionTypeRepr : public TypeRepr {
-  MutableArrayRef<IdentTypeRepr *> Protocols;
+  ArrayRef<IdentTypeRepr *> Protocols;
   SourceLoc ProtocolLoc;
   SourceRange AngleBrackets;
 
 public:
-  ProtocolCompositionTypeRepr(MutableArrayRef<IdentTypeRepr *> Protocols,
+  ProtocolCompositionTypeRepr(ArrayRef<IdentTypeRepr *> Protocols,
                               SourceLoc ProtocolLoc,
                               SourceRange AngleBrackets)
     : TypeRepr(TypeReprKind::ProtocolComposition), Protocols(Protocols),
       ProtocolLoc(ProtocolLoc), AngleBrackets(AngleBrackets) {
   }
 
-  MutableArrayRef<IdentTypeRepr *> getProtocols() const { return Protocols; }
+  ArrayRef<IdentTypeRepr *> getProtocols() const { return Protocols; }
   SourceLoc getProtocolLoc() const { return ProtocolLoc; }
   SourceRange getAngleBrackets() const { return AngleBrackets; }
 
