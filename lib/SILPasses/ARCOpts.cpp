@@ -1,4 +1,4 @@
-//===-------- SILARCOpts.cpp - Perform SIL ARC Optimizations --------------===//
+//===----------- ARCOpts.cpp - Perform SIL ARC Optimizations --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
