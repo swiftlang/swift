@@ -4,6 +4,7 @@ add_swift_library(swiftBasic
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   PrettyStackTrace.cpp
+  Program.cpp
   Punycode.cpp
   QuotedString.cpp
   SourceLoc.cpp

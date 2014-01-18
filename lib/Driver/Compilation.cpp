@@ -12,6 +12,7 @@
 
 #include "swift/Driver/Compilation.h"
 
+#include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/DenseSet.h"
@@ -185,7 +186,47 @@ int Compilation::performJobsInList(const JobList &JL,
   return Result;
 }
 
+static const Command *getOnlyCommandInList(const JobList *List) {
+  if (List->size() != 1)
+    return nullptr;
+
+  const Job *J = List->getJobs()[0];
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    if (Cmd->getInputs().empty())
+      return Cmd;
+    else
+      return nullptr;
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    return getOnlyCommandInList(JL);
+  } else {
+    llvm_unreachable("Unknown Job class!");
+  }
+}
+
+static int performSingleCommand(const Command *Cmd) {
+  assert(Cmd->getInputs().empty() &&
+         "This can only be used to run a single Command with no inputs");
+  
+  SmallVector<const char *, 128> Argv;
+  Argv.push_back(Cmd->getExecutable());
+  Argv.append(Cmd->getArguments().begin(), Cmd->getArguments().end());
+  Argv.push_back(0);
+
+  const char *ExecPath = Cmd->getExecutable();
+  const char **argv = Argv.data();
+
+  return ExecuteInPlace(ExecPath, argv);
+}
+
 int Compilation::performJobs() {
+  // TODO: determine if an option requires buffered output; right now, none do
+  bool RequiresBufferedOutput = false;
+  if (!RequiresBufferedOutput) {
+    const Command *OnlyCmd = getOnlyCommandInList(Jobs.get());
+    if (OnlyCmd)
+      return performSingleCommand(OnlyCmd);
+  }
+
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     // TODO: emit diagnostic
     llvm::errs() << "warning: parallel execution not supported; "
