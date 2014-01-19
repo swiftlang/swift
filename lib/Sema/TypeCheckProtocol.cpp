@@ -1382,6 +1382,11 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   }
 
+  // If this is a getter/setter for a funcdecl, ignore it.
+  if (auto *FD = dyn_cast<FuncDecl>(requirement))
+    if (FD->isGetterOrSetter())
+      return;
+
   // Try to resolve each of the associated types referenced within the
   // requirement's type to type witnesses via name lookup. Such
   // bindings can inform the choice of witness.
@@ -1548,6 +1553,11 @@ void ConformanceChecker::checkConformance() {
       continue;
     }
 
+    // If this is a getter/setter for a funcdecl, ignore it.
+    if (auto *FD = dyn_cast<FuncDecl>(requirement))
+      if (FD->isGetterOrSetter())
+        continue;
+    
     // Try to resolve the witness via explicit definitions.
     switch (resolveWitnessViaLookup(requirement)) {
     case ResolveWitnessResult::Success:
@@ -1640,6 +1650,11 @@ void ConformanceChecker::checkConformance() {
 
     // For a non-type witness.
     if (auto value = dyn_cast<ValueDecl>(member)) {
+      // If this is a getter/setter for a funcdecl, ignore it.
+      if (auto *FD = dyn_cast<FuncDecl>(member))
+        if (FD->isGetterOrSetter())
+          continue;
+
       assert((AlreadyComplained || Conformance->hasWitness(value)) &&
              "Failed to handle witness");
     }
