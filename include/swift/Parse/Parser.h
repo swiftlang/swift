@@ -553,10 +553,11 @@ public:
   ParserStatus parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc);
-  bool parseGetSet(bool HasContainerType, Pattern *Indices, TypeLoc ElementTy,
+  bool parseGetSet(unsigned Flags,
+                   Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc);
-  void parseDeclVarGetSet(Pattern &pattern, bool hasContainerType,
+  void parseDeclVarGetSet(Pattern &pattern, unsigned Flags,
                           SourceLoc StaticLoc);
   
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
@@ -568,8 +569,7 @@ public:
   ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags,
                                                DeclAttributes &Attributes);
   
-  ParserStatus parseDeclSubscript(bool HasContainerType,
-                                  bool NeedDefinition,
+  ParserStatus parseDeclSubscript(unsigned Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls);
 

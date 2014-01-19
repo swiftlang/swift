@@ -248,9 +248,9 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
   // FIXME: They shouldn't.
   if(isa<ClangModuleUnit>(dc) &&
      (isa<ConstructorDecl>(d) ||
-      isa<SubscriptDecl>(d) ||
       isa<EnumElementDecl>(d) ||
-      (isa<VarDecl>(d) && cast<VarDecl>(d)->isComputed()) ||
+      (isa<AbstractStorageDecl>(d) &&
+         cast<AbstractStorageDecl>(d)->isComputed()) ||
       (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext())) ||
       (isa<FuncDecl>(d) && isa<StructDecl>(d->getDeclContext()))))
     return SILLinkage::Shared;

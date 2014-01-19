@@ -635,9 +635,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         .fixItRemove(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    Status = parseDeclSubscript(Flags & PD_HasContainerType,
-                                !(Flags & PD_InProtocol),
-                                Attributes, Entries);
+    Status = parseDeclSubscript(Flags, Attributes, Entries);
     break;
   
   case tok::identifier:
@@ -1113,6 +1111,109 @@ void Parser::addVarsToScope(Pattern *Pat,
                            Decls, IsStatic, Attributes, PBD));
 }
 
+/// createGetterFunc - This function creates the getter function (with no body)
+/// for a computed property or subscript.
+static FuncDecl *createGetterFunc(SourceLoc GetLoc, TypeLoc ElementTy,
+                                  Pattern *Indices, SourceLoc StaticLoc,
+                                  unsigned Flags, Parser *P) {
+  // Create the parameter list(s) for the getter.
+  SmallVector<Pattern *, 3> Params;
+  
+  // Add the implicit 'self' to Params, if needed.
+  if (Flags & Parser::PD_HasContainerType)
+    Params.push_back(P->buildImplicitSelfParameter(GetLoc));
+  
+  // Add the index clause if necessary.
+  if (Indices)
+    Params.push_back(Indices->clone(P->Context, /*Implicit=*/true));
+  
+  // Add a no-parameters clause.
+  Params.push_back(TuplePattern::create(P->Context, SourceLoc(),
+                                        ArrayRef<TuplePatternElt>(),
+                                        SourceLoc(), /*hasVararg=*/false,
+                                        SourceLoc(), /*Implicit=*/true));
+  
+  // Start the function.
+  auto *Get = FuncDecl::create(P->Context, /*StaticLoc=*/SourceLoc(), GetLoc,
+                               Identifier(), GetLoc, /*GenericParams=*/nullptr,
+                               Type(), Params, Params,
+                               ElementTy.clone(P->Context),
+                               P->CurDeclContext);
+  if (StaticLoc.isValid())
+    Get->setStatic(true);
+  return Get;
+}
+
+/// createSetterFunc - This function creates the setter function (with no body)
+/// for a computed property or subscript.
+static FuncDecl *createSetterFunc(SourceLoc SetLoc, Identifier SetName,
+                                  SourceLoc SetNameLoc,
+                                  SourceRange SetNameParens, TypeLoc ElementTy,
+                                  Pattern *Indices, SourceLoc StaticLoc,
+                                  unsigned Flags, Parser *P) {
+  auto &Context = P->Context;
+  
+  // Create the parameter list(s) for the setter.
+  SmallVector<Pattern *, 3> Params;
+  
+  // Add the implicit 'self' to Params, if needed.
+  if (Flags & Parser::PD_HasContainerType)
+    Params.push_back(P->buildImplicitSelfParameter(SetLoc));
+  
+  // Add the index parameters, if necessary.
+  if (Indices)
+    Params.push_back(Indices->clone(Context, /*Implicit=*/true));
+  
+  bool IsNameImplicit = false;
+  // Add the parameter. If no name was specified, the name defaults to
+  // 'value'.
+  if (SetName.empty()) {
+    SetName = Context.getIdentifier("value");
+    SetNameLoc = SetLoc;
+    IsNameImplicit = true;
+  }
+  
+  {
+    VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
+                                           /*IsLet*/true,
+                                           SetNameLoc, SetName,
+                                           Type(), P->CurDeclContext);
+    if (IsNameImplicit)
+      Value->setImplicit();
+    
+    Pattern *ValuePattern
+      = new (Context) TypedPattern(new (Context) NamedPattern(Value),
+                                   ElementTy.clone(Context));
+    // The TypedPattern is always implicit because the ElementTy is not
+    // spelled inside the parameter list.  It comes from elsewhere, and its
+    // source location should be ignored.
+    ValuePattern->setImplicit();
+    
+    TuplePatternElt ValueElt(ValuePattern);
+    Pattern *ValueParamsPattern
+    = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
+                           SetNameParens.End);
+    if (IsNameImplicit)
+      ValueParamsPattern->setImplicit();
+    
+    Params.push_back(ValueParamsPattern);
+  }
+  
+  // Start the function.
+  Type SetterRetTy = TupleType::getEmpty(Context);
+  auto *Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
+                               Identifier(), SetLoc, /*generic=*/nullptr,Type(),
+                               Params, Params, TypeLoc::withoutLoc(SetterRetTy),
+                               P->CurDeclContext);
+  if (StaticLoc.isValid())
+    Set->setStatic(true);
+  else  // non-static setters default to @mutating.
+    Set->setMutating();
+  return Set;
+}
+
+
+
 /// \brief Parse a get-set clause, containing a getter and (optionally)
 /// a setter.
 ///
@@ -1130,13 +1231,15 @@ void Parser::addVarsToScope(Pattern *Pat,
 ///   set-name:
 ///     '(' identifier ')'
 /// \endverbatim
-bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
+bool Parser::parseGetSet(unsigned Flags, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc,
                          SourceLoc StaticLoc) {
   bool Invalid = false;
   Get = nullptr;
   Set = nullptr;
+  
+  bool isInProtocol = Flags & PD_InProtocol;
   
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof)) {
@@ -1164,41 +1267,26 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       if (Tok.isContextualKeyword("get")) {
         GetLoc = consumeToken();
 
-        if (Tok.isNot(tok::colon)) {
-          diagnose(Tok, diag::expected_colon_get);
-          Invalid = true;
-          break;
+        // Protocols don't allow the : because they also don't allow a body.
+        if (!isInProtocol) {
+          if (Tok.isNot(tok::colon)) {
+            diagnose(Tok, diag::expected_colon_get);
+            Invalid = true;
+            break;
+          }
+        
+          ColonLoc = consumeToken(tok::colon);
         }
-        ColonLoc = consumeToken(tok::colon);
       }
 
-      // Set up a function declaration for the getter and parse its body.
-      
-      // Create the parameter list(s) for the getter.
-      SmallVector<Pattern *, 3> Params;
-      
-      // Add the implicit 'self' to Params, if needed.
-      if (HasContainerType)
-        Params.push_back(buildImplicitSelfParameter(GetLoc));
+      // Set up a function declaration for the getter.
+      Get = createGetterFunc(GetLoc, ElementTy, Indices, StaticLoc, Flags,this);
+      if (Attributes.isValid())
+        Get->getMutableAttrs() = Attributes;
 
-      // Add the index clause if necessary.
-      if (Indices) {
-        Params.push_back(Indices->clone(Context, /*Implicit=*/true));
-      }
-      
-      // Add a no-parameters clause.
-      Params.push_back(TuplePattern::create(Context, SourceLoc(),
-                                            ArrayRef<TuplePatternElt>(),
-                                            SourceLoc(), /*hasVararg=*/false,
-                                            SourceLoc(), /*Implicit=*/true));
-
-      // Start the function.
-      Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), GetLoc,
-                             Identifier(), GetLoc, /*GenericParams=*/nullptr,
-                             Type(), Params, Params, ElementTy.clone(Context),
-                             CurDeclContext);
-      if (StaticLoc.isValid())
-        Get->setStatic(true);
+      // In a protocol, we just allow "get" by itself.
+      if (isInProtocol)
+        continue;
       
       Scope S(this, ScopeKind::FunctionBody);
 
@@ -1212,9 +1300,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
       BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                           Entries, Tok.getLoc());
       Get->setBody(Body);
-
-      if (Attributes.isValid())
-        Get->getMutableAttrs() = Attributes;
 
       LastValidLoc = Body->getRBraceLoc();
       continue;
@@ -1256,73 +1341,37 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
         if (Tok.is(tok::r_paren))
           consumeToken();
       }
+      
+      // Protocols don't take a name for the setter.  We parse it but reject it
+      // for good QoI.
+      if (isInProtocol) {
+        diagnose(SetNameLoc, diag::protocol_setter_name);
+        SetName = Identifier();
+        SetNameLoc = SourceLoc();
+        SetNameParens = SourceRange();
+      }
     }
-    if (Tok.isNot(tok::colon)) {
-      diagnose(Tok, diag::expected_colon_set);
-      Invalid = true;
-      break;
-    }
-    SourceLoc ColonLoc = consumeToken(tok::colon);
-
-    // Set up a function declaration for the setter and parse its body.
+    SourceLoc ColonLoc = Tok.getLoc();
     
-    // Create the parameter list(s) for the setter.
-    SmallVector<Pattern *, 3> Params;
+    if (!isInProtocol) {
+      if (Tok.isNot(tok::colon)) {
+        diagnose(Tok, diag::expected_colon_set);
+        Invalid = true;
+        break;
+      }
+      ColonLoc = consumeToken(tok::colon);
+    }
     
-    // Add the implicit 'self' to Params, if needed.
-    if (HasContainerType)
-      Params.push_back(buildImplicitSelfParameter(SetLoc));
+    // Set up a function declaration for the setter.
+    Set = createSetterFunc(SetLoc, SetName, SetNameLoc, SetNameParens,
+                           ElementTy, Indices, StaticLoc, Flags, this);
+    if (Attributes.isValid())
+      Set->getMutableAttrs() = Attributes;
 
-    // Add the index parameters, if necessary.
-    if (Indices)
-      Params.push_back(Indices->clone(Context, /*Implicit=*/true));
+    if (isInProtocol)
+      continue;
 
-    bool IsNameImplicit = false;
-    // Add the parameter. If no name was specified, the name defaults to
-    // 'value'.
-    if (SetName.empty()) {
-      SetName = Context.getIdentifier("value");
-      SetNameLoc = SetLoc;
-      IsNameImplicit = true;
-    }
-
-    {
-      VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
-                                             /*IsLet*/true,
-                                             SetNameLoc, SetName,
-                                             Type(), CurDeclContext);
-      if (IsNameImplicit)
-        Value->setImplicit();
-
-      Pattern *ValuePattern
-        = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                     ElementTy.clone(Context));
-      // The TypedPattern is always implicit because the ElementTy is not
-      // spelled inside the parameter list.  It comes from elsewhere, and its
-      // source location should be ignored.
-      ValuePattern->setImplicit();
-
-      TuplePatternElt ValueElt(ValuePattern);
-      Pattern *ValueParamsPattern
-        = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
-                               SetNameParens.End);
-      if (IsNameImplicit)
-        ValueParamsPattern->setImplicit();
-
-      Params.push_back(ValueParamsPattern);
-    }
-
-    // Start the function.
-    Type SetterRetTy = TupleType::getEmpty(Context);
-    Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
-                           Identifier(), SetLoc, /*generic=*/nullptr, Type(),
-                           Params, Params, TypeLoc::withoutLoc(SetterRetTy),
-                           CurDeclContext);
-    if (StaticLoc.isValid())
-      Set->setStatic(true);
-    else  // non-static setters default to @mutating.
-      Set->setMutating();
-
+    // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
     addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
 
@@ -1336,9 +1385,6 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
                                         Entries, Tok.getLoc());
     Set->setBody(Body);
 
-    if (Attributes.isValid())
-      Set->getMutableAttrs() = Attributes;
-
     LastValidLoc = Body->getRBraceLoc();
   }
   
@@ -1351,7 +1397,7 @@ bool Parser::parseGetSet(bool HasContainerType, Pattern *Indices,
 ///   decl-var:
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
-void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
+void Parser::parseDeclVarGetSet(Pattern &pattern, unsigned Flags,
                                 SourceLoc StaticLoc) {
   bool Invalid = false;
   
@@ -1389,7 +1435,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, bool HasContainerType,
   FuncDecl *Get = nullptr;
   FuncDecl *Set = nullptr;
   SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(HasContainerType, /*Indices=*/0, TyLoc,
+  if (parseGetSet(Flags, /*Indices=*/0, TyLoc,
                   Get, Set, LastValidLoc, StaticLoc))
     Invalid = true;
   
@@ -1480,8 +1526,7 @@ ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
       if (isLet)
         diagnose(Tok, diag::let_cannot_be_computed_property);
 
-      parseDeclVarGetSet(*pattern.get(), Flags & PD_HasContainerType,
-                         StaticLoc);
+      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc);
 
       if (isLet)
         return makeParserError();
@@ -2415,8 +2460,7 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
 ///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
 /// \endverbatim
-ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
-                                        bool NeedDefinition,
+ParserStatus Parser::parseDeclSubscript(unsigned Flags,
                                         DeclAttributes &Attributes,
                                         SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
@@ -2452,11 +2496,19 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
   SourceRange DefRange = SourceRange();
   FuncDecl *Get = nullptr;
   FuncDecl *Set = nullptr;
-  if (Tok.is(tok::l_brace))  {
+  if (Tok.isNot(tok::l_brace))  {
+    // Subscript declarations must always have at least a getter, so they need
+    // to be followed by a {.
+    if (!isInSILMode()) {
+      diagnose(Tok, diag::expected_lbrace_subscript);
+      Status.setIsParseError();
+    }
+    
+  } else {
     SourceLoc LBLoc = consumeToken();
     
     SourceLoc LastValidLoc = LBLoc;
-    if (parseGetSet(HasContainerType, Indices.get(), ElementTy.get(),
+    if (parseGetSet(Flags, Indices.get(),ElementTy.get(),
                     Get, Set, LastValidLoc, /*StaticLoc*/ SourceLoc()))
       Status.setIsParseError();
 
@@ -2472,30 +2524,33 @@ ParserStatus Parser::parseDeclSubscript(bool HasContainerType,
       RBLoc = LastValidLoc;
     }
 
-    if (!Get) {
-      if (Status.isSuccess())
-        diagnose(SubscriptLoc, diag::subscript_without_get);
-      Status.setIsParseError();
-    }
+    if (!Get && Status.isSuccess())
+      diagnose(SubscriptLoc, diag::subscript_without_get);
 
     DefRange = SourceRange(LBLoc, RBLoc);
-
-  } else  {
-    if (NeedDefinition && !isInSILMode()) {
-      diagnose(Tok, diag::expected_lbrace_subscript);
-      return makeParserError();
-    }
   }
 
   // Reject 'subscript' functions outside of type decls
-  if (!HasContainerType) {
+  if (!(Flags & PD_HasContainerType)) {
     diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
     Status.setIsParseError();
   }
 
+  // FIXME: We should build the declarations even if they are invalid.
   if (Status.isSuccess()) {
-    // FIXME: We should build the declarations even if they are invalid.
-
+    // If we had no getter (e.g., because we're in SIL mode or because the
+    // program isn't valid) create a stub here.
+    if (!Get) {
+      Get = createGetterFunc(SubscriptLoc, ElementTy.get(),
+                             Indices.get(), /*StaticLoc*/ SourceLoc(),
+                             Flags, this);
+     
+      if (!isInSILMode()) {
+        Get->setInvalid();
+        Get->setType(ErrorType::get(Context));
+      }
+    }
+    
     // Build an AST for the subscript declaration.
     SubscriptDecl *Subscript
       = new (Context) SubscriptDecl(Context.getIdentifier("subscript"),

@@ -1033,7 +1033,12 @@ struct ASTNodeBase {};
           }
           continue;
         }
-
+        
+        // If this is a getter/setter for a funcdecl, ignore it.
+        if (auto *FD = dyn_cast<FuncDecl>(member))
+          if (FD->isGetterOrSetter())
+            continue;
+        
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
             dumpRef(decl);

@@ -2511,6 +2511,7 @@ public:
                 DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy) {
+    assert(Get && "subscripts should always have at least a getter");
     setComputedAccessors(Braces.Start, Get, Set, Braces.End);
   }
   

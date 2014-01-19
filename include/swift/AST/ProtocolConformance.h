@@ -171,6 +171,11 @@ public:
       if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
           valueReq->isInvalid())
         continue;
+      
+      // If this is a getter/setter for a funcdecl, ignore it.
+      if (auto *FD = dyn_cast<FuncDecl>(valueReq))
+        if (FD->isGetterOrSetter())
+          continue;
 
       f(valueReq, getWitness(valueReq, resolver));
     }

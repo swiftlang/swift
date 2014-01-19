@@ -263,6 +263,8 @@ ERROR(expected_lbrace_protocol,decl_parsing,PointsToFirstBadToken,
       "expected '{' in protocol type", ())
 ERROR(expected_rbrace_protocol,decl_parsing,none,
       "expected '}' in protocol", ())
+ERROR(protocol_setter_name,decl_parsing,none,
+     "setter in a protocol cannot have a name", ())
 
 // Subscripting
 ERROR(subscript_decl_wrong_scope,decl_parsing,none,
@@ -276,7 +278,7 @@ ERROR(expected_type_subscript,type_parsing,PointsToFirstBadToken,
 ERROR(expected_lbrace_subscript,decl_parsing,PointsToFirstBadToken,
       "expected '{' for subscripting", ())
 ERROR(subscript_without_get,decl_parsing,none,
-      "subscripting must have a getter", ())
+      "subscript declarations must have a getter", ())
 ERROR(subscript_static,decl_parsing,none,
      "subscript cannot be marked 'type'", ())
 

@@ -1080,6 +1080,11 @@ namespace {
     void visitFuncDecl(FuncDecl *method) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(method)) return;
+      
+      // getters and setters funcdecls will be handled by their parent
+      // var/subscript.
+      if (method->isGetterOrSetter()) return;
+      
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
         if (method->getAttrs().isOptional())
