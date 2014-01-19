@@ -541,12 +541,38 @@ TypeConverter::~TypeConverter() {
   }
 }
 
+void TypeConverter::pushGenericContext(GenericSignature *signature) {
+  if (!signature)
+    return;
+  
+  // Push the generic context down to the SIL TypeConverter, so we can share
+  // archetypes with SIL.
+  IGM.SILMod->Types.pushGenericContext(signature->getGenericParams(),
+                                       signature->getRequirements());
+}
+
+void TypeConverter::popGenericContext(GenericSignature *signature) {
+  if (!signature)
+    return;
+
+  // Pop the SIL TypeConverter's generic context too.
+  IGM.SILMod->Types.popGenericContext(signature->getGenericParams(),
+                                      signature->getRequirements());
+  
+  Types.DependentCache.clear();
+}
+
+ArchetypeBuilder &TypeConverter::getArchetypes() {
+  return IGM.SILMod->Types.getArchetypes();
+}
+
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
-  assert(!Types.getCacheFor(key).count(key) && "entry already exists for type!");
-  Types.getCacheFor(key).insert(std::make_pair(key, type));
+  assert(!key->isDependentType());
+  assert(!Types.IndependentCache.count(key) && "entry already exists for type!");
+  Types.IndependentCache.insert(std::make_pair(key, type));
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -702,20 +728,25 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
 /// Profile the archetype constraints that may affect type layout into a
 /// folding set node ID.
 static void profileArchetypeConstraints(ArchetypeType *arch,
-                                        llvm::FoldingSetNodeID &ID) {
+                                        llvm::FoldingSetNodeID &ID,
+                                        unsigned depth = 0) {
   // Is the archetype class-constrained?
   ID.AddBoolean(arch->requiresClass());
+  
   // The archetype's superclass constraint.
   auto superclass = arch->getSuperclass();
-  ID.AddPointer(superclass ? superclass->getCanonicalType().getPointer()
-                           : nullptr);
+  auto superclassPtr = superclass ? superclass->getCanonicalType().getPointer()
+                                  : nullptr;
+  ID.AddPointer(superclassPtr);
+
   // The archetype's protocol constraints.
-  for (auto proto : arch->getConformsTo())
+  for (auto proto : arch->getConformsTo()) {
     ID.AddPointer(proto);
+  }
   
   // Recursively profile nested archetypes.
   for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(nested.second, ID);
+    profileArchetypeConstraints(nested.second, ID, depth + 1);
   }
 }
 
@@ -723,61 +754,68 @@ void ExemplarArchetype::Profile(llvm::FoldingSetNodeID &ID) const {
   profileArchetypeConstraints(Archetype, ID);
 }
 
-ArchetypeType *TypeConverter::Types_t::getExemplarArchetype(ArchetypeType *t) {
+ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Check the folding set to see whether we already have an exemplar matching
   // this archetype.
   llvm::FoldingSetNodeID ID;
   profileArchetypeConstraints(t, ID);
   void *insertPos;
   ExemplarArchetype *existing
-    = ExemplarArchetypes.FindNodeOrInsertPos(ID, insertPos);
-  if (existing)
+    = Types.ExemplarArchetypes.FindNodeOrInsertPos(ID, insertPos);
+  if (existing) {
     return existing->Archetype;
+  }
   
   // Otherwise, use this archetype as the exemplar for future similar
   // archetypes.
-  ExemplarArchetypeStorage.push_back({t});
-  ExemplarArchetypes.InsertNode(&ExemplarArchetypeStorage.back(), insertPos);
+  Types.ExemplarArchetypeStorage.push_back({t});
+  Types.ExemplarArchetypes.InsertNode(&Types.ExemplarArchetypeStorage.back(),
+                                      insertPos);
   return t;
+}
+
+/// Fold archetypes to unique exemplars. Any archetype with the same
+/// constraints is equivalent for type lowering purposes.
+CanType TypeConverter::getExemplarType(CanType contextTy) {
+  // FIXME: A generic SILFunctionType should not contain any nondependent
+  // archetypes.
+  if (isa<SILFunctionType>(contextTy)
+      && cast<SILFunctionType>(contextTy)->isPolymorphic())
+    return contextTy;
+  else
+    return CanType(contextTy.transform([&](Type t) -> Type {
+      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
+        return getExemplarArchetype(arch);
+      return t;
+    }));
 }
 
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
   auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
 
-  auto it = Cache.find(canonicalTy.getPointer());
-  if (it != Cache.end()) {
-    return it->second;
+  {
+    auto it = Cache.find(canonicalTy.getPointer());
+    if (it != Cache.end()) {
+      return it->second;
+    }
   }
   
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
   if (contextTy->isDependentType())
-    llvm_unreachable("dependent type lowering not implemented");
-  /*
-    contextTy = getArchetypes()->substDependentType(contextTy)
-                            ->getCanonicalType();
-   */
+    contextTy = getArchetypes().substDependentType(contextTy)
+                              ->getCanonicalType();
   
   // Fold archetypes to unique exemplars. Any archetype with the same
   // constraints is equivalent for type lowering purposes.
-  CanType exemplarTy;
-  // FIXME: A generic SILFunctionType should not contain any nondependent
-  // archetypes.
-  if (isa<SILFunctionType>(contextTy)
-      && cast<SILFunctionType>(contextTy)->isPolymorphic())
-    exemplarTy = contextTy;
-  else
-    exemplarTy = contextTy.transform([&](Type t) -> Type {
-      if (auto arch = dyn_cast<ArchetypeType>(t.getPointer()))
-        return Types.getExemplarArchetype(arch);
-      return t;
-    })->getCanonicalType();
+  CanType exemplarTy = getExemplarType(contextTy);
+  assert(!exemplarTy->isDependentType());
   
   // See whether we lowered a type equivalent to this one.
-  if (exemplarTy != contextTy) {
-    auto it = Cache.find(exemplarTy.getPointer());
-    if (it != Cache.end()) {
+  if (exemplarTy != canonicalTy) {
+    auto it = Types.IndependentCache.find(exemplarTy.getPointer());
+    if (it != Types.IndependentCache.end()) {
       // Record the object under the original type.
       auto result = it->second;
       Cache[canonicalTy.getPointer()] = result;
@@ -798,16 +836,15 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
 
   // Cache the entry under the original type and the exemplar type, so that
   // we can avoid relowering equivalent types.
-  auto insertEntry = [&](CanType ty) {
-    auto &entry = Cache[ty.getPointer()];
+  auto insertEntry = [&](TypeCacheEntry &entry) {
     assert(entry == TypeCacheEntry() ||
            (entry.is<llvm::Type*>() &&
             entry.get<llvm::Type*>() == convertedTI->getStorageType()));
     entry = convertedTI;
   };
-  insertEntry(canonicalTy);
-  if (exemplarTy != canonicalTy)
-    insertEntry(exemplarTy);
+  insertEntry(Cache[canonicalTy.getPointer()]);
+  if (canonicalTy != exemplarTy)
+    insertEntry(Types.IndependentCache[exemplarTy.getPointer()]);
   
   // If the type info hasn't been added to the list of types, do so.
   if (!convertedTI->NextConverted) {
@@ -821,7 +858,8 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
 /// A convenience for grabbing the TypeInfo for a class declaration.
 const TypeInfo &TypeConverter::getTypeInfo(ClassDecl *theClass) {
   // This type doesn't really matter except for serving as a key.
-  CanType theType = theClass->getDeclaredType()->getCanonicalType();
+  CanType theType
+    = getExemplarType(theClass->getDeclaredType()->getCanonicalType());
 
   // If we have generic parameters, use the bound-generics conversion
   // routine.  This does an extra level of caching based on the common
@@ -947,6 +985,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertTupleType(cast<TupleType>(ty));
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
+  case TypeKind::GenericFunction:
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
     return convertFunctionType(cast<SILFunctionType>(ty));
@@ -956,7 +995,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
     return convertProtocolCompositionType(cast<ProtocolCompositionType>(ty));
-  case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");
@@ -1053,7 +1091,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->is<UnboundGenericType>());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.getCacheFor(key);
+  auto &Cache = Types.IndependentCache;
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
@@ -1386,3 +1424,24 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
     return getPointerSize().getValueInBits();
   llvm_unreachable("impossible width value");
 }
+
+#ifndef NDEBUG
+CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const {
+  for (auto &mapping : Types.IndependentCache) {
+    if (auto fwd = mapping.second.dyn_cast<llvm::Type*>())
+      if (fwd == t)
+        return CanType(mapping.first);
+    if (auto *ti = mapping.second.dyn_cast<const TypeInfo *>())
+      if (ti->getStorageType() == t)
+        return CanType(mapping.first);
+  }
+  return CanType();
+}
+
+bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
+  for (auto &ea : Types.ExemplarArchetypeStorage)
+    if (ea.Archetype == arch) return true;
+  return false;
+}
+
+#endif

@@ -2784,6 +2784,8 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
 }
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
+  assert(isExemplarArchetype(archetype) && "lowering non-exemplary archetype");
+  
   // Compute layouts for the protocols we ascribe to.
   SmallVector<ProtocolEntry, 4> protocols;
   for (auto protocol : archetype->getConformsTo()) {

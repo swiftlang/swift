@@ -241,7 +241,8 @@ public:
 private:
   TypeConverter &Types;
   friend class TypeConverter;
-
+  friend class GenericContextScope;
+  
 //--- Globals ---------------------------------------------------------------
 public:
   llvm::Constant *getAddrOfGlobalString(StringRef utf8);

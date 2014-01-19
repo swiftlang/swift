@@ -21,7 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "IRGenModule.h"
 
 namespace llvm {
   class Constant;
@@ -53,7 +53,6 @@ namespace swift {
 
 namespace irgen {
   class Alignment;
-  class IRGenModule;
   class ProtocolInfo;
   class Size;
   class TypeInfo;
@@ -110,7 +109,7 @@ private:
   const TypeInfo *convertBuiltinObjCPointer();
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
-
+  
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
@@ -128,7 +127,30 @@ public:
   const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
 
+  /// Enter a generic context for lowering the parameters of a generic function
+  /// type.
+  void pushGenericContext(GenericSignature *signature);
+  
+  /// Exit a generic context.
+  void popGenericContext(GenericSignature *signature);
+
+  /// Get the ArchetypeBuilder for the current generic context. Fails if there
+  /// is no generic context.
+  ArchetypeBuilder &getArchetypes();
+  
 private:
+  // Debugging aids.
+#ifndef NDEBUG
+  bool isExemplarArchetype(ArchetypeType *arch) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+    CanType getTypeThatLoweredTo(llvm::Type *t) const LLVM_ATTRIBUTE_USED,
+    "only for use within the debugger");
+#endif
+
+  ArchetypeType *getExemplarArchetype(ArchetypeType *t);
+  CanType getExemplarType(CanType t);
+
   class Types_t {
     llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
     llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
@@ -136,35 +158,44 @@ private:
 
     llvm::ilist<ExemplarArchetype> ExemplarArchetypeStorage;
     llvm::FoldingSet<ExemplarArchetype> ExemplarArchetypes;
-    ArchetypeType *getExemplarArchetype(ArchetypeType *t);
     
     friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
     friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
                                                            NominalTypeDecl *D);
     friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
-    //friend void TypeConverter::popGenericContext();
+    friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
+    friend void TypeConverter::popGenericContext(GenericSignature *signature);
+    
+#ifndef DEBUG
+    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
+    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *) const;
+#endif
   };
   Types_t Types;
 };
 
-/*
 /// An RAII interface for entering a generic context for type conversion in
 /// a scope.
 class GenericContextScope {
   TypeConverter &TC;
+  GenericSignature *sig;
 public:
   GenericContextScope(TypeConverter &TC,
                       GenericSignature *sig)
-    : TC(TC)
+    : TC(TC), sig(sig)
   {
     TC.pushGenericContext(sig);
   }
   
+  GenericContextScope(IRGenModule &IGM,
+                      GenericSignature *sig)
+    : GenericContextScope(IGM.Types, sig)
+  {}
+  
   ~GenericContextScope() {
-    TC.popGenericContext();
+    TC.popGenericContext(sig);
   }
 };
- */
   
 } // end namespace irgen
 } // end namespace swift

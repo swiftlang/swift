@@ -741,7 +741,7 @@ namespace {
 }
 
 llvm::Type *SignatureExpansion::addIndirectResult() {
-  auto resultType = FnType->getResult().getSILType();
+  auto resultType = FnType->getInterfaceResult().getSILType();
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   addPointerParameter(resultTI.getStorageType());
   addIndirectReturnAttributes(IGM, Attrs);
@@ -751,7 +751,7 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
 llvm::Type *SignatureExpansion::expandResult() {
   // Handle the direct result type, checking for supposedly scalar
   // result types that we actually want to return indirectly.
-  auto resultType = FnType->getResult().getSILType();
+  auto resultType = FnType->getInterfaceResult().getSILType();
 
   // Fast-path the empty tuple type.
   if (auto tuple = resultType.getAs<TupleType>())
@@ -847,7 +847,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
 void SignatureExpansion::expandParameters() {
-  auto params = FnType->getParameters();
+  auto params = FnType->getInterfaceParameters();
 
   // Some CCs secretly rearrange the parameters.
   switch (FnType->getAbstractCC()) {
@@ -885,6 +885,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   if (signature.isValid())
     return signature;
 
+  GenericContextScope scope(IGM, FormalType->getGenericSignature());
   SignatureExpansion expansion(IGM, FormalType, explosionLevel);
   llvm::Type *resultType = expansion.expandResult();
   expansion.expandParameters();
