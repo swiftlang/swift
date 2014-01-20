@@ -51,6 +51,13 @@
       print(s)
     }
 
+* Objective-C instance variables are no longer imported at all; previously, they
+  would appear as vars within the imported class, but trying to access them
+  would cause a crash. Additionally, their names can conflict with property
+  names, which confuses the Swift compiler, and there are no patterns in our
+  frameworks that expect you to access a parent or other class's instance
+  variables directly. Use properties instead.
+
 
 2014-01-15
 ----------
