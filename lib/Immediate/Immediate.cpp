@@ -245,7 +245,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
   };
   std::for_each(Options.LinkLibraries.begin(), Options.LinkLibraries.end(),
                 addLinkLibrary);
-  M->forAllVisibleModules(Module::AccessPathTy(),
+  M->forAllVisibleModules({}, /*includePrivateTopLevel=*/true,
                           [&](Module::ImportedModule import) {
     import.second->collectLinkLibraries(addLinkLibrary);
   });
