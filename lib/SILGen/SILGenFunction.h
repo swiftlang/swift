@@ -625,10 +625,11 @@ public:
                                    unsigned uncurryLevel
                                  = SILDeclRef::ConstructAtNaturalUncurryLevel);
 
-  /// Produce an RValue for a reference to the specified declaration, with the
-  /// given type and in response to the specified epxression.  Try to emit into
-  /// the specified SGFContext to avoid copies (when provided).
-  RValue emitRValueForDecl(Expr *E, ConcreteDeclRef decl, SGFContext C);
+  /// Produce a singular RValue for a reference to the specified declaration,
+  /// with the given type and in response to the specified epxression.  Try to
+  /// emit into the specified SGFContext to avoid copies (when provided).
+  ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
+                                 SGFContext C = SGFContext());
 
 
   ManagedValue emitClosureValue(SILLocation loc,
@@ -694,7 +695,8 @@ public:
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
-  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src, SGFContext C);
+  ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
+                                SGFContext C);
   
   /// Emit a reference to a method from within another method of the type, and
   /// gather all the substitutions necessary to invoke it, without

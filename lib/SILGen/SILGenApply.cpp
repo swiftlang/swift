@@ -841,7 +841,8 @@ public:
 
     // Obtain a reference for a local closure.
     if (gen.LocalFunctions.count(constant)) {
-      ManagedValue localFn = gen.emitReferenceToDecl(e, e->getDeclRef());
+      ManagedValue localFn =
+        gen.emitRValueForDecl(e, e->getDeclRef(), e->getType());
       auto type = cast<AnyFunctionType>(e->getType()->getCanonicalType());
       setCallee(Callee::forIndirect(localFn, type, type, false, e));
 

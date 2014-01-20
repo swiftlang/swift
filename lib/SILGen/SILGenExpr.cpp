@@ -527,23 +527,20 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                       substLoweredFormalType);
 }
 
-RValue SILGenFunction::emitRValueForDecl(Expr *E, ConcreteDeclRef decl,
-                                         SGFContext C) {
-  Type ty = E->getType();
+ManagedValue SILGenFunction::
+emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty, SGFContext C){
   assert(!ty->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
   // Emit the reference to the decl.
-  ManagedValue Reference = emitReferenceToDecl(E, decl, ty, 0);
+  ManagedValue Reference = emitReferenceToDecl(loc, decl, ty, 0);
 
   // If it comes back as an LValue-style RValue, emit a load to get a real
   // RValue.
-  if (Reference.isLValue()) {
-    Reference = emitLoad(E, Reference.getUnmanagedValue(),
+  if (Reference.isLValue())
+    Reference = emitLoad(loc, Reference.getUnmanagedValue(),
                          getTypeLowering(ty), C, IsNotTake);
-    if (!Reference) return RValue();
-  }
-  return RValue(*this, E, Reference);
+  return Reference;
 }
 
 RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
@@ -552,21 +549,16 @@ RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  return SGF.emitRValueForDecl(E, E->getDeclRef(), C);
+  auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(), C);
+  if (!Val) return RValue();
+  return RValue(SGF, E, Val);
 }
 
 
 RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  auto Self = SGF.emitReferenceToDecl(E, E->getSelf());
-  
-  // In some constructors, 'self' is mutable (since super.init can replace
-  // self).  A super reference is an rvalue though, so perform a load.
-  if (Self.isLValue())
-    Self = SGF.emitLoad(E, Self.getUnmanagedValue(),
-                          SGF.getTypeLowering(E->getSelf()->getType()),
-                          SGFContext(), IsNotTake);
+  auto Self = SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getType());
 
   // Perform an upcast to convert self to the indicated super type.
   auto Result = SGF.B.createUpcast(E, Self.getValue(),
@@ -1270,7 +1262,10 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
             baseMeta->getEnumOrBoundGenericEnum()) &&
            "static stored properties for classes/protocols not implemented");
 
-    return SGF.emitRValueForDecl(E, E->getMember().getDecl(), C);
+    auto Val = SGF.emitRValueForDecl(E, E->getMember().getDecl(),
+                                     E->getType(), C);
+    if (!Val) return RValue();
+    return RValue(SGF, E, Val);
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
@@ -1799,7 +1794,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
     case CaptureKind::LocalFunction: {
       // SILValue is a constant such as a local func. Pass on the reference.
-      ManagedValue v = emitReferenceToDecl(loc, capture);
+      ManagedValue v = emitRValueForDecl(loc, capture, capture->getType());
       capturedArgs.push_back(v.forward(*this));
       break;
     }
@@ -3141,6 +3136,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
+  // We know that self is a box, so emitReferenceToDecl will always return an
+  // lvalue.
   SILValue selfAddr =
     SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
   newSelf.assignInto(SGF, E, selfAddr);

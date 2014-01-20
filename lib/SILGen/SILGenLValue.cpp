@@ -607,14 +607,11 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
   // Emit a reference to self.
   auto selfType = selfDecl->getType()->getLValueOrInOutObjectType()
                     ->getCanonicalType();
-  ManagedValue self = emitReferenceToDecl(loc, selfDecl);
-
-  // If 'self' is a let declaration but we got a boxed lvalue, load
-  // from it.
-  if (selfDecl->isLet() && self.isLValue()) {
-    self = emitLoad(loc, self.getUnmanagedValue(),
-                    getTypeLowering(selfType), SGFContext(), IsNotTake);
-  }
+  ManagedValue self;
+  if (selfDecl->getType()->hasReferenceSemantics())
+    self = emitRValueForDecl(loc, selfDecl, selfDecl->getType());
+  else
+    self = emitReferenceToDecl(loc, selfDecl);
 
   // Refer to 'self' as the base of the lvalue.
   lv.add<ValueComponent>(self, getUnsubstitutedTypeData(*this, selfType));
