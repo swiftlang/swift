@@ -87,7 +87,13 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   //        be const char* for type encoding.
   CHECK_CLANG_TYPE_MATCH(type, "CString", VoidPtrTy);
 #undef CHECK_CLANG_TYPE_MATCH
-
+  if (auto lookupTy = getNamedSwiftType(type->getDecl()->getDeclContext(),
+                                        "Selector"))
+    if (lookupTy->isEqual(type)) {
+      clang::QualType QT =
+        clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
+      return clangCtx.getCanonicalType(QT);
+    }
   // FIXME: Handle other structs resulting from imported non-struct Clang types.
   return clang::CanQualType();
 }
@@ -101,6 +107,15 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 }
 
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
+  if (auto lookupTy = getNamedSwiftType(type->getDecl()->getDeclContext(),
+                                        "DynamicLookup"))
+    if (lookupTy->isEqual(type)) {
+      auto const &clangCtx = getClangASTContext();
+      clang::QualType QT =
+        clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
+      QT = clangCtx.getObjCObjectPointerType(QT);
+      return clangCtx.getCanonicalType(QT);
+    }
   return clang::CanQualType();
 }
 
