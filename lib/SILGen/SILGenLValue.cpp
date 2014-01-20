@@ -599,26 +599,18 @@ LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
   return visitRec(e->getSubExpr());
 }
 
-LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
+LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
                                             VarDecl *ivar) {
   SILGenLValue sgl(*this);
   LValue lv;
   
-  // Emit a reference to self.
-  auto selfType = selfDecl->getType()->getLValueOrInOutObjectType()
-                    ->getCanonicalType();
-  ManagedValue self;
-  if (selfDecl->getType()->hasReferenceSemantics())
-    self = emitRValueForDecl(loc, selfDecl, selfDecl->getType());
-  else
-    self = emitReferenceToDecl(loc, selfDecl);
+  auto baseType = base.getType().getSwiftRValueType();
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add<ValueComponent>(self, getUnsubstitutedTypeData(*this, selfType));
+  lv.add<ValueComponent>(base, getUnsubstitutedTypeData(*this, baseType));
 
   auto origFormalType = getOrigFormalRValueType(ivar->getType());
-  auto substFormalType 
-    = selfDecl->getType()->getLValueOrInOutObjectType()->getCanonicalType();
+  auto substFormalType = ivar->getType()->getCanonicalType();
   LValueTypeData typeData = { origFormalType, substFormalType,
                               getLoweredType(origFormalType, substFormalType) };
 
@@ -626,7 +618,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
   SILType varStorageType =
     SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(ivar->getType()));
 
-  if (selfDecl->getType()->hasReferenceSemantics())
+  if (baseType->hasReferenceSemantics())
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
   else
     lv.add<StructElementComponent>(ivar, varStorageType, typeData);

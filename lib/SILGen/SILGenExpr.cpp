@@ -183,7 +183,9 @@ namespace {
     
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
-    RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C);
+    RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C) {
+      llvm_unreachable("cannot appear in rvalue");
+    }
     RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
     RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
@@ -543,10 +545,107 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty, SGFContext C){
   return Reference;
 }
 
-RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
-                                                 SGFContext C) {
-  llvm_unreachable("cannot appear in rvalue");
+static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
+  auto type = formalStorageType->getCanonicalType();
+  if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
+    type = ref.getReferentType();
+    if (isa<WeakStorageType>(ref))
+      type = OptionalType::get(type)->getCanonicalType();
+  }
+  return AbstractionPattern(type);
 }
+
+
+/// Produce a singular RValue for a load from the specified property.  This
+/// does not consume the base value, which is a struct or reference.
+ManagedValue SILGenFunction::
+emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
+                          VarDecl *FieldDecl,
+                          ArrayRef<Substitution> substitutions,
+                          Type propTy, SGFContext C) {
+
+  // If this is a get-only computed property being accessed, call the getter.
+  switch (FieldDecl->getStorageKind()) {
+  case VarDecl::Computed: {
+    RValueSource baseRV = prepareAccessorBaseArg(loc, base,
+                                                 FieldDecl->getGetter());
+    return emitGetAccessor(loc, FieldDecl, substitutions,
+                           std::move(baseRV), RValueSource(), C);
+  }
+  case VarDecl::Stored:
+    break;
+  }
+
+  // For static variables, emit a reference to the global variable backing
+  // them.
+  // FIXME: This has to be dynamically looked up for classes, and
+  // dynamically instantiated for generics.
+  if (FieldDecl->isStatic()) {
+    auto baseMeta = base.getType().getSwiftRValueType()->castTo<MetatypeType>()
+    ->getInstanceType(); (void)baseMeta;
+    assert(!baseMeta->is<BoundGenericType>() &&
+           "generic static stored properties not implemented");
+    assert((baseMeta->getStructOrBoundGenericStruct() ||
+            baseMeta->getEnumOrBoundGenericEnum()) &&
+           "static stored properties for classes/protocols not implemented");
+
+    return emitRValueForDecl(loc, FieldDecl, propTy, C);
+  }
+
+  // If the base is a reference type, just handle this as loading the lvalue.
+  if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
+    LValue LV = emitDirectIVarLValue(loc, base, FieldDecl);
+    return emitLoadOfLValue(loc, LV, C);
+  }
+
+  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
+  // decl member, and when the base is a (non-lvalue) struct.
+  assert(base.getType().getSwiftRValueType()->getAnyNominal() &&
+         "The base of an rvalue MemberRefExpr should be an rvalue value");
+
+  // If the accessed field is stored, emit a StructExtract on the base.
+
+  // Check for an abstraction difference.
+  bool hasAbstractionChange = false;
+  auto substFormalType = propTy->getCanonicalType();
+  AbstractionPattern origFormalType;
+  if (substFormalType->is<AnyFunctionType>() ||
+      substFormalType->is<TupleType>() ||
+      substFormalType->is<MetatypeType>()) {
+    origFormalType = getOrigFormalRValueType(FieldDecl->getType());
+    hasAbstractionChange = origFormalType.getAsType() != substFormalType;
+  }
+
+  auto &lowering = getTypeLowering(propTy);
+  ManagedValue Result;
+  if (!base.getType().isAddress()) {
+    // For non-address-only structs, we emit a struct_extract sequence.
+    SILValue ElementVal =B.createStructExtract(loc, base.getValue(), FieldDecl);
+
+    // Emit a copyvalue to +1 the returned element, since the entire aggregate
+    // will be destroyed.
+    ElementVal = lowering.emitCopyValue(B, loc, ElementVal);
+
+    Result = emitManagedRValueWithCleanup(ElementVal);
+  } else {
+    // For address-only sequences, the base is in memory.  Emit a
+    // struct_element_addr to get to the field, and then load the element as an
+    // rvalue.
+    SILValue ElementPtr =
+      B.createStructElementAddr(loc, base.getValue(), FieldDecl);
+
+    Result = emitLoad(loc, ElementPtr, lowering,
+                      hasAbstractionChange ? SGFContext() : C, IsNotTake);
+  }
+
+  // If we're accessing this member with an abstraction change, perform that
+  // now.
+  if (hasAbstractionChange)
+    Result = emitOrigToSubstValue(loc, Result, origFormalType,
+                                  substFormalType, C);
+  return Result;
+}
+
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(), C);
@@ -1205,18 +1304,11 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                          methodTy, subs);
 }
 
-static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
-  auto type = formalStorageType->getCanonicalType();
-  if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
-    type = ref.getReferentType();
-    if (isa<WeakStorageType>(ref))
-      type = OptionalType::get(type)->getCanonicalType();
-  }
-  return AbstractionPattern(type);
-}
-
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                          SGFContext C) {
+
+
+
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
@@ -1230,95 +1322,17 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                       SGF.getLoweredLoadableType(E->getType())),
                                ManagedValue::Unmanaged));
   }
-  
-  // If this is a get-only computed property being accessed, call the getter.
+
+
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
-  switch (FieldDecl->getStorageKind()) {
-  case VarDecl::Computed: {
-    ManagedValue base
-      = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
-    RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base,
-                                                     FieldDecl->getGetter());
-    ManagedValue MV =
-      SGF.emitGetAccessor(E, FieldDecl,
-                          E->getMember().getSubstitutions(),
-                          std::move(baseRV), RValueSource(), C);
-    return MV ? RValue(SGF, E, MV) : RValue();
-  }
-  case VarDecl::Stored:
-    break;
-  }
-
-  // For static variables, emit a reference to the global variable backing
-  // them.
-  // FIXME: This has to be dynamically looked up for classes, and
-  // dynamically instantiated for generics.
-  if (FieldDecl->isStatic()) {
-    auto baseMeta = E->getBase()->getType()->castTo<MetatypeType>()
-                            ->getInstanceType(); (void)baseMeta;
-    assert(!baseMeta->is<BoundGenericType>() &&
-           "generic static stored properties not implemented");
-    assert((baseMeta->getStructOrBoundGenericStruct() ||
-            baseMeta->getEnumOrBoundGenericEnum()) &&
-           "static stored properties for classes/protocols not implemented");
-
-    auto Val = SGF.emitRValueForDecl(E, E->getMember().getDecl(),
-                                     E->getType(), C);
-    if (!Val) return RValue();
-    return RValue(SGF, E, Val);
-  }
-
-  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
-  // decl member, and when the base is a struct.
-  assert(isa<StructDecl>(E->getBase()->getType()->getAnyNominal()) &&
-         "The base of an rvalue MemberRefExpr should be an rvalue value");
-
-  // If the accessed field is stored, emit a StructExtract on the base.
 
   // Evaluate the base of the member reference.
-  ManagedValue base = visit(E->getBase()).getAsSingleValue(SGF, E->getBase());
-
-  // Check for an abstraction difference.
-  bool hasAbstractionChange = false;
-  auto substFormalType = E->getType()->getRValueType()->getCanonicalType();
-  AbstractionPattern origFormalType;
-  if (substFormalType->is<AnyFunctionType>() ||
-      substFormalType->is<TupleType>() ||
-      substFormalType->is<MetatypeType>()) {
-    origFormalType = getOrigFormalRValueType(FieldDecl->getType());
-    hasAbstractionChange = origFormalType.getAsType() != substFormalType;
-  }
-
-  // For non-address-only structs, we emit a struct_extract sequence.
-  auto &lowering = SGF.getTypeLowering(E->getType());
-  ManagedValue Result;
-  if (!base.getType().isAddress()) {
-    SILValue ElementVal =
-      SGF.B.createStructExtract(E, base.getValue(), FieldDecl);
-
-    // Emit a copyvalue to +1 the returned element, since the entire aggregate
-    // will be destroyed.
-    ElementVal = lowering.emitCopyValue(SGF.B, E, ElementVal);
-
-    Result = SGF.emitManagedRValueWithCleanup(ElementVal);
-  } else {
-    // For address-only sequences, the base is in memory.  Emit a
-    // struct_element_addr to get to the field, and then load the element as an
-    // rvalue.
-    SILValue ElementPtr =
-      SGF.B.createStructElementAddr(E, base.getValue(), FieldDecl);
-    
-    Result = SGF.emitLoad(E, ElementPtr, lowering,
-                          hasAbstractionChange ? SGFContext() : C, IsNotTake);
-  }
-
-  // If we're accessing this member with an abstraction change, perform that
-  // now.
-  if (hasAbstractionChange)
-    Result = SGF.emitOrigToSubstValue(E, Result, origFormalType,
-                                      substFormalType, C);
-
-  return (Result ? RValue(SGF, E, Result) : RValue());
+  ManagedValue base = SGF.emitRValue(E->getBase())
+    .getAsSingleValue(SGF, E->getBase());
+  ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
+                                             E->getMember().getSubstitutions(),
+                                                   E->getType(), C);
+  return res ? RValue(SGF, E, res) : RValue();
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
@@ -2684,7 +2698,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // method.
   if (NeedsBoxForSelf) {
     // Emit the call to super.init() right before exiting from the initializer.
-    if (Expr* SI = ctor->getSuperInitCall())
+    if (Expr *SI = ctor->getSuperInitCall())
       emitIgnoredRValue(SI);
 
     selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].getAddress());
@@ -2728,7 +2742,13 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     auto named = cast<NamedPattern>(pattern);
     // Form the lvalue referencing this member.
     SILLocation loc = pattern;
-    LValue memberRef = SGF.emitDirectIVarLValue(loc, selfDecl, named->getDecl());
+    ManagedValue self;
+    if (selfDecl->getType()->hasReferenceSemantics())
+      self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType());
+    else
+      self = SGF.emitReferenceToDecl(loc, selfDecl);
+
+    LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 
     // Assign to it.
     SGF.emitAssignToLValue(loc, {loc, std::move(src)}, memberRef);

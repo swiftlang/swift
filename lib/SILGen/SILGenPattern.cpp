@@ -145,90 +145,6 @@ namespace {
     = std::vector<std::pair<SILBasicBlock*, std::vector<SILValue>>>;
 }
 
-/// Load a computed property from a reference type.
-static SILValue emitGetComputedPropertyFromRefTypeRValue(SILGenFunction &gen,
-                                                         SILLocation loc,
-                                                         SILValue aggregate,
-                                                         VarDecl *property,
-                                                         CanType propTy) {
-  // FIXME: class, class archetype, and class protocol type properties
-  llvm_unreachable("not implemented");
-}
-
-/// Load a stored property from a reference type (in other words a class).
-static SILValue emitGetStoredPropertyFromRefTypeRValue(SILGenFunction &gen,
-                                                       SILLocation loc,
-                                                       SILValue aggregate,
-                                                       VarDecl *property,
-                                                       CanType propTy) {
-  assert(aggregate.getType().getClassOrBoundGenericClass());
-  auto &propTL = gen.getTypeLowering(propTy);
-  SILValue addr = gen.B.createRefElementAddr(loc, aggregate, property,
-                                     propTL.getLoweredType().getAddressType());
-  return gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake).forward(gen);
-}
-
-/// Load a computed property from a value type.
-static SILValue emitGetComputedPropertyFromValueTypeRValue(SILGenFunction &gen,
-                                                           SILLocation loc,
-                                                           SILValue aggregate,
-                                                           VarDecl *property,
-                                                           CanType propTy) {
-  // FIXME: struct, archetype, and protocol type properties
-  llvm_unreachable("not implemented");
-}
-
-/// Load a stored property from a value type (in other words a struct).
-static SILValue emitGetStoredPropertyFromValueTypeRValue(SILGenFunction &gen,
-                                                         SILLocation loc,
-                                                         SILValue aggregate,
-                                                         VarDecl *property,
-                                                         CanType substPropTy) {
-  assert(aggregate.getType().getStructOrBoundGenericStruct());
-
-  auto origPropTy = AbstractionPattern(property->getType()->getCanonicalType());
-  auto &propTL = gen.getTypeLowering(origPropTy, substPropTy);
-
-  ManagedValue result;
-  if (aggregate.getType().isAddress()) {
-    // Load from an address-only struct.
-    SILValue addr = gen.B.createStructElementAddr(loc, aggregate, property,
-                                      propTL.getLoweredType().getAddressType());
-    result = gen.emitLoad(loc, addr, propTL, SGFContext(), IsNotTake);
-  } else {
-    // Extract from a loadable struct.
-    SILValue field = gen.B.createStructExtract(loc, aggregate, property,
-                                               propTL.getLoweredType());
-    // FIXME: Make unowned field strong.
-    auto value = gen.B.emitCopyValueOperation(loc, field);
-    result = gen.emitManagedRValueWithCleanup(value, propTL);
-  }
-
-  result = gen.emitOrigToSubstValue(loc, result, origPropTy, substPropTy);
-  return result.forward(gen);
-}
-
-/// Load a property from a struct or class rvalue as an independent rvalue.
-/// Does not consume the source aggregate.
-static SILValue emitGetPropertyFromRValue(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          SILValue aggregate,
-                                          VarDecl *property,
-                                          CanType propTy) {
-  if (aggregate.getType().hasReferenceSemantics()) {
-    if (property->hasAccessorFunctions())
-      return emitGetComputedPropertyFromRefTypeRValue(gen, loc, aggregate,
-                                                      property, propTy);
-    return emitGetStoredPropertyFromRefTypeRValue(gen, loc, aggregate,
-                                                  property, propTy);
-  }
-  
-  if (property->hasAccessorFunctions())
-    return emitGetComputedPropertyFromValueTypeRValue(gen, loc, aggregate,
-                                                      property, propTy);
-  return emitGetStoredPropertyFromValueTypeRValue(gen, loc, aggregate,
-                                                  property, propTy);
-}
 
 /// Emit a conditional branch testing if a value matches one of the given
 /// pattern nodes.
@@ -465,9 +381,15 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     std::vector<SILValue> destructured;
     
     for (auto &elt : np->getElements()) {
-      destructured.push_back(emitGetPropertyFromRValue(gen, loc, v,
-                           elt.getProperty(),
-                           elt.getSubPattern()->getType()->getCanonicalType()));
+      ManagedValue MV = ManagedValue::forUnmanaged(v);
+      auto Val = gen.emitRValueForPropertyLoad(loc, MV, elt.getProperty(),
+                                               // FIXME: No generic substitions.
+                                               {},
+                                               elt.getSubPattern()->getType(),
+                                               // TODO: Avoid copies on
+                                               // address-only types.
+                                               SGFContext());
+      destructured.push_back(Val.forward(gen));
     }
     
     // Carry the aggregate forward. It may be needed to match against other

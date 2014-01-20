@@ -631,6 +631,12 @@ public:
   ManagedValue emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty,
                                  SGFContext C = SGFContext());
 
+  /// Produce a singular RValue for a load from the specified property.
+  ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
+                                         VarDecl *property,
+                                         ArrayRef<Substitution> substitutions,
+                                         Type propTy, SGFContext C);
+
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
@@ -694,7 +700,7 @@ public:
                                 const LValue &src, const LValue &dest);
   void emitCopyLValueInto(SILLocation loc, const LValue &src,
                           Initialization *dest);
-  ManagedValue emitAddressOfLValue(SILLocation loc, LValue const &src);
+  ManagedValue emitAddressOfLValue(SILLocation loc, const LValue &src);
   ManagedValue emitLoadOfLValue(SILLocation loc, const LValue &src,
                                 SGFContext C);
   
@@ -932,7 +938,7 @@ public:
 
   /// Emit an lvalue that directly refers to the given instance
   /// variable (without going through getters or setters).
-  LValue emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl, VarDecl *ivar);
+  LValue emitDirectIVarLValue(SILLocation loc, ManagedValue base, VarDecl *var);
 
   /// Build an identity substitution map for the given generic parameter list.
   ArrayRef<Substitution>
