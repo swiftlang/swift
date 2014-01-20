@@ -719,6 +719,21 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     }
   }
 
+  if (C.getArgs().hasArg(options::OPT_serialize_diagnostics) &&
+      isa<CompileJobAction>(JA)) {
+    // Put the serialized diagnostics next to the primary output file.
+    llvm::SmallString<128> Path;
+    if (Output->getPrimaryOutputType() != types::TY_Nothing)
+      Path = Output->getPrimaryOutputFilename();
+    else if (!Output->getBaseInput().empty())
+      Path = llvm::sys::path::stem(Output->getBaseInput());
+    else
+      Path = OI.ModuleName;
+
+    llvm::sys::path::replace_extension(Path, "dia");
+    Output->setAdditionalOutputForType(types::TY_SerializedDiagnostics, Path);
+  }
+
   if (DriverPrintBindings) {
     llvm::outs() << "# \"" << T->getToolChain().getTripleString() << '"'
                  << " - \"" << T->getName()

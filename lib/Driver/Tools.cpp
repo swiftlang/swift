@@ -166,10 +166,12 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back(ModuleOutputPath->data());
   }
 
-  if (Args.hasArg(options::OPT_serialize_diagnostics)) {
+  Optional<StringRef> SerializedDiagnosticsPath =
+    Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
+  if (SerializedDiagnosticsPath) {
     Arguments.push_back("-serialize-diagnostics");
-    // TODO: pass -serialized-diagnostics-path with user-specified path,
-    // if present. (This requires an output file map.)
+    Arguments.push_back("-serialized-diagnostics-path");
+    Arguments.push_back(SerializedDiagnosticsPath->data());
   }
 
   // Add the output file argument if necessary.
