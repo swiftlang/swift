@@ -358,7 +358,7 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
 static bool isGlobalLazilyInitialized(VarDecl *var) {
   assert(!var->getDeclContext()->isLocalContext() &&
          "not a global variable!");
-  assert(!var->isComputed() &&
+  assert(var->hasStorage() &&
          "not a stored global variable!");
 
   // Imports from C are never lazily initialized.
@@ -458,9 +458,7 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                .copyUnmanaged(*this, loc);
     }
 
-    if (var->isComputed()) {
-      assert(!var->getSetter() &&
-             "computed lvalue decls are handled by lvalue machinery");
+    if (var->hasAccessorFunctions()) {
       // Global properties have no base or subscript.
       return emitGetAccessor(loc, var,
                              ArrayRef<Substitution>(), RValueSource(),
@@ -1247,7 +1245,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   
   // If this is a get-only computed property being accessed, call the getter.
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
-  if (FieldDecl->isComputed()) {
+  switch (FieldDecl->getStorageKind()) {
+  case VarDecl::Computed: {
     ManagedValue base
       = SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
     RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base,
@@ -1257,6 +1256,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                           E->getMember().getSubstitutions(),
                           std::move(baseRV), RValueSource(), C);
     return MV ? RValue(SGF, E, MV) : RValue();
+  }
+  case VarDecl::Stored:
+    break;
   }
 
   // For static variables, emit a reference to the global variable backing
@@ -1283,11 +1285,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   // If the accessed field is stored, emit a StructExtract on the base.
 
   // Evaluate the base of the member reference.
-  ManagedValue base =
-    visit(E->getBase()).getAsSingleValue(SGF, E->getBase());
-
-  assert(!FieldDecl->isComputed() &&
-         "Don't handle computed rvalue memberrefs yet");
+  ManagedValue base = visit(E->getBase()).getAsSingleValue(SGF, E->getBase());
 
   // Check for an abstraction difference.
   bool hasAbstractionChange = false;
@@ -2715,7 +2713,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 /// Emit a member initialization for the members described in the
 /// given pattern from the given source value.
 static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, 
-                           Pattern* pattern, RValue &&src) {
+                           Pattern *pattern, RValue &&src) {
   switch (pattern->getKind()) {
   case PatternKind::Paren:
     return emitMemberInit(SGF, selfDecl, 
@@ -2833,10 +2831,7 @@ void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
                                                 ClassDecl *cd,
                                                 RegularLocation loc,
                                                 CleanupLocation cleanupLoc) {
-  for (Decl *member : cd->getMembers()) {
-    VarDecl *vd = dyn_cast<VarDecl>(member);
-    if (!vd || vd->isComputed()) continue;
-
+  for (VarDecl *vd : cd->getStoredProperties()) {
     const TypeLowering &ti = getTypeLowering(vd->getType());
     if (!ti.isTrivial()) {
       SILValue addr = B.createRefElementAddr(

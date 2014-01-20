@@ -440,7 +440,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isComputed())
+      if (!cast<VarDecl>(member)->hasStorage())
         // Getter/setter will be handled separately.
         continue;
       // FIXME: Will need an implementation here for resilience

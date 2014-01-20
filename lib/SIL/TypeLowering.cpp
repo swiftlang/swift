@@ -117,14 +117,16 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
 
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
-    if (var->isComputed())
+    switch (var->getStorageKind()) {
+    case VarDecl::Computed:
       return var->getSetter()
-         ? CaptureKind::GetterSetter : CaptureKind::Getter;
+        ? CaptureKind::GetterSetter : CaptureKind::Getter;
+    case VarDecl::Stored:
+      if (var->isLet())
+        return CaptureKind::Constant;
 
-    if (var->isLet())
-      return CaptureKind::Constant;
-
-    return CaptureKind::Box;
+      return CaptureKind::Box;
+    }
   }
   
   // "Captured" local typealiases require no context.
@@ -1756,7 +1758,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (asd->isComputed()) {
+    if (asd->hasAccessorFunctions()) {
       FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
         ? asd->getGetter()
         : asd->getSetter();
@@ -1788,7 +1790,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
-    assert(!var->isComputed() && "constant ref to computed global var");
+    assert(!var->hasAccessorFunctions() &&
+           "constant ref to computed global var");
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
@@ -1835,7 +1838,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (asd->isComputed()) {
+    if (asd->hasAccessorFunctions()) {
       FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
         ? asd->getGetter()
         : asd->getSetter();
@@ -1864,7 +1867,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
-    assert(!var->isComputed() && "constant ref to computed global var");
+    assert(!var->hasAccessorFunctions() &&
+           "constant ref to computed global var");
     return getGlobalAccessorType(var->getType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:

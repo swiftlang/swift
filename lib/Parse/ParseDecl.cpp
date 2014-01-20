@@ -1081,7 +1081,7 @@ namespace {
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
         
-        if (VD->isComputed()) {
+        if (VD->hasAccessorFunctions()) {
           // Add getter & setter in source order.
           FuncDecl* Accessors[2] = {VD->getGetter(), VD->getSetter()};
           if (Accessors[0] && Accessors[1] &&

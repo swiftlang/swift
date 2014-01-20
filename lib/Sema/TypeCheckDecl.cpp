@@ -2470,16 +2470,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    for (auto member : decl->getMembers()) {
-      auto var = dyn_cast<VarDecl>(member);
-      if (!var)
-        continue;
-
-      // Computed and static properties are not initialized.
-      if (var->isComputed())
-        continue;
-      if (var->isStatic())
-        continue;
+    // Computed and static properties are not initialized.
+    for (auto var : decl->getStoredProperties()) {
       tc.validateDecl(var);
 
       auto varType = tc.getTypeOfRValue(var);
@@ -2550,7 +2542,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto var = dyn_cast<VarDecl>(member))
-      if (!var->isComputed() && !var->isStatic())
+      if (var->hasStorage() && !var->isStatic())
         FoundInstanceVar = true;
   }
 
@@ -2668,7 +2660,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     patternBind->getPattern()->collectVariables(variables);
 
     for (auto var : variables) {
-      if (var->isStatic() || var->isComputed() || var->isInvalid())
+      if (var->isStatic() || !var->hasStorage() || var->isInvalid())
         continue;
 
       // Otherwise, there is a stored ivar without an initializer.  We can't
@@ -3061,7 +3053,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     auto *ED = dyn_cast<ExtensionDecl>(D);
     auto *VD = dyn_cast<VarDecl>(D);
 
-    if ((!AFD && !ED & !VD) || (VD && !VD->isComputed())) {
+    if ((!AFD && !ED & !VD) || (VD && VD->hasStorage())) {
       TC.diagnose(Attrs.getLoc(AK_transparent), diag::transparent_not_valid);
       D->getMutableAttrs().clearAttribute(AK_transparent);
 

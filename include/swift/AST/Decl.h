@@ -2325,6 +2325,18 @@ public:
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
+public:
+  enum StorageKindTy {
+    /// Stored - There are bits stored in memory for this object, and they are
+    /// accessed directly.
+    Stored,
+
+    /// Computed - There is no memory associated with this decl anywhere.  It is
+    /// accessed by calling a getter and setter.  If the setter is absent, then
+    /// the value is only loadable, but not storable.
+    Computed
+  };
+private:
   AbstractStorageDecl *OverriddenDecl = nullptr;
 
   struct GetSetRecord {
@@ -2341,20 +2353,23 @@ protected:
   }
 public:
 
-  AbstractStorageDecl *getOverriddenDecl() const {
-    return OverriddenDecl;
-  }
-  void setOverriddenDecl(AbstractStorageDecl *over) {
-    OverriddenDecl = over;
-  }
-  
   /// \brief Determine whether this variable is computed, which means it
   /// has no storage but does have a user-defined getter or setter.
   ///
-  /// The opposite of "computed" is "stored".
-  bool isComputed() const { return GetSetInfo != nullptr; }
-  
-  
+  StorageKindTy getStorageKind() const {
+    return GetSetInfo ? Computed : Stored;
+  }
+
+  /// \brief Return true if this is a VarDecl that has storage associated with
+  /// it.
+  bool hasStorage() const {
+    return getStorageKind() == Stored;
+  }
+
+  bool hasAccessorFunctions() const {
+    return getStorageKind() == Computed;
+  }
+
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void setComputedAccessors(SourceLoc LBraceLoc,
                             FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
@@ -2382,7 +2397,13 @@ public:
   /// setters for Objective-C.
   bool usesObjCGetterAndSetter() const;
   
-  
+  AbstractStorageDecl *getOverriddenDecl() const {
+    return OverriddenDecl;
+  }
+  void setOverriddenDecl(AbstractStorageDecl *over) {
+    OverriddenDecl = over;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -3474,7 +3495,7 @@ inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
 }
 
 inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
-  return !vd->isStatic() && !vd->isComputed();
+  return !vd->isStatic() && vd->hasStorage();
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {

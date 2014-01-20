@@ -96,25 +96,21 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            && "can only create destroyer/deallocator SILDeclRef for dtor");
     naturalUncurryLevel = 0;
   } else if (isa<ClassDecl>(vd)) {
-    assert((kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer)
-           && "can only create ivar initializer/destroyer SILDeclRef for class");
+    assert((kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer) &&
+           "can only create ivar initializer/destroyer SILDeclRef for class");
     naturalUncurryLevel = 1;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-    assert((kind == Kind::Getter
-            || kind == Kind::Setter
-            || kind == Kind::GlobalAccessor)
-           && "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
-              "SILDeclRef for var");
-    
-    bool isGlobal = kind == Kind::GlobalAccessor;
-    
-    assert(!(isGlobal && var->isComputed())
-           && "can't reference computed var as global var");
-    assert(!(isGlobal && var->getDeclContext()->isLocalContext())
-           && "can't reference local var as global var");
-    
-    if (isGlobal) {
+    assert((kind == Kind::Getter || kind == Kind::Setter ||
+            kind == Kind::GlobalAccessor) &&
+           "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
+           "SILDeclRef for var");
+
+    if (kind == Kind::GlobalAccessor) {
       naturalUncurryLevel = 0;
+      assert(!var->getDeclContext()->isLocalContext() &&
+             "can't reference local var as global var");
+      assert(var->hasStorage() && "can't reference computed var as global var");
+
     } else {
       // Member computed vars have a 'self' curry.
       // FIXME: What about static vars?

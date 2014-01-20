@@ -736,7 +736,7 @@ struct ASTNodeBase {};
       // a computed property.
       if (E->getBase()->getType()->is<InOutType>()) {
         VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-        if (!VD || !VD->isComputed()) {
+        if (!VD || !VD->hasAccessorFunctions()) {
           Out << "member_ref_expr on value of @inout type\n";
           E->dump(Out);
           abort();

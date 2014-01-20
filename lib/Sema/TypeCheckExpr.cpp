@@ -402,7 +402,7 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
 
   // If the base is an rvalue, then we only produce an lvalue if the vardecl
   // is a computed property, whose setter is @!mutating.
-  return VD->isComputed() && !VD->getSetter()->isMutating();
+  return VD->getSetter() && !VD->getSetter()->isMutating();
 }
 
 /// doesSubscriptDeclProduceLValue - Return true if a reference to the specified

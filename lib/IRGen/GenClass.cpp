@@ -219,7 +219,7 @@ namespace {
 
         // Skip properties that we have to access logically.
         assert(isClassResilient || !IGM.isResilient(var, Resilience));
-        if (var->isComputed())
+        if (!var->hasStorage())
           continue;
 
         // Adjust based on the type of this field.
@@ -248,7 +248,7 @@ namespace {
     }
 
     void adjustAccessAfterField(VarDecl *var, SILType classType) {
-      if (var->isComputed()) return;
+      if (!var->hasStorage()) return;
 
       SILType fieldType = classType.getFieldType(var, *IGM.SILMod);
       switch (IGM.classifyTypeSize(fieldType, ResilienceScope::Local)) {
@@ -446,7 +446,7 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
 llvm::Constant *irgen::tryEmitClassConstantFragileFieldOffset(IRGenModule &IGM,
                                                             ClassDecl *theClass,
                                                             VarDecl *field) {
-  assert(!field->isComputed());
+  assert(field->hasStorage());
   // FIXME: This field index computation is an ugly hack.
   auto &ti = getSelfTypeInfo(IGM, theClass);
 
@@ -681,7 +681,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
       emitClassDecl(cast<ClassDecl>(member));
       continue;
     case DeclKind::Var:
-      if (cast<VarDecl>(member)->isComputed())
+      if (!cast<VarDecl>(member)->hasStorage())
         // Getter/setter will be handled separately.
         continue;
       // FIXME: Will need an implementation here for resilience
@@ -1238,10 +1238,16 @@ namespace {
   public:
     /// Variables might be stored or computed.
     void visitVarDecl(VarDecl *var) {
-      if (isBuildingProtocol() || var->isComputed()) {
+      switch (var->getStorageKind()) {
+      case VarDecl::Stored:
+        if (!isBuildingProtocol()) {
+          visitStoredVar(var);
+          break;
+        }
+        // FALLTHROUGH
+      case VarDecl::Computed:
         visitProperty(var);
-      } else {
-        visitStoredVar(var);
+        break;
       }
     }
 

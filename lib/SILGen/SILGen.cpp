@@ -250,7 +250,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
      (isa<ConstructorDecl>(d) ||
       isa<EnumElementDecl>(d) ||
       (isa<AbstractStorageDecl>(d) &&
-         cast<AbstractStorageDecl>(d)->isComputed()) ||
+       cast<AbstractStorageDecl>(d)->hasAccessorFunctions()) ||
       (isa<FuncDecl>(d) && isa<EnumDecl>(d->getDeclContext())) ||
       (isa<FuncDecl>(d) && isa<StructDecl>(d->getDeclContext()))))
     return SILLinkage::Shared;
@@ -489,7 +489,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
 static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
   for (Decl *member : cd->getMembers()) {
     VarDecl *vd = dyn_cast<VarDecl>(member);
-    if (!vd || vd->isComputed()) continue;
+    if (!vd || !vd->hasStorage()) continue;
 
     const TypeLowering &ti = SGM.Types.getTypeLowering(vd->getType());
     if (!ti.isTrivial())
@@ -722,7 +722,7 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  if (!vd->isComputed())
+  if (vd->hasStorage())
     addGlobalVariable(vd);
 }
 

@@ -134,7 +134,7 @@ private:
     // offset --- but that's really tricky to guarantee.
     for (auto member : theClass->getMembers()) {
       if (auto field = dyn_cast<VarDecl>(member))
-        if (!field->isComputed())
+        if (field->hasStorage())
           updateForFieldSize(field);
     }
 
@@ -143,7 +143,7 @@ private:
       asImpl().noteStartOfFieldOffsets(theClass);
       for (auto member : theClass->getMembers()) {
         if (auto field = dyn_cast<VarDecl>(member))
-          if (!field->isComputed())
+          if (field->hasStorage())
             addFieldEntries(field);
       }
       asImpl().noteEndOfFieldOffsets(theClass);
@@ -174,7 +174,7 @@ private:
   }
 
   void updateForFieldSize(VarDecl *field) {
-    assert(!field->isComputed());
+    assert(field->hasStorage());
 
     // Update the class layout based on abstract, globally-known
     // characteristics of the type.

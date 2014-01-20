@@ -409,19 +409,17 @@ namespace {
       if (VD->isLet())
         OS << " let";
       
-      if (VD->isComputed()) {
-        if (FuncDecl *Get = VD->getGetter()) {
-          OS << "\n";
-          OS.indent(Indent + 2);
-          OS << "get =";
-          printRec(Get);
-        }
-        if (FuncDecl *Set = VD->getSetter()) {
-          OS << "\n";
-          OS.indent(Indent + 2);
-          OS << "set =";
-          printRec(Set);
-        }
+      if (FuncDecl *Get = VD->getGetter()) {
+        OS << "\n";
+        OS.indent(Indent + 2);
+        OS << "get =";
+        printRec(Get);
+      }
+      if (FuncDecl *Set = VD->getSetter()) {
+        OS << "\n";
+        OS.indent(Indent + 2);
+        OS << "set =";
+        printRec(Set);
       }
       OS << ')';
     }

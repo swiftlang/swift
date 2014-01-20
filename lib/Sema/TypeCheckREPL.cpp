@@ -119,7 +119,7 @@ void StmtBuilder::printStruct(VarDecl *Arg, Type SugarT, StructDecl *SD,
   bool isFirstMember = true;
   for (Decl *D : SD->getMembers()) {
     if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
-      if (!VD->isComputed()) {
+      if (VD->hasStorage()) {
         if (isFirstMember)
           isFirstMember = false;
         else

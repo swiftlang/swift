@@ -875,7 +875,7 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
   unsigned OffsetInBits = 0;
   for (auto Decl : D->getMembers())
     if (VarDecl *VD = dyn_cast<VarDecl>(Decl))
-      if (!VD->isComputed()) {
+      if (VD->hasStorage()) {
         auto Ty = VD->getType()->getCanonicalType();
         DebugTypeInfo DTI(VD, IGM.getTypeInfoForUnlowered(Ty));
         Elements.push_back(createMemberType(DTI, VD->getName().str(),

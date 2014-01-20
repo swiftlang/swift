@@ -1222,7 +1222,7 @@ public:
 
   Operand *getOperandForField(const VarDecl *V) {
     // If V is null or is computed, there is no operand associated with it.
-    assert(V && !V->isComputed() &&
+    assert(V && V->hasStorage() &&
            "getOperandForField only works with stored fields");
 
     StructDecl *S = getStructDecl();

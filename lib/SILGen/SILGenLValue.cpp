@@ -469,38 +469,41 @@ LValue SILGenLValue::visitExpr(Expr *e) {
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-static LValue emitLValueForDecl(SILGenLValue &sgl,
-                                SILLocation loc, ValueDecl *decl,
-                                CanType formalRValueType) {
+static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
+                                            SILLocation loc, VarDecl *var,
+                                            CanType formalRValueType) {
   LValue lv;
-  auto typeData = getUnsubstitutedTypeData(sgl.gen, formalRValueType);
+  auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
   // If it's a computed variable, push a reference to the getter and setter.
-  if (VarDecl *var = dyn_cast<VarDecl>(decl)) {
-    if (var->isComputed()) {
-      ArrayRef<Substitution> substitutions;
-      if (auto genericParams
-            = sgl.gen.SGM.Types.getEffectiveGenericParamsForContext(
-                decl->getDeclContext())) {
-        substitutions = sgl.gen.buildForwardingSubstitutions(genericParams);
-      }
-
-      lv.add<GetterSetterComponent>(var, substitutions, typeData);
-      return std::move(lv);
-    }
+  switch (var->getStorageKind()) {
+  case VarDecl::Stored: {
+    // If it's a physical value (e.g. a local variable in memory), push its
+    // address.
+    auto address = gen.emitReferenceToDecl(loc, var);
+    assert(address.getType().isAddress() &&
+           "physical lvalue decl ref must evaluate to an address");
+    lv.add<ValueComponent>(address, typeData);
+    break;
   }
+  case VarDecl::Computed: {
+    ArrayRef<Substitution> substitutions;
+    if (auto genericParams
+          = gen.SGM.Types.getEffectiveGenericParamsForContext(
+              var->getDeclContext())) {
+      substitutions = gen.buildForwardingSubstitutions(genericParams);
+    }
 
-  // If it's a physical value (e.g. a local variable in memory), push its
-  // address.
-  auto address = sgl.gen.emitReferenceToDecl(loc, decl);
-  assert(address.getType().isAddress() &&
-         "physical lvalue decl ref must evaluate to an address");
-  lv.add<ValueComponent>(address, typeData);
+    lv.add<GetterSetterComponent>(var, substitutions, typeData);
+  }
+  }
   return std::move(lv);
 }
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
-  return emitLValueForDecl(*this, e, e->getDecl(), getSubstFormalRValueType(e));
+  // The only non-member decl that can be an lvalue is VarDecl.
+  return emitLValueForNonMemberVarDecl(gen, e, cast<VarDecl>(e->getDecl()),
+                                       getSubstFormalRValueType(e));
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
@@ -511,23 +514,26 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
 
-  LValueTypeData typeData =
-    getMemberTypeData(gen, e->getMember().getDecl()->getType(), e);
-
   // MemberRefExpr can refer to type and function members, but the only case
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
 
-  // If this is a computed variable, or a stored property that we need to access
-  // through an Objective-C getter/setter, use a getter/setter lvalue.
-  if (var->isComputed() ||
-      (var->usesObjCGetterAndSetter() &&
-       !gen.AlwaysDirectStoredPropertyAccess)) {
-    // Otherwise, use the property accessors.
+  LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
+
+  switch (var->getStorageKind()) {
+  case VarDecl::Stored:  // Stored properties handled below.
+    // If this is a computed variable, or a stored property that we need to
+    // access through an Objective-C getter/setter, use a getter/setter lvalue.
+    if (var->usesObjCGetterAndSetter() && !gen.AlwaysDirectStoredPropertyAccess)
+      ;
+    else
+      break;
+
+  case VarDecl::Computed:
+    // Use the property accessors.
     lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
                                   typeData);
     return std::move(lv);
-
   }
 
   // Otherwise, the lvalue access is performed with a fragile element reference.
@@ -543,14 +549,14 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
     auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
       ->getInstanceType();
     (void)baseMeta;
-    assert(!baseMeta->is<BoundGenericType>()
-           && "generic static stored properties not implemented");
-    assert((baseMeta->getStructOrBoundGenericStruct()
-            || baseMeta->getEnumOrBoundGenericEnum())
-       && "static stored properties for classes/protocols not implemented");
+    assert(!baseMeta->is<BoundGenericType>() &&
+           "generic static stored properties not implemented");
+    assert((baseMeta->getStructOrBoundGenericStruct() ||
+            baseMeta->getEnumOrBoundGenericEnum()) &&
+           "static stored properties for classes/protocols not implemented");
     
-    return emitLValueForDecl(*this, e, e->getMember().getDecl(),
-                             getSubstFormalRValueType(e));
+    return emitLValueForNonMemberVarDecl(gen, e, var,
+                                         getSubstFormalRValueType(e));
   }
 
   // For member variables, this access is done w.r.t. a base computation that
@@ -611,8 +617,7 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
   }
 
   // Refer to 'self' as the base of the lvalue.
-  auto selfTypeData = getUnsubstitutedTypeData(*this, selfType);
-  lv.add<ValueComponent>(self, selfTypeData);
+  lv.add<ValueComponent>(self, getUnsubstitutedTypeData(*this, selfType));
 
   auto origFormalType = getOrigFormalRValueType(ivar->getType());
   auto substFormalType 
@@ -624,12 +629,10 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, VarDecl *selfDecl,
   SILType varStorageType =
     SGM.Types.getSubstitutedStorageType(ivar, LValueType::get(ivar->getType()));
 
-  if (selfDecl->isLet()) {
-    assert(selfDecl->getType()->hasReferenceSemantics());
+  if (selfDecl->getType()->hasReferenceSemantics())
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
-  } else {
+  else
     lv.add<StructElementComponent>(ivar, varStorageType, typeData);
-  }
 
   return std::move(lv);
 }

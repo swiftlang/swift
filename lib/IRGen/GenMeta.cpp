@@ -2675,8 +2675,8 @@ namespace {
     }
     
     void addFieldOffset(VarDecl *var) {
-      assert(!var->isComputed()
-             && "storing field offset for computed property?!");
+      assert(var->hasStorage() &&
+             "storing field offset for computed property?!");
       SILType structType =
         SILType::getPrimitiveAddressType(
                        Target->getDeclaredTypeInContext()->getCanonicalType());

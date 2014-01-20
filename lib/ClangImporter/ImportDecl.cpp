@@ -690,7 +690,7 @@ namespace {
       SmallVector<VarDecl *, 8> params;
       for (auto member : members) {
         if (auto var = dyn_cast<VarDecl>(member)) {
-          if (var->isComputed())
+          if (!var->hasStorage())
             continue;
           
           auto param = new (context) VarDecl(/*static*/ false, /*IsLet*/ true,
@@ -735,7 +735,7 @@ namespace {
       unsigned paramIdx = 0;
       for (auto member : members) {
         auto var = dyn_cast<VarDecl>(member);
-        if (!var || var->isComputed())
+        if (!var || !var->hasStorage())
           continue;
 
         // Construct left-hand side.
@@ -933,7 +933,7 @@ namespace {
         // Create a constructor to initialize that value from a value of the
         // underlying type.
         Decl *varDecl = var;
-        auto constructor = createValueConstructor(structDecl, {&varDecl, 1});
+        auto constructor = createValueConstructor(structDecl, varDecl);
 
         // Set the members of the struct.
         Decl *members[3] = { constructor, patternBinding, var };
@@ -1011,7 +1011,7 @@ namespace {
         // Create a constructor to initialize that value from a value of the
         // underlying type.
         Decl *varDecl = var;
-        auto constructor = createValueConstructor(structDecl, {&varDecl, 1});
+        auto constructor = createValueConstructor(structDecl, varDecl);
 
         // Build a RawOptionSet conformance for the type.
         ProtocolDecl *rawOptionSet = Impl.SwiftContext

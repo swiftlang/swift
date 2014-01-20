@@ -930,7 +930,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
           d = diag::assignment_to_self;
         else if (VD->isLet())
           d = diag::assignment_lhs_is_let;
-        else if (VD->isComputed() && !VD->getSetter())
+        else if (VD->hasAccessorFunctions() && !VD->getSetter())
           d = diag::assignment_get_only_property;
         else
           d = diag::assignment_lhs_is_vardecl;

@@ -599,7 +599,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     decl->getType().print(Printer, Options);
   }
 
-  if (decl->isComputed() && Options.FunctionDefinitions) {
+  if (decl->hasAccessorFunctions() && Options.FunctionDefinitions) {
     Printer << " {";
     {
       if (auto getter = decl->getGetter()) {
@@ -1014,16 +1014,15 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
     if (isa<VarDecl>(this) && !this->hasClangNode() &&
-        !cast<VarDecl>(this)->isComputed())
+        cast<VarDecl>(this)->hasStorage())
       return false;
 
     // Skip pattern bindings that consist of just one computed variable.
     if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
       auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
       if (auto named = dyn_cast<NamedPattern>(pattern)) {
-        if (named->getDecl()->isComputed()) {
+        if (named->getDecl()->getStorageKind() == VarDecl::Computed)
           return false;
-        }
       }
     }
   }

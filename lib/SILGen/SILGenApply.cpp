@@ -892,7 +892,7 @@ public:
 
   /// getExistentialOrArchetypeRValueAddress - Return a SILValue of address type
   /// for the specified rvalue of existential or archetype type.  This attempts
-  /// to avoid emitting a load (and thus, a an extra copy of the abstracted
+  /// to avoid emitting a load (and thus, an extra copy of the abstracted
   /// value) for the rvalue in cases where we can find an underlying address we
   /// can use.
   ManagedValue getExistentialOrArchetypeRValueAddress(Expr *e) {
@@ -916,7 +916,7 @@ public:
       if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
         if (VD->isLet() ||
             (!VD->getDeclContext()->isLocalContext() &&
-             !VD->isComputed())) {
+             VD->getStorageKind() == VarDecl::Stored)) {
               auto Reference =
                 gen.emitReferenceToDecl(e, DRE->getDeclRef(), e->getType(), 0);
               assert(Reference.isLValue() && "Should have got an lvalue back");

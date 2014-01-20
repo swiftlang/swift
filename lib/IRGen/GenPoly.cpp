@@ -379,7 +379,7 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
     return visitMembers(decl->getMembers());
   }
   bool visitVarDecl(VarDecl *var) {
-    if (var->isComputed()) return false;
+    if (!var->hasStorage()) return false;
     return visit(var->getType()->getCanonicalType());
   }
   bool visitEnumElementDecl(EnumElementDecl *decl) {

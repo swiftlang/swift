@@ -216,14 +216,14 @@ static SILValue emitGetPropertyFromRValue(SILGenFunction &gen,
                                           VarDecl *property,
                                           CanType propTy) {
   if (aggregate.getType().hasReferenceSemantics()) {
-    if (property->isComputed())
+    if (property->hasAccessorFunctions())
       return emitGetComputedPropertyFromRefTypeRValue(gen, loc, aggregate,
                                                       property, propTy);
     return emitGetStoredPropertyFromRefTypeRValue(gen, loc, aggregate,
                                                   property, propTy);
   }
   
-  if (property->isComputed())
+  if (property->hasAccessorFunctions())
     return emitGetComputedPropertyFromValueTypeRValue(gen, loc, aggregate,
                                                       property, propTy);
   return emitGetStoredPropertyFromValueTypeRValue(gen, loc, aggregate,

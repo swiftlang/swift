@@ -1081,7 +1081,7 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   }
 
   // vars are settable unless they are computed and have no setter.
-  return !isComputed() || getSetter();
+  return hasStorage() || getSetter();
 }
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
@@ -1303,15 +1303,10 @@ static bool isIntegralType(Type type) {
 
     // Find the single ivar.
     VarDecl *singleVar = nullptr;
-    for (auto member : structDecl->getMembers()) {
-      auto var = dyn_cast<VarDecl>(member);
-      if (!var || var->isComputed())
-        continue;
-
+    for (auto member : structDecl->getStoredProperties()) {
       if (singleVar)
         return false;
-
-      singleVar = var;
+      singleVar = member;
     }
 
     if (!singleVar)
