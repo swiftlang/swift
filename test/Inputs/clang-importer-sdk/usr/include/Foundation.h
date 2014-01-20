@@ -28,7 +28,9 @@ typedef signed char BOOL;
 
 NSString *NSStringToNSString(NSString *str);
 
-@interface Hive
+@interface Hive {
+  B *queen;
+}
 @property __attribute__((iboutletcollection(B))) NSArray *bees;
 @end
 

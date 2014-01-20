@@ -1401,9 +1401,8 @@ namespace {
     }
 
     Decl *VisitObjCIvarDecl(const clang::ObjCIvarDecl *decl) {
-      // FIXME: Deal with fact that a property and an ivar can have the same
-      // name.
-      return VisitFieldDecl(decl);
+      // Disallow direct ivar access (and avoid conflicts with property names).
+      return nullptr;
     }
 
     Decl *VisitObjCAtDefsFieldDecl(const clang::ObjCAtDefsFieldDecl *decl) {
