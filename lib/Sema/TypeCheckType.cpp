@@ -210,7 +210,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, dc, TypeResolutionOptions(), resolver))
+    if (validateType(genericArg, dc, None, resolver))
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());

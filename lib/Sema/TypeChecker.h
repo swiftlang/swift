@@ -284,7 +284,7 @@ public:
   ///
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
-                    TypeResolutionOptions options = TypeResolutionOptions(),
+                    TypeResolutionOptions options = None,
                     GenericTypeResolver *resolver = nullptr);
 
   /// \brief Resolves a TypeRepr to a type.
@@ -608,7 +608,8 @@ public:
   /// \param resolver A generic type resolver.
   ///
   /// \returns true if any errors occurred during type checking.
-  bool typeCheckPattern(Pattern *P, DeclContext *dc, unsigned options,
+  bool typeCheckPattern(Pattern *P, DeclContext *dc,
+                        TypeResolutionOptions options,
                         GenericTypeResolver *resolver = nullptr);
 
   /// Coerce a pattern to the given type.
@@ -621,7 +622,7 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
-                           unsigned options, 
+                           TypeResolutionOptions options,
                            GenericTypeResolver *resolver = nullptr);
   bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                             Type type);

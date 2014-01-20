@@ -259,15 +259,13 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (tc.validateType(req.getSubjectLoc(), parentDC,
-                          TypeResolutionOptions(), &resolver)) {
+      if (tc.validateType(req.getSubjectLoc(), parentDC, None, &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getConstraintLoc(), parentDC,
-                          TypeResolutionOptions(), &resolver)) {
+      if (tc.validateType(req.getConstraintLoc(), parentDC, None, &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -299,15 +297,13 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     }
 
     case RequirementKind::SameType:
-      if (tc.validateType(req.getFirstTypeLoc(), parentDC,
-                          TypeResolutionOptions(), &resolver)) {
+      if (tc.validateType(req.getFirstTypeLoc(), parentDC, None, &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getSecondTypeLoc(), parentDC,
-                          TypeResolutionOptions(), &resolver)) {
+      if (tc.validateType(req.getSecondTypeLoc(), parentDC, None, &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -590,7 +586,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
   for (auto pattern : argPatterns) {
     // Check the pattern.
-    if (tc.typeCheckPattern(pattern, func, 0, &resolver))
+    if (tc.typeCheckPattern(pattern, func, None, &resolver))
       badType = true;
 
     // Infer requirements from the pattern.
@@ -603,8 +599,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      if (tc.validateType(fn->getBodyResultTypeLoc(), fn,
-                          TypeResolutionOptions(), &resolver)) {
+      if (tc.validateType(fn->getBodyResultTypeLoc(), fn, None, &resolver)) {
         badType = true;
       }
 

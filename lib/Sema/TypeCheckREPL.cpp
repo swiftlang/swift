@@ -572,7 +572,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
-  TC.typeCheckPattern(ParamPat, Arg->getDeclContext(), 0);
+  TC.typeCheckPattern(ParamPat, Arg->getDeclContext(), None);
 
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
   unsigned discriminator = TLC.claimNextClosureDiscriminator();

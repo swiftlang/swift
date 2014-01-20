@@ -839,7 +839,7 @@ namespace {
       }
 
       if (auto baseTyR = expr->getBaseTypeRepr()) {
-        auto type = CS.TC.resolveType(baseTyR, CS.DC, TypeResolutionOptions());
+        auto type = CS.TC.resolveType(baseTyR, CS.DC, None);
         if (type)
           return MetatypeType::get(type, CS.getASTContext());
 

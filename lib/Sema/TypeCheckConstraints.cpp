@@ -384,7 +384,7 @@ namespace {
       // we've determine the complete function type.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         // Validate the parameters.
-        unsigned options = 0;
+        TypeResolutionOptions options;
         options |= TC_AllowUnspecifiedTypes;
         options |= TC_AllowUnboundGenerics;
         if (TC.typeCheckPattern(closure->getParams(), DC, options)) {

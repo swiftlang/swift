@@ -17,9 +17,13 @@
 #ifndef SWIFT_BASIC_OPTIONSET_H
 #define SWIFT_BASIC_OPTIONSET_H
 
+#include "llvm/ADT/None.h"
+
 #include <type_traits>
 
 namespace swift {
+
+using llvm::None;
 
 /// The class template \c OptionSet captures a set of options stored as the
 /// bits in an unsigned integral value.
@@ -46,6 +50,9 @@ class OptionSet {
 public:
   /// Create an empty option set.
   OptionSet() : Storage() { }
+
+  /// Create an empty option set.
+  OptionSet(llvm::NoneType) : Storage() { }
 
   /// Create an option set with only the given option set.
   OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) { }
@@ -90,6 +97,17 @@ public:
   /// Produce the complement of the given option set.
   friend OptionSet operator~(OptionSet set) {
     return OptionSet(~set.Storage);
+  }
+
+  /// Produce the difference of two option sets.
+  friend OptionSet operator-(OptionSet lhs, OptionSet rhs) {
+    return OptionSet(lhs.Storage & ~rhs.Storage);
+  }
+
+  /// Produce the intersection of two option sets.
+  friend OptionSet &operator-=(OptionSet &lhs, OptionSet rhs) {
+    lhs.Storage &= ~rhs.Storage;
+    return lhs;
   }
 };
 

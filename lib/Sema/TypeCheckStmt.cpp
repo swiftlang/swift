@@ -436,7 +436,7 @@ public:
     // FIXME: Could allow unbound generic types in this pattern, then override
     // here.
     Pattern *pattern = S->getPattern();
-    if (TC.coercePatternToType(pattern, DC, ElementTy, 0))
+    if (TC.coercePatternToType(pattern, DC, ElementTy, None))
       return nullptr;
     S->setPattern(pattern);
     
@@ -512,7 +512,7 @@ public:
           }
 
           // Coerce the pattern to the subject's type.
-          hadTypeError |= TC.coercePatternToType(pattern, DC, subjectType, 0);
+          hadTypeError |= TC.coercePatternToType(pattern, DC, subjectType,None);
         }
         
         // Check the guard expression, if present.

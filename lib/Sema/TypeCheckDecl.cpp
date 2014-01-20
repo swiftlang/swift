@@ -246,7 +246,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, TypeResolutionOptions(), resolver)) {
+    if (validateType(inherited, DC, None, resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -972,7 +972,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // Check the pattern.
   // If we have an initializer, we can also have unknown types.
-  unsigned options = 0;
+  TypeResolutionOptions options;
   if (binding->getInit()) {
     options |= TC_AllowUnspecifiedTypes;
     options |= TC_AllowUnboundGenerics;
@@ -1151,7 +1151,7 @@ public:
 
     auto dc = SD->getDeclContext();
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
-    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc, 0);
+    isInvalid |= TC.typeCheckPattern(SD->getIndices(), dc, None);
 
     if (isInvalid) {
       SD->overwriteType(ErrorType::get(TC.Context));
@@ -1589,7 +1589,7 @@ public:
     for (Pattern *P : paramPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, dc, 0, resolver)) {
+      if (TC.typeCheckPattern(P, dc, None, resolver)) {
         badType = true;
         continue;
       }
@@ -1623,7 +1623,7 @@ public:
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
-                          TypeResolutionOptions(), resolver)) {
+                          None, resolver)) {
         badType = true;
       }
     }
@@ -2105,7 +2105,7 @@ public:
         checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.
-        if (TC.typeCheckPattern(CD->getArgParams(), CD, 0)) {
+        if (TC.typeCheckPattern(CD->getArgParams(), CD, None)) {
           CD->overwriteType(ErrorType::get(TC.Context));
           CD->setInvalid();
         }
@@ -2131,7 +2131,7 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (TC.typeCheckPattern(CD->getArgParams(), CD, 0)) {
+    if (TC.typeCheckPattern(CD->getArgParams(), CD, None)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
@@ -2158,7 +2158,7 @@ public:
       CD->setInitializerType(InitFnTy);
 
       // Type check the constructor body parameters.
-      if (TC.typeCheckPattern(CD->getBodyParams(), CD, 0)) {
+      if (TC.typeCheckPattern(CD->getBodyParams(), CD, None)) {
         CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInvalid();
       }
