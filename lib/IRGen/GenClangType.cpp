@@ -142,6 +142,11 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
   return clang::CanQualType();
 }
 
+clang::CanQualType GenClangType::visitProtocolCompositionType(
+  CanProtocolCompositionType type) {
+  return clang::CanQualType();
+}
+
 clang::CanQualType GenClangType::visitType(CanType type) {
   llvm_unreachable("Unhandled type in Clang type generation.");
 
