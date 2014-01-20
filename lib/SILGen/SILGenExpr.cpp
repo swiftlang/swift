@@ -174,10 +174,6 @@ namespace {
       return visit(E, SGFContext());
     }
 
-    RValue emitDeclRefRValue(Expr *E, ConcreteDeclRef decl,
-                             Type T, SGFContext C);
-
-
     // These always produce lvalues.
     RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C) {
       LValue lv = SGF.emitLValue(E->getSubExpr());
@@ -531,32 +527,32 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                       substLoweredFormalType);
 }
 
+RValue SILGenFunction::emitRValueForDecl(Expr *E, ConcreteDeclRef decl,
+                                         SGFContext C) {
+  Type ty = E->getType();
+  assert(!ty->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
+
+  // Emit the reference to the decl.
+  ManagedValue Reference = emitReferenceToDecl(E, decl, ty, 0);
+
+  // If it comes back as an LValue-style RValue, emit a load to get a real
+  // RValue.
+  if (Reference.isLValue()) {
+    Reference = emitLoad(E, Reference.getUnmanagedValue(),
+                         getTypeLowering(ty), C, IsNotTake);
+    if (!Reference) return RValue();
+  }
+  return RValue(*this, E, Reference);
+}
+
 RValue RValueEmitter::visitDiscardAssignmentExpr(DiscardAssignmentExpr *E,
                                                  SGFContext C) {
   llvm_unreachable("cannot appear in rvalue");
 }
 
-RValue RValueEmitter::emitDeclRefRValue(Expr *E,
-                                        ConcreteDeclRef decl, Type ty,
-                                        SGFContext C) {
-  assert(!ty->is<LValueType>() &&
-         "RValueEmitter shouldn't be called on lvalues");
-
-  // Emit the reference to the decl.
-  ManagedValue Reference = SGF.emitReferenceToDecl(E, decl, ty, 0);
-
-  // If it comes back as an LValue-style RValue, emit a load to get a real
-  // RValue.
-  if (Reference.isLValue()) {
-    Reference = SGF.emitLoad(E, Reference.getUnmanagedValue(),
-                             SGF.getTypeLowering(ty), C, IsNotTake);
-    if (!Reference) return RValue();
-  }
-  return RValue(SGF, E, Reference);
-}
-
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  return emitDeclRefRValue(E, E->getDeclRef(), E->getType(), C);
+  return SGF.emitRValueForDecl(E, E->getDeclRef(), C);
 }
 
 
@@ -1270,11 +1266,11 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                             ->getInstanceType(); (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
-    assert((baseMeta->getStructOrBoundGenericStruct()
-            || baseMeta->getEnumOrBoundGenericEnum()) &&
+    assert((baseMeta->getStructOrBoundGenericStruct() ||
+            baseMeta->getEnumOrBoundGenericEnum()) &&
            "static stored properties for classes/protocols not implemented");
 
-    return emitDeclRefRValue(E, E->getMember().getDecl(), E->getType(), C);
+    return SGF.emitRValueForDecl(E, E->getMember().getDecl(), C);
   }
 
   // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'

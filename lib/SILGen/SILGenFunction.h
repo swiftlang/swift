@@ -619,12 +619,17 @@ public:
   /// \param declRef The reference, including any substitutions to be applied
   /// \param refType The type of the reference (after substitutions)
   /// \param uncurryLevel The uncurry level to use for function references.
-  ManagedValue emitReferenceToDecl(
-                 SILLocation loc,
-                 ConcreteDeclRef declRef,
-                 Type refType = Type(),
-                 unsigned uncurryLevel
-                   = SILDeclRef::ConstructAtNaturalUncurryLevel);
+  ManagedValue emitReferenceToDecl(SILLocation loc,
+                                   ConcreteDeclRef declRef,
+                                   Type refType = Type(),
+                                   unsigned uncurryLevel
+                                 = SILDeclRef::ConstructAtNaturalUncurryLevel);
+
+  /// Produce an RValue for a reference to the specified declaration, with the
+  /// given type and in response to the specified epxression.  Try to emit into
+  /// the specified SGFContext to avoid copies (when provided).
+  RValue emitRValueForDecl(Expr *E, ConcreteDeclRef decl, SGFContext C);
+
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
