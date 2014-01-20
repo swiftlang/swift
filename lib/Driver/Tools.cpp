@@ -183,6 +183,29 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                      Arguments);
 }
 
+
+static void addSwiftmoduleInputs(const Job *J, ArgStringList &Arguments) {
+  using llvm::dyn_cast;
+
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    if (Cmd->getOutput().getPrimaryOutputType() == types::TY_SwiftModuleFile)
+      Arguments.push_back(Cmd->getOutput().getPrimaryOutputFilename().data());
+    else {
+      swift::Optional<llvm::StringRef> SwiftmoduleOutput =
+        Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftModuleFile);
+      assert(SwiftmoduleOutput.hasValue() &&
+             "All inputs to this command must generate a swiftmodule!");
+      Arguments.push_back(SwiftmoduleOutput->data());
+    }
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    for (const Job *JobInList : *JL) {
+      addSwiftmoduleInputs(JobInList, Arguments);
+    }
+  } else {
+    llvm_unreachable("Unknown Job class!");
+  }
+}
+
 Job *MergeModule::constructJob(const JobAction &JA,
                                std::unique_ptr<JobList> Inputs,
                                std::unique_ptr<CommandOutput> Output,
@@ -213,28 +236,8 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  std::function<void(const Job *)> addSwiftmoduleInputs = [&] (const Job *J) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      if (Cmd->getOutput().getPrimaryOutputType() == types::TY_SwiftModuleFile)
-        Arguments.push_back(Cmd->getOutput().getPrimaryOutputFilename().data());
-      else {
-        Optional<StringRef> SwiftmoduleOutput =
-        Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftModuleFile);
-        assert(SwiftmoduleOutput.hasValue() &&
-               "All inputs to this command must generate a swiftmodule!");
-        Arguments.push_back(SwiftmoduleOutput->data());
-      }
-    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-      for (const Job *JobInList : *JL) {
-        addSwiftmoduleInputs(JobInList);
-      }
-    } else {
-      llvm_unreachable("Unknown Job class!");
-    }
-  };
-
   for (Job *J : *Inputs) {
-    addSwiftmoduleInputs(J);
+    addSwiftmoduleInputs(J, Arguments);
   }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
