@@ -1368,6 +1368,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  auto emitUncheckedTrunc = [&](llvm::Type *ToTy) {
+    llvm::Value *in = args.claimNext();
+    llvm::Value *v = IGF.Builder.CreateTrunc(in, ToTy);
+    out->add(v);
+    
+    // Emit "false" for the overflow bit.
+    out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
+  };
+  
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::SToUCheckedTrunc) {
@@ -1378,13 +1387,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
     if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
       // If runtime checks are disabled, emit a plain 'trunc'.
-      llvm::Value *in = args.claimNext();
-      llvm::Value *v = IGF.Builder.CreateTrunc(in, ToTy);
-      out->add(v);
-      
-      // Emit "false" for the overflow bit.
-      out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
-      return;
+      return emitUncheckedTrunc(ToTy);
     }
     
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
@@ -1414,22 +1417,17 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::UToSCheckedTrunc) {
-    if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
-      // If runtime checks are disabled, emit a plain 'trunc'.
-      emitCastBuiltin(IGF, substFnType, *out, args,
-                      llvm::Instruction::Trunc);
-      
-      // Emit "false" for the overflow bit.
-      out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
-      return;
-    }
-
     auto FromTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
     auto ToTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
     llvm::Type *ToMinusOneTy =
       llvm::Type::getIntNTy(ToTy->getContext(), ToTy->getIntegerBitWidth() - 1);
+
+    if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
+      // If runtime checks are disabled, emit a plain 'trunc'.
+      return emitUncheckedTrunc(ToTy);
+    }
 
     // Compute the result for UToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
