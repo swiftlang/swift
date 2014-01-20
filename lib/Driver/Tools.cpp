@@ -47,7 +47,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
   switch (OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile: {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::SingleCompile: {
     switch (Output->getPrimaryOutputType()) {
     case types::TY_Object:
       FrontendModeOption = "-c";
@@ -121,6 +122,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     }
     break;
   }
+  case OutputInfo::Mode::SingleCompile:
   case OutputInfo::Mode::Immediate: {
     for (const Action *A : InputActions) {
       const InputAction *IA = dyn_cast<InputAction>(A);

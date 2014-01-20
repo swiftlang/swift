@@ -211,6 +211,11 @@ def repl : Flag<["-"], "repl">, HelpText<"REPL mode">, Flags<[FrontendOption]>,
 def i : Flag<["-"], "i">, HelpText<"Immediate mode">, Flags<[FrontendOption]>,
   ModeOpt;
 
+def force_single_frontend_invocation :
+  Flag<["-"], "force-single-frontend-invocation">,
+  HelpText<"Compile the module using a single frontend invocation">,
+  Flags<[DriverOption, HelpHidden]>;
+
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[DriverOption]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 

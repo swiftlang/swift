@@ -53,6 +53,9 @@ public:
     /// -primary-file.
     StandardCompile,
 
+    /// A compilation using a single frontend invocation without -primary-file.
+    SingleCompile,
+
     /// Invoke the REPL
     REPL,
 

@@ -289,6 +289,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
   types::ID CompileOutputType = types::TY_INVALID;
   OutputInfo::Mode CompileMode = OutputInfo::Mode::StandardCompile;
+  if (Args.hasArg(options::OPT_force_single_frontend_invocation))
+    CompileMode = OutputInfo::Mode::SingleCompile;
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
   if (!OutputModeArg) {
@@ -402,6 +404,7 @@ void Driver::buildActions(const ToolChain &TC,
     }
     break;
   }
+  case OutputInfo::Mode::SingleCompile:
   case OutputInfo::Mode::Immediate: {
     std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
     for (const InputPair &Input : Inputs) {
@@ -431,7 +434,10 @@ void Driver::buildActions(const ToolChain &TC,
     return;
 
   std::unique_ptr<Action> MergeModuleAction;
-  if (OI.ShouldGenerateModule) {
+  if (OI.ShouldGenerateModule &&
+      OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+    // We're performing multiple compilations; set up a merge module step
+    // so we generate a single swiftmodule as output.
     MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
   }
 
@@ -445,12 +451,9 @@ void Driver::buildActions(const ToolChain &TC,
       LinkAction->addInput(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
-  } else if (OI.ShouldGenerateModule) {
-    assert(MergeModuleAction);
+  } else if (MergeModuleAction) {
     Actions.push_back(MergeModuleAction.release());
   } else {
-    assert(!MergeModuleAction && "MergeModuleAction should be nullptr "
-                                 "if we shouldn't generate a module");
     Actions = CompileActions;
   }
 }
@@ -636,7 +639,8 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
         assert(!BaseInput.empty() &&
                "A Command which produces output must have a BaseInput!");
         StringRef BaseName(BaseInput);
-        if (isa<MergeModuleJobAction>(JA))
+        if (isa<MergeModuleJobAction>(JA) ||
+            OI.CompilerMode == OutputInfo::Mode::SingleCompile)
           BaseName = OI.ModuleName;
 
         // We don't yet have a name, assign one.
@@ -681,13 +685,38 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
       Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
-    // We need to generate a module, and this is a CompileJobAction,
-    // so add an additional output for the swiftmodule, based on the primary
-    // output's name. (Only do this if our primary output isn't a swiftmodule,
-    // though.)
-    llvm::SmallString<128> Path(Output->getPrimaryOutputFilename());
-    llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
-    Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+    const Arg *A = C.getArgs().getLastArg(options::OPT_module_output_path);
+    if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+      // We're performing a single compilation (and thus no merge module step),
+      // so prefer to use -module-output-path, if present.
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
+                                         A->getValue());
+    } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
+               OI.ShouldTreatModuleAsTopLevelOutput) {
+      // We're performing a single compile and don't have -module-output-path,
+      // but have been told to treat the module as a top-level output.
+      // Determine an appropriate path.
+      if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
+        // Put the module next to the top-level output.
+        llvm::SmallString<128> Path(A->getValue());
+        llvm::sys::path::remove_filename(Path);
+        llvm::sys::path::append(Path, OI.ModuleName);
+        llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+        Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      } else {
+        // A top-level output wasn't specified, so just output to
+        // <ModuleName>.swiftmodule.
+        llvm::SmallString<128> Path(OI.ModuleName);
+        llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+        Output->setAdditionalOutputForType(types::TY_SwiftModuleFile, Path);
+      }
+    } else {
+      // We're only generating the module as an intermediate, so put it next
+      // to the primary output of the compile command.
+      llvm::SmallString<128> Path(Output->getPrimaryOutputFilename());
+      llvm::sys::path::replace_extension(Path, SERIALIZED_MODULE_EXTENSION);
+      Output->setAdditionalOutputForType(types::ID::TY_SwiftModuleFile, Path);
+    }
   }
 
   if (DriverPrintBindings) {
