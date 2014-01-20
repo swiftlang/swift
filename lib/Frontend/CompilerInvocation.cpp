@@ -161,7 +161,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (Opts.InputFilenames.empty()) {
       // We don't have any input files, so default to the REPL.
       Action = FrontendOptions::REPL;
-    } else if (Args.hasArg(OPT_emit_module, OPT_module_output_path)) {
+    } else if (Args.hasArg(OPT_emit_module, OPT_emit_module_path)) {
       // We've been told to emit a module, but have no other mode indicators.
       // As a result, put the frontend into EmitModuleOnly mode.
       // (Setting up module output will be handled below.)
@@ -255,24 +255,24 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     return Path.str();
   };
 
-  if (const Arg *A = Args.getLastArg(OPT_serialized_diagnostics_path)) {
+  if (const Arg *A = Args.getLastArg(OPT_serialize_diagnostics_path)) {
     // Claim -serialize-diagnostics, if present.
     Args.ClaimAllArgs(OPT_serialize_diagnostics);
     Opts.SerializedDiagnosticsPath = A->getValue();
   } else if (Args.hasArg(OPT_serialize_diagnostics)) {
     // -serialize-diagnostics has been passed without
-    // -serialized-diagnostics-path, so determine a path based on other inputs.
+    // -serialize-diagnostics-path, so determine a path based on other inputs.
     static const char *const DiagnosticsFilePathExtension = "dia";
     Opts.SerializedDiagnosticsPath =
       determineOutputFilename(DiagnosticsFilePathExtension);
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_module_output_path)) {
+  if (const Arg *A = Args.getLastArg(OPT_emit_module_path)) {
     // Claim -emit-module, if present.
     Args.ClaimAllArgs(OPT_emit_module);
     Opts.ModuleOutputPath = A->getValue();
   } else if (Args.hasArg(OPT_emit_module)) {
-    // -emit-module has been passed without -module-output-path, so determine
+    // -emit-module has been passed without -emit-module-path, so determine
     // a path based on other inputs.
     if (Opts.RequestedAction == FrontendOptions::EmitModuleOnly &&
         !Opts.OutputFilename.empty())

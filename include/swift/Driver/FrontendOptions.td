@@ -24,12 +24,12 @@ def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 def primary_file_EQ : Joined<["-"], "primary-file=">, Alias<primary_file>;
 
-def serialized_diagnostics_path
-  : Separate<["-"], "serialized-diagnostics-path">, MetaVarName<"<path>">,
+def serialize_diagnostics_path
+  : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
     HelpText<"Output serialized diagnostics to <path>">;
-def serialized_diagnostics_path_EQ
-  : Joined<["-"], "serialized-diagnostics-path=">,
-    Alias<serialized_diagnostics_path>;
+def serialize_diagnostics_path_EQ
+  : Joined<["-"], "serialize-diagnostics-path=">,
+    Alias<serialize_diagnostics_path>;
 
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "

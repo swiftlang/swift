@@ -271,7 +271,7 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   // appropariately below if linking is required.
   OI.ShouldLink = false;
 
-  if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path)) {
+  if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.
     OI.ShouldGenerateModule = true;
@@ -294,7 +294,7 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
   if (!OutputModeArg) {
-    if (Args.hasArg(options::OPT_emit_module, options::OPT_module_output_path))
+    if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path))
       CompileOutputType = types::TY_SwiftModuleFile;
     else if (Inputs.empty() && !Args.hasArg(options::OPT_v)) {
       // No inputs and no mode arguments imply REPL mode
@@ -600,7 +600,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   } else {
     // Process Action-specific output-specifying options first.
     if (isa<MergeModuleJobAction>(JA)) {
-      if (Arg *A = C.getArgs().getLastArg(options::OPT_module_output_path))
+      if (Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path))
         Output.reset(new CommandOutput(JA->getType(), A->getValue(),
                                        BaseInput));
       else if (OI.ShouldTreatModuleAsTopLevelOutput) {
@@ -685,15 +685,15 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
       Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
-    const Arg *A = C.getArgs().getLastArg(options::OPT_module_output_path);
+    const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path);
     if (A && OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
       // We're performing a single compilation (and thus no merge module step),
-      // so prefer to use -module-output-path, if present.
+      // so prefer to use -emit-module-path, if present.
       Output->setAdditionalOutputForType(types::TY_SwiftModuleFile,
                                          A->getValue());
     } else if (OI.CompilerMode == OutputInfo::Mode::SingleCompile &&
                OI.ShouldTreatModuleAsTopLevelOutput) {
-      // We're performing a single compile and don't have -module-output-path,
+      // We're performing a single compile and don't have -emit-module-path,
       // but have been told to treat the module as a top-level output.
       // Determine an appropriate path.
       if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {

@@ -139,11 +139,11 @@ def module_link_name_EQ : Joined<["-"], "module-link-name=">,
 
 def emit_module : Flag<["-"], "emit-module">, Flags<[FrontendOption]>,
   HelpText<"Emit an importable module">;
-def module_output_path : Separate<["-"], "module-output-path">,
+def emit_module_path : Separate<["-"], "emit-module-path">,
   Flags<[FrontendOption]>, HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
-def module_output_path_EQ : Joined<["-"], "module-output-path=">,
-  Flags<[FrontendOption]>, Alias<module_output_path>;
+def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
+  Flags<[FrontendOption]>, Alias<emit_module_path>;
 
 // Linker inputs
 

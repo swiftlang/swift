@@ -162,7 +162,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
   if (ModuleOutputPath.hasValue()) {
     Arguments.push_back("-emit-module");
-    Arguments.push_back("-module-output-path");
+    Arguments.push_back("-emit-module-path");
     Arguments.push_back(ModuleOutputPath->data());
   }
 
@@ -170,7 +170,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
   if (SerializedDiagnosticsPath) {
     Arguments.push_back("-serialize-diagnostics");
-    Arguments.push_back("-serialized-diagnostics-path");
+    Arguments.push_back("-serialize-diagnostics-path");
     Arguments.push_back(SerializedDiagnosticsPath->data());
   }
 
