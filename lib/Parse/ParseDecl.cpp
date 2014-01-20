@@ -471,7 +471,8 @@ bool Parser::isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
         Tok2.is(tok::kw_protocol) || Tok2.is(tok::kw_typealias));
 }
 
-void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
+void Parser::consumeDecl(ParserPosition BeginParserPosition,
+                         ParseDeclOptions Flags,
                          bool IsTopLevel) {
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
@@ -482,7 +483,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
   // Consume the code completion token, if there is one.
   consumeIf(tok::code_complete);
   SourceLoc EndLoc = Tok.getLoc();
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags,
+  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
                    CurDeclContext, { BeginLoc, EndLoc },
                    BeginParserPosition.PreviousLoc);
 
@@ -519,7 +520,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
 ///     decl-operator
 /// \endverbatim
 ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
-                               unsigned Flags) {
+                               ParseDeclOptions Flags) {
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
@@ -592,7 +593,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                     Flags & PD_InProtocol, Attributes);
+                                     Flags.contains(PD_InProtocol), Attributes);
     Status = DeclResult;
     break;
   case tok::kw_enum:
@@ -640,7 +641,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   
   case tok::identifier:
     if (isStartOfOperatorDecl(Tok, peekToken())) {
-      DeclResult = parseDeclOperator(Flags & PD_AllowTopLevel, Attributes);
+      DeclResult = parseDeclOperator(Flags.contains(PD_AllowTopLevel),
+                                     Attributes);
       break;
     }
     SWIFT_FALLTHROUGH;
@@ -704,7 +706,7 @@ void Parser::parseDeclDelayed() {
   ContextChange CC(*this, DelayedState->ParentContext);
 
   SmallVector<Decl *, 2> Entries;
-  parseDecl(Entries, DelayedState->Flags);
+  parseDecl(Entries, ParseDeclOptions(DelayedState->Flags));
 }
 
 /// \brief Parse an 'import' declaration, doing no token skipping on error.
@@ -723,7 +725,7 @@ void Parser::parseDeclDelayed() {
 ///   import-path:
 ///     any-identifier ('.' any-identifier)*
 /// \endverbatim
-ParserResult<ImportDecl> Parser::parseDeclImport(unsigned Flags,
+ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
   
@@ -899,7 +901,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///   extension:
 ///    'extension' attribute-list type-identifier inheritance? '{' decl* '}'
 /// \endverbatim
-ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
+ParserResult<ExtensionDecl> Parser::parseDeclExtension(ParseDeclOptions Flags,
                                                        DeclAttributes &Attr) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
@@ -951,9 +953,10 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(unsigned Flags,
         parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
                   /*AllowSepAfterLast=*/false, diag::expected_rbrace_extension,
                   [&]() -> ParserStatus {
-      return parseDecl(MemberDecls,
-                       PD_HasContainerType
-                       | PD_DisallowStoredInstanceVar);
+      ParseDeclOptions Options(PD_HasContainerType |
+                               PD_DisallowStoredInstanceVar);
+
+      return parseDecl(MemberDecls, Options);
     });
     // Don't propagate the code completion bit from members: we can not help
     // code completion inside a member decl, and our callers can not do
@@ -1115,7 +1118,7 @@ void Parser::addVarsToScope(Pattern *Pat,
 /// for a computed property or subscript.
 static FuncDecl *createGetterFunc(SourceLoc GetLoc, TypeLoc ElementTy,
                                   Pattern *Indices, SourceLoc StaticLoc,
-                                  unsigned Flags, Parser *P) {
+                                  Parser::ParseDeclOptions Flags, Parser *P) {
   // Create the parameter list(s) for the getter.
   SmallVector<Pattern *, 3> Params;
   
@@ -1150,7 +1153,7 @@ static FuncDecl *createSetterFunc(SourceLoc SetLoc, Identifier SetName,
                                   SourceLoc SetNameLoc,
                                   SourceRange SetNameParens, TypeLoc ElementTy,
                                   Pattern *Indices, SourceLoc StaticLoc,
-                                  unsigned Flags, Parser *P) {
+                                  Parser::ParseDeclOptions Flags, Parser *P) {
   auto &Context = P->Context;
   
   // Create the parameter list(s) for the setter.
@@ -1231,7 +1234,7 @@ static FuncDecl *createSetterFunc(SourceLoc SetLoc, Identifier SetName,
 ///   set-name:
 ///     '(' identifier ')'
 /// \endverbatim
-bool Parser::parseGetSet(unsigned Flags, Pattern *Indices,
+bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          SourceLoc &LastValidLoc,
                          SourceLoc StaticLoc) {
@@ -1239,7 +1242,7 @@ bool Parser::parseGetSet(unsigned Flags, Pattern *Indices,
   Get = nullptr;
   Set = nullptr;
   
-  bool isInProtocol = Flags & PD_InProtocol;
+  bool isInProtocol = Flags.contains(PD_InProtocol);
   
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof)) {
@@ -1397,7 +1400,7 @@ bool Parser::parseGetSet(unsigned Flags, Pattern *Indices,
 ///   decl-var:
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
-void Parser::parseDeclVarGetSet(Pattern &pattern, unsigned Flags,
+void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                                 SourceLoc StaticLoc) {
   bool Invalid = false;
   
@@ -1472,7 +1475,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, unsigned Flags,
 ///      'type'? 'var' attribute-list pattern initializer? (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
-ParserStatus Parser::parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
+ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
                                   SourceLoc StaticLoc) {
   bool isLet = Tok.is(tok::kw_let);
@@ -1755,9 +1758,9 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
-Parser::parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
+Parser::parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
                       DeclAttributes &Attributes) {
-  bool HasContainerType = Flags & PD_HasContainerType;
+  bool HasContainerType = Flags.contains(PD_HasContainerType);
 
   // Reject 'type' functions at global scope.
   if (StaticLoc.isValid() && !HasContainerType) {
@@ -1952,7 +1955,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 ///   decl-enum-body:
 ///      decl*
 /// \endverbatim
-ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
+ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                                              DeclAttributes &Attributes) {
   SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
@@ -2004,10 +2007,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
   } else {
     ContextChange CC(*this, UD);
     Scope S(this, ScopeKind::ClassBody);
+    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement |
+                             PD_DisallowStoredInstanceVar);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_enum,
-                                PD_HasContainerType | PD_AllowEnumElement |
-                                PD_DisallowStoredInstanceVar))
+                                Options))
       Status.setIsParseError();
   }
 
@@ -2033,7 +2037,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(unsigned Flags,
 ///   decl-enum-element:
 ///      'case' attribute-list enum-case (',' enum-case)*
 /// \endverbatim
-ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
+ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes,
                                        llvm::SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
@@ -2169,7 +2173,7 @@ ParserStatus Parser::parseDeclEnumCase(unsigned Flags,
 /// \endverbatim
 bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                      SourceLoc LBLoc, SourceLoc &RBLoc,
-                                     Diag<> ErrorDiag, unsigned flags) {
+                                     Diag<> ErrorDiag, ParseDeclOptions flags) {
   bool previousHadSemi = true;
   parseList(tok::r_brace, LBLoc, RBLoc, tok::semi, /*OptionalSep=*/true,
             /*AllowSepAfterLast=*/false, ErrorDiag, [&]() -> ParserStatus {
@@ -2208,7 +2212,7 @@ bool Parser::parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
 ///   decl-struct-body:
 ///      decl*
 /// \endverbatim
-ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
+ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
@@ -2295,7 +2299,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(unsigned Flags,
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
-ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
+ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes) {
   SourceLoc ClassLoc = consumeToken(tok::kw_class);
 
@@ -2352,9 +2356,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
     // Parse the body.
     ContextChange CC(*this, CD);
     Scope S(this, ScopeKind::ClassBody);
+    ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_class,
-                                PD_HasContainerType | PD_AllowDestructor))
+                                Options))
       Status.setIsParseError();
   }
 
@@ -2384,7 +2389,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(unsigned Flags,
 ///      decl-typealias
 /// \endverbatim
 ParserResult<ProtocolDecl> Parser::
-parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
+parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   SourceLoc NameLoc;
@@ -2428,12 +2433,13 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
       Status.setIsParseError();
     } else {
       // Parse the members.
+      ParseDeclOptions Options(PD_HasContainerType | PD_DisallowComputedVar |
+                               PD_DisallowNominalTypes |
+                               PD_DisallowInit | PD_DisallowTypeAliasDef |
+                               PD_InProtocol);
       if (parseNominalDeclMembers(Members, LBraceLoc, RBraceLoc,
                                   diag::expected_rbrace_protocol,
-                                  PD_HasContainerType | PD_DisallowComputedVar |
-                                  PD_DisallowNominalTypes |
-                                  PD_DisallowInit | PD_DisallowTypeAliasDef |
-                                  PD_InProtocol))
+                                  Options))
         Status.setIsParseError();
     }
 
@@ -2460,7 +2466,7 @@ parseDeclProtocol(unsigned Flags, DeclAttributes &Attributes) {
 ///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
 /// \endverbatim
-ParserStatus Parser::parseDeclSubscript(unsigned Flags,
+ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                         DeclAttributes &Attributes,
                                         SmallVectorImpl<Decl *> &Decls) {
   ParserStatus Status;
@@ -2589,7 +2595,7 @@ ParserStatus Parser::parseDeclSubscript(unsigned Flags,
 }
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
+Parser::parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 
@@ -2688,7 +2694,7 @@ Parser::parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes) {
 }
 
 ParserResult<DestructorDecl> Parser::
-parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes) {
+parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
 
   ParserResult<Pattern> Params;

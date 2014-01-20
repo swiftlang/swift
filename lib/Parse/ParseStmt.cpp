@@ -251,7 +251,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         NeedParseErrorRecovery = true;
         if (Status.hasCodeCompletion() && IsTopLevel &&
             isCodeCompletionFirstPass()) {
-          consumeDecl(BeginParserPosition, 0U, IsTopLevel);
+          consumeDecl(BeginParserPosition, None, IsTopLevel);
           return Status;
         }
       }
@@ -670,7 +670,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
-    ParserStatus VarDeclStatus = parseDeclVar(false, Attributes, FirstDecls,
+    ParserStatus VarDeclStatus = parseDeclVar(None, Attributes, FirstDecls,
                                               SourceLoc());
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery

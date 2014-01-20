@@ -19,12 +19,13 @@
 
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/Optional.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
+#include "swift/Basic/Optional.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {
@@ -480,16 +481,8 @@ public:
 
   bool parseTopLevel();
 
-  /// Skips the current token if it is '}', and emits a diagnostic.
-  ///
-  /// \returns true if any tokens were skipped.
-  bool skipExtraTopLevelRBraces();
-
-  void consumeDecl(ParserPosition BeginParserPosition, unsigned Flags,
-                   bool IsTopLevel);
-  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, unsigned Flags);
-  void parseDeclDelayed();
-  enum {
+  /// Flags that control the parsing of declarations.
+  enum ParseDeclFlags {
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_DisallowStoredInstanceVar = 1 << 2,
@@ -502,7 +495,20 @@ public:
     PD_AllowEnumElement     = 1 << 9,
     PD_InProtocol           = 1 << 10,
   };
-  
+
+  /// Options that control the parsing of declarations.
+  typedef OptionSet<ParseDeclFlags> ParseDeclOptions;
+
+  /// Skips the current token if it is '}', and emits a diagnostic.
+  ///
+  /// \returns true if any tokens were skipped.
+  bool skipExtraTopLevelRBraces();
+
+  void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
+                   bool IsTopLevel);
+  ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
+  void parseDeclDelayed();
+
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
                                             bool isAssociatedType,
                                             DeclAttributes &Attributes);
@@ -534,49 +540,49 @@ public:
   bool parseTypeAttribute(TypeAttributes &Attributes);
   
   
-  ParserResult<ImportDecl> parseDeclImport(unsigned Flags,
+  ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited);
-  ParserResult<ExtensionDecl> parseDeclExtension(unsigned Flags,
+  ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
-  ParserResult<EnumDecl> parseDeclEnum(unsigned Flags,
+  ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
-  ParserStatus parseDeclEnumCase(unsigned Flags, DeclAttributes &Attributes,
+  ParserStatus parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                  SmallVectorImpl<Decl *> &decls);
   bool parseNominalDeclMembers(SmallVectorImpl<Decl *> &memberDecls,
                                SourceLoc LBLoc, SourceLoc &RBLoc,
-                               Diag<> ErrorDiag, unsigned flags);
+                               Diag<> ErrorDiag, ParseDeclOptions flags);
   ParserResult<StructDecl>
-  parseDeclStruct(unsigned Flags, DeclAttributes &Attributes);
+  parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
-  parseDeclClass(unsigned Flags, DeclAttributes &Attributes);
-  ParserStatus parseDeclVar(unsigned Flags, DeclAttributes &Attributes,
+  parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
+  ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc);
-  bool parseGetSet(unsigned Flags,
+  bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc);
-  void parseDeclVarGetSet(Pattern &pattern, unsigned Flags,
+  void parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                           SourceLoc StaticLoc);
   
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
-  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, unsigned Flags,
+  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
-  ParserResult<ProtocolDecl> parseDeclProtocol(unsigned Flags,
+  ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
   
-  ParserStatus parseDeclSubscript(unsigned Flags,
+  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
-  parseDeclConstructor(unsigned Flags, DeclAttributes &Attributes);
+  parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<DestructorDecl>
-  parseDeclDestructor(unsigned Flags, DeclAttributes &Attributes);
+  parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
   void addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns,
                                     DeclContext *DC);
