@@ -266,9 +266,13 @@ namespace {
     }
 
     Type VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
-      // There is no sensible way to describe functions without prototypes
-      // in the Swift type system.
-      return Type();
+      // Import functions without protocols as functions with no parameters.
+      auto resultTy = Impl.importType(type->getResultType(),
+                                      ImportTypeKind::Result);
+      if (!resultTy)
+        return Type();
+
+      return FunctionType::get(TupleType::getEmpty(Impl.SwiftContext),resultTy);
     }
 
     Type VisitParenType(const clang::ParenType *type) {

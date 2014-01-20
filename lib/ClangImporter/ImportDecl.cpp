@@ -1327,10 +1327,6 @@ namespace {
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       decl = decl->getMostRecentDecl();
-      if (!decl->hasPrototype()) {
-        // We can't import a function without a prototype.
-        return nullptr;
-      }
 
       // FIXME: We can't IRgen inline functions, so don't import them.
       if (decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>()) {
