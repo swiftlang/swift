@@ -26,6 +26,7 @@ add_swift_library(swiftAST
   Stmt.cpp
   Type.cpp
   TypeRepr.cpp
+  TypeWalker.cpp
   Verifier.cpp
   DEPENDS swiftBasic LLVMCore)
 

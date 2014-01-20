@@ -33,6 +33,7 @@ class LazyResolver;
 class Module;
 class TypeBase;
 class Type;
+class TypeWalker;
 class SubstitutableType;
 
 /// \brief Type substitution mapping from substitutable types to their
@@ -54,6 +55,14 @@ public:
   
   TypeBase *operator->() const { return Ptr; }
   explicit operator bool() const { return Ptr != 0; }
+
+  /// Walk this type.
+  ///
+  /// Returns true if the walk was aborted.
+  bool walk(TypeWalker &walker) const;
+  bool walk(TypeWalker &&walker) const {
+    return walk(walker);
+  }
 
   /// Look through the given type and its children to find a type for
   /// which the given predicate returns true.

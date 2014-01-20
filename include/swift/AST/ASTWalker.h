@@ -166,7 +166,7 @@ public:
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
-  virtual ~ASTWalker() {}
+  virtual ~ASTWalker() = default;
   
   virtual void anchor();
 };
