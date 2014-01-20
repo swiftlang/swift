@@ -105,8 +105,8 @@ static SILValue functionSingleReturn(SILFunction *F) {
 }
 
 // Strip the @InOut qualifier.
-CanType stripInOutQualifier(CanType Ty) {
-  CanType ConcreteTy = Ty;
+CanType stripInOutQualifier(SILType Ty) {
+  CanType ConcreteTy = Ty.getSwiftType();
   if (InOutType *IOT = dyn_cast<InOutType>(ConcreteTy))
     ConcreteTy = IOT->getObjectType()->getCanonicalType();
   return ConcreteTy;
@@ -311,30 +311,23 @@ static void replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   AI->eraseFromParent();
 }
 
-void SILDevirtualizer::optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AMI);
-
-  SILDeclRef Member = AMI->getMember();
-  // For each protocol that our type conforms to:
-  ProtocolConformance *Conf = AMI->getConformance();
-  if (!Conf)
-    return;
-
-  // Strip the @InOut qualifier.
-  CanType ConcreteTy = stripInOutQualifier(AMI->getLookupType().getSwiftType());
-
-  // Scan all of the witness tables in search of a matching method.
-  for (SILWitnessTable &Witness : AMI->getModule().getWitnessTableList()) {
+/// \brief Given a protocol \p Proto, a member method \p Member and a concrete
+/// class type \p ConcreteTy, search the witness tables and return the static
+/// function that matches the member. Notice that we do not scan the class
+/// hierarchy, just the concrete class type.
+SILFunction *
+findFuncInWitnessTable(SILDeclRef Member, CanType ConcreteTy,
+                       ProtocolDecl *Proto, SILModule &Mod) {
+  // Scan all of the witness tables in search of a matching protocol and class.
+  for (SILWitnessTable &Witness : Mod.getWitnessTableList()) {
     ProtocolDecl *WitnessProtocol = Witness.getConformance()->getProtocol();
 
     // Is this the correct protocol?
-    if (WitnessProtocol != Conf->getProtocol() ||
+    if (WitnessProtocol != Proto ||
         !ConcreteTy.getPointer()->isEqual(Witness.getConformance()->getType()))
       continue;
 
-    DEBUG(llvm::dbgs() << " *** Found witness table for : " << *AMI);
-
-    // Okay, we found the right witness table. Now look for the method.
+    // Okay, we found the correct witness table. Now look for the method.
     for (auto &Entry : Witness.getEntries()) {
       // Look at method entries only.
       if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
@@ -345,22 +338,42 @@ void SILDevirtualizer::optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI) {
       if (MethodEntry.Requirement != Member)
         continue;
 
-      // We found the correct witness function. Devirtualize this Apply.
-      DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AMI);
-      SILFunction *StaticRef = MethodEntry.Witness;
-
-      FunctionRefInst *FRI =
-        new (AMI->getModule()) FunctionRefInst(AMI->getLoc(), StaticRef);
-      AMI->getParent()->getInstList().insert(AMI, FRI);
-      AMI->replaceAllUsesWith(FRI);
-
-      NumAMI++;
-      Changed = true;
-      return;
+      return MethodEntry.Witness;
     }
   }
+  return nullptr;
+}
 
-  DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *AMI);
+void SILDevirtualizer::optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AMI);
+
+  SILDeclRef Member = AMI->getMember();
+  // For each protocol that our type conforms to:
+  ProtocolConformance *Conf = AMI->getConformance();
+  if (!Conf)
+    return;
+
+  // Strip the @InOut qualifier.
+  CanType ConcreteTy = stripInOutQualifier(AMI->getLookupType());
+
+  SILFunction *StaticRef = findFuncInWitnessTable(Member, ConcreteTy,
+                                                  Conf->getProtocol(),
+                                                  AMI->getModule());
+
+  // We found the correct witness function. Devirtualize this Apply.
+  if (!StaticRef) {
+    DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *AMI);
+    return;
+  }
+
+  FunctionRefInst *FRI =
+  new (AMI->getModule()) FunctionRefInst(AMI->getLoc(), StaticRef);
+  AMI->getParent()->getInstList().insert(AMI, FRI);
+  AMI->replaceAllUsesWith(FRI);
+
+  DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AMI);
+  NumAMI++;
+  Changed = true;
 }
 
 void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
@@ -415,45 +428,24 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     return;
 
   // Strip the @InOut qualifier.
-  CanType ConcreteTy =
-    stripInOutQualifier(Init->getConcreteType().getSwiftType());
+  CanType ConcreteTy = stripInOutQualifier(Init->getConcreteType());
 
-  SILDeclRef Member = PMI->getMember();
   // For each protocol that our type conforms to:
   for (auto &Conf : Init->getConformances()) {
-    // Scan all of the witness tables in search of a matching method.
-    for (SILWitnessTable &Witness : AI->getModule().getWitnessTableList()) {
-      ProtocolDecl *WitnessProtocol = Witness.getConformance()->getProtocol();
-      // Is this the correct protocol?
+    SILFunction *StaticRef = findFuncInWitnessTable(PMI->getMember(),
+                                                    ConcreteTy,
+                                                    Conf->getProtocol(),
+                                                    Init->getModule());
+    if (!StaticRef)
+      continue;
 
-      if (WitnessProtocol != Conf->getProtocol() ||
-          !ConcreteTy.getPointer()->isEqual(
-               Witness.getConformance()->getType()))
-        continue;
-
-      DEBUG(llvm::dbgs() << " *** Found witness table for : " << *Init);
-
-      // Okay, we found the right witness table. Now look for the method.
-      for (auto &Entry : Witness.getEntries()) {
-        // Look at method entries only.
-        if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
-          continue;
-
-        SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
-        // Check if this is the member we were looking for.
-        if (MethodEntry.Requirement != Member)
-          continue;
-
-        // We found the correct witness function. Devirtualize this Apply.
-        DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AI);
-        SILFunction *StaticRef = MethodEntry.Witness;
-        replaceDynApplyWithStaticApply(AI, StaticRef, Init, PEI);
-        NumDynApply++;
-        Changed = true;
-        return;
-      }
-    }
+    DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AI);
+    replaceDynApplyWithStaticApply(AI, StaticRef, Init, PEI);
+    NumDynApply++;
+    Changed = true;
+    return;
   }
+
   DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *PMI);
 }
 
