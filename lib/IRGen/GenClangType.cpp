@@ -51,6 +51,10 @@ static const clang::CanQualType getClangBuiltinTypeFromKind(
   }
 }
 
+static clang::CanQualType getClangSelectorType(
+  const clang::ASTContext &clangCtx) {
+  return clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
+}
 
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   // First attempt a lookup in our map of imported structs.
@@ -74,26 +78,20 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
 
   // Handle other imported types.
 
-#define CHECK_CLANG_TYPE_MATCH(TYPE, NAME, FIELD)                         \
-  if (auto lookupTy = getNamedSwiftType(TYPE->getDecl()->getDeclContext(),\
-                                        NAME))                            \
-    if (lookupTy->isEqual(type))                                          \
-      return clangCtx.FIELD;
+#define CHECK_CLANG_TYPE_MATCH(TYPE, NAME, RESULT)                           \
+  if (auto lookupTy = getNamedSwiftType((TYPE)->getDecl()->getDeclContext(), \
+                                        (NAME)))                             \
+    if (lookupTy->isEqual(type))                                             \
+      return (RESULT);
 
-  CHECK_CLANG_TYPE_MATCH(type, "COpaquePointer", VoidPtrTy);
-  CHECK_CLANG_TYPE_MATCH(type, "Bool", SignedCharTy);
-  CHECK_CLANG_TYPE_MATCH(type, "ObjCBool", ObjCBuiltinBoolTy);
-  // FIXME: This is sufficient for ABI type generation, but should probably
-  //        be const char* for type encoding.
-  CHECK_CLANG_TYPE_MATCH(type, "CString", VoidPtrTy);
+  CHECK_CLANG_TYPE_MATCH(type, "COpaquePointer", clangCtx.VoidPtrTy);
+  CHECK_CLANG_TYPE_MATCH(type, "Bool", clangCtx.SignedCharTy);
+  CHECK_CLANG_TYPE_MATCH(type, "ObjCBool", clangCtx.ObjCBuiltinBoolTy);
+  // FIXME: This is sufficient for ABI type generation, but should
+  //        probably be const char* for type encoding.
+  CHECK_CLANG_TYPE_MATCH(type, "CString", clangCtx.VoidPtrTy);
+  CHECK_CLANG_TYPE_MATCH(type, "Selector", getClangSelectorType(clangCtx));
 #undef CHECK_CLANG_TYPE_MATCH
-  if (auto lookupTy = getNamedSwiftType(type->getDecl()->getDeclContext(),
-                                        "Selector"))
-    if (lookupTy->isEqual(type)) {
-      clang::QualType QT =
-        clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
-      return clangCtx.getCanonicalType(QT);
-    }
   // FIXME: Handle other structs resulting from imported non-struct Clang types.
   return clang::CanQualType();
 }
