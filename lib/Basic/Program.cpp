@@ -33,6 +33,9 @@ int swift::ExecuteInPlace(const char *Program, const char **args,
 
   return result;
 #else
-  return llvm::sys::ExecuteAndWait(Program, args, env);
+  int result = llvm::sys::ExecuteAndWait(Program, args, env);
+  if (result >= 0)
+    exit(result);
+  return result;
 #endif
 }

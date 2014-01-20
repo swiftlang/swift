@@ -26,14 +26,10 @@ namespace swift {
 /// environment. If not provided, the current program's environment will be
 /// used.
 ///
-/// \returns If this process was reexecuted as the given program, this function
-/// will not return. Otherwise, -1 indicates a failure to execute, and other
-/// values are the result code of the program.
-///
-/// \note If the current process cannot be reexecuted as the given program,
-/// this function will defer to \ref llvm::sys::ExecuteAndWait(), so callers
-/// must be prepared to resume normal execution if this function returns a
-/// non-negative value.
+/// \returns Typically, this function will not return, as the current process
+/// will no longer exist, or it will call exit() if the program was successfully
+/// executed. In the event of an error, this function will return a negative
+/// value indicating a failure to execute.
 int ExecuteInPlace(const char *Program, const char **args,
                    const char **env = nullptr);
 
