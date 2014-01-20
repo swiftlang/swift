@@ -32,6 +32,7 @@ static const unsigned RecursionMaxDepth = 8;
 
 STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
+STATISTIC(NumAMI, "Number of archetype_method devirtualzied");
 
 namespace {
 
@@ -44,6 +45,7 @@ struct SILDevirtualizer {
 
   void optimizeClassMethodInst(ClassMethodInst *CMI);
   void optimizeApplyInst(ApplyInst *Inst);
+  void optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI);
 
   bool run() {
     for (auto &F : *M)
@@ -55,6 +57,9 @@ struct SILDevirtualizer {
             optimizeClassMethodInst(CMI);
           else if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
             optimizeApplyInst(AI);
+          else if (ArchetypeMethodInst *AMI =
+                   dyn_cast<ArchetypeMethodInst>(Inst))
+            optimizeArchetypeMethodInst(AMI);
         }
       }
 
@@ -97,6 +102,14 @@ static SILValue functionSingleReturn(SILFunction *F) {
   if (!RI)
     return SILValue();
   return RI->getOperand();
+}
+
+// Strip the @InOut qualifier.
+CanType stripInOutQualifier(CanType Ty) {
+  CanType ConcreteTy = Ty;
+  if (InOutType *IOT = dyn_cast<InOutType>(ConcreteTy))
+    ConcreteTy = IOT->getObjectType()->getCanonicalType();
+  return ConcreteTy;
 }
 
 /// \brief Scan the use-def chain and skip cast instructions that don't change
@@ -298,6 +311,58 @@ static void replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   AI->eraseFromParent();
 }
 
+void SILDevirtualizer::optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AMI);
+
+  SILDeclRef Member = AMI->getMember();
+  // For each protocol that our type conforms to:
+  ProtocolConformance *Conf = AMI->getConformance();
+  if (!Conf)
+    return;
+
+  // Strip the @InOut qualifier.
+  CanType ConcreteTy = stripInOutQualifier(AMI->getLookupType().getSwiftType());
+
+  // Scan all of the witness tables in search of a matching method.
+  for (SILWitnessTable &Witness : AMI->getModule().getWitnessTableList()) {
+    ProtocolDecl *WitnessProtocol = Witness.getConformance()->getProtocol();
+
+    // Is this the correct protocol?
+    if (WitnessProtocol != Conf->getProtocol() ||
+        !ConcreteTy.getPointer()->isEqual(Witness.getConformance()->getType()))
+      continue;
+
+    DEBUG(llvm::dbgs() << " *** Found witness table for : " << *AMI);
+
+    // Okay, we found the right witness table. Now look for the method.
+    for (auto &Entry : Witness.getEntries()) {
+      // Look at method entries only.
+      if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
+        continue;
+
+      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+      // Check if this is the member we were looking for.
+      if (MethodEntry.Requirement != Member)
+        continue;
+
+      // We found the correct witness function. Devirtualize this Apply.
+      DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AMI);
+      SILFunction *StaticRef = MethodEntry.Witness;
+
+      FunctionRefInst *FRI =
+        new (AMI->getModule()) FunctionRefInst(AMI->getLoc(), StaticRef);
+      AMI->getParent()->getInstList().insert(AMI, FRI);
+      AMI->replaceAllUsesWith(FRI);
+
+      NumAMI++;
+      Changed = true;
+      return;
+    }
+  }
+
+  DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *AMI);
+}
+
 void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AI);
   // Devirtualize protocol_method + project_existential + init_existential
@@ -350,10 +415,8 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     return;
 
   // Strip the @InOut qualifier.
-  CanType ConcreteTy = Init->getConcreteType().getSwiftType();
-  if (InOutType *IOT = dyn_cast<InOutType>(ConcreteTy)) {
-    ConcreteTy = IOT->getObjectType()->getCanonicalType();
-  }
+  CanType ConcreteTy =
+    stripInOutQualifier(Init->getConcreteType().getSwiftType());
 
   SILDeclRef Member = PMI->getMember();
   // For each protocol that our type conforms to:
