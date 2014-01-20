@@ -2327,13 +2327,13 @@ public:
 class AbstractStorageDecl : public ValueDecl {
 public:
   enum StorageKindTy {
-    /// Stored - There are bits stored in memory for this object, and they are
-    /// accessed directly.
+    /// There are bits stored in memory for this object, and they are accessed
+    /// directly.
     Stored,
 
-    /// Computed - There is no memory associated with this decl anywhere.  It is
-    /// accessed by calling a getter and setter.  If the setter is absent, then
-    /// the value is only loadable, but not storable.
+    /// There is no memory associated with this decl anywhere.  It is accessed
+    /// by calling a getter and setter.  If the setter is absent, then the value
+    /// is only loadable, but not storable.
     Computed
   };
 private:
