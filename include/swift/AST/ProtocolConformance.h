@@ -181,12 +181,20 @@ public:
     }
   }
 
-  /// Retrieve the protocol conformance for a directly-inherited protocol.
+  /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const {
     auto &inherited = getInheritedConformances();
     auto known = inherited.find(protocol);
-    assert(known != inherited.end());
-    return known->second;
+    if (known != inherited.end())
+      return known->second;
+
+    // The inherited conformance must be in one of the superclasses.
+    for (auto &inheritedMapping : inherited)
+      if (inheritedMapping.first->inheritsFrom(protocol))
+        return inheritedMapping.second->
+          getInheritedConformance(protocol);
+
+    llvm_unreachable("Can't find the inherited conformance.");
   }
 
   /// Retrieve the complete set of protocol conformances for directly inherited

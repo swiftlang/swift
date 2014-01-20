@@ -85,12 +85,19 @@ private:
       // and also to this substitution. Notice that we preserve the order of
       // protocols that the Archetype conforms to.
       //
-      // For all protocol that our Archetype conforms to:
+      // For all protocols that our Archetype conforms to:
       for (auto PC : Ap.Archetype->getConformsTo()) {
         bool Found = false;
         for (auto CallerCon : C.Conformance) {
+          // The protocol conformance can be an exact match:
           if (CallerCon->getProtocol() == PC) {
             NewConf.push_back(CallerCon);
+            Found = true;
+            break;
+          }
+          // Or it can be inherited:
+          if (CallerCon->getProtocol()->inheritsFrom(PC)) {
+            NewConf.push_back(CallerCon->getInheritedConformance(PC));
             Found = true;
             break;
           }
@@ -136,6 +143,65 @@ private:
         getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
         TempSubstList, Args, Inst->isTransparent());
    doPostProcess(Inst, N);
+  }
+
+  void visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
+    DEBUG(llvm::errs()<<"Specializing : " << *Inst << "\n");
+
+    // This is the substitution for the specialzied type from the Caller's
+    // substitution list.
+    Substitution CallerSubst =
+      getCallerSubstitutionForCalleSub(Inst->getLookupType().getSwiftType());
+
+    // Initialize the new protocol conformance with the original conformance.
+    ProtocolConformance *PC = Inst->getConformance();
+
+    // This is the protocol that the *member* belongs to:
+    ProtocolDecl *PDC =
+      cast<ProtocolDecl>(Inst->getMember().getDecl()->getDeclContext());
+
+    DEBUG(llvm::errs()<<"Replacing conformance for protocol: " <<
+          PDC->getName() << "\n");
+
+    // If the caller to the specialized function substitutes the protocol
+    // that the ArchetypeMethodInst conforms to then scan the list of protocols
+    // and find the right substitution.
+    if (CallerSubst.Archetype) {
+      // This is the protocol that the ArchetypeMethodInst conforms to.
+
+      DEBUG(llvm::errs() << "Caller substitution conforms to " <<
+            CallerSubst.Conformance.size() << " types.\n");
+      for (auto CallerCon : CallerSubst.Conformance) {
+        DEBUG(llvm::errs() << CallerCon->getProtocol()->getName() << "\n");
+      }
+
+      for (auto CallerCon : CallerSubst.Conformance) {
+        if (CallerCon->getProtocol() == PDC) {
+          PC = CallerCon;
+          break;
+        }
+        if (CallerCon->getProtocol()->inheritsFrom(PDC)) {
+           DEBUG(llvm::errs()<<"Substituting " << CallerCon->getProtocol()->
+                 getName() << " that inherits from " << PDC->getName() << "\n");
+          PC = CallerCon->getInheritedConformance(PDC);
+          assert(PC && "Can't find the inherited conformance");
+          break;
+        }
+      }
+    }
+
+    if (Inst->getLookupType().getAs<ArchetypeType>()) {
+      assert(PC && "Concrete types must conform to a protocol.");
+    }
+
+    doPostProcess(Inst,Builder.
+                  createArchetypeMethod(getOpLocation(Inst->getLoc()),
+                                        getOpType(Inst->getLookupType()),
+                                        getOpConformance(Inst->getLookupType(),
+                                                         PC),
+                                        Inst->getMember(),
+                                        getOpType(Inst->getType()),
+                                        Inst->isVolatile()));
   }
 
   /// Create a new empty function with the correct arguments and a unique name.
@@ -229,7 +295,7 @@ static bool canSpecializeFunction(SILFunction *F) {
   for (auto &BB : *F)
     for (auto &I : BB) {
       // We don't specialize ArchetypeMethod and PartialApply instructions.
-      if (isa<ArchetypeMethodInst>(&I) || isa<PartialApplyInst>(&I))
+      if (isa<PartialApplyInst>(&I))
         return false;
 
     }
