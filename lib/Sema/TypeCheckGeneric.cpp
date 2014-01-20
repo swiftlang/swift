@@ -260,16 +260,14 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     case RequirementKind::Conformance: {
       // Validate the types.
       if (tc.validateType(req.getSubjectLoc(), parentDC,
-                          /*allowUnboundGenerics=*/false,
-                          &resolver)) {
+                          TypeResolutionOptions(), &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
       if (tc.validateType(req.getConstraintLoc(), parentDC,
-                          /*allowUnboundGenerics=*/false,
-                          &resolver)) {
+                          TypeResolutionOptions(), &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -302,16 +300,14 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
 
     case RequirementKind::SameType:
       if (tc.validateType(req.getFirstTypeLoc(), parentDC,
-                          /*allowUnboundGenerics=*/false,
-                          &resolver)) {
+                          TypeResolutionOptions(), &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
       if (tc.validateType(req.getSecondTypeLoc(), parentDC,
-                          /*allowUnboundGenerics=*/false,
-                          &resolver)) {
+                          TypeResolutionOptions(), &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -608,8 +604,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
       if (tc.validateType(fn->getBodyResultTypeLoc(), fn,
-                          /*allowUnboundGenerics=*/false,
-                          &resolver)) {
+                          TypeResolutionOptions(), &resolver)) {
         badType = true;
       }
 

@@ -774,7 +774,7 @@ namespace {
       // Validate the element type.
       auto &tc = CS.getTypeChecker();
       if (tc.validateType(expr->getElementTypeLoc(), CS.DC,
-                          /*allowUnboundGenerics=*/true))
+                          TC_AllowUnboundGenerics))
         return nullptr;
 
       // Open up the element type.
@@ -942,7 +942,7 @@ namespace {
       
       // Validate the resulting type.
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
-                          /*allowUnboundGenerics=*/true))
+                          TC_AllowUnboundGenerics))
         return nullptr;
 
       // Open the type we're casting to.
@@ -988,7 +988,7 @@ namespace {
       // Validate the type.
       auto &tc = CS.getTypeChecker();
       if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
-                          /*allowUnboundGenerics=*/true))
+                          TC_AllowUnboundGenerics))
         return nullptr;
 
       // Open up the type we're checking.

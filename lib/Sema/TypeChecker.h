@@ -275,27 +275,17 @@ public:
   /// \param Loc The type (with source location information) to validate.
   /// If the type has already been validated, returns immediately.
   ///
-  /// \param isSILType Whether to apply Swift or SIL type formation rules.
-  ///
   /// \param DC The context that the type appears in.
   ///
-  /// \param allowUnboundGenerics Whether the allow unbound generics at the
-  /// top level of the type. Defaults to 'false', and should only be enabled
-  /// in places where the generic arguments will be deduced, e.g., within an
-  /// expression.
+  /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, bool isSILType, DeclContext *DC,
-                    bool allowUnboundGenerics = false,
+  bool validateType(TypeLoc &Loc, DeclContext *DC,
+                    TypeResolutionOptions options = TypeResolutionOptions(),
                     GenericTypeResolver *resolver = nullptr);
-  bool validateType(TypeLoc &loc, DeclContext *DC,
-                    bool allowUnboundGenerics = false,
-                    GenericTypeResolver *resolver = nullptr) {
-    return validateType(loc, false, DC, allowUnboundGenerics, resolver);
-  }
 
   /// \brief Resolves a TypeRepr to a type.
   ///

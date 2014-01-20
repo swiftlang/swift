@@ -388,9 +388,9 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedTypeLoc().wasValidated())
     return;
   
-  // FIXME: Should allow bound generics here as well.
+  // FIXME: Should require bound generics here.
   if (TC.validateType(ED->getExtendedTypeLoc(), ED->getDeclContext(),
-                      /*allowUnboundGenerics=*/true)) {
+                      TC_AllowUnboundGenerics)) {
     ED->setInvalid();
     return;
   }
@@ -737,12 +737,16 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                                    bool isSILType, DeclContext *DC,
                                    bool ProduceDiagnostics) {
+  TypeResolutionOptions options;
+  if (isSILType)
+    options |= TC_SILType;
+
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, isSILType, DC);
+    return TypeChecker(Ctx).validateType(T, DC, options);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, isSILType, DC);
+    return TypeChecker(Ctx, Diags).validateType(T, DC, options);
   }
 }
 

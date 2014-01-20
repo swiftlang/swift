@@ -473,8 +473,7 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
 
   bool hadError = false;
   TypeLoc &TL = TP->getTypeLoc();
-  bool allowUnknownTypes = options & TC_AllowUnspecifiedTypes;
-  if (TC.validateType(TL, DC, allowUnknownTypes, resolver))
+  if (TC.validateType(TL, DC, TypeResolutionOptions(options), resolver))
     hadError = true;
   Type Ty = TL.getType();
 

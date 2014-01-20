@@ -246,7 +246,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, /*allowUnboundGenerics=*/false, resolver)) {
+    if (validateType(inherited, DC, TypeResolutionOptions(), resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -973,8 +973,10 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // Check the pattern.
   // If we have an initializer, we can also have unknown types.
   unsigned options = 0;
-  if (binding->getInit())
+  if (binding->getInit()) {
     options |= TC_AllowUnspecifiedTypes;
+    options |= TC_AllowUnboundGenerics;
+  }
   if (tc.typeCheckPattern(binding->getPattern(),
                           binding->getDeclContext(),
                           options)) {
@@ -1212,8 +1214,7 @@ public:
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull() &&
-        TC.validateType(defaultDefinition, assocType->getDeclContext(),
-                        /*allowUnboundGenerics=*/false)) {
+        TC.validateType(defaultDefinition, assocType->getDeclContext())) {
       defaultDefinition.setInvalidType(TC.Context);
     }
   }
@@ -1622,8 +1623,7 @@ public:
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
-                          /*allowUnboundGenerics=*/false,
-                          resolver)) {
+                          TypeResolutionOptions(), resolver)) {
         badType = true;
       }
     }

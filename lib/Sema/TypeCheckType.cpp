@@ -210,8 +210,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, dc, /*allowUnboundGenerics=*/false,
-                     resolver))
+    if (validateType(genericArg, dc, TypeResolutionOptions(), resolver))
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
@@ -591,8 +590,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   return result.get<Type>();
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, bool isSILType, DeclContext *DC,
-                               bool allowUnboundGenerics,
+bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
+                               TypeResolutionOptions options,
                                GenericTypeResolver *resolver) {
   // FIXME: Verify that these aren't circular and infinite size.
   
@@ -601,11 +600,6 @@ bool TypeChecker::validateType(TypeLoc &Loc, bool isSILType, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    TypeResolutionOptions options;
-    if (isSILType)
-      options |= TC_SILType;
-    if (allowUnboundGenerics)
-      options |= TC_AllowUnboundGenerics;
     Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver),
                 true);
     return Loc.isError();
