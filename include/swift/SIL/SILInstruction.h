@@ -1222,11 +1222,10 @@ public:
 
   Operand *getOperandForField(const VarDecl *V) {
     // If V is null or is computed, there is no operand associated with it.
-    if (!V || V->isComputed())
-      return nullptr;
+    assert(V && !V->isComputed() &&
+           "getOperandForField only works with stored fields");
 
     StructDecl *S = getStructDecl();
-    assert(S && "A struct should always have a StructDecl associated with it");
 
     NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
     unsigned Index = 0;
@@ -1240,7 +1239,7 @@ public:
 
   StructDecl *getStructDecl() const {
     auto s = getType().getStructOrBoundGenericStruct();
-    assert(s);
+    assert(s && "A struct should always have a StructDecl associated with it");
     return s;
   }
 
