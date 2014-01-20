@@ -3261,7 +3261,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         auto fnType = closure->getType()->castTo<FunctionType>();
         Pattern *params = closure->getParams();
         if (tc.coercePatternToType(params, closure, fnType->getInput(),
-                                   TC_OverrideType))
+                                   TR_OverrideType))
           return { false, nullptr };
         closure->setParams(params);
 

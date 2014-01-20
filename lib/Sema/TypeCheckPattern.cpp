@@ -477,7 +477,7 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
     hadError = true;
   Type Ty = TL.getType();
 
-  if ((options & TC_Variadic) && !hadError) {
+  if ((options & TR_Variadic) && !hadError) {
     // FIXME: Use ellipsis loc for diagnostic.
     Ty = TC.getArraySliceType(TP->getLoc(), Ty);
     if (Ty.isNull())
@@ -500,7 +500,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolutionOptions subOptions = options - TC_Variadic;
+  TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -539,7 +539,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Named:
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
-    if (options & TC_AllowUnspecifiedTypes) {
+    if (options & TR_AllowUnspecifiedTypes) {
       return false;
     }
       
@@ -564,7 +564,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       bool isVararg = tuplePat->hasVararg() && i == e-1;
       TypeResolutionOptions eltOptions = subOptions;
       if (isVararg)
-        eltOptions |= TC_Variadic;
+        eltOptions |= TR_Variadic;
       if (typeCheckPattern(pattern, dc, eltOptions, resolver)){
         hadError = true;
         continue;
@@ -584,7 +584,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    if (!missingType && !(options & TC_AllowUnspecifiedTypes))
+    if (!missingType && !(options & TR_AllowUnspecifiedTypes))
       P->setType(TupleType::get(typeElts, Context));
     return false;
   }
@@ -602,7 +602,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
 bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                                       TypeResolutionOptions options,
                                       GenericTypeResolver *resolver) {
-  TypeResolutionOptions subOptions = options - TC_Variadic;
+  TypeResolutionOptions subOptions = options - TR_Variadic;
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
@@ -632,7 +632,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     if (!hadError) {
       if (!type->isEqual(TP->getType()) && !type->is<ErrorType>()) {
-        if (options & TC_OverrideType) {
+        if (options & TR_OverrideType) {
           TP->overwriteType(type);
         } else {
           // Complain if the types don't match exactly.
@@ -730,9 +730,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       else
         CoercionType = tupleTy->getFields()[i].getType();
 
-      TypeResolutionOptions subOptions = options - TC_Variadic;
+      TypeResolutionOptions subOptions = options - TR_Variadic;
       if (isVararg)
-        subOptions |= TC_Variadic;
+        subOptions |= TR_Variadic;
       hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
                                       resolver);
       if (!hadError)

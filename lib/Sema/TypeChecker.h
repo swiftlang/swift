@@ -174,25 +174,25 @@ public:
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
-enum TypeCheckFlags {
+enum TypeResolutionFlags {
   /// Whether to allow unspecified types within a pattern.
-  TC_AllowUnspecifiedTypes = 0x01,
+  TR_AllowUnspecifiedTypes = 0x01,
 
   /// Whether the pattern is variadic.
-  TC_Variadic = 0x02,
+  TR_Variadic = 0x02,
 
   /// Whether the given type can override the type of a typed pattern.
-  TC_OverrideType = 0x04,
+  TR_OverrideType = 0x04,
 
   /// Whether to allow unbound generic types.
-  TC_AllowUnboundGenerics = 0x08,
+  TR_AllowUnboundGenerics = 0x08,
 
   /// Whether we are validating the type for SIL.
-  TC_SILType = 0x10
+  TR_SILType = 0x10
 };
 
 /// Option set describing how type resolution should work.
-typedef OptionSet<TypeCheckFlags> TypeResolutionOptions;
+typedef OptionSet<TypeResolutionFlags> TypeResolutionOptions;
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
@@ -604,7 +604,7 @@ public:
   ///
   /// \param P The pattern to type check.
   /// \param dc The context in which type checking occurs.
-  /// \param options A combination of the flags in \c TypeCheckFlags.
+  /// \param options Options that control type resolution.
   /// \param resolver A generic type resolver.
   ///
   /// \returns true if any errors occurred during type checking.

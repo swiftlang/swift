@@ -687,12 +687,12 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr),
-                                    options.contains(TC_AllowUnboundGenerics),
+                                    options.contains(TR_AllowUnboundGenerics),
                                     /*diagnoseErrors*/ true,
                                     Resolver);
 
   case TypeReprKind::Function:
-    if (!(options & TC_SILType))
+    if (!(options & TR_SILType))
       return resolveASTFunctionType(cast<FunctionTypeRepr>(repr), options);
     return resolveSILFunctionType(cast<FunctionTypeRepr>(repr), options);
 
@@ -838,7 +838,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       calleeConvention = ParameterConvention::Direct_Guaranteed;
     }
 
-    if (options & TC_SILType) {
+    if (options & TR_SILType) {
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
     } else {
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
@@ -1180,7 +1180,7 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   
   // In SIL mode, a metatype must have a @thin or @!thin attribute, so metatypes
   // should have been lowered in resolveAttributedType.
-  if (options & TC_SILType) {
+  if (options & TR_SILType) {
     TC.diagnose(repr->getStartLoc(),
                 diag::sil_metatype_without_thinness_attribute);
     return MetatypeType::get(ty, /*isThin*/ false, Context);

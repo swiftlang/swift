@@ -974,8 +974,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have an initializer, we can also have unknown types.
   TypeResolutionOptions options;
   if (binding->getInit()) {
-    options |= TC_AllowUnspecifiedTypes;
-    options |= TC_AllowUnboundGenerics;
+    options |= TR_AllowUnspecifiedTypes;
+    options |= TR_AllowUnboundGenerics;
   }
   if (tc.typeCheckPattern(binding->getPattern(),
                           binding->getDeclContext(),

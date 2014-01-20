@@ -385,8 +385,8 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         // Validate the parameters.
         TypeResolutionOptions options;
-        options |= TC_AllowUnspecifiedTypes;
-        options |= TC_AllowUnboundGenerics;
+        options |= TR_AllowUnspecifiedTypes;
+        options |= TR_AllowUnboundGenerics;
         if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
@@ -833,7 +833,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // Apply the solution to the pattern as well.
       Pattern *pattern = Binding->getPattern();
       if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
-                                 expr->getType(), TC_OverrideType)) {
+                                 expr->getType(), TR_OverrideType)) {
         return nullptr;
       }
       Binding->setPattern(pattern);
