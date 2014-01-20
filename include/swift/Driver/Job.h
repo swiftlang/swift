@@ -92,14 +92,14 @@ class CommandOutput {
 
   llvm::DenseMap<types::ID, std::string> AdditionalOutputsMap;
 
-  Optional<StringRef> BaseInput;
+  StringRef BaseInput;
 
 public:
-  CommandOutput(Optional<StringRef> BaseInput)
+  CommandOutput(StringRef BaseInput)
       : CommandOutput(types::ID::TY_Nothing, StringRef(), BaseInput) {}
 
   CommandOutput(types::ID PrimaryOutputType, StringRef PrimaryOutputFilename,
-                Optional<StringRef> BaseInput)
+                StringRef BaseInput)
     : PrimaryOutputType(PrimaryOutputType),
       PrimaryOutputFilename(PrimaryOutputFilename), BaseInput(BaseInput) {}
 
@@ -109,7 +109,7 @@ public:
   void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
   Optional<StringRef> getAdditionalOutputForType(types::ID type) const;
 
-  Optional<StringRef> getBaseInput() const { return BaseInput; }
+  StringRef getBaseInput() const { return BaseInput; }
 };
 
 class Command : public Job {
