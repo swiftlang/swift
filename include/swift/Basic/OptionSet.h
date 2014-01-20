@@ -1,4 +1,4 @@
-//===--- OptionSet - Option Set Utility -------------------------*- C++ -*-===//
+//===-- OptionSet.h - Sets of boolean options -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
