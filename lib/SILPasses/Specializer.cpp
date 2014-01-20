@@ -146,7 +146,7 @@ private:
   }
 
   void visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
-    DEBUG(llvm::errs()<<"Specializing : " << *Inst << "\n");
+    DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
     // This is the substitution for the specialzied type from the Caller's
     // substitution list.
@@ -160,7 +160,7 @@ private:
     ProtocolDecl *PDC =
       cast<ProtocolDecl>(Inst->getMember().getDecl()->getDeclContext());
 
-    DEBUG(llvm::errs()<<"Replacing conformance for protocol: " <<
+    DEBUG(llvm::dbgs()<<"Replacing conformance for protocol: " <<
           PDC->getName() << "\n");
 
     // If the caller to the specialized function substitutes the protocol
@@ -169,10 +169,10 @@ private:
     if (CallerSubst.Archetype) {
       // This is the protocol that the ArchetypeMethodInst conforms to.
 
-      DEBUG(llvm::errs() << "Caller substitution conforms to " <<
+      DEBUG(llvm::dbgs() << "Caller substitution conforms to " <<
             CallerSubst.Conformance.size() << " types.\n");
       for (auto CallerCon : CallerSubst.Conformance) {
-        DEBUG(llvm::errs() << CallerCon->getProtocol()->getName() << "\n");
+        DEBUG(llvm::dbgs() << CallerCon->getProtocol()->getName() << "\n");
       }
 
       for (auto CallerCon : CallerSubst.Conformance) {
@@ -181,7 +181,7 @@ private:
           break;
         }
         if (CallerCon->getProtocol()->inheritsFrom(PDC)) {
-           DEBUG(llvm::errs()<<"Substituting " << CallerCon->getProtocol()->
+           DEBUG(llvm::dbgs()<<"Substituting " << CallerCon->getProtocol()->
                  getName() << " that inherits from " << PDC->getName() << "\n");
           PC = CallerCon->getInheritedConformance(PDC);
           assert(PC && "Can't find the inherited conformance");

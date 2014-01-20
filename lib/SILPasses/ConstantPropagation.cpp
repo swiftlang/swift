@@ -707,7 +707,7 @@ static bool isFoldable(SILInstruction *I) {
 }
 
 static bool CCPFunctionBody(SILFunction &F) {
-  DEBUG(llvm::errs() << "*** ConstPropagation processing: " << F.getName()
+  DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
 
   // The list of instructions whose evaluation resulted in errror or warning.

@@ -36,7 +36,7 @@ static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
 /// a live-in value can be provided to optimize out the reload.
 static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
                                    IsInitialization_t isInitialization) {
-  DEBUG(llvm::errs() << "  *** Lowering [isInit=" << (bool)isInitialization
+  DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << (bool)isInitialization
                      << "]: " << *Inst << "\n");
 
   ++NumAssignRewritten;
@@ -495,7 +495,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // As a debugging hack, print the instruction itself if there is no location
   // information.  This should never happen.
   if (Inst->getLoc().isNull())
-    llvm::errs() << "  the instruction: " << *Inst << "\n";
+    llvm::dbgs() << "  the instruction: " << *Inst << "\n";
 
   // Provide context as note diagnostics.
 
@@ -1486,7 +1486,7 @@ static void processMemoryObject(SILInstruction *I) {
       if (isa<MarkUninitializedInst>(UI->getUser()))
         return;
   
-  DEBUG(llvm::errs() << "*** Definite Init looking at: " << *I << "\n");
+  DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
   // Set up the datastructure used to collect the uses of the allocation.

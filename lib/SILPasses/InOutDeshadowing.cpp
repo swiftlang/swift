@@ -112,16 +112,16 @@ static bool processInOutValue(SILArgument *InOutArg) {
 
   for (auto UI : InOutArg->getUses())
     if (AllocStackInst *ASI = isCopyToOrFromStack(UI)) {
-      DEBUG(llvm::errs() << "    Promoting shadow variable " << *ASI);
+      DEBUG(llvm::dbgs() << "    Promoting shadow variable " << *ASI);
       promoteShadow(ASI, InOutArg);
       return true;
     }
 
   // If we fail, dump out some internal state.
   DEBUG({
-    llvm::errs() << "*** Failed to deshadow.  Uses:\n";
+    llvm::dbgs() << "*** Failed to deshadow.  Uses:\n";
     for (auto UI : InOutArg->getUses())
-      llvm::errs() << "    " << *UI->getUser();
+      llvm::dbgs() << "    " << *UI->getUser();
   });
   
   return false;
@@ -132,7 +132,7 @@ static bool processInOutValue(SILArgument *InOutArg) {
 //===----------------------------------------------------------------------===//
 
 void swift::performInOutDeshadowing(SILModule *M) {
-  DEBUG(llvm::errs() << "*** inout Deshadowing\n");
+  DEBUG(llvm::dbgs() << "*** inout Deshadowing\n");
 
   for (auto &Fn : *M) {
     if (Fn.empty()) continue;
@@ -145,7 +145,7 @@ void swift::performInOutDeshadowing(SILModule *M) {
     for (unsigned arg = 0, e = FTI->getInterfaceParameters().size(); arg != e; ++arg) {
       if (!FTI->getInterfaceParameters()[arg].isIndirectInOut()) continue;
 
-      DEBUG(llvm::errs() << "  " << Fn.getName() << ": argument #"
+      DEBUG(llvm::dbgs() << "  " << Fn.getName() << ": argument #"
                          << arg << "\n");
 
       if (processInOutValue(EntryBlock.getBBArgs()[arg]))

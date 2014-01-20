@@ -155,7 +155,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     }
 
     // Otherwise, this looks like it escapes.
-    DEBUG(llvm::errs() << "*** Failed to promote alloc_box in @"
+    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
           << "    Due to user: " << *User << "\n");
     
@@ -197,7 +197,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     }
 
     // Otherwise, this looks like it escapes.
-    DEBUG(llvm::errs() << "*** Failed to promote alloc_box in @"
+    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
           << "    Due to user: " << *User << "\n");
 
@@ -221,13 +221,13 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   if (LastRelease == nullptr && !lowering.isTrivial()) {
     // If we can't tell where the last release is, we don't know where to insert
     // the destroy_addr for this box.
-    DEBUG(llvm::errs() << "*** Failed to promote alloc_box: " << *ABI
+    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box: " << *ABI
           << "    Cannot determine location of the last release!\n"
           << *ABI->getParent()->getParent() << "\n");
     return false;
   }
 
-  DEBUG(llvm::errs() << "*** Promoting alloc_box to stack: " << *ABI);
+  DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
   
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
