@@ -510,7 +510,6 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValue lv = visitRec(e->getBase());
-  CanType baseTy = e->getBase()->getType()->getCanonicalType();
 
   LValueTypeData typeData =
     getMemberTypeData(gen, e->getMember().getDecl()->getType(), e);
@@ -519,45 +518,49 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
 
-  // If this is a stored variable not reflected as an Objective-C
-  // property, access with a fragile element reference.
-  if (!var->isComputed()
-      && (gen.AlwaysDirectStoredPropertyAccess
-          || !gen.SGM.requiresObjCDispatch(var))) {
-    // Find the substituted storage type.
-    SILType varStorageType =
-      gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
-    
-    // For static variables, emit a reference to the global variable backing
-    // them.
-    // FIXME: This has to be dynamically looked up for classes, and
-    // dynamically instantiated for generics.
-    if (var->isStatic()) {
-      auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
-        ->getInstanceType();
-      (void)baseMeta;
-      assert(!baseMeta->is<BoundGenericType>()
-             && "generic static stored properties not implemented");
-      assert((baseMeta->getStructOrBoundGenericStruct()
-              || baseMeta->getEnumOrBoundGenericEnum())
-         && "static stored properties for classes/protocols not implemented");
-      
-      return emitLValueForDecl(*this, e, e->getMember().getDecl(),
-                               getSubstFormalRValueType(e));
-    }
-    
-    if (!isa<LValueType>(baseTy)) {
-      assert(baseTy.hasReferenceSemantics());
-      lv.add<RefElementComponent>(var, varStorageType, typeData);
-    } else {
-      lv.add<StructElementComponent>(var, varStorageType, typeData);
-    }
+  // If this is a computed variable, or a stored property that we need to access
+  // through an Objective-C getter/setter, use a getter/setter lvalue.
+  if (var->isComputed() ||
+      (var->usesObjCGetterAndSetter() &&
+       !gen.AlwaysDirectStoredPropertyAccess)) {
+    // Otherwise, use the property accessors.
+    lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
+                                  typeData);
     return std::move(lv);
+
   }
 
-  // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
-                                typeData);
+  // Otherwise, the lvalue access is performed with a fragile element reference.
+  // Find the substituted storage type.
+  SILType varStorageType =
+    gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+    
+  // For static variables, emit a reference to the global variable backing
+  // them.
+  // FIXME: This has to be dynamically looked up for classes, and
+  // dynamically instantiated for generics.
+  if (var->isStatic()) {
+    auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
+      ->getInstanceType();
+    (void)baseMeta;
+    assert(!baseMeta->is<BoundGenericType>()
+           && "generic static stored properties not implemented");
+    assert((baseMeta->getStructOrBoundGenericStruct()
+            || baseMeta->getEnumOrBoundGenericEnum())
+       && "static stored properties for classes/protocols not implemented");
+    
+    return emitLValueForDecl(*this, e, e->getMember().getDecl(),
+                             getSubstFormalRValueType(e));
+  }
+
+  // For member variables, this access is done w.r.t. a base computation that
+  // was already emitted.  This member is accessed off of it.
+  if (!e->getBase()->getType()->is<LValueType>()) {
+    assert(e->getBase()->getType()->hasReferenceSemantics());
+    lv.add<RefElementComponent>(var, varStorageType, typeData);
+  } else {
+    lv.add<StructElementComponent>(var, varStorageType, typeData);
+  }
   return std::move(lv);
 }
 
