@@ -482,7 +482,9 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
   while (valueCount--) {
     auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
-    auto second = cast<ValueDecl>(getDecl(*rawIDIter++));
+    auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
+    assert(second || first->getAttrs().isOptional());
+
     unsigned substitutionCount = *rawIDIter++;
 
     SmallVector<Substitution, 8> substitutions;
@@ -499,7 +501,8 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
       witness = ConcreteDeclRef(ctx, second, substitutions);
 
     witnesses.insert(std::make_pair(first, witness));
-    ctx.recordConformingDecl(second, first);
+    if (second)
+      ctx.recordConformingDecl(second, first);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
