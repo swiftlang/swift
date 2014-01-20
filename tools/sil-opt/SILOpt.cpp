@@ -47,7 +47,6 @@ enum class PassKind {
   LowerAggregateInstrs,
   SROA,
   ARCOpts,
-  StripRuntimeChecks,
   StripDebugInfo,
 };
 
@@ -125,9 +124,6 @@ Passes(llvm::cl::desc("Passes:"),
                                    "arc-opts",
                                    "Perform automatic reference counting "
                                    "optimizations."),
-                        clEnumValN(PassKind::StripRuntimeChecks,
-                                   "strip-runtime-checks",
-                                   "Strip intrinsic runtime safety checks."),
                         clEnumValN(PassKind::StripDebugInfo,
                                    "strip-debug-info",
                                    "Strip debug info."),
@@ -258,9 +254,6 @@ int main(int argc, char **argv) {
       break;
     case PassKind::ARCOpts:
       performSILARCOpts(CI.getSILModule());
-      break;
-    case PassKind::StripRuntimeChecks:
-      performSILStripRuntimeChecks(CI.getSILModule());
       break;
     case PassKind::StripDebugInfo:
       performSILStripDebugInfo(CI.getSILModule());

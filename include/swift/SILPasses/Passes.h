@@ -107,9 +107,6 @@ namespace swift {
   /// \brief Remove redundant ARC memory operations.
   void performSILARCOpts(SILModule *M);
 
-  /// \brief Ruthlessly eliminate runtime checks.
-  void performSILStripRuntimeChecks(SILModule *M);
-
   /// \brief Eliminate debug info instructions.
   void performSILStripDebugInfo(SILModule *M);
   

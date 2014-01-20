@@ -23,7 +23,6 @@ add_swift_library(swiftSILPasses
   SILLowerAggregateInstrs.cpp
   SILSROA.cpp
   ARCOpts.cpp
-  StripRuntimeChecks.cpp
   StripDebugInfo.cpp
   DEPENDS swiftSILPassesUtils)
 
