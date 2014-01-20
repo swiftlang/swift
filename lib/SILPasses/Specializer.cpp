@@ -295,9 +295,10 @@ static bool canSpecializeFunction(SILFunction *F) {
   for (auto &BB : *F)
     for (auto &I : BB) {
       // We don't specialize the PartialApply instructions.
-      if (isa<PartialApplyInst>(&I))
-        return false;
-
+      if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(&I)) {
+        if (PAI->hasSubstitutions())
+          return false;
+      }
     }
 
   return true;
