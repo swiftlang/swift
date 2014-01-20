@@ -81,21 +81,21 @@ BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
 /// so we should produce a compile time error if we can statically prove
 /// that they do.
 #ifndef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedName, Attrs, Overload) \
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedID, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
 #endif
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SAddOver,
-                                       "sadd_with_overflow", "add", "n", Integer)
+                                       "sadd_with_overflow", Add, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UAddOver,
-                                       "uadd_with_overflow", "add", "n", Integer)
+                                       "uadd_with_overflow", Add, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SSubOver,
-                                       "ssub_with_overflow", "sub", "n", Integer)
+                                       "ssub_with_overflow", Sub, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(USubOver,
-                                       "usub_with_overflow", "sub", "n", Integer)
+                                       "usub_with_overflow", Sub, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SMulOver,
-                                       "smul_with_overflow", "mul", "n", Integer)
+                                       "smul_with_overflow", Mul, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UMulOver,
-                                       "umul_with_overflow", "mul", "n", Integer)
+                                       "umul_with_overflow", Mul, "n", Integer)
 #undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
 
 /// Unary operations have type (T) -> T.

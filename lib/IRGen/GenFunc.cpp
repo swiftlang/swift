@@ -52,6 +52,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -1163,8 +1164,20 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     return out->add(v); \
   }
 
-#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, uncheckedID, attrs, overload) \
 if (Builtin.ID == BuiltinValueKind::id) { \
+  if (IGF.IGM.Opts.DisableAllRuntimeChecks) { \
+    /* If runtime checks are disabled, emit an unchecked operation. */ \
+    llvm::Value *lhs = args.claimNext(); \
+    llvm::Value *rhs = args.claimNext(); \
+    /* Ignore the "report" bit. */ \
+    args.claimNext(); \
+    llvm::Value *v = IGF.Builder.Create##uncheckedID(lhs, rhs); \
+    out->add(v); \
+    /* Emit zero for the overflow check bit. */ \
+    out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)); \
+    return; \
+  } \
   SmallVector<llvm::Type*, 2> ArgTys; \
   auto opType = Builtin.Types[0]->getCanonicalType(); \
   ArgTys.push_back(IGF.IGM.getStorageTypeForLowered(opType)); \
@@ -1363,6 +1376,17 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto ToTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
 
+    if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
+      // If runtime checks are disabled, emit a plain 'trunc'.
+      llvm::Value *in = args.claimNext();
+      llvm::Value *v = IGF.Builder.CreateTrunc(in, ToTy);
+      out->add(v);
+      
+      // Emit "false" for the overflow bit.
+      out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
+      return;
+    }
+    
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
     //   Ext = sext_IntFrom(Res)
@@ -1390,6 +1414,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   if (Builtin.ID == BuiltinValueKind::UToSCheckedTrunc) {
+    if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
+      // If runtime checks are disabled, emit a plain 'trunc'.
+      emitCastBuiltin(IGF, substFnType, *out, args,
+                      llvm::Instruction::Trunc);
+      
+      // Emit "false" for the overflow bit.
+      out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
+      return;
+    }
+
     auto FromTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
     auto ToTy =
@@ -1418,6 +1452,14 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
   if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
       Builtin.ID == BuiltinValueKind::USCheckedConversion) {
+    if (IGF.IGM.Opts.DisableAllRuntimeChecks) {
+      // If runtime checks are disabled, carry the operand forward.
+      out->add(args.claimNext());
+      // Emit 'false' for the overflow bit.
+      out->add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0));
+      return;
+    }
+    
     auto Ty =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
 

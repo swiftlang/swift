@@ -75,11 +75,15 @@ public:
 
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
+  
+  /// \brief Whether we should omit dynamic safety checks from the emitted IR.
+  unsigned DisableAllRuntimeChecks : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    OptLevel(0), DebugInfo(false), UseJIT(false),
                    EnableDynamicValueTypeLayout(false),
-                   DisableLLVMOptzns(false) {}
+                   DisableLLVMOptzns(false),
+                   DisableAllRuntimeChecks(false) {}
 };
 
 } // end namespace swift
