@@ -2882,21 +2882,13 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     break;
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
-    Type setTy;
-    if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-      setTy = subscript->getSetterType();
-    else
-      setTy = cast<VarDecl>(capture)->getSetterType();
+    Type setTy = cast<AbstractStorageDecl>(capture)->getSetterType();
     addSILArgument(gen.getLoweredType(setTy));
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
-    Type getTy;
-    if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-      getTy = subscript->getGetterType();
-    else
-      getTy = cast<VarDecl>(capture)->getGetterType();
+    Type getTy = cast<AbstractStorageDecl>(capture)->getGetterType();
     addSILArgument(gen.getLoweredType(getTy));
     break;
   }

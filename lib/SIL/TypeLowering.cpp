@@ -1580,22 +1580,13 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy;
-      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-        setterTy = subscript->getSetterType();
-      else
-        setterTy = cast<VarDecl>(capture)->getSetterType();
+      Type setterTy = cast<AbstractStorageDecl>(capture)->getSetterType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy;
-      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-        getterTy = subscript->getGetterType();
-      else
-        getterTy = cast<VarDecl>(capture)->getGetterType();
-
+      Type getterTy = cast<AbstractStorageDecl>(capture)->getGetterType();
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
@@ -1726,16 +1717,16 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   return CanFunctionType::get(capturedInputs, funcType, extInfo);
 }
 
-template <class T>
-static CanAnyFunctionType getAccessorType(T *decl, SILDeclRef c) {
+static CanAnyFunctionType getAccessorType(AbstractStorageDecl *decl,
+                                          SILDeclRef c) {
   auto fnType =
     (c.kind == SILDeclRef::Kind::Getter ? decl->getGetterType()
                                         : decl->getSetterType());
   return cast<AnyFunctionType>(fnType->getCanonicalType());
 }
 
-template <class T>
-static CanAnyFunctionType getAccessorInterfaceType(T *decl, SILDeclRef c) {
+static CanAnyFunctionType getAccessorInterfaceType(AbstractStorageDecl *decl,
+                                                   SILDeclRef c) {
   auto fnType =
     (c.kind == SILDeclRef::Kind::Getter ? decl->getGetterInterfaceType()
                                         : decl->getSetterInterfaceType());
@@ -1748,7 +1739,7 @@ TypeConverter::getConstantFormalTypeWithoutCaptures(SILDeclRef c) {
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
-                                                   bool withCaptures) {
+                                                            bool withCaptures) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
@@ -1780,9 +1771,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
-    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
+    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd))
       return getAccessorInterfaceType(sd, c);
-    }
 
     VarDecl *var = cast<VarDecl>(c.getDecl());
     auto accessorMethodType = getAccessorInterfaceType(var, c);
@@ -1796,8 +1786,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       SmallVector<ValueDecl*, 4> LocalCaptures;
       property->getCaptureInfo().getLocalCaptures(LocalCaptures);
       auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
-                                                  LocalCaptures,
-                                                  var->getDeclContext());
+                                                       LocalCaptures,
+                                                       var->getDeclContext());
       return cast<AnyFunctionType>(
         getInterfaceTypeInContext(fnTy, var->getDeclContext()));
     }
@@ -1863,9 +1853,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
-    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd)) {
+    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd))
       return getAccessorType(sd, c);
-    }
 
     VarDecl *var = cast<VarDecl>(c.getDecl());
     auto accessorMethodType = getAccessorType(var, c);
