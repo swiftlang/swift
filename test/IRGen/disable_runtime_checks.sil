@@ -44,3 +44,36 @@ entry(%x : $Builtin.Int64):
   return %z : $Builtin.Int1
 }
 
+class B {}
+class D : B {}
+
+sil @_TFC22disable_runtime_checks1BD : $@thin B -> Builtin.ObjectPointer
+sil @_TFC22disable_runtime_checks1DD : $@thin D -> Builtin.ObjectPointer
+
+protocol P {}
+struct X : P { var x : Builtin.Int8 }
+
+// CHECK-LABEL: define %C22disable_runtime_checks1D* @unconditional_cast_class(%C22disable_runtime_checks1B*) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = bitcast %C22disable_runtime_checks1B* %0 to %C22disable_runtime_checks1D*
+// CHECK-NEXT:    ret %C22disable_runtime_checks1D* %1
+// CHECK-NEXT:  }
+sil @unconditional_cast_class : $@thin B -> D {
+entry(%b : $B):
+  %d = unconditional_checked_cast downcast %b : $B to $D
+  return %d : $D
+}
+
+// CHECK-LABEL: define i8 @unconditional_cast_existential(%P22disable_runtime_checks1P_* noalias) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = bitcast %P22disable_runtime_checks1P_* %0 to %V22disable_runtime_checks1X*
+// CHECK-NEXT:    %.x = getelementptr inbounds %V22disable_runtime_checks1X* %1, i32 0, i32 0
+// CHECK-NEXT:    %2 = load i8* %.x, align 8
+// CHECK-NEXT:    ret i8 %2
+// CHECK-NEXT:  }
+sil @unconditional_cast_existential : $@thin (@in P) -> X {
+entry(%p : $*P):
+  %x = unconditional_checked_cast existential_to_concrete %p : $*P to $*X
+  %y = load %x : $*X
+  return %y : $X
+}

@@ -2559,6 +2559,24 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
 
 void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                                        swift::UnconditionalCheckedCastInst *i) {
+  if (IGM.Opts.DisableAllRuntimeChecks) {
+    // With runtime checks disabled, simply bitcast to the destination type.
+    auto destTy = getTypeInfo(i->getType()).getStorageType();
+    if (i->getType().isAddress()) {
+      Address addr = getLoweredAddress(i->getOperand());
+      setLoweredAddress(SILValue(i, 0),
+                        Builder.CreateBitCast(addr, destTy->getPointerTo()));
+    } else {
+      Explosion ex = getLoweredExplosion(i->getOperand());
+      Explosion cast(ex.getKind());
+      llvm::Value *val = ex.claimNext();
+      val = Builder.CreateBitCast(val, destTy);
+      cast.add(val);
+      setLoweredExplosion(SILValue(i, 0), cast);
+    }
+    return;
+  }
+  
   Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
                                 i->getCastKind(),
                                 CheckedCastMode::Unconditional);
