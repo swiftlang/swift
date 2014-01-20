@@ -97,11 +97,6 @@ public:
     return lhs;
   }
 
-  /// Produce the complement of the given option set.
-  friend OptionSet operator~(OptionSet set) {
-    return OptionSet(~set.Storage);
-  }
-
   /// Produce the difference of two option sets.
   friend OptionSet operator-(OptionSet lhs, OptionSet rhs) {
     return OptionSet(lhs.Storage & ~rhs.Storage);
