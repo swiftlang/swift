@@ -2370,6 +2370,13 @@ public:
     return GetSetInfo->Braces;
   }
 
+  /// Retrieve the type of the getter.
+  Type getGetterType() const;
+  Type getGetterInterfaceType() const;
+
+  /// Retrieve the type of the setter.
+  Type getSetterType() const;
+  Type getSetterInterfaceType() const;
 
   /// Return true if this storage needs to be accessed with getters and
   /// setters for Objective-C.
@@ -2404,14 +2411,6 @@ public:
   /// Only for use in diagnostics.  It is not always possible to always
   /// precisely point to the variable type because of type aliases.
   SourceRange getTypeSourceRangeForDiagnostics() const;
-
-  /// Retrieve the type of the getter.
-  Type getGetterType() const;
-  Type getGetterInterfaceType() const;
-
-  /// Retrieve the type of the setter.
-  Type getSetterType() const;
-  Type getSetterInterfaceType() const;
 
   /// \brief Returns whether the var is settable in the specified context: this
   /// is either because it is a stored var, because it has a custom setter, or
@@ -2531,14 +2530,6 @@ public:
 
   /// \brief Returns whether the subscript operation has a setter.
   bool isSettable() const { return getSetter() != nullptr; }
-
-  /// Retrieve the type of the getter.
-  Type getGetterType() const;
-  Type getGetterInterfaceType() const;
-
-  /// Retrieve the type of the setter.
-  Type getSetterType() const;
-  Type getSetterInterfaceType() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.

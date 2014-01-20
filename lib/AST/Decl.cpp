@@ -1096,14 +1096,15 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   return getSourceRange();
 }
 
-Type VarDecl::getGetterType() const {
+Type AbstractStorageDecl::getGetterType() const {
   // If we have a getter, use its type.
   if (auto getter = getGetter())
     return getter->getType();
   
-  // Otherwise, compute the type.
+  // Otherwise, compute the type.  This can only happen for a var decl.
+  bool isStatic = cast<VarDecl>(this)->isStatic();
   GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic,
                                                        /*@mutating*/false,
                                                        &outerParams);
 
@@ -1122,13 +1123,14 @@ Type VarDecl::getGetterType() const {
   return getterTy;
 }
 
-Type VarDecl::getGetterInterfaceType() const {
+Type AbstractStorageDecl::getGetterInterfaceType() const {
   // If we have a getter, use its type.
   if (auto getter = getGetter())
     return getter->getInterfaceType();
 
-  // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
+  // Otherwise, compute the type.  This can only happen for a var decl.
+  bool isStatic = cast<VarDecl>(this)->isStatic();
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic,
                                                        /*@mutating*/ false);
 
   // Form the getter type.
@@ -1154,15 +1156,16 @@ Type VarDecl::getGetterInterfaceType() const {
   return getterTy;
 }
 
-Type VarDecl::getSetterType() const {
+Type AbstractStorageDecl::getSetterType() const {
   // If we have a setter, use its type.
   if (auto setter = getSetter())
     return setter->getType();
 
-  // Otherwise, compute the type.
+  // Otherwise, compute the type.  This can only happen for a var decl.
+  bool isStatic = cast<VarDecl>(this)->isStatic();
   GenericParamList *outerParams = nullptr;
-  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic(),
-                                                       /*@mutating*/!isStatic(),
+  auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic,
+                                                       /*@mutating*/!isStatic,
                                                        &outerParams);
 
   // Form the element -> () function type.
@@ -1182,14 +1185,15 @@ Type VarDecl::getSetterType() const {
   return setterTy;
 }
 
-Type VarDecl::getSetterInterfaceType() const {
+Type AbstractStorageDecl::getSetterInterfaceType() const {
   // If we have a getter, use its type.
   if (auto setter = getSetter())
     return setter->getInterfaceType();
   
-  // Otherwise, compute the type.
-  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic(),
-                                                     /*@mutating*/ !isStatic());
+  // Otherwise, compute the type.  This can only happen for a var decl.
+  bool isStatic = cast<VarDecl>(this)->isStatic();
+  auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic,
+                                                     /*@mutating*/ !isStatic);
   
   // Form the element -> () function type.
   auto &ctx = getASTContext();
@@ -1318,21 +1322,6 @@ static bool isIntegralType(Type type) {
   }
 
   return false;
-}
-
-Type SubscriptDecl::getGetterType() const {
-  return getGetter()->getType();
-}
-Type SubscriptDecl::getGetterInterfaceType() const {
-  return getGetter()->getInterfaceType();
-}
-
-/// Retrieve the type of the setter.
-Type SubscriptDecl::getSetterType() const {
-  return getSetter()->getType();
-}
-Type SubscriptDecl::getSetterInterfaceType() const {
-  return getSetter()->getInterfaceType();
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
