@@ -24,6 +24,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
 
@@ -190,6 +191,9 @@ enum TypeCheckFlags {
   TC_SILType = 0x10
 };
 
+/// Option set describing how type resolution should work.
+typedef OptionSet<TypeCheckFlags> TypeResolutionOptions;
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker : public ASTMutationListener, public LazyResolver {
@@ -302,14 +306,14 @@ public:
   ///
   /// \param DC The context that the type appears in.
   ///
-  /// \param options A combination of the flags in \c TypeCheckFlags that
-  /// alter type resolution based on context.
+  /// \param options Options that alter type resolution.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, DeclContext *DC, unsigned options,
+  Type resolveType(TypeRepr *TyR, DeclContext *DC,
+                   TypeResolutionOptions options,
                    GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
