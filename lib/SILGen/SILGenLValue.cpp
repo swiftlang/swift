@@ -302,7 +302,7 @@ namespace {
 
   class GetterSetterComponent : public LogicalPathComponent {
     // The VarDecl or SubscriptDecl being get/set.
-    ValueDecl *decl;
+    AbstractStorageDecl *decl;
     std::vector<Substitution> substitutions;
     Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
@@ -334,7 +334,7 @@ namespace {
     }
     
   public:
-    GetterSetterComponent(ValueDecl *decl,
+    GetterSetterComponent(AbstractStorageDecl *decl,
                           ArrayRef<Substitution> substitutions,
                           LValueTypeData typeData,
                           Expr *subscriptIndexExpr = nullptr)
@@ -515,47 +515,48 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   LValueTypeData typeData =
     getMemberTypeData(gen, e->getMember().getDecl()->getType(), e);
 
+  // MemberRefExpr can refer to type and function members, but the only case
+  // that can be an lvalue is a VarDecl.
+  VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
+
   // If this is a stored variable not reflected as an Objective-C
   // property, access with a fragile element reference.
-  if (VarDecl *var = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    if (!var->isComputed()
-        && (gen.AlwaysDirectStoredPropertyAccess
-            || !gen.SGM.requiresObjCDispatch(var))) {
-      // Find the substituted storage type.
-      SILType varStorageType =
-        gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+  if (!var->isComputed()
+      && (gen.AlwaysDirectStoredPropertyAccess
+          || !gen.SGM.requiresObjCDispatch(var))) {
+    // Find the substituted storage type.
+    SILType varStorageType =
+      gen.SGM.Types.getSubstitutedStorageType(var, e->getType());
+    
+    // For static variables, emit a reference to the global variable backing
+    // them.
+    // FIXME: This has to be dynamically looked up for classes, and
+    // dynamically instantiated for generics.
+    if (var->isStatic()) {
+      auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
+        ->getInstanceType();
+      (void)baseMeta;
+      assert(!baseMeta->is<BoundGenericType>()
+             && "generic static stored properties not implemented");
+      assert((baseMeta->getStructOrBoundGenericStruct()
+              || baseMeta->getEnumOrBoundGenericEnum())
+         && "static stored properties for classes/protocols not implemented");
       
-      // For static variables, emit a reference to the global variable backing
-      // them.
-      // FIXME: This has to be dynamically looked up for classes, and
-      // dynamically instantiated for generics.
-      if (var->isStatic()) {
-        auto baseMeta = e->getBase()->getType()->castTo<MetatypeType>()
-          ->getInstanceType();
-        (void)baseMeta;
-        assert(!baseMeta->is<BoundGenericType>()
-               && "generic static stored properties not implemented");
-        assert((baseMeta->getStructOrBoundGenericStruct()
-                || baseMeta->getEnumOrBoundGenericEnum())
-           && "static stored properties for classes/protocols not implemented");
-        
-        return emitLValueForDecl(*this, e, e->getMember().getDecl(),
-                                 getSubstFormalRValueType(e));
-      }
-      
-      if (!isa<LValueType>(baseTy)) {
-        assert(baseTy.hasReferenceSemantics());
-        lv.add<RefElementComponent>(var, varStorageType, typeData);
-      } else {
-        lv.add<StructElementComponent>(var, varStorageType, typeData);
-      }
-      return std::move(lv);
+      return emitLValueForDecl(*this, e, e->getMember().getDecl(),
+                               getSubstFormalRValueType(e));
     }
+    
+    if (!isa<LValueType>(baseTy)) {
+      assert(baseTy.hasReferenceSemantics());
+      lv.add<RefElementComponent>(var, varStorageType, typeData);
+    } else {
+      lv.add<StructElementComponent>(var, varStorageType, typeData);
+    }
+    return std::move(lv);
   }
 
   // Otherwise, use the property accessors.
-  lv.add<GetterSetterComponent>(e->getMember().getDecl(),
-                                e->getMember().getSubstitutions(),
+  lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
                                 typeData);
   return std::move(lv);
 }
@@ -565,10 +566,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(e->getDecl().getDecl(),
-                                e->getDecl().getSubstitutions(),
-                                typeData,
-                                e->getIndex());
+  lv.add<GetterSetterComponent>(decl, e->getDecl().getSubstitutions(),
+                                typeData, e->getIndex());
   return std::move(lv);
 }
 

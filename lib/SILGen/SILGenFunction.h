@@ -636,12 +636,12 @@ public:
   RValueSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                       AbstractFunctionDecl *decl);
   
-  ManagedValue emitGetAccessor(SILLocation loc, ValueDecl *decl,
+  ManagedValue emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
                                RValueSource &&optionalSubscripts,
                                SGFContext C);
-  void emitSetAccessor(SILLocation loc, ValueDecl *decl,
+  void emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                        ArrayRef<Substitution> substitutions,
                        RValueSource &&optionalSelfValue,
                        RValueSource &&optionalSubscripts,

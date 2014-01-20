@@ -2545,7 +2545,7 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::
-emitGetAccessor(SILLocation loc, ValueDecl *decl,
+emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                 ArrayRef<Substitution> substitutions,
                 RValueSource &&selfValue,
                 RValueSource &&subscripts,
@@ -2553,7 +2553,7 @@ emitGetAccessor(SILLocation loc, ValueDecl *decl,
  
   SILDeclRef get(decl, SILDeclRef::Kind::Getter,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 SGM.requiresObjCDispatch(decl));
+                 decl->usesObjCGetterAndSetter());
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
                                                      substitutions, selfValue);
@@ -2577,14 +2577,14 @@ emitGetAccessor(SILLocation loc, ValueDecl *decl,
   return emission.apply(c);
 }
 
-void SILGenFunction::emitSetAccessor(SILLocation loc, ValueDecl *decl,
+void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
                                      RValueSource &&subscripts,
                                      RValueSource &&setValue) {
   SILDeclRef set(decl, SILDeclRef::Kind::Setter,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
-                 SGM.requiresObjCDispatch(decl));
+                 decl->usesObjCGetterAndSetter());
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
                                                      substitutions, selfValue);
