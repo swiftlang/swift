@@ -472,6 +472,14 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           return ty;
         }
 
+        if (parentTy->isExistentialType()) {
+          TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
+                      comp->getIdentifier());
+          Type ty = ErrorType::get(TC.Context);
+          comp->setValue(ty);
+          return ty;
+        }
+
         auto memberType = memberTypes.back().second;
 
         // If there are generic arguments, apply them now.

@@ -335,6 +335,8 @@ NOTE(protocol_existential_assoc_type,sema_tcd,none,
      (Identifier))
 NOTE(protocol_existential_refers_to_this,sema_tcd,none,
      "%0 requirement refers to 'Self' type", (Identifier))
+ERROR(assoc_type_outside_of_protocol,sema_nb,none,
+      "cannot use associated type %0 outside of its protocol", (Identifier))
 
 ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
