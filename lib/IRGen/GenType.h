@@ -166,7 +166,7 @@ private:
     friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
     friend void TypeConverter::popGenericContext(GenericSignature *signature);
     
-#ifndef DEBUG
+#ifndef NDEBUG
     friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *) const;
     friend bool TypeConverter::isExemplarArchetype(ArchetypeType *) const;
 #endif
