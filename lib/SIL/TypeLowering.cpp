@@ -1662,21 +1662,15 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy;
-      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-        setterTy = subscript->getSetterInterfaceType();
-      else
-        setterTy = cast<VarDecl>(capture)->getSetterInterfaceType();
+      Type setterTy =
+        cast<AbstractStorageDecl>(capture)->getSetterInterfaceType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy;
-      if (auto subscript = dyn_cast<SubscriptDecl>(capture))
-        getterTy = subscript->getGetterInterfaceType();
-      else
-        getterTy = cast<VarDecl>(capture)->getGetterInterfaceType();
+      Type getterTy =
+        cast<AbstractStorageDecl>(capture)->getGetterInterfaceType();
 
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
@@ -1717,22 +1711,6 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   return CanFunctionType::get(capturedInputs, funcType, extInfo);
 }
 
-static CanAnyFunctionType getAccessorType(AbstractStorageDecl *decl,
-                                          SILDeclRef c) {
-  auto fnType =
-    (c.kind == SILDeclRef::Kind::Getter ? decl->getGetterType()
-                                        : decl->getSetterType());
-  return cast<AnyFunctionType>(fnType->getCanonicalType());
-}
-
-static CanAnyFunctionType getAccessorInterfaceType(AbstractStorageDecl *decl,
-                                                   SILDeclRef c) {
-  auto fnType =
-    (c.kind == SILDeclRef::Kind::Getter ? decl->getGetterInterfaceType()
-                                        : decl->getSetterInterfaceType());
-  return cast<AnyFunctionType>(fnType->getCanonicalType());
-}
-
 CanAnyFunctionType
 TypeConverter::getConstantFormalTypeWithoutCaptures(SILDeclRef c) {
   return makeConstantType(c, /*withCaptures*/ false);
@@ -1771,25 +1749,24 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
-    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd))
-      return getAccessorInterfaceType(sd, c);
-
-    VarDecl *var = cast<VarDecl>(c.getDecl());
-    auto accessorMethodType = getAccessorInterfaceType(var, c);
+    auto *asd = cast<AbstractStorageDecl>(vd);
+      auto fnType = c.kind == SILDeclRef::Kind::Getter
+        ? asd->getGetterInterfaceType() : asd->getSetterInterfaceType();
+    auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (var->isComputed()) {
+    if (asd->isComputed()) {
       FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
-        ? var->getGetter()
-        : var->getSetter();
+        ? asd->getGetter()
+        : asd->getSetter();
       SmallVector<ValueDecl*, 4> LocalCaptures;
       property->getCaptureInfo().getLocalCaptures(LocalCaptures);
       auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
                                                        LocalCaptures,
-                                                       var->getDeclContext());
+                                                       asd->getDeclContext());
       return cast<AnyFunctionType>(
-        getInterfaceTypeInContext(fnTy, var->getDeclContext()));
+        getInterfaceTypeInContext(fnTy, asd->getDeclContext()));
     }
     return accessorMethodType;
   }
@@ -1814,18 +1791,15 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     assert(!var->isComputed() && "constant ref to computed global var");
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
-  case SILDeclRef::Kind::DefaultArgGenerator: {
+  case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorInterfaceType(cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
-  }
-  case SILDeclRef::Kind::IVarInitializer: {
+  case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, false);
-  }
-  case SILDeclRef::Kind::IVarDestroyer: {
+  case SILDeclRef::Kind::IVarDestroyer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, Context, true);
-  }
   }
 }
 
@@ -1853,22 +1827,22 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
-    if (SubscriptDecl *sd = dyn_cast<SubscriptDecl>(vd))
-      return getAccessorType(sd, c);
+    auto *asd = cast<AbstractStorageDecl>(vd);
+    auto fnType = c.kind == SILDeclRef::Kind::Getter
+      ? asd->getGetterType() : asd->getSetterType();
+    auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
 
-    VarDecl *var = cast<VarDecl>(c.getDecl());
-    auto accessorMethodType = getAccessorType(var, c);
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (var->isComputed()) {
+    if (asd->isComputed()) {
       FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
-        ? var->getGetter()
-        : var->getSetter();
+        ? asd->getGetter()
+        : asd->getSetter();
       SmallVector<ValueDecl*, 4> LocalCaptures;
       property->getCaptureInfo().getLocalCaptures(LocalCaptures);
       return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
-                                         var->getDeclContext());
+                                         asd->getDeclContext());
     }
     return accessorMethodType;
   }
@@ -1893,18 +1867,15 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     assert(!var->isComputed() && "constant ref to computed global var");
     return getGlobalAccessorType(var->getType()->getCanonicalType());
   }
-  case SILDeclRef::Kind::DefaultArgGenerator: {
+  case SILDeclRef::Kind::DefaultArgGenerator:
     return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
-  }
-  case SILDeclRef::Kind::IVarInitializer: {
+  case SILDeclRef::Kind::IVarInitializer:
       return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
                                       Context, false);
-  }
-  case SILDeclRef::Kind::IVarDestroyer: {
+  case SILDeclRef::Kind::IVarDestroyer:
     return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,
                                     Context, true);
-  }
   }
 }
 
