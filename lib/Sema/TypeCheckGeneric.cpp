@@ -586,7 +586,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
   for (auto pattern : argPatterns) {
     // Check the pattern.
-    if (tc.typeCheckPattern(pattern, func, None, &resolver))
+    if (tc.typeCheckPattern(pattern, func, TR_FunctionInput, &resolver))
       badType = true;
 
     // Infer requirements from the pattern.
@@ -599,7 +599,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      if (tc.validateType(fn->getBodyResultTypeLoc(), fn, None, &resolver)) {
+      if (tc.validateType(fn->getBodyResultTypeLoc(), fn, TR_FunctionResult,
+                          &resolver)) {
         badType = true;
       }
 

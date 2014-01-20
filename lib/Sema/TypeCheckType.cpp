@@ -629,6 +629,13 @@ namespace {
     Type resolveType(TypeRepr *repr, TypeResolutionOptions options);
 
   private:
+    /// Strip the contextual options from the given type resolution options.
+    static TypeResolutionOptions withoutContext(TypeResolutionOptions options) {
+      options -= TR_FunctionInput;
+      options -= TR_FunctionResult;
+      return options;
+    }
+
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
     Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
@@ -879,7 +886,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   if (attrs.has(TAK_inout)) {
-    ty = InOutType::get(ty);
+    // @inout is only allowed on function inputs.
+    if (options & TR_FunctionInput) {
+      ty = InOutType::get(ty);
+    } else {
+      TC.diagnose(attrs.getLoc(TAK_inout), diag::inout_attribute_non_parameter);
+    }
+
     attrs.clearAttribute(TAK_inout);
   }
 
@@ -917,10 +930,12 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                 diag::first_class_generic_function);
   }
 
-  Type inputTy = resolveType(repr->getArgsTypeRepr(), options);
+  Type inputTy = resolveType(repr->getArgsTypeRepr(),
+                             options | TR_FunctionInput);
   if (inputTy->is<ErrorType>())
     return inputTy;
-  Type outputTy = resolveType(repr->getResultTypeRepr(), options);
+  Type outputTy = resolveType(repr->getResultTypeRepr(),
+                              options | TR_FunctionResult);
   if (outputTy->is<ErrorType>())
     return outputTy;
   return FunctionType::get(inputTy, outputTy, extInfo);
@@ -945,20 +960,22 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         elt = named->getTypeRepr();
       }
 
-      SILParameterInfo param = resolveSILParameter(elt, options);
+      SILParameterInfo param = resolveSILParameter(elt,
+                                                   options | TR_FunctionInput);
       params.push_back(param);
       if (param.getType()->is<ErrorType>())
         hasError = true;
     }
   } else {
     SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
-                                                 options);
+                                                 options | TR_FunctionInput);
     params.push_back(param);
     if (param.getType()->is<ErrorType>())
       hasError = true;
   }
 
-  SILResultInfo result = resolveSILResult(repr->getResultTypeRepr(), options);
+  SILResultInfo result = resolveSILResult(repr->getResultTypeRepr(),
+                                          options | TR_FunctionResult);
   if (result.getType()->is<ErrorType>())
     hasError = true;
 
@@ -1011,6 +1028,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 SILParameterInfo TypeResolver::resolveSILParameter(
                                  TypeRepr *repr,
                                  TypeResolutionOptions options) {
+  assert(options & TR_FunctionInput && "Parameters should be marked as inputs");
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
@@ -1045,6 +1063,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
 SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
                                              TypeResolutionOptions options) {
+  assert(options & TR_FunctionResult && "Should be marked as a result");
   auto convention = DefaultResultConvention;
   Type type;
   bool hadError = false;
@@ -1076,7 +1095,7 @@ SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase(), options);
+  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (baseTy->is<ErrorType>())
     return baseTy;
   
@@ -1099,7 +1118,7 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The T in T? is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
-  Type baseTy = resolveType(repr->getBase(), options);
+  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (baseTy->is<ErrorType>())
     return baseTy;
 
@@ -1146,7 +1165,7 @@ Type TypeResolver::resolveProtocolCompositionType(
                                          TypeResolutionOptions options) {
   SmallVector<Type, 4> ProtocolTypes;
   for (auto tyR : repr->getProtocols()) {
-    Type ty = TC.resolveType(tyR, DC, options, Resolver);
+    Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
     if (ty->is<ErrorType>())
       return ty;
     if (!ty->isExistentialType()) {
@@ -1174,7 +1193,7 @@ Type TypeResolver::resolveProtocolCompositionType(
 Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
-  Type ty = resolveType(repr->getBase(), options);
+  Type ty = resolveType(repr->getBase(), withoutContext(options));
   if (ty->is<ErrorType>())
     return ty;
   

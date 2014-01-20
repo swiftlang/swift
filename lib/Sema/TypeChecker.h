@@ -188,7 +188,13 @@ enum TypeResolutionFlags {
   TR_AllowUnboundGenerics = 0x08,
 
   /// Whether we are validating the type for SIL.
-  TR_SILType = 0x10
+  TR_SILType = 0x10,
+
+  /// Whether we are in the input type of a function.
+  TR_FunctionInput = 0x20,
+
+  /// Whether we are in the result type of a function.
+  TR_FunctionResult = 0x40,
 };
 
 /// Option set describing how type resolution should work.

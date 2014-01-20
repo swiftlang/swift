@@ -1589,7 +1589,7 @@ public:
     for (Pattern *P : paramPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, dc, None, resolver)) {
+      if (TC.typeCheckPattern(P, dc, TR_FunctionInput, resolver)) {
         badType = true;
         continue;
       }
@@ -1623,7 +1623,7 @@ public:
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
       if (TC.validateType(FD->getBodyResultTypeLoc(), FD->getDeclContext(),
-                          None, resolver)) {
+                          TR_FunctionResult, resolver)) {
         badType = true;
       }
     }
@@ -2131,7 +2131,7 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (TC.typeCheckPattern(CD->getArgParams(), CD, None)) {
+    if (TC.typeCheckPattern(CD->getArgParams(), CD, TR_FunctionInput)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
