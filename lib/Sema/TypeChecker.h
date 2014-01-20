@@ -182,6 +182,12 @@ enum TypeCheckFlags {
 
   /// Whether the given type can override the type of a typed pattern.
   TC_OverrideType = 0x04,
+
+  /// Whether to allow unbound generic types.
+  TC_AllowUnboundGenerics = 0x08,
+
+  /// Whether we are validating the type for SIL.
+  TC_SILType = 0x10
 };
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
@@ -294,18 +300,16 @@ public:
   ///
   /// \param TyR The type representation to check.
   ///
-  /// \param isSILType Whether to apply Swift or SIL type formation rules.
-  ///
   /// \param DC The context that the type appears in.
   ///
-  /// \param allowUnboundGenerics Whether to allow unbound generic types.
+  /// \param options A combination of the flags in \c TypeCheckFlags that
+  /// alter type resolution based on context.
   ///
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
   /// \returns a well-formed type or an ErrorType in case of an error.
-  Type resolveType(TypeRepr *TyR, bool isSILType, DeclContext *DC,
-                   bool allowUnboundGenerics = false,
+  Type resolveType(TypeRepr *TyR, DeclContext *DC, unsigned options,
                    GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
