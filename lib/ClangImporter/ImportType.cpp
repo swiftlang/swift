@@ -266,7 +266,7 @@ namespace {
     }
 
     Type VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
-      // Import functions without protocols as functions with no parameters.
+      // Import functions without prototypes as functions with no parameters.
       auto resultTy = Impl.importType(type->getResultType(),
                                       ImportTypeKind::Result);
       if (!resultTy)
