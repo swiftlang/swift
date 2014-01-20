@@ -963,7 +963,8 @@ bool Module::isSystemModule() const {
 
 template<bool respectVisibility, typename Callback>
 static bool forAllImportedModules(Module *topLevel,
-                                  Optional<Module::AccessPathTy> thisPath,
+                                  Module::AccessPathTy thisPath,
+                                  bool includePrivateTopLevelImports,
                                   const Callback &fn) {
   using ImportedModule = Module::ImportedModule;
   using AccessPathTy = Module::AccessPathTy;
@@ -972,17 +973,14 @@ static bool forAllImportedModules(Module *topLevel,
   SmallVector<ImportedModule, 32> queue;
 
   AccessPathTy overridingPath;
-  if (thisPath.hasValue()) {
-    if (respectVisibility)
-      overridingPath = thisPath.getValue();
-    queue.push_back(ImportedModule(overridingPath, topLevel));
-  } else {
-    visited.insert(ImportedModule({}, topLevel));
-  }
+  if (respectVisibility)
+    overridingPath = thisPath;
+  queue.push_back(ImportedModule(overridingPath, topLevel));
 
-  // Even if we're processing the top-level module like any other, we still want
-  // to include non-exported modules.
-  topLevel->getImportedModules(queue, !respectVisibility);
+  // Even if we're processing the top-level module like any other, we may
+  // still want to include non-exported modules.
+  includePrivateTopLevelImports |= !respectVisibility;
+  topLevel->getImportedModules(queue, includePrivateTopLevelImports);
 
   while (!queue.empty()) {
     auto next = queue.pop_back_val();
@@ -1010,9 +1008,11 @@ static bool forAllImportedModules(Module *topLevel,
   return true;
 }
 
-bool Module::forAllVisibleModules(Optional<AccessPathTy> thisPath,
+bool Module::forAllVisibleModules(AccessPathTy thisPath,
+                                  bool includePrivateTopLevelImports,
                                   std::function<bool(ImportedModule)> fn) {
-  return forAllImportedModules<true>(this, thisPath, fn);
+  return forAllImportedModules<true>(this, thisPath,
+                                     includePrivateTopLevelImports, fn);
 }
 
 bool

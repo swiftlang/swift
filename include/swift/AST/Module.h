@@ -287,31 +287,45 @@ public:
   /// import access paths are incompatible, the indirect module will be skipped.
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
-  ///                           results, with the given access path.
+  ///        results, with the given access path.
+  /// \param includePrivateTopLevelImports If true, imports listed in all
+  ///        file units within this module are traversed. Otherwise (the
+  ///        default), only re-exported imports are traversed.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
-  ///           Return \c false to abort iteration.
+  ///        Return \c false to abort iteration.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
-  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            bool includePrivateTopLevelImports,
                             std::function<bool(ImportedModule)> fn);
 
-  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            bool includePrivateTopLevelImports,
                             std::function<void(ImportedModule)> fn) {
-    forAllVisibleModules(topLevelAccessPath,
-                         [=](const ImportedModule &import) -> bool {
-                           fn(import);
-                           return true;
-                         });
-    return true;
+    return forAllVisibleModules(topLevelAccessPath,
+                                includePrivateTopLevelImports,
+                                [=](const ImportedModule &import) -> bool {
+      fn(import);
+      return true;
+    });
   }
 
   template <typename Fn>
-  bool forAllVisibleModules(Optional<AccessPathTy> topLevelAccessPath,
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            bool includePrivateTopLevelImports,
                             const Fn &fn) {
     using RetTy = typename as_function<Fn>::type::result_type;
     std::function<RetTy(ImportedModule)> wrapped = std::cref(fn);
-    return forAllVisibleModules(topLevelAccessPath, wrapped);
+    return forAllVisibleModules(topLevelAccessPath,
+                                includePrivateTopLevelImports,
+                                wrapped);
+  }
+
+  template <typename Fn>
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            const Fn &fn) {
+    return forAllVisibleModules(topLevelAccessPath, false, fn);
   }
 
   /// @}
