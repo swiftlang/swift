@@ -176,14 +176,11 @@ case "${BUILD_DIR}" in
    *) echo "build-dir must be an absolute path (was '${BUILD_DIR}')" ; exit 1 ;;
 esac
 
-# Make sure the variables and directories we expect to exist actually do.
-test "$WORKSPACE"
-test -d "$WORKSPACE"
-test -d "$WORKSPACE/llvm"
-test -d "$WORKSPACE/llvm/tools"
-test -d "$WORKSPACE/clang"
-test -d "$WORKSPACE/swift"
-test -d "$WORKSPACE/SourceKit"
+# WORKSPACE must exist
+if [ ! -e "$WORKSPACE" ]; then
+    echo "Workspace does not exist (tried $WORKSPACE)"
+    exit 1
+fi
 
 # Swift-project products, in the order they must be built
 SWIFT_BUILD_PRODUCTS=(swift SourceKit)
@@ -191,15 +188,27 @@ SWIFT_BUILD_PRODUCTS=(swift SourceKit)
 # All build products, in the order they must be built
 ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}")
 
+# Calculate source directories for each product.
+# Default to $WORKSPACE/$product if not set above.
+for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
+    varname="$(toupper "${product}")"_SOURCE_DIR
+    eval dir=\${$varname:=$WORKSPACE/$product}
+    if [ ! -e "${dir}" ] ; then
+        echo "Can't find source directory for $product (tried $dir)"
+        exit 1
+    fi
+done
+
 # Calculate build directories for each product
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
-    varname="$(toupper "${product}")"_BUILD_DIR
+    PRODUCT=$(toupper "${product}")
+    eval source_dir=\${${PRODUCT}_SOURCE_DIR}
     if [[ "${BUILD_DIR}" ]] ; then
         product_build_dir="${BUILD_DIR}/${product}"
     else
-        product_build_dir="${WORKSPACE}/${product}/build"
+        product_build_dir="${source_dir}/build"
     fi
-    eval "$varname=\$product_build_dir"
+    eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
 done
 
 SWIFT_MODULE_CACHE="${BUILD_DIR:-${WORKSPACE}}/swift-module-cache"
@@ -221,7 +230,16 @@ if [[ "$PACKAGE" ]]; then
 fi
 
 # Symlink clang into the llvm tree.
-ln -sf  "$WORKSPACE/clang" "$WORKSPACE/llvm/tools/clang"
+CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
+CLANG_BUILD_DIR="${LLVM_BUILD_DIR}"
+if [ ! -e "${WORKSPACE}/clang" ]; then
+    # If llvm/tools/clang is already a directory, use that and skip the symlink.
+    if [ ! -d "${CLANG_SOURCE_DIR}" ]; then
+        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
+        exit 1
+    fi
+fi
+ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 
 # Create a fresh directory for the Swift Clang module cache.
 if [ -e "${SWIFT_MODULE_CACHE}" ]; then
@@ -271,7 +289,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
               -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
-              "$WORKSPACE/llvm" || exit 1)
+              "${LLVM_SOURCE_DIR}" || exit 1)
   fi
   "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
 fi
@@ -287,7 +305,7 @@ SWIFT_CMAKE_OPTIONS=(
 )
 
 SOURCEKIT_CMAKE_OPTIONS=(
-    -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="$WORKSPACE/swift"
+    -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
     -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
 )
@@ -312,6 +330,7 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
     if [[ ! "${!_SKIP_BUILD_PRODUCT}" ]]; then
         
         echo "--- Building ${product} ---"
+        _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
         
         if [[ ! -f  "${!_PRODUCT_BUILD_DIR}/CMakeCache.txt" ]] ; then
@@ -327,11 +346,11 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                     "${!_PRODUCT_CMAKE_OPTIONS}" \
                     "${!_ASAN_OPTIONS}" \
                     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-                    -D${PRODUCT}_PATH_TO_CLANG_SOURCE="$WORKSPACE/llvm/tools/clang" \
-                    -D${PRODUCT}_PATH_TO_CLANG_BUILD="${LLVM_BUILD_DIR}" \
-                    -D${PRODUCT}_PATH_TO_LLVM_SOURCE="$WORKSPACE/llvm" \
+                    -D${PRODUCT}_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}" \
+                    -D${PRODUCT}_PATH_TO_CLANG_BUILD="${CLANG_BUILD_DIR}" \
+                    -D${PRODUCT}_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}" \
                     -D${PRODUCT}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
-                    "$WORKSPACE/${product}" || exit 1)
+                    "${!_PRODUCT_SOURCE_DIR}" || exit 1)
         fi
         "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
     fi
@@ -376,9 +395,9 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
       PERFORMANCE_TESTS_PASSED=0
   fi
   echo "--- Submitting Swift Performance Tests ---"
-  swift_source_revision="$("$WORKSPACE/llvm/utils/GetSourceVersion" "$WORKSPACE/swift")"
+  swift_source_revision="$("${LLVM_SOURCE_DIR}/utils/GetSourceVersion" "${SWIFT_SOURCE_DIR}")"
   (cd "${SWIFT_BUILD_DIR}" &&
-    "$WORKSPACE/swift/utils/submit-benchmark-results" benchmark/results.json \
+    "${SWIFT_SOURCE_DIR}/utils/submit-benchmark-results" benchmark/results.json \
         --output benchmark/lnt_results.json \
         --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
         --run-order "$swift_source_revision" \
@@ -496,7 +515,7 @@ fi
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
   echo "--- Building SourceKit Package ---"
   (cd "${SOURCEKIT_BUILD_DIR}" &&
-    /bin/sh -ex "$WORKSPACE/SourceKit/utils/buildbot-package-sourcekit.sh") || exit 1
+    /bin/sh -ex "${SOURCEKIT_SOURCE_DIR}/utils/buildbot-package-sourcekit.sh") || exit 1
 
   saw_package=
   for package in "${SOURCEKIT_BUILD_DIR}"/SourceKit-*.tar.gz; do
