@@ -526,3 +526,15 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @release_then_retain_peephole
+// CHECK: bb0
+// CHECK-NOT: strong_release
+// CHECK-NOT: strong_retain
+// CHECK-NEXT: return
+sil @release_then_retain_peephole : $@thin (Builtin.ObjectPointer) -> (Builtin.ObjectPointer) {
+bb0(%0 : $Builtin.ObjectPointer):
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_retain %0 : $Builtin.ObjectPointer
+  return %0 : $Builtin.ObjectPointer
+}
+

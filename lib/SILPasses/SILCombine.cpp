@@ -256,6 +256,7 @@ public:
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
+  SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -629,6 +630,39 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand()))
     if (!I->getValue().getBoolValue())
       return eraseInstFromFunction(*CFI);
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
+  // Sometimes in the stdlib due to hand offs, we will see code like:
+  //
+  // strong_release %0
+  // strong_retain %0
+  //
+  // with the matching strong_retain to the strong_release in a predecessor
+  // basic block and the matching strong_release for the strong_retain in a
+  // successor basic block.
+  //
+  // Due to the matching pairs being in different basic blocks, the ARC
+  // Optimizer (which is currently local to one basic block does not handle
+  // it). But that does not mean that we can not eliminate this pair with a
+  // peephole.
+
+  // If we are not the first instruction in this basic block...
+  if (SRI != &*SRI->getParent()->begin()) {
+    SILBasicBlock::iterator Pred = SRI;
+    --Pred;
+
+    // ...and the predecessor instruction is a strong_release on the same value
+    // as our strong_retain...
+    if (StrongReleaseInst *Release = dyn_cast<StrongReleaseInst>(&*Pred))
+      // Remove them...
+      if (Release->getOperand() == SRI->getOperand()) {
+        eraseInstFromFunction(*Release);
+        return eraseInstFromFunction(*SRI);
+      }
+  }
 
   return nullptr;
 }
