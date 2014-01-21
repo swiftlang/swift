@@ -540,12 +540,12 @@ namespace {
 
     ParameterConvention getIndirectParameter(unsigned index,
                                              CanType type) const override {
-      return getIndirectCParameterConvention(FnType->getArgType(index));
+      return getIndirectCParameterConvention(FnType->getParamType(index));
     }
 
     ParameterConvention getDirectParameter(unsigned index,
                                            CanType type) const override {
-      return getDirectCParameterConvention(FnType->getArgType(index));
+      return getDirectCParameterConvention(FnType->getParamType(index));
     }
 
     ParameterConvention getCallee() const override {

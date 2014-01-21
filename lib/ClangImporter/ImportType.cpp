@@ -245,8 +245,8 @@ namespace {
         return Type();
 
       SmallVector<TupleTypeElt, 4> params;
-      for (auto param = type->arg_type_begin(),
-             paramEnd = type->arg_type_end();
+      for (auto param = type->param_type_begin(),
+             paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter);
         if (!swiftParamTy)
