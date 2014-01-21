@@ -1531,9 +1531,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       
       // Subscripts are ok on rvalues so long as the getter is @!mutating.
       if (auto *SD = dyn_cast<SubscriptDecl>(result))
-        // The subscript decl won't have a getter if this is in protocol.  In
-        // that case, we assume it is non-mutating.
-        if (SD->getGetter() && SD->getGetter()->isMutating())
+        if (SD->getGetter()->isMutating())
           continue;
       
       // Computed properties are ok on rvalues so long as the getter is
