@@ -56,6 +56,14 @@ static clang::CanQualType getClangSelectorType(
   return clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
 }
 
+static clang::CanQualType getClangIdType(
+  const clang::ASTContext &clangCtx) {
+  clang::QualType clangType =
+    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
+  clangType = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(clangType);
+}
+
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   // First attempt a lookup in our map of imported structs.
   auto *decl = type->getDecl();
@@ -107,13 +115,8 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
   if (auto lookupTy = getNamedSwiftType(type->getDecl()->getDeclContext(),
                                         "DynamicLookup"))
-    if (lookupTy->isEqual(type)) {
-      auto const &clangCtx = getClangASTContext();
-      clang::QualType QT =
-        clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
-      QT = clangCtx.getObjCObjectPointerType(QT);
-      return clangCtx.getCanonicalType(QT);
-    }
+    if (lookupTy->isEqual(type))
+      return getClangIdType(getClangASTContext());
   return clang::CanQualType();
 }
 
@@ -144,15 +147,9 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
-  // It turns out that clang's encoding ignores the property list,
-  // and essentially, does an encoding for 'id' type.
-  // TODO. I am not sure if this covers all such encodings coming from
-  // this swift type.
-  auto const &clangCtx = getClangASTContext();
-  clang::QualType QT =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
-  QT = clangCtx.getObjCObjectPointerType(QT);
-  return clangCtx.getCanonicalType(QT);
+  // Any protocol composition type in Swift that shows up in an @objc method maps 1-1 to
+  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
+  return getClangIdType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
