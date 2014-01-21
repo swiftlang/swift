@@ -144,7 +144,15 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
-  return clang::CanQualType();
+  // It turns out that clang's encoding ignores the property list,
+  // and essentially, does an encoding for 'id' type.
+  // TODO. I am not sure if this covers all such encodings coming from
+  // this swift type.
+  auto const &clangCtx = getClangASTContext();
+  clang::QualType QT =
+    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy, 0, 0);
+  QT = clangCtx.getObjCObjectPointerType(QT);
+  return clangCtx.getCanonicalType(QT);
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
