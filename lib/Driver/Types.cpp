@@ -54,3 +54,12 @@ ID types::lookupTypeForExtension(StringRef Ext) {
            .Case("o", TY_Object)
            .Default(TY_INVALID);
 }
+
+ID types::lookupTypeForName(StringRef Name) {
+  for (int i = 0, e = numTypes; i != e; ++i) {
+    const struct TypeInfo &TI = TypeInfos[i];
+    if (Name == TI.Name)
+      return (ID)(i + 1);
+  }
+  return TY_INVALID;
+}

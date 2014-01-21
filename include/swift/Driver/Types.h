@@ -38,6 +38,9 @@ namespace types {
   /// Lookup the type to use for the file extension \p Ext.
   ID lookupTypeForExtension(StringRef Ext);
 
+  /// Lookup the type to use for the name \p Name.
+  ID lookupTypeForName(StringRef Name);
+
 } // end namespace types
 } // end namespace driver
 } // end namespace swift
