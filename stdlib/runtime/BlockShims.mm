@@ -110,7 +110,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                 BOOL(id, NSUInteger, BOOL *));
 
 /// NSAnimationContext animation group
-/// (NSAnimation) -> Void
+/// (NSAnimationContext) -> Void
 MAKE_BLOCK_SHIM(FUNC(OWNED(CSo18NSAnimationContext_),
                      VOID),
                 void(id));
