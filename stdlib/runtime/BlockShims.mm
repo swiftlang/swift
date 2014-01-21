@@ -89,7 +89,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
 /// (id, id, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                           OWNED(PS__),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(Sb)),
                 BOOL(id, id, BOOL *));
 
@@ -97,7 +97,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                           DIRECT(Si),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, NSUInteger, BOOL *));
 
@@ -105,13 +105,13 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                           DIRECT(Si),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(Sb)),
                 BOOL(id, NSUInteger, BOOL *));
 
 /// NSAnimationContext animation group
 /// (NSAnimationContext) -> Void
-MAKE_BLOCK_SHIM(FUNC(OWNED(CSo18NSAnimationContext_),
+MAKE_BLOCK_SHIM(FUNC(OWNED(CSo18NSAnimationContext),
                      VOID),
                 void(id));
                 
@@ -119,7 +119,7 @@ MAKE_BLOCK_SHIM(FUNC(OWNED(CSo18NSAnimationContext_),
 /// (id, NSRange, UnsafePointer<BOOL>) -> Void  aka attribute string enumerator
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                           DIRECT(VSC8_NSRange),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, NSRange, BOOL *));
 
@@ -127,7 +127,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
 /// (NSDictionary, NSRange, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo12NSDictionary),
                           DIRECT(VSC8_NSRange),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, NSRange, BOOL *));
 
@@ -135,7 +135,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo12NSDictionary),
 /// (NSDate, Bool, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo6NSDate),
                           DIRECT(Sb),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, BOOL, BOOL *));
 
@@ -143,7 +143,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo6NSDate),
 /// (COpaquePointer, NSRange, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(VSs14COpaquePointer),
                           DIRECT(VSC8_NSRange),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(const void *, NSRange, BOOL *));
 
@@ -208,14 +208,14 @@ MAKE_BLOCK_SHIM(FUNC(OWNED(CSo7NSError),
 /// NSIndexSet enumerator
 /// (NSUInteger, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(Si),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(NSUInteger, BOOL *));
 
 /// NSIndexSet predicate
 /// (NSUInteger, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(Si),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(Sb)),
                 BOOL(NSUInteger, BOOL *));
 
@@ -229,21 +229,21 @@ MAKE_BLOCK_SHIM(FUNC(OWNED(CSo14NSNotification),
 /// (NSTextCheckingResult, NSMatchingFlags, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(CSo20NSTextCheckingResult),
                           OWNED(CSo15NSMatchingFlags),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, NSMatchingFlags, BOOL *));
 
 /// NSSet enumerator
 /// (id, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT2(OWNED(PSo13DynamicLookup_),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, BOOL *));
 
 /// NSSet predicate
 /// (id, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT2(OWNED(PSo13DynamicLookup_),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool___)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(Sb)),
                 BOOL(id, BOOL *));
 
