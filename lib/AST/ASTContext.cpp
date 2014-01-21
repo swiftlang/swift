@@ -149,6 +149,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
+  llvm::FoldingSet<GenericSignature> GenericSignatures;
   
   /// \brief The permanent arena.
   Arena Permanent;
@@ -1841,3 +1842,57 @@ CapturingTypeCheckerDebugConsumer::~CapturingTypeCheckerDebugConsumer() {
   delete Log;
 }
 
+void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
+                               ArrayRef<GenericTypeParamType *> genericParams,
+                               ArrayRef<Requirement> requirements) {
+  for (auto p : genericParams)
+    ID.AddPointer(p);
+  
+  for (auto &reqt : requirements) {
+    ID.AddPointer(reqt.getFirstType().getPointer());
+    ID.AddPointer(reqt.getSecondType().getPointer());
+    ID.AddInteger(unsigned(reqt.getKind()));
+  }
+}
+
+GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
+                                        ArrayRef<Requirement> requirements,
+                                        ASTContext &ctx) {
+  // Check for an existing generic signature.
+  llvm::FoldingSetNodeID ID;
+  GenericSignature::Profile(ID, params, requirements);
+  
+  void *insertPos;
+  if (auto *sig = ctx.Impl.GenericSignatures.FindNodeOrInsertPos(ID, insertPos))
+    return sig;
+  
+  // Allocate and construct the new signature.
+  size_t bytes = sizeof(GenericSignature)
+               + sizeof(GenericTypeParamType *) * params.size()
+               + sizeof(Requirement) * requirements.size();
+  void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
+  auto newSig = new (mem) GenericSignature(params, requirements);
+  ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
+  return newSig;
+}
+
+GenericSignature *GenericSignature::getCanonical(
+                                        ArrayRef<GenericTypeParamType *> params,
+                                        ArrayRef<Requirement> requirements,
+                                        ASTContext &ctx) {
+  // Canonicalize the parameters and requirements.
+  SmallVector<GenericTypeParamType*, 8> canonicalParams;
+  canonicalParams.reserve(params.size());
+  for (auto param : params) {
+    canonicalParams.push_back(cast<GenericTypeParamType>(param->getCanonicalType()));
+  }
+  
+  SmallVector<Requirement, 8> canonicalRequirements;
+  canonicalRequirements.reserve(requirements.size());
+  for (auto &reqt : requirements) {
+    canonicalRequirements.push_back(Requirement(reqt.getKind(),
+                              reqt.getFirstType()->getCanonicalType(),
+                              reqt.getSecondType().getCanonicalTypeOrNull()));
+  }
+  return get(canonicalParams, canonicalRequirements, ctx);
+}

@@ -659,38 +659,6 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
             getRequirementsBuffer().data());
 }
 
-GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        ASTContext &ctx) {
-  // Allocate storage for the object.
-  size_t bytes = sizeof(GenericSignature)
-               + sizeof(GenericTypeParamType *) * params.size()
-               + sizeof(Requirement) * requirements.size();
-  void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
-  return new (mem) GenericSignature(params, requirements);
-}
-
-GenericSignature *GenericSignature::getCanonical(
-                                        ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        ASTContext &ctx) {
-  // Canonicalize the parameters and requirements.
-  SmallVector<GenericTypeParamType*, 8> canonicalParams;
-  canonicalParams.reserve(params.size());
-  for (auto param : params) {
-    canonicalParams.push_back(cast<GenericTypeParamType>(param->getCanonicalType()));
-  }
-  
-  SmallVector<Requirement, 8> canonicalRequirements;
-  canonicalRequirements.reserve(requirements.size());
-  for (auto &reqt : requirements) {
-    canonicalRequirements.push_back(Requirement(reqt.getKind(),
-                              reqt.getFirstType()->getCanonicalType(),
-                              reqt.getSecondType().getCanonicalTypeOrNull()));
-  }
-  return get(canonicalParams, canonicalRequirements, ctx);
-}
-
 void NominalTypeDecl::setGenericSignature(
                         ArrayRef<GenericTypeParamType *> params,
                         ArrayRef<Requirement> requirements) {

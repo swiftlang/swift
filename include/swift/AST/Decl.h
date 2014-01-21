@@ -32,6 +32,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include <cstddef>
@@ -1752,7 +1753,7 @@ public:
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class GenericSignature {
+class GenericSignature : public llvm::FoldingSetNode {
   unsigned NumGenericParams;
   unsigned NumRequirements;
 
@@ -1823,7 +1824,15 @@ public:
   static TypeSubstitutionMap
   getSubstitutionMap(ArrayRef<GenericTypeParamType *> genericParams,
                      ArrayRef<Substitution> args);
-                                         
+
+  /// Uniquing for the ASTContext.
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getGenericParams(), getRequirements());
+  }
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<GenericTypeParamType *> genericParams,
+                      ArrayRef<Requirement> requirements);
 };
 
 /// Kinds of optional types.
