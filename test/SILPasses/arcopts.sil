@@ -185,3 +185,30 @@ bb0(%0 : $S):
   %4 = tuple()
   return %4 : $()
 }
+
+// CHECK-LABEL: sil @literals_do_not_use_values_with_reference_semantics : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: string_literal
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @literals_do_not_use_values_with_reference_semantics : $@thin (Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  strong_retain %0 : $Builtin.ObjectPointer
+  %1 = function_ref @user : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  %2 = function_ref @user : $@thin (Builtin.ObjectPointer) -> ()
+  %3 = builtin_function_ref "sextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = string_literal utf8 "123"
+  strong_release %0 : $Builtin.ObjectPointer
+  %6 = tuple()
+  return %6 : $()
+}
+

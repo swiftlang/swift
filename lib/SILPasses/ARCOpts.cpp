@@ -44,7 +44,21 @@ static bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target) {
 
 /// Can Inst use Target in a manner that requires Target to be alive at Inst?
 static bool cannotUseValue(SILInstruction *Inst, SILValue Target) {
-  // Assume Inst always uses Target for now.
+  // Handle early instructions that we know can not use reference counted values
+  // in a manner that requires the values to be alive.
+  switch (Inst->getKind()) {
+  // These instructions do not use other values.
+  case ValueKind::FunctionRefInst:
+  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::IntegerLiteralInst:
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::StringLiteralInst:
+    return true;
+  default:
+    break;
+  }
+
+  // Otherwise, assume that Inst can use Target.
   return false;
 }
 
