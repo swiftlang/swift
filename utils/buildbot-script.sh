@@ -294,7 +294,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
-              -DLLVM_TARGETS_TO_BUILD="X86;ARM;ARM64" \
+              -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               "${LLVM_SOURCE_DIR}" || exit 1)
   fi
