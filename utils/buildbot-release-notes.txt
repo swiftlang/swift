@@ -52,11 +52,12 @@
     }
 
 * Objective-C instance variables are no longer imported from headers written in
-  Objective-C. Previously, they would appear as vars within the Objective-C
-  class, but trying to access them would result in a crash. Additionally, their
-  names can conflict with property names, which confuses the Swift compiler,
-  and there are no patterns in our frameworks that expect you to access a
-  parent or other class's instance variables directly. Use properties instead.
+  Objective-C. Previously, they would appear as properties within the
+  Objective-C class, but trying to access them would result in a crash.
+  Additionally, their names can conflict with property names, which confuses
+  the Swift compiler, and there are no patterns in our frameworks that expect
+  you to access a parent or other class's instance variables directly. Use
+  properties instead.
 
 
 2014-01-15
