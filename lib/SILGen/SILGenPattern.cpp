@@ -164,7 +164,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
                                         SwitchStmt *stmt) {
   assert(!patterns.empty() && "no patterns to dispatch on?!");
   
-  const Pattern *headPattern = patterns[0].pattern->getSemanticsProvidingPattern();
+  const Pattern *headPattern = patterns[0].pattern;
   PatternKind kind = headPattern->getKind();
   CanType type = headPattern->getType()->getCanonicalType();
   
@@ -1667,7 +1667,8 @@ recur:
     specializers[i].pattern
       = combineAndFilterSubsumedPatterns(specializers,
                                          i, specializers.size(),
-                                         gen.getASTContext());
+                                         gen.getASTContext())
+          ->getSemanticsProvidingPattern();
   }
 
   // If we have no specializations, recur into the default matrix immediately.
