@@ -2293,7 +2293,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     return true;
   }
 
-  auto ArgTys = FTI->getParameterSILTypes();
+  auto ArgTys = FTI->getInterfaceParameterSILTypes();
   
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
@@ -2321,14 +2321,18 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
     SILType FnTy = FnVal.getType();
+    CanSILFunctionType substFTI = FTI;
     if (!subs.empty()) {
       auto silFnTy = FnTy.castTo<SILFunctionType>();
-      FnTy = SILType::getPrimitiveObjectType(
-           silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(), subs));
+      auto substFTI
+        = silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(),
+                                             subs);
+      FnTy = SILType::getPrimitiveObjectType(substFTI);
     }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
-                              FTI->getResult().getSILType(), subs, Args,
+                              substFTI->getInterfaceResult().getSILType(),
+                              subs, Args,
                               Transparent);
     break;
   }
@@ -2351,11 +2355,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (!subs.empty()) {
       auto silFnTy = FnTy.castTo<SILFunctionType>();
       FnTy = SILType::getPrimitiveObjectType(
-           silFnTy->substGenericArgs(SILMod, P.SF.getParentModule(), subs));
+        silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(), subs));
     }
     
     SILType closureTy =
-      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, {});
+      SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(InstLoc, FnVal, FnTy,
                                      subs, Args, closureTy);
