@@ -284,6 +284,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
+  // TODO: Eliminate non-interface-type processing when SILFunctionType doesn't
+  // need non-interface types.
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   auto OrigParams = OrigFTI->getParameters();
 
   // Iterate over the argument types of the original function, collapsing each
@@ -341,6 +344,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
                          ClonedInterfaceArgTys,
                          OrigFTI->getInterfaceResult(),
                          M.getASTContext());
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
   // This inserts the new cloned function before the original function.
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
@@ -562,7 +566,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
     if (AI->getSubstCalleeType()
-          ->getParameters()[O->getOperandNumber()-1].isIndirect()) {
+          ->getInterfaceParameters()[O->getOperandNumber()-1].isIndirect()) {
       Mutations.push_back(AI);
       return true;
     }
@@ -623,7 +627,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureType->getParameters().size();
+      unsigned Index = OpNo - 1 + closureType->getInterfaceParameters().size();
 
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
@@ -710,7 +714,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   unsigned FirstIndex =
-    PAI->getType().castTo<SILFunctionType>()->getParameters().size();
+    PAI->getType().castTo<SILFunctionType>()->getInterfaceParameters().size();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
   while (OpNo != OpCount) {
