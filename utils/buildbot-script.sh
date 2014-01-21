@@ -27,6 +27,7 @@ KNOWN_SETTINGS=(
     prefix                      "/usr"           "installation prefix"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
+    skip-build-ios              1                "set to skip building Swift stdlibs for iOS"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
@@ -185,11 +186,28 @@ fi
 # Swift-project products, in the order they must be built
 SWIFT_BUILD_PRODUCTS=(swift SourceKit)
 
-# All build products, in the order they must be built
-ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}")
+# Swift stdlib build products
+# macosx-x86_64 stdlib is part of the swift product itself
+if [[ ! "$SKIP_BUILD_IOS" ]]; then
+    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_arm64)
+    SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+fi
 
+# All build products, in the order they must be built
+ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+
+#
 # Calculate source directories for each product.
-# Default to $WORKSPACE/$product if not set above.
+#
+
+# iOS build products use the same source directory as swift itself.
+# Default to $WORKSPACE/swift if SWIFT_SOURCE_DIR if not set above.
+for product in "${IOS_BUILD_PRODUCTS[@]}" ; do
+    varname="$(toupper "${product}")"_SOURCE_DIR
+    eval $varname=${SWIFT_SOURCE_DIR:-$WORKSPACE/swift}
+done
+
+# Default source directory is $WORKSPACE/$product if not set above.
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     varname="$(toupper "${product}")"_SOURCE_DIR
     eval dir=\${$varname:=$WORKSPACE/$product}
@@ -199,7 +217,10 @@ for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     fi
 done
 
+#
 # Calculate build directories for each product
+#
+
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     PRODUCT=$(toupper "${product}")
     eval source_dir=\${${PRODUCT}_SOURCE_DIR}
@@ -210,8 +231,6 @@ for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     fi
     eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
 done
-
-SWIFT_MODULE_CACHE="${BUILD_DIR:-${WORKSPACE}}/swift-module-cache"
 
 if [[ "$PACKAGE" ]]; then
   # Make sure install-test-script.sh is available alongside us.
@@ -240,18 +259,6 @@ if [ ! -e "${WORKSPACE}/clang" ]; then
     fi
 fi
 ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
-
-# Create a fresh directory for the Swift Clang module cache.
-if [ -e "${SWIFT_MODULE_CACHE}" ]; then
-  rm -rf "${SWIFT_MODULE_CACHE}" || exit 1
-fi
-mkdir -p "${SWIFT_MODULE_CACHE}"
-
-# Make extra sure it's empty.
-if [ "$(ls -A "${SWIFT_MODULE_CACHE}")" ]; then
-  echo "Module cache not empty! Aborting."
-  exit 1
-fi
 
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
@@ -287,7 +294,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
-              -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
+              -DLLVM_TARGETS_TO_BUILD="X86;ARM;ARM64" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               "${LLVM_SOURCE_DIR}" || exit 1)
   fi
@@ -299,10 +306,42 @@ fi
 #
 
 SWIFT_CMAKE_OPTIONS=(
-    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
 )
+
+# set_ios_options options_var platform deployment_target internal_suffix arch
+function set_ios_options {
+    local platform=$2
+    local deployment_target=$3
+    local internal_suffix=$4
+    local arch=$5
+
+    local sdkroot=`xcrun -sdk ${platform}${internal_suffix} -show-sdk-path`
+    local cc=`xcrun -sdk ${platform}${internal_suffix} -find clang`
+
+    local opts=(
+        -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
+        "${SWIFT_CMAKE_OPTIONS[@]}"
+        -DCMAKE_C_COMPILER=${cc}
+        -DCMAKE_CXX_COMPILER=${cc}++
+        -DCMAKE_SYSTEM_PROCESSOR=${arch}
+        -DCMAKE_OSX_ARCHITECTURES=${arch}
+        -DCMAKE_OSX_SYSROOT="${sdkroot}"
+        -DMODULES_SDK="${sdkroot}"
+        -DCMAKE_C_FLAGS="-isysroot${sdkroot}"
+        -DCMAKE_CXX_FLAGS="-isysroot${sdkroot}"
+        -DSWIFT_DEPLOYMENT_OS=${platform}${internal_suffix}
+        -DSWIFT_DEPLOYMENT_TARGET=${deployment_target}
+        -DSWIFT_BUILD_TOOLS=OFF
+        -DSWIFT_COMPILER="${SWIFT_BUILD_DIR}/bin/swift"
+        -DSWIFT_INCLUDE_DOCS=OFF
+    )
+
+    eval $1=\(\${opts[@]}\)
+}
+
+set_ios_options SWIFT_STDLIB_IOS_ARM64_CMAKE_OPTIONS iphoneos 7.0 .internal arm64
 
 SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
@@ -332,7 +371,13 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
         echo "--- Building ${product} ---"
         _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
-        
+
+        # Clean product-local module cache.
+        swift_module_cache="${!_PRODUCT_BUILD_DIR}/swift-module-cache"
+        rm -rf "${swift_module_cache}"
+        mkdir -p "${swift_module_cache}"
+
+        # Configure if necessary.
         if [[ ! -f  "${!_PRODUCT_BUILD_DIR}/CMakeCache.txt" ]] ; then
             mkdir -p "${!_PRODUCT_BUILD_DIR}"
 
@@ -340,18 +385,26 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
             if [[ "${RUN_WITH_ASAN_COMPILER}" ]]; then
               _ASAN_OPTIONS=ASAN_CMAKE_OPTIONS[@]
             fi
-              
+
+            case "${PRODUCT}" in
+                SWIFT_STDLIB*) var_prefix="SWIFT" ;;
+                *) var_prefix=${PRODUCT} ;;
+            esac
+
             (cd "${!_PRODUCT_BUILD_DIR}" &&
                 "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
                     "${!_PRODUCT_CMAKE_OPTIONS}" \
                     "${!_ASAN_OPTIONS}" \
+                    -DSWIFT_MODULE_CACHE="${swift_module_cache}" \
                     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-                    -D${PRODUCT}_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}" \
-                    -D${PRODUCT}_PATH_TO_CLANG_BUILD="${CLANG_BUILD_DIR}" \
-                    -D${PRODUCT}_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}" \
-                    -D${PRODUCT}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+                    -D${var_prefix}_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}" \
+                    -D${var_prefix}_PATH_TO_CLANG_BUILD="${CLANG_BUILD_DIR}" \
+                    -D${var_prefix}_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}" \
+                    -D${var_prefix}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
                     "${!_PRODUCT_SOURCE_DIR}" || exit 1)
         fi
+
+        # Build.
         "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
     fi
 done
