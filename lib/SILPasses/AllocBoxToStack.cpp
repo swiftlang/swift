@@ -38,35 +38,22 @@ static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
   auto *AllocBoxBB = ABI->getParent();
   auto *ReleaseBB = SRI->getParent();
 
-  // If the box and the release are in the same BB. Exit early.
-  if (AllocBoxBB == ReleaseBB)
-    return false;
-
-  // Add the allocbox's successor BBs to the worklist and the visited set.
-  for (auto &Succ : AllocBoxBB->getSuccs()) {
-    auto *BB = Succ.getBB();
-
-    // Prune the search at the SRI's BB.
-    if (BB == ReleaseBB)
-      continue;
-
-    Worklist.push_back(BB);
-    VisitedBBSet.insert(BB);
-  }
+  // Add the alloc box bb to the worklist.
+  Worklist.push_back(AllocBoxBB);
 
   // For each BB in the worklist...
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
-    // We found an entry cycle, we can not promote this alloc box.
-    if (BB == AllocBoxBB) {
-      ++NumEntryCycleBB;
-      return true;
-    }
-
     // Otherwise, add the successors of the BB to the worklist...
     for (auto &Succ : BB->getSuccs()) {
       auto *BB = Succ.getBB();
+
+      // We found an entry cycle, we can not promote this alloc box.
+      if (BB == AllocBoxBB) {
+        ++NumEntryCycleBB;
+        return true;
+      }
 
       // Prune the search at the SRI's BB.
       if (BB == ReleaseBB)
