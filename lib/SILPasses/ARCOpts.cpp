@@ -1,4 +1,4 @@
-//===----------- ARCOpts.cpp - Perform SIL ARC Optimizations --------------===//
+//===-------- ARCOpts.cpp - Perform SIL ARC Optimizations -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,11 +12,13 @@
 
 #define DEBUG_TYPE "sil-arc-opts"
 #include "swift/SILPasses/Passes.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -26,352 +28,439 @@ using namespace swift;
 static llvm::cl::opt<bool>
 EnableARCOpts("enable-arc-opts", llvm::cl::Hidden, llvm::cl::init(true));
 
-STATISTIC(NumStrongRetains, "Total number of strong_retain seen");
-STATISTIC(NumStrongRetainStrongReleasePairsEliminated,
-          "Number of strong_retain/strong_release pairs eliminated");
-STATISTIC(NumCopyValue, "Total number of copy_value seen");
-STATISTIC(NumCopyValueDestroyValuePairsEliminated,
-          "Number of swift copy_value/destroy_value pairs eliminated");
+STATISTIC(NumIncrements, "Total number of increments seen");
+STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
 
 //===----------------------------------------------------------------------===//
-//                                 Exit Type
+//                          Stub Analysis Functions
+//===----------------------------------------------------------------------===//
+
+/// Could Inst decrement the ref count associated with target?
+static bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target) {
+  // Just make sure that we do not have side effects.
+  return Inst->getMemoryBehavior() !=
+    SILInstruction::MemoryBehavior::MayHaveSideEffects;
+}
+
+/// Can Inst use Target in a manner that requires Target to be alive at Inst?
+static bool cannotUseValue(SILInstruction *Inst, SILValue Target) {
+  // Assume Inst always uses Target for now.
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+//                             Utility Functions
+//===----------------------------------------------------------------------===//
+
+/// Returns true if Inc and Dec are compatible reference count instructions.
+///
+/// In more specific terms this means that means a (strong_retain,
+/// strong_release) pair or a (copy_value, destroy_value) pair.
+static bool matchingRefCountPairType(SILInstruction *Inc, SILInstruction *Dec) {
+  return (isa<StrongRetainInst>(Inc) && isa<StrongReleaseInst>(Dec)) ||
+    (isa<CopyValueInst>(Inc) && isa<DestroyValueInst>(Dec));
+}
+
+/// Is I an instruction that we recognize as a "reference count increment"
+/// instruction?
+static bool isRefCountIncrement(SILInstruction &I) {
+  return isa<StrongRetainInst>(I) || isa<CopyValueInst>(I);
+}
+
+/// Is I an instruction that we recognize as a "reference count decrement"
+/// instruction?
+static bool isRefCountDecrement(SILInstruction &I) {
+  return isa<StrongReleaseInst>(I) || isa<DestroyValueInst>(I);
+}
+
+//===----------------------------------------------------------------------===//
+//                           Reference Count State
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-  /// Returned by local code motion visitors to specify the type of action to
-  /// take after visiting an instruction.
-  enum class ExitType {
-    /// We successfully eliminated a +1/-1 pair. Exit successfully.
-    RefCountPairEliminated,
+/// Sequence of states that a value with reference semantics can go through when
+/// visiting increments top down.
+enum class SequenceState {
+  None,                 ///< The pointer has no information associated with it.
+  Incremented,          ///< The pointer is known to have been incremented.
+  MightBeDecremented,   ///< The pointer has been incremented and may have been
+                        ///  decremented.
+  MightBeUsed           ///< The pointer has been incremented, may have been
+                        ///  decremented, and may have a use that needs to be
+                        ///  protected against the decrement deallocating the
+                        ///  pointer.
+};
 
-    /// Exit, performing any possible code motion.
-    PerformCodeMotion,
+class ReferenceCountState {
+  /// The increment instruction that we are tracking.
+  SILInstruction *Instruction = nullptr;
 
-    /// Set if the two instructions commute. Initiates code motion.
-    CommuteWithMotion,
+  /// Was the pointer we are tracking known incremented when we visited the
+  /// current increment we are tracking? In that case we know that it is safe
+  /// to move the inner retain over instructions that may decrement ref counts
+  /// since the outer retain will keep the reference counted value alive.
+  bool KnownSafe = false;
 
-    /// Set if the two instructions commute, but the visited structure can not
-    /// cause code motion to be initiated. This is used to prevent infinite code
-    /// motion by adjacent retains/releases.
-    CommuteWithoutMotion,
-  };
+  /// The latest point we can move Instruction without moving it over an
+  /// instruction that might be able to decrement the value with reference
+  /// semantics.
+  SILInstruction *InsertPt = nullptr;
 
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
-//                        Local Source Motion Visitor
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// A visitor that attempts to move retain/copy_value instructions down the
-/// CFG.
-///
-/// Currently this visitor implements a state machine without any
-/// memory. After visiting an instruction, it specifies what action the caller
-/// should take in response to the newly visited instruction. These actions
-/// are:
-///
-///   1. RefCountPairEliminated. We visited a release/destroy_value that can
-///   be paired with the retain/copy_value that we are tracking. We eliminated
-///   the pair. The user should return exit with success.
-///
-///   2. PerformCodeMotion. We visited an instruction that we can not move a
-///   retain/copy_value over. Thus do nothing in the case of a copy_value or
-///   in the case of the retain, move the retain next to this usage.
-///
-///   3. CommuteWithMotion. We visited an instruction that we can commute the
-///   retain/copy_value we are tracking with. Visit the next instruction.
-///
-///   4. CommuteWithoutMotion. We visited an instruction that we can commute
-///   the retain/copy_value we are tracking with, but in order to prevent
-///   circular code motion, only move the instruction past that instruction if
-///   there is another instruction beyond it that enables us to commute with
-///   motion.
-///
-/// This will be replaced by the dataflow analysis in a later iteration.
-template <class Subclass>
-class LocalRefCountIncMotionVisitor
-  : public SILVisitor<LocalRefCountIncMotionVisitor<Subclass>, ExitType> {
-protected:
-
-  /// The module the instruction we are processing is in.
-  SILModule &M;
+  /// Current place in the sequence of the value.
+  SequenceState State = SequenceState::None;
 
 public:
-  LocalRefCountIncMotionVisitor(SILModule &Module) : M(Module) { }
+  ReferenceCountState() { }
+  ~ReferenceCountState() { }
 
-  ExitType visitValueBase(ValueBase *V) {
-    llvm_unreachable("This should never be hit.");
-  }
+  /// Are we initialized for tracking a pointer?
+  bool isInitialized() const { return Instruction != nullptr; }
 
-  Subclass &asImpl() { return static_cast<Subclass &>(*this); }
+  /// Can we gaurantee that the given reference counted value is incremented?
+  bool isIncremented() const { return SequenceState::Incremented == State; }
 
-  /// Currently MayHaveSideEffects has a broader definition than we
-  /// require. The following x-macro handles simple cases of instructions that
-  /// have side effects, but that we handle as if they do not since they do
-  /// not decrement reference counts.
-#define SIMPLE_CASE(_Value, _ExitType)                                \
-  ExitType visit ## _Value(_Value *I) { return ExitType::_ExitType; }
-  SIMPLE_CASE(DeallocStackInst, CommuteWithMotion)
-  SIMPLE_CASE(PartialApplyInst, CommuteWithMotion)
-  SIMPLE_CASE(CondFailInst, CommuteWithMotion)
-  SIMPLE_CASE(UnownedRetainInst, CommuteWithMotion)
-  SIMPLE_CASE(UnownedReleaseInst, CommuteWithMotion)
-#undef SIMPLE_CASE
+  /// Are we tracking an instruction currently? This returns false when given
+  /// an uninitialized ReferenceCountState.
+  bool hasInstruction() const { return Instruction != nullptr; }
 
-  ExitType visitSILInstruction(SILInstruction *I);
-  ExitType visitApplyInst(ApplyInst *AI);
-  ExitType visitCopyAddrInst(CopyAddrInst *CA);
+  /// Return the increment we are tracking.
+  SILInstruction *getInstruction() const { return Instruction; }
 
-#define DELEGATE_CASE_TO_SUBCLASS(_Value) \
-    ExitType visit ## _Value(_Value *I) { return asImpl().visit ## _Value(I); }
-    DELEGATE_CASE_TO_SUBCLASS(CopyValueInst)
-    DELEGATE_CASE_TO_SUBCLASS(DestroyValueInst)
-    DELEGATE_CASE_TO_SUBCLASS(StrongRetainInst)
-    DELEGATE_CASE_TO_SUBCLASS(StrongReleaseInst)
-#undef DELEGATE_CASE
+  /// Return the value with reference semantics that is the operand of our
+  /// increment.
+  SILValue getValue() const { return getInstruction()->getOperand(0); }
 
-  bool performLocalCodeMotionDownCFG();
+  /// The latest point we can move the increment without bypassing instructions
+  /// that may have reference semantics.
+  SILInstruction *getInsertPoint() const { return InsertPt; }
+
+  ///
+  bool isKnownSafe() const { return KnownSafe; }
+
+  /// Is this an increment that we can perform code motion for. This is true
+  /// for strong_retain and false for copy_value.
+  bool canBeMoved() const { return isa<StrongRetainInst>(Instruction); }
+
+  /// Initializes/reinitialized the state for I. If we reinitialize we return
+  /// true.
+  bool init(SILInstruction *I);
+
+  /// Uninitialize the current state.
+  void clear();
+
+  /// Check if PotentialDecrement can decrement the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialDecrement(SILInstruction *PotentialDecrement);
+
+  /// Check if PotentialUser could be a use of the reference counted value that
+  /// requires user to be alive. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialUser(SILInstruction *PotentialUser);
+
+  /// Returns true if Decrement is a decrement instruction that matches the
+  /// increment we are tracking. Performs all necessary state cleanups.
+  bool doesDecrementMatchInstruction(SILInstruction *Decrement);
 };
 
 } // end anonymous namespace
 
-template <class Subclass>
-bool LocalRefCountIncMotionVisitor<Subclass>::performLocalCodeMotionDownCFG() {
-  bool Result = true;
-  bool ShouldPerformCodeMotion = false;
-  SILInstruction *Inst = asImpl().getInstruction();
-  SILBasicBlock::iterator II = Inst, IE = Inst->getParent()->getTerminator();
-  for (++II; II != IE; ++II) {
-    DEBUG(llvm::dbgs() << "  Looking at next instruction: " << *II);
-    switch (asImpl().visit(SILValue(&*II))) {
-      case ExitType::RefCountPairEliminated:
-        DEBUG(llvm::dbgs() << "SUCCESS! Eliminated RR Pair...\n");
-        return true;
-      case ExitType::PerformCodeMotion:
-        DEBUG(llvm::dbgs() << "FAILURE! Can not move retain further. Moving "
-              "Retain...\n");
-        Result = false;
-        goto LoopExit;
-      case ExitType::CommuteWithMotion:
-        DEBUG(llvm::dbgs() << "    COMMUTES! Checking next instruction...\n");
-        ShouldPerformCodeMotion = true;
+bool ReferenceCountState::init(SILInstruction *I) {
+  bool AlreadyInitialized = isInitialized();
+
+  // This retain is known safe if the operand we are tracking was already
+  // known incremented previously. This occurs when you have nested increments.
+  KnownSafe = isIncremented();
+
+  // Reset our state to Incremented.
+  State = SequenceState::Incremented;
+
+  // Stash the incrementing instruction we are tracking.
+  Instruction = I;
+
+  // Reset our insertion point to null.
+  InsertPt = nullptr;
+
+  return AlreadyInitialized;
+}
+
+void ReferenceCountState::clear() {
+  State = SequenceState::None;
+  Instruction = nullptr;
+  InsertPt = nullptr;
+  KnownSafe = false;
+}
+
+bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
+  // If our state is not initialized, return false since we are not tracking
+  // anything.
+  if (!isInitialized())
+    return false;
+
+  // If we can prove that Other can not decrement the reference counted
+  // instruction we are tracking, return false.
+  if (cannotDecrementRefCount(Other, getValue()))
+    return false;
+
+  // Otherwise Other could potentially decrement the value we are tracking.
+  // Attempt to advance the sequence. If we do advance the sequence, return
+  // true. If we can not advance the sequence then this information is not
+  // relevant, so return false.
+  switch (State) {
+    case SequenceState::Incremented:
+      State = SequenceState::MightBeDecremented;
+      InsertPt = Other;
+      return true;
+    case SequenceState::None:
+    case SequenceState::MightBeDecremented:
+    case SequenceState::MightBeUsed:
+      return false;
+  }
+}
+
+bool ReferenceCountState::handlePotentialUser(SILInstruction *Other) {
+  // If our state is not initialized, return false since we are not tracking
+  // anything.
+  if (!isInitialized())
+    return false;
+
+  // If we can prove that Other can not use the pointer we are tracking,
+  // return...
+  if (cannotUseValue(Other, getValue()))
+    return false;
+
+  // Otherwise advance the sequence...
+  switch (State) {
+    case SequenceState::MightBeDecremented:
+      State = SequenceState::MightBeUsed;
+      return true;
+    case SequenceState::Incremented:
+    case SequenceState::None:
+    case SequenceState::MightBeUsed:
+      return false;
+  }
+}
+
+bool
+ReferenceCountState::doesDecrementMatchInstruction(SILInstruction *Decrement) {
+  // If our state is not initialized, return false since we are not tracking
+  // anything. If the ValueKind of our increments, decrement do not match, we
+  // can not eliminate the pair so return false.
+  if (!isInitialized() || !matchingRefCountPairType(Instruction, Decrement))
+    return false;
+
+  // Otherwise modify the state appropriately in preparation for removing the
+  // increment, decrement pair.
+  switch (State) {
+    case SequenceState::None:
+      return false;
+    case SequenceState::Incremented:
+    case SequenceState::MightBeDecremented:
+      // Unset InsertPt so we remove retain release pairs instead of performing
+      // code motion.
+      InsertPt = nullptr;
+      SWIFT_FALLTHROUGH;
+    case SequenceState::MightBeUsed:
+      return true;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                             Top Down Dataflow
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+/// Small helper function for reducing the debug output generated by ignoring
+/// functions without interesting instructions.
+static bool isInterestingInstruction(ValueKind Kind) {
+  switch (Kind) {
+   default:
+     return false;
+   case ValueKind::CopyValueInst:
+   case ValueKind::DestroyValueInst:
+   case ValueKind::StrongRetainInst:
+   case ValueKind::StrongReleaseInst:
+     return true;
+  }
+}
+#endif
+
+static bool
+processBBTopDown(SILBasicBlock &BB,
+                 llvm::MapVector<SILValue, ReferenceCountState> &BBState,
+                 llvm::DenseMap<SILInstruction *,
+                                ReferenceCountState> &DecToIncStateMap) {
+
+  bool NestingDetected = false;
+
+#ifndef NDEBUG
+  // If we are in debug mode, to make the output less verbose, make sure we are
+  // actually processing something interesting before emitting any log output.
+  bool FoundOneInst = false;
+  for (auto &I : BB)
+    FoundOneInst |= isInterestingInstruction(I.getKind());
+  if (!FoundOneInst)
+    return false;
+#endif
+
+  // For each instruction I in BB...
+  for (auto &I : BB) {
+
+    DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
+
+    // If I is a ref count increment instruction...
+    if (isRefCountIncrement(I)) {
+      // map its operand to a newly initialized or reinitialized ref count
+      // state and continue...
+      SILValue Operand = I.getOperand(0);
+      ReferenceCountState &RefCountState = BBState[Operand];
+      NestingDetected |= RefCountState.init(&I);
+
+      // If we have a copy value add in an additional state for its output
+      // pointer.
+      if (isa<CopyValueInst>(I)) {
+        ReferenceCountState &OutputRefCountState = BBState[SILValue(&I, 0)];
+        OutputRefCountState.init(&I);
+        NestingDetected |= OutputRefCountState.init(&I);
+      }
+
+      DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
+            << (RefCountState.isKnownSafe()?"yes":"no") << "\n");
+
+      ++NumIncrements;
+      continue;
+    }
+
+    // If we have a reference count decrement...
+    if (isRefCountDecrement(I)) {
+      // Look up the state associated with its operand...
+      SILValue Operand = I.getOperand(0);
+      ReferenceCountState &RefCountState = BBState[Operand];
+
+      DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
+
+      // If the state is already initialized to contain a reference count
+      // increment of the same type (i.e. copy_value, destroy_value or
+      // strong_retain, strong_release), then remove the state from the map
+      // and add the retain/release pair to the delete list and continue.
+      if (RefCountState.doesDecrementMatchInstruction(&I)) {
+        // Copy the current value of ref count state into the result map.
+        DecToIncStateMap[&I] = RefCountState;
+        DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:           "
+              << *RefCountState.getInstruction());
+
+        // If we have matched up a copy_value, find the other copy of its state
+        // and remove it so we do not attempt to remove the copy_value twice.
+        if (auto *CV =
+              dyn_cast<CopyValueInst>(RefCountState.getInstruction())) {
+          SILValue CVOperand = CV->getOperand();
+          if (CVOperand == Operand) {
+            // We matched the copy value's operand, clear the state associated
+            // with its result.
+            BBState[SILValue(CV, 0)].clear();
+          } else {
+            // We matched the copy value's result, clear the state associated
+            // with its operand.
+            BBState[CVOperand].clear();
+          }
+        }
+
+        // Clear the ref count state in case we see more operations on this
+        // ref counted value. This is for safety reasons.
+        //
+        // FIXME: It may be safe to continue here, but for now lets be
+        // conservative.
+        RefCountState.clear();
+      }
+
+      // Otherwise we continue processing the reference count decrement to
+      // see if the decrement can affect any other pointers that we are
+      // tracking.
+    }
+
+    // For all other (reference counted value, ref count state) we are
+    // tracking...
+    for (auto &OtherState : BBState) {
+      // First check if the instruction we are visiting could potentially
+      // decrement the reference counted value we are tracking... in a
+      // manner that could cause us to change states. If we do change states
+      // continue...
+      if (OtherState.second.handlePotentialDecrement(&I)) {
+        DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
+              << *OtherState.second.getInstruction());
         continue;
-      case ExitType::CommuteWithoutMotion:
-        DEBUG(llvm::dbgs() << "    COMMUTES WITHOUT MOTION! next "
-              "instruction...\n");
-        continue;
+      }
+
+      // Otherwise check if the reference counted value we are tracking
+      // could be used by the given instruction.
+      SILInstruction *Other = OtherState.second.getInstruction();
+      (void)Other;
+      if (OtherState.second.handlePotentialUser(&I))
+        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
     }
   }
-LoopExit:
 
-  // If we can not perform code motion at all, return false since we did not
-  // remove any retain/release.
-  if (!ShouldPerformCodeMotion) {
-    DEBUG(llvm::dbgs() << "  Not performing code motion!\n");
-    return false;
-  }
-
-  // Otherwise, attempt to perform code motion and return whether or not we
-  // eliminated a retain/release.
-  return asImpl().performCodeMotion(II) && Result;
+  // Return whether or not we saw a nested retain to signal if so to process
+  // this basic block again.
+  return NestingDetected;
 }
 
-/// Skip over instructions that are guaranteed to not decrement ref counts. In
-/// SIL, this is guaranteed by an instruction not having side effects.
-template <class Subclass>
-ExitType
-LocalRefCountIncMotionVisitor<Subclass>::
-visitSILInstruction(SILInstruction *I) {
-  // If the instruction does not have any side effects, the retain/copy value
-  // and the instruction commute.
-  if (I->getMemoryBehavior() !=
-      SILInstruction::MemoryBehavior::MayHaveSideEffects)
-    return ExitType::CommuteWithMotion;
+//===----------------------------------------------------------------------===//
+//                                Code Motion
+//===----------------------------------------------------------------------===//
 
-  // Otherwise assume that something is occuring here we do not understand,
-  // so bail, performing any code motion that is possible at this point.
-  return ExitType::PerformCodeMotion;
-}
+static bool
+performCodeMotion(llvm::DenseMap<SILInstruction *,
+                                 ReferenceCountState> &DecToIncStateMap) {
+  llvm::SmallVector<SILInstruction *, 16> DeleteList;
 
-template <class Subclass>
-ExitType
-LocalRefCountIncMotionVisitor<Subclass>::visitApplyInst(ApplyInst *AI) {
-  // Ignore any thick functions for now due to us not handling the ref-counted
-  // nature of its context.
-  if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
-    if (!FTy->isThin())
-      return ExitType::PerformCodeMotion;
+  for (auto &Pair : DecToIncStateMap) {
+    // If we do not have an instruction, this is a state with an invalidated
+    // reference count. Skip it...
+    if (!Pair.second.getInstruction())
+      continue;
 
-  // If we have a builtin that is side effect free, we can commute the
-  // ApplyInst and the retain.
-  if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-    if (isSideEffectFree(BI)) {
-      DEBUG(llvm::dbgs() << "Builtin Success: " << *BI << "\n");
-      return ExitType::CommuteWithMotion;
+    auto *InsertPt = Pair.second.getInsertPoint();
+
+    // If we reached this point and do not have an insertion point (in the case
+    // where we do not complete the sequence) or are known safe, remove the
+    // retain release pair.
+    if (Pair.second.isKnownSafe() || !InsertPt) {
+      SILInstruction *Inst = Pair.second.getInstruction();
+
+      DEBUG(llvm::dbgs() << "Removing Pair:\n    KnownSafe: "
+            << (Pair.second.isKnownSafe()?"yes":"no")
+            << "\n    " << *Inst << "    "
+            << *Pair.first);
+
+      assert(!std::count(DeleteList.begin(), DeleteList.end(), Pair.first) &&
+             "Should only add an instruction to this list once.");
+      assert(!std::count(DeleteList.begin(), DeleteList.end(), Inst) &&
+             "Should only add an instruction to this list once.");
+
+      // Add our deleted instructions to the delete list.
+      DeleteList.push_back(Pair.first);
+      DeleteList.push_back(Inst);
+
+      // If we are going to remove a copy value, propagate the operand of the
+      // copy value to all uses of the copy value.
+      if (isa<CopyValueInst>(Inst))
+        SILValue(Inst, 0).replaceAllUsesWith(Inst->getOperand(0));
+
+      ++NumIncrementsRemoved;
+      continue;
     }
-
-  // Plug in alias analysis here.
-
-  // Otherwise exit, performing any code motion that we can.
-  return ExitType::PerformCodeMotion;
-}
-
-template <class Subclass>
-ExitType
-LocalRefCountIncMotionVisitor<Subclass>::visitCopyAddrInst(CopyAddrInst *CA) {
-  // A copy address that is an initialization does not release the old value, so
-  // it always commutes with retains.
-  if (CA->isInitializationOfDest() == IsInitialization_t::IsInitialization)
-    return ExitType::CommuteWithMotion;
-
-  // Otherwise, the CopyAddr will release a pointer implying we must exit,
-  // performing code motion if we can.
-  return ExitType::PerformCodeMotion;
-}
-
-//===----------------------------------------------------------------------===//
-//                        Local Retain Motion Visitor
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class LocalRetainMotionVisitor
-  : public LocalRefCountIncMotionVisitor<LocalRetainMotionVisitor> {
-
-  StrongRetainInst *Retain;
-
-public:
-  LocalRetainMotionVisitor(StrongRetainInst &SRI)
-    : LocalRefCountIncMotionVisitor(SRI.getModule()), Retain(&SRI) { }
-
-  SILInstruction *getInstruction() const { return Retain; }
-
-#define SIMPLE_CASE(_Value, _ExitType)                                \
-  ExitType visit ## _Value(_Value *I) { return ExitType::_ExitType; }
-  SIMPLE_CASE(CopyValueInst, CommuteWithoutMotion)
-  SIMPLE_CASE(DestroyValueInst, PerformCodeMotion)
-#undef SIMPLE_CASE
-
-  ExitType visitStrongRetainInst(StrongRetainInst *InputRetain);
-  ExitType visitStrongReleaseInst(StrongReleaseInst *Release);
-
-  bool performCodeMotion(SILInstruction *I) {
-    DEBUG(llvm::dbgs() << "  Performing code motion!\n");
-    Retain->moveBefore(I);
-    return true;
   }
 
-};
+  // Delete the instructions.
+  for (auto *Inst : DeleteList)
+    Inst->eraseFromParent();
 
-} // end anonymous namespace.
-
-ExitType
-LocalRetainMotionVisitor::visitStrongRetainInst(StrongRetainInst *InputRetain) {
-  // If we see a retain, skip over it since a retain can never cause a release
-  // to occur.
-  //
-  // On the other hand, if we have a retain that is naively on the same pointer,
-  // don't move past it since no "progress" has been made. If we remove any
-  // pairs in this basic block, we will process it again to allow for this
-  // retain to be removed as well.
-  if (Retain->getOperand() == InputRetain->getOperand())
-    return ExitType::PerformCodeMotion;
-  return ExitType::CommuteWithoutMotion;
+  // If we found instructions to delete, return true.
+  return !DeleteList.empty();;
 }
 
-ExitType
-LocalRetainMotionVisitor::visitStrongReleaseInst(StrongReleaseInst *Release) {
-  // If we are processing a copy_value, exit performing code motion since the
-  // the release could trigger a destructor causing potentially unknown side
-  // effects.
-  //
-  // Otherwise if we have a retain and the input release is naively on the same
-  // pointer, eliminate the pair. Otherwise do nothing since the release could
-  // affect our retain count indirectly via a destructor.
-  if (Retain->getOperand() != Release->getOperand())
-    return ExitType::PerformCodeMotion;
-
-  DEBUG(llvm::dbgs() << "    Eliminating Retain Release Pair!\n");
-  DEBUG(llvm::dbgs() << "    Retain: " << *Retain);
-  DEBUG(llvm::dbgs() << "    Release: " << *Release);
-  Retain->eraseFromParent();
-  Release->eraseFromParent();
-  ++NumStrongRetainStrongReleasePairsEliminated;
-  return ExitType::RefCountPairEliminated;
-}
-
-//===----------------------------------------------------------------------===//
-//                             Copy Value Visitor
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class LocalCopyValueMotionVisitor
-  : public LocalRefCountIncMotionVisitor<LocalCopyValueMotionVisitor> {
-
-  CopyValueInst *CV;
-
-public:
-  LocalCopyValueMotionVisitor(CopyValueInst &CV)
-    : LocalRefCountIncMotionVisitor(CV.getModule()), CV(&CV) { }
-
-  SILInstruction *getInstruction() const { return CV; }
-
-#define SIMPLE_CASE(_Value, _ExitType)                                \
-  ExitType visit ## _Value(_Value *I) { return ExitType::_ExitType; }
-  SIMPLE_CASE(StrongRetainInst, CommuteWithoutMotion)
-  SIMPLE_CASE(StrongReleaseInst, PerformCodeMotion)
-#undef SIMPLE_CASE
-
-  ExitType visitCopyValueInst(CopyValueInst *InputCV);
-  ExitType visitDestroyValueInst(DestroyValueInst *DV);
-
-  bool performCodeMotion(SILInstruction *I) {
-    DEBUG(llvm::dbgs() << "  Not performing code motion!\n");
-    return false;
-  }
-};
-
-} // end anonymous namespace
-
-ExitType
-LocalCopyValueMotionVisitor::visitCopyValueInst(CopyValueInst *InputCV) {
-  // If we see a copy_value, skip over it since a copy_value can never cause a
-  // release to occur.
-  //
-  // On the other hand, if we have a copy_value that is naively on the same
-  // pointer, don't move past it since no "progress" has been made. If we remove
-  // any pairs in this basic block, we will process it again to allow for this
-  // copy_value to be removed as well.
-  if (CV->getOperand() == InputCV->getOperand())
-    return ExitType::PerformCodeMotion;
-  return ExitType::CommuteWithoutMotion;
-}
-
-ExitType
-LocalCopyValueMotionVisitor::visitDestroyValueInst(DestroyValueInst *DV) {
-  // If we are processing a copy_value, exit performing code motion since the
-  // the release could trigger a destructor causing potentially unknown side
-  // effects.
-  //
-  // Otherwise if we have a retain and the input release is naively on the same
-  // pointer, eliminate the pair. Otherwise do nothing since the release could
-  // affect our retain count indirectly via a destructor.
-  if (CV->getOperand() != DV->getOperand() && CV != DV->getOperand().getDef())
-    return ExitType::PerformCodeMotion;
-
-  DEBUG(llvm::dbgs() << "    Eliminating Retain Release Pair!\n");
-  DEBUG(llvm::dbgs() << "    Retain: " << *CV);
-  DEBUG(llvm::dbgs() << "    Release: " << *DV);
-  SILValue(CV).replaceAllUsesWith(CV->getOperand());
-  CV->eraseFromParent();
-  DV->eraseFromParent();
-  ++NumCopyValueDestroyValuePairsEliminated;
-  return ExitType::RefCountPairEliminated;
-}
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
@@ -380,55 +469,31 @@ LocalCopyValueMotionVisitor::visitDestroyValueInst(DestroyValueInst *DV) {
 static void processFunction(SILFunction &F) {
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
+  llvm::MapVector<SILValue, ReferenceCountState> BBState;
+  llvm::DenseMap<SILInstruction *, ReferenceCountState> DecToIncStateMap;
+
   // For each basic block in F...
   for (auto &BB : F) {
+    DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
     bool Changed;
 
-    // process the basic block until we do not eliminate any retains/releases.
-    do {
-      Changed = false;
-      for (auto II = BB.begin(), IE = BB.end(); II != IE; ) {
-        SILInstruction *I = II++;
+    // Process the basic block until we do not eliminate any inc/dec pairs
+    // and see any nested increments.
+    while (true) {
+      BBState.clear();
+      DecToIncStateMap.clear();
 
-        if (auto *Retain = dyn_cast<StrongRetainInst>(I)) {
-          DEBUG(llvm::dbgs() << "RETAIN Visiting: " << *Retain);
-          ++NumStrongRetains;
+      // We need to rerun if we saw any nested increment/decrements and if we
+      // removed any increment/decrement pairs.
+      Changed = processBBTopDown(BB, BBState, DecToIncStateMap);
+      Changed &= performCodeMotion(DecToIncStateMap);
+      if (!Changed)
+        break;
 
-          // Retain motion is a forward pass over the block. Make sure we don't
-          // invalidate our iterators by parking it on the instruction before I.
-          SILBasicBlock::iterator Safe = Retain;
-          Safe = Safe != BB.begin() ? std::prev(Safe) : BB.end();
+      DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
+    }
 
-          LocalRetainMotionVisitor V(*Retain);
-          if (V.performLocalCodeMotionDownCFG()) {
-            // If we zapped or moved the retain, reset the iterator on the
-            // instruction *newly* after the prev instruction.
-            II = Safe != BB.end() ? std::next(Safe) : BB.begin();
-            DEBUG(llvm::dbgs() << "\n");
-            Changed = true;
-          }
-        }
-
-        if (auto *CV = dyn_cast<CopyValueInst>(I)) {
-          DEBUG(llvm::dbgs() << "COPY VALUE Visiting: " << *CV);
-          ++NumCopyValue;
-
-          // Retain motion is a forward pass over the block. Make sure we don't
-          // invalidate our iterators by parking it on the instruction before I.
-          SILBasicBlock::iterator Safe = CV;
-          Safe = Safe != BB.begin() ? std::prev(Safe) : BB.end();
-
-          LocalCopyValueMotionVisitor V(*CV);
-          if (V.performLocalCodeMotionDownCFG()) {
-            // If we zapped or moved the retain, reset the iterator on the
-            // instruction *newly* after the prev instruction.
-            II = Safe != BB.end() ? std::next(Safe) : BB.begin();
-            DEBUG(llvm::dbgs() << "\n");
-            Changed = true;
-          }
-        }
-      }
-    } while (Changed);
+    DEBUG(llvm::dbgs() << "\n");
   }
 }
 
