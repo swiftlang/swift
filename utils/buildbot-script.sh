@@ -395,7 +395,7 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                 "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
                     "${!_PRODUCT_CMAKE_OPTIONS}" \
                     "${!_ASAN_OPTIONS}" \
-                    -DSWIFT_MODULE_CACHE="${swift_module_cache}" \
+                    -DSWIFT_MODULE_CACHE_PATH="${swift_module_cache}" \
                     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
                     -D${var_prefix}_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}" \
                     -D${var_prefix}_PATH_TO_CLANG_BUILD="${CLANG_BUILD_DIR}" \
