@@ -21,16 +21,18 @@ class K {
 
 //CHECK: sil @a_function2
 //CHECK-NOT: partial_apply
+// The destroy_value of $K is optimized to a strong_release.
+//CHECK: strong_release
 //CHECK: return
-sil @a_function2 : $@thin (@in K) -> () {
-bb0(%0 : $*K):
+sil @a_function2 : $@thin (@owned K) -> () {
+bb0(%0 : $K):
   %1 = alloc_ref $K
-  %2 = function_ref @our_closure_function2 : $@thin (@in K) -> Bool // user: %2
-  %3 = partial_apply %2(%0) : $@thin (@in K) -> Bool // user: %3
+  %2 = function_ref @our_closure_function2 : $@thin (@owned K) -> Bool // user: %2
+  %3 = partial_apply %2(%0) : $@thin (@owned K) -> Bool // user: %3
   strong_release %3 : $@callee_owned () -> Bool   // id: %3
   %5 = tuple ()                                   // user: %5
   return %5 : $()                                 // id: %5
 }
 
-sil @our_closure_function2 : $@thin (@in K) -> Bool
+sil @our_closure_function2 : $@thin (@owned K) -> Bool
 sil @our_closure_function1 : $@thin (Int64) -> Bool
