@@ -567,7 +567,7 @@ public:
     // DW_OP_piece larger values together.
     if (Vals.size() == 1)
       IGM.DebugInfo->emitStackVariableDeclaration
-        (Builder, Vals[0],
+        (Builder, emitShadowCopy(Address(Vals[0], Alignment(1)), Name),
          DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
          Name, i);
   }
