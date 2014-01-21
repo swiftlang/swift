@@ -24,5 +24,6 @@ add_swift_library(swiftSILPasses
   SILSROA.cpp
   ARCOpts.cpp
   StripDebugInfo.cpp
+  ARCAnalysis.cpp
   DEPENDS swiftSILPassesUtils)
 

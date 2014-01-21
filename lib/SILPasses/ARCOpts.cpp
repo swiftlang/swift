@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-arc-opts"
 #include "swift/SILPasses/Passes.h"
+#include "ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -24,64 +25,13 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+using namespace swift::arc;
 
 static llvm::cl::opt<bool>
 EnableARCOpts("enable-arc-opts", llvm::cl::Hidden, llvm::cl::init(true));
 
 STATISTIC(NumIncrements, "Total number of increments seen");
 STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
-
-//===----------------------------------------------------------------------===//
-//                          Stub Analysis Functions
-//===----------------------------------------------------------------------===//
-
-/// Could Inst decrement the ref count associated with target?
-static bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target) {
-  // Clear up some small cases where MayHaveSideEffects is too broad for our
-  // purposes and the instruction does not decrement ref counts.
-  switch (Inst->getKind()) {
-  case ValueKind::DeallocStackInst:
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongRetainAutoreleasedInst:
-  case ValueKind::StrongRetainUnownedInst:
-  case ValueKind::UnownedRetainInst:
-  case ValueKind::PartialApplyInst:
-  case ValueKind::CondFailInst:
-    return true;
-  case ValueKind::CopyAddrInst: {
-    auto *CA = cast<CopyAddrInst>(Inst);
-    if (CA->isInitializationOfDest() == IsInitialization_t::IsInitialization)
-      return true;
-  }
-  SWIFT_FALLTHROUGH;
-  default:
-    break;
-  }
-
-  // Just make sure that we do not have side effects.
-  return Inst->getMemoryBehavior() !=
-    SILInstruction::MemoryBehavior::MayHaveSideEffects;
-}
-
-/// Can Inst use Target in a manner that requires Target to be alive at Inst?
-static bool cannotUseValue(SILInstruction *Inst, SILValue Target) {
-  // Handle early instructions that we know can not use reference counted values
-  // in a manner that requires the values to be alive.
-  switch (Inst->getKind()) {
-  // These instructions do not use other values.
-  case ValueKind::FunctionRefInst:
-  case ValueKind::BuiltinFunctionRefInst:
-  case ValueKind::IntegerLiteralInst:
-  case ValueKind::FloatLiteralInst:
-  case ValueKind::StringLiteralInst:
-    return true;
-  default:
-    break;
-  }
-
-  // Otherwise, assume that Inst can use Target.
-  return false;
-}
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions

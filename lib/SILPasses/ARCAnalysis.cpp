@@ -1,0 +1,76 @@
+//===-------------- ARCAnalysis.cpp - SIL ARC Analysis --------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#define DEBUG_TYPE "sil-arc-analysis"
+#include "ARCAnalysis.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILPasses/Utils/Local.h"
+#include "llvm/Support/Debug.h"
+
+//===----------------------------------------------------------------------===//
+//                        Decrement Analysis
+//===----------------------------------------------------------------------===//
+
+/// Could Inst decrement the ref count associated with target?
+bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
+                                         SILValue Target) {
+  // Clear up some small cases where MayHaveSideEffects is too broad for our
+  // purposes and the instruction does not decrement ref counts.
+  switch (Inst->getKind()) {
+  case ValueKind::DeallocStackInst:
+  case ValueKind::StrongRetainInst:
+  case ValueKind::StrongRetainAutoreleasedInst:
+  case ValueKind::StrongRetainUnownedInst:
+  case ValueKind::UnownedRetainInst:
+  case ValueKind::PartialApplyInst:
+  case ValueKind::CondFailInst:
+    return true;
+  case ValueKind::CopyAddrInst: {
+    auto *CA = cast<CopyAddrInst>(Inst);
+    if (CA->isInitializationOfDest() == IsInitialization_t::IsInitialization)
+      return true;
+  }
+  SWIFT_FALLTHROUGH;
+  default:
+    break;
+  }
+
+  // Just make sure that we do not have side effects.
+  return Inst->getMemoryBehavior() !=
+    SILInstruction::MemoryBehavior::MayHaveSideEffects;
+}
+
+//===----------------------------------------------------------------------===//
+//                           Use Analysis
+//===----------------------------------------------------------------------===//
+
+/// Can Inst use Target in a manner that requires Target to be alive at Inst?
+bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
+  // Handle early instructions that we know can not use reference
+  // counted values in a manner that requires the values to be alive.
+  switch (Inst->getKind()) {
+  // These instructions do not use other values.
+  case ValueKind::FunctionRefInst:
+  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::IntegerLiteralInst:
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::StringLiteralInst:
+    return true;
+  default:
+    break;
+  }
+
+  // Otherwise, assume that Inst can use Target.
+  return false;
+}
+
