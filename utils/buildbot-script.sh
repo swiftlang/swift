@@ -186,11 +186,14 @@ fi
 # Swift-project products, in the order they must be built
 SWIFT_BUILD_PRODUCTS=(swift SourceKit)
 
+LLVM_TARGETS_TO_BUILD="X86;ARM"
+
 # Swift stdlib build products
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_BUILD_IOS" ]]; then
     IOS_BUILD_PRODUCTS=(swift_stdlib_ios_arm64)
     SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+    LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
 fi
 
 # All build products, in the order they must be built
@@ -294,7 +297,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
-              -DLLVM_TARGETS_TO_BUILD="X86;ARM" \
+              -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               "${LLVM_SOURCE_DIR}" || exit 1)
   fi
