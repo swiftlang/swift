@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -2163,8 +2164,27 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
 #endif
 }
 
+namespace {
+  template <size_t N>
+  union AsBytes {
+    uint64_t data;
+    char bytes[N];
+
+    AsBytes(uint64_t data) : data(data) {}
+
+    static_assert(N <= sizeof(data), "size is too big");
+  };
+
+  template <size_t N>
+  static raw_ostream &operator<<(raw_ostream &os, const AsBytes<N> &wrapper) {
+    os.write(wrapper.bytes, N);
+    return os;
+  }
+}
+
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *M, FilenamesTy inputFiles,
+                               const SILModule *M, SerializationMode mode,
+                               FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
   for (unsigned char byte : SIGNATURE)
@@ -2174,14 +2194,48 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   writeInputFiles(getModule(DC), inputFiles, moduleLinkName);
   writeModule(DC, M);
 
-  os.write(Buffer.data(), Buffer.size());
+  if (mode == SerializationMode::MachOSection) {
+    // FIXME: Duplicated here and in SwiftASTStreamerPass.h.
+    // FIXME: Is this wrapper really necessary?
+
+    // Write the section header.
+    uint32_t magic = 0x41535473;
+    uint32_t version = 1;
+    uint32_t language = dwarf::DW_LANG_Swift;
+    uint32_t flags = 0;
+
+    os << AsBytes<4>(magic) << AsBytes<4>(version) << AsBytes<4>(language)
+       << AsBytes<4>(flags);
+
+    StringRef moduleName = getModule(DC)->Name.str();
+
+    // Write the offset to the serialized data and its length.
+    uint32_t offsetLength = 32 + moduleName.size();
+    uint32_t alignedOffset = llvm::RoundUpToAlignment(offsetLength, 32);
+    os << AsBytes<8>(alignedOffset) << AsBytes<8>(Buffer.size());
+
+    // Write the module name.
+    os << AsBytes<4>(moduleName.size()) << moduleName;
+
+    // Align to 32 bits before and after the actual data.
+    char nulls[31] = {};
+    assert(alignedOffset - offsetLength < sizeof(nulls));
+    os.write(nulls, alignedOffset - offsetLength);
+    os.write(Buffer.data(), Buffer.size());
+    os.write(nulls,
+             llvm::RoundUpToAlignment(Buffer.size(), 32) - Buffer.size());
+
+  } else {
+    os.write(Buffer.data(), Buffer.size());
+  }
+
   os.flush();
   Buffer.clear();
 }
 
 void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
-                      const char *outputPath, FilenamesTy inputFiles,
-                      StringRef moduleLinkName) {
+                      const char *outputPath, SerializationMode mode,
+                      FilenamesTy inputFiles, StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
                            llvm::sys::fs::F_Binary);
@@ -2193,12 +2247,12 @@ void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
     return;
   }
 
-  serializeToStream(DC, out, M, inputFiles, moduleLinkName);
+  serializeToStream(DC, out, M, mode, inputFiles, moduleLinkName);
 }
 
 void swift::serializeToStream(ModuleOrSourceFile DC, raw_ostream &out,
-                              const SILModule *M, FilenamesTy inputFiles,
-                              StringRef moduleLinkName) {
+                              const SILModule *M, SerializationMode mode,
+                              FilenamesTy inputFiles, StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, DC, M, inputFiles, moduleLinkName);
+  S.writeToStream(out, DC, M, mode, inputFiles, moduleLinkName);
 }

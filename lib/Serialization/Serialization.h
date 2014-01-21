@@ -265,8 +265,8 @@ public:
 
   /// Serialize a module to the given stream.
   void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                     const SILModule *M, FilenamesTy inputFiles,
-                     StringRef moduleLinkName);
+                     const SILModule *M, SerializationMode mode,
+                     FilenamesTy inputFiles, StringRef moduleLinkName);
 
   /// Records the use of the given Type.
   ///

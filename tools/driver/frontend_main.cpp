@@ -127,6 +127,7 @@ static bool performCompile(CompilerInstance &Instance,
                                   Instance.getMainModule();
     serialize(DC, SM.get(),
               Invocation.getFrontendOptions().ModuleOutputPath.c_str(),
+              SerializationMode::AST,
               Invocation.getFrontendOptions().InputFilenames,
               Invocation.getFrontendOptions().ModuleLinkName);
 
