@@ -228,3 +228,33 @@ bb0(%0 : $Bool):
   // CHECK-NEXT: return
 }
 
+// Make sure that we do not attempt to optimize this since allocbox is
+// not smart enough yet to insert dealloc_stacks in the appropriate
+// places.
+//
+// rdar://15832873
+//
+// CHECK-LABEL: sil @box_reachable_from_release_test
+// CHECK: bb1
+// CHECK: alloc_box
+// CHECK: bb2:
+// CHECK: strong_release
+// CHECK: bb3:
+// CHECK: strong_release
+sil @box_reachable_from_release_test : $@thin () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %1 = alloc_box $Bool
+  cond_br undef, bb2, bb3
+
+bb2:
+  strong_release %1#0 : $Builtin.ObjectPointer
+  br bb1
+
+bb3:
+  strong_release %1#0 : $Builtin.ObjectPointer
+  %2 = tuple ()
+  return %2 : $()
+}

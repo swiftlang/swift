@@ -20,11 +20,67 @@
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
+STATISTIC(NumEntryCycleBB, "Number of alloc_box's promotion disrupted due to "
+          "entry cycle");
 
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
+/// We are currently checking for domination/post-domination but not control
+/// equivalence, a necessary condition for a single entry/single-exit
+/// region. This function ensures that we do not run into the issue by making
+/// sure that the allocbox is not reachable from itself.
+static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
+  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> VisitedBBSet;
+
+  auto *AllocBoxBB = ABI->getParent();
+  auto *ReleaseBB = SRI->getParent();
+
+  // If the box and the release are in the same BB. Exit early.
+  if (AllocBoxBB == ReleaseBB)
+    return false;
+
+  // Add the allocbox's successor BBs to the worklist and the visited set.
+  for (auto &Succ : AllocBoxBB->getSuccs()) {
+    auto *BB = Succ.getBB();
+
+    // Prune the search at the SRI's BB.
+    if (BB == ReleaseBB)
+      continue;
+
+    Worklist.push_back(BB);
+    VisitedBBSet.insert(BB);
+  }
+
+  // For each BB in the worklist...
+  while (!Worklist.empty()) {
+    auto *BB = Worklist.pop_back_val();
+
+    // We found an entry cycle, we can not promote this alloc box.
+    if (BB == AllocBoxBB) {
+      ++NumEntryCycleBB;
+      return true;
+    }
+
+    // Otherwise, add the successors of the BB to the worklist...
+    for (auto &Succ : BB->getSuccs()) {
+      auto *BB = Succ.getBB();
+
+      // Prune the search at the SRI's BB.
+      if (BB == ReleaseBB)
+        continue;
+
+      // Only visit a BB once.
+      if (VisitedBBSet.insert(BB))
+        Worklist.push_back(BB);
+    }
+  }
+
+  // The allocbox's BB is not reachable from itself, we are safe.
+  return false;
+}
 
 /// getLastRelease - Determine if there is a single ReleaseInst or
 /// DeallocBoxInst that post-dominates all of the uses of the specified
@@ -37,29 +93,29 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   // can only happen in hand-written SIL code, not compiler generated code.
   if (Releases.empty())
     return nullptr;
-  
-  
+
+
   // If there is a single release, it must be the last release.  The calling
   // conventions used in SIL (at least in the case where the ABI doesn't escape)
   // are such that the value is live until it is explicitly released: there are
   // no calls in this case that pass ownership and release for us.
   if (Releases.size() == 1)
     return Releases.back();
-  
+
   // If there are multiple releases of the value, we only support the case where
   // there is a single ultimate release that post-dominates all of the rest of
   // them.
-  
+
   // Determine the most-post-dominating release by doing a linear scan over all
   // of the releases to find one that post-dominates them all.  Because we don't
   // want to do multiple scans of the block (which could be large) just keep
   // track of whether there are multiple releases in the ultimate block we find.
   bool MultipleReleasesInBlock = false;
   SILInstruction *LastRelease = Releases[0];
-  
+
   for (unsigned i = 1, e = Releases.size(); i != e; ++i) {
     SILInstruction *RI = Releases[i];
-    
+
     // If this release is in the same block as our candidate, keep track of the
     // multiple release nature of that block, but don't try to determine an
     // ordering between them yet.
@@ -67,28 +123,35 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
       MultipleReleasesInBlock = true;
       continue;
     }
-    
+
     // Otherwise, we need to order them.  Make sure we've computed PDI.
     if (!PDI.isValid())
       PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
-    
+
     if (PDI->properlyDominates(RI->getParent(), LastRelease->getParent())) {
       // RI post-dom's LastRelease, so it is our new LastRelease.
       LastRelease = RI;
       MultipleReleasesInBlock = false;
     }
   }
-  
-  // Okay, we found the most-post-dominating release.  If it doesn't postdom
-  // all of our uses, it would be unsafe to use it though, so check this.
+
+  // Okay, we found the most-post-dominating release. Make sure that the entry
+  // basic block is not apart of any cycles originating inside the region. This
+  // is to prevent self-cycle issues.
+  if (checkForEntryCycles(ABI, LastRelease))
+    return nullptr;
+
+  // Make sure that the most-post-dominating release we have found postdom all
+  // of our uses. If the release does not postdom a use, it would be unsafe to
+  // perform the use.
   for (auto *User : Users) {
     if (User->getParent() == LastRelease->getParent())
       continue;
-    
+
     // Make sure we've computed PDI.
     if (!PDI.isValid())
       PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
-    
+
     if (!PDI->properlyDominates(LastRelease->getParent(), User->getParent()))
       return nullptr;
   }
@@ -108,7 +171,7 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
       break;
     }
   }
-  
+
   return LastRelease;
 }
 
@@ -118,7 +181,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
                               SmallVectorImpl<SILInstruction*> &Users) {
   for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
-    
+
     // These instructions do not cause the box's address to escape.
     if (isa<CopyAddrInst>(User) ||
         isa<LoadInst>(User) ||
@@ -128,7 +191,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
       Users.push_back(User);
       continue;
     }
-    
+
     // These instructions only cause the alloc_box to escape if they are used in
     // a way that escapes.  Recursively check that the uses of the instruction
     // don't escape and collect all of the uses of the value.
@@ -139,7 +202,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
         return true;
       continue;
     }
-    
+
     // apply and partial_apply instructions do not capture the pointer when
     // it is passed through @inout arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
@@ -151,17 +214,17 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
       if (partialApply->getSubstCalleeType()
             ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
-      
+
     }
 
     // Otherwise, this looks like it escapes.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
           << "    Due to user: " << *User << "\n");
-    
+
     return true;
   }
-  
+
   return false;
 }
 
@@ -204,14 +267,14 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     return false;
   }
 
-  
+
   // Okay, the value doesn't escape.  Determine where the last release is.  This
   // code only handles the case where there is a single "last release".  This
   // should work for us, because we don't expect code duplication that can
   // introduce different releases for different codepaths.  If this ends up
   // mattering in the future, this can be generalized.
   SILInstruction *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
-  
+
   // FIXME: If there's no last release, we can't balance the alloc_stack.
   if (!LastRelease)
     return false;
@@ -228,16 +291,16 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   }
 
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
-  
+
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
   SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
   auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
   ASI->setDebugScope(ABI->getDebugScope());
-   
+
   // Replace all uses of the pointer operand with the spiffy new AllocStack.
   SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());
-  
+
   // If we found a 'last release', insert a dealloc_stack instruction and a
   // destroy_addr if its type is non-trivial.
   if (LastRelease) {
@@ -252,7 +315,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     B2.setInsertionPoint(LastRelease);
     B2.createDeallocStack(LastRelease->getLoc(), ASI->getContainerResult());
   }
-  
+
   // Remove any retain and release instructions.  Since all uses of result #1
   // are gone, this only walks through uses of result #0 (the retain count
   // pointer).
@@ -260,10 +323,10 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
     auto *User = (*ABI->use_begin())->getUser();
     assert(isa<StrongReleaseInst>(User) || isa<StrongRetainInst>(User) ||
            isa<DeallocBoxInst>(User));
-    
+
     User->eraseFromParent();
   }
-  
+
   return true;
 }
 
@@ -272,7 +335,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
 //===----------------------------------------------------------------------===//
 
 void swift::performSILAllocBoxToStackPromotion(SILModule *M) {
-  
+
   for (auto &Fn : *M) {
     // PostDomInfo - This is the post dominance information for the specified
     // function.  It is lazily generated only if needed.
@@ -295,5 +358,3 @@ void swift::performSILAllocBoxToStackPromotion(SILModule *M) {
     }
   }
 }
-
-
