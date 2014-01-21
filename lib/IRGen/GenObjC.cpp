@@ -647,7 +647,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Do we need to retain self before calling, and/or release it after?
   bool retainsSelf;
-  switch (origMethodType->getParameters().back().getConvention()) {
+  switch (origMethodType->getInterfaceParameters().back().getConvention()) {
   case ParameterConvention::Direct_Unowned:
     retainsSelf = false;
     break;
@@ -676,7 +676,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   // Save off the forwarded indirect return address if we have one.
   llvm::Value *indirectReturn = nullptr;
-  SILType appliedResultTy = origMethodType->getSemanticResultSILType();
+  SILType appliedResultTy = origMethodType->getSemanticInterfaceResultSILType();
   auto &appliedResultTI = IGM.getTypeInfo(appliedResultTy);
   if (appliedResultTI.getSchema(ResilienceExpansion::Minimal)
         .requiresIndirectResult(IGM)) {
@@ -705,7 +705,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     emission.emitToExplosion(result);
     subIGF.emitRelease(context);
     auto &callee = emission.getCallee();
-    auto resultType = callee.getOrigFunctionType()->getSILResult();
+    auto resultType = callee.getOrigFunctionType()->getSILInterfaceResult();
     subIGF.emitScalarReturn(resultType, result);
   }
   

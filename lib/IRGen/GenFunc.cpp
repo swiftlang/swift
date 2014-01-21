@@ -1011,8 +1011,8 @@ static void emitCastBuiltin(IRGenFunction &IGF, CanSILFunctionType substFnType,
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getResult().getConvention() == ResultConvention::Unowned);
-  SILType destType = substFnType->getResult().getSILType();
+  assert(substFnType->getInterfaceResult().getConvention() == ResultConvention::Unowned);
+  SILType destType = substFnType->getInterfaceResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output = IGF.Builder.CreateCast(opcode, input, destTy);
   result.add(output);
@@ -1026,9 +1026,9 @@ static void emitCastOrBitCastBuiltin(IRGenFunction &IGF,
   llvm::Value *input = args.claimNext();
   assert(args.empty() && "wrong operands to cast operation");
 
-  assert(substFnType->getResult().getConvention() ==
+  assert(substFnType->getInterfaceResult().getConvention() ==
            ResultConvention::Unowned);
-  SILType destType = substFnType->getResult().getSILType();
+  SILType destType = substFnType->getInterfaceResult().getSILType();
   llvm::Type *destTy = IGF.IGM.getStorageType(destType);
   llvm::Value *output;
   switch (BV) {
