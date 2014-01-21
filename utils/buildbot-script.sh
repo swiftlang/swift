@@ -191,7 +191,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 # Swift stdlib build products
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_BUILD_IOS" ]]; then
-    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_arm64)
+    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64)
     SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
 fi
@@ -212,8 +212,8 @@ done
 
 # Default source directory is $WORKSPACE/$product if not set above.
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
-    varname="$(toupper "${product}")"_SOURCE_DIR
-    eval dir=\${$varname:=$WORKSPACE/$product}
+    _PRODUCT_SOURCE_DIR="$(toupper "${product}")"_SOURCE_DIR
+    eval dir=\${$_PRODUCT_SOURCE_DIR:=$WORKSPACE/$product}
     if [ ! -e "${dir}" ] ; then
         echo "Can't find source directory for $product (tried $dir)"
         exit 1
@@ -224,6 +224,7 @@ done
 # Calculate build directories for each product
 #
 
+# Build directories are $BUILD_DIR/$product or $PRODUCT_SOURCE_DIR/build
 for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     PRODUCT=$(toupper "${product}")
     eval source_dir=\${${PRODUCT}_SOURCE_DIR}
@@ -234,6 +235,19 @@ for product in "${ALL_BUILD_PRODUCTS[@]}" ; do
     fi
     eval "${PRODUCT}_BUILD_DIR=\$product_build_dir"
 done
+
+# iOS build products use their own build directories, which are
+# subdirectories of swift's build directory if BUILD_DIR is not set.
+for product in "${IOS_BUILD_PRODUCTS[@]}" ; do
+    _PRODUCT_BUILD_DIR="$(toupper "${product}")"_BUILD_DIR
+    if [[ "${BUILD_DIR}" ]] ; then
+        eval ${_PRODUCT_BUILD_DIR}="${BUILD_DIR}/${product}"
+    else
+        eval ${_PRODUCT_BUILD_DIR}="${SWIFT_BUILD_DIR}/${product}"
+    fi
+    echo $product ${!_PRODUCT_BUILD_DIR}
+done
+
 
 if [[ "$PACKAGE" ]]; then
   # Make sure install-test-script.sh is available alongside us.
@@ -345,6 +359,7 @@ function set_ios_options {
 }
 
 set_ios_options SWIFT_STDLIB_IOS_ARM64_CMAKE_OPTIONS iphoneos 7.0 .internal arm64
+set_ios_options SWIFT_STDLIB_IOS_SIMULATOR_X86_64_CMAKE_OPTIONS iphonesimulator 7.0 "" x86_64
 
 SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
