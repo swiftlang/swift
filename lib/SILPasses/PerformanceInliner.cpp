@@ -141,13 +141,10 @@ static unsigned getFunctionCost(SILFunction *F) {
 //                                  Inliner
 //===----------------------------------------------------------------------===//
 
-/// Attempt to inline all calls in ApplyInstList into F until we run out of cost
-/// budge.
+/// Attempt to inline all calls smaller than our threshold into F until.
 static void inlineCallsIntoFunction(SILFunction *Caller) {
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
-  // Initialize the budget.
-  unsigned InlineBudget = InlineCostThreshold;
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
 
   llvm::SmallVector<ApplyInst*, 8> CallSites;
@@ -183,8 +180,8 @@ static void inlineCallsIntoFunction(SILFunction *Caller) {
     // Calculate the inlining cost of the callee.
     unsigned CalleeCost = getFunctionCost(Callee);
 
-    if (CalleeCost > InlineBudget) {
-      DEBUG(llvm::dbgs() << "  Budget exceeded.\n");
+    if (CalleeCost > InlineCostThreshold) {
+      DEBUG(llvm::dbgs() << "  Function too big to inline. Skipping.\n");
       continue;
     }
 
@@ -203,8 +200,6 @@ static void inlineCallsIntoFunction(SILFunction *Caller) {
     // our next invocation of the inliner.
     Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
     NumFunctionsInlined++;
-    InlineBudget -= CalleeCost;
-    DEBUG(llvm::dbgs() << "  Remaining budget " << InlineBudget << "\n");
   }
 }
 

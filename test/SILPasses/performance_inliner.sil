@@ -1,4 +1,4 @@
-// RUN: %sil-opt %s -inline -sil-inline-threshold=256 -verify | FileCheck %s
+// RUN: %sil-opt %s -inline -sil-inline-threshold=50 -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -523,7 +523,7 @@ bb0(%0 : $Builtin.ObjectPointer):
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.ObjectPointer):
 // CHECK: [[FUN:%[0-9]+]] = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
 // CHECK: apply [[FUN]]([[INPUT]])
-// CHECK-NOT: apply [[FUN]]([[INPUT]])
+// CHECK: return
 sil @small_function_that_calls_large_function_twice : $@thin (Builtin.ObjectPointer) -> () {
 bb0(%0 : $Builtin.ObjectPointer):
   %1 = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
