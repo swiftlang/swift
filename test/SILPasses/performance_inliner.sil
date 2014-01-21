@@ -347,6 +347,32 @@ sil @trivial_c_caller : $@thin () -> () {
   return %3 : $()
 }
 
+// We can inline function_refs with objc_method calling convention.
+//
+// ObjC calls are unable to be devirtualized since at runtime the call
+// could change. But there is no reason in principal why we could not
+// (if there existed something like sealed classes in objc perhaps?),
+// inline a function_ref to such a call.
+sil @trivial_objc : $@cc(objc_method) @thin (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trivial_objc_caller : $@thin () -> ()
+// CHECK-NOT: apply
+// CHECK: return
+sil @trivial_objc_caller : $@thin () -> () {
+  %0 = alloc_stack $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 0
+  store %1 to %0#1 : $*Builtin.Int64
+  %2 = function_ref @trivial_objc : $@cc(objc_method) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  apply %2 (%0#1) : $@cc(objc_method) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  dealloc_stack %0#0 : $*@local_storage Builtin.Int64
+  %3 = tuple()
+  return %3 : $()
+}
+
 //////////////////////
 // Cost Model Check //
 //////////////////////

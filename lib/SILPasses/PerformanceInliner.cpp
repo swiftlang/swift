@@ -32,18 +32,6 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 //                            Call Graph Creation
 //===----------------------------------------------------------------------===//
 
-static bool isNotInlineableCC(AbstractCC CC) {
-  switch (CC) {
-  case AbstractCC::Freestanding:
-  case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
-  case AbstractCC::C:
-    return false;
-  default:
-    return true;
-  }
-}
-
 /// \brief Returns a SILFunction if this ApplyInst calls a recognizable function
 /// that is legal to inline.
 static SILFunction *getInlinableFunction(ApplyInst *AI) {
@@ -57,8 +45,7 @@ static SILFunction *getInlinableFunction(ApplyInst *AI) {
 
   SILFunction *F = FRI->getReferencedFunction();
 
-  if (F->empty() || isNotInlineableCC(F->getAbstractCC()) ||
-      F->isExternalDeclaration()) {
+  if (F->empty() || F->isExternalDeclaration()) {
     DEBUG(llvm::dbgs() << "  Can't inline " << F->getName() << ".\n");
     return nullptr;
   }
