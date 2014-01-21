@@ -353,7 +353,9 @@ public:
                                        &resolver);
     
     // If we got a fully valid type, then this is a nominal type pattern.
-    if (!ty->is<ErrorType>()) {
+    // FIXME: Only when experimental patterns are enabled for now.
+    if (!ty->is<ErrorType>()
+        && TC.Context.LangOpts.EnableExperimentalPatterns) {
       // Validate the argument tuple elements as nominal type pattern fields.
       // They must all have keywords. For recovery, we still form the pattern
       // even if one or more elements are missing keywords.
