@@ -1249,7 +1249,7 @@ platform calling convention.
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
 Objective-C Calling Convention @cc(objc_method)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
 ````````````````
