@@ -305,6 +305,48 @@ sil @trivial_fun : $@thin () -> (Builtin.Int64) {
   return %0 : $Builtin.Int64
 }
 
+// We can inline function_refs with witness_method calling convention.
+sil @trivial_witness_method : $@cc(witness_method) @thin (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trivial_witness_method_caller : $@thin () -> ()
+// CHECK-NOT: apply
+// CHECK: return
+sil @trivial_witness_method_caller : $@thin () -> () {
+  %0 = alloc_stack $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 0
+  store %1 to %0#1 : $*Builtin.Int64
+  %2 = function_ref @trivial_witness_method : $@cc(witness_method) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  apply %2 (%0#1) : $@cc(witness_method) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  dealloc_stack %0#0 : $*@local_storage Builtin.Int64
+  %3 = tuple()
+  return %3 : $()
+}
+
+// We can inline function_refs with c calling convention.
+sil @trivial_c : $@cc(cdecl) @thin (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  return %1 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @trivial_c_caller : $@thin () -> ()
+// CHECK-NOT: apply
+// CHECK: return
+sil @trivial_c_caller : $@thin () -> () {
+  %0 = alloc_stack $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 0
+  store %1 to %0#1 : $*Builtin.Int64
+  %2 = function_ref @trivial_c : $@cc(cdecl) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  apply %2 (%0#1) : $@cc(cdecl) @thin (@inout Builtin.Int64) -> Builtin.Int64
+  dealloc_stack %0#0 : $*@local_storage Builtin.Int64
+  %3 = tuple()
+  return %3 : $()
+}
+
 //////////////////////
 // Cost Model Check //
 //////////////////////

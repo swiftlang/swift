@@ -37,8 +37,10 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
          "Inliner called on apply instruction in wrong function?");
   assert(I != I->getParent()->end() && "Inliner called on a terminator?");
   assert(CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
-         CalleeFunction->getAbstractCC() != AbstractCC::C &&
-         "Cannot inline Objective-C method or C function");
+         (CalleeFunction->getAbstractCC() != AbstractCC::C ||
+          IKind == InlineKind::PerformanceInline) &&
+         "Cannot inline Objective-C method ever or C function in mandatory "
+         "inlining");
 
   // We can't handle specializations yet.
   if (!Subs.empty())
