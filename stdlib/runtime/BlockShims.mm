@@ -109,6 +109,12 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
                      DIRECT(Sb)),
                 BOOL(id, NSUInteger, BOOL *));
 
+/// NSAnimationContext animation group
+/// (NSAnimation) -> Void
+MAKE_BLOCK_SHIM(FUNC(OWNED(CSo18NSAnimationContext_),
+                     VOID),
+                void(id));
+                
 /// NSAttributedString enumerator
 /// (id, NSRange, UnsafePointer<BOOL>) -> Void  aka attribute string enumerator
 MAKE_BLOCK_SHIM(FUNC(CAT3(OWNED(PSo13DynamicLookup_),
@@ -165,14 +171,14 @@ MAKE_BLOCK_SHIM(_TTbbTPSo13DynamicLookup_CSo7NSArrayCSo19NSMutableDictionary_PS_
 /// (NSURL) -> Void
 MAKE_BLOCK_SHIM(FUNC(OWNED(CSo5NSURL),
                      VOID),
-                void(NSURL *));
+                void(id));
 
 /// NSFileCoordinator accessor
 /// (NSURL, NSURL) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT2(OWNED(CSo5NSURL),
                           OWNED(S_)),
                      VOID),
-                void(NSURL *, NSURL *))
+                void(id, id))
 
 /// NSFileCoordinator accessor with completion handler
 /// NSFilePresenter accessor with reacquirer
