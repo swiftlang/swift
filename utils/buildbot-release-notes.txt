@@ -59,6 +59,8 @@
   you to access a parent or other class's instance variables directly. Use
   properties instead.
 
+* The NSObject protocol is now imported under the name
+  "NSObjectProtocol" (rather than "NSObjectProto").
 
 2014-01-15
 ----------

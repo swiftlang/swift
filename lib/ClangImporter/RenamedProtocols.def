@@ -18,6 +18,6 @@
 #  error Must define RENAMED_PROTOCOL(ObjCName, SwiftName)
 #endif
 
-RENAMED_PROTOCOL(NSObject, NSObjectProto)
+RENAMED_PROTOCOL(NSObject, NSObjectProtocol)
 
 #undef RENAMED_PROTOCOL
