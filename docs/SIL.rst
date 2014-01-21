@@ -534,7 +534,7 @@ types. Function types are transformed in order to encode additional attributes:
     @cc(*convention*)
 
   attribute—where *convention* can currently be ``swift``, ``method``,
-  ``cdecl``, or ``objc``\ —describing a machine-level calling convention
+  ``cdecl``, or ``objc_method``\ —describing a machine-level calling convention
   below the concern of SIL.
 
 - The **thinness** of the function reference, indicated by the ``@thin``
@@ -1248,7 +1248,7 @@ platform calling convention.
 
 SIL (and therefore Swift) cannot currently invoke variadic C functions.
 
-Objective-C Calling Convention @cc(objc)
+Objective-C Calling Convention @cc(objc_method)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Reference Counts
@@ -3233,8 +3233,8 @@ Exits the current function and returns control to the calling function. The
 result of the ``apply`` instruction that invoked the current function will be
 the operand of this ``return`` instruction. The return value is autoreleased
 into the active Objective-C autorelease pool using the "autoreleased return
-value" optimization. The current function must use the ``@cc(objc)`` calling
-convention.
+value" optimization. The current function must use the ``@cc(objc_method)``
+calling convention.
 
 br
 ``
