@@ -83,6 +83,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     performSimplifyCFG(&Module);
     Changed |= performSILDevirtualization(&Module);
     performSILARCOpts(&Module);
+    performSILAllocBoxToStackPromotion(&Module);    
 
     // Stats
     NumOptzIter++;
