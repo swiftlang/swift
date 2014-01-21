@@ -1306,9 +1306,6 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                          SGFContext C) {
-
-
-
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
@@ -1323,8 +1320,42 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
                                ManagedValue::Unmanaged));
   }
 
-
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
+
+  // As a "special" hack, special case a MRE(DRE) of a struct let value.
+  // Instead of emitting the struct as a +1, only to extract one element, emit
+  // a reference to the struct at +0, get the element at +0, then copy_value the
+  // element.  This avoids retaining fields that aren't accessed.  This will be
+  // generalized in the future.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E->getBase())) {
+    auto BaseVD = dyn_cast<VarDecl>(DRE->getDecl());
+    if (BaseVD && BaseVD->isLet() &&
+        !FieldDecl->isStatic() && FieldDecl->hasStorage() &&
+        !E->getBase()->getType()->hasReferenceSemantics() &&
+        E->getMember().getSubstitutions().empty() &&
+        E->getType()->getCanonicalType() ==
+          FieldDecl->getType()->getCanonicalType()) {
+      // For local decls, use the address we allocated or the value if we have
+      // it.
+      auto It = SGF.VarLocs.find(BaseVD);
+      if (It != SGF.VarLocs.end() && !It->second.isAddress() &&
+          !It->second.getConstant().getType().isAddress()) {
+        SILValue Base = It->second.getConstant();
+
+        // For non-address-only structs, we emit a struct_extract sequence.
+        SILValue ElementVal = SGF.B.createStructExtract(E, Base, FieldDecl);
+
+        // Emit a copyvalue to +1 the returned element, since the entire aggregate
+        // will be destroyed.
+        ElementVal = SGF.B.emitCopyValueOperation(E, ElementVal);
+
+        auto Result = SGF.emitManagedRValueWithCleanup(ElementVal);
+        return RValue(SGF, E, Result);
+      }
+    }
+  }
+
+
 
   // Evaluate the base of the member reference.
   ManagedValue base = SGF.emitRValue(E->getBase())
