@@ -1,2 +1,9 @@
 module gizmo { header "Gizmo.h" }
-module Foundation { header "BridgeTestFoundation.h" }
+
+module ObjectiveC { 
+  header "BridgeTestObjectiveC.h" 
+}
+
+module Foundation { 
+  header "BridgeTestFoundation.h" 
+}

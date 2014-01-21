@@ -1,19 +1,7 @@
-@class NSString;
-
-@interface NSObject
-+ (NSObject*) alloc;
-- (NSObject*) init;
-+ (NSObject*) new;
-+ (void) load;
-
-- (NSString*) description;
-
-@end
+@import ObjectiveC;
 
 @interface NSString : NSObject
-
 - (NSString*)uppercaseString;
-
 @end
 
 @interface Foo

@@ -1,3 +1,4 @@
+@import ObjectiveC;
 @import Foundation;
 
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
