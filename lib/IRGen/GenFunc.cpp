@@ -1518,7 +1518,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // Get the natural IR type in the body of the function that makes
   // the call. This may be different than the IR type returned by the
   // call itself due to ABI type coercion.
-  auto resultType = getCallee().getOrigFunctionType()->getSILResult();
+  auto resultType = getCallee().getOrigFunctionType()->getSILInterfaceResult();
   auto &resultTI = IGF.IGM.getTypeInfo(resultType);
   auto schema = resultTI.getSchema(out.getKind());
   auto *bodyType = schema.getScalarResultType(IGF.IGM);
@@ -1625,11 +1625,11 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
 
   CanType origResultType, substResultType;
   if (origFnType->hasIndirectResult()) {
-    origResultType = origFnType->getIndirectResult().getType();
-    substResultType = substFnType->getIndirectResult().getType();
+    origResultType = origFnType->getIndirectInterfaceResult().getType();
+    substResultType = substFnType->getIndirectInterfaceResult().getType();
   } else {
-    origResultType = origFnType->getResult().getType();
-    substResultType = substFnType->getResult().getType();
+    origResultType = origFnType->getInterfaceResult().getType();
+    substResultType = substFnType->getInterfaceResult().getType();
   }
 
   // Figure out how the substituted result differs from the original.
@@ -1661,7 +1661,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
   assert(LastArgWritten <= 1);
 
   CanType substResultType =
-    getCallee().getSubstFunctionType()->getSemanticResultSILType()
+    getCallee().getSubstFunctionType()->getSemanticInterfaceResultSILType()
                .getSwiftRValueType();
 
   auto &substResultTI =
@@ -1685,7 +1685,11 @@ void CallEmission::emitToExplosion(Explosion &out) {
   }
 
   CanType origResultType =
-    getCallee().getOrigFunctionType()->getResult().getType();
+    getCallee().getOrigFunctionType()->getInterfaceResult().getType();
+  if (origResultType->isDependentType())
+    origResultType = IGF.IGM.getContextArchetypes()
+      .substDependentType(origResultType)
+      ->getCanonicalType();
 
   // Okay, we're naturally emitting to an explosion.
   // Figure out how the substituted result differs from the original.
@@ -1795,17 +1799,19 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
                                       CanSILFunctionType fnType,
                                       ResilienceExpansion level) {
   if (fnType->hasIndirectResult()) {
-    return IGM.getStoragePointerType(fnType->getIndirectResult().getSILType());
+    return IGM.getStoragePointerType(
+                             fnType->getIndirectInterfaceResult().getSILType());
   }
 
-  auto resultTy = fnType->getResult().getSILType();
+  auto resultTy = fnType->getInterfaceResult().getSILType();
   GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
 
   // We are unable to produce an appropriate Clang type in some cases,
   // so fall back on the test used for native Swift types.
   if (!clangTy)
-    return IGM.requiresIndirectResult(fnType->getResult().getSILType(), level);
+    return IGM.requiresIndirectResult(fnType->getInterfaceResult().getSILType(),
+                                      level);
 
   auto &ABITypes = *IGM.ABITypes;
   SmallVector<clang::CanQualType,1> args;
@@ -1862,7 +1868,7 @@ static void externalizeArguments(IRGenFunction &IGF,
 void CallEmission::addArg(Explosion &arg) {
   SmallVector<std::pair<unsigned, Alignment>, 2> newByvals;
 
-  auto origParams = getCallee().getOrigFunctionType()->getParameters();
+  auto origParams = getCallee().getOrigFunctionType()->getInterfaceParameters();
 
   // Convert arguments to a representation appropriate to the calling
   // convention.
@@ -2132,16 +2138,21 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion params(explosionLevel);
 
-  // Forward the indirect return value, if we have one.
-  auto &resultTI = IGM.getTypeInfo(outType->getResult().getSILType());
-  if (resultTI.getSchema(explosionLevel).requiresIndirectResult(IGM))
-    params.add(origParams.claimNext());
-  
-  // Reemit the parameters as unsubstituted.
-  for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
-    emitApplyArgument(subIGF, origType->getParameters()[i],
-                      outType->getParameters()[i],
-                      subs, origParams, params);
+  {
+    // Lower the forwarded arguments in the original function's generic context.
+    GenericContextScope scope(IGM, origType->getGenericSignature());
+    
+    // Forward the indirect return value, if we have one.
+    auto &resultTI = IGM.getTypeInfo(outType->getInterfaceResult().getSILType());
+    if (resultTI.getSchema(explosionLevel).requiresIndirectResult(IGM))
+      params.add(origParams.claimNext());
+    
+    // Reemit the parameters as unsubstituted.
+    for (unsigned i = 0; i < outType->getInterfaceParameters().size(); ++i) {
+      emitApplyArgument(subIGF, origType->getInterfaceParameters()[i],
+                        outType->getInterfaceParameters()[i],
+                        subs, origParams, params);
+    }
   }
 
   struct AddressToDeallocate {

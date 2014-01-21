@@ -52,6 +52,7 @@ namespace clang {
 using clang::CodeGen::CodeGenABITypes;
 
 namespace swift {
+  class ArchetypeBuilder;
   class ASTContext;
   class BraceStmt;
   class CanType;
@@ -407,6 +408,10 @@ public:
                                         llvm::Type *definitionTy = nullptr);
 
   StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
+  
+  // Get the ArchetypeBuilder for the currently active generic context. Crashes
+  // if there is no generic context.
+  ArchetypeBuilder &getContextArchetypes();
 
 //--- Global context emission --------------------------------------------------
 public:

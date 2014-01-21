@@ -46,6 +46,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenModule.h"
 #include "ReferenceTypeInfo.h"
+#include "GenType.h"
 #include "WeakTypeInfo.h"
 
 using namespace swift;
@@ -804,7 +805,9 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
     // Map an indirect return for a type SIL considers loadable but still
     // requires an indirect return at the IR level.
     if (requiresIndirectResult()) {
-      auto &retTI = IGF.IGM.getTypeInfo(funcTy->getResult().getSILType());
+      auto retTy = IGF.CurSILFn->mapTypeIntoContext(funcTy->getInterfaceResult()
+                                                          .getSILType());
+      auto &retTI = IGF.IGM.getTypeInfo(retTy);
       IGF.IndirectReturn = retTI.getAddressForPointer(params.claimNext());
     }
     return entry->getBBArgs();
@@ -821,7 +824,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   ArrayRef<SILArgument*> params
     = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTy,
       [&]() -> bool {
-        auto retType = funcTy->getResult().getSILType();
+        auto retType
+          = IGF.CurSILFn->mapTypeIntoContext(funcTy->getInterfaceResult()
+                                                    .getSILType());
         return IGF.IGM.requiresIndirectResult(retType, IGF.CurSILFnExplosionLevel);
       });
 
@@ -1516,11 +1521,15 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
                                  Identifier builtin,
                                  ApplyInst *i,
                                  ArrayRef<Substitution> substitutions) {
+  CanSILFunctionType origCalleeType = i->getOrigCalleeType();
+  
   auto argValues = i->getArgumentsWithoutIndirectResult();
-  auto params = i->getOrigCalleeType()->getParametersWithoutIndirectResult();
+  auto params = origCalleeType->getInterfaceParametersWithoutIndirectResult();
   assert(argValues.size() == params.size());
   auto subs = i->getSubstitutions();
   
+  GenericContextScope scope(IGF.IGM,
+                            i->getOrigCalleeType()->getGenericSignature());
   Explosion args(ResilienceExpansion::Maximal);
   for (auto index : indices(argValues)) {
     emitApplyArgument(IGF, argValues[index], params[index], subs, args);
@@ -1557,7 +1566,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
                                    calleeLV, i->getSubstitutions());
   
-  auto params = origCalleeType->getParametersWithoutIndirectResult();
+  auto params = origCalleeType->getInterfaceParametersWithoutIndirectResult();
   auto args = i->getArgumentsWithoutIndirectResult();
   assert(params.size() == args.size());
 
@@ -1594,13 +1603,16 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
                                  calleeLV.getObjCMethod().getSearchType());
   }
 
+  // Lower the arguments and return value in the callee's generic context.
+  GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
+  
   // Turn the formal SIL parameters into IR-gen things.
   for (auto index : indices(args)) {
     emitApplyArgument(*this, args[index], params[index],
                       i->getSubstitutions(), llArgs);
   }
 
-  // Pass the generic arguments first.
+  // Pass the generic arguments.
   if (hasPolymorphicParameters(origCalleeType)) {
     emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
                              i->getSubstitutions(), llArgs);
@@ -1621,9 +1633,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
     return;
   }
   
-  // FIXME: handle the result being an address. This doesn't happen normally
-  // in Swift but is how SIL currently models global accessors, and could also
-  // be how we model "address" properties in the future.
+  // FIXME: handle the result value being an address?
   
   // If the result is a non-address value, emit to an explosion.
   Explosion result(emission.getCurExplosionLevel());
@@ -1677,23 +1687,24 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
 void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   SILValue v(i, 0);
 
-  // Apply the closure up to the next-to-last uncurry level to gather the
-  // context arguments.
-
-  // Note that we collect the arguments under the substituted type.
+  // NB: We collect the arguments under the substituted type.
   auto args = i->getArguments();
-  auto params = i->getSubstCalleeType()->getParameters();
+  auto params = i->getSubstCalleeType()->getInterfaceParameters();
   params = params.slice(params.size() - args.size(), args.size());
   
   Explosion llArgs(ResilienceExpansion::Maximal);
   SmallVector<SILType, 8> argTypes;
 
-  for (auto index : indices(args)) {
-    assert(args[index].getType() = params[index].getSILType());
-    emitApplyArgument(*this, args[index], params[index], {}, llArgs);
-    // FIXME: Need to carry the address-ness of each argument alongside
-    // the object type's TypeInfo.
-    argTypes.push_back(args[index].getType());
+  {
+    // Lower the parameters in the callee's generic context.
+    GenericContextScope scope(IGM, i->getOrigCalleeType()->getGenericSignature());
+    for (auto index : indices(args)) {
+      assert(args[index].getType() = params[index].getSILType());
+      emitApplyArgument(*this, args[index], params[index], {}, llArgs);
+      // FIXME: Need to carry the address-ness of each argument alongside
+      // the object type's TypeInfo.
+      argTypes.push_back(args[index].getType());
+    }
   }
   
   auto &lv = getLoweredValue(i->getCallee());

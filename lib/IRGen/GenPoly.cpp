@@ -30,6 +30,7 @@
 #include "TypeVisitor.h"
 #include "GenTuple.h"
 #include "GenPoly.h"
+#include "GenType.h"
 
 using namespace swift;
 using namespace irgen;
@@ -187,6 +188,15 @@ namespace {
 
     bool visit(CanType origTy, CanType substTy) {
       if (origTy == substTy) return false;
+      
+      // Contextualize dependent types.
+      if (origTy->isDependentType())
+        origTy = IGM.getContextArchetypes().substDependentType(origTy)
+          ->getCanonicalType();
+      if (substTy->isDependentType())
+        substTy = IGM.getContextArchetypes().substDependentType(substTy)
+          ->getCanonicalType();
+      
       return super::visit(origTy, substTy);
     }
 
@@ -632,6 +642,13 @@ void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   CanType expectedTy, CanType substTy,
                                   ArrayRef<Substitution> subs,
                                   Explosion &in, Explosion &out) {
+  if (expectedTy->isDependentType())
+    expectedTy = IGF.IGM.getContextArchetypes().substDependentType(expectedTy)
+      ->getCanonicalType();
+  if (substTy->isDependentType())
+    substTy = IGF.IGM.getContextArchetypes().substDependentType(substTy)
+      ->getCanonicalType();
+  
   ReemitAsUnsubstituted(IGF, subs, in, out).visit(expectedTy, substTy);
 }
 

@@ -566,6 +566,10 @@ ArchetypeBuilder &TypeConverter::getArchetypes() {
   return IGM.SILMod->Types.getArchetypes();
 }
 
+ArchetypeBuilder &IRGenModule::getContextArchetypes() {
+  return Types.getArchetypes();
+}
+
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
