@@ -194,9 +194,11 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
     else if (isa<VarDecl>(vd)) {
       llvm_unreachable("must create SILDeclRef for VarDecl with explicit kind");
     }
-    // DestructorDecl constants require an explicit kind.
-    else if (isa<DestructorDecl>(vd)) {
-      llvm_unreachable("must create SILDeclRef for DestructorDecl with kind");
+    // Map DestructorDecls to the Deallocator of the destructor.
+    else if (auto dtor = dyn_cast<DestructorDecl>(vd)) {
+      loc = dtor;
+      kind = Kind::Deallocator;
+      naturalUncurryLevel = 0;
     }
     else {
       llvm_unreachable("invalid loc decl for SILDeclRef!");
