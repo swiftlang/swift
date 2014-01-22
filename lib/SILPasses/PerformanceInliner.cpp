@@ -106,7 +106,9 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::FloatLiteralInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
+    case ValueKind::StringLiteralInst:
       return InlineCost::Free;
+      
     case ValueKind::TupleElementAddrInst:
     case ValueKind::StructElementAddrInst: {
       // A gep whose operand is a gep with no other users will get folded by
@@ -202,7 +204,6 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
-    case ValueKind::StringLiteralInst:
     case ValueKind::StrongReleaseInst:
     case ValueKind::StrongRetainAutoreleasedInst:
     case ValueKind::StrongRetainInst:
