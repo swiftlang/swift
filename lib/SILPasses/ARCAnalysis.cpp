@@ -81,6 +81,10 @@ bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
   case ValueKind::IntegerLiteralInst:
   case ValueKind::FloatLiteralInst:
   case ValueKind::StringLiteralInst:
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::AllocArrayInst:
     return true;
   default:
     break;
