@@ -81,11 +81,22 @@ static void TopDownCallGraphOrder(SILModule *M,
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// For now Free is 0 and Expensive is 1. This can be changed in the future by
+// adding more categories.
+enum class InlineCost {
+  Free = 0,
+  Expensive = 1,
+};
+
+} // end anonymous namespace
+
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 ///
 /// TODO: Fill this out.
-static unsigned instructionInlineCost(SILInstruction &I) {
+static InlineCost instructionInlineCost(SILInstruction &I) {
   switch (I.getKind()) {
     case ValueKind::FunctionRefInst:
     case ValueKind::BuiltinFunctionRefInst:
@@ -95,7 +106,7 @@ static unsigned instructionInlineCost(SILInstruction &I) {
     case ValueKind::FloatLiteralInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
-      return 0;
+      return InlineCost::Free;
     case ValueKind::TupleElementAddrInst:
     case ValueKind::StructElementAddrInst: {
       // A gep whose operand is a gep with no other users will get folded by
@@ -104,14 +115,14 @@ static unsigned instructionInlineCost(SILInstruction &I) {
       if ((Op->getKind() == ValueKind::TupleElementAddrInst ||
            Op->getKind() == ValueKind::StructElementAddrInst) &&
           Op->hasOneUse())
-        return 0;
+        return InlineCost::Free;
     }
     // Aggregates are exploded at the IR level; these are effectively no-ops.
     case ValueKind::TupleInst:
     case ValueKind::StructInst:
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
-      return 0;
+      return InlineCost::Free;
       
     // Unchecked casts are free.
     case ValueKind::AddressToPointerInst:
@@ -128,20 +139,20 @@ static unsigned instructionInlineCost(SILInstruction &I) {
       
     case ValueKind::ThinToThickFunctionInst:
     case ValueKind::ConvertFunctionInst:
-      return 0;
+      return InlineCost::Free;
     
     // Arguments and undef are free.
     case ValueKind::SILArgument:
     case ValueKind::SILUndef:
-      return 0;
+      return InlineCost::Free;
     
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
       if (I.getType(0).castTo<MetatypeType>()->isThin())
-        return 0;
+        return InlineCost::Free;
       // TODO: Thick metatypes are free if they don't require generic or lazy
       // instantiation.
-      return 1;
+      return InlineCost::Expensive;
       
     // TODO
     case ValueKind::AllocArrayInst:
@@ -208,7 +219,7 @@ static unsigned instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnownedToRefInst:
     case ValueKind::UnreachableInst:
     case ValueKind::UpcastExistentialInst:
-      return 1;
+      return InlineCost::Expensive;
 
     case ValueKind::MarkFunctionEscapeInst:
     case ValueKind::MarkUninitializedInst:
@@ -226,7 +237,7 @@ static unsigned getFunctionCost(SILFunction *F) {
   unsigned Cost = 0;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      Cost += instructionInlineCost(I);
+      Cost += unsigned(instructionInlineCost(I));
 
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
