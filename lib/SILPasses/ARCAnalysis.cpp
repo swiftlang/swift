@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 #include "ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/Support/Debug.h"
@@ -100,16 +99,6 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::DebugValueInst:
   case ValueKind::DebugValueAddrInst:
     return true;
-
-  // These instructions if there are argument is a metatype do not affect
-  // reference counts since metatypes and reference counted values can not be
-  // converted into each other at the SIL level.
-  case ValueKind::ClassMethodInst:
-  case ValueKind::SuperMethodInst:
-  case ValueKind::PeerMethodInst:
-  case ValueKind::ProtocolMethodInst:
-    if (Inst->getOperand(0).getType().is<MetatypeType>())
-      return true;
 
   default:
     return false;
