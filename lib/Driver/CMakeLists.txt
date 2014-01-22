@@ -4,6 +4,7 @@ add_swift_library(swiftDriver
   Driver.cpp
   Job.cpp
   Options.cpp
+  OutputFileMap.cpp
   Tool.cpp
   Tools.cpp
   ToolChain.cpp
