@@ -313,8 +313,7 @@ static void diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
   // Unqualified lookup case.
   if (components.size() == 1) {
-    tc.diagnose(comp->getIdLoc(), components.size() == 1 ?
-                diag::use_undeclared_type : diag::unknown_name_in_type,
+    tc.diagnose(comp->getIdLoc(), diag::use_undeclared_type,
                 comp->getIdentifier())
       .highlight(SourceRange(comp->getIdLoc(),
                              components.back()->getIdLoc()));
