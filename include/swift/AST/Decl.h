@@ -1156,6 +1156,9 @@ public:
   ArrayRef<Decl*> getMembers() const;
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
+  bool hasLazyMembers() const {
+    return Resolver;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -1919,6 +1922,9 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
+  bool hasLazyMembers() const {
+    return Resolver;
+  }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
 

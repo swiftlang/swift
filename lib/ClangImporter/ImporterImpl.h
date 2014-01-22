@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Optional.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -120,7 +121,7 @@ enum class SpecialMethodKind {
 };
 
 /// \brief Implementation of the Clang importer.
-class ClangImporter::Implementation {
+class ClangImporter::Implementation : public LazyMemberLoader {
   friend class ClangImporter;
 
 public:
@@ -517,6 +518,9 @@ public:
   bool isSpecialTypedefName(clang::TypedefNameDecl *decl) {
     return SpecialTypedefNames.count(decl) > 0;
   }
+
+  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
+                                          uint64_t unused) override;
 };
 
 }

@@ -652,9 +652,11 @@ public:
           if (doIt(T))
             return true;
       }
-      for (Decl *M : ED->getMembers()) {
-        if (doIt(M))
-          return true;
+      if (!ED->hasLazyMembers()) {
+        for (Decl *M : ED->getMembers()) {
+          if (doIt(M))
+            return true;
+        }
       }
     } else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
       for (auto Inherit : NTD->getInherited()) {
@@ -662,9 +664,11 @@ public:
           if (doIt(T))
             return true;
       }
-      for (Decl *Member : NTD->getMembers())
-        if (doIt(Member))
-          return true;
+      if (!NTD->hasLazyMembers()) {
+        for (Decl *Member : NTD->getMembers())
+          if (doIt(Member))
+            return true;
+      }
 
     } else if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
       if (TypeRepr *T = TAD->getUnderlyingTypeLoc().getTypeRepr())

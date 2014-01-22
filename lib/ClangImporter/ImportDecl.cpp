@@ -2652,22 +2652,7 @@ namespace {
       result->setClangNode(decl);
       importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
-
-      // Import each of the members.
-      SmallVector<Decl *, 4> members;
-      importObjCMembers(decl, result, members);
-
-      // Import mirrored declarations for protocols to which this category
-      // or extension conforms.
-      // FIXME: This is a short-term hack.
-      importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members, Impl.SwiftContext);
-
-      // FIXME: Source range isn't accurate.
-      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
-                         Impl.importSourceRange(clang::SourceRange(
-                                                  decl->getLocation(),
-                                                  decl->getLocEnd())));
+      result->setMemberLoader(&Impl, 0);
 
       return result;
     }
@@ -2739,16 +2724,7 @@ namespace {
       // Note that this is an Objective-C and class protocol.
       result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
       result->setIsObjC(true);
-                         
-      // Import each of the members.
-      SmallVector<Decl *, 4> members;
-      importObjCMembers(decl, result, members);
-
-      // FIXME: Source range isn't accurate.
-      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
-                         Impl.importSourceRange(clang::SourceRange(
-                                                  decl->getLocation(),
-                                                  decl->getLocEnd())));
+      result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
@@ -2821,27 +2797,7 @@ namespace {
       }
 #include "InferredAttributes.def"
 
-      // Import each of the members.
-      SmallVector<Decl *, 4> members;
-      importObjCMembers(decl, result, members);
-
-      // Import inherited constructors.
-      // FIXME: Don't create constructors for class Protocol
-      if (decl->getDeclName().getAsString() != "Protocol") {
-        importInheritedConstructors(decl, result, members);
-      }
-
-      // Import mirrored declarations for protocols to which this class
-      // conforms.
-      // FIXME: This is a short-term hack.
-      importMirroredProtocolMembers(decl, result, result->getProtocols(),
-                                    members, Impl.SwiftContext);
-
-      // FIXME: Source range isn't accurate.
-      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
-                         Impl.importSourceRange(clang::SourceRange(
-                                                  decl->getLocation(),
-                                                  decl->getLocEnd())));
+      result->setMemberLoader(&Impl, 0);
 
       // Pass the class to the type checker to create an implicit destructor.
       Impl.SwiftContext.addedExternalDecl(result);
@@ -3380,6 +3336,48 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   SwiftContext.addedExternalDecl(func);
 
   return var;
+}
 
+ArrayRef<Decl *>
+ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
+  assert(D->hasClangNode());
+  auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
+
+  const DeclContext *DC;
+  ArrayRef<ProtocolDecl *> protos;
+  if (auto someClass = dyn_cast<NominalTypeDecl>(D)) {
+    DC = someClass;
+    protos = someClass->getProtocols();
+  } else {
+    auto extension = cast<ExtensionDecl>(D);
+    DC = extension;
+    protos = extension->getProtocols();
+  }
+
+  // Import each of the members.
+  SmallVector<Decl *, 4> members;
+  SwiftDeclConverter converter(*this);
+
+  converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
+                              members);
+
+  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+    if (clangClass->getName() != "Protocol") {
+      converter.importInheritedConstructors(clangClass,
+                                            const_cast<DeclContext *>(DC),
+                                            members);
+    }
+  }
+
+  // Import mirrored declarations for protocols to which this category
+  // or extension conforms.
+  // FIXME: This is a short-term hack.
+  if (!isa<ProtocolDecl>(D)) {
+    converter.importMirroredProtocolMembers(clangDecl,
+                                            const_cast<DeclContext *>(DC),
+                                            protos, members, SwiftContext);
+  }
+
+  return SwiftContext.AllocateCopy(members);
 }
 

@@ -705,20 +705,20 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       llvm_unreachable("Unhandled external definition kind");
     }
 
-    // Define any pending implicit declarations.
-    TC.definePendingImplicitDecls();
-    DefinedFunctions.insert(DefinedFunctions.end(),
-                     TC.implicitlyDefinedFunctions.begin(),
-                     TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
-
     // Type-check any referenced nominal types.
     while (!TC.ValidatedTypes.empty()) {
       auto nominal = TC.ValidatedTypes.back();
       TC.ValidatedTypes.pop_back();
       TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
     }
-      
+
+    // Define any pending implicit declarations.
+    TC.definePendingImplicitDecls();
+    DefinedFunctions.insert(DefinedFunctions.end(),
+                            TC.implicitlyDefinedFunctions.begin(),
+                            TC.implicitlyDefinedFunctions.end());
+    TC.implicitlyDefinedFunctions.clear();
+
   } while (currentFunctionIdx < DefinedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size());
 

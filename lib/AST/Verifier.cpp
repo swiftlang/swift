@@ -1465,16 +1465,18 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ClassDecl *CD) {
-      unsigned NumDestructors = 0;
-      for (auto Member : CD->getMembers()) {
-        if (isa<DestructorDecl>(Member)) {
-          NumDestructors++;
+      if (!CD->hasLazyMembers()) {
+        unsigned NumDestructors = 0;
+        for (auto Member : CD->getMembers()) {
+          if (isa<DestructorDecl>(Member)) {
+            NumDestructors++;
+          }
         }
-      }
-      if (NumDestructors != 1) {
-        Out << "every class should have exactly one destructor, "
-               "explicitly provided or created by the type checker";
-        abort();
+        if (NumDestructors != 1) {
+          Out << "every class should have exactly one destructor, "
+                 "explicitly provided or created by the type checker";
+          abort();
+        }
       }
 
       verifyCheckedBase(CD);

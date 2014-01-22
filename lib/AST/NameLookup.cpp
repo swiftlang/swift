@@ -666,13 +666,18 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 
 template <typename T>
 static void loadAllMembers(const T *container,
-                           LazyMemberLoader * const &resolver,
+                           LazyMemberLoader * const &resolverRef,
                            uint64_t contextData) {
-  if (!resolver)
+  if (!resolverRef)
     return;
+
+  // Don't try to load all members re-entrant-ly.
+  auto resolver = resolverRef;
+  const_cast<LazyMemberLoader *&>(resolverRef) = nullptr;
+
   auto members = resolver->loadAllMembers(container, contextData);
   const_cast<T *>(container)->setMembers(members, {});
-  const_cast<LazyMemberLoader *&>(resolver) = nullptr;
+
   --NumUnloadedLazyMembers;
 }
 
