@@ -112,11 +112,7 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 }
 
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
-  if (auto lookupTy = getNamedSwiftType(type->getDecl()->getDeclContext(),
-                                        "DynamicLookup"))
-    if (lookupTy->isEqual(type))
-      return getClangIdType(getClangASTContext());
-  return clang::CanQualType();
+  return getClangIdType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
