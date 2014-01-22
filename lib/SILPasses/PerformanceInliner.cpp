@@ -141,12 +141,6 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::ConvertFunctionInst:
       return InlineCost::Free;
     
-    // Arguments and undef are free.
-    case ValueKind::SILArgument:
-    case ValueKind::SILUndef:
-      llvm_unreachable("Only instructions should be passed into this "
-                       "function.");
-    
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
       if (I.getType(0).castTo<MetatypeType>()->isThin())
@@ -225,6 +219,10 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::UpcastExistentialInst:
       return InlineCost::Expensive;
 
+    case ValueKind::SILArgument:
+    case ValueKind::SILUndef:
+      llvm_unreachable("Only instructions should be passed into this "
+                       "function.");    
     case ValueKind::MarkFunctionEscapeInst:
     case ValueKind::MarkUninitializedInst:
       llvm_unreachable("not valid in canonical sil");
