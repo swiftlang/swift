@@ -551,15 +551,15 @@ public:
 /// A reference to 'super'. References to members of 'super' resolve to members
 /// of a superclass of 'self'.
 class SuperRefExpr : public Expr {
-  ValueDecl *Self;
+  VarDecl *Self;
   SourceLoc Loc;
   
 public:
-  SuperRefExpr(ValueDecl *Self, SourceLoc Loc, bool Implicit,
+  SuperRefExpr(VarDecl *Self, SourceLoc Loc, bool Implicit,
                Type SuperTy = Type())
     : Expr(ExprKind::SuperRef, Implicit, SuperTy), Self(Self), Loc(Loc) {}
   
-  ValueDecl *getSelf() const { return Self; }
+  VarDecl *getSelf() const { return Self; }
   
   SourceLoc getSuperLoc() const { return Loc; }
   SourceRange getSourceRange() const { return Loc; }
@@ -2651,14 +2651,14 @@ public:
 /// initializing 'self' in-place before the delegator's logic executes.
 class RebindSelfInConstructorExpr : public Expr {
   Expr *SubExpr;
-  ValueDecl *Self;
+  VarDecl *Self;
 public:
-  RebindSelfInConstructorExpr(Expr *SubExpr, ValueDecl *Self);
+  RebindSelfInConstructorExpr(Expr *SubExpr, VarDecl *Self);
   
   SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
   
-  ValueDecl *getSelf() const { return Self; }
+  VarDecl *getSelf() const { return Self; }
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *Sub) { SubExpr = Sub; }
   

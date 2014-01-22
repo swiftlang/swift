@@ -318,7 +318,7 @@ ValueDecl *ApplyExpr::getCalledValue() const {
 }
 
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
-                                                         ValueDecl *Self)
+                                                         VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,
          TupleType::getEmpty(Self->getASTContext())),
     SubExpr(SubExpr), Self(Self)

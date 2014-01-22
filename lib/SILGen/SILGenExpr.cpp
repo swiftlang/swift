@@ -3163,7 +3163,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
-  auto selfDecl = cast<VarDecl>(E->getSelf());
+  auto selfDecl = E->getSelf();
   auto selfTy = selfDecl->getType()->getInOutObjectType();
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
 
