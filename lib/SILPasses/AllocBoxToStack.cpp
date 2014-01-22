@@ -45,21 +45,24 @@ static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
-    // Otherwise, add the successors of the BB to the worklist...
+    // Add the successors of the BB to the worklist...
     for (auto &Succ : BB->getSuccs()) {
       auto *BB = Succ.getBB();
 
-      // We found an entry cycle, we can not promote this alloc box.
+      // If one of those successors is AllocBoxBB, we have an entry cycle
+      // implying that we can not promote this alloc box.
       if (BB == AllocBoxBB) {
         ++NumEntryCycleBB;
         return true;
       }
 
-      // Prune the search at the SRI's BB.
+      // If the successor is the ReleaseBB, skip it since ReleaseBB
+      // post-dominates Prune the search at the SRI's BB.
       if (BB == ReleaseBB)
         continue;
 
-      // Only visit a BB once.
+      // Otherwise, if we have not visited the BB yet, add it to the worklist
+      // for processing.
       if (VisitedBBSet.insert(BB))
         Worklist.push_back(BB);
     }
