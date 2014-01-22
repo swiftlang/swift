@@ -154,6 +154,11 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
       // TODO: Thick metatypes are free if they don't require generic or lazy
       // instantiation.
       return InlineCost::Expensive;
+
+    // Return and unreachable are free.
+    case ValueKind::UnreachableInst:
+    case ValueKind::ReturnInst:
+      return InlineCost::Free;
       
     // TODO
     case ValueKind::AllocArrayInst:
@@ -201,7 +206,6 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::ProtocolMethodInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::RefToUnownedInst:
-    case ValueKind::ReturnInst:
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
     case ValueKind::StringLiteralInst:
@@ -218,7 +222,6 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedToRefInst:
-    case ValueKind::UnreachableInst:
     case ValueKind::UpcastExistentialInst:
       return InlineCost::Expensive;
 
