@@ -45,6 +45,14 @@ struct NestedInts {
 
 typedef long NSInteger;
 
+#if !defined(OBJC_HIDE_64) && TARGET_OS_IPHONE && __LP64__
+typedef bool BOOL;
+#else
+typedef signed char BOOL;
+// BOOL is explicitly signed so @encode(BOOL) == "c" rather than "C"
+// even if -funsigned-char is used.
+#endif
+
 @interface Gizmo : NSObject
 - (Gizmo*) clone NS_RETURNS_RETAINED;
 - (Gizmo*) duplicate;
@@ -58,6 +66,7 @@ typedef long NSInteger;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 + (void) runce;
+- (BOOL) negate:(BOOL) b;
 @end
 
 @interface NSView : NSObject
