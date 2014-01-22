@@ -428,17 +428,17 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       assert (DebugClient && "Debugger variables with no debugger client");
       SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
       assert (SILDebugClient && "Debugger client doesn't support SIL");
-      return ManagedValue(SILDebugClient->emitReferenceToDecl(loc, declRef,
-                                                              ncRefType,
-                                                              uncurryLevel, B),
-                          ManagedValue::LValue);
+      SILValue SV = SILDebugClient->emitReferenceToDecl(loc, declRef,
+                                                        ncRefType,
+                                                        uncurryLevel, B);
+      return ManagedValue::forLValue(SV);
     }
 
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized variable references");
-    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
-            || uncurryLevel == 0)
-           && "uncurry level doesn't make sense for vars");
+    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel ||
+            uncurryLevel == 0) &&
+           "uncurry level doesn't make sense for vars");
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);

@@ -470,7 +470,7 @@ public:
       auto constant = standaloneFunction.atUncurryLevel(level);
       constantInfo = gen.getConstantInfo(constant);
       SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
-      mv = ManagedValue(ref, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(ref);
       break;
     }
     case Kind::ClassMethod: {

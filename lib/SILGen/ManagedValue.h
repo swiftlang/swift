@@ -24,16 +24,20 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "swift/SIL/SILValue.h"
 
-
 namespace swift {
-  class SILValue;
-  
 namespace Lowering {
 
-/// ManagedValue - represents a SIL rvalue. It consists of a SILValue and an
-/// optional cleanup. Ownership of the ManagedValue can be "forwarded" to
-/// disable its cleanup when the rvalue is consumed. A ManagedValue can also
-/// represent an LValue used as a value, such as a @inout function argument.
+/// ManagedValue - represents a singular SIL value and an optional cleanup.
+/// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
+/// the rvalue is consumed. A ManagedValue can also represent an LValue used as
+/// a value, such as a @inout function argument, and can be null.
+///
+/// Interesting relevant cases include:
+///    IsLValue: the SILValue will always have an isAddress() SILType. LValues
+///              never have an associated cleanup.
+///   !IsLValue, isAddress() type: an address-only RValue.
+///   !IsLValue, !isAddress() type: a loadable RValue.
+///
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
   /// whether it represents an lvalue.
@@ -42,15 +46,14 @@ class ManagedValue {
   /// CleanupHandle::invalid() if the value has no cleanup.
   CleanupHandle cleanup;
 
+  explicit ManagedValue(SILValue value, bool isLValue, CleanupHandle cleanup)
+    : valueAndIsLValue(value, isLValue), cleanup(cleanup) {
+  }
+
 public:
   enum Unmanaged_t { Unmanaged };
-  enum LValue_t { LValue };
   
   ManagedValue() = default;
-  explicit ManagedValue(SILValue value, LValue_t)
-    : valueAndIsLValue(value, true),
-      cleanup(CleanupHandle::invalid())
-  {}
   explicit ManagedValue(SILValue value, Unmanaged_t)
     : valueAndIsLValue(value, false),
       cleanup(CleanupHandle::invalid())
@@ -64,7 +67,7 @@ public:
     return ManagedValue(value, Unmanaged);
   }
   static ManagedValue forLValue(SILValue value) {
-    return ManagedValue(value, LValue);
+    return ManagedValue(value, true, CleanupHandle::invalid());
   }
 
   SILValue getUnmanagedValue() const {
