@@ -524,7 +524,7 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
 }
 
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
-  : SILInstruction(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
+  : LiteralInst(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
     Function(F) {
 
       F->RefCount++;
@@ -535,8 +535,8 @@ FunctionRefInst::~FunctionRefInst() {
 }
 
 SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)
-  : SILInstruction(ValueKind::SILGlobalAddrInst, Loc,
-                   Global->getLoweredType().getAddressType()),
+  : LiteralInst(ValueKind::SILGlobalAddrInst, Loc,
+                Global->getLoweredType().getAddressType()),
     Global(Global)
 {}
 
@@ -566,7 +566,7 @@ static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
 
 IntegerLiteralInst::IntegerLiteralInst(SILLocation Loc, SILType Ty,
                                        const llvm::APInt &Value)
-  : SILInstruction(ValueKind::IntegerLiteralInst, Loc, Ty),
+  : LiteralInst(ValueKind::IntegerLiteralInst, Loc, Ty),
     numBits(Value.getBitWidth())
 {
   memcpy(this + 1, Value.getRawData(),
@@ -620,7 +620,7 @@ APInt IntegerLiteralInst::getValue() const {
 
 FloatLiteralInst::FloatLiteralInst(SILLocation Loc, SILType Ty,
                                    const APInt &Bits)
-  : SILInstruction(ValueKind::FloatLiteralInst, Loc, Ty),
+  : LiteralInst(ValueKind::FloatLiteralInst, Loc, Ty),
     numBits(Bits.getBitWidth())
 {
   memcpy(this + 1, Bits.getRawData(),
@@ -665,7 +665,7 @@ APFloat FloatLiteralInst::getValue() const {
 
 StringLiteralInst::StringLiteralInst(SILLocation Loc, StringRef Text,
                                      Encoding encoding, SILTypeList *Ty)
-  : SILInstruction(ValueKind::StringLiteralInst, Loc, Ty),
+  : LiteralInst(ValueKind::StringLiteralInst, Loc, Ty),
     Length(Text.size()), TheEncoding(encoding)
 {
   memcpy(this + 1, Text.data(), Text.size());

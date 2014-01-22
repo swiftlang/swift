@@ -518,8 +518,31 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Literal instructions.
+//===----------------------------------------------------------------------===//
+
+/// Abstract base class for literal instructions.
+class LiteralInst : public SILInstruction {
+public:
+  LiteralInst(ValueKind Kind, SILLocation Loc, SILType Ty)
+    : SILInstruction(Kind, Loc, Ty) {}
+  LiteralInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList=nullptr,
+              SILDebugScope *DS = nullptr)
+    : SILInstruction(Kind, Loc, TypeList, DS) {}
+
+  
+  /// All conversion instructions return a single result.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_LiteralInst &&
+      V->getKind() <= ValueKind::Last_LiteralInst;
+  }
+};
+
 /// FunctionRefInst - Represents a reference to a SIL function.
-class FunctionRefInst : public SILInstruction {
+class FunctionRefInst : public LiteralInst {
   SILFunction *Function;
 public:
   /// Construct a FunctionRefInst.
@@ -545,11 +568,11 @@ public:
 
 /// BuiltinFunctionRefInst - Represents a reference to a primitive function from
 /// the Builtin module.
-class BuiltinFunctionRefInst : public SILInstruction {
+class BuiltinFunctionRefInst : public LiteralInst {
   Identifier Name;
 public:
   BuiltinFunctionRefInst(SILLocation Loc, Identifier Name, SILType Ty)
-    : SILInstruction(ValueKind::BuiltinFunctionRefInst, Loc, Ty),
+    : LiteralInst(ValueKind::BuiltinFunctionRefInst, Loc, Ty),
       Name(Name)
   {}
   
@@ -579,11 +602,11 @@ public:
 /// \brief Gives the address of a global variable.
 ///
 /// TODO: Fold into SILGlobalAddrInst.
-class GlobalAddrInst : public SILInstruction {
+class GlobalAddrInst : public LiteralInst {
   VarDecl *Global;
 public:
   GlobalAddrInst(SILLocation Loc, VarDecl *Global, SILType AddrTy)
-    : SILInstruction(ValueKind::GlobalAddrInst, Loc, AddrTy),
+    : LiteralInst(ValueKind::GlobalAddrInst, Loc, AddrTy),
       Global(Global) {}
   
   /// Return the referenced global variable decl.
@@ -601,7 +624,7 @@ public:
 };
 
 /// Gives the address of a SIL global variable.
-class SILGlobalAddrInst : public SILInstruction {
+class SILGlobalAddrInst : public LiteralInst {
   SILGlobalVariable *Global;
   
 public:
@@ -623,7 +646,7 @@ public:
   
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
 /// by an an IntegerLiteralExpr or CharacterLiteralExpr.
-class IntegerLiteralInst : public SILInstruction {
+class IntegerLiteralInst : public LiteralInst {
   unsigned numBits;
   
   IntegerLiteralInst(SILLocation Loc, SILType Ty, const APInt &Value);
@@ -652,7 +675,7 @@ public:
 
 /// FloatLiteralInst - Encapsulates a floating point constant, as defined
 /// originally by a FloatLiteralExpr.
-class FloatLiteralInst : public SILInstruction {
+class FloatLiteralInst : public LiteralInst {
   unsigned numBits;
   
   FloatLiteralInst(SILLocation Loc, SILType Ty, const APInt &Bits);
@@ -681,7 +704,7 @@ public:
 
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
 /// a StringLiteralExpr.
-class StringLiteralInst : public SILInstruction {
+class StringLiteralInst : public LiteralInst {
 public:
   enum class Encoding {
     UTF8,
