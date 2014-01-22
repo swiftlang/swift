@@ -88,6 +88,11 @@ bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
   case ValueKind::MetatypeInst:
     return true;
 
+  // DeallocStackInst do not use reference counted values, only local storage
+  // handles.
+  case ValueKind::DeallocStackInst:
+    return true;
+
   // Debug values do not use referenced counted values in a manner we care
   // about.
   case ValueKind::DebugValueInst:
