@@ -215,9 +215,14 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
 
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter and the base needs to be mutable.
-  if (auto *VD = dyn_cast<VarDecl>(member))
+  if (auto *VD = dyn_cast<VarDecl>(member)) {
     if (VD->hasAccessorFunctions() && baseTy->is<InOutType>())
       return InOutType::get(baseObjectTy);
+   
+    // If the member is a let, the base is always an unqualified baseObjectTy.
+    if (VD->isLet())
+      return baseObjectTy;
+  }
   
   // If the base of the subscript is mutable, then we may be invoking a mutable
   // getter or setter.
