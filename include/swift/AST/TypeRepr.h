@@ -190,6 +190,10 @@ public:
   SourceLoc getIdLoc() const { return Loc; }
   Identifier getIdentifier() const { return Id; }
 
+  /// Replace the identifier with a new identifier, e.g., due to typo
+  /// correction.
+  void overwriteIdentifier(Identifier newId) { Id = newId; }
+
   /// Return true if this has been name-bound already.
   bool isBound() const { return !Value.isNull(); }
   bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }

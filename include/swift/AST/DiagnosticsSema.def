@@ -704,6 +704,8 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(unchecked_not_optional_type,sema_tct,none,
       "type following '@unchecked' must be an optional type", ())
+ERROR(self_in_nominal,sema_tct,none,
+      "'Self' is only available in a protocol; did you mean %0?", (Identifier))
 
 // Ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,

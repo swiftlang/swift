@@ -301,24 +301,65 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   return type;
 }
 
+/// Retrieve the nearest enclosing nominal type context.
+static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
+  while (dc->isLocalContext())
+    dc = dc->getParent();
+
+  if (dc->isTypeContext())
+    return dc->getDeclaredTypeOfContext()->getAnyNominal();
+
+  return nullptr;
+}
+
 /// Diagnose a reference to an unknown type.
+///
+/// This routine diagnoses a reference to an unknown type, and
+/// attempts to fix the reference via various means.
 ///
 /// \param tc The type checker through which we should emit the diagnostic.
 /// \param dc The context in which name lookup occurred.
 /// \param components The components that refer to the type, where the last
 /// component refers to the type that could not be found.
-static void diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
-                                ArrayRef<ComponentIdentTypeRepr *> components) {
+///
+/// \returns true if we could not fix the type reference, false if
+/// typo correction (or some other mechanism) was able to fix the
+/// reference.
+static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
+                                ArrayRef<ComponentIdentTypeRepr *> components,
+                                GenericTypeResolver *resolver) {
   auto comp = components.back();
 
   // Unqualified lookup case.
   if (components.size() == 1) {
+    // Attempt to refer to 'Self' within a non-protocol nominal
+    // type. Fix this by replacing 'Self' with the nominal type name.
+    NominalTypeDecl *nominal = nullptr;
+    if (comp->getIdentifier() == tc.Context.Id_Self &&
+        !isa<GenericIdentTypeRepr>(comp) &&
+        (nominal = getEnclosingNominalContext(dc))) {
+      // Retrieve the nominal type and resolve it within this context.
+      assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+      auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
+                                  /*allowUnboundGenerics=*/false, resolver);
+      if (type->is<ErrorType>())
+        return true;
+
+      // Produce a Fix-It replacing 'Self' with the nominal type name.
+      tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
+        .fixItReplace(comp->getIdLoc(), nominal->getName().str());
+      comp->overwriteIdentifier(nominal->getName());
+      comp->setValue(type);
+      return false;
+    }
+    
+    // Fallback.
     tc.diagnose(comp->getIdLoc(), diag::use_undeclared_type,
                 comp->getIdentifier())
       .highlight(SourceRange(comp->getIdLoc(),
                              components.back()->getIdLoc()));
 
-    return;
+    return true;
   }
 
   // Qualified lookup case.
@@ -331,7 +372,8 @@ static void diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
                 comp->getIdentifier(), parentType)
       .highlight(parentRange);
-    return;
+
+    return true;
   }
 
   /// Lookup into a module.
@@ -339,7 +381,7 @@ static void diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   assert(module && "Unresolved parent component?");
   tc.diagnose(comp->getIdLoc(), diag::no_module_type,
               comp->getIdentifier(), module->Name);
-  return;
+  return true;
 }
 
 static llvm::PointerUnion<Type, Module *>
@@ -405,17 +447,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           break;
         }
 
-        // We have a found multiple type aliases that refer to the sam thing.
+        // We have a found multiple type aliases that refer to the same thing.
         // Ignore the duplicate.
-      }
-
-      // If we found nothing, complain and fail.
-      if (current.isNull()) {
-        if (diagnoseErrors)
-          diagnoseUnknownType(TC, DC, components);
-        Type ty = ErrorType::get(TC.Context);
-        comp->setValue(ty);
-        return ty;
       }
 
       // Complain about any ambiguities we detected.
@@ -438,6 +471,17 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         return ty;
       }
 
+      // If we found nothing, complain and give ourselves a chance to recover.
+      if (current.isNull()) {
+        // If we're not allowed to complain or we couldn't fix the
+        // source, bail out.
+        if (!diagnoseErrors || 
+            diagnoseUnknownType(TC, DC, components, resolver)) {
+          Type ty = ErrorType::get(TC.Context);
+          comp->setValue(ty);
+          return ty;
+        }
+      }
     } else {
       llvm::PointerUnion<Type, Module *>
         parent = resolveIdentTypeComponent(TC, DC, parentComps, options,
@@ -480,17 +524,6 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
                                                DC);
 
-        // If we didn't find anything, complain.
-        // FIXME: Typo correction!
-        if (!memberTypes) {
-          if (diagnoseErrors)
-            diagnoseUnknownType(TC, DC, components);
-
-          Type ty = ErrorType::get(TC.Context);
-          comp->setValue(ty);
-          return ty;
-        }
-
         // Name lookup was ambiguous. Complain.
         // FIXME: Could try to apply generic arguments first, and see whether
         // that resolves things. But do we really want that to succeed?
@@ -506,6 +539,21 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           return ty;
         }
 
+        // If we didn't find anything, complain.
+        bool recovered = false;
+        if (!memberTypes) {
+          // If we're not allowed to complain or we couldn't fix the
+          // source, bail out.
+          if (!diagnoseErrors || 
+              diagnoseUnknownType(TC, DC, components, resolver)) {
+            Type ty = ErrorType::get(TC.Context);
+            comp->setValue(ty);
+            return ty;
+          }
+
+          recovered = true;
+        }
+
         if (parentTy->isExistentialType()) {
           TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
                       comp->getIdentifier());
@@ -514,7 +562,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           return ty;
         }
 
-        auto memberType = memberTypes.back().second;
+        auto memberType = recovered? comp->getBoundType() 
+                                   : memberTypes.back().second;
 
         // If there are generic arguments, apply them now.
         if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
@@ -531,16 +580,6 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       auto module = parent.get<Module *>();
       LookupTypeResult foundModuleTypes =
         TC.lookupMemberType(ModuleType::get(module), comp->getIdentifier(), DC);
-
-      // If we didn't find a type, complain.
-      if (!foundModuleTypes) {
-        // FIXME: Fully-qualified module name?
-        if (diagnoseErrors)
-          diagnoseUnknownType(TC, DC, components);
-        Type ty = ErrorType::get(TC.Context);
-        comp->setValue(ty);
-        return ty;
-      }
 
       // If lookup was ambiguous, complain.
       if (foundModuleTypes.isAmbiguous()) {
@@ -561,7 +600,22 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         comp->setValue(ty);
         return ty;
       }
-      Type foundType = foundModuleTypes[0].second;
+
+      // If we didn't find a type, complain.
+      bool recovered = false;
+      if (!foundModuleTypes) {
+        if (!diagnoseErrors || 
+            diagnoseUnknownType(TC, DC, components, resolver)) {
+          Type ty = ErrorType::get(TC.Context);
+          comp->setValue(ty);
+          return ty;
+        }
+
+        recovered = true;
+      }
+
+      Type foundType = recovered? comp->getBoundType()
+                                : foundModuleTypes[0].second;
 
       // If there are generic arguments, apply them now.
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
