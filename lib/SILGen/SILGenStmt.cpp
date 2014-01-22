@@ -421,7 +421,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
       InitializationPtr initLoopVars
         = emitPatternBindingInitialization(S->getPattern());
       ManagedValue val = emitGetOptionalValueFrom(S,
-                               ManagedValue(nextBuf, ManagedValue::Unmanaged),
+                               ManagedValue::forUnmanaged(nextBuf),
                                optTL,
                                SGFContext(initLoopVars.get()));
       if (val)

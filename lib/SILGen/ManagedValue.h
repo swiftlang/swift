@@ -51,20 +51,15 @@ class ManagedValue {
   }
 
 public:
-  enum Unmanaged_t { Unmanaged };
   
   ManagedValue() = default;
-  explicit ManagedValue(SILValue value, Unmanaged_t)
-    : valueAndIsLValue(value, false),
-      cleanup(CleanupHandle::invalid())
-  {}
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndIsLValue(value, false),
       cleanup(cleanup)
   {}
 
   static ManagedValue forUnmanaged(SILValue value) {
-    return ManagedValue(value, Unmanaged);
+    return ManagedValue(value, false, CleanupHandle::invalid());
   }
   static ManagedValue forLValue(SILValue value) {
     return ManagedValue(value, true, CleanupHandle::invalid());

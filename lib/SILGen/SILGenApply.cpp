@@ -482,7 +482,7 @@ public:
       // If the call is curried, emit a direct call to the curry thunk.
       if (level < method.methodName.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, constant, constantInfo);
-        mv = ManagedValue(ref, ManagedValue::Unmanaged);
+        mv = ManagedValue::forUnmanaged(ref);
         transparent = false;
         break;
       }
@@ -495,7 +495,7 @@ public:
                                                    /*volatile*/
                                                      constant.isForeign);
       
-      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
     case Kind::SuperMethod: {
@@ -513,7 +513,7 @@ public:
                                                    /*volatile*/
                                                      constant.isForeign);
       
-      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
     case Kind::PeerMethod: {
@@ -531,7 +531,7 @@ public:
                                                    /*volatile*/
                                                    constant.isForeign);
 
-      mv = ManagedValue(methodVal, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
     case Kind::ArchetypeMethod: {
@@ -552,7 +552,7 @@ public:
                                   constant,
                                   constantInfo.getSILType(),
                                   constant.isForeign);
-      mv = ManagedValue(fn, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(fn);
       break;
     }
     case Kind::ProtocolMethod: {
@@ -573,7 +573,7 @@ public:
                                                constant,
                                                closureType,
                                                /*volatile*/ constant.isForeign);
-      mv = ManagedValue(fn, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(fn);
       break;
     }
     case Kind::DynamicMethod: {
@@ -596,7 +596,7 @@ public:
                           constant,
                           SILType::getPrimitiveObjectType(closureType),
                           /*volatile*/ constant.isForeign);
-      mv = ManagedValue(fn, ManagedValue::Unmanaged);
+      mv = ManagedValue::forUnmanaged(fn);
       break;
     }
     }
@@ -971,7 +971,7 @@ public:
         assert(protoSelfTy.isAddress() && "Self should be address-only");
         SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
                                                       protoSelfTy);
-        proj = ManagedValue(val, ManagedValue::Unmanaged);
+        proj = ManagedValue::forUnmanaged(val);
       }
 
       setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
@@ -2085,7 +2085,7 @@ namespace {
     
     // Destroy is a no-op for trivial types.
     if (ti.isTrivial())
-      return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+      return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
     
     SILType destroyType = ti.getLoweredType();
 
@@ -2098,7 +2098,7 @@ namespace {
     // and releases if appropriate.
     gen.B.emitDestroyAddr(loc, addr);
     
-    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
   }
 
   /// Specialized emitter for Builtin.assign and Builtin.init.
@@ -2129,7 +2129,7 @@ namespace {
       src.forwardInto(gen, loc, addr);
     else
       src.assignInto(gen, loc, addr);
-    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
   }
 
   static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
@@ -2241,7 +2241,7 @@ namespace {
     SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
     SILValue result = gen.B.createRefToRawPointer(loc, args[0].getValue(),
                                                   rawPointerType);
-    return ManagedValue(result, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(result);
   }
 
   /// Specialized emitter for Builtin.bridgeFromRawPointer.
@@ -2279,7 +2279,7 @@ namespace {
     SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
     SILValue result = gen.B.createAddressToPointer(loc, args[0].getUnmanagedValue(),
                                                    rawPointerType);
-    return ManagedValue(result, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(result);
   }
 
   /// Specialized emitter for Builtin.typeof.
@@ -2292,7 +2292,7 @@ namespace {
     
     // Get the metatype of the argument.
     SILValue metaTy = gen.emitMetatypeOfValue(loc, args[0].getValue());
-    return ManagedValue(metaTy, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(metaTy);
   }
 
   /// Specialized emitter for Builtin.gep.
@@ -2306,7 +2306,7 @@ namespace {
     SILValue offsetPtr = gen.B.createIndexRawPointer(loc,
                                                    args[0].getUnmanagedValue(),
                                                    args[1].getUnmanagedValue());
-    return ManagedValue(offsetPtr, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(offsetPtr);
   }
   
   /// Specialized emitter for Builtin.condfail.
@@ -2318,7 +2318,7 @@ namespace {
     assert(args.size() == 1 && "condfail should be given one argument");
     
     gen.B.createCondFail(loc, args[0].getUnmanagedValue());
-    return ManagedValue(gen.emitEmptyTuple(loc), ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
   }
 
   Callee::SpecializedEmitter
@@ -2443,11 +2443,11 @@ ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
   auto injectionArgsTy = cast<TupleType>(injectionFnTy->getInput()->getCanonicalType());
   RValue InjectionArgs(injectionArgsTy);
   InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(0),
-                               ManagedValue(BasePtr, ManagedValue::Unmanaged)));
+                               ManagedValue::forUnmanaged(BasePtr)));
   InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(1),
                                   ObjectPtr));
   InjectionArgs.addElement(RValue(*this, Loc, injectionArgsTy.getElementType(2),
-                                ManagedValue(Length, ManagedValue::Unmanaged)));
+                                ManagedValue::forUnmanaged(Length)));
   
   emission.addCallSite(Loc, RValueSource(Loc, std::move(InjectionArgs)),
                        injectionFnTy->getResult());

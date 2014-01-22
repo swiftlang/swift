@@ -92,7 +92,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v.getType());
   if (lowering.isTrivial())
-    return ManagedValue(v, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -108,7 +108,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
   assert(lowering.getLoweredType() == v.getType());
   if (lowering.isTrivial())
-    return ManagedValue(v, ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(v);
   
   if (lowering.isAddressOnly()) {
     Cleanups.pushCleanup<CleanupMaterializedValue>(v);
@@ -349,7 +349,7 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
   
   // Otherwise, use a global FunctionRefInst.
   SILValue c = emitGlobalFunctionRef(loc, constant, constantInfo);
-  return ManagedValue(c, ManagedValue::Unmanaged);
+  return ManagedValue::forUnmanaged(c);
 }
 
 /// True if the global stored property requires lazy initialization.
@@ -417,8 +417,8 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
             || uncurryLevel == 0)
            && "uncurry level doesn't make sense for types");
-    return ManagedValue(B.createMetatype(loc, getLoweredType(refType)),
-                        ManagedValue::Unmanaged);
+    return ManagedValue::forUnmanaged(B.createMetatype(loc,
+                                                      getLoweredType(refType)));
   }
   
   // If this is a reference to a var, produce an address or value.
@@ -676,18 +676,18 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
                                                SGFContext C) {
-  return RValue(SGF, E, ManagedValue(SGF.B.createIntegerLiteral(E),
-                                     ManagedValue::Unmanaged));
+  return RValue(SGF, E,
+                ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
                                              SGFContext C) {
-  return RValue(SGF, E, ManagedValue(SGF.B.createFloatLiteral(E),
-                                     ManagedValue::Unmanaged));
+  return RValue(SGF, E,
+                ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
 }
 RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
                                                  SGFContext C) {
-  return RValue(SGF, E, ManagedValue(SGF.B.createIntegerLiteral(E),
-                                     ManagedValue::Unmanaged));
+  return RValue(SGF, E,
+                ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
 }
 
 RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
@@ -708,9 +708,9 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   CanType ty = E->getType()->getCanonicalType();
   
   ManagedValue EltsArray[] = {
-    ManagedValue(SILValue(string, 0), ManagedValue::Unmanaged),
-    ManagedValue(SILValue(string, 1), ManagedValue::Unmanaged),
-    ManagedValue(SILValue(string, 2), ManagedValue::Unmanaged)
+    ManagedValue::forUnmanaged(SILValue(string, 0)),
+    ManagedValue::forUnmanaged(SILValue(string, 1)),
+    ManagedValue::forUnmanaged(SILValue(string, 2))
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -856,9 +856,8 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   SILValue metaBase = visit(E->getSubExpr()).getUnmanagedSingleValue(SGF,
                                                               E->getSubExpr());
   return RValue(SGF, E,
-                ManagedValue(SGF.B.createUpcast(E, metaBase,
-                                    SGF.getLoweredLoadableType(E->getType())),
-                             ManagedValue::Unmanaged));
+                ManagedValue::forUnmanaged(SGF.B.createUpcast(E, metaBase,
+                                    SGF.getLoweredLoadableType(E->getType()))));
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -1216,8 +1215,7 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   ASTContext &ctx = SGF.SGM.M.getASTContext();
   auto result =
     SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
-                                    ManagedValue(isa,
-                                                 ManagedValue::Unmanaged),
+                                    ManagedValue::forUnmanaged(isa),
                                     C);
   return (result ? RValue(SGF, E, result) : RValue());
 }
@@ -1300,7 +1298,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                       ->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
   
-  return std::make_tuple(ManagedValue(methodValue, ManagedValue::Unmanaged),
+  return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
                          methodTy, subs);
 }
 
@@ -1314,10 +1312,10 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
     assert(E->getType()->is<MetatypeType>() &&
            "generic_member_ref of metatype should give metatype");
     visit(E->getBase());
-    return RValue(SGF, E,
-                  ManagedValue(SGF.B.createMetatype(E,
-                                      SGF.getLoweredLoadableType(E->getType())),
-                               ManagedValue::Unmanaged));
+    SILValue MT =
+      SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
+    return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
+    
   }
 
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
@@ -1427,7 +1425,7 @@ RValue RValueEmitter::visitModuleExpr(ModuleExpr *E, SGFContext C) {
   // Produce an undef value. The module value should never actually be used.
   SILValue module = SILUndef::get(SGF.getLoweredLoadableType(E->getType()),
                                   SGF.SGM.M);
-  return RValue(SGF, E, ManagedValue(module, ManagedValue::Unmanaged));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(module));
 }
 
 RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
@@ -1716,7 +1714,7 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
     metatype = SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
   }
   
-  return RValue(SGF, E, ManagedValue(metatype, ManagedValue::Unmanaged));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(metatype));
 }
 
 ManagedValue
@@ -1803,7 +1801,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         
         // Use an RValue to explode Val if it is a tuple.
         RValue RV(*this, loc, capture->getType()->getCanonicalType(),
-                  ManagedValue(Val, ManagedValue::Unmanaged));
+                  ManagedValue::forUnmanaged(Val));
         std::move(RV).forwardAll(*this, capturedArgs);
         break;
       }
@@ -2581,7 +2579,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     auto objcInfo = getConstantInfo(method);
     SILValue methodRef = B.createClassMethod(Loc, selfValue, initConstant,
                                              objcInfo.getSILType());
-    initVal = ManagedValue(methodRef, ManagedValue::Unmanaged);
+    initVal = ManagedValue::forUnmanaged(methodRef);
     initTy = initVal.getType();
 
     // Bridge arguments.
@@ -2595,7 +2593,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
       auto bridgedTy =
         objcFnType->getParameters()[idx++].getSILType().getSwiftType();
       arg = emitNativeToBridgedValue(Loc,
-                                     ManagedValue(arg, ManagedValue::Unmanaged),
+                                     ManagedValue::forUnmanaged(arg),
                                      AbstractCC::ObjCMethod,
                                      nativeTy, nativeTy,
                                      bridgedTy).forward(*this);
@@ -3036,7 +3034,7 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
     SILDeclRef original = thunk.asForeign(!thunk.isForeign);
     auto originalInfo = getConstantInfo(original);
     auto fn = emitGlobalFunctionRef(fd, original, originalInfo);
-    result = emitMonomorphicApply(fd, ManagedValue(fn, ManagedValue::Unmanaged),
+    result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
                                   managedArgs,
                                   fd->getBodyResultType()->getCanonicalType())
       .forward(*this);
@@ -3142,13 +3140,13 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   }
   case MagicIdentifierLiteralExpr::Line: {
     unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
-    return RValue(SGF, E, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
-                                       ManagedValue::Unmanaged));
+    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
+    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
   }
   case MagicIdentifierLiteralExpr::Column: {
     unsigned Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
-    return RValue(SGF, E, ManagedValue(SGF.B.createIntegerLiteral(E, Ty, Value),
-                                       ManagedValue::Unmanaged));
+    SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
+    return RValue(SGF, E, ManagedValue::forUnmanaged(V));
   }
   }
 }

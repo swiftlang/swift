@@ -1443,7 +1443,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   if (objcInfo->hasIndirectResult()) {
     auto arg = new (gen.F.getModule())
       SILArgument(objcInfo->getIndirectInterfaceResult().getSILType(), gen.F.begin());
-    bridgedArgs.push_back(ManagedValue(arg, ManagedValue::Unmanaged));
+    bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
   }
   
   // Emit the other arguments, taking ownership of arguments if necessary.

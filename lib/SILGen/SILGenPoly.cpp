@@ -1028,7 +1028,7 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
   // unitary, so we can just create an equivalent thin value from thin air.
   assert(willBeThin && "substituting thin to thick metatype?!");
   auto metaTy = gen.B.createMetatype(loc, substSILType);
-  return ManagedValue(metaTy, ManagedValue::Unmanaged);
+  return ManagedValue::forUnmanaged(metaTy);
 }
 
 // Convert a metatype to 'thick' if its abstraction pattern requires it.
@@ -1052,7 +1052,7 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
   // unitary, so we can just create an equivalent thick value from thin air.
   assert(wasThin && "abstracting thick to thin metatype?!");
   auto metaTy = gen.B.createMetatype(loc, loweredTy);
-  return ManagedValue(metaTy, ManagedValue::Unmanaged);
+  return ManagedValue::forUnmanaged(metaTy);
 }
 
 namespace {

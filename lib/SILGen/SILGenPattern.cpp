@@ -1290,8 +1290,7 @@ public:
       
       // Create and initialize the variable.
       InitializationPtr init = gen.emitLocalVariableWithCleanup(vd);
-      ManagedValue(v, ManagedValue::Unmanaged).copyInto(gen, init->getAddress(),
-                                                        loc);
+      ManagedValue::forUnmanaged(v).copyInto(gen, init->getAddress(), loc);
       init->finishInitialization(gen);
       emittedVar = vd;
     };
