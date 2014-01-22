@@ -1589,7 +1589,9 @@ GenericTypeParamType *FuncDecl::makeDynamicSelf() {
 
   // 'DynamicSelf' is bounded by the enclosing nominal type.
   auto nominal = extType->getAnyNominal();
-  auto nominalRef = new (ctx) SimpleIdentTypeRepr(loc, nominal->getName());
+  auto nominalRef = new (ctx) SimpleIdentTypeRepr(
+                                getBodyResultTypeLoc().getSourceRange().Start,
+                                                  nominal->getName());
   TypeLoc nominalInherited[1] = { TypeLoc(nominalRef) };
   dynamicSelfDecl->setInherited(ctx.AllocateCopy(nominalInherited));
 

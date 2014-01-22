@@ -690,7 +690,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
     genericArgs = genComp->getGenericArgs();
 
-  Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), nullptr,
+  Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                               genericArgs, 
                               options.contains(TR_AllowUnboundGenerics),
                               resolver);

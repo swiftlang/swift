@@ -253,6 +253,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
 
     auto inheritedTy = inherited.getType();
 
+    // If this is an error type, ignore it.
+    if (inheritedTy->is<ErrorType>())
+      continue;
+
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
     auto knownType = inheritedTypes.find(inheritedCanTy);
@@ -268,6 +272,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                diag::duplicate_inheritance, inheritedTy)
         .fixItRemoveChars(afterPriorLoc, afterMyEndLoc)
         .highlight(knownType->second);
+      inherited.setInvalidType(Context);
       continue;
     }
     inheritedTypes[inheritedCanTy] = inherited.getSourceRange();
@@ -282,6 +287,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
             !decl->isImplicit()) {
           diagnose(inheritedClause[i].getSourceRange().Start,
                    diag::dynamic_lookup_conformance);
+          inherited.setInvalidType(Context);
           continue;
         }
       }
@@ -299,6 +305,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
         diagnose(inherited.getSourceRange().Start,
                  diag::multiple_enum_raw_types, superclassTy, inheritedTy)
           .highlight(superclassRange);
+        inherited.setInvalidType(Context);
         continue;
       }
       
@@ -342,6 +349,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
         diagnose(inherited.getSourceRange().Start,
                  diag::multiple_inheritance, superclassTy, inheritedTy)
           .highlight(superclassRange);
+        inherited.setInvalidType(Context);
         continue;
       }
 
@@ -357,6 +365,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                    : diag::non_class_inheritance,
                  getDeclaredType(decl), inheritedTy)
           .highlight(inherited.getSourceRange());
+        inherited.setInvalidType(Context);
         continue;
       }
 
@@ -385,10 +394,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
       continue;
     }
 
-    // If this is an error type, ignore it.
-    if (inheritedTy->is<ErrorType>())
-      continue;
-
     // We can't inherit from a non-class, non-protocol type.
     diagnose(decl->getLoc(),
              canInheritClass(decl)
@@ -396,6 +401,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
                : diag::inheritance_from_non_protocol,
              inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
+    inherited.setInvalidType(Context);
   }
 
   // Record the protocols to which this declaration conforms along with the
@@ -411,6 +417,12 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
   }
 
   auto typeDecl = cast<TypeDecl>(decl);
+
+  // FIXME: If we already set the protocols, bail out. We'd rather not have
+  // to check this.
+  if (typeDecl->isProtocolsValid())
+    return;
+
   typeDecl->setProtocols(allProtocolsCopy);
   if (superclassTy) {
     if (auto classDecl = dyn_cast<ClassDecl>(decl))
@@ -625,6 +637,10 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   if (!tl.getTypeRepr())
     return;
 
+  // Don't revert an error type; we've already complained.
+  if (tl.wasValidated() && tl.isError())
+    return;
+
   // Make sure we validate the type again.
   tl.setType(Type(), /*validated=*/false);
 
@@ -665,10 +681,9 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
         // generic parameter itself.
         if (auto genericParamType
             = dyn_cast<GenericTypeParamType>(type.getPointer())) {
-          // FIXME: Assert that it has a decl.
+          assert(genericParamType->getDecl() && "Missing type parameter decl");
           comp->setValue(genericParamType->getDecl());
         } else {
-          // FIXME: Often, we could revert to a decl here.
           comp->revert();
         }
       }
@@ -685,8 +700,13 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 
 static void revertDependentPattern(Pattern *pattern) {
   // Clear out the pattern's type.
-  if (pattern->hasType())
+  if (pattern->hasType()) {
+    // If the type of the pattern was in error, we're done.
+    if (pattern->getType()->is<ErrorType>())
+      return;
+
     pattern->overwriteType(Type());
+  }
 
   switch (pattern->getKind()) {
 #define PATTERN(Id, Parent)
@@ -702,7 +722,8 @@ static void revertDependentPattern(Pattern *pattern) {
   case PatternKind::Named: {
     // Clear out the type of the variable.
     auto named = cast<NamedPattern>(pattern);
-    if (named->getDecl()->hasType())
+    if (named->getDecl()->hasType() &&
+        !named->getDecl()->isInvalid())
       named->getDecl()->overwriteType(Type());
     break;
   }
@@ -835,8 +856,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
                                          DeclContext *dc) {
-  // FIXME: Revert the inherited clause of the generic parameter list.
-#if 0
+  // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
     auto typeParam = param.getAsTypeParam();
 
@@ -844,7 +864,6 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams,
     for (auto &inherited : typeParam->getInherited())
       revertDependentTypeLoc(inherited);
   }
-#endif
 
   // Revert the requirements of the generic parameter list.
   for (auto &req : genericParams->getRequirements()) {
@@ -880,6 +899,8 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
   for (auto GP : *genericParams) {
     auto TypeParam = GP.getAsTypeParam();
     TypeParam->setArchetype(builder.getArchetype(TypeParam));
+
+    TC.checkInheritanceClause(TypeParam);
   }
   genericParams->setAllArchetypes(
     TC.Context.AllocateCopy(builder.getAllArchetypes()));
@@ -1319,6 +1340,7 @@ public:
           TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
                       diag::raw_type_not_literal_convertible,
                       rawTy);
+          ED->getInherited()[0].setInvalidType(TC.Context);
         }
         
         // We need at least one case to have a raw value.
@@ -2232,12 +2254,12 @@ public:
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getArgParams());
 
-        // Assign archetypes.
-        finalizeGenericParamList(builder, gp, CD, TC);
-
         // Revert the constructor signature so it can be type-checked with
         // archetypes below.
         TC.revertGenericFuncSignature(CD);
+
+        // Assign archetypes.
+        finalizeGenericParamList(builder, gp, CD, TC);
       }
     } else if (outerGenericParams) {
       if (TC.validateGenericFuncSignature(CD)) {

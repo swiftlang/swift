@@ -1435,10 +1435,6 @@ protected:
     TypeDeclBits.ProtocolsSet = false;
   }
 
-  bool isProtocolsValid() const {
-    return TypeDeclBits.ProtocolsSet;
-  }
-
 public:
   Type getDeclaredType() const;
 
@@ -1470,6 +1466,10 @@ public:
            "protocols already set");
     TypeDeclBits.ProtocolsSet = true;
     Protocols = protocols;
+  }
+
+  bool isProtocolsValid() const {
+    return TypeDeclBits.ProtocolsSet;
   }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
