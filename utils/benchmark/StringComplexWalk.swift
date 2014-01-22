@@ -1,0 +1,4 @@
+
+import swift
+
+benchStringComplexWalk()
