@@ -1,9 +1,16 @@
 // -*- mode: c++ -*-
 // $Id: ackermann.g++,v 1.3 2001/06/20 03:20:02 doug Exp $
 // http://www.bagley.org/~doug/shootout/
+//
+// With some modifications to improve timing.
 
 #include <iostream>
-#include <stdlib.h>
+#include <cstdlib>
+#include <cstdint>
+
+extern "C" {
+#include <mach/mach_time.h>
+}
 
 using namespace std;
 
@@ -14,8 +21,11 @@ int Ack(int M, int N) {
 }
 
 int main(int argc, char *argv[]) {
-    int n = 13; 
+    // Only time Ack not buffering or c++ or anything like that.
+    uint64_t start = mach_absolute_time();
+    Ack(3, 13);
+    uint64_t end = mach_absolute_time() - start;
 
-    cout << "Ack(3," << n << "): " << Ack(3, n) << endl;
+    printf("%llu nanoseconds.\n", end);
     return(0);
 }
