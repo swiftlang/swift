@@ -359,8 +359,8 @@ void Parser::skipUntilGreaterInTypeList() {
 
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Parse/Tokens.def"
-    // 'Self' can appear in types, skip it.
-    if (Tok.is(tok::kw_Self))
+    // 'Self' and 'DynamicSelf' can appear in types, skip it.
+    if (Tok.is(tok::kw_Self) || Tok.is(tok::kw_DynamicSelf))
       break;
     if (isStartOfStmt(Tok) || isStartOfDecl(Tok, peekToken()))
       return;

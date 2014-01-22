@@ -1792,6 +1792,64 @@ public:
     return true;
   }
 
+  /// Check for methods that return 'DynamicResult'.
+  bool checkDynamicSelfReturn(FuncDecl *func) {
+    // Check whether we have a specified result type.
+    auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
+    if (!typeRepr)
+      return false;
+      
+    // Check whether we have a simple identifier type.
+    auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
+    if (!simpleRepr)
+      return false;
+
+    // Check whether it is 'DynamicSelf'.
+    if (simpleRepr->getIdentifier() != TC.Context.Id_DynamicSelf)
+      return false;
+
+    // 'DynamicSelf' is only permitted on methods.
+    auto dc = func->getDeclContext();
+    if (!dc->isTypeContext()) {
+      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
+                  dc->isLocalContext());
+      simpleRepr->setValue(ErrorType::get(TC.Context));
+      return true;
+    }
+
+    // 'DynamicSelf' is only permitted on class or protocol methods.
+    auto containerTy = dc->getDeclaredTypeOfContext();
+    if (!containerTy->getClassOrBoundGenericClass() &&
+        !containerTy->is<ProtocolType>()) {
+      if (containerTy->is<ErrorType>())
+        return true;
+
+      auto nominal = containerTy->getAnyNominal();
+      assert(nominal && "Non-nominal container for method type?");
+      int which;
+      if (containerTy->getStructOrBoundGenericStruct())
+        which = 0;
+      else if (containerTy->getEnumOrBoundGenericEnum())
+        which = 1;
+      else
+        llvm_unreachable("Unknown nominal type");
+      TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
+                  which, nominal->getName())
+        .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
+      simpleRepr->setValue(ErrorType::get(TC.Context));
+      return true;
+    }
+
+    // FIXME: As a short-term hack, replace DynamicSelf with either
+    // 'Self' (in a protocol) or the name of the class.
+    auto nominal = containerTy->getAnyNominal();
+    if (isa<ProtocolDecl>(nominal))
+      simpleRepr->overwriteIdentifier(TC.Context.Id_Self);
+    else
+      simpleRepr->overwriteIdentifier(nominal->getName());
+    return false;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->getBody()) {
@@ -1845,6 +1903,10 @@ public:
     }
 
     bool isInvalid = false;
+
+    // Check whether the return type is 'DynamicSelf'.
+    if (checkDynamicSelfReturn(FD))
+      isInvalid = true;
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {

@@ -20,6 +20,7 @@
 #endif
 
 IDENTIFIER(destructor)
+IDENTIFIER(DynamicSelf)
 IDENTIFIER(init)
 IDENTIFIER(self)
 IDENTIFIER(Self)
