@@ -1956,7 +1956,7 @@ namespace {
       // We use the context emit-into initialization only for the outermost
       // call.
       SGFContext uncurriedContext =
-        (extraSites.empty() ? C : SGFContext::Ungeneralized);
+        (extraSites.empty() ? C : SGFContext());
 
       // Emit the uncurried call.
       ManagedValue result;
@@ -1996,7 +1996,7 @@ namespace {
         AbstractionPattern origParamType(claimNextParamClause(formalType));
         std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
                                       uncurriedArgs);
-        SGFContext context = i == size - 1 ? C : SGFContext::Ungeneralized;
+        SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
         result = emitApply(gen, loc, result, {}, uncurriedArgs,
                            substFnType,

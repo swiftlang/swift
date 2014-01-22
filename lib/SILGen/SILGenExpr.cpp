@@ -3697,10 +3697,6 @@ void SILGenFunction::emitIgnoredRValue(Expr *E) {
   emitRValue(E, SGFContext::Ignored);
 }
 
-RValue SILGenFunction::emitUngeneralizedRValue(Expr *E) {
-  return emitRValue(E, SGFContext::Ungeneralized);
-}
-
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
   return RValueEmitter(*this).visit(E, C);
 }

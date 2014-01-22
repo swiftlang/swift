@@ -32,16 +32,12 @@ namespace Lowering {
 /// might have a emit-into buffer must be aware of this.
 struct SGFContext {
 public:
-  enum ChildOfLoad_t { ChildOfLoad };
   enum Ignored_t { Ignored };
-  enum Ungeneralized_t { Ungeneralized };
   
 private:
   enum class Kind {
     Normal,
-    Ignored,
-    ChildOfLoad,
-    Ungeneralized
+    Ignored
   };
 
 private:
@@ -57,23 +53,10 @@ public:
     : state(emitInto, Kind::Normal)
   {}
   
-  /// Creates a load expr context, in which a temporary lvalue that would
-  /// normally be materialized can be left as an rvalue to avoid a useless
-  /// immediately-consumed allocation.
-  SGFContext(ChildOfLoad_t _)
-    : state(nullptr, Kind::ChildOfLoad)
-  {}
-
   /// Creates an ignored context, in which the value of the
   /// expression is being ignored.
   SGFContext(Ignored_t _)
     : state(nullptr, Kind::Ignored)
-  {}
-
-  /// Creates a context that is friendly to differences in abstraction.
-  /// This permits generalization to be suppressed.
-  SGFContext(Ungeneralized_t _)
-    : state(nullptr, Kind::Ungeneralized)
   {}
 
   /// Returns a pointer to the Initialization that the current expression should
@@ -86,21 +69,9 @@ public:
   /// Does this context have a preferred address to emit into?
   bool hasAddressToEmitInto() const; // in Initialization.h
   
-  /// Returns true if the current expression is a child of a LoadExpr, and
-  /// should thus avoid emitting a temporary materialization if possible.
-  bool isChildOfLoadExpr() const {
-    return state.getInt() == Kind::ChildOfLoad;
-  }
-
   /// Returns true if the current expression is in an ignored context.
   bool isIgnored() const {
     return state.getInt() == Kind::Ignored;
-  }
-
-  /// Returns true if the result of the expression does not need to
-  /// generalized to match the representation of its formal type.
-  bool isUngeneralized() const {
-    return state.getInt() == Kind::Ungeneralized;
   }
 };
 
@@ -578,10 +549,6 @@ public:
   /// Emit an r-value that we're ignoring the result of.
   void emitIgnoredRValue(Expr *E);
 
-  /// Emit an r-value, potentially suppressing conversion to a
-  /// generalized form.
-  RValue emitUngeneralizedRValue(Expr *E);
-  
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,
