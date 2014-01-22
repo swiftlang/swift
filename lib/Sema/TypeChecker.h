@@ -268,7 +268,7 @@ public:
   /// Type or an ErrorType in case of error.
   Type resolveIdentifierType(DeclContext *DC,
                              IdentTypeRepr *IdType,
-                             bool allowUnboundGenerics,
+                             TypeResolutionOptions options,
                              bool diagnoseErrors,
                              GenericTypeResolver *resolver);
   

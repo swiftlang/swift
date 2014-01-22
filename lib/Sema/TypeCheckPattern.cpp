@@ -271,10 +271,8 @@ public:
     auto *repr = IdentTypeRepr::create(TC.Context, components);
       
     // See if the repr resolves to a type.
-    Type ty = TC.resolveIdentifierType(DC, repr,
-                                       /*allowUnboundGenerics*/true,
-                                       /*diagnoseErrors*/false,
-                                       &resolver);
+    Type ty = TC.resolveIdentifierType(DC, repr, TR_AllowUnboundGenerics,
+                                       /*diagnoseErrors*/false, &resolver);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -347,10 +345,8 @@ public:
     auto *repr = IdentTypeRepr::create(TC.Context, components);
     
     // See first if the entire repr resolves to a type.
-    Type ty = TC.resolveIdentifierType(DC, repr,
-                                       /*allowUnboundGenerics*/true,
-                                       /*diagnoseErrors*/false,
-                                       &resolver);
+    Type ty = TC.resolveIdentifierType(DC, repr, TR_AllowUnboundGenerics,
+                                       /*diagnoseErrors*/false, &resolver);
     
     // If we got a fully valid type, then this is a nominal type pattern.
     // FIXME: Only when experimental patterns are enabled for now.

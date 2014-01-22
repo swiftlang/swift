@@ -304,7 +304,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 static llvm::PointerUnion<Type, Module *>
 resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                           ArrayRef<ComponentIdentTypeRepr *> components,
-                          bool allowUnboundGenerics,
+                          TypeResolutionOptions options,
                           bool diagnoseErrors,
                           GenericTypeResolver *resolver) {
   auto &comp = components.back();
@@ -344,7 +344,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           genericArgs = genComp->getGenericArgs();
         Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                     DC, genericArgs,
-                                    allowUnboundGenerics,
+                                    options.contains(TR_AllowUnboundGenerics),
                                     resolver);
         if (type->is<ErrorType>()) {
           comp->setValue(type);
@@ -403,10 +403,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
     } else {
       llvm::PointerUnion<Type, Module *>
-        parent = resolveIdentTypeComponent(TC, DC, parentComps,
-                                           allowUnboundGenerics,
-                                           diagnoseErrors,
-                                           resolver);
+        parent = resolveIdentTypeComponent(TC, DC, parentComps, options,
+                                           diagnoseErrors, resolver);
       // If the last resolved component is a type, perform member type lookup.
       if (parent.is<Type>()) {
         // FIXME: Want the end of the back range.
@@ -564,7 +562,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     genericArgs = genComp->getGenericArgs();
 
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), nullptr,
-                              genericArgs, allowUnboundGenerics,
+                              genericArgs, 
+                              options.contains(TR_AllowUnboundGenerics),
                               resolver);
   comp->setValue(type);
   return type;
@@ -573,7 +572,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 /// \brief Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(DeclContext *DC,
                                         IdentTypeRepr *IdType,
-                                        bool allowUnboundGenerics,
+                                        TypeResolutionOptions options,
                                         bool diagnoseErrors,
                                         GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
@@ -582,10 +581,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
   llvm::PointerUnion<Type, Module *>
-    result = resolveIdentTypeComponent(*this, DC, Components,
-                                       allowUnboundGenerics,
-                                       diagnoseErrors,
-                                       resolver);
+    result = resolveIdentTypeComponent(*this, DC, Components, options, 
+                                       diagnoseErrors, resolver);
   if (auto mod = result.dyn_cast<Module*>()) {
     if (diagnoseErrors)
       diagnose(Components.back()->getIdLoc(),
@@ -701,10 +698,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
-    return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr),
-                                    options.contains(TR_AllowUnboundGenerics),
-                                    /*diagnoseErrors*/ true,
-                                    Resolver);
+    return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
+                                    /*diagnoseErrors*/ true, Resolver);
 
   case TypeReprKind::Function:
     if (!(options & TR_SILType))
