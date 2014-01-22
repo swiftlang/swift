@@ -670,8 +670,8 @@ static void loadAllMembers(const T *container,
                            uint64_t contextData) {
   if (!resolver)
     return;
-  const_cast<T *>(container)->setMembers(resolver->loadAllMembers(contextData),
-                                         {});
+  auto members = resolver->loadAllMembers(container, contextData);
+  const_cast<T *>(container)->setMembers(members, {});
   const_cast<LazyMemberLoader *&>(resolver) = nullptr;
   --NumUnloadedLazyMembers;
 }

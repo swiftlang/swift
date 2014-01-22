@@ -22,6 +22,7 @@
 namespace swift {
 
 class AssociatedTypeDecl;
+class Decl;
 class DeclContext;
 class ExtensionDecl;
 class Identifier;
@@ -93,8 +94,12 @@ class alignas(void*) LazyMemberLoader {
 public:
   virtual ~LazyMemberLoader() = default;
 
-  /// Returns an ASTContext-allocated array containing all member decls.
-  virtual ArrayRef<Decl *> loadAllMembers(uint64_t contextData) = 0;
+  /// Returns an ASTContext-allocated array containing all member decls for
+  /// \p D.
+  ///
+  /// The implementation should \em not call setMembers on \p D.
+  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
+                                          uint64_t contextData) = 0;
 };
 
 }

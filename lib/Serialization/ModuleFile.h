@@ -459,7 +459,8 @@ public:
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 
-  virtual ArrayRef<Decl *> loadAllMembers(uint64_t contextData) override;
+  virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
+                                          uint64_t contextData) override;
 };
 
 } // end namespace swift
