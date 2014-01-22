@@ -144,7 +144,8 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
     // Arguments and undef are free.
     case ValueKind::SILArgument:
     case ValueKind::SILUndef:
-      return InlineCost::Free;
+      llvm_unreachable("Only instructions should be passed into this "
+                       "function.");
     
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
