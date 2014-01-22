@@ -518,6 +518,31 @@ public:
   }
 };
 
+/// FunctionRefInst - Represents a reference to a SIL function.
+class FunctionRefInst : public SILInstruction {
+  SILFunction *Function;
+public:
+  /// Construct a FunctionRefInst.
+  ///
+  /// \param Loc  The location of the reference.
+  /// \param F    The function being referenced.
+  FunctionRefInst(SILLocation Loc, SILFunction *F);
+  ~FunctionRefInst();
+
+  /// Return the referenced function.
+  SILFunction *getReferencedFunction() const { return Function; }
+
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::FunctionRefInst;
+  }
+};
+
 /// BuiltinFunctionRefInst - Represents a reference to a primitive function from
 /// the Builtin module.
 class BuiltinFunctionRefInst : public SILInstruction {
@@ -548,31 +573,6 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::BuiltinFunctionRefInst;
-  }
-};
-  
-/// FunctionRefInst - Represents a reference to a SIL function.
-class FunctionRefInst : public SILInstruction {
-  SILFunction *Function;
-public:
-  /// Construct a FunctionRefInst.
-  ///
-  /// \param Loc  The location of the reference.
-  /// \param F    The function being referenced.
-  FunctionRefInst(SILLocation Loc, SILFunction *F);
-  ~FunctionRefInst();
-
-  /// Return the referenced function.
-  SILFunction *getReferencedFunction() const { return Function; }
-
-  /// getType() is ok since this is known to only have one type.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::FunctionRefInst;
   }
 };
   
