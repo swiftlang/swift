@@ -746,8 +746,20 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
         llvm::outs() << ", ";
     }
     printJobOutputs(InputJobs.get());
-    llvm::outs() << "], output: \"" << Output->getPrimaryOutputFilename()
-                 << "\"\n";
+    llvm::outs() << "], output: {"
+                 << types::getTypeName(Output->getPrimaryOutputType())
+                 << ": \"" << Output->getPrimaryOutputFilename() << '"';
+
+    for (unsigned i = (types::TY_INVALID + 1), e = types::TY_LAST; i != e; ++i){
+      Optional<StringRef> AdditionalOutput =
+        Output->getAdditionalOutputForType((types::ID)i);
+      if (AdditionalOutput.hasValue()) {
+        llvm::outs() << ", " << types::getTypeName((types::ID)i) << ": \""
+                     << AdditionalOutput.getValue() << '"';
+      }
+    }
+
+    llvm::outs() << "}\n";
   }
 
   // 5. Construct a Job which produces the right CommandOutput.
