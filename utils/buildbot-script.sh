@@ -27,7 +27,7 @@ KNOWN_SETTINGS=(
     prefix                      "/usr"           "installation prefix"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
-    skip-build-ios              1                "set to skip building Swift stdlibs for iOS"
+    skip-build-ios              ""               "set to skip building Swift stdlibs for iOS"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
