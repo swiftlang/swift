@@ -419,6 +419,10 @@ public:
   /// \returns True if this type is \c ty or a superclass of \c ty.
   bool isSuperclassOf(Type ty, LazyResolver *resolver);
 
+  /// \brief Determines whether this type is both a subtype of the
+  /// given type and guaranteed to have the same representation.
+  bool isTrivialSubtypeOf(Type other, LazyResolver *resolver);
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();

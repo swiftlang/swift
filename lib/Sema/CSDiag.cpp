@@ -91,11 +91,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << getSecondType().getString();
     break;
 
-  case TypesNotTrivialSubtypes:
-    out << getFirstType().getString() << " is not a trivial subtype of "
-        << getSecondType().getString();
-    break;
-
   case TypesNotEqual:
     out << getFirstType().getString() << " is not equal to "
         << getSecondType().getString();
@@ -544,7 +539,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::TypesNotEqual:
-  case Failure::TypesNotTrivialSubtypes:
   case Failure::TypesNotSubtypes:
   case Failure::TypesNotConvertible:
   case Failure::TypesNotConstructible:

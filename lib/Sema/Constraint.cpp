@@ -46,7 +46,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
-  case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::OperatorConversion:
@@ -152,7 +151,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   switch (Kind) {
   case ConstraintKind::Bind: Out << " := "; break;
   case ConstraintKind::Equal: Out << " == "; break;
-  case ConstraintKind::TrivialSubtype: Out << " <t "; break;
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
   case ConstraintKind::OperatorConversion: Out << " <oc "; break;
@@ -271,7 +269,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
-  case ConstraintKind::TrivialSubtype:
   case ConstraintKind::TypeMember:
   case ConstraintKind::ValueMember:
     constraint->getSecondType()->getTypeVariables(typeVars);

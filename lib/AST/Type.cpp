@@ -1148,6 +1148,50 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   return false;
 }
 
+/// Is t1 not just a subtype of t2, but one such that its values are
+/// trivially convertible to values of the other?
+static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
+  if (t1 == t2) return true;
+
+  // Scalar-to-tuple and tuple-to-tuple.
+  if (auto tuple2 = dyn_cast<TupleType>(t2)) {
+    // We only ever look into singleton tuples on the RHS if we're
+    // certain that the LHS isn't also a singleton tuple.
+    auto tuple1 = dyn_cast<TupleType>(t1);
+    if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
+      if (tuple2->getNumElements() == 1)
+        return isTrivialSubtypeOf(t1, tuple2.getElementType(0), resolver);
+      return false;
+    }
+
+    for (auto i : indices(tuple1.getElementTypes())) {
+      if (!isTrivialSubtypeOf(tuple1.getElementType(i),
+                              tuple2.getElementType(i),
+                              resolver))
+        return false;
+    }
+    return true;
+  }
+
+  // Function-to-function.  (Polymorphic functions?)
+  if (auto fn2 = dyn_cast<FunctionType>(t2)) {
+    auto fn1 = dyn_cast<FunctionType>(t1);
+    if (!fn1 || fn1->getExtInfo() != fn2->getExtInfo())
+      return false;
+    // Inputs are contravariant, results are covariant.
+    return (isTrivialSubtypeOf(fn2.getInput(), fn1.getInput(), resolver) &&
+            isTrivialSubtypeOf(fn1.getResult(), fn2.getResult(), resolver));
+  }
+
+  // Class-to-class.
+  return t2->isSuperclassOf(t1, resolver);
+}
+
+bool TypeBase::isTrivialSubtypeOf(Type other, LazyResolver *resolver) {
+  return ::isTrivialSubtypeOf(getCanonicalType(), other->getCanonicalType(),
+                              resolver);
+}
+
 /// hasAnyDefaultValues - Return true if any of our elements has a default
 /// value.
 bool TupleType::hasAnyDefaultValues() const {

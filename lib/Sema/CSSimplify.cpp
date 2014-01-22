@@ -213,7 +213,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // An @auto_closure function type can be a subtype of a
   // non-@auto_closure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
-    if (func2->isAutoClosure() || kind < TypeMatchKind::TrivialSubtype) {
+    if (func2->isAutoClosure() || kind < TypeMatchKind::Subtype) {
       // Record this failure.
       if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
@@ -243,14 +243,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   switch (kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
-  case TypeMatchKind::TrivialSubtype:
     subKind = kind;
     break;
 
   case TypeMatchKind::Subtype:
-    subKind = TypeMatchKind::TrivialSubtype;
-    break;
-
   case TypeMatchKind::Conversion:
   case TypeMatchKind::OperatorConversion:
     subKind = TypeMatchKind::Subtype;
@@ -293,9 +289,6 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::SameType:
     return Failure::TypesNotEqual;
-
-  case TypeMatchKind::TrivialSubtype:
-    return Failure::TypesNotTrivialSubtypes;
 
   case TypeMatchKind::Subtype:
     return Failure::TypesNotSubtypes;
@@ -430,9 +423,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
-
-  case TypeMatchKind::TrivialSubtype:
-    return ConstraintKind::TrivialSubtype;
 
   case TypeMatchKind::Subtype:
     return ConstraintKind::Subtype;
@@ -636,7 +626,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
 
-    case TypeMatchKind::TrivialSubtype:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
     case TypeMatchKind::OperatorConversion:
@@ -802,7 +791,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  if (concrete && kind >= TypeMatchKind::TrivialSubtype) {
+  if (concrete && kind >= TypeMatchKind::Subtype) {
     auto tuple1 = type1->getAs<TupleType>();
     auto tuple2 = type2->getAs<TupleType>();
 
@@ -1747,7 +1736,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
-  case ConstraintKind::TrivialSubtype: return TypeMatchKind::TrivialSubtype;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
   case ConstraintKind::OperatorConversion:
@@ -1790,7 +1778,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
-  case ConstraintKind::TrivialSubtype:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::OperatorConversion: {

@@ -1147,10 +1147,7 @@ bool TypeChecker::isTrivialSubtypeOf(Type type1, Type type2, DeclContext *dc) {
       type2->is<PolymorphicFunctionType>())
     return false;
 
-  ConstraintSystem cs(*this, dc);
-  cs.addConstraint(ConstraintKind::TrivialSubtype, type1, type2);
-  SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions);
+  return type1->isTrivialSubtypeOf(type2, nullptr);
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
@@ -1177,7 +1174,7 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
-    cs.addConstraint(ConstraintKind::TrivialSubtype, type, superclass);
+    cs.addConstraint(ConstraintKind::Subtype, type, superclass);
   }
   for (auto proto : archetype->getConformsTo()) {
     cs.addConstraint(ConstraintKind::ConformsTo, type,

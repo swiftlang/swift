@@ -321,8 +321,6 @@ public:
     FunctionNoReturnMismatch,
     /// \brief Types are not the same.
     TypesNotEqual,
-    /// \brief Types are not trivial subtypes.
-    TypesNotTrivialSubtypes,
     /// \brief Types are not subtypes.
     TypesNotSubtypes,
     /// \brief Types are not convertible.
@@ -414,7 +412,6 @@ public:
     case TypesNotConvertible:
     case TypesNotEqual:
     case TypesNotSubtypes:
-    case TypesNotTrivialSubtypes:
     case DoesNotConformToProtocol:
     case IsForbiddenLValue:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
@@ -537,9 +534,6 @@ enum class TypeMatchKind : char {
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,
-  /// \brief Require the first type to be a "trivial" subtype of the second
-  /// type or be an exact match.
-  TrivialSubtype,
   /// \brief Require the first type to be a subtype of the second type
   /// (or be an exact match or trivial subtype).
   Subtype,

@@ -411,11 +411,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     break;
 
   case SelfTypeRelationship::Subclass:
-    cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy1, selfTy2);
+    cs.addConstraint(ConstraintKind::Subtype, selfTy1, selfTy2);
     break;
 
   case SelfTypeRelationship::Superclass:
-    cs.addConstraint(ConstraintKind::TrivialSubtype, selfTy2, selfTy1);
+    cs.addConstraint(ConstraintKind::Subtype, selfTy2, selfTy1);
     break;
 
   case SelfTypeRelationship::ConformsTo:

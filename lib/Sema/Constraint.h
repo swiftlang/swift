@@ -50,10 +50,6 @@ enum class ConstraintKind : char {
   /// \brief The two types must be bound to the same type, dropping
   /// lvalueness when comparing a type variable to a type.
   Equal,
-  /// \brief The first type is a "trivial" subtype of the second type,
-  /// meaning that it is a subtype that is also guaranteed to have the same
-  /// in-memory representation.
-  TrivialSubtype,
   /// \brief The first type is a subtype of the second type, i.e., a value
   /// of the type of the first type can be used wherever a value of the
   /// second type is expected.
@@ -288,7 +284,6 @@ public:
     switch (Kind) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
-    case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::OperatorConversion:

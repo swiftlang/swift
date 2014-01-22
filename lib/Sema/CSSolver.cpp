@@ -502,7 +502,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
-    case ConstraintKind::TrivialSubtype:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::OperatorConversion:
@@ -683,8 +682,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     // tuples.
     if (constraint->getKind() == ConstraintKind::OperatorConversion ||
         constraint->getKind() == ConstraintKind::Conversion ||
-        constraint->getKind() == ConstraintKind::Subtype ||
-        constraint->getKind() == ConstraintKind::TrivialSubtype) {
+        constraint->getKind() == ConstraintKind::Subtype) {
       if (auto funcTy = type->getAs<FunctionType>()) {
         if (funcTy->isAutoClosure())
           type = funcTy->getResult();
