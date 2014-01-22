@@ -613,6 +613,10 @@ public:
   ManagedValue emitFunctionRef(SILLocation loc, SILDeclRef constant,
                                SILConstantInfo constantInfo);
 
+  /// Emit the specified VarDecl as an LValue if possible, otherwise return
+  /// null.
+  ManagedValue emitLValueForDecl(SILLocation loc, ConcreteDeclRef declRef);
+  
   /// Emit a reference to the given declaration.
   ///
   /// \param loc The location of the reference.

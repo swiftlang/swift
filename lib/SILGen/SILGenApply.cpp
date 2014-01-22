@@ -911,20 +911,16 @@ public:
       return gen.emitLoadOfLValue(e, lv, SGFContext());
     }
 
-    // If this is a reference to a 'let' value or global, then it is sitting in
-    // memory.
+    // If this is a reference something sitting in memory, then we can use it.
     if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
-      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl()))
-        if (VD->isLet() ||
-            (!VD->getDeclContext()->isLocalContext() &&
-             VD->getStorageKind() == VarDecl::Stored)) {
-              auto Reference =
-                gen.emitReferenceToDecl(e, DRE->getDeclRef(), e->getType(), 0);
-              assert(Reference.isLValue() && "Should have got an lvalue back");
+      if (isa<VarDecl>(DRE->getDecl())) {
+        if (auto Reference = gen.emitLValueForDecl(e, DRE->getDeclRef())) {
+          assert(Reference.isLValue() && "Should have got an lvalue back");
 
-              // Return the lvalue as an rvalue address.
-              return ManagedValue::forUnmanaged(Reference.getValue());
-            }
+          // Return the lvalue as an rvalue address.
+          return ManagedValue::forUnmanaged(Reference.getValue());
+        }
+      }
     }
 
     return gen.emitRValue(e).getAsSingleValue(gen, e);

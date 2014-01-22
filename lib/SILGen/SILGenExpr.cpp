@@ -400,11 +400,67 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
   return ManagedValue::forLValue(addr);
 }
 
+/// Emit the specified declaration as an LValue if possible, otherwise return
+/// null.
+ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc,
+                                               ConcreteDeclRef declRef) {
+  VarDecl *var = dyn_cast<VarDecl>(declRef.getDecl());
+  if (var == 0) return ManagedValue();
+  assert(!declRef.isSpecialized() &&
+         "Cannot handle specialized variable references");
+
+  if (var->isDebuggerVar()) {
+    DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
+    assert (DebugClient && "Debugger variables with no debugger client");
+    SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
+    assert (SILDebugClient && "Debugger client doesn't support SIL");
+    // FIXME: it is pointless to pass an uncurry level to this, it is always
+    // zero for vars.  It is also pointless to pass a type.
+    SILValue SV = SILDebugClient->emitReferenceToDecl(loc, declRef,
+                                                      var->getType(), 0, B);
+    return ManagedValue::forLValue(SV);
+  }
+  
+  // For local decls, use the address we allocated or the value if we have it.
+  auto It = VarLocs.find(var);
+  if (It != VarLocs.end()) {
+    // If this is a mutable lvalue, return it as an LValue.
+    if (It->second.isAddress())
+      return ManagedValue::forLValue(It->second.getAddress());
+    
+    // If this is an address-only 'let', return its address as an lvalue.
+    if (It->second.getConstant().getType().isAddress())
+      return ManagedValue::forLValue(It->second.getConstant());
+    
+    // Otherwise, it is an RValue let.
+    return ManagedValue();
+  }
+  
+  // a getter produces an rvalue.
+  if (var->hasAccessorFunctions())
+    return ManagedValue();
+  
+  // If this is a global variable, invoke its accessor function to get its
+  // address.
+  return emitGlobalVariableRef(*this, loc, var);
+}
+
+
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ConcreteDeclRef declRef,
                                                  Type ncRefType,
                                                  unsigned uncurryLevel) {
+  // If this is an decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
+  if (isa<VarDecl>(decl)) {
+    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel ||
+            uncurryLevel == 0) &&
+           "uncurry level doesn't make sense for vars");
+
+    auto Result = emitLValueForDecl(loc, declRef);
+    if (Result) return Result;
+  }
+  
   if (!ncRefType) ncRefType = decl->getType();
   CanType refType = ncRefType->getCanonicalType();
   
@@ -423,17 +479,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   
   // If this is a reference to a var, produce an address or value.
   if (auto *var = dyn_cast<VarDecl>(decl)) {
-    if (var->isDebuggerVar()) {
-      DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
-      assert (DebugClient && "Debugger variables with no debugger client");
-      SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
-      assert (SILDebugClient && "Debugger client doesn't support SIL");
-      SILValue SV = SILDebugClient->emitReferenceToDecl(loc, declRef,
-                                                        ncRefType,
-                                                        uncurryLevel, B);
-      return ManagedValue::forLValue(SV);
-    }
-
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized variable references");
     assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel ||
@@ -443,29 +488,22 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
     if (It != VarLocs.end()) {
-      // If this is a mutable lvalue, return it as an LValue.
-      if (It->second.isAddress())
-        return ManagedValue::forLValue(It->second.getAddress());
-
-      // If this is an address-only 'let', return its address as an lvalue.
-      if (It->second.getConstant().getType().isAddress())
-        return ManagedValue::forLValue(It->second.getConstant());
+      // Mutable lvalue and address-only 'let's are LValues.
+      assert(!It->second.isAddress() &&
+             !It->second.getConstant().getType().isAddress() &&
+             "LValue cases should be handled above");
 
       // Otherwise, emit it as a +1 value.
       return ManagedValue::forUnmanaged(It->second.getConstant())
                .copyUnmanaged(*this, loc);
     }
 
-    if (var->hasAccessorFunctions()) {
-      // Global properties have no base or subscript.
-      return emitGetAccessor(loc, var,
-                             ArrayRef<Substitution>(), RValueSource(),
-                             RValueSource(), SGFContext());
-    }
-    
-    // If this is a global variable, invoke its accessor function to get its
-    // address.
-    return emitGlobalVariableRef(*this, loc, var);
+    assert(var->hasAccessorFunctions() && "Unknown rvalue case");
+
+    // Global properties have no base or subscript.
+    return emitGetAccessor(loc, var,
+                           ArrayRef<Substitution>(), RValueSource(),
+                           RValueSource(), SGFContext());
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
@@ -2775,7 +2813,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     if (selfDecl->getType()->hasReferenceSemantics())
       self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType());
     else
-      self = SGF.emitReferenceToDecl(loc, selfDecl);
+      self = SGF.emitLValueForDecl(loc, selfDecl);
 
     LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 
@@ -3185,10 +3223,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
-  // We know that self is a box, so emitReferenceToDecl will always return an
-  // lvalue.
-  SILValue selfAddr =
-    SGF.emitReferenceToDecl(E, E->getSelf()).getUnmanagedValue();
+  // We know that self is a box, so get its address.
+  SILValue selfAddr = SGF.emitLValueForDecl(E, E->getSelf()).getLValueAddress();
   newSelf.assignInto(SGF, E, selfAddr);
 
   // If we are using Objective-C allocation, the caller can return

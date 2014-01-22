@@ -480,8 +480,8 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
   case VarDecl::Stored: {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
-    auto address = gen.emitReferenceToDecl(loc, var);
-    assert(address.getType().isAddress() &&
+    auto address = gen.emitLValueForDecl(loc, var);
+    assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add<ValueComponent>(address, typeData);
     break;

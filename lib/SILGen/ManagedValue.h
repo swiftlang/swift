@@ -74,6 +74,13 @@ public:
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
 
+  bool isLValue() const { return valueAndIsLValue.getInt(); }
+
+  SILValue getLValueAddress() const {
+    assert(isLValue() && "This isn't an lvalue");
+    return getValue();
+  }
+  
   SILValue getUnmanagedValue() const {
     assert(!hasCleanup());
     return getValue();
@@ -82,7 +89,6 @@ public:
   
   SILType getType() const { return getValue().getType(); }
   
-  bool isLValue() const { return valueAndIsLValue.getInt(); }
 
   CanType getSwiftType() const {
     return isLValue()
