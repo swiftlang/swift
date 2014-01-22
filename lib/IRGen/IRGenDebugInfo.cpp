@@ -247,13 +247,13 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
                                    SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
-  FullLocation L = getLocation(SM, Loc);
   // In LLVM IR, the function prologue has neither location nor scope.
   if (Loc && Loc->isInPrologue()) return;
 
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   if (!Scope.Verify()) return;
 
+  FullLocation L = getLocation(SM, Loc);
   if (L.LocForLinetable.Filename &&
       L.LocForLinetable.Filename !=
       getLocation(SM, DS->Loc).LocForLinetable.Filename) {
@@ -673,11 +673,6 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   StringRef Name,
                                                   SILInstruction *I,
                                                   IndirectionKind Indirection) {
-  // There are variables without storage, such as "struct { func foo() {} }".
-  if (isa<llvm::UndefValue>(Storage)) {
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    Storage = llvm::ConstantInt::get(Int64Ty, 0);
-  }
   emitVariableDeclaration(B, Storage, Ty, Name,
                           llvm::dwarf::DW_TAG_auto_variable,
                           0, Indirection, RealValue);
@@ -747,6 +742,12 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned ArgNo,
                                              IndirectionKind Indirection,
                                              ArtificialKind Artificial) {
+  // There are variables without storage, such as "struct { func foo() {} }".
+  if (isa<llvm::UndefValue>(Storage)) {
+    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
+    Storage = llvm::ConstantInt::get(Int64Ty, 0);
+  }
+
   // FIXME: enable this assertion.
   //assert(Ty.getDebugScope());
   llvm::DIDescriptor Scope = getOrCreateScope(Ty.getDebugScope());
