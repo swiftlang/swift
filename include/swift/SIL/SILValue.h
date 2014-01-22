@@ -38,6 +38,15 @@ namespace swift {
 #include "swift/SIL/SILNodes.def"
   };
 
+/// Define predicates for determining if a ValueKind is in a specific
+/// VALUE_RANGE.
+#define VALUE_RANGE(Id, FirstId, LastId)                            \
+  static inline bool is##Id(ValueKind Kind) {                       \
+    return unsigned(ValueKind::FirstId) <= unsigned(Kind) &&        \
+      unsigned(Kind) <= unsigned(ValueKind::LastId);                \
+  }
+#include "swift/SIL/SILNodes.def"
+
 /// ValueBase - This is the base class of the SIL value hierarchy, which
 /// represents a runtime computed value.  Things like SILInstruction derive
 /// from this.
