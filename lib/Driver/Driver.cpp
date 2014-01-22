@@ -821,11 +821,11 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                  << ": \"" << Output->getPrimaryOutputFilename() << '"';
 
     for (unsigned i = (types::TY_INVALID + 1), e = types::TY_LAST; i != e; ++i){
-      Optional<StringRef> AdditionalOutput =
+      StringRef AdditionalOutput =
         Output->getAdditionalOutputForType((types::ID)i);
-      if (AdditionalOutput.hasValue()) {
+      if (!AdditionalOutput.empty()) {
         llvm::outs() << ", " << types::getTypeName((types::ID)i) << ": \""
-                     << AdditionalOutput.getValue() << '"';
+                     << AdditionalOutput << '"';
       }
     }
 

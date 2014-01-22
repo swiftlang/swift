@@ -90,7 +90,7 @@ class CommandOutput {
   types::ID PrimaryOutputType;
   std::string PrimaryOutputFilename;
 
-  llvm::DenseMap<types::ID, std::string> AdditionalOutputsMap;
+  llvm::SmallDenseMap<types::ID, std::string, 4> AdditionalOutputsMap;
 
   StringRef BaseInput;
 
@@ -104,10 +104,17 @@ public:
       PrimaryOutputFilename(PrimaryOutputFilename), BaseInput(BaseInput) {}
 
   types::ID getPrimaryOutputType() const { return PrimaryOutputType; }
-  StringRef getPrimaryOutputFilename() const { return PrimaryOutputFilename; }
+
+  // This returns a std::string instead of a StringRef so that users can rely
+  // on the data buffer being null-terminated.
+  const std::string &getPrimaryOutputFilename() const {
+    return PrimaryOutputFilename;
+  }
 
   void setAdditionalOutputForType(types::ID type, StringRef OutputFilename);
-  Optional<StringRef> getAdditionalOutputForType(types::ID type) const;
+  const std::string &getAdditionalOutputForType(types::ID type) const;
+
+  const std::string &getAnyOutputForType(types::ID type) const;
 
   StringRef getBaseInput() const { return BaseInput; }
 };

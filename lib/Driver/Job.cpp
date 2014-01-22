@@ -39,9 +39,12 @@ void CommandOutput::setAdditionalOutputForType(types::ID type,
   AdditionalOutputsMap[type] = OutputFilename;
 }
 
-Optional<StringRef> CommandOutput::getAdditionalOutputForType(types::ID type) const {
+const std::string &
+CommandOutput::getAdditionalOutputForType(types::ID type) const {
   auto iter = AdditionalOutputsMap.find(type);
   if (iter != AdditionalOutputsMap.end())
     return iter->second;
-  return Optional<StringRef>();
+
+  static const std::string empty;
+  return empty;
 }

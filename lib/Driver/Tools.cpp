@@ -158,26 +158,26 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
-  Optional<StringRef> ModuleOutputPath =
+  const std::string &ModuleOutputPath =
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
-  if (ModuleOutputPath.hasValue()) {
+  if (!ModuleOutputPath.empty()) {
     Arguments.push_back("-emit-module");
     Arguments.push_back("-emit-module-path");
-    Arguments.push_back(ModuleOutputPath->data());
+    Arguments.push_back(ModuleOutputPath.c_str());
   }
 
-  Optional<StringRef> SerializedDiagnosticsPath =
+  const std::string &SerializedDiagnosticsPath =
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
-  if (SerializedDiagnosticsPath) {
+  if (!SerializedDiagnosticsPath.empty()) {
     Arguments.push_back("-serialize-diagnostics");
     Arguments.push_back("-serialize-diagnostics-path");
-    Arguments.push_back(SerializedDiagnosticsPath->data());
+    Arguments.push_back(SerializedDiagnosticsPath.c_str());
   }
 
   // Add the output file argument if necessary.
   if (Output->getPrimaryOutputType() != types::TY_Nothing) {
     Arguments.push_back("-o");
-    Arguments.push_back(Output->getPrimaryOutputFilename().data());
+    Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
   }
 
   if (OI.CompilerMode == OutputInfo::Mode::Immediate)
