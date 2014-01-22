@@ -844,7 +844,8 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
   auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, valueAddr,
                                             SGFContext(&emitInto));
-  assert(!result && "didn't emit directly into buffer?"); (void) result;
+  assert(result.isInContext() && "didn't emit directly into buffer?");
+  (void)result;
 }
 
 void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc, 
@@ -861,7 +862,8 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
   TemporaryInitialization emitInto(dest, CleanupHandle::invalid());
   auto result = emitApplyOfLibraryIntrinsic(loc, fn, sub, {},
                                             SGFContext(&emitInto));
-  assert(!result && "didn't emit directly into buffer?"); (void) result;
+  assert(result.isInContext() && "didn't emit directly into buffer?");
+  (void)result;
 }
 
 SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc, 
@@ -1145,10 +1147,10 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
 void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
                                         Initialization *dest) {
   auto skipPeephole = [&]{
-    if (auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest))) {
+    auto loaded = emitLoadOfLValue(loc, src, SGFContext(dest));
+    if (!loaded.isInContext())
       RValue(*this, loc, src.getSubstFormalType(), loaded)
         .forwardInto(*this, dest, loc);
-    }
   };
   
   // If the source is a physical lvalue, the destination is a single address,

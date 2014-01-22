@@ -1467,10 +1467,8 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
     // managedBuffer will be null here to indicate that we satisfied
     // the evalContext.  If so, we're done.
-    if (!managedBuffer) return ManagedValue();
-
-    // Otherwise, if the expected type is address-only, we're done.
-    if (formalResultTL.isAddressOnly())
+    // We are also done if the expected type is address-only.
+    if (managedBuffer.isInContext() || formalResultTL.isAddressOnly())
       return managedBuffer;
 
     // Otherwise, deactivate the cleanup we just entered; we're about
@@ -2382,8 +2380,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(ApplyExpr *e, SGFContext c) {
-  ManagedValue result = prepareApplyExpr(*this, e).apply(c);
-  return (result ? RValue(*this, e, result) : RValue());
+  return RValue(*this, e, prepareApplyExpr(*this, e).apply(c));
 }
 
 ManagedValue

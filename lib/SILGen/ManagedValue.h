@@ -37,20 +37,25 @@ namespace Lowering {
 ///           never have an associated cleanup.
 ///   RValue, isAddress() type: an address-only RValue.
 ///   RValue, !isAddress() type: a loadable RValue.
+///   "InContext": Represented with the lvalue flag set but with no SILValue,
+///                this represents a value that was emitted directly into an
+///                initialization stored by an SGFContext.
 ///
 /// The RValue cases may or may not have a cleanup associated with the value.
 /// A cleanup is associated with +1 values of non-trivial type.
 ///
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
-  /// whether it represents an lvalue.
-  llvm::PointerIntPair<SILValue, 1, bool> valueAndIsLValue;
+  /// whether it represents an lvalue.  InContext is represented with the lvalue
+  /// flag set but with a null SILValue.
+  llvm::PointerIntPair<SILValue, 1, bool> valueAndFlag;
+  
   /// A handle to the cleanup that destroys this value, or
   /// CleanupHandle::invalid() if the value has no cleanup.
   CleanupHandle cleanup;
 
   explicit ManagedValue(SILValue value, bool isLValue, CleanupHandle cleanup)
-    : valueAndIsLValue(value, isLValue), cleanup(cleanup) {
+    : valueAndFlag(value, isLValue), cleanup(cleanup) {
   }
 
 public:
@@ -59,8 +64,7 @@ public:
   
   /// Create a managed value for a +1 rvalue.
   ManagedValue(SILValue value, CleanupHandle cleanup)
-    : valueAndIsLValue(value, false),
-      cleanup(cleanup) {
+    : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified");
   }
 
@@ -76,8 +80,20 @@ public:
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
+  
+  /// Create a managed value that indicates that the value you're looking for
+  /// got stored into an initialization specified by an SGFContext, instead of
+  /// being represented by this ManagedValue.
+  static ManagedValue forInContext() {
+    return ManagedValue(SILValue(), true, CleanupHandle::invalid());
+  }
 
-  bool isLValue() const { return valueAndIsLValue.getInt(); }
+  bool isLValue() const {
+    return valueAndFlag.getInt() && valueAndFlag.getPointer();
+  }
+  bool isInContext() const {
+    return valueAndFlag.getInt() && !valueAndFlag.getPointer();
+  }
 
   SILValue getLValueAddress() const {
     assert(isLValue() && "This isn't an lvalue");
@@ -88,7 +104,7 @@ public:
     assert(!hasCleanup());
     return getValue();
   }
-  SILValue getValue() const { return valueAndIsLValue.getPointer(); }
+  SILValue getValue() const { return valueAndFlag.getPointer(); }
   
   SILType getType() const { return getValue().getType(); }
   
@@ -147,7 +163,8 @@ public:
   void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address);
   
   explicit operator bool() const {
-    return bool(getValue());
+    // "InContext" is not considered false.
+    return bool(getValue()) || valueAndFlag.getInt();
   }
 };
 

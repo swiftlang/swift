@@ -406,11 +406,9 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var) {
 
   if (var->isDebuggerVar()) {
     DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
-    assert (DebugClient && "Debugger variables with no debugger client");
+    assert(DebugClient && "Debugger variables with no debugger client");
     SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
-    assert (SILDebugClient && "Debugger client doesn't support SIL");
-    // FIXME: it is pointless to pass an uncurry level to this, it is always
-    // zero for vars.  It is also pointless to pass a type.
+    assert(SILDebugClient && "Debugger client doesn't support SIL");
     SILValue SV = SILDebugClient->emitLValueForVariable(var, B);
     return ManagedValue::forLValue(SV);
   }
@@ -654,7 +652,6 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(), C);
-  if (!Val) return RValue();
   return RValue(SGF, E, Val);
 }
 
@@ -740,8 +737,7 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   LValue lv = SGF.emitLValue(E->getSubExpr());
-  auto result = SGF.emitLoadOfLValue(E, lv, C);
-  return (result ? RValue(SGF, E, result) : RValue());
+  return RValue(SGF, E, SGF.emitLoadOfLValue(E, lv, C));
 }
 
 SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
@@ -804,13 +800,13 @@ ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
     case Initialization::Kind::LetValue:
       if (I->hasAddress()) {
         I->finishInitialization(*this);
-        return ManagedValue();
+        return ManagedValue::forInContext();
       }
       break;
 
     case Initialization::Kind::SingleBuffer:
       I->finishInitialization(*this);
-      return ManagedValue();
+      return ManagedValue::forInContext();
     }
   }
 
@@ -860,9 +856,9 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                    SGFContext C) {
   SILValue metaBase = visit(E->getSubExpr()).getUnmanagedSingleValue(SGF,
                                                               E->getSubExpr());
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(SGF.B.createUpcast(E, metaBase,
-                                    SGF.getLoweredLoadableType(E->getType()))));
+  auto upcast = SGF.B.createUpcast(E, metaBase,
+                                   SGF.getLoweredLoadableType(E->getType()));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -980,8 +976,8 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     gen.emitExprInto(E->getSubExpr(), init.get());
   }
 
-  auto result = gen.manageBufferForExprResult(existential, existentialTL, C);
-  return (result ? RValue(gen, E, result) : RValue());
+  return RValue(gen, E,
+                gen.manageBufferForExprResult(existential, existentialTL, C));
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
@@ -1150,7 +1146,7 @@ RValue RValueEmitter::visitConditionalCheckedCastExpr(
 
   // Manage the optional buffer.
   auto result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
-  if (!result) return RValue();
+  if (result.isInContext()) return RValue();
 
   if (!resultTL.isAddressOnly()) {
     auto resultValue = SGF.B.createLoad(E, result.forward(SGF));
@@ -1222,7 +1218,7 @@ RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
     SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
                                     ManagedValue::forUnmanaged(isa),
                                     C);
-  return (result ? RValue(SGF, E, result) : RValue());
+  return RValue(SGF, E, result);
 }
 
 RValue RValueEmitter::visitCoerceExpr(CoerceExpr *E, SGFContext C) {
@@ -1366,7 +1362,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
                                              E->getMember().getSubstitutions(),
                                                    E->getType(), C);
-  return res ? RValue(SGF, E, res) : RValue();
+  return RValue(SGF, E, res);
 }
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
@@ -1422,7 +1418,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   ManagedValue MV =
     SGF.emitGetAccessor(E, decl, E->getDecl().getSubstitutions(),
                         std::move(baseRV), std::move(subscriptRV), C);
-  return MV ? RValue(SGF, E, MV) : RValue();
+  return RValue(SGF, E, MV);
 }
 
 
@@ -3240,13 +3236,12 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   // _injectValueIntoOptional anyway, so there's not much point
   // avoiding that.
   auto &optTL = SGF.getTypeLowering(E->getType());
-  SILValue optAddr =
-    SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
+  SILValue optAddr = SGF.getBufferForExprResult(E, optTL.getLoweredType(), C);
 
   SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
 
   ManagedValue result = SGF.manageBufferForExprResult(optAddr, optTL, C);
-  if (!result) return RValue();
+  if (result.isInContext()) return RValue();
 
   // If we're not address-only, the caller will expect a non-address value.
   if (!optTL.isAddressOnly()) {
@@ -3350,8 +3345,8 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
     
     cond.complete(SGF.B);
 
-    auto result = SGF.manageBufferForExprResult(resultAddr, lowering, C);
-    return (result ? RValue(SGF, E, result) : RValue());
+    return RValue(SGF, E,
+                  SGF.manageBufferForExprResult(resultAddr, lowering, C));
   }
 }
 
@@ -3570,7 +3565,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   SGF.B.emitBlock(hasValueBB);
   auto optValue = temp->getManagedAddress();
   auto resultValue = SGF.emitGetOptionalValueFrom(E, optValue, optTL, C);
-  return (resultValue ? RValue(SGF, E, resultValue) : RValue());
+  return RValue(SGF, E, resultValue);
 }
 
 namespace {
@@ -3677,8 +3672,7 @@ RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
 
   ManagedValue V = SGF.emitGetOptionalValueFrom(E, optTemp->getManagedAddress(),
                                                 optTL, C);
-  
-  return V ? RValue(SGF, E, V) : RValue();
+  return RValue(SGF, E, V);
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

@@ -350,9 +350,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   }
 
   // If we're emitting to an address, just manage that.
-  if (outputAddr) {
+  if (outputAddr)
     return SGF.manageBufferForExprResult(outputAddr, outputTL, ctxt);
-  }
 
   // Otherwise, assemble the tuple value and manage that.
   auto outputTuple =

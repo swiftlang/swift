@@ -323,8 +323,14 @@ static unsigned getRValueSize(CanType type) {
 }
 
 RValue::RValue(ArrayRef<ManagedValue> values, CanType type)
-  : values(values.begin(), values.end()), type(type), elementsToBeAdded(0)
-{
+  : values(values.begin(), values.end()), type(type), elementsToBeAdded(0) {
+  if (values.size() == 1 && values[0].isInContext()) {
+    values = ArrayRef<ManagedValue>();
+    type = CanType();
+    elementsToBeAdded = Used;
+    return;
+  }
+    
 }
 
 RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
@@ -332,13 +338,26 @@ RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
   : type(formalType), elementsToBeAdded(0)
 {
   assert(v && "creating r-value with consumed value");
+  
+  if (v.isInContext()) {
+    type = CanType();
+    elementsToBeAdded = Used;
+    return;
+  }
+  
   ExplodeTupleValue(values, gen).visit(type, v, l);
   assert(values.size() == getRValueSize(type));
 }
 
 RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
-  : type(expr->getType()->getCanonicalType()), elementsToBeAdded(0)
-{
+  : type(expr->getType()->getCanonicalType()), elementsToBeAdded(0) {
+    
+  if (v.isInContext()) {
+    type = CanType();
+    elementsToBeAdded = Used;
+    return;
+  }
+    
   assert(v && "creating r-value with consumed value");
   ExplodeTupleValue(values, gen).visit(type, v, expr);
   assert(values.size() == getRValueSize(type));

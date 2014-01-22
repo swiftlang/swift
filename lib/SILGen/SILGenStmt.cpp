@@ -424,7 +424,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
                                ManagedValue::forUnmanaged(nextBuf),
                                optTL,
                                SGFContext(initLoopVars.get()));
-      if (val)
+      if (!val.isInContext())
         RValue(*this, S, valTy, val).forwardInto(*this, initLoopVars.get(), S);
       visit(S->getBody());
     }
