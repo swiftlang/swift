@@ -43,31 +43,51 @@ enum class AbstractionDifference : bool {
 
 /// Function abstraction changes should have been handled in SILGen.
 /// This function checks that SIL function types are call-compatible.
-void checkFunctionsAreCompatible(CanSILFunctionType origTy,
+void checkFunctionsAreCompatible(IRGenModule &IGM,
+                                 CanSILFunctionType origTy,
                                  CanSILFunctionType substTy) {
 #ifndef NDEBUG
+  assert(origTy->getGenericSignature() == substTy->getGenericSignature()
+         && "types have different generic signatures");
+  
+  GenericContextScope scope(IGM, origTy->getGenericSignature());
+  
+  auto getContextType = [&](CanType t) -> CanType {
+    if (t->isDependentType())
+      return IGM.getContextArchetypes().substDependentType(t)
+        ->getCanonicalType();
+    return t;
+  };
+  
   // The result types must either both be reference types with the same
   // convention, or must be equivalent value types.
-  if (origTy->getResult().getType()->hasReferenceSemantics()) {
-    assert(substTy->getResult().getType()->hasReferenceSemantics()
+  auto origResultTy = getContextType(origTy->getInterfaceResult().getType());
+  auto substResultTy = getContextType(substTy->getInterfaceResult().getType());
+  
+  if (origResultTy->hasReferenceSemantics()) {
+    assert(substResultTy->hasReferenceSemantics()
            && "result abstraction difference survived to IRGen");
-    assert(origTy->getResult().getConvention()
-             == substTy->getResult().getConvention()
+    assert(origTy->getInterfaceResult().getConvention()
+             == substTy->getInterfaceResult().getConvention()
            && "result abstraction difference survived to IRGen");
   } else {
     // FIXME: Assert that the substTy is a valid substitution of origTy.
-    //assert(origTy->getResult() == substTy->getResult()
+    //assert(origTy->getInterfaceResult() == substTy->getInterfaceResult()
     //       && "result abstraction difference survived to IRGen");
   }
-  assert(origTy->getParameters().size() == substTy->getParameters().size()
+  assert(origTy->getInterfaceParameters().size()
+           == substTy->getInterfaceParameters().size()
          && "parameter abstraction difference survived to IRGen");
-  for (unsigned i = 0, e = origTy->getParameters().size(); i < e; ++i) {
-    auto &origParam = origTy->getParameters()[i];
-    auto &substParam = substTy->getParameters()[i];
+  for (unsigned i = 0, e = origTy->
+       getInterfaceParameters().size(); i < e; ++i) {
+    auto &origParam = origTy->getInterfaceParameters()[i];
+    auto &substParam = substTy->getInterfaceParameters()[i];
+    auto origParamTy = getContextType(origParam.getType());
+    auto substParamTy = getContextType(substParam.getType());
     // Direct parameters must be both reference types or matching value types.
     if (!origParam.isIndirect()) {
-      if (origParam.getType()->hasReferenceSemantics()) {
-        assert(substParam.getType()->hasReferenceSemantics()
+      if (origParamTy->hasReferenceSemantics()) {
+        assert(substParamTy->hasReferenceSemantics()
                && "parameter abstraction difference survived to IRGen");
         assert(origParam.getConvention() == substParam.getConvention()
                && "parameter abstraction difference survived to IRGen");
@@ -263,7 +283,7 @@ namespace {
     bool visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
       // Function abstraction changes should have been handled in SILGen.
-      checkFunctionsAreCompatible(origTy, substTy);
+      checkFunctionsAreCompatible(IGM, origTy, substTy);
       return false;
     }
 
@@ -558,7 +578,7 @@ namespace {
 
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
-      checkFunctionsAreCompatible(origTy, substTy);
+      checkFunctionsAreCompatible(IGF.IGM, origTy, substTy);
       In.transferInto(Out, 1 + (origTy->isThin() ? 0 : 1));
     }
 
@@ -730,7 +750,7 @@ namespace {
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
       // Function abstraction differences should have been handled by SILGen.
-      checkFunctionsAreCompatible(origTy, substTy);
+      checkFunctionsAreCompatible(IGF.IGM, origTy, substTy);
       In.transferInto(Out, origTy->isThin() ? 1 : 2);
     }
 
