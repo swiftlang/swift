@@ -448,15 +448,10 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc,
 
 ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
                                                  ConcreteDeclRef declRef,
-                                                 Type ncRefType,
-                                                 unsigned uncurryLevel) {
+                                                 Type ncRefType) {
   // If this is an decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   if (isa<VarDecl>(decl)) {
-    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel ||
-            uncurryLevel == 0) &&
-           "uncurry level doesn't make sense for vars");
-
     auto Result = emitLValueForDecl(loc, declRef);
     if (Result) return Result;
   }
@@ -470,9 +465,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
            "Cannot handle specialized type references");
     assert(decl->getType()->is<MetatypeType>() &&
            "type declref does not have metatype type?!");
-    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel
-            || uncurryLevel == 0)
-           && "uncurry level doesn't make sense for types");
     return ManagedValue::forUnmanaged(B.createMetatype(loc,
                                                       getLoweredType(refType)));
   }
@@ -481,9 +473,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized variable references");
-    assert((uncurryLevel == SILDeclRef::ConstructAtNaturalUncurryLevel ||
-            uncurryLevel == 0) &&
-           "uncurry level doesn't make sense for vars");
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
@@ -512,18 +501,15 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // If the referenced decl is a local func with context, then the SILDeclRef
   // uncurry level is one deeper (for the context vars).
   bool hasLocalCaptures = false;
+  unsigned uncurryLevel = 0;
   if (auto *fd = dyn_cast<FuncDecl>(decl)) {
     hasLocalCaptures = fd->getCaptureInfo().hasLocalCaptures();
-    if (hasLocalCaptures &&
-        uncurryLevel != SILDeclRef::ConstructAtNaturalUncurryLevel)
+    if (hasLocalCaptures)
       ++uncurryLevel;
   }
 
   auto silDeclRef = SILDeclRef(decl, uncurryLevel);
   auto constantInfo = getConstantInfo(silDeclRef);
-
-  unsigned uncurryLevelWithoutCaptures =
-    silDeclRef.uncurryLevel - unsigned(hasLocalCaptures);
 
   ManagedValue result = emitFunctionRef(loc, silDeclRef, constantInfo);
 
@@ -535,15 +521,13 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
       cast<AnyFunctionType>(constantInfo.FormalType.getResult());
     origLoweredFormalType =
       AbstractionPattern(
-              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,
-                                                  uncurryLevelWithoutCaptures));
+              SGM.Types.getLoweredASTFunctionType(formalTypeWithoutCaptures,0));
   }
 
   // - the substituted type
   auto substFormalType = cast<AnyFunctionType>(refType);
   auto substLoweredFormalType =
-    SGM.Types.getLoweredASTFunctionType(substFormalType,
-                                        uncurryLevelWithoutCaptures);
+    SGM.Types.getLoweredASTFunctionType(substFormalType, 0);
 
   // If the declaration reference is specialized, create the partial
   // application.
@@ -573,7 +557,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty, SGFContext C){
          "RValueEmitter shouldn't be called on lvalues");
 
   // Emit the reference to the decl.
-  ManagedValue Reference = emitReferenceToDecl(loc, decl, ty, 0);
+  ManagedValue Reference = emitReferenceToDecl(loc, decl, ty);
 
   // If it comes back as an LValue-style RValue, emit a load to get a real
   // RValue.

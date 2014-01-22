@@ -622,12 +622,9 @@ public:
   /// \param loc The location of the reference.
   /// \param declRef The reference, including any substitutions to be applied
   /// \param refType The type of the reference (after substitutions)
-  /// \param uncurryLevel The uncurry level to use for function references.
   ManagedValue emitReferenceToDecl(SILLocation loc,
                                    ConcreteDeclRef declRef,
-                                   Type refType = Type(),
-                                   unsigned uncurryLevel
-                                 = SILDeclRef::ConstructAtNaturalUncurryLevel);
+                                   Type refType = Type());
 
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to
