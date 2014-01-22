@@ -667,18 +667,6 @@ TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   return MetadataTypeDecl;
 }
 
-void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
-                                                  llvm::Value *Storage,
-                                                  DebugTypeInfo Ty,
-                                                  StringRef Name,
-                                                  SILInstruction *I,
-                                                  IndirectionKind Indirection) {
-  emitVariableDeclaration(B, Storage, Ty, Name,
-                          llvm::dwarf::DW_TAG_auto_variable,
-                          0, Indirection, RealValue);
-}
-
-
 void IRGenDebugInfo::
 emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
   auto TName = BumpAllocatedString(("$swift.type."+Name).str());
@@ -692,6 +680,16 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                           // having a shadow copy doesn't add another
                           // layer of indirection.
                           DirectValue, ArtificialValue);
+}
+
+void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
+                                                  llvm::Value *Storage,
+                                                  DebugTypeInfo Ty,
+                                                  StringRef Name,
+                                                  IndirectionKind Indirection) {
+  emitVariableDeclaration(B, Storage, Ty, Name,
+                          llvm::dwarf::DW_TAG_auto_variable,
+                          0, Indirection, RealValue);
 }
 
 
