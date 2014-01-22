@@ -112,9 +112,107 @@ static unsigned instructionInlineCost(SILInstruction &I) {
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
       return 0;
+      
+    // Unchecked casts are free.
+    case ValueKind::AddressToPointerInst:
+    case ValueKind::PointerToAddressInst:
+
+    case ValueKind::ObjectPointerToRefInst:
+    case ValueKind::RefToObjectPointerInst:
     
-    default:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::RefToRawPointerInst:
+    
+    case ValueKind::UpcastExistentialRefInst:
+    case ValueKind::UpcastInst:
+      
+    case ValueKind::ThinToThickFunctionInst:
+    case ValueKind::ConvertFunctionInst:
+      return 0;
+    
+    // Arguments and undef are free.
+    case ValueKind::SILArgument:
+    case ValueKind::SILUndef:
+      return 0;
+    
+    case ValueKind::MetatypeInst:
+      // Thin metatypes are always free.
+      if (I.getType(0).castTo<MetatypeType>()->isThin())
+        return 0;
+      // TODO: Thick metatypes are free if they don't require generic or lazy
+      // instantiation.
       return 1;
+      
+    // TODO
+    case ValueKind::AllocArrayInst:
+    case ValueKind::AllocBoxInst:
+    case ValueKind::AllocRefInst:
+    case ValueKind::AllocStackInst:
+    case ValueKind::ApplyInst:
+    case ValueKind::ArchetypeMetatypeInst:
+    case ValueKind::ArchetypeMethodInst:
+    case ValueKind::ArchetypeRefToSuperInst:
+    case ValueKind::AssignInst:
+    case ValueKind::AutoreleaseReturnInst:
+    case ValueKind::BranchInst:
+    case ValueKind::BridgeToBlockInst:
+    case ValueKind::CheckedCastBranchInst:
+    case ValueKind::ClassMetatypeInst:
+    case ValueKind::ClassMethodInst:
+    case ValueKind::CondBranchInst:
+    case ValueKind::CondFailInst:
+    case ValueKind::CopyAddrInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::DeallocBoxInst:
+    case ValueKind::DeallocRefInst:
+    case ValueKind::DeallocStackInst:
+    case ValueKind::DeinitExistentialInst:
+    case ValueKind::DestroyAddrInst:
+    case ValueKind::DestroyValueInst:
+    case ValueKind::DynamicMethodBranchInst:
+    case ValueKind::DynamicMethodInst:
+    case ValueKind::EnumInst:
+    case ValueKind::IndexAddrInst:
+    case ValueKind::IndexRawPointerInst:
+    case ValueKind::InitEnumDataAddrInst:
+    case ValueKind::InitExistentialInst:
+    case ValueKind::InitExistentialRefInst:
+    case ValueKind::InjectEnumAddrInst:
+    case ValueKind::IsNonnullInst:
+    case ValueKind::LoadInst:
+    case ValueKind::LoadWeakInst:
+    case ValueKind::PartialApplyInst:
+    case ValueKind::PeerMethodInst:
+    case ValueKind::ProjectExistentialInst:
+    case ValueKind::ProjectExistentialRefInst:
+    case ValueKind::ProtocolMetatypeInst:
+    case ValueKind::ProtocolMethodInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::RefToUnownedInst:
+    case ValueKind::ReturnInst:
+    case ValueKind::StoreInst:
+    case ValueKind::StoreWeakInst:
+    case ValueKind::StringLiteralInst:
+    case ValueKind::StrongReleaseInst:
+    case ValueKind::StrongRetainAutoreleasedInst:
+    case ValueKind::StrongRetainInst:
+    case ValueKind::StrongRetainUnownedInst:
+    case ValueKind::SuperMethodInst:
+    case ValueKind::SwitchEnumAddrInst:
+    case ValueKind::SwitchEnumInst:
+    case ValueKind::SwitchIntInst:
+    case ValueKind::TakeEnumDataAddrInst:
+    case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::UnownedReleaseInst:
+    case ValueKind::UnownedRetainInst:
+    case ValueKind::UnownedToRefInst:
+    case ValueKind::UnreachableInst:
+    case ValueKind::UpcastExistentialInst:
+      return 1;
+
+    case ValueKind::MarkFunctionEscapeInst:
+    case ValueKind::MarkUninitializedInst:
+      llvm_unreachable("not valid in canonical sil");
   }
 }
 
