@@ -28,6 +28,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <utility>
 
 namespace swift {
@@ -168,6 +169,65 @@ public:
     }
   }
 
+  /// Flags for efficiently recording certain information about a path.
+  /// All of this information should be re-derivable from the path.
+  ///
+  /// Values are chosen so that an empty path has value 0 and the
+  /// flags for a concatenated paths is simply the bitwise-or of the
+  /// flags of the component paths.
+  enum Flag : unsigned {
+    /// Is this not a simple path?
+    IsNotSimple = 0x1,
+
+    /// Does this path involve a function conversion, i.e. a
+    /// FunctionArgument or FunctionResult node?
+    IsFunctionConversion = 0x2,
+  };
+
+  static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
+    switch (kind) {
+    case AddressOf:
+    case ApplyArgument:
+    case ApplyFunction:
+    case ArrayElementType:
+    case ClosureResult:
+    case ConstructorMember:
+    case ConversionMember:
+    case ConversionResult:
+    case InstanceType:
+    case Load:
+    case LvalueObjectType:
+    case Member:
+    case MemberRefBase:
+    case UnresolvedMember:
+    case ParentType:
+    case RvalueAdjustment:
+    case ScalarToTuple:
+    case SubscriptIndex:
+    case SubscriptMember:
+    case SubscriptResult:
+    case IfThen:
+    case IfElse:
+    case AssignSource:
+    case AssignDest:
+    case NewArrayElement:
+    case NewArrayConstructor:
+      return 0;
+
+    case FunctionArgument:
+    case FunctionResult:
+      return IsFunctionConversion;
+
+    case Archetype:
+    case GenericArgument:
+    case InterpolationArgument:
+    case NamedTupleElement:
+    case TupleElement:
+      return IsNotSimple;
+    }
+    llvm_unreachable("bad path element kind");
+  }
+
   template<unsigned N> struct incomplete;
   
   /// \brief One element in the path of a locator, which can include both
@@ -272,7 +332,19 @@ public:
       assert(getKind() == Archetype && "Not an archetype path element");
       return storage.getPointer().get<ArchetypeType *>();
     }
+
+    /// \brief Return the summary flags for this particular element.
+    unsigned getNewSummaryFlags() const {
+      return getSummaryFlagsForPathElement(getKind());
+    }
   };
+
+  /// Return the summary flags for an entire path.
+  static unsigned getSummaryFlagsForPath(ArrayRef<PathElement> path) {
+    unsigned flags = 0;
+    for (auto &elt : path) flags |= elt.getNewSummaryFlags();
+    return flags;
+  }
 
   /// \brief Retrieve the expression that anchors this locator.
   Expr *getAnchor() const { return anchor; }
@@ -285,51 +357,18 @@ public:
                               numPathElements);
   }
 
+  unsigned getSummaryFlags() const { return summaryFlags; }
+
   /// \brief Determines whether this locator has a "simple" path, without
   /// any transformations that break apart types.
   bool hasSimplePath() const {
-    for (auto elt : getPath()) {
-      switch (elt.getKind()) {
-      case AddressOf:
-      case ApplyArgument:
-      case ApplyFunction:
-      case ArrayElementType:
-      case ClosureResult:
-      case ConstructorMember:
-      case ConversionMember:
-      case ConversionResult:
-      case FunctionArgument:
-      case FunctionResult:
-      case InstanceType:
-      case Load:
-      case LvalueObjectType:
-      case Member:
-      case MemberRefBase:
-      case UnresolvedMember:
-      case ParentType:
-      case RvalueAdjustment:
-      case ScalarToTuple:
-      case SubscriptIndex:
-      case SubscriptMember:
-      case SubscriptResult:
-      case IfThen:
-      case IfElse:
-      case AssignSource:
-      case AssignDest:
-      case NewArrayElement:
-      case NewArrayConstructor:
-        continue;
+    return !(getSummaryFlags() & IsNotSimple);
+  }
 
-      case Archetype:
-      case GenericArgument:
-      case InterpolationArgument:
-      case NamedTupleElement:
-      case TupleElement:
-        return false;
-      }
-    }
-
-    return true;
+  /// \brief Determines whether this locator is part of a function
+  /// conversion.
+  bool isFunctionConversion() const {
+    return (getSummaryFlags() & IsFunctionConversion);
   }
 
   /// \brief Produce a profile of this locator, for use in a folding set.
@@ -350,8 +389,9 @@ public:
 
 private:
   /// \brief Initialize a constraint locator with an anchor and a path.
-  ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path)
-    : anchor(anchor), numPathElements(path.size()) {
+  ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path,
+                    unsigned flags)
+    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags) {
     // FIXME: Alignment.
     std::copy(path.begin(), path.end(),
               reinterpret_cast<PathElement *>(this + 1));
@@ -365,12 +405,13 @@ private:
   /// uniquing via the FoldingSet.
   static ConstraintLocator *create(llvm::BumpPtrAllocator &allocator,
                                    Expr *anchor,
-                                   ArrayRef<PathElement> path) {
+                                   ArrayRef<PathElement> path,
+                                   unsigned flags) {
     // FIXME: Alignment.
     unsigned size = sizeof(ConstraintLocator)
                   + path.size() * sizeof(PathElement);
     void *mem = allocator.Allocate(size, alignof(ConstraintLocator));
-    return new (mem) ConstraintLocator(anchor, path);
+    return new (mem) ConstraintLocator(anchor, path, flags);
   }
 
   /// \brief The expression at which this locator is anchored.
@@ -379,7 +420,10 @@ private:
   /// \brief The number of path elements in this locator.
   ///
   /// The actual path elements are stored after the locator.
-  unsigned numPathElements;
+  unsigned numPathElements : 24;
+
+  /// \brief A set of flags summarizing interesting properties of the path.
+  unsigned summaryFlags : 8;
 
   friend class ConstraintSystem;
 };
@@ -400,27 +444,38 @@ class ConstraintLocatorBuilder {
   /// \brief The current path element, if there is one.
   Optional<LocatorPathElt> element;
 
+  /// \brief The current set of flags.
+  unsigned summaryFlags;
+
   ConstraintLocatorBuilder(llvm::PointerUnion<ConstraintLocator *,
                                               ConstraintLocatorBuilder *>
                              previous,
-                           LocatorPathElt element)
-    : previous(previous), element(element) { }
+                           LocatorPathElt element,
+                           unsigned flags)
+    : previous(previous), element(element), summaryFlags(flags) { }
 
 public:
   ConstraintLocatorBuilder(ConstraintLocator *locator)
-    : previous(locator), element() { }
+    : previous(locator), element(),
+      summaryFlags(locator ? locator->getSummaryFlags() : 0) { }
 
   /// \brief Retrieve a new path with the given path element added to it.
   ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) {
+    unsigned newFlags = summaryFlags | newElt.getNewSummaryFlags();
     if (!element)
-      return ConstraintLocatorBuilder(previous, newElt);
+      return ConstraintLocatorBuilder(previous, newElt, newFlags);
 
-    return ConstraintLocatorBuilder(this, newElt);
+    return ConstraintLocatorBuilder(this, newElt, newFlags);
   }
 
   /// \brief Determine whether this builder has an empty path.
   bool hasEmptyPath() const {
     return !element;
+  }
+
+  /// \brief Return the set of flags that summarize this path.
+  unsigned getSummaryFlags() const {
+    return summaryFlags;
   }
 
   /// \brief Retrieve the base constraint locator, on which this builder's

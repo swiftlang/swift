@@ -1152,8 +1152,7 @@ namespace {
       // Create a tuple containing all of the coerced segments.
       SmallVector<Expr *, 4> segments;
       unsigned index = 0;
-      ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr,
-                                                                      { }));
+      ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
       for (auto segment : expr->getSegments()) {
         segment = coerceToType(segment, type,
                                locatorBuilder.withPathElement(
@@ -1217,7 +1216,7 @@ namespace {
     }
 
     Expr *visitDeclRefExpr(DeclRefExpr *expr) {
-      auto locator = cs.getConstraintLocator(expr, { });
+      auto locator = cs.getConstraintLocator(expr);
 
       // Find the overload choice used for this declaration reference.
       auto selected = getOverloadChoice(locator);
@@ -1299,7 +1298,7 @@ namespace {
                                                      expr->getSubExpr());
       return finishApply(call, expr->getType(),
                          ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr, { })));
+                           cs.getConstraintLocator(expr)));
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
@@ -1308,7 +1307,7 @@ namespace {
 
     Expr *visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
-      auto locator = cs.getConstraintLocator(expr, { });
+      auto locator = cs.getConstraintLocator(expr);
       auto selected = getOverloadChoice(locator);
       auto choice = selected.choice;
       auto decl = choice.getDecl();
@@ -1326,7 +1325,7 @@ namespace {
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
-                            cs.getConstraintLocator(expr, { }),
+                            cs.getConstraintLocator(expr),
                             expr->isImplicit());
     }
 
@@ -1360,7 +1359,7 @@ namespace {
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
-                            cs.getConstraintLocator(expr, { }),
+                            cs.getConstraintLocator(expr),
                             expr->isImplicit());
     }
 
@@ -1377,7 +1376,7 @@ namespace {
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
-                            cs.getConstraintLocator(expr, { }),
+                            cs.getConstraintLocator(expr),
                             expr->isImplicit());
     }
 
@@ -1390,7 +1389,7 @@ namespace {
                                    selected.choice.getDecl(),
                                    expr->getNameLoc(),
                                    selected.openedType,
-                                   cs.getConstraintLocator(expr, { }));
+                                   cs.getConstraintLocator(expr));
     }
 
     Expr *visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
@@ -1417,7 +1416,7 @@ namespace {
                                    expr->getDotLoc(), member, 
                                    expr->getNameLoc(),
                                    selected.openedType,
-                                   cs.getConstraintLocator(expr, { }),
+                                   cs.getConstraintLocator(expr),
                                    expr->isImplicit());
       if (!result)
         return nullptr;
@@ -1426,7 +1425,7 @@ namespace {
       if (auto arg = expr->getArgument()) {
         ApplyExpr *apply = new (tc.Context) CallExpr(result, arg, 
                                                      /*Implicit=*/false);
-        result = finishApply(apply, Type(), cs.getConstraintLocator(expr, { }));
+        result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 
       return result;
@@ -1469,7 +1468,7 @@ namespace {
                                      selected.choice.getDecl(),
                                      expr->getNameLoc(),
                                      selected.openedType,
-                                     cs.getConstraintLocator(expr, { }),
+                                     cs.getConstraintLocator(expr),
                                      expr->isImplicit());
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
@@ -1518,14 +1517,14 @@ namespace {
                                      selected.choice.getDecl(),
                                      expr->getNameLoc(),
                                      selected.openedType,
-                                     cs.getConstraintLocator(expr, { }));
+                                     cs.getConstraintLocator(expr));
 
       case OverloadChoiceKind::TupleIndex: {
         auto base = expr->getBase();
         auto baseTy = base->getType()->getRValueType();
         if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
           base = coerceUncheckedOptionalToValue(base, objTy,
-                                         cs.getConstraintLocator(base, { }));
+                                         cs.getConstraintLocator(base));
           if (!base) return nullptr;
         }
 
@@ -1562,7 +1561,7 @@ namespace {
 
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr));
     }
 
     Expr *visitArrayExpr(ArrayExpr *expr) {
@@ -1642,17 +1641,17 @@ namespace {
 
     Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr));
     }
 
     Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr));
     }
 
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr, { }));
+                            cs.getConstraintLocator(expr));
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
@@ -1661,7 +1660,7 @@ namespace {
       auto baseTy = base->getType()->getRValueType();
       if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
         base = coerceUncheckedOptionalToValue(base, objTy,
-                                              cs.getConstraintLocator(base, { }));
+                                              cs.getConstraintLocator(base));
         if (!base) return nullptr;
         expr->setBase(base);
       }
@@ -1731,7 +1730,7 @@ namespace {
 
       // Convert the subexpression to an array bound.
       auto outerBoundLocator
-        = cs.getConstraintLocator(expr->getBounds()[0].Value,{ });
+        = cs.getConstraintLocator(expr->getBounds()[0].Value);
       auto outerBound = solution.convertToArrayBound(expr->getBounds()[0].Value,
                                                      outerBoundLocator);
       if (!outerBound)
@@ -1842,7 +1841,7 @@ namespace {
       
       auto result = finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr, { })));
+                           cs.getConstraintLocator(expr)));
 
       // See if this application advanced a partial value type application.
       auto foundApplication = ValueTypeMemberApplications.find(
@@ -1874,7 +1873,7 @@ namespace {
       // Convert the condition to a logic value.
       auto cond
         = solution.convertToLogicValue(expr->getCondExpr(),
-                                       cs.getConstraintLocator(expr, { }));
+                                       cs.getConstraintLocator(expr));
       if (!cond)
         return nullptr;
       expr->setCondExpr(cond);
@@ -1882,12 +1881,12 @@ namespace {
       // Coerce the then/else branches to the common type.
       expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
                                      ConstraintLocatorBuilder(
-                                       cs.getConstraintLocator(expr, { }))
+                                       cs.getConstraintLocator(expr))
                                      .withPathElement(
                                        ConstraintLocator::IfThen)));
       expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
                                      ConstraintLocatorBuilder(
-                                       cs.getConstraintLocator(expr, { }))
+                                       cs.getConstraintLocator(expr))
                                      .withPathElement(
                                        ConstraintLocator::IfElse)));
 
@@ -2054,7 +2053,7 @@ namespace {
       if (!optType) return nullptr;
 
       Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
-                                   cs.getConstraintLocator(expr, { }));
+                                   cs.getConstraintLocator(expr));
       if (!subExpr) return nullptr;
 
       // Complain if the sub-expression was converted to T? via the
@@ -2077,7 +2076,7 @@ namespace {
     Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *expr) {
       Type optType = simplifyType(expr->getType());
       Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
-                                   cs.getConstraintLocator(expr, { }));
+                                   cs.getConstraintLocator(expr));
       if (!subExpr) return nullptr;
 
       expr->setSubExpr(subExpr);
@@ -2128,7 +2127,7 @@ namespace {
       } else {
         // Coerce the subexpression to the appropriate optional type.
         subExpr = coerceToType(subExpr, optType,
-                               cs.getConstraintLocator(expr, { }));
+                               cs.getConstraintLocator(expr));
         if (!subExpr) return nullptr;
 
         // Complain if the sub-expression was converted to T? via the
@@ -2169,8 +2168,11 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
 
   // If the locator points to a function application, find the function itself.
   if (locator->getPath().back().getKind() == ConstraintLocator::ApplyArgument) {
+    assert(locator->getPath().back().getNewSummaryFlags() == 0 &&
+           "ApplyArgument adds no flags");
     SmallVector<LocatorPathElt, 4> newPath;
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
+    unsigned newFlags = locator->getSummaryFlags();
 
     // If we have an interpolation argument, dig out the constructor if we
     // can.
@@ -2179,7 +2181,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
         newPath[0].getKind() == ConstraintLocator::InterpolationArgument) {
       newPath.push_back(ConstraintLocator::ConstructorMember);
 
-      locator = cs.getConstraintLocator(locator->getAnchor(), newPath);
+      locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
       auto known = solution.overloadChoices.find(locator);
       if (known != solution.overloadChoices.end()) {
         auto &choice = known->second.choice;
@@ -2190,7 +2192,9 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
     } else {
       newPath.push_back(ConstraintLocator::ApplyFunction);
     }
-    locator = cs.getConstraintLocator(locator->getAnchor(), newPath);
+    assert(newPath.back().getNewSummaryFlags() == 0 &&
+           "added element that changes the flags?");
+    locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
   }
 
   // Simplify the locator.
@@ -2656,7 +2660,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
     auto openedType = selected.openedType->castTo<FunctionType>()->getResult();
     expr = finishApply(apply, openedType,
                        ConstraintLocatorBuilder(
-                         cs.getConstraintLocator(apply, { })));
+                         cs.getConstraintLocator(apply)));
 
     if (!expr)
       return nullptr;
@@ -3393,7 +3397,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     = cs.getTypeOfMemberReference(base->getType(), witness,
                                   /*isTypeReference=*/false,
                                   /*isDynamicResult=*/false);
-  auto locator = cs.getConstraintLocator(base, { });
+  auto locator = cs.getConstraintLocator(base);
 
   // Form the call argument.
   Expr *arg;
@@ -3437,7 +3441,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
   return rewriter.finishApply(apply, openedType,
-                              cs.getConstraintLocator(arg, { }));
+                              cs.getConstraintLocator(arg));
 }
 
 /// \brief Convert an expression via a builtin protocol.

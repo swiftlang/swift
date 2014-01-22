@@ -1664,8 +1664,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   Expr *anchor = locator.getLocatorParts(parts);
   assert(!parts.empty() && "Nonsensical applicable-function locator");
   assert(parts.back().getKind() == ConstraintLocator::ApplyFunction);
+  assert(parts.back().getNewSummaryFlags() == 0);
   parts.pop_back();
-  ConstraintLocatorBuilder outerLocator = getConstraintLocator(anchor, parts);
+  ConstraintLocatorBuilder outerLocator =
+    getConstraintLocator(anchor, parts, locator.getSummaryFlags());
   
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();

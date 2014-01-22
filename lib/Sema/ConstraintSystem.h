@@ -582,18 +582,22 @@ struct SelectedOverload {
 /// Describes an aspect of a solution that affects is overall score, i.e., a
 /// user-defined conversions.
 enum ScoreKind {
+  // These values are used as indices into a Score value.
+
   /// A user-defined conversion.
-  SK_UserConversion = 0,
+  SK_UserConversion,
+  /// A non-trivial function conversion.
+  SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
-  SK_NonDefaultLiteral = 1
+  SK_NonDefaultLiteral
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 2;
+const unsigned NumScoreKinds = 3;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
-  unsigned Data[NumScoreKinds] = { 0, 0 };
+  unsigned Data[NumScoreKinds] = {};
 
   friend Score &operator+=(Score &x, const Score &y) {
     for (unsigned i = 0; i != NumScoreKinds; ++i) {
@@ -1164,13 +1168,21 @@ public:
   /// path, uniqued.
   ConstraintLocator *
   getConstraintLocator(Expr *anchor,
-                       ArrayRef<ConstraintLocator::PathElement> path);
+                       ArrayRef<ConstraintLocator::PathElement> path,
+                       unsigned summaryFlags);
+
+  /// \brief Retrieve the constraint locator for the given anchor and
+  /// an empty path, uniqued.
+  ConstraintLocator *getConstraintLocator(Expr *anchor) {
+    return getConstraintLocator(anchor, {}, 0);
+  }
 
   /// \brief Retrieve the constraint locator for the given anchor and
   /// path element.
   ConstraintLocator *
   getConstraintLocator(Expr *anchor, ConstraintLocator::PathElement pathElt) {
-    return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt));
+    return getConstraintLocator(anchor, llvm::makeArrayRef(pathElt),
+                                pathElt.getNewSummaryFlags());
   }
 
   /// \brief Extend the given constraint locator with a path element.

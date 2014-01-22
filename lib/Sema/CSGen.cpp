@@ -165,7 +165,7 @@ namespace {
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        protocol->getDeclaredType());
@@ -186,7 +186,7 @@ namespace {
 
       // The type of the expression must conform to the
       // StringInterpolationConvertible protocol.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType());
@@ -222,7 +222,7 @@ namespace {
       if (E->getDecl()->isInvalid())
         return nullptr;
 
-      auto locator = CS.getConstraintLocator(E, { });
+      auto locator = CS.getConstraintLocator(E);
 
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
@@ -255,7 +255,7 @@ namespace {
       // Open a member constraint for constructors on the subexpr type.
       auto baseTy = expr->getSubExpr()->getType()->getRValueType();
       auto argsTy = CS.createTypeVariable(
-                      CS.getConstraintLocator(expr, { }),
+                      CS.getConstraintLocator(expr),
                       TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
       auto methodTy = FunctionType::get(argsTy, baseTy);
       CS.addValueMemberConstraint(baseTy,
@@ -276,7 +276,7 @@ namespace {
       // For a reference to an overloaded declaration, we create a type variable
       // that will be equal to different types depending on which overload
       // is selected.
-      auto locator = CS.getConstraintLocator(expr, { });
+      auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
@@ -305,7 +305,7 @@ namespace {
       // For a reference to an overloaded declaration, we create a type variable
       // that will be bound to different types depending on which overload
       // is selected.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
@@ -336,7 +336,7 @@ namespace {
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
       // FIXME: Do we need to note that we're doing some kind of recovery?
-      return CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      return CS.createTypeVariable(CS.getConstraintLocator(expr),
                                    TVO_CanBindToLValue);
     }
     
@@ -509,7 +509,7 @@ namespace {
         return Type();
       }
 
-      auto locator = CS.getConstraintLocator(expr, { });
+      auto locator = CS.getConstraintLocator(expr);
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
 
       // The array must be an array literal type.
@@ -557,7 +557,7 @@ namespace {
         return Type();
       }
 
-      auto locator = CS.getConstraintLocator(expr, { });
+      auto locator = CS.getConstraintLocator(expr);
       auto dictionaryTy = CS.createTypeVariable(locator,
                                                 TVO_PrefersSubtypeBinding);
 
@@ -759,7 +759,7 @@ namespace {
       //     S < @inout(implicit) T
       //
       // where T is a fresh type variable.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       /*options=*/0);
       auto bound = LValueType::get(tv);
       auto result = InOutType::get(tv);
@@ -797,7 +797,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::ConformsTo, outerBound.Value->getType(),
                        arrayBoundProto->getDeclaredType(),
-                       CS.getConstraintLocator(outerBound.Value, { }));
+                       CS.getConstraintLocator(outerBound.Value));
 
       // If we have an explicit constructor, make sure we can call it.
       // Either we have an explicit constructor closure or else ElementType must
@@ -832,7 +832,7 @@ namespace {
 
     Type visitMetatypeExpr(MetatypeExpr *expr) {
       if (auto base = expr->getBase()) {
-        auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+        auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                         /*options=*/0);
         CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
@@ -919,10 +919,10 @@ namespace {
 
       CS.addConstraint(ConstraintKind::ConformsTo, condExpr->getType(),
                        logicValue->getDeclaredType(),
-                       CS.getConstraintLocator(expr, { }));
+                       CS.getConstraintLocator(expr));
 
       // The branches must be convertible to a common type.
-      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                             TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getThenExpr()->getType(), resultTy,
@@ -952,7 +952,7 @@ namespace {
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Create a type variable to describe the result.
-      auto locator = CS.getConstraintLocator(expr, { });
+      auto locator = CS.getConstraintLocator(expr);
       auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
 
       // Form the constraints for the implicit conversion case.
@@ -1000,7 +1000,7 @@ namespace {
       // Add a checked cast constraint.
       auto fromType = expr->getSubExpr()->getType();
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
-                       CS.getConstraintLocator(expr, { }));
+                       CS.getConstraintLocator(expr));
 
       // The result is Bool.
       return CS.getTypeChecker().lookupBoolType(CS.DC);
@@ -1059,7 +1059,7 @@ namespace {
 
     Type visitBindOptionalExpr(BindOptionalExpr *expr) {
       // The operand must be coercible to T?, and we will have type T.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                             /*options*/ 0);
 
       Type optTy = getOptionalType(expr->getQuestionLoc(), valueTy);
@@ -1068,7 +1068,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), optTy,
-                       CS.getConstraintLocator(expr, {}));
+                       CS.getConstraintLocator(expr));
       return valueTy;
     }
     
@@ -1077,7 +1077,7 @@ namespace {
       // like this to be the smallest possible nesting level of
       // optional types, e.g. T? over T??; otherwise we don't really
       // have a preference.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
@@ -1086,7 +1086,7 @@ namespace {
 
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), optTy,
-                       CS.getConstraintLocator(expr, {}));
+                       CS.getConstraintLocator(expr));
       return optTy;
     }
 
@@ -1096,14 +1096,14 @@ namespace {
       //     retrieves the value stored in the optional
       //   - The value is of rvalue type DynamicLookup, and the result is
       //     some class type T.
-      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr, { }),
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding);
 
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
       if (!optTy)
         return Type();
 
-      auto locator = CS.getConstraintLocator(expr, {});
+      auto locator = CS.getConstraintLocator(expr);
       Constraint *downcastConstraints[2] = {
         Constraint::create(CS, ConstraintKind::DynamicLookupValue,
                            expr->getSubExpr()->getType(),

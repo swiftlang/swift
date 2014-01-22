@@ -105,6 +105,13 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   out << ")\n";
 }
 
+/// Given a subpath of an old locator, compute its summary flags.
+static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
+                                      ArrayRef<LocatorPathElt> path) {
+  if (oldLocator->getSummaryFlags() != 0)
+    return ConstraintLocator::getSummaryFlagsForPath(path);
+  return 0;
+}
 
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs,
@@ -129,9 +136,11 @@ constraints::simplifyLocator(ConstraintSystem &cs,
   // If we have a target anchor, build and simplify the target locator.
   if (targetLocator && targetAnchor) {
     SourceRange targetRange1, targetRange2;
+    unsigned targetFlags = recomputeSummaryFlags(locator, targetPath);
     *targetLocator = simplifyLocator(cs,
                                      cs.getConstraintLocator(targetAnchor,
-                                                             targetPath),
+                                                             targetPath,
+                                                             targetFlags),
                                      targetRange1, targetRange2);
   }
 
@@ -141,7 +150,10 @@ constraints::simplifyLocator(ConstraintSystem &cs,
     return locator;
   }
 
-  return cs.getConstraintLocator(anchor, path);
+  // Recompute the summary flags if we had any to begin with.  This is
+  // necessary because we might remove e.g. tuple elements from the path.
+  unsigned summaryFlags = recomputeSummaryFlags(locator, path);
+  return cs.getConstraintLocator(anchor, path, summaryFlags);
 }
 
 void constraints::simplifyLocator(Expr *&anchor,
@@ -350,7 +362,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
              isa<OverloadedMemberRefExpr>(anchor) ||
              isa<UnresolvedDeclRefExpr>(anchor)) {
     // Overloaded and unresolved cases: find the resolved overload.
-    auto anchorLocator = cs.getConstraintLocator(anchor, { });
+    auto anchorLocator = cs.getConstraintLocator(anchor);
     if (auto choice = findOvlChoice(anchorLocator)) {
       // FIXME: DeclViaDynamic
       if (choice->getKind() == OverloadChoiceKind::Decl)

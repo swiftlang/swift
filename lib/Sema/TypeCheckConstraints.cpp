@@ -604,7 +604,7 @@ bool TypeChecker::typeCheckExpression(
   // constraint.
   if (convertType) {
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
-                     cs.getConstraintLocator(expr, { }));
+                     cs.getConstraintLocator(expr));
   }
 
   // Notify the listener that we've built the constraint system.
@@ -664,7 +664,7 @@ bool TypeChecker::typeCheckExpression(
   // do so now.
   if (convertType) {
     result = solution.coerceToType(result, convertType,
-                                   cs.getConstraintLocator(expr, { }));
+                                   cs.getConstraintLocator(expr));
     if (!result) {
       diagnoseExpr(*this, expr, dc, listener);
       return true;
@@ -724,7 +724,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   // constraint.
   if (convertType) {
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
-                     cs.getConstraintLocator(expr, { }));
+                     cs.getConstraintLocator(expr));
   }
 
   if (getLangOpts().DebugConstraintSolver) {
@@ -768,7 +768,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   // do so now.
   if (convertType) {
     result = solution.coerceToType(result, convertType,
-                                   cs.getConstraintLocator(expr, { }));
+                                   cs.getConstraintLocator(expr));
     if (!result) {
       return true;
     }
@@ -802,7 +802,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the locator we're using for the expression.
-      Locator = cs.getConstraintLocator(expr, { });
+      Locator = cs.getConstraintLocator(expr);
 
       // Collect constraints from the pattern.
       auto pattern = Binding->getPattern();
@@ -980,7 +980,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
       cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
                        logicValueProto->getDeclaredType(),
-                       cs.getConstraintLocator(OrigExpr, { }));
+                       cs.getConstraintLocator(OrigExpr));
       return false;
     }
 
@@ -989,8 +989,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
                                   Expr *expr) {
       auto &cs = solution.getConstraintSystem();
       return solution.convertToLogicValue(expr,
-                                          cs.getConstraintLocator(OrigExpr,
-                                                                  { }));
+                                          cs.getConstraintLocator(OrigExpr));
     }
   };
 
@@ -1050,7 +1049,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
 
       cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
                        arrayBoundProto->getDeclaredType(),
-                       cs.getConstraintLocator(OrigExpr, { }));
+                       cs.getConstraintLocator(OrigExpr));
       return false;
     }
 
@@ -1059,8 +1058,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
                                   Expr *expr) {
       auto &cs = solution.getConstraintSystem();
       return solution.convertToArrayBound(expr,
-                                         cs.getConstraintLocator(OrigExpr,
-                                                                 { }));
+                                          cs.getConstraintLocator(OrigExpr));
     }
   };
 
@@ -1269,7 +1267,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
-                   cs.getConstraintLocator(expr, { }));
+                   cs.getConstraintLocator(expr));
 
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
@@ -1303,7 +1301,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
   // Perform the conversion.
   Expr *result = solution.coerceToType(expr, type,
-                                       cs.getConstraintLocator(expr, { }));
+                                       cs.getConstraintLocator(expr));
   if (!result) {
     return true;
   }

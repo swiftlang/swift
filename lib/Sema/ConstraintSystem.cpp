@@ -270,7 +270,10 @@ ArrayRef<Type> ConstraintSystem::getAlternativeLiteralTypes(
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
                      Expr *anchor,
-                     ArrayRef<ConstraintLocator::PathElement> path) {
+                     ArrayRef<ConstraintLocator::PathElement> path,
+                     unsigned summaryFlags) {
+  assert(summaryFlags == ConstraintLocator::getSummaryFlagsForPath(path));
+
   // Check whether a locator with this anchor + path already exists.
   llvm::FoldingSetNodeID id;
   ConstraintLocator::Profile(id, anchor, path);
@@ -280,7 +283,8 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
     return locator;
 
   // Allocate a new locator and add it to the set.
-  locator = ConstraintLocator::create(getAllocator(), anchor, path);
+  locator = ConstraintLocator::create(getAllocator(), anchor, path,
+                                      summaryFlags);
   ConstraintLocators.InsertNode(locator, insertPos);
   return locator;
 }
@@ -298,7 +302,7 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   if (!anchor)
     return nullptr;
 
-  return getConstraintLocator(anchor, path);
+  return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
 bool ConstraintSystem::addConstraint(Constraint *constraint,
