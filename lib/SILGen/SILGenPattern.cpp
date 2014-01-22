@@ -1419,8 +1419,7 @@ public:
         {
           Expr *ME = ep->getMatchExpr();
           FullExpr scope(gen.Cleanups, CleanupLocation(ME));
-          testBool = gen.emitRValue(ME)
-            .getUnmanagedSingleValue(gen, ME);
+          testBool = gen.emitRValue(ME).getUnmanagedSingleValue(gen, ME);
         }
 
         // If the test succeeds, we move on to the next test; otherwise, we

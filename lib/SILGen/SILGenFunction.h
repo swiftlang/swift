@@ -27,26 +27,18 @@ namespace Lowering {
 ///
 /// In general, emission methods which take an SGFContext indicate
 /// that they've initialized the emit-into buffer (if they have) by
-/// returning a null value of whatever type (typically an RValue or
-/// ManagedValue).  Callers who propagate down an SGFContext that
-/// might have a emit-into buffer must be aware of this.
-struct SGFContext {
-private:
-  enum class Kind {
-    Normal,
-  };
-
-private:
-  using State = llvm::PointerIntPair<Initialization *, 2, Kind>;
-  
-  State state;
+/// returning a "isInContext()" ManagedValue of whatever type.  Callers who
+/// propagate down an SGFContext that might have a emit-into buffer must be
+/// aware of this.
+class SGFContext {
+  llvm::PointerIntPair<Initialization *, 1, bool> state;
 public:
   SGFContext() = default;
   
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
   explicit SGFContext(Initialization *emitInto)
-    : state(emitInto, Kind::Normal)
+    : state(emitInto, false)
   {}
   
   /// Returns a pointer to the Initialization that the current expression should
@@ -531,6 +523,10 @@ public:
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
 
+  /// Emit the given expression as an r-value, then (if it is a tuple), combine
+  /// it together into a single ManagedValue.
+  ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());
+  
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
                                       SILValue Length,

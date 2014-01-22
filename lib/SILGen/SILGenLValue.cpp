@@ -454,7 +454,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
-    ManagedValue rv = gen.emitRValue(e).getAsSingleValue(gen, e);
+    ManagedValue rv = gen.emitRValueAsSingleValue(e);
     auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
     lv.add<ValueComponent>(rv, typeData);

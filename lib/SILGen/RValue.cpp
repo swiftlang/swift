@@ -572,7 +572,7 @@ ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen) && {
   }
 
   auto e = std::move(*this).asKnownExpr();
-  return gen.emitRValue(e).getAsSingleValue(gen, e);
+  return gen.emitRValueAsSingleValue(e);
 }
 
 void RValueSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {

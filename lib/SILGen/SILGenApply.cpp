@@ -755,7 +755,7 @@ public:
     auto *t = e->getType()->castTo<AnyFunctionType>();
     bool isTransparent = t->getExtInfo().isAutoClosure();
 
-    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
+    ManagedValue fn = gen.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
     setCallee(Callee::forIndirect(fn, origType, getSubstFnType(), isTransparent,
                                   e));
@@ -772,7 +772,7 @@ public:
       isTransparent = t->getExtInfo().isAutoClosure();
     }
     // TODO: preserve the function pointer at its original abstraction level
-    ManagedValue fn = gen.emitRValue(e).getAsSingleValue(gen, e);
+    ManagedValue fn = gen.emitRValueAsSingleValue(e);
     auto origType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
     setCallee(Callee::forIndirect(fn, origType, getSubstFnType(),
                                   isTransparent, e));
@@ -923,7 +923,7 @@ public:
       }
     }
 
-    return gen.emitRValue(e).getAsSingleValue(gen, e);
+    return gen.emitRValueAsSingleValue(e);
   }
 
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
@@ -945,8 +945,7 @@ public:
         !e->getBase()->getType()->castTo<ProtocolType>()->requiresClass())
       existential = getExistentialOrArchetypeRValueAddress(e->getBase());
     else
-      existential =
-        gen.emitRValue(e->getBase()).getAsSingleValue(gen, e->getBase());
+      existential = gen.emitRValueAsSingleValue(e->getBase());
 
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
@@ -1066,7 +1065,7 @@ public:
   void applySuper(ApplyExpr *apply) {
     // Load the 'super' argument.
     Expr *arg = apply->getArg();
-    ManagedValue super = gen.emitRValue(arg).getAsSingleValue(gen, arg);
+    ManagedValue super = gen.emitRValueAsSingleValue(arg);
 
     // The callee for a super call has to be either a method or constructor.
     Expr *fn = apply->getFn();
@@ -1128,7 +1127,7 @@ public:
 
     // Load the 'self' argument.
     Expr *arg = expr->getArg();
-    ManagedValue self = gen.emitRValue(arg).getAsSingleValue(gen, arg);
+    ManagedValue self = gen.emitRValueAsSingleValue(arg);
 
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
@@ -1235,10 +1234,9 @@ public:
 
     // We found it. Emit the base.
     ManagedValue existential =
-      gen.emitRValue(dynamicMemberRef->getBase())
-        .getAsSingleValue(gen, dynamicMemberRef->getBase());
+      gen.emitRValueAsSingleValue(dynamicMemberRef->getBase());
 
-    assert(fd->isObjC() && "Dynamic member references require [objc]");
+    assert(fd->isObjC() && "Dynamic member references require @objc");
     SILValue val;
     if (fd->isInstanceMember()) {
       assert(fd->isInstanceMember() && "Non-instance dynamic member reference");
@@ -2605,8 +2603,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
 RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                                 SGFContext c) {
   // Emit the operand.
-  ManagedValue existential = emitRValue(e->getBase(), c)
-                               .getAsSingleValue(*this, e->getBase());
+  ManagedValue existential = emitRValueAsSingleValue(e->getBase(), c);
 
   SILValue operand = existential.getValue();
   if (e->getMember().getDecl()->isInstanceMember()) {
@@ -2700,8 +2697,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, 
                                                 SGFContext c) {
   // Emit the base operand.
-  ManagedValue existential = emitRValue(e->getBase(), c)
-                               .getAsSingleValue(*this, e->getBase());
+  ManagedValue existential = emitRValueAsSingleValue(e->getBase(), c);
 
   SILValue base = existential.getValue();
   base = B.createProjectExistentialRef(e, base, 

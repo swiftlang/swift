@@ -921,8 +921,7 @@ namespace {
 }
 
 static RValue emitClassBoundErasure(SILGenFunction &gen, ErasureExpr *E) {
-  ManagedValue sub = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen,
-                                                              E->getSubExpr());
+  ManagedValue sub = gen.emitRValueAsSingleValue(E->getSubExpr());
   SILType resultTy = gen.getLoweredLoadableType(E->getType());
   
   SILValue v;
@@ -956,8 +955,7 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
     // If the source value is already of a protocol type, we can use
     // upcast_existential to steal its already-initialized witness tables and
     // concrete value.
-    ManagedValue subExistential
-      = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen, E->getSubExpr());
+    ManagedValue subExistential = gen.emitRValueAsSingleValue(E->getSubExpr());
 
     IsTake_t isTake = IsTake_t(subExistential.hasCleanup());
 
@@ -1357,8 +1355,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
 
 
   // Evaluate the base of the member reference.
-  ManagedValue base = SGF.emitRValue(E->getBase())
-    .getAsSingleValue(SGF, E->getBase());
+  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase());
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
                                              E->getMember().getSubstitutions(),
                                                    E->getType(), C);
@@ -1408,8 +1405,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   auto decl = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   // Emit the base.
-  ManagedValue base =
-     SGF.emitRValue(E->getBase()).getAsSingleValue(SGF, E);
+  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase());
   RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, decl->getGetter());
 
   // Emit the indices.
@@ -1546,8 +1542,7 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     gen.emitExprInto(E->getSubExpr(), scalarInit);
   } else {
     // Otherwise, create the vararg and store it to the vararg field.
-    ManagedValue scalar = gen.emitRValue(E->getSubExpr()).getAsSingleValue(gen,
-                                                              E->getSubExpr());
+    ManagedValue scalar = gen.emitRValueAsSingleValue(E->getSubExpr());
     ManagedValue varargs = emitVarargs(gen, E, E->getSubExpr()->getType(),
                                        scalar,E->getVarargsInjectionFunction());
     varargs.forwardInto(gen, E, scalarInit->getAddress());
@@ -3696,3 +3691,11 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
   return RValueEmitter(*this).visit(E, C);
 }
+
+/// Emit the given expression as an r-value, then (if it is a tuple), combine
+/// it together into a single ManagedValue.
+ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
+  return emitRValue(E, C).getAsSingleValue(*this, E);
+}
+
+
