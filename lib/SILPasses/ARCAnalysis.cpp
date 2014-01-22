@@ -70,10 +70,8 @@ bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
 
-/// Can Inst use Target in a manner that requires Target to be alive at Inst?
-bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
-  // Handle early instructions that we know can not use reference
-  // counted values in a manner that requires the values to be alive.
+/// Returns true if Inst is a function that we know never uses ref count values.
+static bool canInstUseRefCountValues(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case ValueKind::FunctionRefInst:
@@ -98,11 +96,19 @@ bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
   case ValueKind::DebugValueInst:
   case ValueKind::DebugValueAddrInst:
     return true;
+
   default:
-    break;
+    return false;
   }
+}
+
+/// Can Inst use Target in a manner that requires Target to be alive at Inst?
+bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
+  // If Inst is an instruction that we know can never use values with reference
+  // semantics, return true.
+  if (canInstUseRefCountValues(Inst))
+    return true;
 
   // Otherwise, assume that Inst can use Target.
   return false;
 }
-
