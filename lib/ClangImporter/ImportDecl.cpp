@@ -3340,40 +3340,44 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
 
+  SmallVector<Decl *, 4> members;
+  SwiftDeclConverter converter(*this);
+
   const DeclContext *DC;
   ArrayRef<ProtocolDecl *> protos;
-  if (auto someClass = dyn_cast<NominalTypeDecl>(D)) {
-    DC = someClass;
-    protos = someClass->getProtocols();
+
+  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+    auto swiftClass = cast<ClassDecl>(D);
+    protos = swiftClass->getProtocols();
+    DC = swiftClass;
+
+    clangDecl = clangClass = clangClass->getDefinition();
+
+    if (clangClass->getName() != "Protocol") {
+      converter.importInheritedConstructors(clangClass,
+                                            const_cast<DeclContext *>(DC),
+                                            members);
+    }
+
+  } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
+    DC = cast<ProtocolDecl>(D);
+    clangDecl = clangProto->getDefinition();
+
   } else {
     auto extension = cast<ExtensionDecl>(D);
     DC = extension;
     protos = extension->getProtocols();
   }
 
-  // Import each of the members.
-  SmallVector<Decl *, 4> members;
-  SwiftDeclConverter converter(*this);
-
   converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
                               members);
 
-  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
-    if (clangClass->getName() != "Protocol") {
-      converter.importInheritedConstructors(clangClass,
-                                            const_cast<DeclContext *>(DC),
-                                            members);
-    }
-  }
-
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
-  // FIXME: This is a short-term hack.
-  if (!isa<ProtocolDecl>(D)) {
-    converter.importMirroredProtocolMembers(clangDecl,
-                                            const_cast<DeclContext *>(DC),
-                                            protos, members, SwiftContext);
-  }
+  // FIXME: This is supposed to be a short-term hack.
+  converter.importMirroredProtocolMembers(clangDecl,
+                                          const_cast<DeclContext *>(DC),
+                                          protos, members, SwiftContext);
 
   return SwiftContext.AllocateCopy(members);
 }
