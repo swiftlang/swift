@@ -209,33 +209,6 @@ static void insertOperatorDecl(NameBinder &Binder,
   Operators[OpDecl->getName()] = { OpDecl, true };
 }
 
-namespace {
-  /// \brief AST mutation listener that captures any added declarations and
-  /// types, then adds them to the list of used externals.
-  class CaptureExternalsListener : public ASTMutationListener {
-    ASTContext &Ctx;
-
-    CaptureExternalsListener(const CaptureExternalsListener &) = delete;
-
-    CaptureExternalsListener &
-    operator=(const CaptureExternalsListener &) = delete;
-
-  public:
-    explicit CaptureExternalsListener(ASTContext &ctx) : Ctx(ctx) {
-      Ctx.addMutationListener(*this);
-    }
-
-    ~CaptureExternalsListener() {
-      Ctx.removeMutationListener(*this);
-    }
-
-    /// \brief A new declaration was added to the AST.
-    virtual void addedExternalDecl(Decl *decl) {
-      Ctx.ExternalDefinitions.insert(decl);
-    }
-};
-}
-
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
@@ -250,8 +223,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
     return;
   }
 
-  CaptureExternalsListener Capture(SF.getASTContext());
-  
   // Reset the name lookup cache so we find new decls.
   // FIXME: This is inefficient.
   SF.clearLookupCache();

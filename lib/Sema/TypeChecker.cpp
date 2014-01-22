@@ -67,7 +67,6 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
 
 void TypeChecker::addedExternalDecl(Decl *decl) {
   handleExternalDecl(decl);
-  Context.ExternalDefinitions.insert(decl);
 }
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
@@ -481,6 +480,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   
   TypeChecker TC(SF.getASTContext());
   auto &DefinedFunctions = TC.definedFunctions;
+  size_t existingExternalDecls = TC.Context.ExternalDefinitions.size();
 
   // Lookup the swift module.  This ensures that we record all known protocols
   // in the AST.
@@ -698,8 +698,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       }
        if (isa<StructDecl>(decl) || isa<ClassDecl>(decl) ||
            isa<EnumDecl>(decl) || isa<ProtocolDecl>(decl)) {
-         // Type decls should already be typed by the ClangImporter and don't
-         // need additional typechecking.
+         if (currentExternalDef < existingExternalDecls)
+           TC.handleExternalDecl(decl);
          continue;
       }
       llvm_unreachable("Unhandled external definition kind");

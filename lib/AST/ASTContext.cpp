@@ -641,6 +641,7 @@ void ASTContext::removeMutationListener(ASTMutationListener &listener) {
 void ASTContext::addedExternalDecl(Decl *decl) {
   for (auto listener : Impl.MutationListeners)
     listener->addedExternalDecl(decl);
+  ExternalDefinitions.insert(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
