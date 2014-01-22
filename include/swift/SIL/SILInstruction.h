@@ -530,10 +530,6 @@ public:
   LiteralInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList=nullptr,
               SILDebugScope *DS = nullptr)
     : SILInstruction(Kind, Loc, TypeList, DS) {}
-
-  
-  /// All conversion instructions return a single result.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
   
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_LiteralInst &&
