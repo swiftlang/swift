@@ -21,11 +21,11 @@ int Ack(int M, int N) {
 }
 
 int main(int argc, char *argv[]) {
-    // Only time Ack not buffering or c++ or anything like that.
-    uint64_t start = mach_absolute_time();
-    Ack(3, 13);
-    uint64_t end = mach_absolute_time() - start;
+  // Only time Ack not buffering or c++ or anything like that.
+  uint64_t start = mach_absolute_time();
+  volatile int result = Ack(3, 13);
+  uint64_t end = mach_absolute_time() - start;
 
-    printf("%llu nanoseconds.\n", end);
-    return(0);
+  printf("%llu nanoseconds.\n", end);
+  return result;
 }
