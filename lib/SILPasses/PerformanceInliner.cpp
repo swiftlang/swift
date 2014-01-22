@@ -106,6 +106,13 @@ static unsigned instructionInlineCost(SILInstruction &I) {
           Op->hasOneUse())
         return 0;
     }
+    // Aggregates are exploded at the IR level; these are effectively no-ops.
+    case ValueKind::TupleInst:
+    case ValueKind::StructInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
+      return 0;
+    
     default:
       return 1;
   }
@@ -127,7 +134,8 @@ static unsigned getFunctionCost(SILFunction *F) {
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
       if (Cost > InlineCostThreshold) {
-        DEBUG(llvm::dbgs() << "  Cost too high.\n");
+        DEBUG(llvm::dbgs() << "  Cost too high: " << Cost
+                           << ". Threshold is " << InlineCostThreshold << ".\n");
         return Cost;
       }
     }
