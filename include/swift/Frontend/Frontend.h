@@ -148,13 +148,6 @@ public:
     return FrontendOpts.SerializedDiagnosticsPath;
   }
 
-  void setModuleSourceListPath(StringRef Path) {
-    FrontendOpts.ModuleSourceListPath = Path;
-  }
-  StringRef getModuleSourceListPath() const {
-    return FrontendOpts.ModuleSourceListPath;
-  }
-
   LangOptions &getLangOptions() {
     return LangOpts;
   }

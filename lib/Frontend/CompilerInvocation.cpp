@@ -111,10 +111,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ParseStdlib = true;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_module_source_list)) {
-    Opts.ModuleSourceListPath = A->getValue();
-  }
-
   if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
     for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
       Opts.ImmediateArgv.push_back(A->getValue(i));

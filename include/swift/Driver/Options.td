@@ -128,12 +128,6 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
 def module_cache_path_EQ : Joined<["-"], "module-cache-path=">,
   Flags<[DriverOption, FrontendOption]>, Alias<module_cache_path>;
 
-def module_source_list : Separate<["-"], "module-source-list">,
-  Flags<[FrontendOption]>,
-  HelpText<"Provide a list of all source files in the module">;
-def module_source_list_EQ : Joined<["-"], "module-source-list=">,
-  Flags<[FrontendOption]>, Alias<module_source_list>;
-
 def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
