@@ -446,15 +446,14 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc,
 }
 
 
-ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
-                                                 ConcreteDeclRef declRef,
-                                                 Type ncRefType) {
+ManagedValue SILGenFunction::
+emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
+                  SGFContext C) {
+  assert(!ncRefType->is<LValueType>() &&
+         "RValueEmitter shouldn't be called on lvalues");
+
   // If this is an decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
-  if (isa<VarDecl>(decl)) {
-    auto Result = emitLValueForDecl(loc, declRef);
-    if (Result) return Result;
-  }
   
   if (!ncRefType) ncRefType = decl->getType();
   CanType refType = ncRefType->getCanonicalType();
@@ -473,6 +472,13 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     assert(!declRef.isSpecialized() &&
            "Cannot handle specialized variable references");
+
+    // If this VarDecl is represented as an address, emit it as an lvalue, then
+    // perform a load to get the rvalue.
+    if (auto Result = emitLValueForDecl(loc, declRef)) {
+      return emitLoad(loc, Result.getLValueAddress(),
+                      getTypeLowering(refType), C, IsNotTake);
+    }
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
@@ -549,22 +555,6 @@ ManagedValue SILGenFunction::emitReferenceToDecl(SILLocation loc,
   // Generalize if necessary.
   return emitGeneralizedFunctionValue(loc, result, origLoweredFormalType,
                                       substLoweredFormalType);
-}
-
-ManagedValue SILGenFunction::
-emitRValueForDecl(SILLocation loc, ConcreteDeclRef decl, Type ty, SGFContext C){
-  assert(!ty->is<LValueType>() &&
-         "RValueEmitter shouldn't be called on lvalues");
-
-  // Emit the reference to the decl.
-  ManagedValue Reference = emitReferenceToDecl(loc, decl, ty);
-
-  // If it comes back as an LValue-style RValue, emit a load to get a real
-  // RValue.
-  if (Reference.isLValue())
-    Reference = emitLoad(loc, Reference.getUnmanagedValue(),
-                         getTypeLowering(ty), C, IsNotTake);
-  return Reference;
 }
 
 static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {

@@ -617,15 +617,6 @@ public:
   /// null.
   ManagedValue emitLValueForDecl(SILLocation loc, ConcreteDeclRef declRef);
   
-  /// Emit a reference to the given declaration.
-  ///
-  /// \param loc The location of the reference.
-  /// \param declRef The reference, including any substitutions to be applied
-  /// \param refType The type of the reference (after substitutions)
-  ManagedValue emitReferenceToDecl(SILLocation loc,
-                                   ConcreteDeclRef declRef,
-                                   Type refType = Type());
-
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to
   /// emit into the specified SGFContext to avoid copies (when provided).
