@@ -27,8 +27,10 @@ using namespace swift;
 SILWitnessTable *SILWitnessTable::create(SILModule &M,
                                      NormalProtocolConformance *Conformance,
                                      ArrayRef<SILWitnessTable::Entry> entries) {
-  void *buf = M.allocate(sizeof(SILWitnessTable)
-                           + sizeof(Entry) * (entries.size()-1),
+  // FIXME: Is it valid to get an empty array ?
+  size_t AdditionalEntriesSize =
+    entries.empty() ? 0 : sizeof(Entry) * (entries.size()-1);
+  void *buf = M.allocate(sizeof(SILWitnessTable) + AdditionalEntriesSize,
                          alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(Conformance, entries);
   M.witnessTables.push_back(wt);
