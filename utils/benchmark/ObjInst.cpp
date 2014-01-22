@@ -1,3 +1,11 @@
+
+#include <cstdio>
+#include <cstdint>
+
+extern "C" {
+#include <mach/mach_time.h>
+}
+
 class Toggle {
 public:
   bool state = true;
@@ -35,6 +43,9 @@ public:
 };
 
 int main() {
+
+  uint64_t start = mach_absolute_time();
+
   int n = 100000000;
 
   Toggle *toggle1 = new Toggle(true);
@@ -57,5 +68,10 @@ int main() {
     NthToggle *toggle = new NthToggle(true, 3);
     delete toggle;
   }
-  return(0);
+
+  uint64_t end = mach_absolute_time() - start;
+
+  printf("%llu nanoseconds.\n", end);
+
+  return 0;
 }
