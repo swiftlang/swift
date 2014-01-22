@@ -778,7 +778,7 @@ namespace {
     }
   };
 
-  /// A type lowering for [unowned] types.
+  /// A type lowering for @unowned types.
   class UnownedTypeLowering final : public LeafLoadableTypeLowering {
   public:
     UnownedTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
@@ -879,7 +879,7 @@ namespace {
       return new (TC, Dependent) AddressOnlyTypeLowering(silType);
     }
 
-    /// [unowned] is basically like a reference type lowering except
+    /// @unowned is basically like a reference type lowering except
     /// it manipulates unowned reference counts instead of strong.
     const TypeLowering *visitUnownedStorageType(CanUnownedStorageType type) {
       return new (TC, Dependent) UnownedTypeLowering(
@@ -1925,10 +1925,10 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   // types.  So, basically, we just need to undo the changes made by
   // getTypeOfReference and then reapply them on the substituted type.
 
-  // The only really significant manipulation there is with [weak] and
-  // [unowned].
+  // The only really significant manipulation there is with @weak and
+  // @unowned.
   if (auto refType = dyn_cast<ReferenceStorageType>(origType)) {
-    // Strip Optional<> off of [weak] types.
+    // Strip Optional<> off of @weak types.
     if (isa<WeakStorageType>(refType))
       substType = cast<BoundGenericType>(substType).getGenericArgs()[0];
     substType = CanType(ReferenceStorageType::get(substType,

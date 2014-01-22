@@ -1130,7 +1130,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// UnownedToRefInst - Given a value of an [unowned] type,
+/// UnownedToRefInst - Given a value of an @unowned type,
 /// convert it to the underlying reference type.
 ///
 /// This does nothing at runtime; it just changes the formal type.
@@ -1834,7 +1834,7 @@ public:
 /// StrongRetainUnownedInst - Increase the strong reference count of an object
 /// and assert that it has not been deallocated.
 ///
-/// The operand must be an [unowned] type.
+/// The operand must be an @unowned type.
 class StrongRetainUnownedInst :
     public UnaryInstructionBase<ValueKind::StrongRetainUnownedInst,
                                 RefCountingInst, /*HAS_RESULT*/ false>

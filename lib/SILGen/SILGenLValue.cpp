@@ -907,14 +907,14 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
                                          IsTake_t isTake) {
   SILType storageType = src.getType();
 
-  // For [weak] types, we need to create an Optional<T>.
+  // For @weak types, we need to create an Optional<T>.
   // Optional<T> is currently loadable, but it probably won't be forever.
   if (storageType.is<WeakStorageType>()) {
     auto refValue = gen.B.createLoadWeak(loc, src, isTake);
     return emitRefToOptional(gen, loc, refValue, valueTL);
   }
 
-  // For [unowned] types, we need to strip the unowned box.
+  // For @unowned types, we need to strip the unowned box.
   if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
     auto unownedValue = gen.B.createLoad(loc, src);
     gen.B.createStrongRetainUnowned(loc, unownedValue);
@@ -937,7 +937,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
                                       IsInitialization_t isInit) {
   auto storageType = dest.getType();
 
-  // For [weak] types, we need to break down an Optional<T> and then
+  // For @weak types, we need to break down an Optional<T> and then
   // emit the storeWeak ourselves.
   if (auto weakType = storageType.getAs<WeakStorageType>()) {
     auto refType = SILType::getPrimitiveObjectType(weakType.getReferentType());
@@ -1041,9 +1041,9 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     return semanticValue;
   }
   
-  // [weak] types are never loadable, so we don't need to handle them here.
+  // @weak types are never loadable, so we don't need to handle them here.
   
-  // For [unowned] types, place into an unowned box.
+  // For @unowned types, place into an unowned box.
   if (storageType.is<UnownedStorageType>()) {
     SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
     B.createUnownedRetain(loc, unowned);

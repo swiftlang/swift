@@ -2037,7 +2037,7 @@ namespace {
     assert(args.size() == 1 && "load should have a single argument");
     
     // The substitution gives the type of the load.  This is always a
-    // first-class type; there is no way to e.g. produce a [weak] load
+    // first-class type; there is no way to e.g. produce a @weak load
     // with this builtin.
     auto &rvalueTL = gen.getTypeLowering(substitutions[0].Replacement);
     SILType loadedType = rvalueTL.getLoweredType();
