@@ -147,7 +147,10 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_O_Group);
   
   // Set the SDK for the frontend.
-  Args.AddLastArg(Arguments, options::OPT_sdk);
+  if (!OI.SDKPath.empty()) {
+    Arguments.push_back("-sdk");
+    Arguments.push_back(Args.MakeArgString(OI.SDKPath));
+  }
 
   // Pass through the values passed to -Xfrontend.
   Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);

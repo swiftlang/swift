@@ -390,6 +390,23 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       OI.ModuleName = "__bad__";
     }
   }
+
+  {
+    if (const Arg *A = Args.getLastArg(options::OPT_sdk)) {
+      OI.SDKPath = A->getValue();
+    } else {
+      const char *SDKROOT = getenv("SDKROOT");
+      if (SDKROOT)
+        OI.SDKPath = SDKROOT;
+    }
+
+    if (!OI.SDKPath.empty()) {
+      if (!llvm::sys::fs::exists(OI.SDKPath)) {
+        // TODO: emit diagnostic
+        llvm::errs() << "warning: no such SDK: '" << OI.SDKPath << "'\n";
+      }
+    }
+  }
 }
 
 void Driver::buildActions(const ToolChain &TC,

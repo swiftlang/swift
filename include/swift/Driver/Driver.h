@@ -82,6 +82,10 @@ public:
 
   /// The name of the module which we are building.
   std::string ModuleName;
+
+  /// The path to the SDK against which to build.
+  /// (If empty, this implies no SDK.)
+  std::string SDKPath;
 };
 
 class Driver {
