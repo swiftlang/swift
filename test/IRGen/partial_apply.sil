@@ -110,7 +110,7 @@ entry(%c : $ObjCClass):
 // CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(initFamily)", align 8
-// CHECK:   call %CSo9ObjCClass* bitcast (void ()* @objc_msgSend to %CSo9ObjCClass* (%CSo9ObjCClass*, i8*)*)(%CSo9ObjCClass* [[SELF]], i8* [[CMD]])
+// CHECK:   call i8* bitcast (void ()* @objc_msgSend to i8* (%CSo9ObjCClass*, i8*)*)(%CSo9ObjCClass* [[SELF]], i8* [[CMD]])
 // CHECK:   ret void
 // CHECK: }
 
