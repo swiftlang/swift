@@ -2488,11 +2488,11 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   }
 
   // Create the constructor.
-  auto constructorID = context.getIdentifier("init");
+  auto constructorID = context.Id_init;
   VarDecl *selfDecl
     = new (context) VarDecl(/*static*/ false,
                             /*IsLet*/isa<ClassDecl>(decl),
-                            Loc, context.SelfIdentifier, Type(), decl);
+                            Loc, context.Id_self, Type(), decl);
   selfDecl->setImplicit();
   ConstructorDecl *ctor
     = new (context) ConstructorDecl(constructorID, Loc,
@@ -2592,12 +2592,12 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
 
   VarDecl *SelfDecl =
     new (Context) VarDecl(/*static*/ false, /*IsLet*/true, SourceLoc(),
-                          Context.SelfIdentifier, Type(), CD);
+                          Context.Id_self, Type(), CD);
   SelfDecl->setImplicit();
 
   DestructorDecl *DD =
-      new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                                   CD->getLoc(), SelfDecl, CD);
+    new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(), SelfDecl,
+                                 CD);
   SelfDecl->setDeclContext(DD);
 
   DD->setImplicit();

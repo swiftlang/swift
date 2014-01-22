@@ -708,7 +708,7 @@ void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 IndirectionKind Indirection,
                                                 ArtificialKind IsArtificial) {
   assert(ArgNo > 0);
-  if (Name == IGM.Context.SelfIdentifier.str())
+  if (Name == IGM.Context.Id_self.str())
     emitVariableDeclaration(Builder, Storage, Ty, Name,
                             llvm::dwarf::DW_TAG_arg_variable, ArgNo,
                             DirectValue, ArtificialValue);

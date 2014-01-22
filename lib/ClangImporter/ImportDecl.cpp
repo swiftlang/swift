@@ -291,7 +291,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
-                                      C.SelfIdentifier,
+                                      C.Id_self,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
@@ -402,7 +402,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
 
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
-                                      C.SelfIdentifier,
+                                      C.Id_self,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
@@ -498,7 +498,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
 
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
-                                      C.SelfIdentifier,
+                                      C.Id_self,
                                       Type(),
                                       optionSetDecl);
   selfDecl->setImplicit();
@@ -671,14 +671,12 @@ namespace {
     ConstructorDecl *createValueConstructor(StructDecl *structDecl,
                                             ArrayRef<Decl *> members) {
       auto &context = Impl.SwiftContext;
-
-      // FIXME: Name hack.
-      auto name = context.getIdentifier("init");
+      auto name = context.Id_init;
 
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetatype = MetatypeType::get(selfType, context);
-      auto selfName = context.SelfIdentifier;
+      auto selfName = context.Id_self;
       auto selfDecl = new (context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                             SourceLoc(), selfName, selfType,
                                             structDecl);
@@ -1499,7 +1497,7 @@ namespace {
       auto selfTy = getSelfTypeForContext(dc);
       if (decl->isClassMethod() || forceClassMethod)
         selfTy = MetatypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.SelfIdentifier;
+      auto selfName = Impl.SwiftContext.Id_self;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      /*IsLet*/ true,
                                                      SourceLoc(), selfName,
@@ -1777,16 +1775,15 @@ namespace {
       }
       }
 
-      // FIXME: Hack.
       auto loc = decl->getLoc();
-      auto name = Impl.SwiftContext.getIdentifier("init");
+      auto name = Impl.SwiftContext.Id_init;
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
       auto selfMetaTy = MetatypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.SelfIdentifier;
+      auto selfName = Impl.SwiftContext.Id_self;
       auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                          /*IsLet*/ true,
                                                          SourceLoc(), selfName,
@@ -1878,7 +1875,7 @@ namespace {
     /// \param args The set of arguments 
     VarDecl *addImplicitSelfParameter(Type selfTy,
                                       SmallVectorImpl<Pattern *> &args) {
-      auto selfName = Impl.SwiftContext.SelfIdentifier;
+      auto selfName = Impl.SwiftContext.Id_self;
       auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
                                                      /*IsLet*/ true,
                                                      SourceLoc(), selfName,
@@ -2256,7 +2253,7 @@ namespace {
       // Build the subscript declaration.
       auto argPatterns =
           getterThunk->getArgParamPatterns()[1]->clone(context);
-      auto name = context.getIdentifier("subscript");
+      auto name = context.Id_subscript;
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
                                       decl->getLoc(),
@@ -2696,7 +2693,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Create the archetype for the implicit 'Self'.
-      auto selfId = Impl.SwiftContext.getIdentifier("Self");
+      auto selfId = Impl.SwiftContext.Id_Self;
       auto selfDecl = result->getSelf();
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,

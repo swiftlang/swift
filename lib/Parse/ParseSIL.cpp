@@ -206,13 +206,13 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   case tok::kw_destructor:
-    Result = P.Context.getIdentifier("destructor");
+    Result = P.Context.Id_destructor;
     break;
   case tok::kw_init:
-    Result = P.Context.getIdentifier("init");
+    Result = P.Context.Id_init;
     break;
   case tok::kw_subscript:
-    Result = P.Context.getIdentifier("subscript");
+    Result = P.Context.Id_subscript;
     break;
   default:
     P.diagnose(P.Tok, D);
@@ -646,7 +646,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
   unsigned options = NL_QualifiedDefault;
   // FIXME: a bit of a hack.
-  if (Name.str().equals("destructor") || Name.str().equals("init"))
+  if (Name == P.Context.Id_destructor || Name == P.Context.Id_init)
     options = options & ~NL_VisitSupertypes;
   P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
   assert(Lookup.size() == 1);

@@ -693,7 +693,7 @@ void NominalTypeDecl::computeType() {
   if (!getGenericParams()) {
     if (auto proto = dyn_cast<ProtocolDecl>(this)) {
       // The generic parameter 'Self'.
-      auto selfId = ctx.getIdentifier("Self");
+      auto selfId = ctx.Id_Self;
       auto selfDecl = new (ctx) GenericTypeParamDecl(proto, selfId,
                                                      proto->getLoc(), 0, 0);
       auto protoRef = new (ctx) SimpleIdentTypeRepr(proto->getLoc(),
@@ -905,7 +905,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
-  auto name = getASTContext().getIdentifier("destructor");
+  auto name = getASTContext().Id_destructor;
   auto results = lookupDirect(name);
   assert(!results.empty() && "Class without destructor?");
   assert(results.size() == 1 && "More than one destructor?");
@@ -1427,7 +1427,7 @@ VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
 
   // The decl should be named 'self' and be implicit.
   auto NP = dyn_cast<NamedPattern>(P);
-  if (NP && NP->getBoundName().str() == "self" && NP->isImplicit())
+  if (NP && NP->isImplicit() && NP->getBoundName() == getASTContext().Id_self)
     return NP->getDecl();
   return nullptr;
 }

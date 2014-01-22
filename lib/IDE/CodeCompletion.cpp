@@ -984,7 +984,7 @@ public:
 
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
-    if (VD->getName() == Ctx.SelfIdentifier) {
+    if (VD->getName() == Ctx.Id_self) {
       // Strip @inout from 'self'.  It is useful to show @inout for function
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
@@ -1147,7 +1147,7 @@ public:
         FirstInputType = PT->getUnderlyingType();
 
       Builder.addLeftParen();
-      Builder.addCallParameter(Ctx.SelfIdentifier,
+      Builder.addCallParameter(Ctx.Id_self,
                                FirstInputType.getString());
       Builder.addRightParen();
     } else {

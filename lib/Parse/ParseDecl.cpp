@@ -1695,7 +1695,7 @@ Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
   VarDecl *D
     = new (Context) VarDecl(/*static*/ false,
                             /*IsLet*/ true,
-                            Loc, Context.SelfIdentifier,
+                            Loc, Context.Id_self,
                             Type(), CurDeclContext);
   D->setImplicit();
   Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
@@ -2559,7 +2559,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     
     // Build an AST for the subscript declaration.
     SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(Context.getIdentifier("subscript"),
+      = new (Context) SubscriptDecl(Context.Id_subscript,
                                     SubscriptLoc, Indices.get(), ArrowLoc,
                                     ElementTy.get(), DefRange,
                                     Get, Set, CurDeclContext);
@@ -2628,15 +2628,15 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes)
 
   VarDecl *SelfDecl
     = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                            SourceLoc(), Context.SelfIdentifier,
+                            SourceLoc(), Context.Id_self,
                             Type(), CurDeclContext);
   SelfDecl->setImplicit();
 
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
-      new (Context) ConstructorDecl(Context.getIdentifier("init"),
-                                    ConstructorLoc, ArgPattern, BodyPattern,
-                                    SelfDecl, GenericParams, CurDeclContext);
+      new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc, ArgPattern,
+                                    BodyPattern, SelfDecl, GenericParams,
+                                    CurDeclContext);
   // No need to setLocalDiscriminator.
 
   if (HasSelectorStyleSignature)
@@ -2748,14 +2748,14 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   VarDecl *SelfDecl
     = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                            SourceLoc(), Context.SelfIdentifier,
+                            SourceLoc(), Context.Id_self,
                             Type(), CurDeclContext);
   SelfDecl->setImplicit();
 
   Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD
-    = new (Context) DestructorDecl(Context.getIdentifier("destructor"),
-                                 DestructorLoc, SelfDecl, CurDeclContext);
+    = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
+                                   SelfDecl, CurDeclContext);
   // No need to setLocalDiscriminator.
 
   SelfDecl->setDeclContext(DD);

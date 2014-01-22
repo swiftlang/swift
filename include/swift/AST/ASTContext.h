@@ -181,8 +181,9 @@ public:
   /// The name of the standard library module "swift".
   Identifier StdlibModuleName;
 
-  /// The identifier "self".
-  Identifier SelfIdentifier;
+  // Define the set of known identifiers.
+#define IDENTIFIER(Id) Identifier Id_##Id;
+#include "swift/AST/KnownIdentifiers.def"
 
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr
   // and remove the explicit delete loop in the destructor.

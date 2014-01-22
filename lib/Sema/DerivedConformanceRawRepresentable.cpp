@@ -104,7 +104,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
-                                      C.SelfIdentifier,
+                                      C.Id_self,
                                       Type(),
                                       enumDecl);
   selfDecl->setImplicit();
@@ -178,7 +178,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
-                                      C.SelfIdentifier,
+                                      C.Id_self,
                                       Type(),
                                       enumDecl);
   selfDecl->setImplicit();

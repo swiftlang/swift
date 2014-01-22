@@ -139,7 +139,7 @@ namespace {
       // FIXME: lame name!
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTv);
-      CS.addValueMemberConstraint(baseTy, Context.getIdentifier("subscript"),
+      CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
                                   fnTy, subscriptMemberLocator);
 
       // Add the constraint that the index expression's type be convertible
@@ -258,7 +258,8 @@ namespace {
                       CS.getConstraintLocator(expr, { }),
                       TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
       auto methodTy = FunctionType::get(argsTy, baseTy);
-      CS.addValueMemberConstraint(baseTy, C.getIdentifier("init"),
+      CS.addValueMemberConstraint(baseTy,
+                                  C.Id_init,
         methodTy,
         CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
       
@@ -820,9 +821,10 @@ namespace {
         // Otherwise, ElementType must be default constructible.
         Type defaultCtorTy = FunctionType::get(TupleType::getEmpty(tc.Context),
                                                elementTy);
-        CS.addValueMemberConstraint(elementTy, tc.Context.getIdentifier("init"),
-            defaultCtorTy,
-            CS.getConstraintLocator(expr, ConstraintLocator::NewArrayElement));
+        CS.addValueMemberConstraint(elementTy,
+          tc.Context.Id_init,
+          defaultCtorTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::NewArrayElement));
       }
       
       return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);

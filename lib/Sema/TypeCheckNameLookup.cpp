@@ -41,8 +41,7 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   assert(!type->is<TupleType>());
 
   // Constructor lookup is special.
-  // FIXME: string comparison here is lame.
-  if (name.str().equals("init")) {
+  if (name == Context.Id_init) {
     // We only have constructors for nominal declarations.
     auto nominalDecl = type->getAnyNominal();
     if (!nominalDecl)
@@ -154,6 +153,6 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
 
 LookupResult TypeChecker::lookupConstructors(Type type, DeclContext *dc) {
   // FIXME: Use of string literal here is lame.
-  return lookupMember(type, Context.getIdentifier("init"), dc,
-                      /*allowDynamicLookup=*/false);
+  return lookupMember(type, Context.Id_init,
+                      dc, /*allowDynamicLookup=*/false);
 }

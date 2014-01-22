@@ -165,7 +165,8 @@ SILDeclRef SILGenModule::getStringDefaultInitFn() {
   return StringDefaultInitFn.cache([&] {
     auto &C = getASTContext();
     auto stringDecl = Types.getStringType()->getNominalOrBoundGenericNominal();
-    auto constructors = stringDecl->lookupDirect(C.getIdentifier("init"));
+    auto constructors = stringDecl->lookupDirect(
+                          C.Id_init);
     ConstructorDecl *defaultCtor = nullptr;
     for (auto decl : constructors) {
       auto ctor = dyn_cast<ConstructorDecl>(decl);

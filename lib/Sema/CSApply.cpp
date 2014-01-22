@@ -1253,7 +1253,7 @@ namespace {
         // 'self' case below.
         bool diagnoseBadInitRef = true;
         if (auto dre = dyn_cast<DeclRefExpr>(arg)) {
-          if (dre->getDecl()->getName().str().equals("self")) {
+          if (dre->getDecl()->getName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
 

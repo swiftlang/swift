@@ -240,7 +240,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     Diags(Diags),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier("swift")),
-    SelfIdentifier(getIdentifier("self")),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -262,6 +261,10 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                     BuiltinFloatType(BuiltinFloatType::IEEE128, *this)),
     ThePPC128Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::PPC128,*this)) {
+
+  // Initialize all of the known identifiers.
+#define IDENTIFIER(Id) Id_##Id = getIdentifier(#Id);
+#include "swift/AST/KnownIdentifiers.def"
 }
 
 ASTContext::~ASTContext() {

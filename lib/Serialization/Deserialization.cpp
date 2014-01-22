@@ -1415,8 +1415,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
     auto genericParams = maybeReadGenericParams(parent);
 
-    auto ctor = new (ctx) ConstructorDecl(ctx.getIdentifier("init"),
-                                          SourceLoc(), /*argParams=*/nullptr,
+    auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
+                                          /*argParams=*/nullptr,
                                           /*bodyParams=*/nullptr, selfDecl,
                                           genericParams, parent);
     declOrOffset = ctor;
@@ -1962,7 +1962,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto getter = cast_or_null<FuncDecl>(getDecl(getterID));
     auto setter = cast_or_null<FuncDecl>(getDecl(setterID));
 
-    auto subscript = new (ctx) SubscriptDecl(ctx.getIdentifier("subscript"),
+    auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
                                              SourceLoc(), indices, SourceLoc(),
                                              elemTy, SourceRange(),
                                              getter, setter, DC);
@@ -2036,8 +2036,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
 
-    auto dtor = new (ctx) DestructorDecl(ctx.getIdentifier("destructor"),
-                                         SourceLoc(), selfDecl, parent);
+    auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
+                                         selfDecl, parent);
     declOrOffset = dtor;
     selfDecl->setDeclContext(dtor);
 

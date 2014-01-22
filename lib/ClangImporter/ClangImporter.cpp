@@ -834,7 +834,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   clang::IdentifierInfo *setObjectId = nullptr;
   clang::IdentifierInfo *atIndexedSubscriptId = nullptr;
   clang::IdentifierInfo *forKeyedSubscriptId = nullptr;
-  bool isSubscript = !name.empty() && name.str().equals("subscript");
+  bool isSubscript = name == Impl.SwiftContext.Id_subscript;
   if (isSubscript) {
     auto &identTable = S.Context.Idents;
     objectAtIndexedSubscriptId = &identTable.get("objectAtIndexedSubscript");
