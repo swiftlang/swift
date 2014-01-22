@@ -301,6 +301,48 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   return type;
 }
 
+/// Diagnose a reference to an unknown type.
+///
+/// \param tc The type checker through which we should emit the diagnostic.
+/// \param dc The context in which name lookup occurred.
+/// \param components The components that refer to the type, where the last
+/// component refers to the type that could not be found.
+static void diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
+                                ArrayRef<ComponentIdentTypeRepr *> components) {
+  auto comp = components.back();
+
+  // Unqualified lookup case.
+  if (components.size() == 1) {
+    tc.diagnose(comp->getIdLoc(), components.size() == 1 ?
+                diag::use_undeclared_type : diag::unknown_name_in_type,
+                comp->getIdentifier())
+      .highlight(SourceRange(comp->getIdLoc(),
+                             components.back()->getIdLoc()));
+
+    return;
+  }
+
+  // Qualified lookup case.
+  auto parentComponents = components.slice(0, components.size()-1);
+  auto parentRange = SourceRange(parentComponents.front()->getStartLoc(),
+                                 parentComponents.back()->getEndLoc());
+
+  // Lookup into a type.
+  if (auto parentType = parentComponents.back()->getBoundType()) {
+    tc.diagnose(comp->getIdLoc(), diag::invalid_member_type,
+                comp->getIdentifier(), parentType)
+      .highlight(parentRange);
+    return;
+  }
+
+  /// Lookup into a module.
+  auto module = parentComponents.back()->getBoundModule();
+  assert(module && "Unresolved parent component?");
+  tc.diagnose(comp->getIdLoc(), diag::no_module_type,
+              comp->getIdentifier(), module->Name);
+  return;
+}
+
 static llvm::PointerUnion<Type, Module *>
 resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                           ArrayRef<ComponentIdentTypeRepr *> components,
@@ -371,11 +413,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // If we found nothing, complain and fail.
       if (current.isNull()) {
         if (diagnoseErrors)
-          TC.diagnose(comp->getIdLoc(), components.size() == 1 ?
-                      diag::use_undeclared_type : diag::unknown_name_in_type,
-                      comp->getIdentifier())
-            .highlight(SourceRange(comp->getIdLoc(),
-                                   components.back()->getIdLoc()));
+          diagnoseUnknownType(TC, DC, components);
         Type ty = ErrorType::get(TC.Context);
         comp->setValue(ty);
         return ty;
@@ -447,9 +485,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         // FIXME: Typo correction!
         if (!memberTypes) {
           if (diagnoseErrors)
-            TC.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                        comp->getIdentifier(), parent.get<Type>())
-              .highlight(parentRange);
+            diagnoseUnknownType(TC, DC, components);
+
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -500,8 +537,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (!foundModuleTypes) {
         // FIXME: Fully-qualified module name?
         if (diagnoseErrors)
-          TC.diagnose(comp->getIdLoc(), diag::no_module_type,
-                      comp->getIdentifier(), module->Name);
+          diagnoseUnknownType(TC, DC, components);
         Type ty = ErrorType::get(TC.Context);
         comp->setValue(ty);
         return ty;
