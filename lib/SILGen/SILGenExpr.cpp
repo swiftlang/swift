@@ -498,7 +498,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // Global properties have no base or subscript.
     return emitGetAccessor(loc, var,
                            ArrayRef<Substitution>(), RValueSource(),
-                           RValueSource(), SGFContext());
+                           RValueSource(), C);
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
