@@ -1,6 +1,18 @@
 #include <vector>
 #include <iostream>
 
+// Turn off logging if we only want to time the routine.
+#ifndef LOG
+#define LOG(x) x
+#else
+#undef LOG
+#define LOG(x)
+#endif
+
+extern "C" {
+#include <mach/mach_time.h>
+}
+
 struct RC4 {
   std::vector<uint8_t> State;
   int I;
@@ -52,7 +64,7 @@ void benchRC4(int messageLen, int iterations, bool validate) {
 
   std::vector<uint8_t> LongData(messageLen, 0);
 
-  std::cout<<"Generating data ... "<<std::endl;
+  LOG(std::cout << "Generating data ... " << std::endl);
 
   for (int i = 0; i < messageLen ; i++)
     LongData[i] = SecretData[i % SecretData.size()];
@@ -62,20 +74,23 @@ void benchRC4(int messageLen, int iterations, bool validate) {
   Enc.initialize(KeyData);
   Dec.initialize(KeyData);
 
-  std::cout<<"Starting benchmark..."<<std::endl;
+  LOG(std::cout << "Starting benchmark..." << std::endl);
+  uint64_t start = mach_absolute_time();
   for (int i=0; i < iterations; i++) {
     Enc.encrypt(LongData);
     Dec.encrypt(LongData);
   }
+  uint64_t end = mach_absolute_time() - start;
+  printf("%llu nanoseconds.\n", end);
 
   if (validate) {
-    std::cout<<"Validating..."<<std::endl;
+    LOG(std::cout << "Validating..." << std::endl);
     for (int i = 0; i < messageLen ; i++)
       if (LongData[i] != SecretData[i % SecretData.size()]) {
-        std::cout<<"Error at " << i << "!!!"<<std::endl;
+        LOG(std::cout << "Error at " << i << "!!!" << std::endl);
       }
   }
-  std::cout<<"done"<<std::endl;
+  LOG(std::cout << "done" << std::endl);
 }
 
 int main() {

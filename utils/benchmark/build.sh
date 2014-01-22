@@ -30,7 +30,7 @@ benchmark() {
     $CLANG $NAME.swift.o -o $NAME.swift_bin -Wl,-rpath -Wl,"$BUILD_DIR/lib/swift/macosx" -L "$BUILD_DIR/lib/swift/macosx"
 
     # Compile CXX benchmark.
-    $CLANGPP -O3 -c $NAME.cpp -o $NAME.cpp.o -isysroot "$SDKROOT" $CFLAGS $CXXFLAGS
+    $CLANGPP -O3 -c $NAME.cpp -o $NAME.cpp.o -isysroot "$SDKROOT" $CFLAGS $CXXFLAGS -DLOG=0
     $CLANGPP -O3  $NAME.cpp.o -o $NAME.cpp_bin -isysroot "$SDKROOT" $CFLAGS $CXXFLAGS
 
     # Run swift benchmark.
