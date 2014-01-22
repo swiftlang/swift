@@ -61,14 +61,17 @@ public:
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndIsLValue(value, false),
       cleanup(cleanup) {
+    assert(value && "No value specified");
   }
 
   /// Create a managed value for a +0 rvalue.
   static ManagedValue forUnmanaged(SILValue value) {
+    assert(value && "No value specified");
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
   /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
+    assert(value && "No value specified");
     assert(value.getType().isAddress() &&
            "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());

@@ -402,12 +402,7 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
 
 /// Emit the specified declaration as an LValue if possible, otherwise return
 /// null.
-ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc,
-                                               ConcreteDeclRef declRef) {
-  VarDecl *var = dyn_cast<VarDecl>(declRef.getDecl());
-  if (var == 0) return ManagedValue();
-  assert(!declRef.isSpecialized() &&
-         "Cannot handle specialized variable references");
+ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var) {
 
   if (var->isDebuggerVar()) {
     DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
@@ -416,8 +411,8 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc,
     assert (SILDebugClient && "Debugger client doesn't support SIL");
     // FIXME: it is pointless to pass an uncurry level to this, it is always
     // zero for vars.  It is also pointless to pass a type.
-    SILValue SV = SILDebugClient->emitReferenceToDecl(loc, declRef,
-                                                      var->getType(), 0, B);
+    SILValue SV = SILDebugClient->emitReferenceToDecl(loc, var, var->getType(),
+                                                      0, B);
     return ManagedValue::forLValue(SV);
   }
   
@@ -475,10 +470,9 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
-    if (auto Result = emitLValueForDecl(loc, declRef)) {
+    if (auto Result = emitLValueForDecl(loc, var))
       return emitLoad(loc, Result.getLValueAddress(),
                       getTypeLowering(refType), C, IsNotTake);
-    }
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
@@ -3169,7 +3163,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
-  auto selfDecl = E->getSelf();
+  auto selfDecl = cast<VarDecl>(E->getSelf());
   auto selfTy = selfDecl->getType()->getInOutObjectType();
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
 
@@ -3198,7 +3192,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   }
 
   // We know that self is a box, so get its address.
-  SILValue selfAddr = SGF.emitLValueForDecl(E, E->getSelf()).getLValueAddress();
+  SILValue selfAddr = SGF.emitLValueForDecl(E, selfDecl).getLValueAddress();
   newSelf.assignInto(SGF, E, selfAddr);
 
   // If we are using Objective-C allocation, the caller can return

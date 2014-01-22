@@ -913,8 +913,8 @@ public:
 
     // If this is a reference something sitting in memory, then we can use it.
     if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
-      if (isa<VarDecl>(DRE->getDecl())) {
-        if (auto Reference = gen.emitLValueForDecl(e, DRE->getDeclRef())) {
+      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+        if (auto Reference = gen.emitLValueForDecl(e, VD)) {
           assert(Reference.isLValue() && "Should have got an lvalue back");
 
           // Return the lvalue as an rvalue address.

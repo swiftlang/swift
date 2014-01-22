@@ -658,11 +658,10 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
 static void emitUnloweredStoreOfCopy(SILBuilder &B, SILLocation loc,
                                      SILValue value, SILValue addr,
                                      IsInitialization_t isInit) {
-  if (isInit) {
+  if (isInit)
     B.createStore(loc, value, addr);
-  } else {
+  else
     B.createAssign(loc, value, addr);
-  }
 }
 
 #ifndef NDEBUG
@@ -948,7 +947,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     return;
   }
 
-  // For [unowned] types, we need to enter the unowned box by turning
+  // For @unowned types, we need to enter the unowned box by turning
   // the strong retain into an unowned retain.
   if (storageType.is<UnownedStorageType>()) {
     auto unownedValue =
@@ -1000,8 +999,7 @@ void SILGenFunction::emitSemanticLoadInto(SILLocation loc,
     return;
   }
 
-  auto rvalue =
-    emitLoadOfSemanticRValue(*this, loc, src, srcTL, isTake);
+  auto rvalue = emitLoadOfSemanticRValue(*this, loc, src, srcTL, isTake);
   emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
 }
 

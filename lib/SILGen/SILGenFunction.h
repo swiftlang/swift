@@ -615,7 +615,7 @@ public:
 
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
-  ManagedValue emitLValueForDecl(SILLocation loc, ConcreteDeclRef declRef);
+  ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var);
   
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to
