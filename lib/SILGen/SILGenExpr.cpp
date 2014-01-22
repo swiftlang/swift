@@ -1738,7 +1738,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // so getFunctionTypeWithCaptures is unable to find contextual generic
   // parameters for them. The getAs null check here should be unnecessary.
   auto pft = constantInfo.SILFnType;
-  
+
+  bool wasSpecialized = false;
   if (pft->isPolymorphic() && !forwardSubs.empty()) {
     auto info = FunctionType::ExtInfo()
                   .withCallingConv(pft->getAbstractCC())
@@ -1753,9 +1754,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                             pft->getResult(),
                                             F.getASTContext());
     functionTy = getLoweredLoadableType(specialized);
+    wasSpecialized = true;
   }
 
-  if (!TheClosure.getCaptureInfo().hasLocalCaptures()) {
+  if (!TheClosure.getCaptureInfo().hasLocalCaptures() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitGeneralizedFunctionValue(loc, result,
                              AbstractionPattern(expectedType), expectedType);
