@@ -18,17 +18,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "Initialization.h"
-#include "SILGen.h"
 #include "RValue.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
-#include <deque>
 
 using namespace swift;
 using namespace Lowering;
 
-namespace {
 
 static unsigned getTupleSize(CanType t) {
   if (TupleType *tt = dyn_cast<TupleType>(t))
@@ -36,6 +33,7 @@ static unsigned getTupleSize(CanType t) {
   return 1;
 }
 
+namespace {
 class ExplodeTupleValue
   : public CanTypeVisitor<ExplodeTupleValue,
                           /*RetTy=*/ void,
@@ -500,24 +498,6 @@ RValue::RValue(const RValue &copied, SILGenFunction &gen, SILLocation l)
   for (ManagedValue value : copied.values) {
     values.push_back(value.copy(gen, l));
   }
-}
-
-void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
-                               SILValue address) {
-  if (hasCleanup())
-    forwardCleanup(gen);
-  auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticStore(loc, getValue(), address, addrTL, IsInitialization);
-}
-
-void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
-                              SILValue address) {
-  if (hasCleanup())
-    forwardCleanup(gen);
-
-  auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticStore(loc, getValue(), address, addrTL,
-                        IsNotInitialization);
 }
 
 ManagedValue RValue::materialize(SILGenFunction &gen, SILLocation loc) && {
