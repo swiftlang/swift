@@ -33,10 +33,13 @@ namespace Lowering {
 /// a value, such as a @inout function argument, and can be null.
 ///
 /// Interesting relevant cases include:
-///    IsLValue: the SILValue will always have an isAddress() SILType. LValues
-///              never have an associated cleanup.
-///   !IsLValue, isAddress() type: an address-only RValue.
-///   !IsLValue, !isAddress() type: a loadable RValue.
+///   LValue: the SILValue will always have an isAddress() SILType. LValues
+///           never have an associated cleanup.
+///   RValue, isAddress() type: an address-only RValue.
+///   RValue, !isAddress() type: a loadable RValue.
+///
+/// The RValue cases may or may not have a cleanup associated with the value.
+/// A cleanup is associated with +1 values of non-trivial type.
 ///
 class ManagedValue {
   /// The value (or address of an address-only value) being managed, and
@@ -53,15 +56,21 @@ class ManagedValue {
 public:
   
   ManagedValue() = default;
+  
+  /// Create a managed value for a +1 rvalue.
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndIsLValue(value, false),
-      cleanup(cleanup)
-  {}
+      cleanup(cleanup) {
+  }
 
+  /// Create a managed value for a +0 rvalue.
   static ManagedValue forUnmanaged(SILValue value) {
     return ManagedValue(value, false, CleanupHandle::invalid());
   }
+  /// Create a managed value for an l-value.
   static ManagedValue forLValue(SILValue value) {
+    assert(value.getType().isAddress() &&
+           "lvalues always have isAddress() type");
     return ManagedValue(value, true, CleanupHandle::invalid());
   }
 

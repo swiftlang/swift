@@ -922,7 +922,7 @@ public:
                 gen.emitReferenceToDecl(e, DRE->getDeclRef(), e->getType(), 0);
               assert(Reference.isLValue() && "Should have got an lvalue back");
 
-              // Return the lvalue as a non-lvalue address.
+              // Return the lvalue as an rvalue address.
               return ManagedValue::forUnmanaged(Reference.getValue());
             }
     }
