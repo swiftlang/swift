@@ -178,12 +178,6 @@ public:
   }
 };
 
-inline bool SGFContext::hasAddressToEmitInto() const {
-  if (auto init = getEmitInto())
-    return init->kind == Initialization::Kind::SingleBuffer;
-  return false;
-}
-
 } // end namespace Lowering
 } // end namespace swift
 

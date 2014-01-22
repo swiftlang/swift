@@ -275,12 +275,11 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   auto inputType = inputTuple.getType().castTo<TupleType>();
   assert(substFormalType->getNumElements() == inputType->getNumElements());
 
-  // In some cases, we may need or want to emit directly into an address.
+  // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly() || ctxt.hasAddressToEmitInto()) {
+  if (outputTL.isAddressOnly())
     outputAddr = SGF.getBufferForExprResult(Loc, outputTL.getLoweredType(),
                                             ctxt);
-  }
 
   // Explode the tuple into individual managed values.
   SmallVector<ManagedValueAndType, 4> inputElts;

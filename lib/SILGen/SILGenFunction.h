@@ -47,9 +47,6 @@ public:
   Initialization *getEmitInto() const {
     return state.getPointer();
   }
-
-  /// Does this context have a preferred address to emit into?
-  bool hasAddressToEmitInto() const; // in Initialization.h
 };
 
 class SwitchContext;
