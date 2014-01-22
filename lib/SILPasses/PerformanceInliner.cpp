@@ -240,14 +240,18 @@ static unsigned getFunctionCost(SILFunction *F) {
     for (auto &I : BB) {
       Cost += unsigned(instructionInlineCost(I));
 
+      // If we're debugging, continue calculating the total cost even if we
+      // passed the threshold.
+      DEBUG(goto next);
+      
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
       if (Cost > InlineCostThreshold) {
-        DEBUG(llvm::dbgs() << "  Cost too high: " << Cost
-                           << ". Threshold is " << InlineCostThreshold << ".\n");
         return Cost;
       }
+      goto next;
+next:;
     }
   }
 
