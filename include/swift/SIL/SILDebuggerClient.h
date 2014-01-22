@@ -35,12 +35,8 @@ public:
   /// DebuggerClient is asked to emit SIL references to locals,
   /// permitting SILGen to access them like any other variables.
   /// This avoids generation of properties.
-  virtual SILValue emitReferenceToDecl(SILLocation loc,
-                                       ConcreteDeclRef declRef,
-                                       Type ncRefType,
-                                       unsigned uncurryLevel,
-                                       SILBuilder &builder) = 0;
-
+  virtual SILValue emitLValueForVariable(VarDecl *var,
+                                         SILBuilder &builder) = 0;
 
   inline SILDebuggerClient *getAsSILDebuggerClient() {
     return this;

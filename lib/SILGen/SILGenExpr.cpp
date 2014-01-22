@@ -411,8 +411,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var) {
     assert (SILDebugClient && "Debugger client doesn't support SIL");
     // FIXME: it is pointless to pass an uncurry level to this, it is always
     // zero for vars.  It is also pointless to pass a type.
-    SILValue SV = SILDebugClient->emitReferenceToDecl(loc, var, var->getType(),
-                                                      0, B);
+    SILValue SV = SILDebugClient->emitLValueForVariable(var, B);
     return ManagedValue::forLValue(SV);
   }
   
