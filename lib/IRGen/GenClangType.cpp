@@ -146,8 +146,9 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
-  // Any protocol composition type in Swift that shows up in an @objc method maps 1-1 to
-  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
+  // Any protocol composition type in Swift that shows up in an @objc
+  // method maps 1-1 to "id <SomeProto>"; with clang's encoding
+  // ignoring the protocol list.
   return getClangIdType(getClangASTContext());
 }
 
