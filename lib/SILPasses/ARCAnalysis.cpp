@@ -86,6 +86,12 @@ bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
   case ValueKind::AllocBoxInst:
   case ValueKind::AllocArrayInst:
     return true;
+
+  // Debug values do not use referenced counted values in a manner we care
+  // about.
+  case ValueKind::DebugValueInst:
+  case ValueKind::DebugValueAddrInst:
+    return true;
   default:
     break;
   }
