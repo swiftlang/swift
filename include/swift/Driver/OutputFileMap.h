@@ -54,6 +54,9 @@ public:
   /// OutputFileMap. (If not present, returns nullptr.)
   const TypeToPathMap *getOutputMapForInput(StringRef Input) const;
 
+  /// Dump the OutputFileMap to the given \p os.
+  void dump(llvm::raw_ostream &os, bool Sort = false) const;
+
 private:
   /// \brief Parses the given \p Buffer into the OutputFileMap, taking ownership
   /// of \p Buffer in the process.

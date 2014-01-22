@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/system_error.h"
 
 using namespace swift;
@@ -50,6 +51,44 @@ const TypeToPathMap *OutputFileMap::getOutputMapForInput(StringRef Input) const{
     return nullptr;
   else
     return &iter->second;
+}
+
+void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
+  typedef std::pair<types::ID, std::string> TypePathPair;
+
+  auto printOutputPair = [&os] (StringRef InputPath,
+                                const TypePathPair &OutputPair) -> void {
+    os << InputPath << " -> " << types::getTypeName(OutputPair.first) << ": \""
+       << OutputPair.second << "\"\n";
+  };
+
+  if (Sort) {
+    typedef std::pair<StringRef, TypeToPathMap> PathMapPair;
+    std::vector<PathMapPair> Maps;
+    for (auto &InputPair : InputToOutputsMap) {
+      Maps.emplace_back(InputPair.first(), InputPair.second);
+    }
+    std::sort(Maps.begin(), Maps.end(), [] (const PathMapPair &LHS,
+                                            const PathMapPair &RHS) -> bool {
+      return LHS.first < RHS.first;
+    });
+    for (auto &InputPair : Maps) {
+      const TypeToPathMap &Map = InputPair.second;
+      std::vector<TypePathPair> Pairs;
+      Pairs.insert(Pairs.end(), Map.begin(), Map.end());
+      std::sort(Pairs.begin(), Pairs.end());
+      for (auto &OutputPair : Pairs) {
+        printOutputPair(InputPair.first, OutputPair);
+      }
+    }
+  } else {
+    for (auto &InputPair : InputToOutputsMap) {
+      const TypeToPathMap &Map = InputPair.second;
+      for (const TypePathPair &OutputPair : Map) {
+        printOutputPair(InputPair.first(), OutputPair);
+      }
+    }
+  }
 }
 
 bool OutputFileMap::parse(llvm::MemoryBuffer *Buffer) {

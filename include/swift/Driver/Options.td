@@ -64,6 +64,8 @@ class InternalDebugOpt : Group<internal_debug_Group>,
 
 def driver_print_actions : Flag<["-"], "driver-print-actions">,
   InternalDebugOpt, HelpText<"Dump list of actions to perform">;
+def driver_print_output_file_map : Flag<["-"], "driver-print-output-file-map">,
+  InternalDebugOpt, HelpText<"Dump the contents of the output file map">;
 def driver_print_bindings : Flag<["-"], "driver-print-bindings">,
   InternalDebugOpt, HelpText<"Dump list of bindings">;
 def driver_print_jobs : Flag<["-"], "driver-print-jobs">, InternalDebugOpt,
