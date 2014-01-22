@@ -362,15 +362,20 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
       if (AFD->getExtensionType()) {
         ExtendedType = AFD->getExtensionType();
         BaseDecl = AFD->getImplicitSelfDecl();
-        if (NominalType *NT = ExtendedType->getAs<NominalType>())
-          MetaBaseDecl = NT->getDecl();
-        else if (auto UGT = ExtendedType->getAs<UnboundGenericType>())
-          MetaBaseDecl = UGT->getDecl();
+        MetaBaseDecl = ExtendedType->getAnyNominal();
         DC = DC->getParent();
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
             ExtendedType = MetatypeType::get(ExtendedType, M.getASTContext());
+
+        // If we're not in the body of the function, the base declaration
+        // is the nominal type, not 'self'.
+        if (Loc.isValid() &&
+            AFD->getBodySourceRange().isValid() &&
+            !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)) {
+          BaseDecl = MetaBaseDecl;
+        }
       }
 
       // Look in the generic parameters after checking our local declaration.
