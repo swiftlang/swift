@@ -705,8 +705,8 @@ void ConstraintSystem::openGeneric(
                         proto);
         }
       } else {
-        addConstraint(ConstraintKind::Subtype, subjectTy,
-                      req.getSecondType());
+        auto boundTy = req.getSecondType().transform(replaceDependentTypes);
+        addConstraint(ConstraintKind::Subtype, subjectTy, boundTy);
       }
       break;
     }
