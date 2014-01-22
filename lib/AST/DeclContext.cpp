@@ -79,8 +79,9 @@ Type DeclContext::getDeclaredInterfaceType() {
     return Type();
 
   case DeclContextKind::ExtensionDecl:
-    // FIXME: Need a getExtendedInterfaceType for extensions
-    assert(false && "not implemented for ExtensionDecls");
+    // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
+    if (auto nominal = getDeclaredTypeOfContext()->getAnyNominal())
+      return nominal->getDeclaredInterfaceType();
     return Type();
 
   case DeclContextKind::NominalTypeDecl:
@@ -90,16 +91,21 @@ Type DeclContext::getDeclaredInterfaceType() {
 
 static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
                                     bool isStatic, bool isMutatingFunc,
+                                    bool wantInterfaceType,
                                     GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
   
   // For a protocol, the type of 'self' is the parameter type 'Self', not
   // the protocol itself.
+  auto selfTy = containerTy;
   if (auto proto = containerTy->getAs<ProtocolType>()) {
     auto self = proto->getDecl()->getSelf();
     assert(self && "Missing 'Self' type in protocol");
-    containerTy = self->getArchetype();
+    if (wantInterfaceType)
+      selfTy = self->getDeclaredType();
+    else
+      selfTy = self->getArchetype();
   }
 
   // Capture the generic parameters, if requested.
@@ -108,11 +114,11 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return MetatypeType::get(containerTy, dc->getASTContext());
+    return MetatypeType::get(selfTy, dc->getASTContext());
 
   // Reference types have 'self' of type T.
   if (containerTy->hasReferenceSemantics())
-    return containerTy;
+    return selfTy;
 
   // Mutating methods are always passed @inout so we can receive the side
   // effect.
@@ -125,10 +131,10 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
   // base object as an rvalue for @!mutating protocol members, even though that
   // doesn't match the type of the protocol requirement.
   if (isMutatingFunc || isa<ProtocolDecl>(dc))
-    return InOutType::get(containerTy);
+    return InOutType::get(selfTy);
 
   // Non-mutating methods on structs and enums pass the receiver by value.
-  return containerTy;
+  return selfTy;
 }
 
 Type DeclContext::getSelfTypeInContext(bool isStatic, bool isInOutFunc,
@@ -139,7 +145,7 @@ Type DeclContext::getSelfTypeInContext(bool isStatic, bool isInOutFunc,
     return nullptr;
 
   return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
-                                 outerGenericParams);
+                                 false, outerGenericParams);
 }
 
 Type DeclContext::getInterfaceSelfType(bool isStatic, bool isInOutFunc) {
@@ -149,7 +155,7 @@ Type DeclContext::getInterfaceSelfType(bool isStatic, bool isInOutFunc) {
     return nullptr;
   
   return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
-                                 nullptr);
+                                 true, nullptr);
 }
 
 GenericParamList *DeclContext::getGenericParamsOfContext() const {

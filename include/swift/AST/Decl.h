@@ -871,6 +871,9 @@ public:
   /// for more information.
   void setOuterParameters(GenericParamList *Outer) { OuterParameters = Outer; }
 
+  SourceLoc getLAngleLoc() const { return Brackets.Start; }
+  SourceLoc getRAngleLoc() const { return Brackets.End; }
+
   SourceRange getSourceRange() const { return Brackets; }
 
   /// Retrieve the depth of this generic parameter list.
@@ -2785,6 +2788,16 @@ public:
   /// generic type.
   Type computeSelfType(GenericParamList **outerGenericParams = nullptr);
 
+  /// \brief If this is a method in a type or extension thereof, compute
+  /// and return the type to be used for the 'self' argument of the interface
+  /// type, or an empty Type() if no 'self' argument should exist.  This can
+  /// only be used after name binding has resolved types.
+  ///
+  /// \param isInitializingCtor Specifies whether we're computing the 'self'
+  /// type of an initializing constructor, which accepts an instance 'self'
+  /// rather than a metatype 'self'.
+  Type computeInterfaceSelfType(bool isInitializingCtor);
+
   /// \brief This method returns the implicit 'self' decl.
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
@@ -3010,6 +3023,14 @@ public:
   /// getGetterOrSetterDecl - Return the declaration for which this function
   /// is a getter or setter, if it is one.
   ValueDecl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
+
+  /// Creates the implicit 'DynamicSelf' generic parameter.
+  ///
+  /// This utility function
+  GenericTypeParamType *makeDynamicSelf();
+
+  /// Retrieve the generic parameter DynamicSelf, if there is one.
+  GenericTypeParamType *getDynamicSelf() const;
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).

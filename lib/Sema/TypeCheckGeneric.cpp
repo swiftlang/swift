@@ -614,52 +614,6 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-/// Replace the type of 'self' in the given function declaration's argument
-/// patterns.
-///
-/// FIXME: This almost duplicates AbstractFunctionDecl::computeSelfType(), which
-/// should migrate into the type checker anyway.
-static Type computeSelfType(AbstractFunctionDecl *func,
-                            bool isInitializing = false) {
-  // Figure out the type we're in.
-  Type containerTy = func->getExtensionType();
-  if (!containerTy)
-    return nullptr;
-
-  // For a protocol, the container type is the 'Self' type.
-  // FIXME: This is temporary.
-  Type selfTy;
-  if (auto protoTy = containerTy->getAs<ProtocolType>()) {
-    auto self = protoTy->getDecl()->getSelf();
-    selfTy = self->getDeclaredType();
-  } else {
-    // For any other nominal type, the self type is the interface type.
-    selfTy = containerTy->getAnyNominal()->getDeclaredInterfaceType();
-  }
-
-  // For a static function or constructor, 'self' has type T.metatype.
-  if ((!isInitializing && isa<ConstructorDecl>(func)) ||
-      (isa<FuncDecl>(func) && cast<FuncDecl>(func)->isStatic()))
-    return MetatypeType::get(selfTy, func->getASTContext());
-
-  // For a type with reference semantics, 'self' is passed by value.
-  if (containerTy->hasReferenceSemantics())
-    return selfTy;
-
-  // 'self' is passed by value if it is a type method or a non-mutating,
-  // non-protocol instance method.
-  if (auto *FD = dyn_cast<FuncDecl>(func)) {
-    if (FD->isStatic()
-        || (!FD->isMutating() && !isa<ProtocolDecl>(FD->getDeclContext())))
-      return selfTy;
-  } else if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
-    return selfTy;
-  }
-  
-  // Otherwise, 'self' is passed inout.
-  return InOutType::get(selfTy);
-}
-
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Create the archetype builder.
   ArchetypeBuilder builder = createArchetypeBuilder(*this,
@@ -740,13 +694,15 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     Type initArgTy;
 
     Type selfTy;
-    if (i == e-1 && (selfTy = computeSelfType(func))) {
+    if (i == e-1 &&
+        (selfTy
+           = func->computeInterfaceSelfType(/*isInitializingCtor=*/false))) {
       // Substitute in our own 'self' parameter.
       assert(selfTy && "Missing self type?");
 
       argTy = selfTy;
       if (initFuncTy) {
-        initArgTy = computeSelfType(func, /*isInitializing=*/true);
+        initArgTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/true);
       }
     } else {
       argTy = patterns[e - i - 1]->getType();

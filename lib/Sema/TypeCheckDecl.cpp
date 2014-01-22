@@ -1817,19 +1817,18 @@ public:
       return true;
     }
 
-    // 'DynamicSelf' is only permitted on class or protocol methods.
     auto containerTy = dc->getDeclaredTypeOfContext();
-    if (!containerTy->getClassOrBoundGenericClass() &&
-        !containerTy->is<ProtocolType>()) {
-      if (containerTy->is<ErrorType>())
-        return true;
+    if (containerTy->is<ErrorType>())
+      return true;
 
-      auto nominal = containerTy->getAnyNominal();
-      assert(nominal && "Non-nominal container for method type?");
+    // 'DynamicSelf' is only permitted on class or protocol methods.
+    auto nominal = containerTy->getAnyNominal();
+    assert(nominal && "Non-nominal container for method type?");
+    if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
       int which;
-      if (containerTy->getStructOrBoundGenericStruct())
+      if (isa<StructDecl>(nominal))
         which = 0;
-      else if (containerTy->getEnumOrBoundGenericEnum())
+      else if (isa<EnumDecl>(nominal))
         which = 1;
       else
         llvm_unreachable("Unknown nominal type");
@@ -1840,13 +1839,10 @@ public:
       return true;
     }
 
-    // FIXME: As a short-term hack, replace DynamicSelf with either
-    // 'Self' (in a protocol) or the name of the class.
-    auto nominal = containerTy->getAnyNominal();
-    if (isa<ProtocolDecl>(nominal))
-      simpleRepr->overwriteIdentifier(TC.Context.Id_Self);
-    else
-      simpleRepr->overwriteIdentifier(nominal->getName());
+    // Create the generic parameter for DynamicSelf. The result type is this
+    // generic parameter type.
+    auto dynamicSelfType = func->makeDynamicSelf();
+    simpleRepr->setValue(dynamicSelfType);
     return false;
   }
 
