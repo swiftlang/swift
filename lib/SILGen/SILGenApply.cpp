@@ -2603,7 +2603,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
 RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                                 SGFContext c) {
   // Emit the operand.
-  ManagedValue existential = emitRValueAsSingleValue(e->getBase(), c);
+  ManagedValue existential = emitRValueAsSingleValue(e->getBase());
 
   SILValue operand = existential.getValue();
   if (e->getMember().getDecl()->isInstanceMember()) {
@@ -2697,7 +2697,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, 
                                                 SGFContext c) {
   // Emit the base operand.
-  ManagedValue existential = emitRValueAsSingleValue(e->getBase(), c);
+  ManagedValue existential = emitRValueAsSingleValue(e->getBase());
 
   SILValue base = existential.getValue();
   base = B.createProjectExistentialRef(e, base, 
