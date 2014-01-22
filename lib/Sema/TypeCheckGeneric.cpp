@@ -579,12 +579,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                          func->getDeclContext(), resolver);
 
   // Check the parameter patterns.
-  // Skip the 'self' pattern, if we have one.
-  auto argPatterns = func->getArgParamPatterns();
-  if (func->getExtensionType() && isa<FuncDecl>(func))
-    argPatterns = argPatterns.slice(1);
-
-  for (auto pattern : argPatterns) {
+  for (auto pattern : func->getArgParamPatterns()) {
     // Check the pattern.
     if (tc.typeCheckPattern(pattern, func, TR_FunctionInput, &resolver))
       badType = true;

@@ -1391,42 +1391,7 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(FuncDecl *FD) {
-      // Check that non-static member functions have "self" as the first
-      // parameter.
-      if (!FD->isStatic()) {
-        auto NominalTy = FD->getDeclContext()->getDeclaredTypeInContext();
-        if (!NominalTy) {
-          // A non-member function.
-          return;
-        }
-        auto FuncTy = FD->getInterfaceType();
-        auto InTy = FuncTy->castTo<AnyFunctionType>()->getInput();
-        if (auto TupleTy = InTy->getAs<TupleType>()) {
-          if (TupleTy->getNumElements() != 1) {
-            Out << "Should have a single parameter 'self'";
-            abort();
-          }
-          InTy = TupleTy->getFields()[0].getType();
-        }
-        InTy = InTy->getInOutObjectType();
-
-        Decl *ExpectedSelfDecl;
-        Decl *ActualSelfDecl;
-        if (auto *PD = dyn_cast<ProtocolDecl>(NominalTy->getAnyNominal())) {
-          // In protocols, the first parameter refers to an associated type
-          // 'Self'.
-          ExpectedSelfDecl = PD->getSelf();
-          ActualSelfDecl = InTy->castTo<GenericTypeParamType>()->getDecl();
-        } else {
-          ExpectedSelfDecl = NominalTy->getAnyNominal();
-          ActualSelfDecl = InTy->getAnyNominal();
-        }
-
-        if (ActualSelfDecl != ExpectedSelfDecl) {
-          Out << "Wrong type for 'self' parameter";
-          abort();
-        }
-      }
+      // FIXME: Chain to AbstractFunctionDecl checking!
     }
 
     void verifyParsed(FuncDecl *FD) {

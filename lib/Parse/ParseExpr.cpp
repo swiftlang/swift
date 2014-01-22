@@ -721,6 +721,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::kw_self:     // self
+  case tok::kw_Self:     // Self
+  case tok::kw_DynamicSelf:     // Self
   case tok::identifier:  // foo
     Result = makeParserResult(parseExprIdentifier());
     break;
@@ -1116,7 +1118,8 @@ Expr *Parser::parseExprStringLiteral() {
 ///     period_following comma semicolon
 ///
 Expr *Parser::parseExprIdentifier() {
-  assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self));
+  assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
+         Tok.is(tok::kw_Self) || Tok.is(tok::kw_DynamicSelf));
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
   consumeToken();

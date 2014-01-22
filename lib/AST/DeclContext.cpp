@@ -90,22 +90,26 @@ Type DeclContext::getDeclaredInterfaceType() {
 }
 
 static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
+                                    Type selfTypeOverride,
                                     bool isStatic, bool isMutatingFunc,
                                     bool wantInterfaceType,
                                     GenericParamList **outerGenericParams) {
   if (outerGenericParams)
     *outerGenericParams = nullptr;
-  
-  // For a protocol, the type of 'self' is the parameter type 'Self', not
-  // the protocol itself.
-  auto selfTy = containerTy;
-  if (auto proto = containerTy->getAs<ProtocolType>()) {
-    auto self = proto->getDecl()->getSelf();
-    assert(self && "Missing 'Self' type in protocol");
-    if (wantInterfaceType)
-      selfTy = self->getDeclaredType();
-    else
-      selfTy = self->getArchetype();
+
+  Type selfTy = selfTypeOverride;
+  if (!selfTy) {
+    // For a protocol, the type of 'self' is the parameter type 'Self', not
+    // the protocol itself.
+    selfTy = containerTy;
+    if (auto proto = containerTy->getAs<ProtocolType>()) {
+      auto self = proto->getDecl()->getSelf();
+      assert(self && "Missing 'Self' type in protocol");
+      if (wantInterfaceType)
+        selfTy = self->getDeclaredType();
+      else
+        selfTy = self->getArchetype();
+    }
   }
 
   // Capture the generic parameters, if requested.
@@ -138,23 +142,27 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
 }
 
 Type DeclContext::getSelfTypeInContext(bool isStatic, bool isInOutFunc,
+                                       Type selfTypeOverride,
                                        GenericParamList **outerGenericParams) {
   // Determine the type of the container.
   Type containerTy = getDeclaredTypeInContext();
   if (!containerTy)
     return nullptr;
 
-  return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
+  return getSelfTypeForContainer(this, containerTy, selfTypeOverride,
+                                 isStatic, isInOutFunc,
                                  false, outerGenericParams);
 }
 
-Type DeclContext::getInterfaceSelfType(bool isStatic, bool isInOutFunc) {
+Type DeclContext::getInterfaceSelfType(bool isStatic, bool isInOutFunc,
+                                       Type selfTypeOverride) {
   // Determine the type of the container.
   Type containerTy = getDeclaredInterfaceType();
   if (!containerTy)
     return nullptr;
   
-  return getSelfTypeForContainer(this, containerTy, isStatic, isInOutFunc,
+  return getSelfTypeForContainer(this, containerTy, selfTypeOverride,
+                                 isStatic, isInOutFunc,
                                  true, nullptr);
 }
 

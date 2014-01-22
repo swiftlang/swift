@@ -1074,7 +1074,7 @@ Type AbstractStorageDecl::getGetterType() const {
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic,
                                                        /*@mutating*/false,
-                                                       &outerParams);
+                                                       Type(), &outerParams);
 
   // Form the getter type.
   auto &ctx = getASTContext();
@@ -1099,7 +1099,8 @@ Type AbstractStorageDecl::getGetterInterfaceType() const {
   // Otherwise, compute the type.  This can only happen for a var decl.
   bool isStatic = cast<VarDecl>(this)->isStatic();
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic,
-                                                       /*@mutating*/ false);
+                                                       /*@mutating*/ false,
+                                                       Type());
 
   // Form the getter type.
   auto &ctx = getASTContext();
@@ -1134,7 +1135,7 @@ Type AbstractStorageDecl::getSetterType() const {
   GenericParamList *outerParams = nullptr;
   auto selfTy = getDeclContext()->getSelfTypeInContext(/*isStatic=*/isStatic,
                                                        /*@mutating*/!isStatic,
-                                                       &outerParams);
+                                                       Type(), &outerParams);
 
   // Form the element -> () function type.
   auto &ctx = getASTContext();
@@ -1161,7 +1162,8 @@ Type AbstractStorageDecl::getSetterInterfaceType() const {
   // Otherwise, compute the type.  This can only happen for a var decl.
   bool isStatic = cast<VarDecl>(this)->isStatic();
   auto selfTy = getDeclContext()->getInterfaceSelfType(/*isStatic=*/isStatic,
-                                                     /*@mutating*/ !isStatic);
+                                                       /*@mutating*/ !isStatic,
+                                                       Type());
   
   // Form the element -> () function type.
   auto &ctx = getASTContext();
@@ -1348,10 +1350,12 @@ Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
   bool isStatic = false;
   bool isMutating = false;
+  Type selfTypeOverride;
 
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
+    selfTypeOverride = FD->getDynamicSelf();
   } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
     // constructors and destructors of value types always have an implicitly
     // @inout self.
@@ -1359,16 +1363,19 @@ computeSelfType(GenericParamList **outerGenericParams) {
   }
 
   return getDeclContext()->getSelfTypeInContext(isStatic, isMutating,
+                                                selfTypeOverride,
                                                 outerGenericParams);
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
   bool isStatic = false;
   bool isMutating = false;
+  Type selfTypeOverride;
 
   if (auto *FD = dyn_cast<FuncDecl>(this)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
+    selfTypeOverride = FD->getDynamicSelf();
   } else if (isa<ConstructorDecl>(this)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -1383,7 +1390,8 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
     isMutating = true;
   }
 
-  return getDeclContext()->getInterfaceSelfType(isStatic, isMutating);
+  return getDeclContext()->getInterfaceSelfType(isStatic, isMutating,
+                                                selfTypeOverride);
 }
 
 VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {

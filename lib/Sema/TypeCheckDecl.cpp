@@ -938,16 +938,12 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
 
   // Revert the argument patterns.
   ArrayRef<Pattern *> argPatterns = func->getArgParamPatterns();
-  if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
-    argPatterns = argPatterns.slice(1);
   for (auto argPattern : argPatterns) {
     revertDependentPattern(argPattern);
   }
 
   // Revert the body patterns.
   ArrayRef<Pattern *> bodyPatterns = func->getBodyParamPatterns();
-  if (func->getDeclContext()->isTypeContext() && isa<FuncDecl>(func))
-    bodyPatterns = bodyPatterns.slice(1);
   for (auto bodyPattern : bodyPatterns) {
     revertDependentPattern(bodyPattern);
   }
@@ -1846,6 +1842,89 @@ public:
     return false;
   }
 
+  /// Create a trivial type representation for 'self'.
+  TypeRepr *createTrivialSelfTypeRepr(Type type, SourceLoc loc) {
+    // Metatype.
+    if (auto metatype = type->getAs<MetatypeType>()) {
+      auto baseRepr = createTrivialSelfTypeRepr(metatype->getInstanceType(),
+                                                loc);
+      return new (TC.Context) MetatypeTypeRepr(baseRepr, loc);
+    }
+
+    // @inout
+    if (auto inout = type->getAs<InOutType>()) {
+      auto baseRepr = createTrivialSelfTypeRepr(inout->getObjectType(), loc);
+      TypeAttributes typeAttrs;
+      typeAttrs.setAttr(TAK_inout, loc);
+      return new (TC.Context) AttributedTypeRepr(typeAttrs, baseRepr);
+    }
+
+    // Generic parameter type.
+    if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+      auto name = genericParam->getName();
+      assert(!name.empty() && "Empty generic parameter name in 'self'");
+      auto result = new (TC.Context) SimpleIdentTypeRepr(loc, name);
+      result->setValue(type);
+      return result;
+    }
+
+    // Archetype
+    if (auto archetype = type->getAs<ArchetypeType>()) {
+      auto name = archetype->getName();
+      assert(!name.empty() && "Empty archetype name in 'self'");
+      auto result = new (TC.Context) SimpleIdentTypeRepr(loc, name);
+      result->setValue(type);
+      return result;
+    }
+
+    auto nominal = type->getAnyNominal();
+    assert(nominal && "'self' is not a nominal type");
+    auto result = new (TC.Context) SimpleIdentTypeRepr(loc, nominal->getName());
+    result->setValue(type);
+    return result;
+  }
+
+  /// Configure the implicit 'self' parameter of a function, setting its type,
+  /// pattern, etc.
+  ///
+  /// \param func The function whose 'self' is being configured.
+  /// \param outerGenericParams The generic parameters from the outer scope.
+  ///
+  /// \returns the type of 'self'.
+  Type configureImplicitSelf(AbstractFunctionDecl *func,
+                             GenericParamList *&outerGenericParams) {
+    outerGenericParams = nullptr;
+
+    // Compute the type of self.
+    Type selfTy = func->computeSelfType(&outerGenericParams);
+    if (!selfTy)
+      return Type();
+
+    auto containerTy = func->getExtensionType();
+    auto selfDecl = func->getImplicitSelfDecl();
+
+    // 'self' is let for reference types (i.e., classes) or when 'self' is
+    // neither @inout nor a metatype.
+    // FIXME: The metatype check here is odd.
+    selfDecl->setLet(containerTy->hasReferenceSemantics() ||
+                     (!selfTy->is<InOutType>() &&
+                      !selfTy->is<MetatypeType>()));
+
+    auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
+    if (!argPattern->getTypeLoc().getTypeRepr()) {
+      argPattern->getTypeLoc()
+        = TypeLoc(createTrivialSelfTypeRepr(selfTy, func->getLoc()));
+    }
+
+    auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
+    if (!bodyPattern->getTypeLoc().getTypeRepr()) {
+      bodyPattern->getTypeLoc()
+        = TypeLoc(createTrivialSelfTypeRepr(selfTy, func->getLoc()));
+    }
+
+    return selfTy;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
       if (FD->getBody()) {
@@ -1864,7 +1943,6 @@ public:
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
 
-
     // Validate the @mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being in DeclAttrs).
     Optional<bool> MutatingAttr = FD->getAttrs().getMutating();
@@ -1877,32 +1955,15 @@ public:
         FD->setMutating(MutatingAttr.getValue());
     }
 
-    // Before anything else, set up the 'self' argument correctly.
-    GenericParamList *outerGenericParams = nullptr;
-    if (Type SelfTy = FD->computeSelfType(&outerGenericParams)) {
-      auto SelfDecl = FD->getImplicitSelfDecl();
-      SelfDecl->setType(SelfTy);
-      // 'self' is let for reference types (i.e., classes) or when 'self' is
-      // lowered to the type itself.  It is mutable when lowered to @inout.
-      SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                       (!SelfTy->is<InOutType>() &&
-                        !SelfTy->is<MetatypeType>()));
-
-      TypedPattern *selfPattern =
-          cast<TypedPattern>(FD->getArgParamPatterns()[0]);
-      if (selfPattern->hasType()) {
-        assert(selfPattern->getType().getPointer() == SelfTy.getPointer());
-      } else {
-        selfPattern->setType(SelfTy);
-        cast<NamedPattern>(selfPattern->getSubPattern())->setType(SelfTy);
-      }
-    }
-
     bool isInvalid = false;
 
     // Check whether the return type is 'DynamicSelf'.
     if (checkDynamicSelfReturn(FD))
       isInvalid = true;
+
+    // Before anything else, set up the 'self' argument correctly.
+    GenericParamList *outerGenericParams = nullptr;
+    configureImplicitSelf(FD, outerGenericParams);
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
