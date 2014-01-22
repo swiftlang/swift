@@ -193,6 +193,30 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   GenericArguments genericArgs;
   genericArgs.collect(IGF, boundGeneric);
+  
+  // If we have less than four arguments, use a fast entry point.
+  assert(genericArgs.Values.size() > 0 && "no generic args?!");
+  if (genericArgs.Values.size() <= 4) {
+    llvm::Constant *fastMetadataGetters[] = {
+      nullptr,
+      IGF.IGM.getGetGenericMetadata1Fn(),
+      IGF.IGM.getGetGenericMetadata2Fn(),
+      IGF.IGM.getGetGenericMetadata3Fn(),
+      IGF.IGM.getGetGenericMetadata4Fn(),
+    };
+    auto fastGetter = fastMetadataGetters[genericArgs.Values.size()];
+    
+    SmallVector<llvm::Value *, 5> args;
+    args.push_back(metadata);
+    for (auto value : genericArgs.Values)
+      args.push_back(IGF.Builder.CreateBitCast(value, IGF.IGM.Int8PtrTy));
+    auto result = IGF.Builder.CreateCall(fastGetter, args);
+    result->setDoesNotThrow();
+    result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::ReadNone);
+    // FIXME: Save scope type metadata.
+    return result;
+  }
 
   // Slam that information directly into the generic arguments buffer.
   auto argsBufferTy =
@@ -214,6 +238,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   auto result = IGF.Builder.CreateCall2(IGF.IGM.getGetGenericMetadataFn(),
                                         metadata, arguments);
   result->setDoesNotThrow();
+  result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                       llvm::Attribute::ReadOnly);
 
   // FIXME: Save scope type metadata.
   return result;

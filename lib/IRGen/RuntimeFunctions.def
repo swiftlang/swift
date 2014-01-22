@@ -254,7 +254,41 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, ReadOnly))
+
+// type_metadata_t *swift_getGenericMetadata1(type_metadata_pattern_t *pattern,
+//                                            const void *arg0);
+FUNCTION(GetGenericMetadata1, swift_getGenericMetadata1, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getGenericMetadata2(type_metadata_pattern_t *pattern,
+//                                            const void *arg0,
+//                                            const void *arg1);
+FUNCTION(GetGenericMetadata2, swift_getGenericMetadata2, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getGenericMetadata3(type_metadata_pattern_t *pattern,
+//                                            const void *arg0,
+//                                            const void *arg1,
+//                                            const void *arg2);
+FUNCTION(GetGenericMetadata3, swift_getGenericMetadata3, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// type_metadata_t *swift_getGenericMetadata4(type_metadata_pattern_t *pattern,
+//                                            const void *arg0,
+//                                            const void *arg1,
+//                                            const void *arg2,
+//                                            const void *arg3);
+FUNCTION(GetGenericMetadata4, swift_getGenericMetadata4, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPatternPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadNone))
 
 // type_metadata_t *swift_getMetatypeMetadata(type_metadata_t *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
