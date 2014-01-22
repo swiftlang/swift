@@ -32,6 +32,9 @@ NSString *NSStringToNSString(NSString *str);
   B *queen;
 }
 @property __attribute__((iboutletcollection(B))) NSArray *bees;
+
+@property(getter=isMakingHoney) BOOL makingHoney;
+@property(setter=assignGuard:) id guard;
 @end
 
 BOOL BOOLtoBOOL(BOOL b);

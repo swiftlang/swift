@@ -2816,6 +2816,14 @@ namespace {
       if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
         return nullptr;
 
+      // FIXME: For now, don't import properties with custom getter or setter
+      // names. We don't call them properly in SILGen.
+      auto customAccessorMask =
+        clang::ObjCPropertyDecl::OBJC_PR_getter |
+        clang::ObjCPropertyDecl::OBJC_PR_setter;
+      if (decl->getPropertyAttributesAsWritten() & customAccessorMask)
+        return nullptr;
+
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;

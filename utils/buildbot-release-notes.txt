@@ -1,3 +1,15 @@
+2014-01-29
+----------
+
+* Objective-C properties with custom getter or setter names are (temporarily)
+  not imported into Swift; the getter and setter will be imported individually
+  as methods instead. Previously, they would appear as properties within the
+  Objective-C class, but attempting to use the accessor with the customized
+  name would result in a crash.
+
+  The long-term fix is tracked as <rdar://problem/15877160>.
+
+
 2014-01-22
 ----------
 
