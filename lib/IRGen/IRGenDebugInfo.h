@@ -180,7 +180,6 @@ public:
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
                                     StringRef Name,
-                                    swift::SILInstruction *I,
                                     IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
@@ -309,6 +308,30 @@ public:
 
   /// ~ArtificialLocation - Autorestore everything back to normal.
   ~ArtificialLocation() {
+    if (DI) DI->popLoc();
+  }
+};
+
+
+/// PrologueLocation - An RAII object that temporarily switches to an
+/// empty location. This is how the function prologue is represented.
+class PrologueLocation {
+  IRGenDebugInfo *DI;
+public:
+  /// Set the current location to line 0, but within the current scope
+  /// (= the top of the LexicalBlockStack).
+  PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
+    if (DI) {
+      DI->pushLoc();
+      llvm::DIDescriptor Scope(Builder.getCurrentDebugLocation().
+                               getScope(Builder.getContext()));
+      auto DL = llvm::DebugLoc::get(0, 0, nullptr);
+      Builder.SetCurrentDebugLocation(DL);
+    }
+  }
+
+  /// ~PrologueLocation - Autorestore everything back to normal.
+  ~PrologueLocation() {
     if (DI) DI->popLoc();
   }
 };

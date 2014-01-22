@@ -484,21 +484,47 @@ public:
     return foundBB->second;
   }
 
-  /// Emit a shadow copy of an Address in an alloca, so the register
-  /// allocator doesn't elide the dbg.value intrinsic when register
-  /// pressure is high.
-  llvm::Value *emitShadowCopy(const Address &Source,
-                              StringRef Name) {
-    if (IGM.Opts.OptLevel == 0) {
-      auto Alloca = createAlloca(Source->getType(),
-                                 Source.getAlignment(),
-                                 Name+".addr");
-      Builder.CreateAlignedStore(Source.getAddress(),
-                                 Alloca.getAddress(),
-                                 Source.getAlignment().getValue());
-      return Alloca.getAddress();
+  /// At -O0, emit a shadow copy of an Address in an alloca, so the
+  /// register allocator doesn't elide the dbg.value intrinsic when
+  /// register pressure is high.
+  llvm::Value *emitShadowCopy(llvm::Value *Storage,
+                              StringRef Name,
+                              Alignment Align = Alignment(0)) {
+    if (IGM.Opts.OptLevel > 0
+        || isa<llvm::AllocaInst>(Storage)
+        || isa<llvm::UndefValue>(Storage))
+      return Storage;
+
+    if (Align.isZero())
+      Align = IGM.getPointerAlignment();
+
+    auto Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
+    Builder.CreateAlignedStore(Storage, Alloca.getAddress(), Align.getValue());
+    return Alloca.getAddress();
+  }
+
+  llvm::Value *emitShadowCopy(const Address &Storage, StringRef Name) {
+    return emitShadowCopy(Storage.getAddress(), Name, Storage.getAlignment());
+  }
+
+
+  /// Emit debug info for a function argument or a local variable.
+  template <typename StorageType>
+  void emitDebugVariableDeclaration(IRBuilder& Builder,
+                                    StorageType Storage,
+                                    DebugTypeInfo Ty,
+                                    StringRef Name) {
+    if (!IGM.DebugInfo) return;
+    auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
+    if (N != ArgNo.end()) {
+      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      IGM.DebugInfo->
+        emitArgVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
+                                   Ty, Name, N->second, DirectValue);
     } else
-      return Source.getAddress();
+      IGM.DebugInfo->
+        emitStackVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
+                                     Ty, Name, DirectValue);
   }
 
   /// Emit the shared trap block for condfail instructions, or reuse one we
@@ -563,13 +589,13 @@ public:
     StringRef Name = Decl->getName().str();
     auto SILVal = i->getOperand();
     auto Vals = getLoweredExplosion(SILVal).claimAll();
-    // See also comment for SILArgument; it would be nice of
+    // See also comment for SILArgument; it would be nice if we could
     // DW_OP_piece larger values together.
     if (Vals.size() == 1)
-      IGM.DebugInfo->emitStackVariableDeclaration
-        (Builder, emitShadowCopy(Address(Vals[0], Alignment(1)), Name),
+      emitDebugVariableDeclaration
+        (Builder, Vals[0],
          DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
-         Name, i);
+         Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
     if (!IGM.DebugInfo) return;
@@ -578,10 +604,10 @@ public:
     StringRef Name = Decl->getName().str();
     auto SILVal = i->getOperand();
     auto Val = getLoweredAddress(SILVal).getAddress();
-    IGM.DebugInfo->emitStackVariableDeclaration
+    emitDebugVariableDeclaration
       (Builder, Val,
        DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
-       Name, i);
+       Name);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
@@ -2283,16 +2309,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                  i->getElementType().getSwiftRValueType(),
                                  dbgname);
   if (IGM.DebugInfo && Decl) {
-    auto AddrIR = addr.getAddressPointer();
     auto DTI = DebugTypeInfo(Decl, type, i->getDebugScope());
     auto Name = Decl->getName().str();
-    auto N = ArgNo.find(cast<VarDecl>(Decl));
-    if (N != ArgNo.end())
-      IGM.DebugInfo->emitArgVariableDeclaration(Builder, AddrIR, DTI, Name,
-                                                N->second, DirectValue);
-    else
-      IGM.DebugInfo->emitStackVariableDeclaration(Builder, AddrIR, DTI, Name,
-                                                  i, DirectValue);
+    emitDebugVariableDeclaration(Builder, addr.getAddress(), DTI, Name);
   }
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
@@ -2360,7 +2379,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
        emitShadowCopy(addr.getAddress(), Name),
        Decl ? DebugTypeInfo(Decl, type, i->getDebugScope())
        : DebugTypeInfo(i->getElementType().getSwiftType(), type, nullptr),
-       Name, i, Indirection);
+       Name, Indirection);
   }
 }
 
