@@ -18,7 +18,7 @@
 #include "llvm/Support/Debug.h"
 
 //===----------------------------------------------------------------------===//
-//                        Decrement Analysis
+//                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 
 /// Could Inst decrement the ref count associated with target?
@@ -67,7 +67,7 @@ bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
 }
 
 //===----------------------------------------------------------------------===//
-//                           Use Analysis
+//                                Use Analysis
 //===----------------------------------------------------------------------===//
 
 /// Can Inst use Target in a manner that requires Target to be alive at Inst?
