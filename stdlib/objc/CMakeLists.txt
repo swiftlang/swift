@@ -6,12 +6,17 @@ set(SWIFTOBJC_SOURCES
     BridgeObjectiveC.mm)
 
 # Definition of ObjCBool is platform-specific.
-if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
+if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx" 
+    OR
+    (SWIFT_DEPLOYMENT_OS MATCHES "^iphone" 
+     AND NOT (CMAKE_OSX_ARCHITECTURES MATCHES "64$")))
+  # OS X or 32-bit iOS: Objective-C BOOL is signed char
   list(APPEND SWIFTOBJC_SOURCES 
-    ObjectiveC-macosx.swift)
-elseif (SWIFT_DEPLOYMENT_OS MATCHES "^iphone")
+    ObjectiveC-BOOLchar.swift)
+else()
+  # Others: Objective-C BOOL is C99/C++ bool.
   list(APPEND SWIFTOBJC_SOURCES 
-    ObjectiveC-iphoneos.swift)
+    ObjectiveC-BOOLbool.swift)
 endif()
 
 add_swift_library(swiftObjectiveC INSTALL

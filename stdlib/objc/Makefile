@@ -14,7 +14,7 @@ SWIFT_LEVEL := ../..
 LIBRARYNAME := swiftObjectiveC
 LINK_LIBS_IN_SHARED := 1
 SHARED_LIBRARY := 1
-SWIFT_SOURCES := ObjectiveC.swift ObjectiveC-macosx.swift
+SWIFT_SOURCES := ObjectiveC.swift ObjectiveC-BOOLchar.swift
 SOURCES := ObjectiveC.o BridgeObjectiveC.mm
 NO_BUILD_ARCHIVE := 1
 
