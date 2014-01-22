@@ -378,6 +378,8 @@ struct ASTNodeBase {};
 #define SCOPE_LIKE(NODE)                                        \
     bool shouldVerify(NODE *fn) {                               \
       pushScope(fn);                                            \
+      if (fn->hasLazyMembers())                                 \
+        return false;                                           \
       return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
     }                                                           \
     void cleanup(NODE *fn) {                                    \
