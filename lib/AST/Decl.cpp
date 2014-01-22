@@ -1449,6 +1449,23 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   return { Found->getDefaultArgKind(), Found->getPattern()->getType() };
 }
 
+SourceRange AbstractFunctionDecl::getBodySourceRange() const {
+  switch (getBodyKind()) {
+  case BodyKind::None:
+    return SourceRange();
+
+  case BodyKind::Parsed:
+    if (auto body = getBody())
+      return body->getSourceRange();
+
+    return SourceRange();
+
+  case BodyKind::Skipped:
+  case BodyKind::Unparsed:
+    return BodyRange;
+  }
+}
+
 VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
   ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
   if (ArgParamPatterns.empty())
@@ -1562,7 +1579,7 @@ GenericTypeParamType *FuncDecl::makeDynamicSelf() {
   unsigned index = existingParams? existingParams->size() : 0;
 
   // Create the 'DynamicSelf' parameter.
-  auto loc = getBodyResultTypeLoc().getSourceRange().Start;
+  SourceLoc loc;
   auto &ctx = getASTContext();
   auto dynamicSelfDecl = new (ctx) GenericTypeParamDecl(this,
                                                         ctx.Id_DynamicSelf,
@@ -1686,7 +1703,7 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 SourceRange FuncDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { FuncLoc, BodyEndLoc };
+    return { FuncLoc, BodyRange.End };
 
   if (auto *B = getBody())
     return { FuncLoc, B->getEndLoc() };
@@ -1706,7 +1723,7 @@ SourceRange EnumElementDecl::getSourceRange() const {
 SourceRange ConstructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { getConstructorLoc(), BodyEndLoc };
+    return { getConstructorLoc(), BodyRange.End };
 
   if (!Body || !Body->getEndLoc().isValid()) {
     const DeclContext *DC = getDeclContext();
@@ -1905,7 +1922,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 SourceRange DestructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { getDestructorLoc(), BodyEndLoc };
+    return { getDestructorLoc(), BodyRange.End };
 
   if (getBodyKind() == BodyKind::None)
     return getDestructorLoc();

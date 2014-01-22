@@ -223,8 +223,23 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (!Params)
       return;
 
-    for (auto P : *Params)
+    for (auto P : *Params) {
+      // As a special case, DynamicSelf is only visible within the body of the
+      // method that declares it or at the
+      auto decl = P.getDecl();
+      if (decl->isImplicit() && Loc.isValid() &&
+          decl->getName() == decl->getASTContext().Id_DynamicSelf) {
+        auto func = cast<FuncDecl>(decl->getDeclContext());
+        SourceRange bodyRange = func->getBodySourceRange();
+        if (bodyRange.isValid() &&
+            !IntersectsRange(bodyRange) &&
+            !IntersectsRange(func->getBodyResultTypeLoc().getSourceRange()))
+          continue;
+      }
+
+
       checkValueDecl(P.getDecl());
+    }
   }
 
   void checkSourceFile(const SourceFile &SF) {

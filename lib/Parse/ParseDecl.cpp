@@ -1741,9 +1741,9 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                                      BodyRange)) {
     State->delayFunctionBodyParsing(AFD, BodyRange,
                                     BeginParserPosition.PreviousLoc);
-    AFD->setBodyDelayed(BodyRange.End);
+    AFD->setBodyDelayed(BodyRange);
   } else {
-    AFD->setBodySkipped(BodyRange.End);
+    AFD->setBodySkipped(BodyRange);
   }
 }
 
@@ -1883,7 +1883,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
           // FIXME: Should do some sort of error recovery here?
         } else if (SignatureStatus.hasCodeCompletion()) {
           // Code completion was inside the signature, don't attach the body.
-          FD->setBodySkipped(Body.get()->getEndLoc());
+          FD->setBodySkipped(Body.get()->getSourceRange());
         } else {
           FD->setBody(Body.get());
         }

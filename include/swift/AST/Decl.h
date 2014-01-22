@@ -2620,10 +2620,10 @@ protected:
     /// This enum member is active if getBodyKind() == BodyKind::Parsed.
     BraceStmt *Body;
 
-    /// End location of the function body when the body is delayed or skipped.
+    /// The location of the function body when the body is delayed or skipped.
     /// This enum member is active if getBodyKind() is BodyKind::Unparsed or
     /// BodyKind::Skipped.
-    SourceLoc BodyEndLoc;
+    SourceRange BodyRange;
   };
 
   /// Pointer to the implicit 'self' decl and a bit that is set to true when
@@ -2692,18 +2692,21 @@ public:
 
   /// \brief Note that the body was skipped for this function.  Function body
   /// can not be attached after this call.
-  void setBodySkipped(SourceLoc EndLoc) {
+  void setBodySkipped(SourceRange bodyRange) {
     assert(getBodyKind() == BodyKind::None);
-    BodyEndLoc = EndLoc;
+    BodyRange = bodyRange;
     setBodyKind(BodyKind::Skipped);
   }
 
   /// \brief Note that parsing for the body was delayed.
-  void setBodyDelayed(SourceLoc EndLoc) {
+  void setBodyDelayed(SourceRange bodyRange) {
     assert(getBodyKind() == BodyKind::None);
-    BodyEndLoc = EndLoc;
+    BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);
   }
+
+  /// Retrieve the source range of the function body.
+  SourceRange getBodySourceRange() const;
 
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
