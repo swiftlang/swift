@@ -42,6 +42,7 @@ namespace driver {
   class Compilation;
   class Job;
   class JobList;
+  class OutputFileMap;
   class ToolChain;
 
 /// \brief A class encapsulating information about the outputs the driver
@@ -177,14 +178,24 @@ public:
                     const InputList &Inputs, const OutputInfo &OI,
                     ActionList &Actions) const;
 
+  /// Construct the OutputFileMap for the driver from the given arguments.
+  ///
+  /// \param Args The input arguments.
+  /// \param[out] OFM a unique_ptr which, upon return, will point to the
+  /// OutputFileMap for this driver, or nullptr if one does not exist
+  /// (or could not be constructed).
+  void buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
+                          std::unique_ptr<OutputFileMap> &OFM) const;
+
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.
   ///
   /// \param Actions The Actions for which Jobs should be generated.
   /// \param OI The OutputInfo for which Jobs should be generated
+  /// \param OFM The OutputFileMap for which Jobs should be generated
   /// \param[out] C The Compilation to which Jobs should be added
   void buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                 Compilation &C) const;
+                 const OutputFileMap *OFM, Compilation &C) const;
 
   /// \brief A map for caching Jobs for a given Action/ToolChain pair
   typedef llvm::DenseMap<std::pair<const Action *, const ToolChain *>, Job *>
@@ -196,14 +207,16 @@ public:
   /// \param C The Compilation which this Job will eventually be part of
   /// \param A The Action for which a Job should be created
   /// \param OI The OutputInfo for which a Job should be created
+  /// \param OFM The OutputFileMap for which a Job should be created
   /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
   Job *buildJobsForAction(const Compilation &C, const Action *A,
-                          const OutputInfo &OI, const ToolChain &TC,
-                          bool AtTopLevel, JobCacheMap &JobCache) const;
+                          const OutputInfo &OI, const OutputFileMap *OFM,
+                          const ToolChain &TC, bool AtTopLevel,
+                          JobCacheMap &JobCache) const;
 
   /// Handle any arguments which should be treated before building actions or
   /// binding tools.

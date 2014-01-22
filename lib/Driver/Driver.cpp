@@ -26,6 +26,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
+#include "swift/Driver/OutputFileMap.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/DenseSet.h"
@@ -122,12 +123,15 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     }
   }
 
+  std::unique_ptr<OutputFileMap> OFM;
+  buildOutputFileMap(*TranslatedArgList, OFM);
+
   std::unique_ptr<Compilation> C(new Compilation(*this, TC, std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  NumberOfParallelCommands,
                                                  DriverSkipExecution));
 
-  buildJobs(Actions, OI, *C);
+  buildJobs(Actions, OI, OFM.get(), *C);
   if (DriverPrintBindings) {
     return nullptr;
   }
@@ -483,8 +487,23 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   return true;
 }
 
+void
+Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
+                           std::unique_ptr<OutputFileMap> &OFM) const {
+  if (const Arg *A = Args.getLastArg(options::OPT_output_file_map)) {
+    // TODO: perform some preflight checks to ensure the file exists.
+    OFM = OutputFileMap::loadFromPath(A->getValue());
+    if (!OFM)
+      // TODO: emit diagnostic
+      llvm::errs() << "error: unable to load output file map\n";
+  } else {
+    // We don't have an OutputFileMap, so reset the unique_ptr.
+    OFM.reset();
+  }
+}
+
 void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
-                       Compilation &C) const {
+                       const OutputFileMap *OFM, Compilation &C) const {
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
@@ -519,7 +538,7 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    Job *J = buildJobsForAction(C, A, OI, C.getDefaultToolChain(), true,
+    Job *J = buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
                                 JobCache);
     C.addJob(J);
   }
@@ -551,8 +570,10 @@ static void printJobOutputs(const Job *J) {
 }
 
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
-                                const OutputInfo &OI, const ToolChain &TC,
-                                bool AtTopLevel, JobCacheMap &JobCache) const {
+                                const OutputInfo &OI,
+                                const OutputFileMap *OFM,
+                                const ToolChain &TC, bool AtTopLevel,
+                                JobCacheMap &JobCache) const {
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
   {
@@ -570,7 +591,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
     } else {
-      InputJobs->addJob(buildJobsForAction(C, Input, OI,
+      InputJobs->addJob(buildJobsForAction(C, Input, OI, OFM,
                                            C.getDefaultToolChain(), false,
                                            JobCache));
     }

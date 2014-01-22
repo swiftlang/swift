@@ -110,6 +110,12 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
   Alias<I>;
 
+def output_file_map : Separate<["-"], "output-file-map">, Flags<[DriverOption]>,
+  HelpText<"A file which specifies the location of outputs">,
+  MetaVarName<"<path>">;
+def output_file_map_EQ : Joined<["-"], "output-file-map=">,
+  Flags<[DriverOption]>, Alias<output_file_map>;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[DriverOption, FrontendOption]>,
   HelpText<"Serialize diagnostics in a binary format">;
