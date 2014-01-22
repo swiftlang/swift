@@ -2729,7 +2729,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (NeedsBoxForSelf) {
     // Emit the call to super.init() right before exiting from the initializer.
     if (Expr *SI = ctor->getSuperInitCall())
-      emitIgnoredRValue(SI);
+      emitRValue(SI);
 
     selfArg = B.createLoad(cleanupLoc, VarLocs[selfDecl].getAddress());
     SILValue selfBox = VarLocs[selfDecl].box;
@@ -3691,10 +3691,6 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   // Retain the value.
   entry.second = true;
   return RValue(SGF, E, SGF.emitManagedRetain(E, entry.first));
-}
-
-void SILGenFunction::emitIgnoredRValue(Expr *E) {
-  emitRValue(E, SGFContext::Ignored);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

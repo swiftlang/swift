@@ -559,11 +559,10 @@ void RValueSource::rewriteType(CanType newType) & {
 }
 
 RValue RValueSource::getAsRValue(SILGenFunction &gen) && {
-  if (isRValue()) {
+  if (isRValue())
     return std::move(*this).asKnownRValue();
-  } else {
-    return gen.emitRValue(std::move(*this).asKnownExpr());
-  }
+
+  return gen.emitRValue(std::move(*this).asKnownExpr());
 }
 
 ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen) && {

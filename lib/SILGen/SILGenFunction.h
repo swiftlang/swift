@@ -31,13 +31,9 @@ namespace Lowering {
 /// ManagedValue).  Callers who propagate down an SGFContext that
 /// might have a emit-into buffer must be aware of this.
 struct SGFContext {
-public:
-  enum Ignored_t { Ignored };
-  
 private:
   enum class Kind {
     Normal,
-    Ignored
   };
 
 private:
@@ -53,12 +49,6 @@ public:
     : state(emitInto, Kind::Normal)
   {}
   
-  /// Creates an ignored context, in which the value of the
-  /// expression is being ignored.
-  SGFContext(Ignored_t _)
-    : state(nullptr, Kind::Ignored)
-  {}
-
   /// Returns a pointer to the Initialization that the current expression should
   /// store its result to, or null if the expression should allocate temporary
   /// storage for its result.
@@ -68,11 +58,6 @@ public:
 
   /// Does this context have a preferred address to emit into?
   bool hasAddressToEmitInto() const; // in Initialization.h
-  
-  /// Returns true if the current expression is in an ignored context.
-  bool isIgnored() const {
-    return state.getInt() == Kind::Ignored;
-  }
 };
 
 class SwitchContext;
@@ -545,9 +530,6 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
-
-  /// Emit an r-value that we're ignoring the result of.
-  void emitIgnoredRValue(Expr *E);
 
   ManagedValue emitArrayInjectionCall(ManagedValue ObjectPtr,
                                       SILValue BasePtr,
