@@ -2423,6 +2423,7 @@ namespace {
     /// of this type to that protocol.
     void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
       auto &entry = SILEntries.front();
+      (void)entry;
       assert(entry.getKind() == SILWitnessTable::BaseProtocol
              && "sil witness table does not match protocol");
       assert(entry.getBaseProtocolWitness().Requirement == baseProto
@@ -2471,6 +2472,7 @@ namespace {
     
     void addAssociatedType(AssociatedTypeDecl *ty) {
       auto &entry = SILEntries.front();
+      (void)entry;
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
       assert(entry.getAssociatedTypeWitness().Requirement == ty
@@ -2489,7 +2491,9 @@ namespace {
 
       // FIXME: Add static witness tables for type conformances.
       for (auto protocol : ty->getProtocols()) {
+        (void)protocol;
         auto &entry = SILEntries.front();
+        (void)entry;
         assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
                && "sil witness table does not match protocol");
         assert(entry.getAssociatedTypeProtocolWitness().Requirement == ty

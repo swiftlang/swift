@@ -3075,6 +3075,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     return nullptr;
 
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
+  (void)Canon;
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
   if (!Result->getDeclContext()->isModuleScopeContext() ||
