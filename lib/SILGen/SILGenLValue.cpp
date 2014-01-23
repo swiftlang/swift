@@ -668,11 +668,9 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
 ///
 /// \param rvalueTL - the type lowering for the type-of-rvalue
 ///   of the address
-ManagedValue SILGenFunction::emitLoad(SILLocation loc,
-                                      SILValue addr,
+ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
                                       const TypeLowering &rvalueTL,
-                                      SGFContext C,
-                                      IsTake_t isTake) {
+                                      SGFContext C, IsTake_t isTake) {
   // Get the lowering for the address type.  We can avoid a re-lookup
   // in the very common case of this being equivalent to the r-value
   // type.
@@ -681,6 +679,12 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc,
        ? rvalueTL : getTypeLowering(addr.getType()));
 
   if (rvalueTL.isAddressOnly()) {
+    // If the client is cool with a +0 rvalue, the decl has an address-only
+    // type, and there are no conversions, then we can return this as a +0
+    // address RValue.
+    if (C.isPlusZeroOk() && rvalueTL.getLoweredType() ==addrTL.getLoweredType())
+      return ManagedValue::forUnmanaged(addr);
+        
     // Copy the address-only value.
     SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
     emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,

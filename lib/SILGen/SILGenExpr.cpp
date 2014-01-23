@@ -437,8 +437,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
     if (auto Result = emitLValueForDecl(loc, var))
-      return emitLoad(loc, Result.getLValueAddress(),
-                      getTypeLowering(refType), C, IsNotTake);
+      return emitLoad(loc, Result.getLValueAddress(), getTypeLowering(refType),
+                      C, IsNotTake);
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
