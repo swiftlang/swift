@@ -1073,8 +1073,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  // Create a variable to stand in for the RHS value.
-  auto *matchVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+  // Create a 'let' binding to stand in for the RHS value.
+  auto *matchVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          rhsType,
