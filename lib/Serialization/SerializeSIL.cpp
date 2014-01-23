@@ -281,9 +281,45 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                        (unsigned)SI.getKind());
     break;
   }
-  case ValueKind::DeallocBoxInst:
   case ValueKind::InitExistentialInst:
-  case ValueKind::InitExistentialRefInst:
+  case ValueKind::InitExistentialRefInst: {
+    SILValue operand;
+    SILType Ty;
+    ArrayRef<ProtocolConformance*> conformances;
+
+    switch (SI.getKind()) {
+    default: assert(0 && "out of sync with parent");
+    case ValueKind::InitExistentialInst: {
+      auto &IEI = cast<InitExistentialInst>(SI);
+      operand = IEI.getOperand();
+      Ty = IEI.getConcreteType();
+      conformances = IEI.getConformances();
+      break;
+    }
+    case ValueKind::InitExistentialRefInst: {
+      auto &IERI = cast<InitExistentialRefInst>(SI);
+      operand = IERI.getOperand();
+      Ty = IERI.getType();
+      conformances = IERI.getConformances();
+      break;
+    }
+    }
+    unsigned abbrCode = SILAbbrCodes[SILInitExistentialLayout::Code];
+    SILInitExistentialLayout::emitRecord(Out, ScratchRecord, abbrCode,
+       (unsigned)SI.getKind(),
+       S.addTypeRef(Ty.getSwiftRValueType()),
+       (unsigned)Ty.getCategory(),
+       S.addTypeRef(operand.getType().getSwiftRValueType()),
+       (unsigned)operand.getType().getCategory(),
+       addValueRef(operand),
+       operand.getResultNumber(),
+       conformances.size());
+
+    for (auto *c : conformances)
+      S.writeConformance(c->getProtocol(), c, nullptr, SILAbbrCodes);
+    break;
+  }
+  case ValueKind::DeallocBoxInst:
   case ValueKind::ArchetypeMetatypeInst:
   case ValueKind::ClassMetatypeInst:
   case ValueKind::ProtocolMetatypeInst:
@@ -299,14 +335,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::ClassMetatypeInst:
       operand = cast<ClassMetatypeInst>(&SI)->getOperand();
       Ty = cast<ClassMetatypeInst>(&SI)->getType();
-      break;
-    case ValueKind::InitExistentialInst:
-      operand = cast<InitExistentialInst>(&SI)->getOperand();
-      Ty = cast<InitExistentialInst>(&SI)->getConcreteType();
-      break;
-    case ValueKind::InitExistentialRefInst:
-      operand = cast<InitExistentialRefInst>(&SI)->getOperand();
-      Ty = cast<InitExistentialRefInst>(&SI)->getType();
       break;
     case ValueKind::ProtocolMetatypeInst:
       operand = cast<ProtocolMetatypeInst>(&SI)->getOperand();
@@ -1216,6 +1244,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
     registerSILAbbr<SILOneTypeLayout>();
     registerSILAbbr<SILOneOperandLayout>();
     registerSILAbbr<SILOneTypeOneOperandLayout>();
+    registerSILAbbr<SILInitExistentialLayout>();
     registerSILAbbr<SILOneTypeValuesLayout>();
     registerSILAbbr<SILTwoOperandsLayout>();
     registerSILAbbr<SILInstApplyLayout>();

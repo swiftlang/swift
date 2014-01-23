@@ -92,7 +92,8 @@ namespace sil_block {
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
     SIL_GLOBALVAR,
-    SIL_INST_CAST // It has a cast kind instead of an attribute.
+    SIL_INST_CAST, // It has a cast kind instead of an attribute.
+    SIL_INIT_EXISTENTIAL,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -155,6 +156,20 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     SILValueResultField
+  >;
+  
+  // SIL instructions that construct existential values.
+  using SILInitExistentialLayout = BCRecordLayout<
+    SIL_INIT_EXISTENTIAL,
+    SILInstOpCodeField,   // opcode
+    TypeIDField,          // result type
+    SILTypeCategoryField, // result type category
+    TypeIDField,          // operand type
+    SILTypeCategoryField, // operand type category
+    ValueIDField,         // operand id
+    SILValueResultField,  // operand result id
+    BCFixed<32>           // number of conformances
+                          // followed by conformances
   >;
 
   // SIL Cast instructions with a cast kind, one type and one typed valueref.

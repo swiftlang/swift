@@ -539,6 +539,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                            TyID2, TyCategory2,
                                            ValID, ValResNum);
     break;
+  case SIL_INIT_EXISTENTIAL:
+    SILInitExistentialLayout::readRecord(scratch, OpCode,
+                                         TyID, TyCategory,
+                                         TyID2, TyCategory2,
+                                         ValID, ValResNum, Attr);
+    break;
   case SIL_INST_CAST:
     SILInstCastLayout::readRecord(scratch, OpCode, Attr,
                                   TyID, TyCategory,
@@ -629,21 +635,36 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 #undef ONEOPERAND_ONETYPE_INST
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {
+    
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
     SILValue operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
+    
+    SmallVector<ProtocolConformance*, 2> conformances;
+    for (unsigned i = 0; i < Attr; ++i) {
+      auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
+                                                      SILCursor);
+      assert(conformancePair && "did not read enough conformances");
+      ProtocolConformance *conformance
+        = conformancePair ? conformancePair->second : nullptr;
+
+      conformances.push_back(conformance);
+    }
+    
+    auto ctxConformances = MF->getContext().AllocateCopy(conformances);
+    
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::InitExistentialInst:
       // FIXME: Conformances in InitExistentialInst needs to be serialized.
       ResultVal = Builder.createInitExistential(Loc, operand, Ty,
-                      ArrayRef<ProtocolConformance*>());
+                                                ctxConformances);
       break;
     case ValueKind::InitExistentialRefInst:
       // FIXME: Conformances in InitExistentialRefInst needs to be serialized.
       ResultVal = Builder.createInitExistentialRef(Loc, Ty, operand,
-                      ArrayRef<ProtocolConformance*>());
+                                                   ctxConformances);
       break;
     }
     break;
