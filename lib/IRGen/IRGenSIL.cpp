@@ -323,7 +323,7 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
-  llvm::DenseMap<const VarDecl *, unsigned> ArgNo;
+  llvm::SmallDenseMap<const VarDecl *, unsigned, 8> ArgNo;
   
   // Shared destination basic block for condfail traps.
   llvm::BasicBlock *FailBB = nullptr;
