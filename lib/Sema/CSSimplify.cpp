@@ -889,7 +889,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // that there is no implicit conversion from T? to @unchecked T?.
   {
     BoundGenericType *boundGenericType2;
-    if (concrete && kind >= TypeMatchKind::Conversion &&
+    if (concrete && kind >= TypeMatchKind::Subtype &&
         (boundGenericType2 = type2->getAs<BoundGenericType>())) {
       auto decl2 = boundGenericType2->getDecl();
       if (auto optionalKind2 = decl2->classifyAsOptionalType()) {
