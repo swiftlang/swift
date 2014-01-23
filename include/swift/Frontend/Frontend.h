@@ -22,7 +22,6 @@
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/TargetOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
@@ -54,7 +53,6 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
-  TargetOptions TargetOpts;
   DiagnosticOptions DiagnosticOpts;
   IRGenOptions IRGenOpts;
 
@@ -86,7 +84,7 @@ public:
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
-    return TargetOpts.Triple;
+    return IRGenOpts.Triple;
   }
 
   void setClangModuleCachePath(StringRef Path) {
@@ -167,9 +165,6 @@ public:
   const SearchPathOptions &getSearchPathOptions() const {
     return SearchPathOpts;
   }
-
-  TargetOptions &getTargetOptions() { return TargetOpts; }
-  const TargetOptions &getTargetOptions() const { return TargetOpts; }
 
   DiagnosticOptions &getDiagnosticOptions() { return DiagnosticOpts; }
   const DiagnosticOptions &getDiagnosticOptions() const {

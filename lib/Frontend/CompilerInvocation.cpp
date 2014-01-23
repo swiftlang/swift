@@ -28,7 +28,7 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 swift::CompilerInvocation::CompilerInvocation() {
-  TargetOpts.Triple = llvm::sys::getDefaultTargetTriple();
+  IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
 }
 
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
@@ -48,14 +48,14 @@ void CompilerInvocation::setRuntimeIncludePath(StringRef Path) {
 void CompilerInvocation::updateRuntimeImportPath() {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeIncludePath);
 
-  llvm::Triple Triple(TargetOpts.Triple);
+  llvm::Triple Triple(IRGenOpts.Triple);
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
 
   SearchPathOpts.RuntimeImportPath = LibPath.str();
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
-  TargetOpts.Triple = Triple.str();
+  IRGenOpts.Triple = Triple.str();
   updateRuntimeImportPath();
 }
 
@@ -365,17 +365,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   return false;
 }
 
-static bool ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
-                            DiagnosticEngine &Diags) {
-  using namespace options;
-
-  if (const Arg *A = Args.getLastArg(OPT_target)) {
-    Opts.Triple = llvm::Triple::normalize(A->getValue());
-  }
-
-  return false;
-}
-
 static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   using namespace options;
@@ -486,15 +475,15 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableDynamicValueTypeLayout = true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_target)) {
+    Opts.Triple = llvm::Triple::normalize(A->getValue());
+  }
+
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
   if (!FrontendOpts.InputFilenames.empty())
     Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
   Opts.OutputFilename = FrontendOpts.OutputFilename;
-
-  if (const Arg *A = Args.getLastArg(OPT_target)) {
-    Opts.Triple = A->getValue();
-  }
 
   return false;
 }
@@ -542,10 +531,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags)) {
-    return true;
-  }
-
-  if (ParseTargetArgs(TargetOpts, *ParsedArgs, Diags)) {
     return true;
   }
   
