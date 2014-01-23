@@ -478,6 +478,10 @@ public:
     return summaryFlags;
   }
 
+  bool isFunctionConversion() const {
+    return (getSummaryFlags() & ConstraintLocator::IsFunctionConversion);
+  }
+
   /// \brief Retrieve the base constraint locator, on which this builder's
   /// path is based.
   ConstraintLocator *getBaseLocator() const {

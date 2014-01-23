@@ -946,6 +946,14 @@ commit_to_conversions:
     return SolutionKind::Error;
   }
 
+  // Okay, we need to perform one or more conversions.  If this
+  // conversion will cause a function conversion, score it as worse.
+  // This induces conversions to occur within closures instead of
+  // outside of them wherever possible.
+  if (locator.isFunctionConversion()) {
+    increaseScore(SK_FunctionConversion);
+  }
+
   // Where there is more than one potential conversion, create a disjunction
   // so that we'll explore all of the options.
   if (potentialConversions.size() > 1) {
