@@ -236,6 +236,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       llvm::sys::fs::is_directory(Opts.OutputFilename)) {
     // No output filename was specified, or an output directory was specified.
     // Determine the correct output filename.
+
+    // Note: this should typically only be used when invoking the frontend
+    // directly, as the driver will always pass -o with an appropriate filename
+    // if output is required for the requested action.
+
     StringRef Suffix;
     switch (Opts.RequestedAction) {
     case FrontendOptions::Parse:
