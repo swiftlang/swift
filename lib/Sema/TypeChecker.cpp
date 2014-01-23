@@ -203,7 +203,7 @@ static Type getBaseMemberDeclType(TypeChecker &TC,
   while (Base->getClassOrBoundGenericClass() != BaseDecl)
     Base = TC.getSuperClassOf(Base);
   return TC.substMemberTypeWithBase(D->getModuleContext(),
-                                    D->getType(), D, Base);
+                                    D->getInterfaceType(), D, Base);
 }
 
 /// \brief Check the given set of members for any members that override a member
@@ -242,7 +242,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
       continue;
     if (MemberVD->getName().empty())
       continue;
-    if (MemberVD->getType()->is<ErrorType>())
+    if (MemberVD->getInterfaceType()->is<ErrorType>())
       continue;
     auto FoundDeclResult = FoundDecls.insert({ MemberVD->getName(),
                                                std::vector<ValueDecl*>() });
@@ -281,14 +281,14 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
           auto CurAsFunc = cast<FuncDecl>(CurDecls[i]);
           if (MemberFunc->isStatic() == CurAsFunc->isStatic()) {
             AnyFunctionType *MemberFTy =
-                MemberVD->getType()->getAs<AnyFunctionType>();
+                MemberVD->getInterfaceType()->getAs<AnyFunctionType>();
             AnyFunctionType *OtherFTy = BaseMemberTy->castTo<AnyFunctionType>();
             if (MemberFTy && OtherFTy)
               isTypeEqual =
                 MemberFTy->getResult()->isEqual(OtherFTy->getResult());
           }
         } else {
-          isTypeEqual = MemberVD->getType()->isEqual(BaseMemberTy);
+          isTypeEqual = MemberVD->getInterfaceType()->isEqual(BaseMemberTy);
         }
         if (isTypeEqual) {
           if (CurDecls[i]->getDeclContext() == MemberVD->getDeclContext()) {
@@ -332,7 +332,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
       if (auto MemberFunc = dyn_cast<FuncDecl>(MemberVD)) {
         if (MemberFunc->isStatic() == cast<FuncDecl>(CurDecls[i])->isStatic()) {
           AnyFunctionType *MemberFTy =
-              MemberVD->getType()->getAs<AnyFunctionType>();
+              MemberVD->getInterfaceType()->getAs<AnyFunctionType>();
           AnyFunctionType *OtherFTy = BaseMemberTy->getAs<AnyFunctionType>();
           // FIXME: We should be dealing in interface types here.
           if (MemberFTy && OtherFTy) {
@@ -342,7 +342,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
           }
         }
       } else {
-        isSubtype = TC.isTrivialSubtypeOf(MemberVD->getType(),
+        isSubtype = TC.isTrivialSubtypeOf(MemberVD->getInterfaceType(),
                                           BaseMemberTy,
                                           CD->getDeclContext());
       }

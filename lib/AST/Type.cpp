@@ -2157,7 +2157,8 @@ case TypeKind::Id:
           return Type();
       }
 
-      if (firstType->isDependentType() || secondType->isDependentType()) {
+      if (firstType->isDependentType() || 
+          (secondType && secondType->isDependentType())) {
         if (firstType.getPointer() != req.getFirstType().getPointer() ||
             secondType.getPointer() != req.getSecondType().getPointer())
           anyChanges = true;
