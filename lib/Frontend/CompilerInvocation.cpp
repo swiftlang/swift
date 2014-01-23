@@ -63,10 +63,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
   using namespace options;
 
-  if (const Arg *A = Args.getLastArg(OPT_o)) {
-    Opts.OutputFilename = A->getValue();
-  }
-
   if (Args.hasArg(OPT_emit_verbose_sil)) {
     Opts.EmitVerboseSIL = true;
   }
@@ -194,6 +190,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   else
     Opts.InputKind = SourceFileKind::Main;
 
+  if (const Arg *A = Args.getLastArg(OPT_o)) {
+    Opts.OutputFilename = A->getValue();
+  }
+
   {
     const Arg *A = Args.getLastArg(OPT_module_name);
     std::string ModuleName;
@@ -230,6 +230,113 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
 
     Opts.ModuleName = ModuleName;
+  }
+
+  if (Opts.OutputFilename.empty() ||
+      llvm::sys::fs::is_directory(Opts.OutputFilename)) {
+    // No output filename was specified, or an output directory was specified.
+    // Determine the correct output filename.
+    StringRef Suffix;
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::Parse:
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+      // Textual modes.
+      Opts.OutputFilename = "-";
+      break;
+
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL: {
+      if (Opts.OutputFilename.empty())
+        Opts.OutputFilename = "-";
+      else
+        Suffix = SIL_EXTENSION;
+      break;
+    }
+
+    case FrontendOptions::EmitModuleOnly:
+      Suffix = SERIALIZED_MODULE_EXTENSION;
+      break;
+
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      // These modes have no frontend-generated output.
+      Opts.OutputFilename = "";
+      break;
+
+    case FrontendOptions::EmitAssembly: {
+      if (Opts.OutputFilename.empty())
+        Opts.OutputFilename = "-";
+      else
+        Suffix = "s";
+      break;
+    }
+
+    case FrontendOptions::EmitIR: {
+      if (Opts.OutputFilename.empty())
+        Opts.OutputFilename = "-";
+      else
+        Suffix = "ll";
+      break;
+    }
+
+    case FrontendOptions::EmitBC: {
+      if (Opts.OutputFilename.empty())
+        Opts.OutputFilename = "-";
+      else
+        Suffix = "bc";
+      break;
+    }
+
+    case FrontendOptions::EmitObject:
+      Suffix = "o";
+      break;
+    }
+
+    if (!Suffix.empty()) {
+      // We need to deduce a file name.
+
+      // First, if we're reading from stdin and we don't have a directory,
+      // output to stdout.
+      if (Opts.InputFilenames.size() == 1 && Opts.InputFilenames[0] == "-" &&
+          Opts.OutputFilename.empty())
+        Opts.OutputFilename = "-";
+      else {
+        // We have a suffix, so determine an appropriate name.
+        llvm::SmallString<128> Path(Opts.OutputFilename);
+        
+        StringRef BaseName;
+        if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
+          BaseName = llvm::sys::path::stem(Opts.InputFilenames[Opts.PrimaryInput->Index]);
+        } else if (Opts.InputFilenames.size() == 1) {
+          BaseName = llvm::sys::path::stem(Opts.InputFilenames[0]);
+        } else {
+          BaseName = Opts.ModuleName;
+        }
+
+        llvm::sys::path::append(Path, BaseName);
+        llvm::sys::path::replace_extension(Path, Suffix);
+
+        Opts.OutputFilename = Path.c_str();
+      }
+    }
+
+    if (Opts.OutputFilename.empty()) {
+      if (Opts.RequestedAction != FrontendOptions::REPL &&
+          Opts.RequestedAction != FrontendOptions::Immediate) {
+        // TODO: emit diagnostic
+        llvm::errs() << "error: an output filename was not specified for a mode which requires an output filename\n";
+        return true;
+      }
+    } else if (Opts.OutputFilename != "-" &&
+        llvm::sys::fs::is_directory(Opts.OutputFilename)) {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: the implicit output file '" << Opts.OutputFilename
+                   << "' is a directory; explicitly specify a filename using -o"
+                   << '\n';
+      return true;
+    }
   }
 
   auto determineOutputFilename = [&] (const char *Extension) -> std::string {
