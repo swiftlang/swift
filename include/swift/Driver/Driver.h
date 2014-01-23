@@ -80,6 +80,9 @@ public:
   /// output.
   bool ShouldTreatModuleAsTopLevelOutput = false;
 
+  /// Whether the compiler picked the current module name, rather than the user.
+  bool ModuleNameIsFallback = false;
+
   /// The name of the module which we are building.
   std::string ModuleName;
 
@@ -89,9 +92,6 @@ public:
 };
 
 class Driver {
-  /// The default image name (e.g. "a.out")
-  static const char *const DefaultImageName;
-  
   std::unique_ptr<llvm::opt::OptTable> Opts;
 
   DiagnosticEngine &Diags;

@@ -50,8 +50,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-const char *const Driver::DefaultImageName = "a.out";
-
 Driver::Driver(StringRef DriverExecutable,
                DiagnosticEngine &Diags)
   : Opts(createDriverOptTable()), Diags(Diags),
@@ -377,16 +375,23 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
+  } else if (Inputs.size() == 1) {
+    OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
   }
 
   if (!Lexer::isIdentifier(OI.ModuleName)) {
+    OI.ModuleNameIsFallback = true;
     if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
       OI.ModuleName = "main";
     else if (!Inputs.empty() || OI.CompilerMode == OutputInfo::Mode::REPL) {
       // Having an improper module name is only bad if we have inputs or if
       // we're in REPL mode.
       // TODO: emit diagnostic
-      llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
+      if (OI.ModuleName.empty())
+        llvm::errs() << "error: must specify a module name with -o or "
+                        "-module-name\n";
+      else
+        llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
       OI.ModuleName = "__bad__";
     }
   }
@@ -703,7 +708,8 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                  "A Command which produces output must have a BaseInput!");
           StringRef BaseName(BaseInput);
           if (isa<MergeModuleJobAction>(JA) ||
-              OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+              OI.CompilerMode == OutputInfo::Mode::SingleCompile ||
+              JA->getType() == types::TY_Image)
             BaseName = OI.ModuleName;
 
           // We don't yet have a name, assign one.
@@ -725,7 +731,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                            BaseInput));
           } else {
             if (JA->getType() == types::TY_Image) {
-              Output.reset(new CommandOutput(JA->getType(), DefaultImageName,
+              if (A->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
+                BaseName = llvm::sys::path::stem(BaseInput);
+              Output.reset(new CommandOutput(JA->getType(), BaseName,
                                              BaseInput));
             } else {
               StringRef Suffix = types::getTypeTempSuffix(JA->getType());
