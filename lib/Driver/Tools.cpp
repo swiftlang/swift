@@ -256,6 +256,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
   size_t origLen = Arguments.size();
+  (void)origLen;
   addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
   assert(Arguments.size() - origLen == Inputs->size() &&
          "every input to MergeModule must generate a swiftmodule");

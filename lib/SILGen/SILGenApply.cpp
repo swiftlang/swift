@@ -828,6 +828,7 @@ public:
     // If this is a direct reference to a vardecl, it must be a let constant
     // (which doesn't need to be loaded).  Just emit its value directly.
     if (auto *vd = dyn_cast<VarDecl>(e->getDecl())) {
+      (void)vd;
       assert(vd->isLet() && "Direct reference to vardecl that isn't a let?");
       visitExpr(e);
       return;

@@ -2886,6 +2886,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // coercion.
   if (auto fromLValue = fromType->getAs<LValueType>()) {
     if (auto *toIO = toType->getAs<InOutType>()) {
+      (void)toIO;
       // In an @assignment operator like "++i", the operand is converted from
       // an implicit lvalue to an @inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));

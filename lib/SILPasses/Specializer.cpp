@@ -172,6 +172,7 @@ private:
       DEBUG(llvm::dbgs() << "Caller substitution conforms to " <<
             CallerSubst.Conformance.size() << " types.\n");
       for (auto CallerCon : CallerSubst.Conformance) {
+        (void)CallerCon;
         DEBUG(llvm::dbgs() << CallerCon->getProtocol()->getName() << "\n");
       }
 
