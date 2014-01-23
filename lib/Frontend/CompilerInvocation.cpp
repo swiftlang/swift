@@ -154,8 +154,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // (Setting up module output will be handled below.)
       Action = FrontendOptions::EmitModuleOnly;
     } else {
-      // In the absence of any other mode indicators, parse the inputs.
-      Action = FrontendOptions::Parse;
+      // In the absence of any other mode indicators, emit an object file.
+      Action = FrontendOptions::EmitObject;
     }
   }
   Opts.RequestedAction = Action;
