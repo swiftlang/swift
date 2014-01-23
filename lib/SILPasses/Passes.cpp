@@ -85,6 +85,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     performSILARCOpts(&Module);
     performSILAllocBoxToStackPromotion(&Module);    
 
+    DEBUG(Module.verify());
     // Stats
     NumOptzIter++;
   }
