@@ -60,18 +60,20 @@ static SILValue getAccessPathRoot(SILValue Pointer) {
   }
 }
 
-/// Compute the element number indicated by the specified pointer (which is
-/// derived from the root by a series of tuple/struct element addresses) and return
-/// the first subelement addressed by the address.  For example, given:
+/// Compute the subelement number indicated by the specified pointer (which is
+/// derived from the root by a series of tuple/struct element addresses) by
+/// treating the type as a linearized namespace with sequential elements.  For
+/// example, given:
 ///
 ///   root = alloc { a: { c: i64, d: i64 }, b: (i64, i64) }
 ///   tmp1 = struct_element_addr root, 1
 ///   tmp2 = tuple_element_addr tmp1, 0
 ///
-/// This will return an access path of [struct: 'b', tuple: 0] and a base
-/// element of 2.
+/// This will return a subelement number of 2.
 ///
-static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
+/// If this pointer is to within a existential projection, it returns ~0U.
+///
+static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
   unsigned SubEltNumber = 0;
   SILModule &M = RootInst->getModule();
   
@@ -80,7 +82,8 @@ static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
     if (RootInst == Pointer.getDef())
       return SubEltNumber;
     
-    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Pointer)) {
+    auto *Inst = cast<SILInstruction>(Pointer);
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
       SILType TT = TEAI->getOperand().getType();
       
       // Keep track of what subelement is being referenced.
@@ -88,8 +91,7 @@ static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
         SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
       }
       Pointer = TEAI->getOperand();
-    } else {
-      auto *SEAI = cast<StructElementAddrInst>(Pointer);
+    } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
       SILType ST = SEAI->getOperand().getType();
       
       // Keep track of what subelement is being referenced.
@@ -100,6 +102,11 @@ static unsigned ComputeAccessPath(SILValue Pointer, SILInstruction *RootInst) {
       }
       
       Pointer = SEAI->getOperand();
+    } else {
+      assert((isa<InitExistentialInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
+             "Unknown access path instruction");
+      // Cannot promote loads and stores from within an existential projection.
+      return ~0U;
     }
   }
 }
@@ -284,7 +291,8 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
                       llvm::SmallBitVector &ConflictingValues) {
   // Handle store and assign.
   if (isa<StoreInst>(Inst) || isa<AssignInst>(Inst)) {
-    unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
+    unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
+    assert(StartSubElt != ~0U && "Store within enum projection not handled");
     SILType ValTy = Inst->getOperand(0).getType();
     
     for (unsigned i = 0, e = getNumSubElements(ValTy, Module); i != e; ++i) {
@@ -311,7 +319,8 @@ updateAvailableValues(SILInstruction *Inst, llvm::SmallBitVector &RequiredElts,
   // to see if any loaded subelements are being used, and if so, explode the
   // copy_addr to its individual pieces.
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    unsigned StartSubElt = ComputeAccessPath(Inst->getOperand(1), TheMemory);
+    unsigned StartSubElt = computeSubelement(Inst->getOperand(1), TheMemory);
+    assert(StartSubElt != ~0U && "Store within enum projection not handled");
     SILType ValTy = Inst->getOperand(1).getType();
     
     bool AnyRequired = false;
@@ -594,7 +603,13 @@ bool AllocOptimize::promoteLoad(SILInstruction *Inst) {
   // If this is a load/copy_addr from a struct field that we want to promote,
   // compute the access path down to the field so we can determine precise
   // def/use behavior.
-  unsigned FirstElt = ComputeAccessPath(Inst->getOperand(0), TheMemory);
+  unsigned FirstElt = computeSubelement(Inst->getOperand(0), TheMemory);
+  
+  // If this is a load from within an enum projection, we can't promote it since
+  // we don't track subelements in a type that could be changing.
+  if (FirstElt == ~0U)
+    return false;
+  
   unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
   
   // Set up the bitvector of elements being demanded by the load.
@@ -676,7 +691,8 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   
   // Compute the access path down to the field so we can determine precise
   // def/use behavior.
-  unsigned FirstElt = ComputeAccessPath(Address, TheMemory);
+  unsigned FirstElt = computeSubelement(Address, TheMemory);
+  assert(FirstElt != ~0U && "destroy within enum projection is not valid");
   unsigned NumLoadSubElements = getNumSubElements(LoadTy, Module);
   
   // Set up the bitvector of elements being demanded by the load.
