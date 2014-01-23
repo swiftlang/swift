@@ -32,6 +32,7 @@ namespace {
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
+    SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
   };
 } // end anonymous namespace
 
@@ -141,6 +142,17 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
       if (UCCI->getOperand().getType() == Upcast->getType() &&
           UCCI->getType() == Upcast->getOperand().getType())
       return Upcast->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
+  // (object-pointer-to-ref-inst (ref-to-object-pointer-inst x) typeof(x)) -> x
+  if (auto *RTOPI = dyn_cast<RefToObjectPointerInst>(&*OPRI->getOperand()))
+    if (RTOPI->getOperand().getType() == OPRI->getType())
+      return RTOPI->getOperand();
 
   return SILValue();
 }

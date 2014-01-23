@@ -538,3 +538,12 @@ bb0(%0 : $Builtin.ObjectPointer):
   return %0 : $Builtin.ObjectPointer
 }
 
+// CHECK-LABEL: sil @object_pointer_to_ref_ref_to_object_pointer_round_trip
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @object_pointer_to_ref_ref_to_object_pointer_round_trip : $@thin <T_0_0, T_0_1> (HeapBuffer<T_0_0, T_0_1>) -> HeapBuffer<T_0_0, T_0_1> {
+bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
+  %1 = ref_to_object_pointer %0 : $HeapBuffer<T_0_0, T_0_1> to $Builtin.ObjectPointer
+  %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $HeapBuffer<T_0_0, T_0_1>
+  return %2 : $HeapBuffer<T_0_0, T_0_1>
+}
