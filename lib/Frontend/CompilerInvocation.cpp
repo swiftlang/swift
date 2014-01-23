@@ -177,9 +177,15 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     return true;
   }
 
-  if (Args.hasArg(OPT_parse_sil) ||
-      (Opts.InputFilenames.size() == 1 &&
-       llvm::sys::path::extension(Opts.InputFilenames[0]) == SIL_EXTENSION))
+  bool TreatAsSIL = Args.hasArg(OPT_parse_sil);
+  if (!TreatAsSIL && Opts.InputFilenames.size() == 1) {
+    // If we have exactly one input filename, and its extension is "sil",
+    // treat the input as SIL.
+    StringRef Input(Opts.InputFilenames[0]);
+    TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
+  }
+
+  if (TreatAsSIL)
     Opts.InputKind = SourceFileKind::SIL;
   else if (Args.hasArg(OPT_parse_as_library))
     Opts.InputKind = SourceFileKind::Library;
