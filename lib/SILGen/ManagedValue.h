@@ -95,6 +95,16 @@ public:
     return valueAndFlag.getInt() && !valueAndFlag.getPointer();
   }
 
+  /// Return true if this is an +0 rvalue, or has trivial type.
+  bool isPlusZeroRValueOrTrivial() const {
+    // If this is an lvalue or isInContext() then it is not an RValue.
+    if (isLValue() || isInContext()) return false;
+    
+    // If this has a cleanup attached, then it is +1 rvalue.  If not, it is
+    // either +0 or trivial (in which case +0 vs +1 doesn't matter).
+    return !hasCleanup();
+  }
+  
   SILValue getLValueAddress() const {
     assert(isLValue() && "This isn't an lvalue");
     return getValue();

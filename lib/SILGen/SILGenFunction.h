@@ -31,22 +31,40 @@ struct Materialize;
 /// returning a "isInContext()" ManagedValue of whatever type.  Callers who
 /// propagate down an SGFContext that might have a emit-into buffer must be
 /// aware of this.
+///
+/// Clients of emission routines that take an SGFContext can also specify that
+/// they are ok getting back an RValue at +0 instead of requiring it to be at
+/// +1.  The client is then responsible for checking the ManagedValue to see if
+/// it got back a ManagedValue at +0 or +1.
 class SGFContext {
   llvm::PointerIntPair<Initialization *, 1, bool> state;
 public:
   SGFContext() = default;
   
+  enum AllowPlusZero_t {
+    AllowPlusZero
+  };
+  
   /// Creates an emitInto context that will store the result of the visited expr
   /// into the given Initialization.
-  explicit SGFContext(Initialization *emitInto)
-    : state(emitInto, false)
-  {}
+  explicit SGFContext(Initialization *emitInto) : state(emitInto, false) {
+  }
+  
+  /*implicit*/
+  SGFContext(AllowPlusZero_t) : state(nullptr, true) {
+  }
   
   /// Returns a pointer to the Initialization that the current expression should
   /// store its result to, or null if the expression should allocate temporary
   /// storage for its result.
   Initialization *getEmitInto() const {
     return state.getPointer();
+  }
+  
+  /// Return true if a ManagedValue producer is encouraged to return its value
+  /// at +0 instead of +1.
+  bool isPlusZeroOk() const {
+    return state.getInt();
   }
 };
 

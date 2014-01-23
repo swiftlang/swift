@@ -447,9 +447,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
              !It->second.getConstant().getType().isAddress() &&
              "LValue cases should be handled above");
 
-      // Otherwise, emit it as a +1 value.
-      return ManagedValue::forUnmanaged(It->second.getConstant())
-               .copyUnmanaged(*this, loc);
+      auto Result = ManagedValue::forUnmanaged(It->second.getConstant());
+      
+      // If the client can't handle a +0 result, retain it to get a +1.
+      return C.isPlusZeroOk() ? Result : Result.copyUnmanaged(*this, loc);
     }
 
     assert(var->hasAccessorFunctions() && "Unknown rvalue case");
@@ -528,7 +529,7 @@ static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
 
 
 /// Produce a singular RValue for a load from the specified property.  This
-/// does not consume the base value, which is a struct or reference.
+/// is designed to work with RValue ManagedValue bases that are either +0 or +1.
 ManagedValue SILGenFunction::
 emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           VarDecl *FieldDecl,
@@ -538,6 +539,11 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   // If this is a get-only computed property being accessed, call the getter.
   switch (FieldDecl->getStorageKind()) {
   case VarDecl::Computed: {
+    // If the base is +0, emit a copy_value to bring it to +1.
+    // TODO: Enhance prepareAccessorBaseArg to work with +0 bases directly.
+    if (base.isPlusZeroRValueOrTrivial())
+      base = base.copyUnmanaged(*this, loc);
+    
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,
                                                  FieldDecl->getGetter());
     return emitGetAccessor(loc, FieldDecl, substitutions,
@@ -565,6 +571,10 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
   // If the base is a reference type, just handle this as loading the lvalue.
   if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
+    // TODO: Enhance emitDirectIVarLValue to work with +0 bases directly.
+    if (base.isPlusZeroRValueOrTrivial())
+      base = base.copyUnmanaged(*this, loc);
+
     LValue LV = emitDirectIVarLValue(loc, base, FieldDecl);
     return emitLoadOfLValue(loc, LV, C);
   }
@@ -580,6 +590,9 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   bool hasAbstractionChange = false;
   auto substFormalType = propTy->getCanonicalType();
   AbstractionPattern origFormalType;
+  // FIXME: This crazy 'if' condition should not be required when we have
+  // reliable canonical type comparisons (i.e., interfacetypes get done).  For
+  // now, not doing this causes us to emit extra pointless copies.
   if (substFormalType->is<AnyFunctionType>() ||
       substFormalType->is<TupleType>() ||
       substFormalType->is<MetatypeType>()) {
@@ -591,13 +604,14 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   ManagedValue Result;
   if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
-    SILValue ElementVal =B.createStructExtract(loc, base.getValue(), FieldDecl);
+    Result = ManagedValue::forUnmanaged(B.createStructExtract(loc,
+                                                              base.getValue(),
+                                                              FieldDecl));
 
-    // Emit a copyvalue to +1 the returned element, since the entire aggregate
-    // will be destroyed.
-    ElementVal = lowering.emitCopyValue(B, loc, ElementVal);
-
-    Result = emitManagedRValueWithCleanup(ElementVal);
+    // If we have an abstraction change or if we have to produce a result at
+    // +1, then emit a copyvalue.
+    if (hasAbstractionChange || !C.isPlusZeroOk())
+      Result = Result.copyUnmanaged(*this, loc);
   } else {
     // For address-only sequences, the base is in memory.  Emit a
     // struct_element_addr to get to the field, and then load the element as an
@@ -1253,43 +1267,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
 
-  // As a "special" hack, special case a MRE(DRE) of a struct let value.
-  // Instead of emitting the struct as a +1, only to extract one element, emit
-  // a reference to the struct at +0, get the element at +0, then copy_value the
-  // element.  This avoids retaining fields that aren't accessed.  This will be
-  // generalized in the future.
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E->getBase())) {
-    auto BaseVD = dyn_cast<VarDecl>(DRE->getDecl());
-    if (BaseVD && BaseVD->isLet() &&
-        !FieldDecl->isStatic() && FieldDecl->hasStorage() &&
-        !E->getBase()->getType()->hasReferenceSemantics() &&
-        E->getMember().getSubstitutions().empty() &&
-        E->getType()->getCanonicalType() ==
-          FieldDecl->getType()->getCanonicalType()) {
-      // For local decls, use the address we allocated or the value if we have
-      // it.
-      auto It = SGF.VarLocs.find(BaseVD);
-      if (It != SGF.VarLocs.end() && !It->second.isAddress() &&
-          !It->second.getConstant().getType().isAddress()) {
-        SILValue Base = It->second.getConstant();
-
-        // For non-address-only structs, we emit a struct_extract sequence.
-        SILValue ElementVal = SGF.B.createStructExtract(E, Base, FieldDecl);
-
-        // Emit a copyvalue to +1 the returned element, since the entire aggregate
-        // will be destroyed.
-        ElementVal = SGF.B.emitCopyValueOperation(E, ElementVal);
-
-        auto Result = SGF.emitManagedRValueWithCleanup(ElementVal);
-        return RValue(SGF, E, Result);
-      }
-    }
-  }
-
-
-
   // Evaluate the base of the member reference.
-  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase());
+  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(),
+                                                  SGFContext::AllowPlusZero);
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
                                              E->getMember().getSubstitutions(),
                                                    E->getType(), C);

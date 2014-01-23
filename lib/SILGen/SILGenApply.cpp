@@ -2517,9 +2517,9 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       return RValueSource(loc, RValue(*this, loc,
                                       base.getType().getSwiftType(),
                                       base));
-    // When calling an accessor, the base may be provided as an @inout value, even
-    // though we only need an rvalue.  In this case, load the value out of the
-    // address.
+    // When calling an accessor, the base may be provided as an @inout value,
+    // even though we only need an rvalue.  In this case, load the value out of
+    // the address.
     // TODO: this causes us to materialize stuff (at the SIL level) that will
     // just be loaded - unnecessarily dumping stuff in memory.
     base = emitLoad(loc, base.getValue(),
