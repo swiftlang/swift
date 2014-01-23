@@ -1589,12 +1589,12 @@ private:
   /// declaration.
   ValueDecl *DefaultArgsOwner;
 
-  ArrayRef<Expr *> CallerDefaultArgs;
+  MutableArrayRef<Expr *> CallerDefaultArgs;
 
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
                    ValueDecl *defaultArgsOwner,
-                   ArrayRef<Expr *> CallerDefaultArgs, Type ty)
+                   MutableArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
       ElementMapping(elementMapping), InjectionFn(nullptr),
       DefaultArgsOwner(defaultArgsOwner), CallerDefaultArgs(CallerDefaultArgs)
@@ -1618,6 +1618,9 @@ public:
 
   /// Retrieve the caller-defaulted arguments.
   ArrayRef<Expr *> getCallerDefaultArgs() const { return CallerDefaultArgs; }
+
+  /// Retrieve the caller-defaulted arguments.
+  MutableArrayRef<Expr *> getCallerDefaultArgs() { return CallerDefaultArgs; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TupleShuffle;

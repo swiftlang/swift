@@ -286,7 +286,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return E;
     }
     return nullptr;
-}
+  }
+
+  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+    } else {
+      return nullptr;
+    }
+
+    for (auto &defaultArg : E->getCallerDefaultArgs()) {
+      if (Expr *newDefaultArg = doIt(defaultArg))
+        defaultArg = newDefaultArg;
+      else
+        return nullptr;
+    }
+
+    return E;
+  }
 
   Expr *visitAddressOfExpr(AddressOfExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
