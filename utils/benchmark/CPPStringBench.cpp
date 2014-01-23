@@ -4,7 +4,7 @@
 
 #define LAPS 10000000
 
-std::string s = "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig";
+std::wstring s = L"siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig";
 
 int
 main(void) {
