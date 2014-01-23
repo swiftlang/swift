@@ -3140,7 +3140,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr());
+  return visit(E->getSemanticExpr(), C);
 }
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
