@@ -540,8 +540,8 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   // If this is a get-only computed property being accessed, call the getter.
   switch (FieldDecl->getStorageKind()) {
   case VarDecl::Computed: {
-    // If the base is +0, emit a copy_value to bring it to +1.
-    // TODO: Enhance prepareAccessorBaseArg to work with +0 bases directly.
+    // If the base is +0, emit a copy_value to bring it to +1 since getters
+    // always take the base object at +1.
     if (base.isPlusZeroRValueOrTrivial())
       base = base.copyUnmanaged(*this, loc);
     
@@ -1268,7 +1268,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
 
-  // Evaluate the base of the member reference.
+  // Evaluate the base of the member reference.  Since emitRValueForPropertyLoad
+  // works with +0 bases correctly, we ask for them to come back.
   ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(),
                                                   SGFContext::AllowPlusZero);
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
@@ -1344,7 +1345,16 @@ RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
                                             SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  return visit(E->getBase()).extractElement(E->getFieldNumber());
+  
+  // If our client is ok with a +0 result, then we can compute our base as +0
+  // and return its element that way.  It would not be ok to reuse the Context's
+  // address buffer though, since our base value will a different type than the
+  // element.
+  SGFContext SubContext;
+  if (C.isPlusZeroOk())
+    SubContext = SGFContext::AllowPlusZero;
+  
+  return visit(E->getBase(), SubContext).extractElement(E->getFieldNumber());
 }
 
 RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,

@@ -54,6 +54,8 @@ public:
   }
   
   void visitTupleType(CanTupleType t, ManagedValue mv, SILLocation l) {
+    bool IsPlusZero = mv.isPlusZeroRValueOrTrivial();
+    
     SILValue v = mv.forward(gen);
     if (v.getType().isAddressOnly(gen.F.getModule())) {
       // Destructure address-only types by addressing the individual members.
@@ -66,7 +68,13 @@ public:
         assert(fieldTI.getSemanticType() == fieldTy);
         if (fieldTI.isLoadable() && !isa<InOutType>(fieldCanTy))
           member = gen.B.createLoad(l, member);
-        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member, fieldTI), l);
+        
+        // If we're returning a +1 value, emit a cleanup for the member to cover
+        // for the cleanup we disabled for the tuple aggregate.
+        auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
+                            : gen.emitManagedRValueWithCleanup(member, fieldTI);
+        
+        visit(fieldCanTy, SubValue, l);
       }
     } else {
       // Extract the elements from loadable tuples.
@@ -76,7 +84,13 @@ public:
         assert(fieldTI.isLoadable());
         SILValue member = gen.B.createTupleExtract(l, v, i,
                                                    fieldTI.getLoweredType());
-        visit(fieldCanTy, gen.emitManagedRValueWithCleanup(member, fieldTI), l);
+        
+        // If we're returning a +1 value, emit a cleanup for the member to cover
+        // for the cleanup we disabled for the tuple aggregate.
+        auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
+          : gen.emitManagedRValueWithCleanup(member, fieldTI);
+
+        visit(fieldCanTy, SubValue, l);
       }
     }
   }
