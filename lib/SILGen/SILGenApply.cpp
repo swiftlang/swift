@@ -892,41 +892,6 @@ public:
     return subs.slice(innerIdx);
   }
 
-  /// getExistentialOrArchetypeRValueAddress - Return a SILValue of address type
-  /// for the specified rvalue of existential or archetype type.  This attempts
-  /// to avoid emitting a load (and thus, an extra copy of the abstracted
-  /// value) for the rvalue in cases where we can find an underlying address we
-  /// can use.
-  ManagedValue getExistentialOrArchetypeRValueAddress(Expr *e) {
-    // If this is a load of a physical lvalue, we can just use the address
-    // available within the lvalue.
-    if (auto *LE = dyn_cast<LoadExpr>(e)) {
-      LValue lv = gen.emitLValue(LE->getSubExpr());
-
-      // If this is a load of a physical lvalue, we can just us the value
-      // already plunked into memory.
-      if (lv.isLastComponentPhysical())
-        return gen.emitAddressOfLValue(e, lv);
-
-      // Otherwise, for logic lvalues we really do have to perform a load.
-      return gen.emitLoadOfLValue(e, lv, SGFContext());
-    }
-
-    // If this is a reference something sitting in memory, then we can use it.
-    if (auto *DRE = dyn_cast<DeclRefExpr>(e)) {
-      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (auto Reference = gen.emitLValueForDecl(e, VD)) {
-          assert(Reference.isLValue() && "Should have got an lvalue back");
-
-          // Return the lvalue as an rvalue address.
-          return ManagedValue::forUnmanaged(Reference.getValue());
-        }
-      }
-    }
-
-    return gen.emitRValueAsSingleValue(e);
-  }
-
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
     ManagedValue existential;
 
@@ -944,7 +909,8 @@ public:
     // in memory.  We access this with the project_existential instruction.
     if (e->getBase()->getType()->is<ProtocolType>() &&
         !e->getBase()->getType()->castTo<ProtocolType>()->requiresClass())
-      existential = getExistentialOrArchetypeRValueAddress(e->getBase());
+      existential = gen.emitRValueAsSingleValue(e->getBase(),
+                                                SGFContext::AllowPlusZero);
     else
       existential = gen.emitRValueAsSingleValue(e->getBase());
 
@@ -1013,7 +979,8 @@ public:
     //
     if (e->getBase()->getType()->is<ArchetypeType>() &&
         !e->getBase()->getType()->castTo<ArchetypeType>()->requiresClass()) {
-      auto archetype = getExistentialOrArchetypeRValueAddress(e->getBase());
+      auto archetype = gen.emitRValueAsSingleValue(e->getBase(),
+                                                   SGFContext::AllowPlusZero);
       setSelfParam(RValue(gen, e->getBase(), archetype.getType().getSwiftType(),
                           archetype), e);
     } else {
