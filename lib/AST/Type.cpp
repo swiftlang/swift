@@ -1183,6 +1183,32 @@ static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
             isTrivialSubtypeOf(fn1.getResult(), fn2.getResult(), resolver));
   }
 
+  // Class-to-optional and class optional-to-optional.  Note that this
+  // is not recursive: T? is not necessarily a trivial subtype of T??,
+  // although it is a subtype.
+  if (auto bound2 = dyn_cast<BoundGenericType>(t2)) {
+    if (auto optKind2 = bound2->getDecl()->classifyAsOptionalType()) {
+      auto obj2 = bound2.getGenericArgs()[0];
+
+      // Optional-to-optional.
+      if (auto bound1 = dyn_cast<BoundGenericType>(t1)) {
+        if (auto optKind1 = bound1->getDecl()->classifyAsOptionalType()) {
+          auto obj1 = bound1.getGenericArgs()[0];
+          // T? is not a subtype of @unchecked T?, but all other
+          // combinations are fine.
+          return (optKind1 >= optKind2 && obj2->isSuperclassOf(obj1, resolver));
+        } else if (!isa<BoundGenericClassType>(bound1)) {
+          return false;
+        }
+      }
+
+      // Class-to-optional.
+      return obj2->isSuperclassOf(t1, resolver);
+    } else if (!isa<BoundGenericClassType>(bound2)) {
+      return false;
+    }
+  }
+
   // Class-to-class.
   return t2->isSuperclassOf(t1, resolver);
 }
