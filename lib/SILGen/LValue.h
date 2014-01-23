@@ -152,9 +152,10 @@ public:
                            ManagedValue base, SGFContext c) const = 0;
   
   /// Get the property, materialize a temporary lvalue for it, and if
-  /// we're in a writeback scope, register a writeback.
-  Materialize getMaterialized(SILGenFunction &gen, SILLocation loc,
-                              ManagedValue base) const;
+  /// we're in a writeback scope, register a writeback.  This returns the
+  /// address of the buffer.
+  SILValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue base) const;
 };
 
 inline LogicalPathComponent &PathComponent::asLogical() {

@@ -744,7 +744,7 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
                                                  SILType ty) {
   ty = ty.getObjectType();
   auto alloc = B.createAllocStack(loc, ty);
-  enterDeallocStackCleanup(loc, alloc->getContainerResult());
+  enterDeallocStackCleanup(alloc->getContainerResult());
   return alloc->getAddressResult();
 }
 
@@ -816,30 +816,6 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
 
   Cleanups.pushCleanup<CleanupMaterializedValue>(buffer);
   return ManagedValue(buffer, getTopCleanup());
-}
-
-Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
-  // Address-only values are already materialized.
-  if (v.getType().isAddress()) {
-    assert(v.getType().isAddressOnly(SGM.M) && "can't materialize an l-value");
-    return Materialize{v.getValue(), v.getCleanup()};
-  }
-
-  assert(!v.isLValue() && "materializing a non-address-only lvalue?!");
-  auto &lowering = getTypeLowering(v.getType().getSwiftType());
-  
-  // We don't use getBufferForExprResult here because the result of a
-  // materialization is *not* the value, but an address of the value.
-  SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
-  v.forwardInto(*this, loc, tmpMem);
-  
-  CleanupHandle valueCleanup = CleanupHandle::invalid();
-  if (!lowering.isTrivial()) {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(tmpMem);
-    valueCleanup = getTopCleanup();
-  }
-  
-  return Materialize{tmpMem, valueCleanup};
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,

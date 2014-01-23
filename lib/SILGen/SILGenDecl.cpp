@@ -200,10 +200,9 @@ public:
 
 /// Cleanup to destroy an initialized variable.
 class DeallocStackCleanup : public Cleanup {
-  SILLocation Loc;
   SILValue Addr;
 public:
-  DeallocStackCleanup(SILLocation loc, SILValue addr) : Loc(loc), Addr(addr) {}
+  DeallocStackCleanup(SILValue addr) : Addr(addr) {}
 
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.createDeallocStack(l, Addr);
@@ -595,11 +594,15 @@ SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
 }
 
 /// Enter a cleanup to deallocate the given location.
-CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILLocation loc,
-                                                       SILValue temp) {
+CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
   assert(temp.getType().isLocalStorage() &&
          "must deallocate container operand, not address operand!");
-  Cleanups.pushCleanup<DeallocStackCleanup>(loc, temp);
+  Cleanups.pushCleanup<DeallocStackCleanup>(temp);
+  return Cleanups.getTopCleanup();
+}
+
+CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
+  Cleanups.pushCleanup<DestroyValueCleanup>(valueOrAddr);
   return Cleanups.getTopCleanup();
 }
 
@@ -762,7 +765,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
       SILType ty = gen.getLoweredType(capture->getType());
       SILValue val = emitReconstitutedConstantCaptureArguments(ty, capture,gen);
       gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
-      gen.Cleanups.pushCleanup<DestroyValueCleanup>(val);
+      gen.enterDestroyCleanup(val);
       break;
     }
     // Address-only values we capture by-box since partial_apply doesn't work
@@ -790,7 +793,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
                                                  gen.F.begin(), capture);
     gen.LocalFunctions[SILDeclRef(capture)] = value;
-    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
+    gen.enterDestroyCleanup(value);
     break;
   }
   case CaptureKind::GetterSetter: {
@@ -799,7 +802,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
-    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
+    gen.enterDestroyCleanup(value);
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
@@ -808,7 +811,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
-    gen.Cleanups.pushCleanup<DestroyValueCleanup>(value);
+    gen.enterDestroyCleanup(value);
     break;
   }
   }

@@ -22,6 +22,7 @@
 
 namespace swift {
 namespace Lowering {
+struct Materialize;
 
 /// SGFContext - Internal context information for the SILGenFunction visitor.
 ///
@@ -865,8 +866,11 @@ public:
   void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
-  CleanupHandle enterDeallocStackCleanup(SILLocation loc, SILValue address);
+  CleanupHandle enterDeallocStackCleanup(SILValue address);
   
+  /// Enter a cleanup to emit a destroyValue/destroyAddr of the specified value.
+  CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
+
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E);
 

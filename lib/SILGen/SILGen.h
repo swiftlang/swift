@@ -268,21 +268,7 @@ public:
                                      diag, std::forward<U>(args)...);
   }
 };
-  
-/// Materialize - Represents a temporary allocation.
-struct Materialize {
-  /// The address of the allocation.
-  SILValue address;
-
-  /// The cleanup to dispose of the value before deallocating the buffer.
-  /// This cleanup can be killed by calling the consume method.
-  CleanupHandle valueCleanup;
-  
-  /// Load and claim ownership of the value in the buffer. Does not deallocate
-  /// the buffer.
-  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
-};
-
+ 
 } // end namespace Lowering
 } // end namespace swift
 

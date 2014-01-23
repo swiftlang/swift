@@ -35,6 +35,23 @@ using namespace Lowering;
 /// A pending writeback.
 namespace swift {
 namespace Lowering {
+
+  
+/// Materialize - Represents a temporary allocation.
+struct LLVM_LIBRARY_VISIBILITY Materialize {
+  /// The address of the allocation.
+  SILValue address;
+  
+  /// The cleanup to dispose of the value before deallocating the buffer.
+  /// This cleanup can be killed by calling the consume method.
+  CleanupHandle valueCleanup;
+  
+  /// Load and claim ownership of the value in the buffer. Does not deallocate
+  /// the buffer.
+  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
+};
+
+  
 struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   SILLocation loc;
   std::unique_ptr<LogicalPathComponent> component;
@@ -65,6 +82,27 @@ void SILGenFunction::freeWritebackStack() {
   delete WritebackStack;
 }
 
+Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
+  // Address-only values are already materialized.
+  if (v.getType().isAddress()) {
+    assert(v.getType().isAddressOnly(SGM.M) && "can't materialize an l-value");
+    return Materialize{v.getValue(), v.getCleanup()};
+  }
+  
+  assert(!v.isLValue() && "materializing a non-address-only lvalue?!");
+  auto &lowering = getTypeLowering(v.getType().getSwiftType());
+  
+  // We don't use getBufferForExprResult here because the result of a
+  // materialization is *not* the value, but an address of the value.
+  SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
+  v.forwardInto(*this, loc, tmpMem);
+  
+  CleanupHandle valueCleanup = CleanupHandle::invalid();
+  if (!lowering.isTrivial())
+    valueCleanup = enterDestroyCleanup(tmpMem);
+  
+  return Materialize{tmpMem, valueCleanup};
+}
 
 //===----------------------------------------------------------------------===//
 
@@ -134,14 +172,14 @@ public:
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
 
-Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
-                                                  SILLocation loc,
-                                                  ManagedValue base) const {
+SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
+                                               SILLocation loc,
+                                               ManagedValue base) const {
   // If the writeback is disabled, just emit a load into a temporary memory
   // location.
   if (!gen.InWritebackScope) {
     ManagedValue value = get(gen, loc, base, SGFContext());
-    return gen.emitMaterialize(loc, value);
+    return gen.emitMaterialize(loc, value).address;
   }
 
   // Otherwise, we need to emit a get and set.  The get operation will consume
@@ -154,7 +192,7 @@ Materialize LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   Materialize temp = gen.emitMaterialize(loc, value);
   
   gen.getWritebackStack().emplace_back(loc, clone(gen, loc), base, temp);
-  return temp;
+  return temp.address;
 }
 
 WritebackScope::WritebackScope(SILGenFunction &gen)
@@ -1065,8 +1103,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
     addr = component.asPhysical().offset(SGF, loc, base);
   } else {
     auto &lcomponent = component.asLogical();
-    Materialize temporary = lcomponent.getMaterialized(SGF, loc, base);
-    addr = ManagedValue::forLValue(temporary.address);
+    addr = ManagedValue::forLValue(lcomponent.getMaterialized(SGF, loc, base));
   }
 
   return addr;
