@@ -677,17 +677,17 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
 }
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,
-                                               SGFContext C) {
+                                              SGFContext C) {
   return RValue(SGF, E,
                 ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
 }
 RValue RValueEmitter::visitFloatLiteralExpr(FloatLiteralExpr *E,
-                                             SGFContext C) {
+                                            SGFContext C) {
   return RValue(SGF, E,
                 ManagedValue::forUnmanaged(SGF.B.createFloatLiteral(E)));
 }
 RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
-                                                 SGFContext C) {
+                                                SGFContext C) {
   return RValue(SGF, E,
                 ManagedValue::forUnmanaged(SGF.B.createIntegerLiteral(E)));
 }
@@ -748,8 +748,8 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
   return alloc->getAddressResult();
 }
 
-SILValue SILGenFunction::getBufferForExprResult(
-                                    SILLocation loc, SILType ty, SGFContext C) {
+SILValue SILGenFunction::
+getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C) {
   // If you change this, change manageBufferForExprResult below as well.
 
   // If we have a single-buffer "emit into" initialization, use that for the
@@ -786,9 +786,9 @@ SILValue SILGenFunction::getBufferForExprResult(
   return emitTemporaryAllocation(loc, ty.getObjectType());
 }
 
-ManagedValue SILGenFunction::manageBufferForExprResult(SILValue buffer,
-                                                 const TypeLowering &bufferTL,
-                                                       SGFContext C) {
+ManagedValue SILGenFunction::
+manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
+                          SGFContext C) {
   if (Initialization *I = C.getEmitInto()) {
     switch (I->kind) {
     case Initialization::Kind::AddressBinding:
@@ -844,8 +844,7 @@ Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
                                              SGFContext C) {
-  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
   SILValue converted = SGF.B.createUpcast(E,
                                    original.getValue(),
                                    SGF.getLoweredType(E->getType()));
@@ -853,18 +852,17 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
 }
 
 RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
-                                                   SGFContext C) {
-  SILValue metaBase = visit(E->getSubExpr()).getUnmanagedSingleValue(SGF,
-                                                              E->getSubExpr());
+                                                  SGFContext C) {
+  SILValue metaBase =
+    SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
   auto upcast = SGF.B.createUpcast(E, metaBase,
                                    SGF.getLoweredLoadableType(E->getType()));
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
-                                                 SGFContext C) {
-  ManagedValue archetype = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
+                                                SGFContext C) {
+  ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
   // Replace the cleanup with a new one on the superclass value so we always use
   // concrete retain/release operations.
   SILValue base = SGF.B.createArchetypeRefToSuper(E,
@@ -876,8 +874,7 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
-  ManagedValue original = visit(e->getSubExpr()).getAsSingleValue(SGF,
-                                                              e->getSubExpr());
+  ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
   
   // Retain the thinness of the original function type.
   CanAnyFunctionType destTy =
@@ -1084,11 +1081,10 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
   return {success, failure};
 }
 
-RValue RValueEmitter::visitConditionalCheckedCastExpr(
-                                                  ConditionalCheckedCastExpr *E,
-                                                  SGFContext C) {
-  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
+RValue RValueEmitter::
+visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
+                                SGFContext C) {
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
   SILBasicBlock *contBB = SGF.createBasicBlock();
 
@@ -1159,7 +1155,7 @@ RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
                                                    Type destType,
                                                    CheckedCastKind castKind,
                                                    SGFContext C) {
-  ManagedValue original = visit(source).getAsSingleValue(SGF, source);
+  ManagedValue original = SGF.emitRValueAsSingleValue(source);
 
   // Disable the original cleanup because the cast-to type is more specific and
   // should have a more efficient cleanup.
@@ -1181,8 +1177,7 @@ RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
 
 RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
   // Cast the value using a conditional cast.
-  ManagedValue original = visit(E->getSubExpr()).getAsSingleValue(SGF,
-                                                              E->getSubExpr());
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto &origTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   auto &castTL = SGF.getTypeLowering(E->getCastTypeLoc().getType());
   SILValue origAbs = SGF.emitCheckedCastAbstractionChange(E,original.getValue(),
@@ -1301,20 +1296,16 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                          methodTy, subs);
 }
 
-RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E,
-                                         SGFContext C) {
+RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   
   if (E->getType()->is<MetatypeType>()) {
     // Emit the metatype for the associated type.
-    assert(E->getType()->is<MetatypeType>() &&
-           "generic_member_ref of metatype should give metatype");
     visit(E->getBase());
     SILValue MT =
       SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
     return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
-    
   }
 
   auto FieldDecl = cast<VarDecl>(E->getMember().getDecl());
@@ -1687,13 +1678,13 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   // For class, archetype, and protocol types, look up the dynamic metatype.
   SILType metaTy = getLoweredLoadableType(
     MetatypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
-  if (base.getType().getSwiftType()->getClassOrBoundGenericClass()) {
+  if (base.getType().getSwiftType()->getClassOrBoundGenericClass())
     return B.createClassMetatype(loc, metaTy, base);
-  } else if (base.getType().getSwiftRValueType()->is<ArchetypeType>()) {
+  if (base.getType().getSwiftRValueType()->is<ArchetypeType>())
     return B.createArchetypeMetatype(loc, metaTy, base);
-  } else if (base.getType().getSwiftRValueType()->isExistentialType()) {
+  if (base.getType().getSwiftRValueType()->isExistentialType())
     return B.createProtocolMetatype(loc, metaTy, base);
-  }
+
   // Otherwise, ignore the base and return the static metatype.
   return B.createMetatype(loc, metaTy);
 }
@@ -1703,8 +1694,7 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
   SILValue metatype;
   
   if (E->getBase()) {
-    SILValue base = visit(E->getBase()).getAsSingleValue(SGF,
-                                                      E->getBase()).getValue();
+    SILValue base = SGF.emitRValueAsSingleValue(E->getBase()).getValue();
     metatype = SGF.emitMetatypeOfValue(E, base);
   } else {
     metatype = SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
@@ -3160,8 +3150,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
 
   // Emit the subexpression.
-  ManagedValue newSelf = visit(E->getSubExpr()).getAsSingleValue(
-                                                  SGF, E->getSubExpr());
+  ManagedValue newSelf = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
   // If we called a superclass constructor, cast down to the subclass.
   if (isSuper) {
@@ -3525,8 +3514,7 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
     if (!isa<TupleExpr>(E->getDest())
         && E->getDest()->getType()->isEqual(LE->getSubExpr()->getType())) {
       auto SrcLV = SGF.emitLValue(cast<LoadExpr>(E->getSrc())->getSubExpr());
-      SGF.emitAssignLValueToLValue(E, SrcLV,
-                                   SGF.emitLValue(E->getDest()));
+      SGF.emitAssignLValueToLValue(E, SrcLV, SGF.emitLValue(E->getDest()));
       return SGF.emitEmptyTupleRValue(E);
     }
   }
