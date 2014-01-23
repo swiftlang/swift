@@ -161,7 +161,7 @@ clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
-  llvm_unreachable("Unhandled type in Clang type generation.");
+  llvm_unreachable("Unexpected type in Clang type generation.");
 
   return clang::CanQualType();
 }
