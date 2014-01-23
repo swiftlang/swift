@@ -150,6 +150,16 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   return getClangIdType(getClangASTContext());
 }
 
+clang::CanQualType GenClangType::visitBuiltinRawPointerType(
+  CanBuiltinRawPointerType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
+  CanBuiltinObjCPointerType type) {
+  return clang::CanQualType();
+}
+
 clang::CanQualType GenClangType::visitType(CanType type) {
   llvm_unreachable("Unhandled type in Clang type generation.");
 
