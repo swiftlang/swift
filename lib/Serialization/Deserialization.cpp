@@ -1999,6 +1999,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto baseTy = TypeLoc::withoutLoc(getType(baseID));
+    if (declOrOffset.isComplete())
+      break;
 
     auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, { }, DC);
     declOrOffset = extension;
