@@ -893,8 +893,6 @@ public:
   }
 
   void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
-    ManagedValue existential;
-
     // We have four cases to deal with here:
     //
     //  1) for a "static" / "type" method, the base is a metatype.
@@ -907,12 +905,8 @@ public:
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory.  We access this with the project_existential instruction.
-    if (e->getBase()->getType()->is<ProtocolType>() &&
-        !e->getBase()->getType()->castTo<ProtocolType>()->requiresClass())
-      existential = gen.emitRValueAsSingleValue(e->getBase(),
-                                                SGFContext::AllowPlusZero);
-    else
-      existential = gen.emitRValueAsSingleValue(e->getBase());
+    auto existential = gen.emitRValueAsSingleValue(e->getBase(),
+                                                   SGFContext::AllowPlusZero);
 
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "existential properties not yet supported");
@@ -962,6 +956,7 @@ public:
       callee->setSubstitutions(gen, e, subs, callDepth);
     }
   }
+  
   void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
     // We have four cases to deal with here:
     //
@@ -977,15 +972,10 @@ public:
     // rvalue, but the witness is actually expecting a pointer to the +0 value
     // in memory (since the archetype is address-only).
     //
-    if (e->getBase()->getType()->is<ArchetypeType>() &&
-        !e->getBase()->getType()->castTo<ArchetypeType>()->requiresClass()) {
-      auto archetype = gen.emitRValueAsSingleValue(e->getBase(),
-                                                   SGFContext::AllowPlusZero);
-      setSelfParam(RValue(gen, e->getBase(), archetype.getType().getSwiftType(),
-                          archetype), e);
-    } else {
-      setSelfParam(gen.emitRValue(e->getBase()), e);
-    }
+    auto archetype = gen.emitRValueAsSingleValue(e->getBase(),
+                                                 SGFContext::AllowPlusZero);
+    setSelfParam(RValue(gen, e->getBase(), archetype.getType().getSwiftType(),
+                        archetype), e);
 
     auto *fd = dyn_cast<FuncDecl>(e->getDecl());
     assert(fd && "archetype properties not yet supported");
