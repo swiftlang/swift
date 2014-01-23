@@ -1533,13 +1533,10 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
       
   // Make sure the interface types are sane.
   if (genericSig) {
-    for (auto gparam : genericSig->getGenericParams()) {
-      (void)gparam;
+    for (auto gparam : genericSig->getGenericParams())
       assert(gparam->isCanonical() && "generic signature is not canonicalized");
-    }
     
     for (auto param : getInterfaceParameters()) {
-      (void)param;
       assert(!param.getType().findIf([](Type t) {
         return t->is<ArchetypeType>()
           && !t->castTo<ArchetypeType>()->getSelfProtocol();
@@ -1552,7 +1549,6 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
       
   assert(getParameters().size() == getInterfaceParameters().size());
   for (unsigned i : indices(getParameters())) {
-    (void)i;
     assert(getParameters()[i].getConvention()
              == getInterfaceParameters()[i].getConvention()
            && "interface parameter convention differs");

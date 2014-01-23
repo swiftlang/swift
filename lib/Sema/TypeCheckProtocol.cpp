@@ -1650,7 +1650,6 @@ void ConformanceChecker::checkConformance() {
 
     // For a non-type witness.
     if (auto value = dyn_cast<ValueDecl>(member)) {
-      (void)value;
       // If this is a getter/setter for a funcdecl, ignore it.
       if (auto *FD = dyn_cast<FuncDecl>(member))
         if (FD->isGetterOrSetter())

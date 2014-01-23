@@ -349,7 +349,6 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
                                                   NotForDefinition);
     SILValue accessor = gen.B.createFunctionRef(loc, accessorFn);
     auto accessorTy = accessor.getType().castTo<SILFunctionType>();
-    (void)accessorTy;
     assert(!accessorTy->isPolymorphic()
            && "generic global variable accessors not yet implemented");
     SILValue addr = gen.B.createApply(loc, accessor, accessor.getType(),

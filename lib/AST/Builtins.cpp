@@ -801,7 +801,6 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::Vector:
-  case IITDescriptor::HalfVecArgument:
   case IITDescriptor::ExtendVecArgument:
   case IITDescriptor::TruncVecArgument:
   case IITDescriptor::VarArg:
