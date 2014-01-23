@@ -291,6 +291,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.UseMalloc = true;
   }
 
+  if (Args.hasArg(OPT_enable_experimental_patterns)) {
+    Opts.EnableExperimentalPatterns = true;
+  }
+
   if (Args.hasArg(OPT_debug_constraints)) {
     Opts.DebugConstraintSolver = true;
   }

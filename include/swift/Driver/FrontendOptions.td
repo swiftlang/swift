@@ -63,6 +63,9 @@ def enable_dynamic_value_type_layout :
   Flag<["-"], "enable-dynamic-value-type-layout">,
   HelpText<"Enable experimental dynamic generic struct/enum type layout">;
 
+def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
+  HelpText<"Enable experimental 'switch' pattern matching features">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
