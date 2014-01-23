@@ -75,6 +75,15 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   const NormalProtocolConformance *NormalC
     = cast<NormalProtocolConformance>(ParentC);
   
+  // If the normal conformance is for a generic type, and we didn't hit a
+  // specialized conformance, collect the substitutions from the generic type.
+  // FIXME: The AST should do this for us.
+  if (NormalC->getType()->isSpecialized() && Subs.empty()) {
+    Subs = NormalC->getType()
+      ->gatherAllSubstitutions(NormalC->getDeclContext()->getParentModule(),
+                               nullptr);
+  }
+  
   // Did we already find this?
   auto found = WitnessTableLookupCache.find(NormalC);
   if (found != WitnessTableLookupCache.end())
