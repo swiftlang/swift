@@ -545,7 +545,8 @@ LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
-  gen.emitRValue(e->getLHS());
+  // If it is convenient to avoid loading the base, don't bother loading it.
+  gen.emitRValue(e->getLHS(), SGFContext::AllowPlusZero);
   return visitRec(e->getRHS());
 }
 

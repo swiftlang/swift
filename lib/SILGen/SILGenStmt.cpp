@@ -134,7 +134,8 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
       
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
       FullExpr scope(Cleanups, CleanupLocation(E));
-      emitRValue(E);
+      // If it is convenient to avoid loading the result, don't bother.
+      emitRValue(E, SGFContext::AllowPlusZero);
 
     } else
       visit(ESD.get<Decl*>());
@@ -295,7 +296,8 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   
   if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
     FullExpr Scope(Cleanups, CleanupLocation(Initializer));
-    emitRValue(Initializer);
+    // If it is convenient to avoid loading the init expr, don't bother.
+    emitRValue(Initializer, SGFContext::AllowPlusZero);
   }
   
   // If we ever reach an unreachable point, stop emitting statements.
@@ -329,7 +331,8 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     
     if (B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(Cleanups, CleanupLocation(S->getIncrement().get()));
-      emitRValue(S->getIncrement().get());
+      // Don't bother loading the result of the increment expression.
+      emitRValue(S->getIncrement().get(), SGFContext::AllowPlusZero);
     }
     
     if (B.hasValidInsertionPoint()) {
