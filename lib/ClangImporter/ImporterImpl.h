@@ -99,6 +99,7 @@ enum class MappedCTypeKind {
   FloatIEEEsingle,
   FloatIEEEdouble,
   FloatX87DoubleExtended,
+  VaList,
   ObjCBool,
   ObjCSel,
   ObjCId,

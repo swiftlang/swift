@@ -70,6 +70,8 @@ MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false)
 MAP_STDLIB_TYPE("size_t", UnsignedWord, 0, "UInt", All, false)
 MAP_STDLIB_TYPE("intptr_t", SignedWord, 0, "Int", All, false)
 MAP_STDLIB_TYPE("uintptr_t", UnsignedWord, 0, "UInt", All, false)
+// FIXME: why does this not catch va_list on x86_64?
+MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false)
 
 // Objective-C types.
 MAP_TYPE("BOOL",  ObjCBool,  8, "ObjectiveC", "ObjCBool",  ObjC1, false, false)

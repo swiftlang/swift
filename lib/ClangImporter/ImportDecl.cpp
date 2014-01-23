@@ -124,7 +124,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   if (Bitwidth != 0 && Bitwidth != ClangTypeSize)
     return std::make_pair(Type(), "");
 
-  // Chceck other expected properties of the C type.
+  // Check other expected properties of the C type.
   switch(CTypeKind) {
   case MappedCTypeKind::UnsignedInt:
     if (!ClangType->isUnsignedIntegerType())
@@ -180,6 +180,12 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       llvm_unreachable("should see only floating point types here");
     }
     }
+    break;
+
+  case MappedCTypeKind::VaList:
+    // FIXME: why is va_list not a pointer type on 32-bit arm
+    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+      return std::make_pair(Type(), "");
     break;
 
   case MappedCTypeKind::ObjCBool:
