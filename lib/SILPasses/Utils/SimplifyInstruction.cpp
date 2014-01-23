@@ -122,7 +122,15 @@ SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
+SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw) {
+  // Perform the following simplification:
+  //
+  // (ref_to_raw_pointer (raw_pointer_to_ref x)) -> x
+  //
+  // *NOTE* We don't need to check types here.
+  if (auto *RawToRef = dyn_cast<RawPointerToRefInst>(&*RefToRaw->getOperand()))
+    return RawToRef->getOperand();
+
   return SILValue();
 }
 

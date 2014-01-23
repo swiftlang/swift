@@ -548,3 +548,14 @@ bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
   %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $HeapBuffer<T_0_0, T_0_1>
   return %2 : $HeapBuffer<T_0_0, T_0_1>
 }
+
+// CHECK-LABEL: sil @raw_pointer_to_ref_ref_to_raw_pointer_round_trip
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @raw_pointer_to_ref_ref_to_raw_pointer_round_trip : $@thin (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = raw_pointer_to_ref %0 : $Builtin.RawPointer to $C
+  %2 = ref_to_raw_pointer %1 : $C to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
