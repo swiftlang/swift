@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Subsystems.h"
 #include "swift/Driver/Options.h"
+#include "swift/Driver/Util.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Arg.h"
@@ -48,13 +49,7 @@ void CompilerInvocation::updateRuntimeImportPath() {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeIncludePath);
 
   llvm::Triple Triple(TargetOpts.Triple);
-  if (Triple.isiOS())
-    if (Triple.getArch() == llvm::Triple::ArchType::x86)
-      llvm::sys::path::append(LibPath, "iphonesimulator");
-    else 
-      llvm::sys::path::append(LibPath, "iphoneos");
-  else if (Triple.isMacOSX()) 
-    llvm::sys::path::append(LibPath, "macosx");  
+  llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
 
   SearchPathOpts.RuntimeImportPath = LibPath.str();
 }

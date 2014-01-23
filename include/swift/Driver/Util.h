@@ -15,7 +15,22 @@
 
 #include "llvm/ADT/SmallVector.h"
 
+namespace llvm {
+  class Triple;
+}
+
 namespace swift {
+
+  /// Returns the platform name for a given target triple.
+  ///
+  /// For example, the iOS simulator has the name "iphonesimulator", while real
+  /// iOS uses "iphoneos". OS X is "macosx". (These names are intended to be
+  /// compatible with Xcode's SDKs.)
+  ///
+  /// If the triple does not correspond to a known platform, the empty string is
+  /// returned.
+  StringRef getPlatformNameForTriple(const llvm::Triple &triple);
+
 namespace driver {
   class Action;
 

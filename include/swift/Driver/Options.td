@@ -147,12 +147,25 @@ def emit_module_path : Separate<["-"], "emit-module-path">,
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption]>, Alias<emit_module_path>;
 
-// Linker inputs
+// Linker options
 
-def l : JoinedOrSeparate<["-"], "l">, Flags<[FrontendOption]>,
+def linker_option_Group : OptionGroup<"<linker-specific options>">;
+
+def l : Joined<["-"], "l">, Flags<[FrontendOption]>,
+  Group<linker_option_Group>,
   HelpText<"Specifies a library which should be linked against">;
 def framework : Separate<["-"], "framework">, Flags<[FrontendOption]>,
+  Group<linker_option_Group>,
   HelpText<"Specifies a framework which should be linked against">;
+
+def L : JoinedOrSeparate<["-"], "L">, Flags<[FrontendOption]>,
+  Group<linker_option_Group>,
+  HelpText<"Add directory to library link search path">;
+def L_EQ : Joined<["-"], "L=">, Flags<[FrontendOption]>,
+  Alias<L>;
+
+def Xlinker : Separate<["-"], "Xlinker">,
+  HelpText<"Specifies an option which should be passed to the linker">;
 
 // Optimization levels
 

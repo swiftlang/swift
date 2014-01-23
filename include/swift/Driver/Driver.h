@@ -133,8 +133,8 @@ public:
 
   const DiagnosticEngine &getDiags() const { return Diags; }
 
-  const char *getSwiftProgramPath() const {
-    return DriverExecutable.c_str();
+  const std::string &getSwiftProgramPath() const {
+    return DriverExecutable;
   }
 
   /// Construct a compilation object for a command line argument vector.

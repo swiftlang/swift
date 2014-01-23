@@ -18,16 +18,50 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Options.h"
+#include "swift/Frontend/Frontend.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Path.h"
 
+using namespace swift;
 using namespace swift::driver;
 using namespace swift::driver::tools;
 using namespace llvm::opt;
 
+StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
+  if (triple.isiOS()) {
+    llvm::Triple::ArchType arch = triple.getArch();
+    if (arch == llvm::Triple::ArchType::x86 ||
+        arch == llvm::Triple::ArchType::x86_64)
+      return "iphonesimulator";
+    return "iphoneos";
+  }
+
+  if (triple.isMacOSX())
+    return "macosx";
+
+  return "";
+}
+
 /// Swift Tool
+
+namespace {
+  static void addInputsOfType(ArgStringList &Arguments, const Job *J,
+                              types::ID InputType) {
+    if (const Command *Cmd = dyn_cast<Command>(J)) {
+      auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
+      if (!output.empty())
+        Arguments.push_back(output.c_str());
+    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+      for (const Job *J : *JL)
+        addInputsOfType(Arguments, J, InputType);
+    } else {
+      llvm_unreachable("Unable to add input arguments for unknown Job class");
+    }
+  }
+}
+
 
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
@@ -35,7 +69,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          const OutputInfo &OI) const {
   ArgStringList Arguments;
 
-  const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
+  const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
   
   // Invoke ourselves in -frontend mode.
   Arguments.push_back("-frontend");
@@ -191,28 +225,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 }
 
 
-static void addSwiftmoduleInputs(const Job *J, ArgStringList &Arguments) {
-  using llvm::dyn_cast;
-
-  if (const Command *Cmd = dyn_cast<Command>(J)) {
-    if (Cmd->getOutput().getPrimaryOutputType() == types::TY_SwiftModuleFile)
-      Arguments.push_back(Cmd->getOutput().getPrimaryOutputFilename().data());
-    else {
-      swift::Optional<llvm::StringRef> SwiftmoduleOutput =
-        Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftModuleFile);
-      assert(SwiftmoduleOutput.hasValue() &&
-             "All inputs to this command must generate a swiftmodule!");
-      Arguments.push_back(SwiftmoduleOutput->data());
-    }
-  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-    for (const Job *JobInList : *JL) {
-      addSwiftmoduleInputs(JobInList, Arguments);
-    }
-  } else {
-    llvm_unreachable("Unknown Job class!");
-  }
-}
-
 Job *MergeModule::constructJob(const JobAction &JA,
                                std::unique_ptr<JobList> Inputs,
                                std::unique_ptr<CommandOutput> Output,
@@ -221,7 +233,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
                                const OutputInfo &OI) const {
   ArgStringList Arguments;
 
-  const char *Exec = getToolChain().getDriver().getSwiftProgramPath();
+  const char *Exec = getToolChain().getDriver().getSwiftProgramPath().c_str();
 
   // Invoke ourself in -frontend mode.
   Arguments.push_back("-frontend");
@@ -243,9 +255,10 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  for (Job *J : *Inputs) {
-    addSwiftmoduleInputs(J, Arguments);
-  }
+  size_t origLen = Arguments.size();
+  addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
+  assert(Arguments.size() - origLen == Inputs->size() &&
+         "every input to MergeModule must generate a swiftmodule");
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
@@ -286,11 +299,59 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                                   const OutputInfo &OI) const {
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
-  ArgStringList Arguments;
-  Arguments.push_back("-v");
 
-  std::string Exec = getToolChain().getDriver().getProgramPath("ld",
-                                                               getToolChain());
+  ArgStringList Arguments;
+  addInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+
+  Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
+  Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
+  Args.AddAllArgs(Arguments, options::OPT_F);
+
+  if (!OI.SDKPath.empty()) {
+    Arguments.push_back("-syslibroot");
+    Arguments.push_back(Args.MakeArgString(OI.SDKPath));
+  }
+
+  Arguments.push_back("-lSystem");
+  AddDarwinArch(Args, Arguments);
+
+  const toolchains::Darwin &TC = getDarwinToolChain();
+  const Driver &D = TC.getDriver();
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
+  // library link path and the standard library module import path don't
+  // need to be the same.
+  llvm::SmallString<128> RuntimeLibPath(D.getSwiftProgramPath());
+  llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
+  llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
+  llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  llvm::sys::path::append(RuntimeLibPath,
+                          getPlatformNameForTriple(TC.getTriple()));
+  Arguments.push_back("-L");
+  Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied.
+  Arguments.push_back("-rpath");
+  Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
+
+  // FIXME: Properly handle deployment targets.
+  assert(TC.getTriple().isiOS() || TC.getTriple().isMacOSX());
+  if (TC.getTriple().isiOS()) {
+    Arguments.push_back("-iphoneos_version_min");
+    Arguments.push_back("7.0.0");
+  } else {
+    Arguments.push_back("-macosx_version_min");
+    Arguments.push_back("10.8.0");
+  }
+
+  // This should be the last option, for convenience in checking output.
+  Arguments.push_back("-o");
+  Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
+
+  std::string Exec = D.getProgramPath("ld", getToolChain());
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output),
                      Args.MakeArgString(Exec), Arguments);
