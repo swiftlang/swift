@@ -3316,6 +3316,9 @@ void irgen::emitPolymorphicParametersForGenericValueWitness(IRGenFunction &IGF,
                                                         NominalTypeDecl *ntd,
                                                         llvm::Value *selfMeta) {
   EmitPolymorphicParameters(IGF, ntd).emitForGenericValueWitness(selfMeta);
+  // Register the 'Self' argument as generic metadata for the type.
+  IGF.setUnscopedLocalTypeData(ntd->getDeclaredTypeInContext()->getCanonicalType(),
+                               LocalTypeData::Metatype, selfMeta);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
