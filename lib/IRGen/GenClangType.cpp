@@ -152,7 +152,7 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
 
 clang::CanQualType GenClangType::visitBuiltinRawPointerType(
   CanBuiltinRawPointerType type) {
-  return clang::CanQualType();
+  return getClangASTContext().VoidPtrTy;
 }
 
 clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
