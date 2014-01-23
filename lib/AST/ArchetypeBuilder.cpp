@@ -802,11 +802,15 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
         --skipLevels;
       }
 
-      // Extract the generic parameter.
-      auto gp = myGenericParams->getParams()[index];
-
       // Return the archetype.
-      return gp.getAsTypeParam()->getArchetype();
+      // FIXME: Use the allArchetypes vector instead of the generic param because
+      // of cross-module archetype serialization woes.
+      if (myGenericParams->hasSelfArchetype()) {
+        if (index == 0)
+          return myGenericParams->getParams()[0].getAsTypeParam()->getArchetype();
+        return myGenericParams->getPrimaryArchetypes()[index - 1];
+      }
+      return myGenericParams->getPrimaryArchetypes()[index];
     }
 
     // Map a dependent member to the corresponding nested archetype.
