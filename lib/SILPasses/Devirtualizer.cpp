@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "devirtualization"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -45,7 +46,6 @@ struct SILDevirtualizer {
 
   void optimizeClassMethodInst(ClassMethodInst *CMI);
   void optimizeApplyInst(ApplyInst *Inst);
-  void optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI);
 
   bool run() {
     for (auto &F : *M)
@@ -57,9 +57,6 @@ struct SILDevirtualizer {
             optimizeClassMethodInst(CMI);
           else if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
             optimizeApplyInst(AI);
-          else if (ArchetypeMethodInst *AMI =
-                   dyn_cast<ArchetypeMethodInst>(Inst))
-            optimizeArchetypeMethodInst(AMI);
         }
       }
 
@@ -344,40 +341,64 @@ findFuncInWitnessTable(SILDeclRef Member, CanType ConcreteTy,
   return nullptr;
 }
 
-void SILDevirtualizer::optimizeArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AMI);
+void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
+  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AI);
 
-  SILDeclRef Member = AMI->getMember();
-  // For each protocol that our type conforms to:
-  ProtocolConformance *Conf = AMI->getConformance();
-  if (!Conf)
-    return;
+  // Devirtualize apply instructions that call archetype_method instructions:
+  //
+  //   %8 = archetype_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+  //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
+  //
+  ArchetypeMethodInst *AMI = dyn_cast<ArchetypeMethodInst>(AI->getCallee());
+  if (AMI && AMI->getConformance() ) {
+    // Lookup the function reference in the witness tables.
+    std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
+      AI->getModule().lookUpWitnessTable(AMI->getConformance());
 
-  // Strip the @InOut qualifier.
-  CanType ConcreteTy = stripInOutQualifier(AMI->getLookupType());
+    // We do not handle remapping of the substitution list. rdar://15884344.
+    if (!Ret.first || Ret.second.size())
+      return;
 
-  SILFunction *StaticRef = findFuncInWitnessTable(Member, ConcreteTy,
-                                                  Conf->getProtocol(),
-                                                  AMI->getModule());
+    for (auto &Entry : Ret.first->getEntries()) {
+      // Look at method entries only.
+      if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
+        continue;
 
-  // We found the correct witness function. Devirtualize this Apply.
-  if (!StaticRef) {
-    DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *AMI);
+      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+      // Check if this is the member we were looking for.
+      if (MethodEntry.Requirement != AMI->getMember())
+        continue;
+
+      SILBuilder Builder(AI);
+      SILLocation Loc = AI->getLoc();
+      SILFunction *F = MethodEntry.Witness;
+      FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+      SILType FnTy = FRI->getType();
+
+      // Do not devirtualize polymorphic types.
+      if (FnTy.castTo<SILFunctionType>()->isPolymorphic())
+        return;
+
+      // Collect the function arguments.
+      SmallVector<SILValue, 4> Args;
+      for (auto &A : AI->getArgumentOperands())
+        Args.push_back(A.get());
+
+      SILType RetTy = FnTy.castTo<SILFunctionType>()->getInterfaceResult().
+        getSILType();
+
+      ApplyInst *SAI = Builder.createApply(Loc, FRI, FnTy, RetTy,
+                                           ArrayRef<Substitution>(), Args);
+      AI->replaceAllUsesWith(SAI);
+      AI->eraseFromParent();
+      NumAMI++;
+      Changed = true;
+    }
+
+    DEBUG(llvm::dbgs() << " *** Could not find a witness table.\n");
     return;
   }
 
-  FunctionRefInst *FRI =
-  new (AMI->getModule()) FunctionRefInst(AMI->getLoc(), StaticRef);
-  AMI->getParent()->getInstList().insert(AMI, FRI);
-  AMI->replaceAllUsesWith(FRI);
-
-  DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AMI);
-  NumAMI++;
-  Changed = true;
-}
-
-void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
-  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AI);
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
   //
