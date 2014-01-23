@@ -16,6 +16,8 @@
 
 let Flags = [FrontendOption, NoDriverOption] in {
 
+def triple : Separate<["-"], "triple">, Alias<target>;
+
 def delayed_function_body_parsing :
   Flag<["-"], "delayed-function-body-parsing">,
   HelpText<"Delay function body parsing until the end of all files">;
