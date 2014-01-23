@@ -784,37 +784,26 @@ static bool tryTypeVariableBindings(
     // try again.
     SmallVector<PotentialBinding, 4> newBindings;
 
-    // Check whether this was our first attempt.
-    if (tryCount == 0) {
-      // Note which bindings we already visited.
-      for (auto binding : bindings) {
-        exploredTypes.insert(binding.BindingType->getCanonicalType());
-
-        // If we have a protocol with a default type, look for alternative
-        // types to the default.
-        if (binding.DefaultedProtocol) {
-          KnownProtocolKind knownKind 
-            = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
-          for (auto type : cs.getAlternativeLiteralTypes(knownKind)) {
-            if (exploredTypes.insert(type->getCanonicalType()))
-              newBindings.push_back({type, AllowedBindingKind::Subtypes, 
-                                     binding.DefaultedProtocol});
-          }
-        }
-      }
-
-      // If we found any new bindings, try them now.
-      if (!newBindings.empty()) {
-        // We have a new set of bindings; use them for our next loop.
-        storedBindings = std::move(newBindings);
-        bindings = storedBindings;
-        continue;
-      }
-    }
-
     // Enumerate the supertypes of each of the types we tried.
     for (auto binding : bindings) {
       auto type = binding.BindingType;
+
+      // After our first pass, note that that we've explored these
+      // types.
+      if (tryCount == 0)
+        exploredTypes.insert(type->getCanonicalType());
+
+      // If we have a protocol with a default type, look for alternative
+      // types to the default.
+      if (tryCount == 0 && binding.DefaultedProtocol) {
+        KnownProtocolKind knownKind 
+          = *((*binding.DefaultedProtocol)->getKnownProtocolKind());
+        for (auto altType : cs.getAlternativeLiteralTypes(knownKind)) {
+          if (exploredTypes.insert(altType->getCanonicalType()))
+            newBindings.push_back({altType, AllowedBindingKind::Subtypes, 
+                                   binding.DefaultedProtocol});
+        }
+      }
 
       // Handle simple subtype bindings.
       if (binding.Kind == AllowedBindingKind::Subtypes &&
@@ -826,6 +815,16 @@ static bool tryTypeVariableBindings(
           newBindings.push_back({subtype, binding.Kind, Nothing});
       }
 
+      if (binding.Kind == AllowedBindingKind::Subtypes) {
+        if (auto tupleTy = type->getAs<TupleType>()) {
+          int scalarIdx = tupleTy->getFieldForScalarInit();
+          if (scalarIdx >= 0) {
+            auto eltType = tupleTy->getElementType(scalarIdx);
+            if (exploredTypes.insert(eltType->getCanonicalType()))
+              newBindings.push_back({eltType, binding.Kind, Nothing});
+          }
+        }
+      }
 
       if (binding.Kind != AllowedBindingKind::Supertypes)
         continue;
