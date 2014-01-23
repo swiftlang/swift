@@ -37,31 +37,6 @@ using namespace Lowering;
 
 void SILDebuggerClient::anchor() {}
 
-namespace {
-  class CleanupRValue : public Cleanup {
-    const TypeLowering &Lowering;
-    SILValue Value;
-  public:
-    CleanupRValue(const TypeLowering &lowering, SILValue value)
-      : Lowering(lowering), Value(value) {}
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      Lowering.emitDestroyRValue(gen.B, l, Value);
-    }
-  };
-  
-  class CleanupMaterializedValue : public Cleanup {
-    SILValue Address;
-  public:
-    CleanupMaterializedValue(SILValue address)
-      : Address(address) {}
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitDestroyAddr(l, Address);
-    }
-  };
-} // end anonymous namespace
-
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
   // Destroy the value, unless it was both uniquely referenced and consumed.
   auto entry = Self.OpaqueValues.find(OpaqueValue);
@@ -110,13 +85,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
   
-  if (lowering.isAddressOnly()) {
-    Cleanups.pushCleanup<CleanupMaterializedValue>(v);
-    return ManagedValue(v, getTopCleanup());
-  }
-  
-  Cleanups.pushCleanup<CleanupRValue>(lowering, v);
-  return ManagedValue(v, getTopCleanup());
+  return ManagedValue(v, enterDestroyCleanup(v));
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
@@ -130,8 +99,7 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
 
-  Cleanups.pushCleanup<CleanupMaterializedValue>(v);
-  return ManagedValue(v, getTopCleanup());
+  return ManagedValue(v, enterDestroyCleanup(v));
 }
 
 static void destroyRValue(SILGenFunction &SGF, CleanupLocation loc,
@@ -814,8 +782,7 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
   if (bufferTL.isTrivial())
     return ManagedValue::forUnmanaged(buffer);
 
-  Cleanups.pushCleanup<CleanupMaterializedValue>(buffer);
-  return ManagedValue(buffer, getTopCleanup());
+  return ManagedValue(buffer, enterDestroyCleanup(buffer));
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
@@ -2838,9 +2805,8 @@ void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
   for (VarDecl *vd : cd->getStoredProperties()) {
     const TypeLowering &ti = getTypeLowering(vd->getType());
     if (!ti.isTrivial()) {
-      SILValue addr = B.createRefElementAddr(
-                        loc, selfValue, vd,
-                        ti.getLoweredType().getAddressType());
+      SILValue addr = B.createRefElementAddr(loc, selfValue, vd,
+                                         ti.getLoweredType().getAddressType());
       B.emitDestroyAddr(cleanupLoc, addr);
     }
   }

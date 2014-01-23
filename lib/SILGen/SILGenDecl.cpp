@@ -231,17 +231,6 @@ public:
   }
 };
   
-/// Cleanup to perform a destroy address.
-class DestroyAddr : public Cleanup {
-  SILValue Addr;
-public:
-  DestroyAddr(SILValue addr) : Addr(addr) {}
-  
-  void emit(SILGenFunction &gen, CleanupLocation l) override {
-    gen.B.emitDestroyAddr(l, Addr);
-  }
-};
-
 /// An initialization of a local 'var'.
 class LocalVariableInitialization : public SingleBufferInitialization {
   /// The local variable decl being initialized.
@@ -644,7 +633,7 @@ struct ArgumentInitVisitor :
       // If this is an address-only non-inout argument, we take ownership
       // of the referenced value.
       if (!ty->is<InOutType>())
-        gen.Cleanups.pushCleanup<DestroyAddr>(arg);
+        gen.enterDestroyCleanup(arg);
       I->finishInitialization(gen);
     } else {
       std::move(argrv).forwardInto(gen, I, loc);
@@ -1313,11 +1302,10 @@ SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
 CleanupHandle
 SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
                                              const TypeLowering &tempTL) {
-  if (tempTL.isTrivial()) {
+  if (tempTL.isTrivial())
     return CleanupHandle::invalid();
-  }
 
-  Cleanups.pushCleanupInState<DestroyAddr>(CleanupState::Dormant, addr);
+  Cleanups.pushCleanupInState<DestroyValueCleanup>(CleanupState::Dormant, addr);
   return Cleanups.getCleanupsDepth();
 }
 
