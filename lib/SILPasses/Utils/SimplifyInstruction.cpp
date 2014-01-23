@@ -123,13 +123,6 @@ SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 }
 
 SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
-  // (ref_to_raw_pointer (ref_to_object_pointer x))
-  //    -> (ref_to_raw_pointer x)
-  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*RRPI->getOperand())) {
-    RRPI->setOperand(ROPI->getOperand());
-    return SILValue();
-  }
-
   return SILValue();
 }
 

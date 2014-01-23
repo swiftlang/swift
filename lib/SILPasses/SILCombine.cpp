@@ -257,6 +257,7 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
+  SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -666,6 +667,21 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
 
   return nullptr;
 }
+
+SILInstruction *
+SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
+  // Ref to raw pointer consumption of other ref casts.
+  //
+  // (ref_to_raw_pointer (ref_to_object_pointer x))
+  //    -> (ref_to_raw_pointer x)
+  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*RRPI->getOperand())) {
+    RRPI->setOperand(ROPI->getOperand());
+    return eraseInstFromFunction(*ROPI);
+  }
+
+  return nullptr;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
