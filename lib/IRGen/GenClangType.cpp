@@ -56,6 +56,14 @@ static clang::CanQualType getClangSelectorType(
   return clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
 }
 
+static clang::CanQualType getClangMetatypeType(
+  const clang::ASTContext &clangCtx) {
+  clang::QualType clangType =
+    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, 0, 0);
+  clangType = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(clangType);
+}
+
 static clang::CanQualType getClangIdType(
   const clang::ASTContext &clangCtx) {
   clang::QualType clangType =
@@ -116,11 +124,7 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
 }
 
 clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
-  auto const &clangCtx = getClangASTContext();
-  clang::QualType clangType =
-    clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinClassTy, 0, 0);
-  clangType = clangCtx.getObjCObjectPointerType(clangType);
-  return clangCtx.getCanonicalType(clangType);
+  return getClangMetatypeType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
@@ -139,6 +143,8 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
 }
 
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
+  // FIXME: We hit this building Foundation, with a call on the type
+  // encoding path.
   return clang::CanQualType();
 }
 
@@ -157,6 +163,20 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
 
 clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
   CanBuiltinObjCPointerType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
+  return clang::CanQualType();
+}
+
+clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
+  return clang::CanQualType();
+}
+
+// FIXME: We should not be seeing these by the time we generate Clang types.
+clang::CanQualType GenClangType::visitGenericTypeParamType(
+  CanGenericTypeParamType type) {
   return clang::CanQualType();
 }
 
