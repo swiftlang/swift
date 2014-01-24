@@ -932,7 +932,9 @@ namespace {
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
                                                        SourceLoc(),
                                                        varPattern,
-                                                       nullptr, structDecl);
+                                                       nullptr,
+                                                       /*storage*/ true,
+                                                       structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
@@ -1010,7 +1012,9 @@ namespace {
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
                                                        SourceLoc(),
                                                        varPattern,
-                                                       nullptr, structDecl);
+                                                       nullptr,
+                                                       /*storage*/ true,
+                                                       structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.

@@ -1642,16 +1642,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     bool isImplicit;
     bool isStatic;
+    bool hasStorage;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
                                                   isImplicit,
-                                                  isStatic);
+                                                  isStatic,
+                                                  hasStorage);
     Pattern *pattern = maybeReadPattern();
     assert(pattern);
 
     auto binding = new (ctx) PatternBindingDecl(SourceLoc(),
                                                 SourceLoc(), pattern,
                                                 /*init=*/nullptr,
+                                                /*storage=*/hasStorage,
                                                 getDeclContext(contextID));
     binding->setStatic(isStatic);
     declOrOffset = binding;

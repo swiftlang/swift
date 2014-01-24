@@ -564,7 +564,8 @@ public:
                    FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc);
   void parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                          SourceLoc StaticLoc);
+                          SourceLoc StaticLoc,
+                          VarDecl *&boundVar);
   
   Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,

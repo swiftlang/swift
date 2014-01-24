@@ -140,8 +140,11 @@ class alignas(8) Decl {
     
     /// \brief Whether this pattern binding declares static variables.
     unsigned IsStatic : 1;
+
+    /// \brief Whether this pattern binding declares a variable with storage.
+    unsigned HasStorage : 1;
   };
-  enum { NumPatternBindingDeclBits = 1 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 2 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -1240,11 +1243,13 @@ class PatternBindingDecl : public Decl {
 public:
   PatternBindingDecl(SourceLoc StaticLoc,
                      SourceLoc VarLoc, Pattern *Pat, Expr *E,
+                     bool hasStorage,
                      DeclContext *Parent)
     : Decl(DeclKind::PatternBinding, Parent),
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
     PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
+    PatternBindingDeclBits.HasStorage = hasStorage;
   }
 
   SourceLoc getStartLoc() const {
@@ -1263,6 +1268,9 @@ public:
   void setInit(Expr *expr, bool checked) {
     InitAndChecked.setPointerAndInt(expr, checked);
   }
+
+  /// Does this binding declare something that requires storage?
+  bool hasStorage() const { return PatternBindingDeclBits.HasStorage; }
   
   bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
   void setStatic(bool s) { PatternBindingDeclBits.IsStatic = s; }

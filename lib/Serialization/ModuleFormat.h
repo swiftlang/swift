@@ -636,7 +636,8 @@ namespace decls_block {
     PATTERN_BINDING_DECL,
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCFixed<1>   // static?
+    BCFixed<1>,  // static?
+    BCFixed<1>   // storage?
     // The pattern trails the record.
   >;
 

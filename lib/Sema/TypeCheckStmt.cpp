@@ -389,7 +389,8 @@ public:
       auto GenBinding = new (TC.Context) PatternBindingDecl(SourceLoc(),
                                                             S->getForLoc(),
                                                           GenPat, GetStream,
-                                                          DC);
+                                                            /*storage*/ true,
+                                                            DC);
       GenBinding->setImplicit();
       S->setStream(GenBinding);
     }

@@ -257,6 +257,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
     Expr *init = TC.buildCheckedRefExpr(trueDecl, DC, Loc, /*Implicit=*/true);
     addToBody(new (Context) PatternBindingDecl(SourceLoc(),
                                                Loc, pattern, init,
+                                               /*storage*/ true,
                                                DC));
   }
 
@@ -660,7 +661,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   PatternBindingDecl *metavarBinding
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        E->getStartLoc(), metavarPat, E,
-                                       &SF);
+                                       /*storage*/ true, &SF);
   SF.Decls.push_back(metavarBinding);
 
   // Finally, print the variable's value.
@@ -720,7 +721,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   PatternBindingDecl *metavarBinding
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        PBD->getStartLoc(), metavarPat,
-                                       PBD->getInit(), &SF);
+                                       PBD->getInit(), /*storage*/ true, &SF);
 
   auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                    ASTNode(metavarBinding),

@@ -1404,7 +1404,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                                SourceLoc StaticLoc) {
+                                SourceLoc StaticLoc,
+                                VarDecl *&boundVar) {
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
@@ -1421,6 +1422,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 
   if (!PrimaryVar)
     diagnose(pattern.getLoc(), diag::getset_nontrivial_pattern);
+
+  boundVar = PrimaryVar;
 
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
@@ -1508,6 +1511,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
   } Bindings(*this);
 
   bool HasGetSet = false;
+  bool hasStorage = true;
   ParserStatus Status;
 
   do {
@@ -1532,12 +1536,14 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
       if (isLet)
         diagnose(Tok, diag::let_cannot_be_computed_property);
 
-      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc);
+      VarDecl *boundVar = nullptr;
+      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar);
 
       if (isLet)
         return makeParserError();
 
       HasGetSet = true;
+      if (boundVar) hasStorage = boundVar->hasStorage();
     }
 
     if (isLet && Tok.isNot(tok::equal) &&
@@ -1566,6 +1572,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
     auto PBD = new (Context) PatternBindingDecl(StaticLoc, VarLoc,
                                                 pattern.get(),
                                                 nullptr,
+                                                hasStorage,
                                                 CurDeclContext);
 
     Bindings.All.push_back({PBD, topLevelDecl});
