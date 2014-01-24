@@ -70,7 +70,7 @@ SILValue SILValue::stripCasts() {
   }
 }
 
-SILValue SILValue::stripPointerProjections() {
+SILValue SILValue::stripAddressProjections() {
   SILValue V = *this;
 
   while (true) {

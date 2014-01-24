@@ -196,8 +196,11 @@ public:
   SILValue stripCasts();
 
   // Return the underlying SILValue after stripping off all casts and
-  // pointer projection instructions.
-  SILValue stripPointerProjections();
+  // address projection instructions.
+  //
+  // An address projection instruction is one of one of ref_element_addr,
+  // struct_element_addr, tuple_element_addr.
+  SILValue stripAddressProjections();
   
   void replaceAllUsesWith(SILValue V);
 
