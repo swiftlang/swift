@@ -1832,8 +1832,32 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
 /// C or ObjC arguments?
 llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
                                                         SILType type) {
-  // FIXME: we need to consider the target's C calling convention.
-  return IGM.requiresIndirectResult(type, ResilienceExpansion::Minimal);
+
+  GenClangType GCT(IGM.Context);
+  auto clangTy = GCT.visit(type.getSwiftRValueType());
+
+  // FIXME: Temporarily choose IR types one argument at a time, and
+  //        fall back on Swift choices if we cannot generate a Clang
+  //        type.
+  if (!clangTy)
+    return IGM.requiresIndirectResult(type, ResilienceExpansion::Minimal);
+
+  auto &ABITypes = *IGM.ABITypes;
+  SmallVector<clang::CanQualType,1> args;
+  args.push_back(clangTy);
+
+  auto extInfo = clang::FunctionType::ExtInfo();
+  // Use clangTy as a dummy result type; we don't use the resulting ABI type.
+  auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
+  auto const &AI = FI.arg_begin()->info;
+  if (!AI.isIndirect() || !AI.getIndirectByVal())
+    return nullptr;
+
+  auto &ti = IGM.getTypeInfo(type);
+  return ti.getStorageType()->getPointerTo();
 }
 
 static void externalizeArgument(IRGenFunction &IGF,
