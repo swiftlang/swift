@@ -204,12 +204,17 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     } else {
       // The user did not specify a module name, so determine a default fallback
       // based on other options.
+
+      // Note: this code path will only be taken when running the frontend
+      // directly; the driver should always pass -module-name when invoking the
+      // frontend.
       if (Opts.RequestedAction == FrontendOptions::REPL) {
         // Default to a module named "REPL" if we're in REPL mode.
         ModuleName = "REPL";
       } else {
         StringRef OutputFilename(Opts.OutputFilename);
-        if (OutputFilename.empty() || OutputFilename == "-") {
+        if (OutputFilename.empty() || OutputFilename == "-" ||
+            llvm::sys::fs::is_directory(OutputFilename)) {
           ModuleName = Opts.InputFilenames[0];
         } else {
           ModuleName = OutputFilename;
