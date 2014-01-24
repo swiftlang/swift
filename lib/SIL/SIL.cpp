@@ -68,8 +68,6 @@ SILValue SILValue::stripCasts() {
       return V;
     }
   }
-
-  return V;
 }
 
 SILValue SILValue::stripPointerProjections() {
