@@ -630,12 +630,11 @@ LookupConformanceResult Module::lookupConformance(Type type,
   }
 
   // Check whether we have already cached an answer to this query.
-  ASTContext::ConformsToMap::key_type key(type->getCanonicalType(), protocol);
-  auto known = ctx.ConformsTo.find(key);
-  if (known != ctx.ConformsTo.end()) {
+  CanType canType = type->getCanonicalType();
+  if (auto entry = ctx.getConformsTo(canType, protocol)) {
     // If we conform, return the conformance.
-    if (known->second.getInt()) {
-      return { known->second.getPointer(), ConformanceKind::Conforms };
+    if (entry->getInt()) {
+      return { entry->getPointer(), ConformanceKind::Conforms };
     }
 
     // We don't conform.
@@ -661,7 +660,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // If we didn't find an owning nominal, we don't conform. Cache the negative
   // result and return.
   if (!owningNominal) {
-    ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+    ctx.setConformsTo(canType, protocol, ConformanceEntry(nullptr, false));
     return { nullptr, ConformanceKind::DoesNotConform };
   }
 
@@ -697,7 +696,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // Create the inherited conformance entry.
     auto result
       = ctx.getInheritedConformance(type, inheritedConformance.getPointer());
-    ctx.ConformsTo[key] = ConformanceEntry(result, true);
+    ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
     return { result, ConformanceKind::Conforms };
   }
 
@@ -720,16 +719,17 @@ LookupConformanceResult Module::lookupConformance(Type type,
       auto substitutions = type->gatherAllSubstitutions(this, resolver);
 
       // Create the specialized conformance entry.
-      ctx.ConformsTo[key] = ConformanceEntry(nullptr, false);
+      ctx.setConformsTo(canType, protocol, ConformanceEntry(nullptr, false));
       auto result = ctx.getSpecializedConformance(type, nominalConformance,
                                                   substitutions);
-      ctx.ConformsTo[key] = ConformanceEntry(result, true);
+      ctx.setConformsTo(canType, protocol, ConformanceEntry(result, true));
       return { result, ConformanceKind::Conforms };
     }
   }
 
   // Record and return the simple conformance.
-  ctx.ConformsTo[key] = ConformanceEntry(nominalConformance, true);
+  ctx.setConformsTo(canType, protocol, 
+                    ConformanceEntry(nominalConformance, true));
   return { nominalConformance, ConformanceKind::Conforms };
 }
 

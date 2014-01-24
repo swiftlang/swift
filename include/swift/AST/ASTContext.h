@@ -190,10 +190,6 @@ public:
   typedef llvm::DenseMap<std::pair<CanType, ProtocolDecl *>, 
                          ConformanceEntry> ConformsToMap;
   
-  /// ConformsTo - Caches the results of checking whether a given (canonical)
-  /// type conforms to a given protocol.
-  ConformsToMap ConformsTo;
-
   /// \brief The list of external definitions imported by this context.
   llvm::SetVector<Decl *> ExternalDefinitions;
 
@@ -487,6 +483,12 @@ public:
   ///
   /// \returns the previous generation number.
   unsigned bumpGeneration() { return CurrentGeneration++; }
+
+  /// Retrieve the conformance entry for a given type and protocol.
+  Optional<ConformanceEntry> getConformsTo(CanType type, ProtocolDecl *proto);
+
+  /// Set the conformance entry for the given type and protocol.
+  void setConformsTo(CanType type, ProtocolDecl *proto, ConformanceEntry entry);
 
   /// \brief Record that the given nominal type or extension thereof conforms
   /// to the given compiler-known protocol.

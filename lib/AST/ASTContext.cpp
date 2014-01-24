@@ -139,6 +139,10 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ClassType> ClassTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+    /// ConformsTo - Caches the results of checking whether a given (canonical)
+    /// type conforms to a given protocol.
+    ConformsToMap ConformsTo;
+
   };
   
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
@@ -845,6 +849,31 @@ void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
   Impl.UnusedDefaultArgumentContext = DC;
 }
 
+/// \brief Retrieve the arena from which we should allocate storage for a type.
+static AllocationArena getArena(RecursiveTypeProperties properties) {
+  bool hasTypeVariable = properties.hasTypeVariable();
+  return hasTypeVariable? AllocationArena::ConstraintSolver
+                        : AllocationArena::Permanent;
+}
+
+Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type, 
+                                                     ProtocolDecl *proto) {
+  auto arena = getArena(type->getRecursiveProperties());
+  auto &conformsTo = Impl.getArena(arena).ConformsTo;
+  auto known = conformsTo.find({type, proto});
+  if (known == conformsTo.end())
+    return Nothing;
+
+  return known->second;
+}
+
+void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto, 
+                               ConformanceEntry entry) {
+  auto arena = getArena(type->getRecursiveProperties());
+  auto &conformsTo = Impl.getArena(arena).ConformsTo;
+  conformsTo[{type, proto}] = entry;
+}
+
 void ASTContext::recordConformance(KnownProtocolKind protocolKind, Decl *decl) {
   assert(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl));
   auto index = static_cast<unsigned>(protocolKind);
@@ -930,13 +959,6 @@ BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
   if (Result == 0)
     Result = new (C, AllocationArena::Permanent) BuiltinIntegerType(BitWidth,C);
   return Result;
-}
-
-/// \brief Retrieve the arena from which we should allocate storage for a type.
-static AllocationArena getArena(RecursiveTypeProperties properties) {
-  bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable? AllocationArena::ConstraintSolver
-                        : AllocationArena::Permanent;;
 }
 
 BuiltinVectorType *BuiltinVectorType::get(const ASTContext &context,

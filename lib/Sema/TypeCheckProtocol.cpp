@@ -1680,13 +1680,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
 
   // Find or create the conformance for this type.
   NormalProtocolConformance *conformance;
-  ASTContext::ConformsToMap::key_type key(T->getCanonicalType(), Proto);
-  auto knownConformance = TC.Context.ConformsTo.find(key);
-  if (knownConformance != TC.Context.ConformsTo.end() &&
-      knownConformance->second.getPointer()) {
+  auto canT = T->getCanonicalType();
+  auto knownConformance = TC.Context.getConformsTo(canT, Proto);
+  if (knownConformance && knownConformance->getPointer()) {
     // Get the normal protocol conformance.
     conformance = cast<NormalProtocolConformance>(
-                    knownConformance->second.getPointer());
+                    knownConformance->getPointer());
   } else {
     // Create and record this conformance.
     conformance = TC.Context.getConformance(
@@ -1694,7 +1693,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     conformingDC,
                     ProtocolConformanceState::Incomplete);
 
-    TC.Context.ConformsTo[key] = ConformanceEntry(conformance, true);
+    TC.Context.setConformsTo(canT, Proto, ConformanceEntry(conformance, true));
   }
 
   // Check that T conforms to all inherited protocols.
@@ -1919,15 +1918,14 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     return existentialConformsToProtocol(*this, T, Proto, ComplainLoc);
 
   // Check whether we have already cached an answer to this query.
-  ASTContext::ConformsToMap::key_type Key(T->getCanonicalType(), Proto);
-  ASTContext::ConformsToMap::iterator Known = Context.ConformsTo.find(Key);
-  if (Known != Context.ConformsTo.end()) {
+  auto canT = T->getCanonicalType();
+  if (auto Known = Context.getConformsTo(canT, Proto)) {
     // If we conform, set the conformance and return true.
-    if (Known->second.getInt()) {
+    if (Known->getInt()) {
       if (Conformance)
-        *Conformance = Known->second.getPointer();
+        *Conformance = Known->getPointer();
 
-      return Known->second.getPointer()->isComplete();
+      return Known->getPointer()->isComplete();
     }
 
     // If we're just checking for conformance, we already know the answer.
@@ -1963,8 +1961,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     auto lookupResult = M->lookupConformance(T, Proto, this);
     switch (lookupResult.getInt()) {
     case ConformanceKind::Conforms:
-      Context.ConformsTo[Key] = ConformanceEntry(lookupResult.getPointer(),
-                                                 true);
+      Context.setConformsTo(canT, Proto, 
+                            ConformanceEntry(lookupResult.getPointer(), true));
 
       if (Conformance)
         *Conformance = lookupResult.getPointer();
