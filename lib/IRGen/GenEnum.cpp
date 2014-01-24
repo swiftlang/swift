@@ -2170,10 +2170,10 @@ namespace {
       }
       // FIXME: Memory corruption issues arise when enabling this for mixed
       // Swift/ObjC enums.
-      //else if (allSingleUnknownRefcount
-      //           && WithNoPayload.size() <= 1) {
-      //  CopyDestroyKind = TaggedUnknownRefcounted;
-      //}
+      else if (allSingleUnknownRefcount
+                 && WithNoPayload.size() <= 1) {
+        CopyDestroyKind = TaggedUnknownRefcounted;
+      }
     }
     
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,

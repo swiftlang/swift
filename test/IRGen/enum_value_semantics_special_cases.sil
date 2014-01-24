@@ -134,15 +134,15 @@ enum AllMixedRefcounted {
   case ORef(Builtin.ObjCPointer)
   case None
 }
-// FIXME--disabled pending memory corruption investigation
-// C/HECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases18AllMixedRefcounted(%swift.opaque* %object, %swift.type* %Self) {
-// C/HECK: entry:
-// C/HECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases18AllMixedRefcounted*
-// C/HECK:   %1 = bitcast %O34enum_value_semantics_special_cases18AllMixedRefcounted* %0 to i64*
-// C/HECK:   %2 = load i64* %1, align 8
-// -/-                         0x9fffffffffffffff
-// C/HECK:   %3 = and i64 %2, -6917529027641081857
-// C/HECK:   %4 = inttoptr i64 %3 to %objc_object*
-// C/HECK:   call void @objc_release(%objc_object* %4) #0
-// C/HECK:   ret void
+
+// CHECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases18AllMixedRefcounted(%swift.opaque* %object, %swift.type* %Self) {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O34enum_value_semantics_special_cases18AllMixedRefcounted*
+// CHECK:   %1 = bitcast %O34enum_value_semantics_special_cases18AllMixedRefcounted* %0 to i64*
+// CHECK:   %2 = load i64* %1, align 8
+// --                         0x9fffffffffffffff
+// CHECK:   %3 = and i64 %2, -6917529027641081857
+// CHECK:   %4 = inttoptr i64 %3 to %objc_object*
+// CHECK:   call void @objc_release(%objc_object* %4) #0
+// CHECK:   ret void
 // CHECK: }
