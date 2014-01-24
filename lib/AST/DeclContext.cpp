@@ -197,14 +197,8 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
 
   case DeclContextKind::ExtensionDecl: {
     auto extension = cast<ExtensionDecl>(this);
-    auto extendedType = extension->getExtendedType();
-    if (auto bound = extendedType->getAs<BoundGenericType>()) {
-      return bound->getDecl()->getGenericParams();
-    }
-    if (auto nominalTy = extendedType->getAs<NominalType>()) {
-      auto nominalDecl = nominalTy->getDecl();
-      return nominalDecl->getDeclContext()->getGenericParamsOfContext();
-    }
+    if (auto gp = extension->getGenericParams())
+      return gp;
     return nullptr;
   }
   }
@@ -327,23 +321,28 @@ bool DeclContext::isGenericContext() const {
     case DeclContextKind::Initializer:
     case DeclContextKind::AbstractClosureExpr:
       // Check parent context.
-      break;
+      continue;
 
     case DeclContextKind::AbstractFunctionDecl:
       if (cast<AbstractFunctionDecl>(dc)->getGenericParams())
         return true;
-      break;
+      continue;
 
     case DeclContextKind::TopLevelCodeDecl:
       // Check parent context.
-      break;
+      continue;
+
+    case DeclContextKind::NominalTypeDecl:
+      if (cast<NominalTypeDecl>(dc)->getGenericParams())
+        return true;
+      continue;
 
     case DeclContextKind::ExtensionDecl:
-    case DeclContextKind::NominalTypeDecl:
-      if (dc->getDeclaredTypeOfContext()->getAnyNominal()->getGenericParams())
+      if (cast<ExtensionDecl>(dc)->getGenericParams())
         return true;
-      break;
+      continue;
     }
+    llvm_unreachable("bad decl context kind");
   }
   llvm_unreachable("illegal declcontext hierarchy");
 }
@@ -351,16 +350,12 @@ bool DeclContext::isGenericContext() const {
 /// Determine whether the innermost context is generic.
 bool DeclContext::isInnermostContextGeneric() const {
   switch (getContextKind()) {
-    case DeclContextKind::AbstractFunctionDecl:
-      if (cast<AbstractFunctionDecl>(this)->getGenericParams())
-        return true;
-      return false;
-
-    case DeclContextKind::ExtensionDecl:
-    case DeclContextKind::NominalTypeDecl:
-      if (getDeclaredTypeOfContext()->getAnyNominal()->getGenericParams())
-        return true;
-      return false;
+  case DeclContextKind::AbstractFunctionDecl:
+    return (cast<AbstractFunctionDecl>(this)->getGenericParams() != nullptr);
+  case DeclContextKind::ExtensionDecl:
+    return (cast<ExtensionDecl>(this)->getGenericParams() != nullptr);
+  case DeclContextKind::NominalTypeDecl:
+    return (cast<NominalTypeDecl>(this)->getGenericParams() != nullptr);
   default:
     return false;
   }
