@@ -37,69 +37,64 @@ SerializedModuleLoader::~SerializedModuleLoader() = default;
 // the source loader search path should be the same as the module loader search
 // path.
 static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
-                                   std::unique_ptr<llvm::MemoryBuffer> &buffer,
-                                   bool isStdlib) {
+                                   std::unique_ptr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
   llvm::SmallString<128> inputFilename;
   llvm::OwningPtr<llvm::MemoryBuffer> bufferRef;
-  llvm::error_code err;
 
-  if (!isStdlib) {
-    // First, search in the directory corresponding to the import location.
-    // FIXME: This screams for a proper FileManager abstraction.
-    if (moduleID.second.isValid()) {
-      unsigned currentBufferID =
-          ctx.SourceMgr.findBufferContainingLoc(moduleID.second);
-      const llvm::MemoryBuffer *importingBuffer
-        = ctx.SourceMgr->getMemoryBuffer(currentBufferID);
-      StringRef currentDirectory
-        = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
-      if (!currentDirectory.empty()) {
-        inputFilename = currentDirectory;
-        llvm::sys::path::append(inputFilename, moduleFilename.str());
-        llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                                           bufferRef);
-        if (!err || err.value() != llvm::errc::no_such_file_or_directory) {
-          buffer.reset(bufferRef.take());
-          return err;
-        }
-      }
-    }
-
-    // Second, search in the current directory.
-    err = llvm::MemoryBuffer::getFile(moduleFilename.str(), bufferRef);
-    if (!err || err.value() != llvm::errc::no_such_file_or_directory) {
-      buffer.reset(bufferRef.take());
-      return err;
-    }
-
-    // If we fail, search each import search path.
-    for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
-      inputFilename = Path;
+  // First, search in the directory corresponding to the import location.
+  // FIXME: This screams for a proper FileManager abstraction.
+  if (moduleID.second.isValid()) {
+    unsigned currentBufferID =
+        ctx.SourceMgr.findBufferContainingLoc(moduleID.second);
+    const llvm::MemoryBuffer *importingBuffer
+      = ctx.SourceMgr->getMemoryBuffer(currentBufferID);
+    StringRef currentDirectory
+      = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
+    if (!currentDirectory.empty()) {
+      inputFilename = currentDirectory;
       llvm::sys::path::append(inputFilename, moduleFilename.str());
-      err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
-      if (!err || err.value() != llvm::errc::no_such_file_or_directory) {
+      llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
+                                                         bufferRef);
+      if (!err) {
         buffer.reset(bufferRef.take());
         return err;
       }
     }
   }
 
-  // Search the runtime import path.
-  inputFilename = ctx.SearchPathOpts.RuntimeImportPath;
-  llvm::sys::path::append(inputFilename, moduleFilename.str());
-
-  err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
-  if (!err || err.value() != llvm::errc::no_such_file_or_directory) {
+  // Second, search in the current directory.
+  llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename.str(),
+                                                     bufferRef);
+  if (!err) {
     buffer.reset(bufferRef.take());
     return err;
   }
 
-  // If we get here, we couldn't find the module, so return our last
-  // "no such file" error.
+  // If we fail, search each import search path.
+  for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
+    inputFilename = Path;
+    llvm::sys::path::append(inputFilename, moduleFilename.str());
+    err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
+    if (!err) {
+      buffer.reset(bufferRef.take());
+      return err;
+    }
+  }
+
+  // Search the runtime import path.
+  inputFilename = ctx.SearchPathOpts.RuntimeImportPath;
+  llvm::sys::path::append(inputFilename, moduleFilename.str());
+  err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
+  if (!err) {
+    buffer.reset(bufferRef.take());
+    return err;
+  }
+
+  // If we get here, we couldn't find the module, so return our most recent err.
   return err;
 }
 
@@ -196,8 +191,7 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
 }
 
 Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
-                                           Module::AccessPathTy path,
-                                           bool isStdlib) {
+                                           Module::AccessPathTy path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -221,7 +215,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Otherwise look on disk.
   if (!inputFile) {
-    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile, isStdlib)) {
+    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
       if (err.value() != llvm::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
                            moduleID.first.str(), err.message());

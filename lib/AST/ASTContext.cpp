@@ -775,12 +775,9 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
     return M;
 
   auto moduleID = ModulePath[0];
-  bool isStdlib = (ModulePath.size() == 1 &&
-                   moduleID.first == StdlibModuleName);
   for (auto importer : Impl.ModuleLoaders) {
-    if (Module *M = importer->loadModule(moduleID.second, ModulePath,
-                                         isStdlib)) {
-      if (isStdlib)
+    if (Module *M = importer->loadModule(moduleID.second, ModulePath)) {
+      if (ModulePath.size() == 1 && ModulePath[0].first == StdlibModuleName)
         recordKnownProtocols(M);
       return M;
     }

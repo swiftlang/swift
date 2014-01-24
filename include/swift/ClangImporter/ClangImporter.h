@@ -79,14 +79,11 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
-  /// \param isStdlib If we're trying to load the standard library, it shouldn't
-  /// come from the ClangImporter.
-  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual Module *loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path,
-                             bool isStdlib) override;
+                             ArrayRef<std::pair<Identifier, SourceLoc>> path)
+                                                                      override;
 
   /// \brief Look for declarations associated with the given name.
   ///
