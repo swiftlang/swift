@@ -291,7 +291,7 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
     bool fail;
-    if (Opts.DebugInfo) {
+    if (Opts.DebugInfo && Opts.LegacyDebugInfo) {
       // Use our own wrapper for TargetMachine which schedules a
       // SwiftASTStreamerPass to be run after the code generation.
       swift::irgen::TargetMachine

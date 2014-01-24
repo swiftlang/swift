@@ -67,6 +67,9 @@ public:
   /// Whether we should emit debug info.
   unsigned DebugInfo : 1;
 
+  /// Whether we should include the module directly along with the debug info.
+  unsigned LegacyDebugInfo : 1;
+
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
@@ -80,10 +83,9 @@ public:
   unsigned DisableAllRuntimeChecks : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
-                   OptLevel(0), DebugInfo(false), UseJIT(false),
-                   EnableDynamicValueTypeLayout(false),
-                   DisableLLVMOptzns(false),
-                   DisableAllRuntimeChecks(false) {}
+                   OptLevel(0), DebugInfo(false), LegacyDebugInfo(false),
+                   UseJIT(false), EnableDynamicValueTypeLayout(false),
+                   DisableLLVMOptzns(false), DisableAllRuntimeChecks(false) {}
 };
 
 } // end namespace swift
