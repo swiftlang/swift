@@ -503,6 +503,11 @@ FUNCTION(Once, swift_once, RuntimeCC,
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, RefCountedPtrTy),
          ATTRS())
 
+FUNCTION(ForceInitializeObjCClass, swift_forceInitializeObjCClass, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,

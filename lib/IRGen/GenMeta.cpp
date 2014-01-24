@@ -1740,21 +1740,12 @@ namespace {
                                 fields.getAddress(), fieldVector);
       }
       
-      // FIXME: Crudely invoke an ObjC class method on the class to force the
+      // FIXME: Crudely invoke a runtime function on the class to force the
       // ObjC runtime to do minimal initialization of the class.
-      // We should really register the class pair with the runtime through the
-      // approved channels.
-      llvm::Value *msgSend = IGF.IGM.getObjCMsgSendFn();
-      llvm::Type *classFArgs[] = {
-        IGF.IGM.ObjCPtrTy,
-        IGF.IGM.ObjCSELTy,
-      };
-      auto classFTy = llvm::FunctionType::get(IGF.IGM.ObjCClassPtrTy,
-                                              classFArgs, /*isVarArg*/ false);
-      msgSend = IGF.Builder.CreateBitCast(msgSend, classFTy->getPointerTo());
-      auto classPtr = IGF.Builder.CreateBitCast(metadata, IGF.IGM.ObjCPtrTy);
-      llvm::Value *classSel = IGF.emitObjCSelectorRefLoad("class");
-      IGF.Builder.CreateCall2(msgSend, classPtr, classSel);
+      // We should really register the class pair with the runtime through an
+      // approved channel.
+      llvm::Value *forceInit = IGF.IGM.getForceInitializeObjCClassFn();
+      IGF.Builder.CreateCall(forceInit, metadata);
     }
     
   };
