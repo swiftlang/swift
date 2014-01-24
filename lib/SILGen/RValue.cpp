@@ -96,7 +96,7 @@ public:
   }
 };
 
-enum class ImplodeKind { Unmanaged, Forward };
+enum class ImplodeKind { Unmanaged, Forward, Copy };
 
 template<ImplodeKind KIND>
 class ImplodeLoadableTupleValue
@@ -108,12 +108,14 @@ public:
   ArrayRef<ManagedValue> values;
   SILGenFunction &gen;
 
-  static SILValue getValue(SILGenFunction &gen, ManagedValue v) {
+  static SILValue getValue(SILGenFunction &gen, ManagedValue v, SILLocation l) {
     switch (KIND) {
     case ImplodeKind::Unmanaged:
       return v.getUnmanagedValue();
     case ImplodeKind::Forward:
       return v.forward(gen);
+    case ImplodeKind::Copy:
+      return v.copy(gen, l).forward(gen);
     }
   }
   
@@ -123,7 +125,7 @@ public:
   {}
   
   SILValue visitType(CanType t, SILLocation l) {
-    SILValue result = getValue(gen, values[0]);
+    SILValue result = getValue(gen, values[0], l);
     values = values.slice(1);
     return result;
   }
@@ -140,9 +142,10 @@ public:
     assert(values.empty() && "values not exhausted imploding tuple?!");
   }
 };
-  
+
+template<ImplodeKind KIND>
 class ImplodeAddressOnlyTuple
-  : public CanTypeVisitor<ImplodeAddressOnlyTuple,
+  : public CanTypeVisitor<ImplodeAddressOnlyTuple<KIND>,
                           /*RetTy=*/ void,
                           /*Args...=*/ SILValue, SILLocation>
 {
@@ -157,7 +160,18 @@ public:
   
   void visitType(CanType t, SILValue address, SILLocation l) {
     ManagedValue v = values[0];
-    v.forwardInto(gen, l, address);
+    switch (KIND) {
+    case ImplodeKind::Unmanaged:
+      llvm_unreachable("address-only types always managed!");
+      
+    case ImplodeKind::Forward:
+      v.forwardInto(gen, l, address);
+      break;
+
+    case ImplodeKind::Copy:
+      v.copyInto(gen, address, l);
+      break;
+    }
     values = values.slice(1);
   }
   
@@ -184,7 +198,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   // Non-tuples don't need to be imploded.
   if (!isa<TupleType>(tupleType)) {
     assert(values.size() == 1 && "exploded non-tuple value?!");
-    return ImplodeLoadableTupleValue<KIND>::getValue(gen, values[0]);
+    return ImplodeLoadableTupleValue<KIND>::getValue(gen, values[0], l);
   }
   
   SILType loweredType = gen.getLoweredType(tupleType);
@@ -195,7 +209,7 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
     SILValue buffer = gen.emitTemporaryAllocation(l, loweredType);
-    ImplodeAddressOnlyTuple(values, gen).visit(tupleType, buffer, l);
+    ImplodeAddressOnlyTuple<KIND>(values, gen).visit(tupleType, buffer, l);
     return buffer;
   }
   
@@ -203,7 +217,89 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
   // TupleInsts.
   return ImplodeLoadableTupleValue<KIND>(values, gen).visit(tupleType, l);
 }
+
+class CopyIntoTupleValues
+  : public CanTypeVisitor<CopyIntoTupleValues,
+                          /*RetTy=*/ void,
+                          /*Args...=*/ Initialization*>
+{
+public:
+  ArrayRef<ManagedValue> values;
+  SILGenFunction &gen;
+  SILLocation loc;
   
+  CopyIntoTupleValues(ArrayRef<ManagedValue> values, SILGenFunction &gen,
+                        SILLocation l)
+    : values(values), gen(gen), loc(l)
+  {}
+  
+  void visitType(CanType t, Initialization *I) {
+    // Pop a value off.
+    ManagedValue orig = values[0];
+    values = values.slice(1);
+    
+    switch (I->kind) {
+    case Initialization::Kind::AddressBinding:
+      llvm_unreachable("cannot emit into a inout binding");
+    case Initialization::Kind::Tuple:
+      llvm_unreachable("tuple initialization not destructured?!");
+
+    case Initialization::Kind::Ignored:
+      // Throw out the value without copying it.
+      return;
+
+    case Initialization::Kind::Translating: {
+      auto copy = orig.copyUnmanaged(gen, loc);
+      I->translateValue(gen, loc, copy);
+      I->finishInitialization(gen);
+      return;
+    }
+
+    case Initialization::Kind::LetValue:
+      // If this is a non-address-only let, just bind the value.
+      if (!I->hasAddress()) {
+        // Disable the expression cleanup of the copy, since the let value
+        // initialization has a cleanup that lives for the entire scope of the
+        // let declaration.
+        I->bindValue(orig.copyUnmanaged(gen, loc).forward(gen), gen);
+        I->finishInitialization(gen);
+        return;
+      }
+      // Otherwise, handle it the same as the singlebuffer case.
+      SWIFT_FALLTHROUGH;
+
+    case Initialization::Kind::SingleBuffer:
+      assert(orig.getValue() != I->getAddress() && "copying in place?!");
+      orig.copyInto(gen, I->getAddress(), loc);
+      I->finishInitialization(gen);
+      return;
+    }
+  }
+  
+  void visitTupleType(CanTupleType t, Initialization *I) {
+    // Break up the aggregate initialization if we can.
+    if (I->canSplitIntoSubelementAddresses()) {
+      SmallVector<InitializationPtr, 4> subInitBuf;
+      auto subInits = I->getSubInitializationsForTuple(gen, t, subInitBuf, loc);
+      
+      assert(subInits.size() == t->getNumElements() &&
+             "initialization does not match tuple?!");
+      
+      for (unsigned i = 0, e = subInits.size(); i < e; ++i)
+        visit(t.getElementType(i), subInits[i].get());
+      return;
+    }
+    
+    // Otherwise, process this by turning the values corresponding to the tuple
+    // into a single value (through an implosion) and then binding that value to
+    // our initialization.
+    assert(I->kind == Initialization::Kind::LetValue);
+    SILValue V = implodeTupleValues<ImplodeKind::Copy>(values, gen, t, loc);
+    I->bindValue(V, gen);
+    I->finishInitialization(gen);
+  }
+};
+
 class InitializeTupleValues
   : public CanTypeVisitor<InitializeTupleValues,
                           /*RetTy=*/ void,
@@ -433,6 +529,13 @@ void RValue::forwardInto(SILGenFunction &gen, Initialization *I,
                          SILLocation loc) && {
   assert(isComplete() && "rvalue is not complete");
   InitializeTupleValues(values, gen, loc).visit(type, I);
+}
+
+void RValue::copyInto(SILGenFunction &gen, Initialization *I,
+                      SILLocation loc) const & {
+  assert(isComplete() && "rvalue is not complete");
+
+  CopyIntoTupleValues(values, gen, loc).visit(type, I);
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &gen, SILLocation l) && {

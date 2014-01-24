@@ -855,6 +855,11 @@ public:
     // We handle these in pattern binding.
   }
   
+  /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
+  std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd,
+                                                             bool isArgument,
+                                                             Type patternType);
+  
   /// Emit the allocation for a local variable. Returns the address of the
   /// value. Does not register a cleanup.
   void emitLocalVariable(VarDecl *D);

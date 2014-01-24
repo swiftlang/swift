@@ -160,6 +160,10 @@ public:
   /// Use this rvalue to initialize an Initialization.
   void forwardInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) &&;
 
+  /// Copy this rvalue to initialize an Initialization without consuming the
+  /// rvalue.
+  void copyInto(SILGenFunction &gen, Initialization *I, SILLocation Loc) const&;
+  
   /// Forward the exploded SILValues into a SmallVector.
   void forwardAll(SILGenFunction &gen,
                   SmallVectorImpl<SILValue> &values) &&;

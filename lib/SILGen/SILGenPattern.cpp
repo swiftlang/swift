@@ -1276,23 +1276,21 @@ public:
     
     // Since only one row's variables will ever be available in any case block,
     // we can emit one box and alias all the column variables to it.
+    // If any variable in the column is mutable, emit a box, otherwise, emit
+    // an immutable binding.
     // FIXME: If we end up supporting variables in case alternates, we will need
-    // to handle that, perhaps by phi-ing the corresponding boxes into the case
+    // to handle that, perhaps by phi-ing the bindings into the case
     // block.
-    VarDecl *emittedVar = nullptr;
+    Optional<std::pair<VarDecl *, SILLocation>> varToEmit;
+    SmallVector<VarDecl*, 4> varsToAlias;
     
-    auto emitVar = [&](VarDecl *vd, SILLocation loc) {
-      // If we already emitted a variable from another row, alias that variable.
-      if (emittedVar) {
-        gen.VarLocs[vd] = gen.VarLocs[emittedVar];
-        return;
+    auto addVar = [&](VarDecl *vd, SILLocation loc) {
+      if (!varToEmit
+          // If we have a 'var', that takes precedence over 'let's.
+          || (!vd->isLet() && varToEmit->first->isLet())) {
+        varToEmit = {vd, loc};
       }
-      
-      // Create and initialize the variable.
-      InitializationPtr init = gen.emitLocalVariableWithCleanup(vd);
-      ManagedValue::forUnmanaged(v).copyInto(gen, init->getAddress(), loc);
-      init->finishInitialization(gen);
-      emittedVar = vd;
+      varsToAlias.push_back(vd);
     };
     
     for (unsigned r = 0, e = rows(); r < e; ++r) {
@@ -1311,14 +1309,14 @@ public:
           
       case PatternKind::Named:
         // Bind the named variable.
-        emitVar(cast<NamedPattern>(p)->getDecl(),
+        addVar(cast<NamedPattern>(p)->getDecl(),
                 RegularLocation(const_cast<Pattern*>(p)));
         break;
           
       case PatternKind::Expr:
         // Bind the ExprPattern's implicit match var.
         // TODO: It'd be nice not to need the temp var for expr patterns.
-        emitVar(cast<ExprPattern>(p)->getMatchVar(),
+        addVar(cast<ExprPattern>(p)->getMatchVar(),
                 RegularLocation(const_cast<Pattern*>(p)));
         break;
 
@@ -1328,6 +1326,26 @@ public:
         llvm_unreachable("not semantic");
       }
     }
+    
+    if (!varToEmit)
+      return;
+
+    VarDecl *vdToEmit = varToEmit->first;
+    SILLocation locToEmit = varToEmit->second;
+    
+    // Initialize the variable value.
+    InitializationPtr init
+      = gen.emitInitializationForVarDecl(vdToEmit, /*isArgument*/ false, Type());
+    auto mv = ManagedValue::forUnmanaged(v);
+    RValue(gen, locToEmit, vdToEmit->getType()->getCanonicalType(), mv)
+      .copyInto(gen, init.get(), locToEmit);
+    
+    // Alias the variables to the value.
+    for (auto var : varsToAlias) {
+      if (var == varToEmit->first)
+        continue;
+      gen.VarLocs[var] = gen.VarLocs[varToEmit->first];
+    }    
   }
   
   /// Transform this matrix into its default. The following row-wise

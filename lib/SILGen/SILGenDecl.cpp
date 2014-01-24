@@ -457,7 +457,6 @@ public:
   }
 };
 
-  
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
 /// Initialization representing the needed initializations. 
@@ -489,51 +488,9 @@ struct InitializationForPattern
   // Bind to a named pattern by creating a memory location and initializing it
   // with the initial value.
   InitializationPtr visitNamedPattern(NamedPattern *P) {
-    VarDecl *vd = P->getDecl();
-    
-    // If this is a computed variable, we don't need to do anything here.
-    // We'll generate the getter and setter when we see their FuncDecls.
-    if (!vd->hasStorage())
-      return InitializationPtr(new BlackHoleInitialization());
-
-    // If this is a global variable, initialize it without allocations or
-    // cleanups.
-    if (!vd->getDeclContext()->isLocalContext()) {
-      SILValue addr = Gen.B.createGlobalAddr(vd, vd,
-                          Gen.getLoweredType(vd->getType()).getAddressType());
-      
-      // In a top level context, all global variables must be initialized.
-      addr = Gen.B.createMarkUninitializedGlobalVar(vd, addr);
-      
-      Gen.VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
-      return InitializationPtr(new GlobalInitialization(addr));
-    }
-
-    CanType varType = vd->getType()->getCanonicalType();
-
-    // If this is an @inout parameter, set up the writeback variable.
-    if (isa<InOutType>(varType))
-      return InitializationPtr(new InOutInitialization(vd));
-
-    // If this is a 'let' initialization for a non-address-only type, set up a
-    // let binding, which stores the initialization value into VarLocs directly.
-    if (vd->isLet()) {
-      bool isArgument = ArgumentOrVar == Argument;
-      return InitializationPtr(new LetValueInitialization(vd, isArgument, Gen));
-    }
-    
-    // Otherwise, we have a normal local-variable initialization.
-    auto varInit = Gen.emitLocalVariableWithCleanup(vd);
-
-    // Initializing a @weak or @unowned variable requires a change in type.
-    if (isa<ReferenceStorageType>(varType))
-      return InitializationPtr(new ReferenceStorageInitialization(
-                                                         std::move(varInit)));
-
-    // Otherwise, the pattern type should match the type of the variable.
-    // FIXME: why do we ever get patterns without types here?
-    assert(!P->hasType() || varType == P->getType()->getCanonicalType());
-    return varInit;
+    return Gen.emitInitializationForVarDecl(P->getDecl(),
+                                            ArgumentOrVar == Argument,
+                                            P->hasType() ? P->getType() : Type());
   }
   
   // Bind a tuple pattern by aggregating the component variables into a
@@ -558,6 +515,52 @@ struct InitializationForPattern
 
 } // end anonymous namespace
 
+InitializationPtr
+SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
+                                             Type patternType) {
+  // If this is a computed variable, we don't need to do anything here.
+  // We'll generate the getter and setter when we see their FuncDecls.
+  if (!vd->hasStorage())
+    return InitializationPtr(new BlackHoleInitialization());
+
+  // If this is a global variable, initialize it without allocations or
+  // cleanups.
+  if (!vd->getDeclContext()->isLocalContext()) {
+    SILValue addr = B.createGlobalAddr(vd, vd,
+                                getLoweredType(vd->getType()).getAddressType());
+    
+    // In a top level context, all global variables must be initialized.
+    addr = B.createMarkUninitializedGlobalVar(vd, addr);
+    
+    VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
+    return InitializationPtr(new GlobalInitialization(addr));
+  }
+
+  CanType varType = vd->getType()->getCanonicalType();
+
+  // If this is an @inout parameter, set up the writeback variable.
+  if (isa<InOutType>(varType))
+    return InitializationPtr(new InOutInitialization(vd));
+
+  // If this is a 'let' initialization for a non-address-only type, set up a
+  // let binding, which stores the initialization value into VarLocs directly.
+  if (vd->isLet()) {
+    return InitializationPtr(new LetValueInitialization(vd, isArgument, *this));
+  }
+  
+  // Otherwise, we have a normal local-variable initialization.
+  auto varInit = emitLocalVariableWithCleanup(vd);
+
+  // Initializing a @weak or @unowned variable requires a change in type.
+  if (isa<ReferenceStorageType>(varType))
+    return InitializationPtr(new ReferenceStorageInitialization(
+                                                       std::move(varInit)));
+
+  // Otherwise, the pattern type should match the type of the variable.
+  // FIXME: why do we ever get patterns without types here?
+  assert(!patternType || varType == patternType->getCanonicalType());
+  return varInit;
+}
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
   // Allocate the variables and build up an Initialization over their
