@@ -190,6 +190,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Arguments.push_back("-module-name");
   Arguments.push_back(Args.MakeArgString(OI.ModuleName));
 
+  Args.AddLastArg(Arguments, options::OPT_module_link_name);
+
   Args.AddLastArg(Arguments, options::OPT_g);
 
   // Pass the optimization level down to the frontend.
@@ -209,6 +211,10 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
+
+  Args.AddAllArgs(Arguments, options::OPT_I);
+
+  Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
   const std::string &ModuleOutputPath =
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
