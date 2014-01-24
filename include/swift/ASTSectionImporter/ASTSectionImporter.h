@@ -17,12 +17,9 @@
 #ifndef SWIFT_ASTSECTION_IMPORTER_H
 #define SWIFT_ASTSECTION_IMPORTER_H
 
-#include "llvm/ADT/SmallVector.h"
-#include <memory>
+#include "swift/Basic/LLVM.h"
+#include <string>
 
-namespace llvm {
-  class MemoryBuffer;
-}
 namespace swift {
   class SerializedModuleLoader;
 
