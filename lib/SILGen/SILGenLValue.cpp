@@ -515,6 +515,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 
   // If it's a computed variable, push a reference to the getter and setter.
   switch (var->getStorageKind()) {
+  case VarDecl::StoredObjC: assert(0 && "Can't happen, always a member");
   case VarDecl::Stored: {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
@@ -559,15 +560,23 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
 
+  
+  // FIXME: This should go away.
+  if (var->getStorageKind() == VarDecl::Stored &&
+      var->usesObjCGetterAndSetter() && !gen.AlwaysDirectStoredPropertyAccess) {
+    // Use the property accessors.
+    lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
+                                  typeData);
+    return std::move(lv);
+  }
+  
   switch (var->getStorageKind()) {
-  case VarDecl::Stored:  // Stored properties handled below.
-    // If this is a computed variable, or a stored property that we need to
-    // access through an Objective-C getter/setter, use a getter/setter lvalue.
-    if (var->usesObjCGetterAndSetter() && !gen.AlwaysDirectStoredPropertyAccess)
-      ;
-    else
+    case VarDecl::Stored:  // Stored properties handled below.
       break;
-
+  case VarDecl::StoredObjC:
+    // FIXME: This 'if' should go away.
+    if (gen.AlwaysDirectStoredPropertyAccess)
+      break;
   case VarDecl::Computed:
     // Use the property accessors.
     lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),

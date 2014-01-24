@@ -1031,6 +1031,9 @@ void AbstractStorageDecl::setComputedAccessors(SourceLoc LBraceLoc,
     Get->makeGetter(this);
   if (Set)
     Set->makeSetter(this);
+  
+  // Mark that this is a computed ivar.
+  setStorageKind(Computed);
 }
 
 

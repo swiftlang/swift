@@ -2348,6 +2348,12 @@ public:
     /// There are bits stored in memory for this object, and they are accessed
     /// directly.
     Stored,
+    
+    /// This is a stored property reflected through to Objective-C access with
+    /// getters and setters.  It is possible to either access it directly, or to
+    /// use the associated getter/setter method.  This is not valid for a
+    /// SubscriptDecl.
+    StoredObjC,
 
     /// There is no memory associated with this decl anywhere.  It is accessed
     /// by calling a getter and setter.  If the setter is absent, then the value
@@ -2355,7 +2361,7 @@ public:
     Computed
   };
 private:
-  AbstractStorageDecl *OverriddenDecl = nullptr;
+  llvm::PointerIntPair<AbstractStorageDecl*, 2, StorageKindTy> OverriddenDecl;
 
   struct GetSetRecord {
     SourceRange Braces;
@@ -2364,10 +2370,13 @@ private:
   };
 
   GetSetRecord *GetSetInfo = nullptr;
+  
+  void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, Identifier Name,
                       SourceLoc NameLoc)
     : ValueDecl(Kind, DC, Name, NameLoc) {
+    OverriddenDecl.setInt(Stored);
   }
 public:
 
@@ -2375,17 +2384,29 @@ public:
   /// has no storage but does have a user-defined getter or setter.
   ///
   StorageKindTy getStorageKind() const {
-    return GetSetInfo ? Computed : Stored;
+    return OverriddenDecl.getInt();
   }
 
   /// \brief Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    return getStorageKind() == Stored;
+    switch (getStorageKind()) {
+    case Stored:
+    case StoredObjC:
+      return true;
+    case Computed:
+      return false;
+    }
   }
 
   bool hasAccessorFunctions() const {
-    return getStorageKind() == Computed;
+    switch (getStorageKind()) {
+    case Computed:
+    case StoredObjC:
+      return true;
+    case Stored:
+      return false;
+    }
   }
 
   /// \brief Turn this into a computed variable, providing a getter and setter.
@@ -2416,10 +2437,10 @@ public:
   bool usesObjCGetterAndSetter() const;
   
   AbstractStorageDecl *getOverriddenDecl() const {
-    return OverriddenDecl;
+    return OverriddenDecl.getPointer();
   }
   void setOverriddenDecl(AbstractStorageDecl *over) {
-    OverriddenDecl = over;
+    OverriddenDecl.setPointer(over);
   }
 
   // Implement isa/cast/dyncast/etc.

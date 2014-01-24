@@ -539,6 +539,9 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
   // If this is a get-only computed property being accessed, call the getter.
   switch (FieldDecl->getStorageKind()) {
+  case VarDecl::StoredObjC:
+    assert(0 && "Cannot happen as an rvalue-only access, "
+           "these are always class properties");
   case VarDecl::Computed: {
     // If the base is +0, emit a copy_value to bring it to +1 since getters
     // always take the base object at +1.
