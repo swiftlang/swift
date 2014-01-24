@@ -202,12 +202,12 @@ public:
   // struct_element_addr, tuple_element_addr.
   SILValue stripAddressProjections();
 
-  // Return the underlying SILValue after stripping off all object projection
+  // Return the underlying SILValue after stripping off all aggregate projection
   // instructions.
   //
-  // An object projection instruction is either a struct_extract or a
+  // An aggregate projection instruction is either a struct_extract or a
   // tuple_extract instruction.
-  SILValue stripObjectProjections();
+  SILValue stripAggregateProjections();
   
   void replaceAllUsesWith(SILValue V);
 
