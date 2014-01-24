@@ -194,11 +194,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.OutputFilename = A->getValue();
   }
 
+  bool UserSpecifiedModuleName = false;
   {
     const Arg *A = Args.getLastArg(OPT_module_name);
     std::string ModuleName;
     if (A) {
       ModuleName = A->getValue();
+      UserSpecifiedModuleName = true;
     } else {
       // The user did not specify a module name, so determine a default fallback
       // based on other options.
@@ -313,8 +315,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         
         StringRef BaseName;
         if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
-          BaseName = llvm::sys::path::stem(Opts.InputFilenames[Opts.PrimaryInput->Index]);
-        } else if (Opts.InputFilenames.size() == 1) {
+          unsigned Index = Opts.PrimaryInput->Index;
+          BaseName = llvm::sys::path::stem(Opts.InputFilenames[Index]);
+        } else if (!UserSpecifiedModuleName &&
+                   Opts.InputFilenames.size() == 1) {
           BaseName = llvm::sys::path::stem(Opts.InputFilenames[0]);
         } else {
           BaseName = Opts.ModuleName;
