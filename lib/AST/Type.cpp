@@ -2323,3 +2323,84 @@ bool Type::findIf(const std::function<bool(Type)> &pred) const {
   return walk(Walker(pred));
 }
 
+static TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> subs) {
+  TypeSubstitutionMap r;
+  
+  for (auto sub : subs) {
+    if (sub.Archetype->isPrimary())
+      r[sub.Archetype] = sub.Replacement;
+  }
+  
+  return r;
+}
+
+Substitution Substitution::subst(Module *module,
+                                 ArrayRef<Substitution> subs) const {
+  TypeSubstitutionMap subMap = getSubstitutionMap(subs);
+  return subst(module, subs, subMap);
+}
+
+Substitution Substitution::subst(Module *module,
+                                 ArrayRef<Substitution> subs,
+                                 TypeSubstitutionMap &subMap) const {
+  // Substitute the replacement.
+  Type substReplacement
+    = Replacement.subst(module, subMap, /*ignoreMissing*/false, nullptr);
+  assert(substReplacement && "substitution replacement failed");
+  
+  if (substReplacement->isEqual(Replacement))
+    return *this;
+  
+  bool conformancesChanged = false;
+  SmallVector<ProtocolConformance *, 4> substConformance;
+  substConformance.reserve(Conformance.size());
+  
+  // When substituting a concrete type for an archetype, we need to fill in the
+  // conformances.
+  if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
+    if (!substReplacement->is<ArchetypeType>()) {
+      conformancesChanged = true;
+      // Find the substitution that satisfied the archetype.
+      auto archetypeSub = std::find_if(subs.begin(), subs.end(),
+         [&](const Substitution &s) { return s.Archetype == replacementArch; });
+      assert(archetypeSub != subs.end()
+             && "no substitution for substituted archetype?!");
+      // Get the conformances for the type that apply to the original substituted
+      // archetype.
+      for (auto proto : Archetype->getConformsTo()) {
+        for (auto c : archetypeSub->Conformance) {
+          if (c->getProtocol() == proto) {
+            substConformance.push_back(c);
+            goto found_conformance;
+          }
+          if (c->getProtocol()->inheritsFrom(proto)) {
+            substConformance.push_back(c->getInheritedConformance(proto));
+            goto found_conformance;
+          }
+        }
+        assert(false && "did not find conformance for archetype requirement?!");
+found_conformance:;
+      }
+    }
+  } else {
+    // If we substituted a concrete type for another, we need to substitute the
+    // conformance to apply to the new type.
+    for (auto c : Conformance) {
+      auto substC = c->subst(module, substReplacement, subs, subMap);
+      if (c != substC)
+        conformancesChanged = true;
+      substConformance.push_back(substC);
+    }
+  }
+  
+  ArrayRef<ProtocolConformance *> substConformanceRef;
+  if (conformancesChanged)
+    substConformanceRef = module->getASTContext().AllocateCopy(substConformance);
+  else
+    substConformanceRef = Conformance;
+
+  assert(substReplacement->is<ArchetypeType>()
+         || substConformanceRef.size() == Archetype->getConformsTo().size());
+
+  return Substitution{Archetype, substReplacement, substConformanceRef};
+}

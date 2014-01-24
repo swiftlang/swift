@@ -240,6 +240,15 @@ public:
   void printName(raw_ostream &os) const;
   
   void dump() const;
+
+private:
+  friend class Substitution;
+  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// applies to the substituted type.
+  ProtocolConformance *subst(Module *module,
+                             Type substType,
+                             ArrayRef<Substitution> subs,
+                             TypeSubstitutionMap &subMap);
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol

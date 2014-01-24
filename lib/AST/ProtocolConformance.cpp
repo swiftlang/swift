@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -268,4 +269,50 @@ ProtocolConformance::getRootNormalConformance() const {
     }
   }
   return cast<NormalProtocolConformance>(C);
+}
+
+ProtocolConformance *ProtocolConformance::subst(Module *module,
+                                                Type substType,
+                                                ArrayRef<Substitution> subs,
+                                                TypeSubstitutionMap &subMap) {
+  if (getType()->isEqual(substType)) return this;
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    if (substType->isSpecialized()) {
+      assert(getType()->isSpecialized()
+             && "substitution mapped non-specialized to specialized?!");
+      assert(getType()->getNominalOrBoundGenericNominal()
+               == substType->getNominalOrBoundGenericNominal()
+             && "substitution mapped to different nominal?!");
+      return module->getASTContext()
+        .getSpecializedConformance(substType, this,
+                           substType->gatherAllSubstitutions(module, nullptr));
+    }
+    assert(substType->isEqual(getType())
+           && "substitution changed non-specialized type?!");
+    return this;
+      
+  case ProtocolConformanceKind::Inherited: {
+    // Substitute the base.
+    ProtocolConformance *newBase
+      = cast<InheritedProtocolConformance>(this)->getInheritedConformance()
+        ->subst(module, substType, subs, subMap);
+    return module->getASTContext()
+      .getInheritedConformance(substType, newBase);
+  }
+  case ProtocolConformanceKind::Specialized: {
+    // Substitute the substitutions in the specialized conformance.
+    auto spec = cast<SpecializedProtocolConformance>(this);
+    SmallVector<Substitution, 8> newSubs;
+    newSubs.reserve(spec->getGenericSubstitutions().size());
+    for (auto &sub : spec->getGenericSubstitutions())
+      newSubs.push_back(sub.subst(module, subs, subMap));
+    
+    auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
+    
+    return module->getASTContext()
+      .getSpecializedConformance(substType, spec->getGenericConformance(),
+                                 ctxNewSubs);
+  }
+  }
 }

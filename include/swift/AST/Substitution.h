@@ -38,6 +38,14 @@ public:
   bool operator!=(const Substitution &Other) const;
   void print(llvm::raw_ostream &os) const;
   void dump() const;
+  
+  /// Substitute the replacement and conformance types with the given
+  /// substitution vector.
+  Substitution subst(Module *module,
+                     ArrayRef<Substitution> subs) const;
+  Substitution subst(Module *module,
+                     ArrayRef<Substitution> subs,
+                     TypeSubstitutionMap &subMap) const;
 };
 
 } // end namespace swift

@@ -59,65 +59,6 @@ private:
     return SILType::substType(OrigFunc->getModule(), SwiftMod, SubsMap, Ty);
   }
 
-  /// Finds the generic type substitution in the caller substitution list that
-  /// corresponds to a specific generic type.
-  Substitution getCallerSubstitutionForCalleSub(Type T) {
-    // Find the correct type replacement in the caller ApplyInst
-    for (Substitution &CallerSub : CallerInst->getSubstitutions())
-      if (CallerSub.Archetype->getCanonicalType() == T->getCanonicalType())
-        return CallerSub;
-
-    // T is not a caller Archetype, return an empty subst list.
-    return  Substitution{ 0, 0, ArrayRef<ProtocolConformance *>() };
-  }
-
-  Substitution remapSubstitution(Substitution Ap) {
-    // Find this substitution in the caller subst list.
-    Substitution C = getCallerSubstitutionForCalleSub(Ap.Replacement);
-
-    // The new conformance list.
-    SmallVector<ProtocolConformance*, 4> NewConf;
-
-    // If we found this substitution in the caller apply inst:
-    if (C.Archetype) {
-      // If the replacement type is a caller archetype then we need to find
-      // the subset of the protocol that applies to the Calle subst list
-      // and also to this substitution. Notice that we preserve the order of
-      // protocols that the Archetype conforms to.
-      //
-      // For all protocols that our Archetype conforms to:
-      for (auto PC : Ap.Archetype->getConformsTo()) {
-        bool Found = false;
-        for (auto CallerCon : C.Conformance) {
-          // The protocol conformance can be an exact match:
-          if (CallerCon->getProtocol() == PC) {
-            NewConf.push_back(CallerCon);
-            Found = true;
-            break;
-          }
-          // Or it can be inherited:
-          if (CallerCon->getProtocol()->inheritsFrom(PC)) {
-            NewConf.push_back(CallerCon->getInheritedConformance(PC));
-            Found = true;
-            break;
-          }
-        }
-        assert(Found && "Unable to find Caller conformance for archetype con.");
-      }
-    } else {
-      // If the replacement type is not a caller Archetype then use the
-      // unmodified _caller_ conformance list.
-      NewConf.append(Ap.Conformance.begin(), Ap.Conformance.end());
-    }
-
-    // Copy the conformance list to a permanent location.
-    ArrayRef<ProtocolConformance*> NewConfArray =
-    SwiftMod->getASTContext(). AllocateCopy(NewConf);
-
-    Type SubstTy = Ap.Replacement.subst(SwiftMod, SubsMap, true, 0);
-    return Substitution{ Ap.Archetype, SubstTy, NewConfArray };
-  }
-
   void visitClassMethodInst(ClassMethodInst *Inst) {
     NumCMSpecialized++;
     doPostProcess(Inst,
@@ -136,7 +77,8 @@ private:
 
     SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions())
-      TempSubstList.push_back(remapSubstitution(Sub));
+      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
+                                        CallerInst->getSubstitutions()));
 
     ApplyInst *N = Builder.createApply(
         getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
@@ -148,58 +90,17 @@ private:
   void visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
-    // This is the substitution for the specialzied type from the Caller's
-    // substitution list.
-    Substitution CallerSubst =
-      getCallerSubstitutionForCalleSub(Inst->getLookupType().getSwiftType());
-
-    // Initialize the new protocol conformance with the original conformance.
-    ProtocolConformance *PC = Inst->getConformance();
-
-    // This is the protocol that the *member* belongs to:
-    ProtocolDecl *PDC =
-      cast<ProtocolDecl>(Inst->getMember().getDecl()->getDeclContext());
-
-    DEBUG(llvm::dbgs()<<"Replacing conformance for protocol: " <<
-          PDC->getName() << "\n");
-
-    // If the caller to the specialized function substitutes the protocol
-    // that the ArchetypeMethodInst conforms to then scan the list of protocols
-    // and find the right substitution.
-    if (CallerSubst.Archetype) {
-      // This is the protocol that the ArchetypeMethodInst conforms to.
-
-      DEBUG(llvm::dbgs() << "Caller substitution conforms to " <<
-            CallerSubst.Conformance.size() << " types.\n");
-      for (auto CallerCon : CallerSubst.Conformance) {
-        (void)CallerCon;
-        DEBUG(llvm::dbgs() << CallerCon->getProtocol()->getName() << "\n");
-      }
-
-      for (auto CallerCon : CallerSubst.Conformance) {
-        if (CallerCon->getProtocol() == PDC) {
-          PC = CallerCon;
-          break;
-        }
-        if (CallerCon->getProtocol()->inheritsFrom(PDC)) {
-           DEBUG(llvm::dbgs()<<"Substituting " << CallerCon->getProtocol()->
-                 getName() << " that inherits from " << PDC->getName() << "\n");
-          PC = CallerCon->getInheritedConformance(PDC);
-          assert(PC && "Can't find the inherited conformance");
-          break;
-        }
-      }
-    }
-
-    if (Inst->getLookupType().getAs<ArchetypeType>()) {
-      assert(PC && "Concrete types must conform to a protocol.");
-    }
-
+    // Specialize the Self substitution of the archetype_method.
+    auto sub = Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
+                                                 CallerInst->getSubstitutions());
+    
+    assert(sub.Conformance.size() == 1 && "didn't get conformance from substitution?!");
+    
     doPostProcess(Inst,Builder.
                   createArchetypeMethod(getOpLocation(Inst->getLoc()),
                                         getOpType(Inst->getLookupType()),
                                         getOpConformance(Inst->getLookupType(),
-                                                         PC),
+                                                         sub.Conformance[0]),
                                         Inst->getMember(),
                                         getOpType(Inst->getType()),
                                         Inst->isVolatile()));
