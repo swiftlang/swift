@@ -237,6 +237,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
+  BLOCK_RECORD(control_block, MODULE_NAME);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, SOURCE_FILE);
@@ -293,12 +294,15 @@ void Serializer::writeBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeHeader() {
+void Serializer::writeHeader(const Module *M) {
   writeBlockInfoBlock();
 
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+    control_block::ModuleNameLayout ModuleName(Out);
     control_block::MetadataLayout Metadata(Out);
+
+    ModuleName.emit(ScratchRecord, M->Name.str());
 
     // FIXME: put a real version in here.
 #ifdef LLVM_VERSION_INFO
@@ -2184,16 +2188,17 @@ namespace {
 }
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *M, SerializationMode mode,
+                               const SILModule *SILMod, SerializationMode mode,
                                FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
   for (unsigned char byte : SIGNATURE)
     Out.Emit(byte, 8);
 
-  writeHeader();
-  writeInputFiles(getModule(DC), inputFiles, moduleLinkName);
-  writeModule(DC, M);
+  const Module *mod = getModule(DC);
+  writeHeader(mod);
+  writeInputFiles(mod, inputFiles, moduleLinkName);
+  writeModule(DC, SILMod);
 
   if (mode == SerializationMode::MachOSection) {
     // FIXME: Duplicated here and in SwiftASTStreamerPass.h.

@@ -61,6 +61,10 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       result = ModuleStatus::Valid;
       break;
     }
+    case control_block::MODULE_NAME:
+      // Ignore the module name; this is only interesting when the serialized
+      // data is the only clue to which module this is.
+      break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
       // module format.

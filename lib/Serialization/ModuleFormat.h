@@ -246,7 +246,8 @@ namespace control_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum {
-    METADATA = 1
+    METADATA = 1,
+    MODULE_NAME
   };
 
   using MetadataLayout = BCRecordLayout<
@@ -254,6 +255,11 @@ namespace control_block {
     BCFixed<16>, // Module format major version
     BCFixed<16>, // Module format minor version
     BCBlob // misc. version information
+  >;
+
+  using ModuleNameLayout = BCRecordLayout<
+    MODULE_NAME,
+    BCBlob
   >;
 }
 

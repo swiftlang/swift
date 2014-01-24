@@ -164,8 +164,8 @@ private:
   void writeBlockInfoBlock();
 
   /// Writes the Swift module file header, BLOCKINFO block, and
-  /// non-module-specific metadata.
-  void writeHeader();
+  /// non-module-specific metadata, other than the module name.
+  void writeHeader(const Module *M);
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
