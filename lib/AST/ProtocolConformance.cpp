@@ -23,8 +23,9 @@
 using namespace swift;
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
+                                        AllocationArena arena,
                                         unsigned alignment) {
-  return context.Allocate(bytes, alignment);
+  return context.Allocate(bytes, alignment, arena);
 
 }
 

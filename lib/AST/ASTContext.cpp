@@ -139,10 +139,23 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ClassType> ClassTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
+
+    /// The set of specialized protocol conformances.
+    llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
+
+    /// The set of inherited protocol conformances.
+    llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
+
     /// ConformsTo - Caches the results of checking whether a given (canonical)
     /// type conforms to a given protocol.
     ConformsToMap ConformsTo;
 
+    ~Arena() {
+      for (auto &conformance : SpecializedConformances)
+        conformance.~SpecializedProtocolConformance();
+      for (auto &conformance : InheritedConformances)
+        conformance.~InheritedProtocolConformance();
+    }
   };
   
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
@@ -173,12 +186,6 @@ struct ASTContext::Implementation {
   /// Since these conformances are tied explicitly to the source code, semantic
   /// analysis is responsible for handling the uniquing.
   SmallVector<NormalProtocolConformance *, 2> NormalConformances;
-
-  /// The set of specialized protocol conformances.
-  llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
-
-  /// The set of inherited protocol conformances.
-  llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
   /// \brief Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
@@ -275,8 +282,6 @@ ASTContext::~ASTContext() {
   // Tear down protocol conformances.
   for (auto conformance : Impl.NormalConformances)
     conformance->~NormalProtocolConformance();
-  for (auto &conformance : Impl.SpecializedConformances)
-    conformance.~SpecializedProtocolConformance();
 
   delete &Impl;
 }
@@ -903,8 +908,8 @@ ASTContext::getConformance(Type conformingType,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
   auto result
-    = new (*this) NormalProtocolConformance(conformingType, protocol, loc,
-                                            dc, state);
+    = new (*this, AllocationArena::Permanent)
+         NormalProtocolConformance(conformingType, protocol, loc, dc, state);
   Impl.NormalConformances.push_back(result);
   return result;
 }
@@ -916,16 +921,21 @@ ASTContext::getSpecializedConformance(Type type,
   llvm::FoldingSetNodeID id;
   SpecializedProtocolConformance::Profile(id, type, generic);
 
+  // Figure out which arena this conformance should go into.
+  AllocationArena arena = getArena(type->getRecursiveProperties());
+
   // Did we already record the specialized conformance?
   void *insertPos;
-  if (auto result
-        = Impl.SpecializedConformances.FindNodeOrInsertPos(id, insertPos))
+  auto &specializedConformances = Impl.getArena(arena).SpecializedConformances;
+  if (auto result = specializedConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
   // Build a new specialized conformance.
+  substitutions = AllocateCopy(substitutions, arena);
   auto result
-    = new (*this) SpecializedProtocolConformance(type, generic, substitutions);
-  Impl.SpecializedConformances.InsertNode(result, insertPos);
+    = new (*this, arena) SpecializedProtocolConformance(type, generic, 
+                                                        substitutions);
+  specializedConformances.InsertNode(result, insertPos);
   return result;
 }
 
@@ -934,15 +944,19 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   llvm::FoldingSetNodeID id;
   InheritedProtocolConformance::Profile(id, type, inherited);
 
+  // Figure out which arena this conformance should go into.
+  AllocationArena arena = getArena(type->getRecursiveProperties());
+
   // Did we already record the specialized conformance?
   void *insertPos;
+  auto &inheritedConformances = Impl.getArena(arena).InheritedConformances;
   if (auto result
-        = Impl.InheritedConformances.FindNodeOrInsertPos(id, insertPos))
+        = inheritedConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
   // Build a new specialized conformance.
-  auto result = new (*this) InheritedProtocolConformance(type, inherited);
-  Impl.InheritedConformances.InsertNode(result, insertPos);
+  auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
+  inheritedConformances.InsertNode(result, insertPos);
   return result;
 }
 

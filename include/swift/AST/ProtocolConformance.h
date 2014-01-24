@@ -34,6 +34,7 @@ class NormalProtocolConformance;
 class ProtocolConformance;
 class SubstitutableType;
 class Module;
+enum class AllocationArena;
   
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -227,6 +228,7 @@ public:
   // Only allow allocation of protocol conformances using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t bytes, ASTContext &context,
+                     AllocationArena arena,
                      unsigned alignment = alignof(ProtocolConformance));
   void *operator new(size_t bytes, void *mem) {
     assert(mem);

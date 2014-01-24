@@ -173,10 +173,13 @@ bool TypeBase::isSpecialized() {
   });
 }
 
-ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
-                                                        LazyResolver *resolver) {
+ArrayRef<Substitution> 
+TypeBase::gatherAllSubstitutions(Module *module,
+                                 SmallVectorImpl<Substitution> &scratchSpace,
+                                 LazyResolver *resolver) {
   Type type(this);
   SmallVector<ArrayRef<Substitution>, 2> allSubstitutions;
+  scratchSpace.clear();
 
   while (type) {
     // Record the substitutions in a bound generic type.
@@ -205,11 +208,19 @@ ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
   if (allSubstitutions.size() == 1)
     return allSubstitutions.front();
 
-  SmallVector<Substitution, 4> flatSubstitutions;
   for (auto substitutions : allSubstitutions)
-    flatSubstitutions.append(substitutions.begin(), substitutions.end());
-  auto &ctx = module->getASTContext();
-  return ctx.AllocateCopy(flatSubstitutions);
+    scratchSpace.append(substitutions.begin(), substitutions.end());
+  return scratchSpace;
+}
+
+ArrayRef<Substitution> TypeBase::gatherAllSubstitutions(Module *module,
+                                                        LazyResolver *resolver) {
+  SmallVector<Substitution, 4> scratchSpace;
+  auto subs = gatherAllSubstitutions(module, scratchSpace, resolver);
+  if (scratchSpace.empty())
+    return subs;
+
+  return getASTContext().AllocateCopy(subs);
 }
 
 

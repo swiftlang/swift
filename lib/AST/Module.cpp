@@ -716,7 +716,9 @@ LookupConformanceResult Module::lookupConformance(Type type,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto substitutions = type->gatherAllSubstitutions(this, resolver);
+      SmallVector<Substitution, 4> substitutionsVec;
+      auto substitutions = type->gatherAllSubstitutions(this, substitutionsVec,
+                                                        resolver);
 
       // Create the specialized conformance entry.
       ctx.setConformsTo(canType, protocol, ConformanceEntry(nullptr, false));

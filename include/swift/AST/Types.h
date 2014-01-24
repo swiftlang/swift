@@ -358,10 +358,20 @@ public:
   /// Gather all of the substitutions used to produce the given specialized type
   /// from its unspecialized type.
   ///
-  /// Note that the resulting array may be ASTContext-allocted by this
-  /// routine.
-  ArrayRef<Substitution> gatherAllSubstitutions(Module *module,
-                                                LazyResolver *resolver);
+  /// \param scratchSpace The substitutions will be written into this scratch
+  /// space if a single substitutions array cannot be returned.
+  ArrayRef<Substitution> gatherAllSubstitutions(
+                           Module *module,
+                           SmallVectorImpl<Substitution> &scratchSpace,
+                           LazyResolver *resolver);
+
+  /// Gather all of the substitutions used to produce the given specialized type
+  /// from its unspecialized type.
+  ///
+  /// \returns ASTContext-allocated substitutions.
+  ArrayRef<Substitution> gatherAllSubstitutions(
+                           Module *module,
+                           LazyResolver *resolver);
 
   /// \brief Determine whether the given type is "generic", meaning that
   /// it involves generic types for which generic arguments have not been
