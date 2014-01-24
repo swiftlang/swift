@@ -2412,7 +2412,10 @@ public:
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void setComputedAccessors(SourceLoc LBraceLoc,
                             FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
-  
+
+  /// \brief Turn this into a StorageObjC var, providing a getter and setter.
+  void setStorageObjCAccessors(FuncDecl *Get, FuncDecl *Set);
+
   /// \brief Retrieve the getter used to access the value of this variable.
   FuncDecl *getGetter() const { return GetSetInfo ? GetSetInfo->Get : nullptr; }
   

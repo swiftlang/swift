@@ -1032,9 +1032,28 @@ void AbstractStorageDecl::setComputedAccessors(SourceLoc LBraceLoc,
   if (Set)
     Set->makeSetter(this);
   
-  // Mark that this is a computed ivar.
+  // Mark that this is a computed property.
   setStorageKind(Computed);
 }
+
+/// \brief Turn this into a StorageObjC var, providing a getter and setter.
+void AbstractStorageDecl::setStorageObjCAccessors(FuncDecl *Get, FuncDecl *Set){
+  assert(Get && Set);
+  auto &Context = getASTContext();
+  assert(!GetSetInfo && "Variable already has accessors?");
+  void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
+  GetSetInfo = new (Mem) GetSetRecord;
+  GetSetInfo->Braces = SourceRange();
+  GetSetInfo->Get = Get;
+  GetSetInfo->Set = Set;
+  
+  Get->makeGetter(this);
+  Set->makeSetter(this);
+  
+  // Mark that this is a StorageObjC property.
+  setStorageKind(StoredObjC);
+}
+
 
 
 /// \brief Returns whether the var is settable in the specified context: this

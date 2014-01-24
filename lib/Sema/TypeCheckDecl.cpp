@@ -1025,10 +1025,122 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   }
 }
 
+static Pattern *buildGetterSetterSelf(SourceLoc Loc, DeclContext *DC,
+                                      VarDecl **SelfDecl) {
+  auto &Context = DC->getASTContext();
+
+  VarDecl *D = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                     Loc, Context.Id_self, Type(), DC);
+  *SelfDecl = D;
+  D->setImplicit();
+  Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
+  return new (Context) TypedPattern(P, TypeLoc());
+}
+
+static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
+                                                VarDecl **ValueDecl) {
+  auto &Context = VD->getASTContext();
+  auto *Arg = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
+                                    VD->getLoc(),Context.getIdentifier("value"),
+                                    Type(), VD->getDeclContext());
+  *ValueDecl = Arg;
+  Arg->setImplicit();
+    
+  Pattern *ValuePattern
+    = new (Context) TypedPattern(new (Context) NamedPattern(Arg),
+                                 TypeLoc::withoutLoc(VD->getType()));
+  ValuePattern->setImplicit();
+  
+  TuplePatternElt ValueElt(ValuePattern);
+  Pattern *ValueParamsPattern
+    = TuplePattern::create(Context, SourceLoc(), ValueElt, SourceLoc());
+  ValueParamsPattern->setImplicit();
+  return ValueParamsPattern;
+}
+
+/// Given a "Stored" property that needs to be converted to StoreObjC (i.e.,
+/// has @objc getters and setters), create the getter and setter, and switch the
+/// storage kind.
+static void convertStoredVarToStoredObjC(VarDecl *VD) {
+  auto &Context = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
+  
+  VarDecl *SelfDecl = nullptr;
+  // Create the parameter list for the getter.
+  Pattern *GetterParams[] = {
+    // The implicit 'self' argument.
+    buildGetterSetterSelf(Loc, VD->getDeclContext(), &SelfDecl),
+  
+    // Add a no-parameters clause.
+    TuplePattern::create(Context, SourceLoc(),
+                         ArrayRef<TuplePatternElt>(),
+                         SourceLoc(), /*hasVararg=*/false,
+                         SourceLoc(), /*Implicit=*/true)
+  };
+  
+  
+  // Start the function.
+  auto *Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), Loc,
+                               Identifier(), Loc, /*GenericParams=*/nullptr,
+                               Type(), GetterParams, GetterParams,
+                               TypeLoc::withoutLoc(VD->getType()),
+                               VD->getDeclContext());
+  // Self comes in at +0 for this accessor.
+  Get->setIsObjC(true);
+  
+  // Reparent the self argument.
+  SelfDecl->setDeclContext(Get);
+  
+  
+  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
+  auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+  auto *MRE = new (Context) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                          /*implicit*/true);
+  ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
+  Get->setBody(BraceStmt::create(Context, SourceLoc(), Return, SourceLoc()));
+
+  
+  // Okay, the getter is set up, create the setter next.
+  VarDecl *ValueDecl = nullptr;
+  
+  // Create the parameter list for the setter.
+  Pattern *SetterParams[] = {
+    // The implicit 'self' argument.
+    buildGetterSetterSelf(Loc, VD->getDeclContext(), &SelfDecl),
+    
+    // Add a "(value : T)" pattern.
+    buildSetterValueArgumentPattern(VD, &ValueDecl)
+  };
+  Type SetterRetTy = TupleType::getEmpty(Context);
+  auto *Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), Loc,
+                               Identifier(), Loc, /*generic=*/nullptr,Type(),
+                               SetterParams, SetterParams,
+                               TypeLoc::withoutLoc(SetterRetTy),
+                               VD->getDeclContext());
+  // Self comes in at +0 for this accessor.
+  Set->setIsObjC(true);
+
+  // Reparent the self and value arguments.
+  SelfDecl->setDeclContext(Set);
+  ValueDecl->setDeclContext(Set);
+
+  // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
+  //                decl_ref_expr(value))
+  auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+  auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
+  MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
+                                    /*implicit*/true);
+  ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
+  Set->setBody(BraceStmt::create(Context, SourceLoc(), Assign, SourceLoc()));
+
+  
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->setStorageObjCAccessors(Get, Set);
+}
+
 namespace {
 
 class DeclChecker : public DeclVisitor<DeclChecker> {
-
 public:
   TypeChecker &TC;
 
@@ -1122,6 +1234,19 @@ public:
           VD->setIsObjC(ExplicitlyRequested ||
                         (classContext && classContext->isObjC()) ||
                         (protocolContext && protocolContext->isObjC()));
+        }
+        
+        
+        // If this is a stored ObjC ivar and should have an objc getter and
+        // setter, then change its storage kind to reflect that.
+        if (VD->getASTContext().LangOpts.EnableNewObjCProperties &&
+            VD->usesObjCGetterAndSetter() &&
+            VD->getStorageKind() == VarDecl::Stored) {
+          convertStoredVarToStoredObjC(VD);
+
+          // Type check the body of the getter and setter.
+          visit(VD->getGetter());
+          visit(VD->getSetter());
         }
       }
 
