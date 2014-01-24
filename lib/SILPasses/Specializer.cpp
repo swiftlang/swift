@@ -180,15 +180,6 @@ static bool isGenericType(Type F) {
                   });
 }
 
-/// \brief Return true if we can specialize this Apply Instruction.
-static bool canSpecializeApplyInst(ApplyInst *AI) {
-  for (auto &Sub : AI->getSubstitutions())
-    if (isGenericType(Sub.Replacement))
-      return false;
-
-  return true;
-}
-
 /// Check if we can clone and remap types this function.
 static bool canSpecializeFunction(SILFunction *F) {
   if (F->isExternalDeclaration())
@@ -289,11 +280,6 @@ void SILSpecializer::collectApplyInst(SILFunction &F) {
       if (Callee->isExternalDeclaration())
         continue;
 
-      // Check if we can specialize this AI. We perform this check last
-      // because it can be more expensive.
-      if (!canSpecializeApplyInst(AI))
-        continue;
-
       // Save the ApplyInst into the function/bucket that it calls.
       ApplyInstMap[Callee].push_back(AI);
     }
@@ -359,8 +345,6 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     // Continue if the AI is placed in a bucket.
     if (Placed)
       continue;
-
-    assert(canSpecializeApplyInst(AI) && "Can't specialize this ApplyInst");
 
     // Create a new bucket and place the AI.
     Buckets.push_back(AIList());
