@@ -72,6 +72,23 @@ SILValue SILValue::stripCasts() {
   return V;
 }
 
+SILValue SILValue::stripPointerProjections() {
+  SILValue V = *this;
+
+  while (true) {
+    V = V.stripCasts();
+    switch (V->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::RefElementAddrInst:
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    default:
+      return V;
+    }
+  }
+}
+
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
   SILUndef *&Entry = M->UndefValues[Ty];

@@ -194,6 +194,10 @@ public:
   // Return the underlying SILValue after stripping off all casts from the
   // current SILValue.
   SILValue stripCasts();
+
+  // Return the underlying SILValue after stripping off all casts and
+  // pointer projection instructions.
+  SILValue stripPointerProjections();
   
   void replaceAllUsesWith(SILValue V);
 
