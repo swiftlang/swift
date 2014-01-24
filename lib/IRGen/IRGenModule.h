@@ -111,7 +111,7 @@ public:
   const llvm::DataLayout &DataLayout;
   SILModule *SILMod;
   /// Order dependency -- TargetInfo must be initialized after Opts.
-  SwiftTargetInfo TargetInfo;
+  const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
   IRGenDebugInfo *DebugInfo;
   /// A Clang-to-IR-type converter for types appearing in function
