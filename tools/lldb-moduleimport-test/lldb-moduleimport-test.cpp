@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Dwarf.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "llvm/ADT/OwningPtr.h"
@@ -99,8 +100,7 @@ int main(int argc, char **argv) {
         for (uint32_t j = 0; j < sc.nsects; ++j) {
           struct section_64 section;
           macho.read((char*)&section, sizeof(section));
-          auto sectname = "__ast";
-          if (strncmp(section.sectname, sectname, strlen(sectname)) == 0) {
+          if (llvm::StringRef(swift::MachOASTSectionName) == section.sectname) {
             // Pass the __ast section to the module loader.
             macho.seekg(section.offset, macho.beg);
             assert(macho.good());

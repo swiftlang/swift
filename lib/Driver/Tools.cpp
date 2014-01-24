@@ -13,6 +13,7 @@
 #include "Tools.h"
 #include "ToolChains.h"
 
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Driver/Driver.h"
@@ -56,6 +57,20 @@ namespace {
     } else if (const JobList *JL = dyn_cast<JobList>(J)) {
       for (const Job *J : *JL)
         addInputsOfType(Arguments, J, InputType);
+    } else {
+      llvm_unreachable("Unable to add input arguments for unknown Job class");
+    }
+  }
+
+  static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
+                                     types::ID InputType) {
+    if (const Command *Cmd = dyn_cast<Command>(J)) {
+      auto &outputInfo = Cmd->getOutput();
+      if (outputInfo.getPrimaryOutputType() == InputType)
+        Arguments.push_back(outputInfo.getPrimaryOutputFilename().c_str());
+    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+      for (const Job *J : *JL)
+        addPrimaryInputsOfType(Arguments, J, InputType);
     } else {
       llvm_unreachable("Unable to add input arguments for unknown Job class");
     }
@@ -302,7 +317,27 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
          "Invalid linker output type.");
 
   ArgStringList Arguments;
-  addInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+  addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+
+  if (Args.hasArg(options::OPT_g)) {
+    Arguments.push_back("-sectalign");
+    Arguments.push_back(MachOASTSegmentName);
+    Arguments.push_back(MachOASTSectionName);
+    Arguments.push_back("4");
+
+    Arguments.push_back("-sectcreate");
+    Arguments.push_back(MachOASTSegmentName);
+    Arguments.push_back(MachOASTSectionName);
+
+    size_t argCount = Arguments.size();
+    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+      addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
+    else
+      addPrimaryInputsOfType(Arguments, Inputs.get(),
+                             types::TY_SwiftModuleFile);
+    assert(argCount + 1 == Arguments.size() && "no swiftmodule found for -g");
+    (void)argCount;
+  }
 
   Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);

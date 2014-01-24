@@ -484,7 +484,10 @@ void Driver::buildActions(const ToolChain &TC,
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
       // no longer owns its inputs.
       MergeModuleAction->setOwnsInputs(false);
-      LinkAction->addInput(MergeModuleAction.release());
+      if (Args.hasArg(options::OPT_g))
+        LinkAction->addInput(MergeModuleAction.release());
+      else
+        Actions.push_back(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
   } else if (MergeModuleAction) {

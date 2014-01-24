@@ -44,6 +44,8 @@ typedef enum {
 //
 //===--------- END "TO BE FIXED IN A SWIFT BRANCH OF LLVM" --------===//
 
+  static const char MachOASTSegmentName[] = "__SWIFT";
+  static const char MachOASTSectionName[] = "__ast";
 }
 
 #endif

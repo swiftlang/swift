@@ -100,7 +100,8 @@ def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
 def sdk : Separate<["-"], "sdk">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
-def g : Flag<["-"], "g">, Flags<[FrontendOption]>, HelpText<"Emit debug info">;
+def g : Flag<["-"], "g">, Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Emit debug info">;
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
