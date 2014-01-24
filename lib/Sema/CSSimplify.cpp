@@ -1124,7 +1124,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   }
 
   auto &context = getASTContext();
-  // FIXME: lame name
   auto name = context.Id_init;
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
