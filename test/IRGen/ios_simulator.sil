@@ -1,0 +1,28 @@
+// RUN: %swift -emit-llvm -triple=x86_64-apple-ios6 %s | FileCheck %s
+// RUN: %swift -emit-llvm -triple=i386-apple-ios6 %s | FileCheck %s
+
+// rdar://15806697 - use null pointers for &_objc_empty_vtable in the simulator
+
+// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
+
+class C {}
+
+sil @_TFC13ios_simulator1CD : $@cc(method) @thin (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: _TMmC13ios_simulator1C = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
+// CHECK: _TMdC13ios_simulator1C = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
+
+class G<T> {}
+
+sil @_TFC13ios_simulator1GD : $@cc(method) @thin <T> (@owned G<T>) -> () {
+bb0(%0 : $G<T>):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: _TMmC13ios_simulator1G = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
+// CHECK: _TMPdC13ios_simulator1G = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,

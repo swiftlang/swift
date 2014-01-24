@@ -316,7 +316,17 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
   if (ObjCEmptyVTablePtr) return ObjCEmptyVTablePtr;
 
   // IMP _objc_empty_vtable;
-  if (Opts.UseJIT) {
+
+  // On recent Darwin platforms, this symbol is actually defined at
+  // runtime as an absolute symbol with the value of null.  On some
+  // older platforms, that wasn't true, and it isn't clear that the
+  // ObjC runtime is willing to make a *guarantee* that it's true, so
+  // in general we still use the symbol.  However, there are a number
+  // of (non-ABI) environments that don't actually support absolute
+  // symbols correctly, such as the iOS simulator, and for these we
+  // have to fill in null directly.
+
+  if (TargetInfo.ObjCUseNullForEmptyVTable) {
     ObjCEmptyVTablePtr = llvm::ConstantPointerNull::get(OpaquePtrTy);
   } else {
     ObjCEmptyVTablePtr = Module.getOrInsertGlobal("_objc_empty_vtable",
