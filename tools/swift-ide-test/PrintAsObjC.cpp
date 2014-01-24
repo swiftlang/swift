@@ -47,7 +47,7 @@ static void writeImports(raw_ostream &os, Module *M) {
 namespace {
 class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
                     public TypeVisitor<ObjCPrinter> {
-  llvm::DenseMap<Identifier, StringRef> specialNames;
+  llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
   Identifier unsafePointerID;
 
   ASTContext &ctx;
@@ -196,10 +196,11 @@ private:
   ///
   /// This handles typealiases and structs provided by the standard library
   /// for interfacing with C and Objective-C.
-  bool printIfKnownTypeName(Identifier name) {
+  bool printIfKnownTypeName(Identifier moduleName, Identifier name) {
     if (specialNames.empty()) {
 #define MAP(SWIFT_NAME, CLANG_REPR) \
-      specialNames[ctx.getIdentifier(#SWIFT_NAME)] = CLANG_REPR
+      specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
+        CLANG_REPR
 
       MAP(CBool, "bool");
 
@@ -241,9 +242,13 @@ private:
       MAP(Bool, "BOOL");
       MAP(String, "NSString *");
       MAP(COpaquePointer, "void *");
+
+      Identifier ID_ObjectiveC = ctx.getIdentifier("ObjectiveC");
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = "BOOL";
+      specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = "SEL";
     }
 
-    auto iter = specialNames.find(name);
+    auto iter = specialNames.find({moduleName, name});
     if (iter == specialNames.end())
       return false;
     os << iter->second;
@@ -258,9 +263,8 @@ private:
 
   void visitNameAliasType(NameAliasType *aliasTy) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (alias->getModuleContext()->isStdlibModule())
-      if (printIfKnownTypeName(alias->getName()))
-        return;
+    if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName()))
+      return;
 
     if (alias->hasClangNode() || alias->isObjC()) {
       os << alias->getName();
@@ -272,9 +276,8 @@ private:
 
   void visitStructType(StructType *ST) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
-    if (SD->getParentModule()->isStdlibModule())
-      if (printIfKnownTypeName(SD->getName()))
-        return;
+    if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName()))
+      return;
 
     // FIXME: Check if we can actually use the name or if we have to tag it with
     // "struct".
