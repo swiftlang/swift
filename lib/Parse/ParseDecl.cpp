@@ -560,39 +560,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
   case tok::kw_let:
   case tok::kw_var:
-    // TODO: Static properties are only implemented for non-generic value types.
-    if (StaticLoc.isValid()) {
-      // Selector for unimplemented_type_var message.
-      enum : unsigned {
-        Misc,
-        GenericTypes,
-        Classes,
-        Protocols,
-      };
-      
-      auto unimplementedStatic = [&](unsigned diagSel) {
-        diagnose(Tok, diag::unimplemented_type_var, diagSel)
-          .highlight(SourceRange(StaticLoc));
-      };
-      
-      if (auto nom = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
-        if (nom->getGenericParams()) {
-          unimplementedStatic(GenericTypes);
-        } else if (isa<ClassDecl>(CurDeclContext)) {
-          unimplementedStatic(Classes);
-        } else if (isa<ProtocolDecl>(CurDeclContext)) {
-          unimplementedStatic(Protocols);
-        } else if (!isa<StructDecl>(CurDeclContext)
-                   && !isa<EnumDecl>(CurDeclContext)) {
-          unimplementedStatic(Misc);
-        }
-      } else {
-        unimplementedStatic(Misc);
-      }
-
-      UnhandledStatic = false;
-    }
     Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc);
+    UnhandledStatic = false;
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),

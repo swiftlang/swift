@@ -172,11 +172,6 @@ ERROR(decl_not_type,decl_parsing,none,
 ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
-// Var Name
-ERROR(unimplemented_type_var,decl_parsing,none,
-     "type variables not yet supported in "
-     "%select{this context|generic types|classes|protocols}0", (unsigned))
-
 // Variable getters/setters
 ERROR(getset_missing_type,decl_parsing,none,
       "variable with getter/setter must have an explicit type", ())

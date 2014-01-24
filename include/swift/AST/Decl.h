@@ -1274,6 +1274,7 @@ public:
   
   bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
   void setStatic(bool s) { PatternBindingDeclBits.IsStatic = s; }
+  SourceLoc getStaticLoc() const { return StaticLoc; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;

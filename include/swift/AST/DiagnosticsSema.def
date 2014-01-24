@@ -276,6 +276,11 @@ NOTE(requires_stored_property_inits_here,sema_tcd,none,
 ERROR(inout_attribute_non_parameter,sema_tcd,none,
       "'inout' attribute can only be applied to function parameters", ())
 
+// Variables (var and let).
+ERROR(unimplemented_type_var,decl_parsing,none,
+     "type variables not yet supported in "
+     "%select{this context|generic types|classes|protocols}0", (unsigned))
+
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))

@@ -1023,6 +1023,54 @@ static void validatePatternBindingDecl(TypeChecker &tc,
         tc.getInterfaceTypeFromInternalType(dc, var->getType()));
     });
   }
+
+  // For now, we only support 'type' variables in specific contexts.
+  if (binding->isStatic()) {
+    // Selector for unimplemented_type_var message.
+    enum : unsigned {
+      Misc,
+      GenericTypes,
+      Classes,
+      Protocols,
+    };
+      
+    auto unimplementedStatic = [&](unsigned diagSel) {
+      auto staticLoc = binding->getStaticLoc();
+      tc.diagnose(staticLoc, diag::unimplemented_type_var, diagSel)
+        .highlight(SourceRange(staticLoc));
+    };
+
+    assert(dc->isTypeContext());
+    // The parser only accepts 'type' variables in type contexts, so
+    // we're either in a nominal type context or an extension.
+    NominalTypeDecl *nominal;
+    if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
+      nominal = extension->getExtendedType()->getAnyNominal();
+      assert(nominal);
+    } else {
+      nominal = cast<NominalTypeDecl>(dc);
+    }
+
+    // Type variables in a protocol context are just a kind of
+    // requirement we don't know how to work with yet.
+    if (isa<ProtocolDecl>(nominal)) {
+      unimplementedStatic(Protocols);
+
+    // Non-stored properties are fine in any other context.
+    } else if (!binding->hasStorage()) {
+      // do nothing
+
+    // Stored type variables in a generic context need to logically
+    // occur once per instantiation, which we don't yet handle.
+    } else if (dc->isGenericContext()) {
+      unimplementedStatic(GenericTypes);
+
+    // Stored type variables in a class context need to be created
+    // once per subclass, which we don't yet handle.
+    } else if (isa<ClassDecl>(nominal)) {
+      unimplementedStatic(Classes);
+    }
+  }
 }
 
 static Pattern *buildGetterSetterSelf(SourceLoc Loc, DeclContext *DC,
