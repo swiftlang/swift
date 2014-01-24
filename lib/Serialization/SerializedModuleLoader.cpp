@@ -253,12 +253,11 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
   }
 }
 
-bool
-SerializedModuleLoader::isValidSerializedAST(const llvm::MemoryBuffer &input) {
+bool SerializedModuleLoader::isSerializedAST(StringRef data) {
   using serialization::SIGNATURE;
   StringRef signatureStr(reinterpret_cast<const char *>(SIGNATURE),
                          llvm::array_lengthof(SIGNATURE));
-  return input.getBuffer().startswith(signatureStr);
+  return data.startswith(signatureStr);
 }
 
 //-----------------------------------------------------------------------------

@@ -21,6 +21,25 @@
 namespace swift {
 class ModuleFile;
 
+/// Describes whether a loaded module can be used.
+enum class ModuleStatus {
+  /// The module is valid.
+  Valid,
+
+  /// The module file format is too new to be used by this version of the
+  /// compiler.
+  FormatTooNew,
+
+  /// The module file depends on another module that can't be loaded.
+  MissingDependency,
+
+  /// The module file is an overlay for a Clang module, which can't be found.
+  MissingShadowedModule,
+
+  /// The module file is malformed in some way.
+  Malformed
+};
+
 /// \brief Imports serialized Swift modules into an ASTContext.
 class SerializedModuleLoader : public ModuleLoader {
 private:
@@ -59,9 +78,6 @@ public:
   loadModule(SourceLoc importLoc,
              ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
 
-  /// Returns true if the memory buffer contains a serialized AST.
-  static bool isValidSerializedAST(const llvm::MemoryBuffer &input);
-
   /// Attempt to load a serialized AST into the given module.
   ///
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
@@ -84,27 +100,30 @@ public:
 
   virtual void loadDeclsConformingTo(KnownProtocolKind kind,
                                      unsigned previousGeneration) override;
+
+
+  /// Returns true if the data looks like it contains a serialized AST.
+  static bool isSerializedAST(StringRef data);
+
+  /// \see validateSerializedAST()
+  struct ValidationInfo {
+    StringRef name;
+    size_t bytes;
+    ModuleStatus status;
+  };
+
+  /// Returns info about the serialized AST in the given data.
+  ///
+  /// If the returned status is anything but ModuleStatus::Valid, the
+  /// serialized data cannot be loaded by this version of the compiler. If the
+  /// returned size is non-zero, it's possible to skip over this module's data,
+  /// in case there is more data in the buffer. The returned name, which may
+  /// be empty, directly points into the given data buffer.
+  ///
+  /// Note that this does not actually try to load the module or validate any
+  /// of its dependencies; it only checks that it /can/ be loaded.
+  static ValidationInfo validateSerializedAST(StringRef data);
 };
-
-/// Describes whether a loaded module can be used.
-enum class ModuleStatus {
-  /// The module is valid.
-  Valid,
-
-  /// The module file format is too new to be used by this version of the
-  /// compiler.
-  FormatTooNew,
-
-  /// The module file depends on another module that can't be loaded.
-  MissingDependency,
-
-  /// The module file is an overlay for a Clang module, which can't be found.
-  MissingShadowedModule,
-
-  /// The module file is malformed in some way.
-  Malformed
-};
-
 
 /// A file-unit loaded from a serialized AST file.
 class SerializedASTFile final : public LoadedFile {

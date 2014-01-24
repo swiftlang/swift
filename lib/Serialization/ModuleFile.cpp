@@ -35,16 +35,22 @@ static bool checkSignature(llvm::BitstreamCursor &cursor) {
   return true;
 }
 
-static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor) {
+static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
+                                     bool shouldReadBlockInfo = true) {
   auto next = cursor.advance();
 
   if (next.Kind != llvm::BitstreamEntry::SubBlock)
     return false;
 
   if (next.ID == llvm::bitc::BLOCKINFO_BLOCK_ID) {
-    if (cursor.ReadBlockInfoBlock())
-      return false;
-    return enterTopLevelModuleBlock(cursor);
+    if (shouldReadBlockInfo) {
+      if (cursor.ReadBlockInfoBlock())
+        return false;
+    } else {
+      if (cursor.SkipBlock())
+        return false;
+    }
+    return enterTopLevelModuleBlock(cursor, false);
   }
 
   if (next.ID != MODULE_BLOCK_ID)
@@ -54,23 +60,25 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor) {
   return true;
 }
 
-static ModuleStatus
+static std::pair<ModuleStatus, StringRef>
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch) {
   // The control block is malformed until we've at least read a major version
   // number.
   ModuleStatus result = ModuleStatus::Malformed;
+  bool versionSeen = false;
+  StringRef name;
 
   auto next = cursor.advance();
   while (next.Kind != llvm::BitstreamEntry::EndBlock) {
     if (next.Kind == llvm::BitstreamEntry::Error)
-      return ModuleStatus::Malformed;
+      return { ModuleStatus::Malformed, name };
 
     if (next.Kind == llvm::BitstreamEntry::SubBlock) {
       // Unknown metadata sub-block, possibly for use by a future version of the
       // module format.
       if (cursor.SkipBlock())
-        return ModuleStatus::Malformed;
+        return { ModuleStatus::Malformed, name };
       next = cursor.advance();
       continue;
     }
@@ -80,15 +88,20 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
     switch (kind) {
     case control_block::METADATA: {
-      uint16_t versionMajor = scratch[0];
-      if (versionMajor > VERSION_MAJOR)
-        return ModuleStatus::FormatTooNew;
-      result = ModuleStatus::Valid;
+      if (versionSeen) {
+        result = ModuleStatus::Malformed;
+      } else {
+        uint16_t versionMajor = scratch[0];
+        if (versionMajor > VERSION_MAJOR)
+          result = ModuleStatus::FormatTooNew;
+        else
+          result = ModuleStatus::Valid;
+        versionSeen = true;
+      }
       break;
     }
     case control_block::MODULE_NAME:
-      // Ignore the module name; this is only interesting when the serialized
-      // data is the only clue to which module this is.
+      name = blobData;
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -97,6 +110,48 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
     }
 
     next = cursor.advance();
+  }
+
+  return { result, name };
+}
+
+SerializedModuleLoader::ValidationInfo
+SerializedModuleLoader::validateSerializedAST(StringRef data) {
+  llvm::BitstreamReader reader(reinterpret_cast<const uint8_t *>(data.begin()),
+                               reinterpret_cast<const uint8_t *>(data.end()));
+  llvm::BitstreamCursor cursor(reader);
+  SmallVector<uint64_t, 32> scratch;
+
+  ValidationInfo result = { {}, 0, ModuleStatus::Malformed };
+
+  if (!checkSignature(cursor) || !enterTopLevelModuleBlock(cursor, false))
+    return result;
+
+  auto topLevelEntry = cursor.advance();
+  while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
+    if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
+      cursor.EnterSubBlock(CONTROL_BLOCK_ID);
+      llvm::tie(result.status, result.name) =
+        validateControlBlock(cursor, scratch);
+      if (result.status == ModuleStatus::Malformed)
+        return result;
+
+    } else {
+      if (cursor.SkipBlock()) {
+        result.status = ModuleStatus::Malformed;
+        return result;
+      }
+    }
+    
+    topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
+  }
+  
+  if (topLevelEntry.Kind == llvm::BitstreamEntry::EndBlock) {
+    cursor.ReadBlockEnd();
+    assert(cursor.GetCurrentBitNo() % CHAR_BIT == 0);
+    result.bytes = cursor.GetCurrentBitNo() / CHAR_BIT;
+  } else {
+    result.status = ModuleStatus::Malformed;
   }
 
   return result;
@@ -336,7 +391,7 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      ModuleStatus err = validateControlBlock(cursor, scratch);
+      ModuleStatus err = validateControlBlock(cursor, scratch).first;
       if (err != ModuleStatus::Valid) {
         error(err);
         return;

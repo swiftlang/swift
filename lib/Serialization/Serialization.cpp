@@ -2205,6 +2205,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     writeHeader(mod);
     writeInputFiles(mod, inputFiles, moduleLinkName);
     writeModule(DC, SILMod);
+    Out.FlushToWord();
   }
 
   if (mode == SerializationMode::MachOSection) {
@@ -2230,8 +2231,8 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     // Write the module name.
     os << AsBytes<4>(moduleName.size()) << moduleName;
 
-    // Align to 32 bits before and after the actual data.
-    char nulls[31] = {};
+    // Align to 32 bytes before and after the actual data.
+    static const char nulls[31] = {};
     assert(alignedOffset - offsetLength < sizeof(nulls));
     os.write(nulls, alignedOffset - offsetLength);
     os.write(Buffer.data(), Buffer.size());

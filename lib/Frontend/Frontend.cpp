@@ -213,7 +213,7 @@ void CompilerInstance::performParse() {
       continue;
 
     auto Buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(BufferID);
-    if (SerializedModuleLoader::isValidSerializedAST(*Buffer)) {
+    if (SerializedModuleLoader::isSerializedAST(Buffer->getBuffer())) {
       std::unique_ptr<llvm::MemoryBuffer> Input(
         llvm::MemoryBuffer::getMemBuffer(Buffer->getBuffer(),
                                          Buffer->getBufferIdentifier(),
