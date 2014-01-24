@@ -28,6 +28,31 @@
 using namespace swift;
 using namespace swift::serialization;
 
+static bool checkSignature(llvm::BitstreamCursor &cursor) {
+  for (unsigned char byte : SIGNATURE)
+    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
+      return false;
+  return true;
+}
+
+static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor) {
+  auto next = cursor.advance();
+
+  if (next.Kind != llvm::BitstreamEntry::SubBlock)
+    return false;
+
+  if (next.ID == llvm::bitc::BLOCKINFO_BLOCK_ID) {
+    if (cursor.ReadBlockInfoBlock())
+      return false;
+    return enterTopLevelModuleBlock(cursor);
+  }
+
+  if (next.ID != MODULE_BLOCK_ID)
+    return false;
+
+  cursor.EnterSubBlock(MODULE_BLOCK_ID);
+  return true;
+}
 
 static ModuleStatus
 validateControlBlock(llvm::BitstreamCursor &cursor,
@@ -295,11 +320,9 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
 
   llvm::BitstreamCursor cursor{InputReader};
 
-  for (unsigned char byte : SIGNATURE) {
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte) {
-      error();
-      return;
-    }
+  if (!checkSignature(cursor) || !enterTopLevelModuleBlock(cursor)) {
+    error();
+    return;
   }
 
   // Future-proofing: make sure we validate the control block before we try to
@@ -310,13 +333,6 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
   auto topLevelEntry = cursor.advance();
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     switch (topLevelEntry.ID) {
-    case llvm::bitc::BLOCKINFO_BLOCK_ID:
-      if (cursor.ReadBlockInfoBlock()) {
-        error();
-        return;
-      }
-      break;
-
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 

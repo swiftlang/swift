@@ -188,11 +188,15 @@ enum : uint8_t {
 /// These IDs must \em not be renumbered or reordered without incrementing
 /// VERSION_MAJOR.
 enum BlockID {
+  /// The module block, which contains all of the other blocks (and in theory
+  /// allows a single file to contain multiple modules).
+  MODULE_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
+
   /// The control block, which contains all of the information that needs to
   /// be validated prior to committing to loading the serialized module.
   ///
   /// \sa control_block
-  CONTROL_BLOCK_ID = llvm::bitc::FIRST_APPLICATION_BLOCKID,
+  CONTROL_BLOCK_ID,
 
   /// The input block, which contains all the files this module depends on.
   ///

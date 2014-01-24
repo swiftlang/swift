@@ -235,6 +235,8 @@ void Serializer::writeBlockInfoBlock() {
 #define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
 #define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
 
+  BLOCK(MODULE_BLOCK);
+
   BLOCK(CONTROL_BLOCK);
   BLOCK_RECORD(control_block, METADATA);
   BLOCK_RECORD(control_block, MODULE_NAME);
@@ -295,8 +297,6 @@ void Serializer::writeBlockInfoBlock() {
 }
 
 void Serializer::writeHeader(const Module *M) {
-  writeBlockInfoBlock();
-
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -2195,10 +2195,17 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   for (unsigned char byte : SIGNATURE)
     Out.Emit(byte, 8);
 
+  // FIXME: This is only really needed for debugging. We don't actually use it.
+  writeBlockInfoBlock();
+
   const Module *mod = getModule(DC);
-  writeHeader(mod);
-  writeInputFiles(mod, inputFiles, moduleLinkName);
-  writeModule(DC, SILMod);
+
+  {
+    BCBlockRAII moduleBlock(Out, MODULE_BLOCK_ID, 2);
+    writeHeader(mod);
+    writeInputFiles(mod, inputFiles, moduleLinkName);
+    writeModule(DC, SILMod);
+  }
 
   if (mode == SerializationMode::MachOSection) {
     // FIXME: Duplicated here and in SwiftASTStreamerPass.h.

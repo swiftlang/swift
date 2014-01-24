@@ -13,16 +13,12 @@
 #ifndef SWIFT_SERIALIZATION_MODULELOADER_H
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
-#include "swift/Basic/Dwarf.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include <map>
 
 namespace swift {
-class ASTContext;
-class Module;
 class ModuleFile;
 
 /// \brief Imports serialized Swift modules into an ASTContext.
