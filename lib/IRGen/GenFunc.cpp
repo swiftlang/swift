@@ -994,8 +994,7 @@ static void extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
   // coerce the result back from the ABI type before extracting the
   // elements.
   if (bodyType != callType)
-    returned = IGF.coerceValue(returned, callType, bodyType,
-                               IGF.IGM.DataLayout);
+    returned = IGF.coerceValue(returned, bodyType, IGF.IGM.DataLayout);
 
   if (llvm::StructType *structType = dyn_cast<llvm::StructType>(bodyType))
     for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
@@ -2022,10 +2021,10 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
-llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *fromTy,
-                                        llvm::Type *toTy,
+llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
                                         const llvm::DataLayout &DL)
 {
+  llvm::Type *fromTy = value->getType();
   assert(fromTy != toTy && "Unexpected same types in type coercion!");
   assert(!fromTy->isVoidTy()
          && "Unexpected void source type in type coercion!");
@@ -2063,7 +2062,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   if (result.size() == 1) {
     auto *returned = result.claimNext();
     if (ABIType != bodyType)
-      returned = coerceValue(returned, bodyType, ABIType, IGM.DataLayout);
+      returned = coerceValue(returned, ABIType, IGM.DataLayout);
 
     Builder.CreateRet(returned);
     return;
@@ -2078,7 +2077,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
   }
 
   if (ABIType != bodyType)
-    resultAgg = coerceValue(resultAgg, bodyType, ABIType, IGM.DataLayout);
+    resultAgg = coerceValue(resultAgg, ABIType, IGM.DataLayout);
 
   Builder.CreateRet(resultAgg);
 }
