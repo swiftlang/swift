@@ -283,22 +283,6 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   // appropariately below if linking is required.
   OI.ShouldLink = false;
 
-  if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
-    // The user has requested a module, so generate one and treat it as
-    // top-level output.
-    OI.ShouldGenerateModule = true;
-    OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if (Args.hasArg(options::OPT_g)) {
-    // An option has been passed which requires a module, but the user hasn't
-    // requested one. Generate a module, but treat it as an intermediate output.
-    OI.ShouldGenerateModule = true;
-    OI.ShouldTreatModuleAsTopLevelOutput = false;
-  } else {
-    // No options require a module, so don't generate one.
-    OI.ShouldGenerateModule = false;
-    OI.ShouldTreatModuleAsTopLevelOutput = false;
-  }
-
   types::ID CompileOutputType = types::TY_INVALID;
   OutputInfo::Mode CompileMode = OutputInfo::Mode::StandardCompile;
   if (Args.hasArg(options::OPT_force_single_frontend_invocation))
@@ -360,6 +344,22 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
   OI.CompilerOutputType = CompileOutputType;
   OI.CompilerMode = CompileMode;
+
+  if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
+    // The user has requested a module, so generate one and treat it as
+    // top-level output.
+    OI.ShouldGenerateModule = true;
+    OI.ShouldTreatModuleAsTopLevelOutput = true;
+  } else if (Args.hasArg(options::OPT_g) && OI.ShouldLink) {
+    // An option has been passed which requires a module, but the user hasn't
+    // requested one. Generate a module, but treat it as an intermediate output.
+    OI.ShouldGenerateModule = true;
+    OI.ShouldTreatModuleAsTopLevelOutput = false;
+  } else {
+    // No options require a module, so don't generate one.
+    OI.ShouldGenerateModule = false;
+    OI.ShouldTreatModuleAsTopLevelOutput = false;
+  }
 
   if (OI.ShouldGenerateModule &&
       (OI.CompilerMode == OutputInfo::Mode::REPL ||
