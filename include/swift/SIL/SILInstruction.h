@@ -161,6 +161,11 @@ public:
       B == MemoryBehavior::MayHaveSideEffects;
   }
 
+  /// Returns true if the instruction may read from or write to memory.
+  bool mayReadOrWriteMemory() const {
+    return getMemoryBehavior() != MemoryBehavior::None;
+  }
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
            V->getKind() <= ValueKind::Last_SILInstruction;
