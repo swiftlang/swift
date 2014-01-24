@@ -40,8 +40,10 @@ std::string getExecutablePath(const char *FirstArg) {
   return llvm::sys::fs::getMainExecutable(FirstArg, P);
 }
 
-extern int frontend_main(ArrayRef<const char *> Args,
-                         const char *Argv0, void *MainAddr);
+extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
+                         void *MainAddr);
+extern int transform_ir_main(ArrayRef<const char *> Args, const char *Argv0,
+                             void *MainAddr);
 
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
@@ -60,11 +62,18 @@ int main(int argc_, const char **argv_) {
     return 1;
   }
   
-  // Handle -frontend integrated tools.
-  if (argv.size() > 1 && StringRef(argv[1]) == "-frontend") {
-    return frontend_main(llvm::makeArrayRef(argv.data()+2,
-                                            argv.data()+argv.size()),
-                         argv[0], (void *)(intptr_t)getExecutablePath);
+  // Handle integrated tools.
+  if (argv.size() > 1){
+    StringRef FirstArg(argv[1]);
+    if (FirstArg == "-frontend") {
+      return frontend_main(llvm::makeArrayRef(argv.data()+2,
+                                              argv.data()+argv.size()),
+                           argv[0], (void *)(intptr_t)getExecutablePath);
+    } else if (FirstArg == "-transform-ir") {
+      return transform_ir_main(llvm::makeArrayRef(argv.data()+2,
+                                                  argv.data()+argv.size()),
+                               argv[0], (void *)(intptr_t)getExecutablePath);
+    }
   }
 
   std::string Path = getExecutablePath(argv[0]);
