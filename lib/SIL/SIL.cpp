@@ -62,9 +62,7 @@ SILValue SILValue::stripCasts() {
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
     case ValueKind::UnconditionalCheckedCastInst:
-      assert(V->getNumOperands() == 1 &&
-             "Defensive check to make sure every kind here is unary.");
-      V = V->getOperand(0);
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
       continue;
     default:
       return V;
