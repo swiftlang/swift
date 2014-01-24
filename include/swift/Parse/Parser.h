@@ -609,6 +609,7 @@ public:
   bool parseDeclSILStage();
   bool parseSILVTable();
   bool parseSILGlobal();
+  bool parseSILWitnessTable();
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

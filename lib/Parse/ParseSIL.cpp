@@ -2663,3 +2663,119 @@ bool Parser::parseSILVTable() {
   SILVTable::create(*SIL->M, theClass, vtableEntries);
   return false;
 }
+
+/// decl-sil-witness: [[only in SIL mode]]
+///   'sil_witness_table' normal-conformance decl-sil-witness-body
+/// normal-conformance:
+///   [generic params] type: protocol module ModuleName
+/// decl-sil-witness-body:
+///   '{' sil-witness-entry* '}'
+/// sil-witness-entry:
+///   method SILDeclRef ':' @SILFunctionName
+///   associated_type AssociatedTypeDeclName: Type
+///   associated_type_protocol (AssocName: ProtocolName):
+///                              protocol-conformance|dependent
+///   base_protocol ProtocolName: protocol-conformance
+bool Parser::parseSILWitnessTable() {
+  consumeToken(tok::kw_sil_witness_table);
+  SILParser WitnessState(*this);
+
+  // Parse the protocol conformance.
+  // FIXME: parse generic params.
+  SILType ConformingTy;
+  TypeAttributes emptyAttrs;
+  Identifier ProtocolName, ModuleKeyword, ModuleName;
+  SourceLoc Loc, ProtoLoc, KeywordLoc;
+  if (WitnessState.parseSILTypeWithoutQualifiers(ConformingTy,
+                                                 SILValueCategory::Object,
+                                                 emptyAttrs) ||
+      parseToken(tok::colon, diag::expected_sil_witness_colon) ||
+      WitnessState.parseSILIdentifier(ProtocolName, ProtoLoc,
+                                      diag::expected_sil_value_name) ||
+      parseIdentifier(ModuleKeyword, KeywordLoc,
+                      diag::expected_tok_in_sil_instr, "module") ||
+      WitnessState.parseSILIdentifier(ModuleName, Loc,
+                                      diag::expected_sil_value_name))
+    return true;
+
+  if (ModuleKeyword.str() != "module") {
+    diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
+    return true;
+  }
+
+  // Find the protocol decl.
+  SmallVector<ValueDecl*, 4> CurModuleResults;
+  SF.getParentModule()->lookupValue(Module::AccessPathTy(), ProtocolName,
+                                    NLKind::UnqualifiedLookup,
+                                    CurModuleResults);
+  if (CurModuleResults.size() != 1) {
+    diagnose(ProtoLoc, diag::sil_witness_protocol_not_found, ProtocolName);
+    return true;
+  }
+  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(CurModuleResults[0]);
+  if (!proto) {
+    diagnose(ProtoLoc, diag::sil_witness_protocol_not_found, ProtocolName);
+    return true;
+  }
+
+  // Find the NormalProtocolConformance.
+  auto lookup = SF.getParentModule()->lookupConformance(
+                            ConformingTy.getSwiftRValueType(), proto, nullptr);
+  NormalProtocolConformance *theConformance =
+      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
+
+  SourceLoc LBraceLoc = Tok.getLoc();
+  consumeToken(tok::l_brace);
+
+  // We need to turn on InSILBody to parse SILDeclRef.
+  Lexer::SILBodyRAII Tmp(*L);
+  // Parse the entry list.
+  std::vector<SILWitnessTable::Entry> witnessEntries;
+  if (Tok.isNot(tok::r_brace)) {
+    do {
+      Identifier EntryKeyword;
+      SourceLoc KeywordLoc;
+      if (parseIdentifier(EntryKeyword, KeywordLoc,
+            diag::expected_tok_in_sil_instr,
+            "method, associated_type, associated_type_protocol, base_protocol"))
+        return true;
+
+      if (EntryKeyword.str() == "associated_type" ||
+          EntryKeyword.str() == "associated_type_protocol" ||
+          EntryKeyword.str() == "base_protocol") {
+        // FIXME: associated_type, associated_type_protocol, base_protocol.
+        return true;
+      }
+
+      if (EntryKeyword.str() != "method") {
+        diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "method");
+        return true;
+      }
+
+      SILDeclRef Ref;
+      Identifier FuncName;
+      SourceLoc FuncLoc;
+      if (WitnessState.parseSILDeclRef(Ref) ||
+          parseToken(tok::colon, diag::expected_sil_witness_colon) ||
+          parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+          WitnessState.parseSILIdentifier(FuncName, FuncLoc,
+                                          diag::expected_sil_value_name))
+        return true;
+      SILFunction *Func = SIL->M->lookUpFunction(FuncName.str());
+      if (!Func) {
+        diagnose(FuncLoc, diag::sil_witness_func_not_found, FuncName);
+        return true;
+      }
+      witnessEntries.push_back(SILWitnessTable::MethodWitness{
+        Ref, Func
+      });
+    } while (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof));
+  }
+
+  SourceLoc RBraceLoc;
+  parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
+                     LBraceLoc);
+
+  SILWitnessTable::create(*SIL->M, theConformance, witnessEntries);
+  return false;
+}

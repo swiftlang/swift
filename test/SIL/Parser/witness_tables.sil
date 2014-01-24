@@ -1,0 +1,31 @@
+// RUN: %swift %s -emit-silgen | FileCheck %s
+
+protocol AssocReqt {
+  func requiredMethod()
+}
+
+struct ConformingAssoc : AssocReqt {
+  func requiredMethod()
+}
+
+sil @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> () {
+bb0(%0 : $ConformingAssoc):
+  debug_value %0 : $ConformingAssoc
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil private @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout ConformingAssoc) -> () {
+bb0(%0 : $*ConformingAssoc):
+  %1 = load %0 : $*ConformingAssoc
+  %2 = function_ref @_TFV14witness_tables15ConformingAssoc14requiredMethodfS0_FT_T_ : $@cc(method) @thin (ConformingAssoc) -> ()
+  %3 = apply %2(%1) : $@cc(method) @thin (ConformingAssoc) -> ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+// CHECK: #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+// CHECK: }
+sil_witness_table ConformingAssoc: AssocReqt module witness_tables {
+  method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
+}
