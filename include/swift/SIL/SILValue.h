@@ -191,6 +191,9 @@ public:
 
   inline bool hasOneUse();
 
+  // Return the underlying SILValue after stripping off all casts from the
+  // current SILValue.
+  SILValue stripCasts();
   
   void replaceAllUsesWith(SILValue V);
 

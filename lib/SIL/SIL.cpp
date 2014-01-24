@@ -48,6 +48,32 @@ void SILValue::replaceAllUsesWith(SILValue V) {
     (**use_begin()).set(V);
 }
 
+SILValue SILValue::stripCasts() {
+  SILValue V = *this;
+
+  while (true) {
+    switch (V->getKind()) {
+    case ValueKind::UpcastInst:
+    case ValueKind::ArchetypeRefToSuperInst:
+    case ValueKind::AddressToPointerInst:
+    case ValueKind::PointerToAddressInst:
+    case ValueKind::RefToObjectPointerInst:
+    case ValueKind::ObjectPointerToRefInst:
+    case ValueKind::RefToRawPointerInst:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::UnconditionalCheckedCastInst:
+      assert(V->getNumOperands() == 1 &&
+             "Defensive check to make sure every kind here is unary.");
+      V = V->getOperand(0);
+      continue;
+    default:
+      return V;
+    }
+  }
+
+  return V;
+}
+
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
   SILUndef *&Entry = M->UndefValues[Ty];
