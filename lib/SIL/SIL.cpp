@@ -87,6 +87,22 @@ SILValue SILValue::stripAddressProjections() {
   }
 }
 
+SILValue SILValue::stripObjectProjections() {
+  SILValue V = *this;
+
+  while (true) {
+    switch (V->getKind()) {
+    case ValueKind::StructExtractInst:
+    case ValueKind::TupleExtractInst:
+      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+      continue;
+    default:
+      return V;
+    }
+  }
+}
+
+
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
   SILUndef *&Entry = M->UndefValues[Ty];
