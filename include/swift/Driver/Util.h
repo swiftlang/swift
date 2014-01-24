@@ -37,6 +37,12 @@ namespace driver {
   /// Type used for list of Actions.
   typedef llvm::SmallVector<Action *, 3> ActionList;
 
+  enum class LinkKind {
+    None,
+    Executable,
+    DynamicLibrary
+  };
+
 } // end namespace driver
 } // end namespace swift
 

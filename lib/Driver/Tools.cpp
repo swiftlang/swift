@@ -206,7 +206,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Pass through the values passed to -Xfrontend.
   Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
 
-  Args.AddLastArg(Arguments, options::OPT_parse_as_library);
+  if (Args.hasArg(options::OPT_parse_as_library) ||
+      Args.hasArg(options::OPT_emit_library))
+    Arguments.push_back("-parse-as-library");
 
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
@@ -343,6 +345,17 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
                              types::TY_SwiftModuleFile);
     assert(argCount + 1 == Arguments.size() && "no swiftmodule found for -g");
     (void)argCount;
+  }
+
+  switch (cast<LinkJobAction>(JA).getKind()) {
+  case LinkKind::None:
+    llvm_unreachable("invalid link kind");
+  case LinkKind::Executable:
+    // The default for ld; no extra flags necessary.
+    break;
+  case LinkKind::DynamicLibrary:
+    Arguments.push_back("-dylib");
+    break;
   }
 
   Args.AddAllArgValues(Arguments, options::OPT_Xlinker);

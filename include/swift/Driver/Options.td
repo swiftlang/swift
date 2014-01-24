@@ -104,7 +104,7 @@ def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
 def sdk : Separate<["-"], "sdk">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
-def g : Flag<["-"], "g">, Flags<[DriverOption, FrontendOption]>,
+def g : Flag<["-"], "g">, Flags<[FrontendOption]>,
   HelpText<"Emit debug info">;
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
@@ -163,11 +163,9 @@ def framework : Separate<["-"], "framework">, Flags<[FrontendOption]>,
   Group<linker_option_Group>,
   HelpText<"Specifies a framework which should be linked against">;
 
-def L : JoinedOrSeparate<["-"], "L">, Flags<[FrontendOption]>,
-  Group<linker_option_Group>,
+def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
   HelpText<"Add directory to library link search path">;
-def L_EQ : Joined<["-"], "L=">, Flags<[FrontendOption]>,
-  Alias<L>;
+def L_EQ : Joined<["-"], "L=">, Alias<L>;
 
 def Xlinker : Separate<["-"], "Xlinker">,
   HelpText<"Specifies an option which should be passed to the linker">;
@@ -198,6 +196,8 @@ class ModeOpt : Group<modes_Group>;
 // Output Modes
 def emit_executable : Flag<["-"], "emit-executable">, Flags<[DriverOption]>,
   HelpText<"Emit a linked executable">, ModeOpt;
+def emit_library : Flag<["-"], "emit-library">, Flags<[DriverOption]>,
+  HelpText<"Emit a linked library">, ModeOpt;
 def c : Flag<["-"], "c">, HelpText<"Emit object file(s)">,
   Flags<[FrontendOption]>, ModeOpt;
 def emit_object : Flag<["-"], "emit-object">, Alias<c>, Flags<[FrontendOption]>,

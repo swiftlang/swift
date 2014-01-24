@@ -281,76 +281,90 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
                              const InputList &Inputs, OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
   // appropariately below if linking is required.
-  OI.ShouldLink = false;
 
-  types::ID CompileOutputType = types::TY_INVALID;
-  OutputInfo::Mode CompileMode = OutputInfo::Mode::StandardCompile;
   if (Args.hasArg(options::OPT_force_single_frontend_invocation))
-    CompileMode = OutputInfo::Mode::SingleCompile;
+    OI.CompilerMode = OutputInfo::Mode::SingleCompile;
 
   const Arg *const OutputModeArg = Args.getLastArg(options::OPT_modes_Group);
   if (!OutputModeArg) {
-    if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path))
-      CompileOutputType = types::TY_SwiftModuleFile;
-    else if (Inputs.empty() && !Args.hasArg(options::OPT_v)) {
+    if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
+      OI.CompilerOutputType = types::TY_SwiftModuleFile;
+    } else if (Inputs.empty() && !Args.hasArg(options::OPT_v)) {
       // No inputs and no mode arguments imply REPL mode
       // (Treat -v as a mode, since -v and no other mode arguments means
       // "print the version and exit".)
-      CompileOutputType = types::TY_Nothing;
-      CompileMode = OutputInfo::Mode::REPL;
+      OI.CompilerOutputType = types::TY_Nothing;
+      OI.CompilerMode = OutputInfo::Mode::REPL;
+    } else {
+      OI.LinkAction = LinkKind::Executable;
+      OI.CompilerOutputType = types::TY_Object;
     }
-    else {
-      OI.ShouldLink = true;
-      CompileOutputType = types::TY_Object;
-    }
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_executable)) {
-    OI.ShouldLink = true;
-    CompileOutputType = types::TY_Object;
-  } else if (OutputModeArg->getOption().matches(options::OPT_c)) {
-    // The user has requested an object file.
-    CompileOutputType = types::TY_Object;
-  } else if (OutputModeArg->getOption().matches(options::OPT_S)) {
-    // The user has requested an assembly file.
-    CompileOutputType = types::TY_Assembly;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_sil)) {
-    // The user has requested a SIL file.
-    CompileOutputType = types::TY_SIL;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_silgen)) {
-    // The user has requested a raw SIL file.
-    CompileOutputType = types::TY_RawSIL;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_ir)) {
-    // The user has requested LLVM IR.
-    CompileOutputType = types::TY_LLVM_IR;
-  } else if (OutputModeArg->getOption().matches(options::OPT_emit_bc)) {
-    // The user has requested LLVM BC.
-    CompileOutputType = types::TY_LLVM_BC;
-  } else if (OutputModeArg->getOption().matches(options::OPT_parse) ||
-             OutputModeArg->getOption().matches(options::OPT_dump_parse) ||
-             OutputModeArg->getOption().matches(options::OPT_dump_ast) ||
-             OutputModeArg->getOption().matches(options::OPT_print_ast)) {
-    // These modes don't have any output.
-    CompileOutputType = types::TY_Nothing;
-  } else if (OutputModeArg->getOption().matches(options::OPT_i)) {
-    // Immediate mode has been explicitly requested by the user.
-    CompileOutputType = types::TY_Nothing;
-    CompileMode = OutputInfo::Mode::Immediate;
-  } else if (OutputModeArg->getOption().matches(options::OPT_repl)) {
-    // REPL mode has been explicitly requested by the user.
-    CompileOutputType = types::TY_Nothing;
-    CompileMode = OutputInfo::Mode::REPL;
   } else {
-    llvm_unreachable("Unknown output mode option!");
+    switch (OutputModeArg->getOption().getID()) {
+    case options::OPT_emit_executable:
+      OI.LinkAction = LinkKind::Executable;
+      OI.CompilerOutputType = types::TY_Object;
+      break;
+
+    case options::OPT_emit_library:
+      OI.LinkAction = LinkKind::DynamicLibrary;
+      OI.CompilerOutputType = types::TY_Object;
+      break;
+
+    case options::OPT_c:
+      OI.CompilerOutputType = types::TY_Object;
+      break;
+
+    case options::OPT_S:
+      OI.CompilerOutputType = types::TY_Assembly;
+      break;
+
+    case options::OPT_emit_sil:
+      OI.CompilerOutputType = types::TY_SIL;
+      break;
+
+    case options::OPT_emit_silgen:
+      OI.CompilerOutputType = types::TY_RawSIL;
+      break;
+
+    case options::OPT_emit_ir:
+      OI.CompilerOutputType = types::TY_LLVM_IR;
+      break;
+
+    case options::OPT_emit_bc:
+      OI.CompilerOutputType = types::TY_LLVM_BC;
+      break;
+
+    case options::OPT_parse:
+    case options::OPT_dump_parse:
+    case options::OPT_dump_ast:
+    case options::OPT_print_ast:
+      OI.CompilerOutputType = types::TY_Nothing;
+      break;
+
+    case options::OPT_i:
+      OI.CompilerOutputType = types::TY_Nothing;
+      OI.CompilerMode = OutputInfo::Mode::Immediate;
+      break;
+
+    case options::OPT_repl:
+      OI.CompilerOutputType = types::TY_Nothing;
+      OI.CompilerMode = OutputInfo::Mode::REPL;
+      break;
+
+    default:
+      llvm_unreachable("unknown mode");
+    }
   }
 
-  OI.CompilerOutputType = CompileOutputType;
-  OI.CompilerMode = CompileMode;
+  assert(OI.CompilerOutputType != types::ID::TY_INVALID);
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if (Args.hasArg(options::OPT_g) && OI.ShouldLink) {
+  } else if (Args.hasArg(options::OPT_g) && OI.shouldLink()) {
     // An option has been passed which requires a module, but the user hasn't
     // requested one. Generate a module, but treat it as an intermediate output.
     OI.ShouldGenerateModule = true;
@@ -477,8 +491,8 @@ void Driver::buildActions(const ToolChain &TC,
     MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
   }
 
-  if (OI.ShouldLink) {
-    Action *LinkAction = new LinkJobAction(CompileActions);
+  if (OI.shouldLink()) {
+    Action *LinkAction = new LinkJobAction(CompileActions, OI.LinkAction);
     if (MergeModuleAction) {
       // We have a MergeModuleJobAction; this needs to be an input to the
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it

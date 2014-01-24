@@ -136,9 +136,15 @@ public:
 
 class LinkJobAction : public JobAction {
   virtual void anchor();
+  LinkKind Kind;
+
 public:
-  LinkJobAction(ArrayRef<Action *> Inputs)
-      : JobAction(Action::LinkJob, Inputs, types::TY_Image) {}
+  LinkJobAction(ArrayRef<Action *> Inputs, LinkKind K)
+      : JobAction(Action::LinkJob, Inputs, types::TY_Image), Kind(K) {
+    assert(Kind != LinkKind::None);
+  }
+
+  LinkKind getKind() const { return Kind; }
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::LinkJob;

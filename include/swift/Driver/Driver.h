@@ -70,8 +70,12 @@ public:
   /// The output type which should be used for compile actions.
   types::ID CompilerOutputType = types::ID::TY_INVALID;
 
-  /// Whether or not the output of compile actions should be linked together.
-  bool ShouldLink = false;
+  /// Describes if and how the output of compile actions should be
+  /// linked together.
+  LinkKind LinkAction = LinkKind::None;
+
+  /// Returns true if the linker will be invoked at all.
+  bool shouldLink() const { return LinkAction != LinkKind::None; }
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
