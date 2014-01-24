@@ -406,6 +406,14 @@ void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
   Conformances = c;
 }
 
+GenericParamList *ExtensionDecl::getGenericParams() const {
+  auto extendedType = getExtendedType();
+  if (auto nominalDecl = extendedType->getNominalOrBoundGenericNominal()) {
+    return nominalDecl->getGenericParamsOfContext();
+  }
+  return nullptr;
+}
+
 SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
   if (auto init = getInit()) {

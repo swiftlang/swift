@@ -1148,6 +1148,8 @@ public:
     Protocols = protocols;
   }
 
+  GenericParamList *getGenericParams() const;
+
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
