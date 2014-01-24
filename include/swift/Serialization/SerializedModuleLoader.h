@@ -65,18 +65,10 @@ public:
   SerializedModuleLoader &operator=(const SerializedModuleLoader &) = delete;
   SerializedModuleLoader &operator=(SerializedModuleLoader &&) = delete;
 
-  /// \brief Import a module with the given module path.
-  ///
-  /// \param importLoc The location of the 'import' keyword.
-  ///
-  /// \param path A sequence of (identifier, location) pairs that denote
-  /// the dotted module name to load, e.g., AppKit.NSWindow.
-  ///
-  /// \returns the module referenced, if it could be loaded. Otherwise,
-  /// emits a diagnostic and returns a FailedImportModule object.
   virtual Module *
   loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+             ArrayRef<std::pair<Identifier, SourceLoc>> path,
+             bool isStdlib) override;
 
   /// Attempt to load a serialized AST into the given module.
   ///

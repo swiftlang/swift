@@ -77,7 +77,7 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // This allows a Swift module to extend a Clang module of the same name.
   if (moduleID.first == SF.getParentModule()->Name && modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
-      return importer->loadModule(moduleID.second, modulePath);
+      return importer->loadModule(moduleID.second, modulePath, false);
     return nullptr;
   }
   

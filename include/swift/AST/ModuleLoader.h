@@ -41,11 +41,14 @@ public:
   /// \param path A sequence of (identifier, location) pairs that denote
   /// the dotted module name to load, e.g., AppKit.NSWindow.
   ///
+  /// \param isStdlib True if the module being loaded is the standard library.
+  ///
   /// \returns the module referenced, if it could be loaded. Otherwise,
   /// emits a diagnostic and returns NULL.
   virtual
   Module *loadModule(SourceLoc importLoc,
-                     ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                     ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                     bool isStdlib) = 0;
 
   /// \brief Load extensions to the given nominal type.
   ///

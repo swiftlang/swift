@@ -53,7 +53,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
       llvm::sys::path::append(inputFilename, moduleFilename.str());
       llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
                                                          buffer);
-      if (!err)
+      if (!err || err.value() != llvm::errc::no_such_file_or_directory)
         return err;
     }
   }
@@ -69,7 +69,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
     err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err)
+    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
 
@@ -77,7 +77,7 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
   inputFilename = ctx.SearchPathOpts.RuntimeImportPath;
   llvm::sys::path::append(inputFilename, moduleFilename.str());
   err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-  if (!err)
+  if (!err || err.value() != llvm::errc::no_such_file_or_directory)
     return err;
 
   // If we get here, we couldn't find the module, so return our most recent err.
@@ -98,8 +98,12 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
 
 } // unnamed namespace
 
-Module *SourceLoader::loadModule(SourceLoc importLoc,
-                             ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+Module *
+SourceLoader::loadModule(SourceLoc importLoc,
+                         ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                         bool isStdlib) {
+  if (isStdlib)
+    return nullptr;
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;

@@ -1158,7 +1158,8 @@ Module *ModuleFile::getModule(Identifier name) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
       ShadowedModule = importer->loadModule(SourceLoc(),
-                                            std::make_pair(name, SourceLoc()));
+                                            std::make_pair(name, SourceLoc()),
+                                            false);
     }
 
     return ShadowedModule;

@@ -247,8 +247,9 @@ bool ClangImporter::Implementation::hasValidSDK() const {
 
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
-    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  if (!Impl.hasValidSDK())
+    ArrayRef<std::pair<Identifier, SourceLoc>> path,
+    bool isStdlib) {
+  if (!Impl.hasValidSDK() || isStdlib)
     return nullptr;
 
   // Convert the Swift import path over to a Clang import path.
