@@ -239,7 +239,7 @@ namespace {
         return Type();
 
       // Import the result type.
-      auto resultTy = Impl.importType(type->getResultType(),
+      auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result);
       if (!resultTy)
         return Type();
@@ -267,7 +267,7 @@ namespace {
 
     Type VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
       // Import functions without prototypes as functions with no parameters.
-      auto resultTy = Impl.importType(type->getResultType(),
+      auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result);
       if (!resultTy)
         return Type();

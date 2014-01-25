@@ -527,7 +527,7 @@ namespace {
     ResultConvention getResult(CanType type) const override {
       if (Method->hasAttr<clang::NSReturnsRetainedAttr>())
         return ResultConvention::Owned;
-      return getCResultConvention(Method->getResultType());
+      return getCResultConvention(Method->getReturnType());
     }
   };
 
@@ -556,7 +556,7 @@ namespace {
     ResultConvention getResult(CanType type) const override {
       if (FnType->getExtInfo().getProducesResult())
         return ResultConvention::Owned;
-      return getCResultConvention(FnType->getResultType());
+      return getCResultConvention(FnType->getReturnType());
     }    
   };
 }

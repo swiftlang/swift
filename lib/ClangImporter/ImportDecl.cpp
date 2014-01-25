@@ -1349,7 +1349,7 @@ namespace {
       // get into the resulting function type.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      Type type = Impl.importFunctionType(decl->getResultType(),
+      Type type = Impl.importFunctionType(decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -1527,7 +1527,7 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      auto type = Impl.importFunctionType(decl->getResultType(),
+      auto type = Impl.importFunctionType(decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -1811,7 +1811,7 @@ namespace {
       bool hasSelectorStyleSignature;
 
       // Import the type that this method will have.
-      auto type = Impl.importFunctionType(objcMethod->getResultType(),
+      auto type = Impl.importFunctionType(objcMethod->getReturnType(),
                                           { objcMethod->param_begin(),
                                             objcMethod->param_size() },
                                           objcMethod->isVariadic(),
