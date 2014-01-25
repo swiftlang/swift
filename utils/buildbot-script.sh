@@ -245,7 +245,6 @@ for product in "${IOS_BUILD_PRODUCTS[@]}" ; do
     else
         eval ${_PRODUCT_BUILD_DIR}="${SWIFT_BUILD_DIR}/${product}"
     fi
-    echo $product ${!_PRODUCT_BUILD_DIR}
 done
 
 
