@@ -373,11 +373,14 @@ namespace {
 
       Type baseTy = base->getType()->getRValueType();
 
-      // Handle accesses that implicitly look through UncheckedOptional<T>.
-      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
-        base = coerceUncheckedOptionalToValue(base, objTy, locator);
-        if (!base) return nullptr;
-        baseTy = objTy;
+      // Explicit member accesses are permitted to implicitly look
+      // through UncheckedOptional<T>.
+      if (!Implicit) {
+        if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
+          base = coerceUncheckedOptionalToValue(base, objTy, locator);
+          if (!base) return nullptr;
+          baseTy = objTy;
+        }
       }
 
       // Figure out the actual base type, and whether we have an instance of
