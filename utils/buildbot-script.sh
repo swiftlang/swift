@@ -334,13 +334,10 @@ function set_ios_options {
     local arch=$5
 
     local sdkroot=`xcrun -sdk ${platform}${internal_suffix} -show-sdk-path`
-    local cc=`xcrun -sdk ${platform}${internal_suffix} -find clang`
 
     local opts=(
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
         "${SWIFT_CMAKE_OPTIONS[@]}"
-        -DCMAKE_C_COMPILER=${cc}
-        -DCMAKE_CXX_COMPILER=${cc}++
         -DCMAKE_SYSTEM_PROCESSOR=${arch}
         -DCMAKE_OSX_ARCHITECTURES=${arch}
         -DCMAKE_OSX_SYSROOT="${sdkroot}"

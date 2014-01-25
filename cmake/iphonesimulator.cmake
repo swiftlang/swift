@@ -3,10 +3,10 @@ include(CMakeForceCompiler)
 
 set(CMAKE_SYSTEM_NAME Darwin)
 
-execute_process(COMMAND xcrun -sdk iphonesimulator -find clang
+execute_process(COMMAND xcrun -sdk iphonesimulator -toolchain XcodeDefault -find clang
                 OUTPUT_VARIABLE cc_path
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND xcrun -sdk iphonesimulator -find clang++
+execute_process(COMMAND xcrun -sdk iphonesimulator -toolchain XcodeDefault -find clang++
                 OUTPUT_VARIABLE cxx_path
                 OUTPUT_STRIP_TRAILING_WHITESPACE)
 
