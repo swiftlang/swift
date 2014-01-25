@@ -157,8 +157,8 @@ done
 INSTALL_PREFIX="${PREFIX}"
 
 # Set these to the paths of the OS X SDK and toolchain.
-SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk
-TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolchain
+SYSROOT="$(xcrun --show-sdk-path --sdk macosx)"
+TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain
 
 # Set this to the path on matte to which release packages should be delivered.
 PACKAGE_PATH=/Users/swift-discuss
