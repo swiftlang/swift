@@ -422,10 +422,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalPatterns = true;
   }
 
-  if (Args.hasArg(OPT_enable_new_objc_properties)) {
-    Opts.EnableNewObjCProperties = true;
-  }
-
   if (Args.hasArg(OPT_debug_constraints)) {
     Opts.DebugConstraintSolver = true;
   }

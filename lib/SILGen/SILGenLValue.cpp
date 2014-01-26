@@ -560,25 +560,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
 
   LValueTypeData typeData = getMemberTypeData(gen, var->getType(), e);
 
-  // FIXME: This should go away.
-  if (var->getStorageKind() == VarDecl::Stored &&
-      var->usesObjCGetterAndSetter() &&
-      !e->isDirectPropertyAccess()) {
-    // Use the property accessors.
-    lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
-                                  typeData);
-    return std::move(lv);
-  }
-  
-  switch (var->getStorageKind()) {
-    case VarDecl::Stored:  // Stored properties handled below.
-      break;
-  case VarDecl::StoredObjC:
-    // FIXME: This 'if' should be simplified.
-    if (e->isDirectPropertyAccess())
-      break;
-  case VarDecl::Computed:
-    // Use the property accessors.
+  // Use the property accessors if the variable has accessors and this isn't a
+  // direct access to underlying storage.
+  if (var->hasAccessorFunctions() && !e->isDirectPropertyAccess()) {
     lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
                                   typeData);
     return std::move(lv);

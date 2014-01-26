@@ -40,8 +40,6 @@ namespace swift {
     
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
-    
-    bool EnableNewObjCProperties = false;
   };
 }
 

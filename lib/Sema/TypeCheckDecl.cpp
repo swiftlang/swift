@@ -1297,8 +1297,7 @@ public:
       
       // If this is a stored ObjC ivar and should have an objc getter and
       // setter, then change its storage kind to reflect that.
-      if (VD->getASTContext().LangOpts.EnableNewObjCProperties &&
-          VD->getStorageKind() == VarDecl::Stored &&
+      if (VD->getStorageKind() == VarDecl::Stored &&
           VD->usesObjCGetterAndSetter() &&
           // FIXME: properties in protocols should not be modeled as stored
           // properties!
