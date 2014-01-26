@@ -357,6 +357,23 @@ bool ConstraintSystem::addConstraint(Constraint *constraint,
   }
 }
 
+TypeVariableType *
+ConstraintSystem::getMemberType(TypeVariableType *baseTypeVar, 
+                                AssociatedTypeDecl *assocType,
+                                ConstraintLocatorBuilder locator,
+                                unsigned options) {
+  return CG.getMemberType(baseTypeVar, assocType->getName(), [&]() {
+    // FIXME: Premature associated type -> identifier mapping. We should
+    // retain the associated type throughout.
+    auto loc = getConstraintLocator(locator);
+    auto memberTypeVar = createTypeVariable(loc, options);
+    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
+                                     baseTypeVar, memberTypeVar, 
+                                     assocType->getName(), loc));
+    return memberTypeVar;
+  });
+}
+
 /// Check whether this is the depth 0, index 0 generic parameter, which is
 /// used for the 'Self' type of a protocol.
 static bool isProtocolSelfType(Type type) {
@@ -372,62 +389,63 @@ namespace {
   /// given dependent type.
   class GetTypeVariable {
     ConstraintSystem &CS;
+    ConstraintGraph &CG;
     DependentTypeOpener *Opener;
-
-    /// The type variables introduced for (base type, associated type) pairs.
-    llvm::DenseMap<std::pair<CanType, AssociatedTypeDecl *>, TypeVariableType *>
-      MemberReplacements;
 
   public:
     GetTypeVariable(ConstraintSystem &cs, DependentTypeOpener *opener)
-      : CS(cs), Opener(opener) { }
+      : CS(cs), CG(CS.getConstraintGraph()), Opener(opener) { }
 
     TypeVariableType *operator()(Type base, AssociatedTypeDecl *member) {
-      auto known = MemberReplacements.find({base->getCanonicalType(), member});
-      if (known != MemberReplacements.end())
-        return known->second;
-
+      // FIXME: Premature associated type -> identifier mapping. We should
+      // retain the associated type throughout.
       auto baseTypeVar = base->castTo<TypeVariableType>();
-      auto archetype = baseTypeVar->getImpl().getArchetype()
-                         ->getNestedType(member->getName());
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(
-                                        (Expr *)nullptr,
-                                        LocatorPathElt(archetype)),
-                                      TVO_PrefersSubtypeBinding);
-      MemberReplacements[{base->getCanonicalType(), member}] = tv;
+      return CG.getMemberType(baseTypeVar, member->getName(), [&]() {
+        auto archetype = baseTypeVar->getImpl().getArchetype()
+                           ->getNestedType(member->getName());
+        auto locator = CS.getConstraintLocator((Expr *)nullptr,
+                                               LocatorPathElt(archetype));
+        auto memberTypeVar = CS.createTypeVariable(locator,
+                                                   TVO_PrefersSubtypeBinding);
 
-      // Determine whether we should bind the new type variable as a
-      // member of the base type variable, or let it float.
-      Type replacementType;
-      bool shouldBindMember = true;
-      if (Opener) {
-        shouldBindMember = Opener->shouldBindAssociatedType(base, baseTypeVar,
-                                                            member, tv,
-                                                            replacementType);
-      }
+        // Determine whether we should bind the new type variable as a
+        // member of the base type variable, or let it float.
+        Type replacementType;
+        bool shouldBindMember = true;
+        if (Opener) {
+          shouldBindMember = Opener->shouldBindAssociatedType(base, baseTypeVar,
+                                                              member, 
+                                                              memberTypeVar,
+                                                              replacementType);
+        }
 
-      // Bind the member's type variable as a type member of the base,
-      // if needed.
-      if (shouldBindMember)
-        CS.addTypeMemberConstraint(base, member->getName(), tv);
+        // Bind the member's type variable as a type member of the base,
+        // if needed.
+        if (shouldBindMember) {
+          CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
+                                              baseTypeVar, memberTypeVar, 
+                                              member->getName(), locator));
+        }
 
-      // If we have a replacement type, bind the member's type
-      // variable to it.
-      if (replacementType)
-        CS.addConstraint(ConstraintKind::Bind, tv, replacementType);
+        // If we have a replacement type, bind the member's type
+        // variable to it.
+        if (replacementType)
+          CS.addConstraint(ConstraintKind::Bind, memberTypeVar, replacementType);
 
-      // Add associated type constraints.
-      // FIXME: Would be better to walk the requirements of the protocol
-      // of which the associated type is a member.
-      if (auto superclass = member->getSuperclass()) {
-        CS.addConstraint(ConstraintKind::Subtype, tv, superclass);
-      }
+        // Add associated type constraints.
+        // FIXME: Would be better to walk the requirements of the protocol
+        // of which the associated type is a member.
+        if (auto superclass = member->getSuperclass()) {
+          CS.addConstraint(ConstraintKind::Subtype, memberTypeVar, superclass);
+        }
 
-      for (auto proto : member->getArchetype()->getConformsTo()) {
-        CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                         proto->getDeclaredType());
-      }
-      return tv;
+        for (auto proto : member->getArchetype()->getConformsTo()) {
+          CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
+                           proto->getDeclaredType());
+        }
+
+        return memberTypeVar;
+      });
     }
   };
 

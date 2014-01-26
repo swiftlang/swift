@@ -1332,17 +1332,6 @@ public:
                                      baseTy, memberTy, name, locator));
   }
 
-  /// \brief Add a type member constraint to the constraint system.
-  void addTypeMemberConstraint(Type baseTy, Identifier name, Type memberTy,
-                               ConstraintLocator *locator = nullptr) {
-    assert(baseTy);
-    assert(memberTy);
-    assert(!name.empty());
-    
-    addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                     baseTy, memberTy, name, locator));
-  }
-
   /// \brief Add an archetype constraint.
   void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator = nullptr) {
     assert(baseTy);
@@ -1350,6 +1339,24 @@ public:
                                      baseTy, Type(), Identifier(),
                                          locator));
   }
+
+  /// Retrieve the type that corresponds to the given member of the
+  /// given base type, which may be a newly-created type variable.
+  ///
+  /// \param baseTypeVar The base type variable whose member is being queried.
+  ///
+  /// \param assocType The associated type we're referencing.
+  ///
+  /// \param locator The location used to describe this member access.
+  ///
+  /// \param options Options to be supplied to type variable creation if 
+  /// a new type is created.
+  ///
+  /// \returns the type variable representing the member type.
+  TypeVariableType *getMemberType(TypeVariableType *baseTypeVar, 
+                                  AssociatedTypeDecl *assocType,
+                                  ConstraintLocatorBuilder locator,
+                                  unsigned options);
 
   /// Retrieve the list of active constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }

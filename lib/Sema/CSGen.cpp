@@ -509,6 +509,11 @@ namespace {
         return Type();
       }
 
+      // FIXME: Protect against broken standard library.
+      auto elementAssocTy = cast<AssociatedTypeDecl>(
+                              arrayProto->lookupDirect(
+                                C.getIdentifier("Element")).front());
+
       auto locator = CS.getConstraintLocator(expr);
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
 
@@ -521,13 +526,11 @@ namespace {
       // FIXME: We should really go through the conformance above to extract
       // the element type, rather than just looking for the element type.
       // FIXME: Member constraint is still weird here.
-      auto arrayElementTy
-        = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::Member),
-            /*options=*/0);
-      CS.addTypeMemberConstraint(arrayTy,
-                                 C.getIdentifier("Element"),
-                                 arrayElementTy);
+      ConstraintLocatorBuilder builder(locator);
+      auto arrayElementTy = CS.getMemberType(arrayTy, elementAssocTy,
+                                             builder.withPathElement(
+                                               ConstraintLocator::Member),
+                                             /*options=*/0);
 
       // Introduce conversions from each element to the element type of the
       // array.
@@ -557,6 +560,14 @@ namespace {
         return Type();
       }
 
+      // FIXME: Protect against broken standard library.
+      auto keyAssocTy = cast<AssociatedTypeDecl>(
+                          dictionaryProto->lookupDirect(
+                            C.getIdentifier("Key")).front());
+      auto valueAssocTy = cast<AssociatedTypeDecl>(
+                            dictionaryProto->lookupDirect(
+                              C.getIdentifier("Value")).front());
+
       auto locator = CS.getConstraintLocator(expr);
       auto dictionaryTy = CS.createTypeVariable(locator,
                                                 TVO_PrefersSubtypeBinding);
@@ -567,25 +578,18 @@ namespace {
                        locator);
 
 
-      // Its subexpression should be convertible to a tuple
-      // ((T.Key,T.Value)...).
-      //
-      // FIXME: We should be getting Key/Value through the witnesses, not
-      // directly from the type.
-      // FIXME: Member locator here is weird.
-      auto memberLocator = CS.getConstraintLocator(expr,
-                                                   ConstraintLocator::Member);
-      auto dictionaryKeyTy = CS.createTypeVariable(memberLocator,
-                                                   /*options=*/0);
-      CS.addTypeMemberConstraint(dictionaryTy,
-                                 C.getIdentifier("Key"),
-                                 dictionaryKeyTy);
-
-      auto dictionaryValueTy = CS.createTypeVariable(memberLocator,
-                                                     /*options=*/0);
-      CS.addTypeMemberConstraint(dictionaryTy,
-                                 C.getIdentifier("Value"),
-                                 dictionaryValueTy);
+      // Its subexpression should be convertible to a tuple ((T.Key,T.Value)...).
+      ConstraintLocatorBuilder locatorBuilder(locator);
+      auto dictionaryKeyTy = CS.getMemberType(dictionaryTy,
+                                              keyAssocTy,
+                                              locatorBuilder.withPathElement(
+                                                ConstraintLocator::Member),
+                                              /*options=*/0);
+      auto dictionaryValueTy = CS.getMemberType(dictionaryTy,
+                                                valueAssocTy,
+                                                locatorBuilder.withPathElement(
+                                                  ConstraintLocator::Member),
+                                                /*options=*/0);
       
       TupleTypeElt tupleElts[2] = { TupleTypeElt(dictionaryKeyTy),
                                     TupleTypeElt(dictionaryValueTy) };

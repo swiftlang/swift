@@ -215,6 +215,18 @@ void ConstraintGraphNode::removeFixedBinding(TypeVariableType *typeVar) {
   });
 }
 
+TypeVariableType *
+ConstraintGraphNode::getMemberType(Identifier name,
+                                   std::function<TypeVariableType *()> create) {
+  auto known = MemberTypes.find(name);
+  if (known != MemberTypes.end())
+    return known->second;
+
+  auto memberType = create();
+  MemberTypes.insert({name, memberType});
+  return memberType;
+}
+
 #pragma mark Graph scope management
 ConstraintGraphScope::ConstraintGraphScope(ConstraintGraph &CG)
   : CG(CG), ParentScope(CG.ActiveScope), NumChanges(CG.Changes.size())
@@ -279,6 +291,16 @@ ConstraintGraph::Change::boundTypeVariable(TypeVariableType *typeVar,
   return result;
 }
 
+ConstraintGraph::Change
+ConstraintGraph::Change::addedMemberType(TypeVariableType *typeVar,
+                                         Identifier name) {
+  Change result;
+  result.Kind = ChangeKind::AddedMemberType;
+  result.MemberType.TypeVar = typeVar;
+  result.MemberType.Name = name;
+  return result;
+}
+
 void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   /// Temporarily change the active scope to null, so we don't record
   /// any changes made while performing the undo operation.
@@ -309,6 +331,15 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   case ChangeKind::BoundTypeVariable:
     cg.unbindTypeVariable(Binding.TypeVar, Binding.FixedType);
     break;
+
+  case ChangeKind::AddedMemberType: {
+    auto &node = cg[MemberType.TypeVar];
+
+    auto known = node.MemberTypes.find(MemberType.Name);
+    assert(known != node.MemberTypes.end() && "Constraint graph corrupted");
+    node.MemberTypes.erase(known);
+    break;
+  }
   }
 }
 
@@ -380,6 +411,21 @@ void ConstraintGraph::removeConstraint(Constraint *constraint) {
     Changes.push_back(Change::removedConstraint(constraint));
 }
 
+TypeVariableType *ConstraintGraph::getMemberType(
+                    TypeVariableType *typeVar,
+                    Identifier name,
+                    std::function<TypeVariableType *()> create) {
+  auto repTypeVar = CS.getRepresentative(typeVar);
+  auto &node = (*this)[repTypeVar];
+  
+  return node.getMemberType(name, [&]() {
+    auto memberTypeVar = create();  
+    if (ActiveScope)
+      Changes.push_back(Change::addedMemberType(repTypeVar, name));
+    return memberTypeVar;
+  });
+}
+
 void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1, 
                                  TypeVariableType *typeVar2) {
   assert(CS.getRepresentative(typeVar1) == CS.getRepresentative(typeVar2) &&
@@ -403,6 +449,44 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
   // Merge equivalence class from the non-representative type variable.
   auto &nonRepNode = (*this)[typeVarNonRep];
   repNode.addToEquivalenceClass(nonRepNode.getEquivalenceClassUnsafe());
+
+  // Merge member types.
+  for (auto newEquivTypeVar : nonRepNode.getEquivalenceClassUnsafe()) {
+    // FIXME: non-determinism here.
+    auto &newEquivNode = newEquivTypeVar == typeVarNonRep
+                           ? nonRepNode
+                           : (*this)[newEquivTypeVar];
+    for (auto memberType : newEquivNode.MemberTypes) {
+      auto repKnown = repNode.MemberTypes.find(memberType.first);
+      if (repKnown == repNode.MemberTypes.end()) {
+        // We haven't seen this member type before. Add it.
+        repNode.MemberTypes.insert(memberType);
+        if (ActiveScope)
+          Changes.push_back(Change::addedMemberType(typeVarRep, 
+                                                    memberType.first));
+        continue;
+      }
+
+      // We have seen this member before. If the type variables are
+      // the same, do nothing. This is a fast-patch check.
+      if (repKnown->second == memberType.second)
+        continue;
+
+      // Find the representatives for the member type variables.
+      TypeVariableType *repMemberTypeVar 
+        = CS.getRepresentative(repKnown->second);
+      TypeVariableType *otherMemberTypeVar
+        = CS.getRepresentative(memberType.second);
+
+      // If the representatives are equivalent, do nothing.
+      if (repMemberTypeVar == otherMemberTypeVar)
+        continue;
+
+      // We have two different type variables representing the same
+      // member type; merge them.
+      CS.mergeEquivalenceClasses(repMemberTypeVar, otherMemberTypeVar);
+    }
+  }
 }
 
 void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
@@ -422,7 +506,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   }
 
   // Record the change, if there are active scopes.
-  // FIXME: If we ever use this to undo the actual variable binding,
+  // Note: If we ever use this to undo the actual variable binding,
   // we'll need to store the change along the early-exit path as well.
   if (ActiveScope)
     Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
@@ -651,6 +735,19 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
     for (unsigned i = 1, n = EquivalenceClass.size(); i != n; ++i) {
       out << ' ';
       EquivalenceClass[i]->print(out);
+    }
+    out << "\n";
+  }
+
+  // Print member types.
+  if (!MemberTypes.empty()) {
+    out.indent(indent + 2);
+    out << "Member types:\n";
+    for (auto memberType : MemberTypes) {
+      out.indent(indent + 4);
+      out << memberType.first.str() << " -> ";
+      memberType.second->print(out);
+      out << "\n";
     }
     out << "\n";
   }
