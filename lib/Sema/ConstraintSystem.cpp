@@ -23,7 +23,13 @@ using namespace swift;
 using namespace constraints;
 
 ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
-  : TC(tc), DC(dc), Arena(tc.Context, Allocator),
+  : TC(tc), DC(dc), 
+    Arena(tc.Context, Allocator, 
+          [&](TypeVariableType *baseTypeVar, AssociatedTypeDecl *assocType) {
+            return getMemberType(baseTypeVar, assocType,
+                                 ConstraintLocatorBuilder(nullptr),
+                                 /*options=*/0);
+          }),
     CG(*new ConstraintGraph(*this))
 {
   assert(DC && "context required");

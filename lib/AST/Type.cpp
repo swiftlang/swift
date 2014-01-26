@@ -1622,7 +1622,15 @@ static Type getMemberForBaseType(Module *module,
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
     return archetypeParent->getNestedType(name);
   }
-  
+
+  // If the parent is a type variable, retrieve its member type
+  // variable.
+  if (auto typeVarParent = substBase->getAs<TypeVariableType>()) {
+    assert(assocType && "Missing associated type");
+    return substBase->getASTContext().getTypeVariableMemberType(typeVarParent,
+                                                                assocType);
+  }
+
   // Retrieve the member type with the given name.
 
   // Tuples don't have member types.

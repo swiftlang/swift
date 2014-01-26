@@ -187,13 +187,17 @@ struct ASTContext::Implementation {
   /// analysis is responsible for handling the uniquing.
   SmallVector<NormalProtocolConformance *, 2> NormalConformances;
 
-  /// \brief Temporary arena used for a constraint solver.
+  /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
-    /// \brief The allocator used for all allocations within this arena.
+    /// The allocator used for all allocations within this arena.
     llvm::BumpPtrAllocator &Allocator;
 
-    ConstraintSolverArena(llvm::BumpPtrAllocator &Allocator)
-      : Allocator(Allocator) { }
+    /// Callback used to get a type member of a type variable.
+    GetTypeVariableMemberCallback GetTypeMember;
+
+    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator,
+                          GetTypeVariableMemberCallback &&getTypeMember)
+      : Allocator(allocator), GetTypeMember(std::move(getTypeMember)) { }
 
     ConstraintSolverArena(const ConstraintSolverArena &) = delete;
     ConstraintSolverArena(ConstraintSolverArena &&) = delete;
@@ -224,11 +228,14 @@ ASTContext::Implementation::~Implementation() {
 }
 
 ConstraintCheckerArenaRAII::
-ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
+ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator,
+                           GetTypeVariableMemberCallback getTypeMember)
   : Self(self), Data(self.Impl.CurrentConstraintSolverArena.release())
 {
   Self.Impl.CurrentConstraintSolverArena.reset(
-    new ASTContext::Implementation::ConstraintSolverArena(allocator));
+    new ASTContext::Implementation::ConstraintSolverArena(
+          allocator,
+          std::move(getTypeMember)));
 }
 
 ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
@@ -701,6 +708,12 @@ void ASTContext::setSubstitutions(BoundGenericType* Bound,
   assert(Impl.BoundGenericSubstitutions.count(Bound) == 0 &&
          "Already have substitutions?");
   Impl.BoundGenericSubstitutions[Bound] = Subs;
+}
+
+Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+                                           AssociatedTypeDecl *assocType) {
+  auto &arena = *Impl.CurrentConstraintSolverArena;
+  return arena.GetTypeMember(baseTypeVar, assocType);
 }
 
 void ASTContext::addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,

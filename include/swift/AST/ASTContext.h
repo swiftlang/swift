@@ -61,6 +61,7 @@ namespace swift {
   class PatternBindingInitializer;
   class SourceLoc;
   class Type;
+  class TypeVariableType;
   class TupleType;
   class FunctionType;
   class ArchetypeType;
@@ -98,6 +99,11 @@ enum class AllocationArena {
   ConstraintSolver
 };
 
+/// Callback function used when referring to a type member of a given
+/// type variable.
+typedef std::function<Type(TypeVariableType *, AssociatedTypeDecl *)>
+  GetTypeVariableMemberCallback;
+
 /// \brief Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -114,7 +120,8 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator);
+                             llvm::BumpPtrAllocator &allocator,
+                             GetTypeVariableMemberCallback getTypeMember);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
@@ -425,6 +432,13 @@ public:
   const CanType TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
   const CanType TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
   const CanType ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
+
+  /// Retrieve a type member of the given base type variable.
+  ///
+  /// Note that this routine is only usable when a constraint system
+  /// is active.
+  Type getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+                                 AssociatedTypeDecl *assocType);
 
   /// \brief Adds a module loader to this AST context.
   ///
