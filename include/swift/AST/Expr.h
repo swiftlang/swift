@@ -579,8 +579,9 @@ class OtherConstructorDeclRefExpr : public Expr {
   SourceLoc Loc;
   
 public:
-  OtherConstructorDeclRefExpr(ConcreteDeclRef Ctor, SourceLoc Loc, Type Ty = {})
-    : Expr(ExprKind::OtherConstructorDeclRef, /*Implicit=*/true, Ty),
+  OtherConstructorDeclRefExpr(ConcreteDeclRef Ctor, SourceLoc Loc,
+                              bool Implicit, Type Ty = {})
+    : Expr(ExprKind::OtherConstructorDeclRef, Implicit, Ty),
       Ctor(Ctor), Loc(Loc)
   {}
   

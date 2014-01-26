@@ -158,6 +158,10 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     return { false, E };
 
+  } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
+    if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getConstructorLoc()))
+      return { false, nullptr };
+
   } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
     if (SE->hasDecl())
       if (!passReference(SE->getDecl().getDecl(), E->getLoc()))

@@ -877,10 +877,8 @@ namespace {
       }
 
       // Build the constructor reference.
-      Expr *refExpr = new (ctx) OtherConstructorDeclRefExpr(ref, loc,
+      Expr *refExpr = new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
                                                             resultTy);
-      if (implicit)
-        refExpr->setImplicit();
       return refExpr;
     }
 
