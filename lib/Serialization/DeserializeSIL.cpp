@@ -722,22 +722,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert((ArgTys.size() << 1) >= ListOfValues.size() &&
            "Argument number mismatch in PartialApplyInst.");
 
-    SmallVector<TupleTypeElt, 4> NewArgTypes;
-    // Compute the result type of the partial_apply, based on which arguments
-    // are getting applied.
-    unsigned ArgNo = 0, NewArgCount = ArgTys.size() - (ListOfValues.size()>>1);
-    while (ArgNo != NewArgCount)
-      NewArgTypes.push_back(ArgTys[ArgNo++].getSwiftType());
-
     SILValue FnVal = getLocalValue(ValID, ValResNum, FnTy);
     SmallVector<SILValue, 4> Args;
+    unsigned unappliedArgs = ArgTys.size() - (ListOfValues.size() >> 1);
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 2)
       Args.push_back(getLocalValue(ListOfValues[I], ListOfValues[I+1],
-                                   ArgTys[ArgNo++]));
+                                   ArgTys[(I>>1) + unappliedArgs]));
 
-    Type ArgTy = TupleType::get(NewArgTypes, Ctx);
-    Type ResTy = FunctionType::get(ArgTy, FTI->getResult().getType());
-
+    // Compute the result type of the partial_apply, based on which arguments
+    // are getting applied.
+    SILType closureTy
+      = SILBuilder::getPartialApplyResultType(SubstFnTy,
+                                              Args.size(),
+                                              Fn->getModule(),
+                                              {});
+    
     unsigned NumSub = NumSubs;
     SmallVector<Substitution, 4> Substitutions;
     while (NumSub--) {
@@ -749,7 +748,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
                                            Substitutions, Args,
-                                           SILMod.Types.getLoweredType(ResTy));
+                                           closureTy);
     break;
   }
   case ValueKind::BuiltinFunctionRefInst: {

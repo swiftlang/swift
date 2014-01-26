@@ -859,6 +859,19 @@ entry(%0 : $Builtin.Int1):
 // CHECK-LABEL: @test_forward_ref
 sil  @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
 
+// CHECK-LABEL: sil public_external @partial_apply : $@thin (@thin (@out Int64, Int64) -> (), Int64) -> Int64 {
+// CHECK: [[PA:%.*]] = partial_apply {{%.*}}({{%.*}}) : $@thin (@out Int64, Int64) -> ()
+// CHECK: apply [[PA]]({{%.*}}) : $@callee_owned (@out Int64) -> ()
+sil @partial_apply : $@thin (@thin (@out Int64, Int64) -> (), Int64) -> Int64 {
+entry(%f : $@thin (@out Int64, Int64) -> (), %x : $Int64):
+  %p = partial_apply %f(%x) : $@thin (@out Int64, Int64) -> ()
+  %i = alloc_stack $Int64
+  %z = apply %p(%i#1) : $@callee_owned (@out Int64) -> ()
+  %y = load %i#1 : $*Int64
+  dealloc_stack %i#0 : $*@local_storage Int64
+  return %y : $Int64
+}
+
 @fragile
 class Foo {
   subscript (x: Int, y: Int) -> Int
@@ -978,7 +991,9 @@ bb0:
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
+  %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
 
   %119 = tuple ()
   return %119 : $()
 }
+
