@@ -1184,50 +1184,17 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->setStorageObjCAccessors(Get, Set);
+  
+  
+  // We've added some members to our containing class, add them to the members
+  // list.
+  ClassDecl *CD = cast<ClassDecl>(VD->getDeclContext());
+  SmallVector<Decl*, 4> members(CD->getMembers().begin(),
+                                CD->getMembers().end());
+  members.push_back(Get);
+  members.push_back(Set);
+  CD->setMembers(CD->getASTContext().AllocateCopy(members), CD->getBraces());
 }
-
-/// Check the specified ClassDecl to see if it has any stored properties that
-/// need to be accessed with ObjC indirection.  If so, they are upgraded to have
-/// StoredObjC StorageKind.
-static void setupObjCStorageProperties(ClassDecl *CD, TypeChecker &TC) {
-  if (!CD->getASTContext().LangOpts.EnableNewObjCProperties)
-    return;
-  
-  SmallVector<Decl*, 4> members;
-  
-  // Check all of our stored properties to see if they need to be accessed
-  // dynamically with get/set accessors.
-  for (auto VD : CD->getStoredProperties()) {
-    // If this is a stored ObjC ivar and should have an objc getter and
-    // setter, then change its storage kind to reflect that.
-    if (VD->getStorageKind() != VarDecl::Stored ||
-        !VD->usesObjCGetterAndSetter())
-      continue;
-    
-    // If this is the first property we need to upgrade in this class, copy the
-    // members list, so we can add to it.
-    // FIXME: Painfully inefficient to do the copy here.
-    if (members.empty())
-      members.append(CD->getMembers().begin(), CD->getMembers().end());
-
-    convertStoredVarToStoredObjC(VD);
-    
-    // Add the getter and setter to the members list for the class to keep our
-    // AST properly formed.
-    members.push_back(VD->getGetter());
-    members.push_back(VD->getSetter());
-  
-    // Type check the body of the getter and setter.
-    TC.typeCheckDecl(VD->getGetter(), true);
-    TC.typeCheckDecl(VD->getSetter(), true);
-  }
-  
-  // If there were any upgraded properties, set the members of the class,
-  // including the new getters and setters.
-  if (!members.empty())
-    CD->setMembers(CD->getASTContext().AllocateCopy(members), CD->getBraces());
-}
-
 
 namespace {
 
@@ -1326,6 +1293,18 @@ public:
                         (classContext && classContext->isObjC()) ||
                         (protocolContext && protocolContext->isObjC()));
         }
+      }
+      
+      // If this is a stored ObjC ivar and should have an objc getter and
+      // setter, then change its storage kind to reflect that.
+      if (VD->getASTContext().LangOpts.EnableNewObjCProperties &&
+          VD->getStorageKind() == VarDecl::Stored &&
+          VD->usesObjCGetterAndSetter()) {
+        convertStoredVarToStoredObjC(VD);
+        
+        // Type check the body of the getter and setter.
+        TC.typeCheckDecl(VD->getGetter(), true);
+        TC.typeCheckDecl(VD->getSetter(), true);
       }
 
       return;
@@ -1771,7 +1750,6 @@ public:
     if (!IsSecondPass) {
       TC.addImplicitConstructors(CD);
       TC.addImplicitDestructor(CD);
-      setupObjCStorageProperties(CD, TC);
     }
     if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
