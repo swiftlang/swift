@@ -192,9 +192,12 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, SourceLoc nameLoc,
-                             bool Implicit)
+                             bool Implicit, bool UsesDirectPropertyAccess)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) { }
+    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+   
+  MemberRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
+}
 
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
                                                    ConcreteDeclRef Value,

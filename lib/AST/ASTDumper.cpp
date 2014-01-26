@@ -1074,6 +1074,10 @@ public:
     printCommon(E, "member_ref_expr")
       << " decl=";
     E->getMember().dump(OS);
+    
+    if (E->isDirectPropertyAccess())
+      OS << " direct_property_access";
+            
     OS << '\n';
     printRec(E->getBase());
     OS << ')';

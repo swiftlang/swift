@@ -1143,7 +1143,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
   auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
   auto *MRE = new (Context) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                          /*implicit*/true);
+                                          /*implicit*/true,/*direct ivar*/true);
   ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
   Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
 
@@ -1177,7 +1177,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
   auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
   MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                    /*implicit*/true);
+                                    /*implicit*/true, /*direct ivar*/true);
   ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
   Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
 

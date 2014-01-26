@@ -98,6 +98,14 @@ class alignas(8) Expr {
   enum { NumStringLiteralExprBits = NumLiteralExprBits + 1 };
   static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
 
+  class MemberRefExprBitfields {
+    friend class MemberRefExpr;
+    unsigned : NumExprBits;
+    unsigned IsDirectPropertyAccess : 1;
+  };
+  enum { NumMemberRefExprBits = NumExprBits + 1 };
+  static_assert(NumMemberRefExprBits <= 32, "fits in an unsigned");
+
   class MagicIdentifierLiteralExprBitfields {
     friend class MagicIdentifierLiteralExpr;
     unsigned : NumLiteralExprBits;
@@ -137,6 +145,7 @@ protected:
     LiteralExprBitfields LiteralExprBits;
     IntegerLiteralExprBitfields IntegerLiteralExprBits;
     StringLiteralExprBitfields StringLiteralExprBits;
+    MemberRefExprBitfields MemberRefExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
@@ -763,13 +772,21 @@ class MemberRefExpr : public Expr {
   
 public:  
   MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
-                SourceLoc nameLoc, bool Implicit);
+                SourceLoc nameLoc, bool Implicit,
+                // If True, access to computed properties with storage goes to
+                // the storage, instead of through the accessors.
+                bool UsesDirectPropertyAccess = false);
   Expr *getBase() const { return Base; }
   ConcreteDeclRef getMember() const { return Member; }
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
   void setBase(Expr *E) { Base = E; }
+  
+  /// Return true if this member access is
+  bool isDirectPropertyAccess() const {
+    return MemberRefExprBits.IsDirectPropertyAccess;
+  }
   
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {

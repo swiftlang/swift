@@ -575,7 +575,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
       break;
   case VarDecl::StoredObjC:
     // FIXME: This 'if' should go away.
-    if (gen.AlwaysDirectStoredPropertyAccess)
+    if (gen.AlwaysDirectStoredPropertyAccess ||
+        e->isDirectPropertyAccess())
       break;
   case VarDecl::Computed:
     // Use the property accessors.

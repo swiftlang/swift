@@ -173,7 +173,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
         // Find MemberRefExprs that have an implicit "self" base.
         if (MRE->getMember().getDecl() == Var &&
             isa<DeclRefExpr>(MRE->getBase()) &&
-            MRE->getBase()->isImplicit()) {
+            MRE->getBase()->isImplicit() &&
+            !MRE->isDirectPropertyAccess()) {
           bool shouldDiagnose = true;
           if (IsSetter)
             shouldDiagnose = !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr());

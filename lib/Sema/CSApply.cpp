@@ -343,7 +343,7 @@ namespace {
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
-                              locator, implicit);
+                              locator, implicit, /*direct ivar*/false);
       }
 
       // If this is a declaration with generic function type, build a
@@ -367,7 +367,7 @@ namespace {
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
                          Type openedType, ConstraintLocatorBuilder locator,
-                         bool Implicit) {
+                         bool Implicit, bool IsDirectPropertyAccess) {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
@@ -426,6 +426,8 @@ namespace {
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
+        assert(!IsDirectPropertyAccess &&
+               "Direct property access doesn't make sense for this");
         Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         ref->setType(refTy);
         return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
@@ -483,6 +485,9 @@ namespace {
 
       // Handle archetype and existential references.
       if (isArchetypeOrExistentialRef) {
+        assert(!IsDirectPropertyAccess &&
+               "Direct property access doesn't make sense for this");
+
         Expr *ref;
 
         if (member->getAttrs().isOptional()) {
@@ -506,12 +511,16 @@ namespace {
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         auto result
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
-                                        memberLoc, Implicit);
+                                        memberLoc, Implicit,
+                                        IsDirectPropertyAccess);
 
         // Skip the synthesized 'self' input type of the opened type.
         result->setType(simplifyType(openedType));
         return result;
       }
+      
+      assert(!IsDirectPropertyAccess &&
+             "Direct property access doesn't make sense for this");
       
       // Handle all other references.
       Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
@@ -1327,7 +1336,7 @@ namespace {
                             selected.choice.getDecl(), expr->getMemberLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit());
+                            expr->isImplicit(), /*direct ivar*/false);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -1361,7 +1370,8 @@ namespace {
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit());
+                            expr->isImplicit(),
+                            expr->isDirectPropertyAccess());
     }
 
     Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
@@ -1378,7 +1388,7 @@ namespace {
                             selected.choice.getDecl(), expr->getNameLoc(),
                             selected.openedType,
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit());
+                            expr->isImplicit(), /*direct ivar*/false);
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -1418,7 +1428,7 @@ namespace {
                                    expr->getNameLoc(),
                                    selected.openedType,
                                    cs.getConstraintLocator(expr),
-                                   expr->isImplicit());
+                                   expr->isImplicit(), /*direct ivar*/false);
       if (!result)
         return nullptr;
 
@@ -1470,7 +1480,7 @@ namespace {
                                      expr->getNameLoc(),
                                      selected.openedType,
                                      cs.getConstraintLocator(expr),
-                                     expr->isImplicit());
+                                     expr->isImplicit(), /*direct ivar*/false);
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
         FuncDecl *fn = nullptr;
@@ -2646,7 +2656,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                     expr->getEndLoc(),
                                     selected.openedType,
                                     locator,
-                                    /*Implicit=*/true);
+                                    /*Implicit=*/true, /*direct ivar*/false);
 
     // Form an empty tuple.
     Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
@@ -2695,7 +2705,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                  expr->getStartLoc(),
                                  selected.openedType,
                                  storedLocator,
-                                 /*Implicit=*/true);
+                                 /*Implicit=*/true, /*direct ivar*/false);
 
   // FIXME: Lack of openedType here is an issue.
   ApplyExpr *apply = new (tc.Context) CallExpr(declRef, expr,
@@ -3236,7 +3246,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  /*DotLoc=*/SourceLoc(),
                                  decl, fn->getEndLoc(),
                                  selected->openedType, locator,
-                                 /*Implicit=*/true);
+                                 /*Implicit=*/true, /*direct ivar*/false);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
@@ -3438,7 +3448,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                            base->getStartLoc(),
                                            witness, base->getEndLoc(),
                                            openedType, locator,
-                                           /*Implicit=*/true);
+                                           /*Implicit=*/true,
+                                           /*direct ivar*/false);
 
   // Call the witness.
   ApplyExpr *apply = new (Context) CallExpr(memberRef, arg, /*Implicit=*/true);
