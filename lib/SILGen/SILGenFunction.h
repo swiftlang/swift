@@ -113,10 +113,6 @@ public:
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
   
-  /// \brief True if stored property accesses in this function should always be
-  /// direct, even in @objc methods.
-  bool AlwaysDirectStoredPropertyAccess : 1;
-  
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 

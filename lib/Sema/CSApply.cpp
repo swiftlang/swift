@@ -241,6 +241,26 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   return baseTy;
 }
 
+/// Return true if a MemberReferenceExpr with the specified base and member in
+/// the specified DeclContext should be implicitly marked as
+/// "isDirectPropertyAccess".
+static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
+                                            DeclContext *DC) {
+  // Properties with "StoredObjC" storage have storage the class, but are
+  // usually accessed through accessors.  However, in init and destructor
+  // methods, accesses are done direct.
+  if (( /* FIXME: REMOVE*/member->usesObjCGetterAndSetter() ||
+       member->getStorageKind() == VarDecl::StoredObjC) &&
+      (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
+      isa<DeclRefExpr>(base) &&
+      cast<AbstractFunctionDecl>(DC)->getImplicitSelfDecl() ==
+      cast<DeclRefExpr>(base)->getDecl()) {
+    return true;
+  }
+  
+  return false;
+}
+
 namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
@@ -507,6 +527,11 @@ namespace {
         return ref;
       }
 
+      // References to properties with accessors and storage usually go
+      // through the accessors, but sometimes are direct.
+      if (auto *VD = dyn_cast<VarDecl>(member))
+        IsDirectPropertyAccess |= isImplicitDirectMemberReference(base, VD, dc);
+      
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         auto result

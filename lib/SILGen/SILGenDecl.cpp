@@ -1607,9 +1607,6 @@ void SILGenFunction::emitObjCSetter(SILDeclRef setter) {
 }
 
 void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
-  // Always emit physical property accesses in destructors.
-  AlwaysDirectStoredPropertyAccess = true;
-
   auto dd = cast<DestructorDecl>(dtor.getDecl());
   auto cd = cast<ClassDecl>(dd->getDeclContext());
   RegularLocation loc(dd);
