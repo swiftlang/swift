@@ -249,8 +249,7 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
   // Properties with "StoredObjC" storage have storage the class, but are
   // usually accessed through accessors.  However, in init and destructor
   // methods, accesses are done direct.
-  if (( /* FIXME: REMOVE*/member->usesObjCGetterAndSetter() ||
-       member->getStorageKind() == VarDecl::StoredObjC) &&
+  if (member->getStorageKind() == VarDecl::StoredObjC &&
       (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
       isa<DeclRefExpr>(base) &&
       cast<AbstractFunctionDecl>(DC)->getImplicitSelfDecl() ==
