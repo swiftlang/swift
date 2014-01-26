@@ -1226,7 +1226,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     
-    if (Tok.isContextualKeyword("get") || !Tok.isContextualKeyword("set")) {
+    if (Tok.isContextualKeyword("get") ||
+        (!Tok.isContextualKeyword("set") && !isInProtocol)) {
       //   get         ::= 'get' stmt-brace
 
       // Have we already parsed a get clause?
@@ -1373,8 +1374,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                                SourceLoc StaticLoc,
-                                VarDecl *&boundVar) {
+                                SourceLoc StaticLoc, VarDecl *&boundVar) {
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
