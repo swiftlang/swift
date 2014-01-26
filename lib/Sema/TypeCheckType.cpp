@@ -221,8 +221,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                                                 unbound->getParent(),
                                                 genericArgTypes);
   // Check protocol conformance.
-  // FIXME: Should be able to check when there are type variables?
-  if (!BGT->isDependentType() && !BGT->hasTypeVariable()) {
+  if (!BGT->isDependentType()) {
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
     TypeSubstitutionMap Substitutions;

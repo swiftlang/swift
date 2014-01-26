@@ -839,9 +839,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // If we have a nominal type that conforms to the protocol in which the
     // associated type resides, use the witness.
     if (!baseObjTy->isExistentialType() &&
-        !baseObjTy->hasTypeVariable() &&
         baseObjTy->getAnyNominal()) {
-
       auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance) &&
@@ -948,7 +946,6 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // When we have an associated type, the base type conforms to the
     // given protocol, so use the type witness directly.
     // FIXME: Diagnose existentials properly.
-    // FIXME: Eliminate the "hasTypeVariables()" hack here.
     auto proto = cast<ProtocolDecl>(value->getDeclContext());
     auto assocType = cast<AssociatedTypeDecl>(value);
 
@@ -957,8 +954,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // For an archetype, we substitute the base object for the base.
       // FIXME: Feels like a total hack.
     } else if (!baseObjTy->isExistentialType() &&
-        !baseObjTy->is<ArchetypeType>() &&
-        !baseObjTy->hasTypeVariable()) {
+               !baseObjTy->is<ArchetypeType>()) {
       ProtocolConformance *conformance = nullptr;
       if (TC.conformsToProtocol(baseObjTy, proto, DC, &conformance) &&
           conformance->isComplete()) {

@@ -103,13 +103,6 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
 
-    // If there are any type variables in the base type, don't substitute.
-    // FIXME: This is a total hack that won't actually work.
-    if (type->hasTypeVariable()) {
-      result.Results.push_back({typeDecl, typeDecl->getDeclaredType()});
-      continue;
-    }
-
     Type memberType;
 
     // If we found a member of a protocol type when looking into a non-protocol,
