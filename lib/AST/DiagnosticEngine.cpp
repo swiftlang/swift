@@ -105,7 +105,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplaceChars(SourceLoc Start,
                                                           SourceLoc End,
                                                           StringRef Str) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine)
+  if (Engine && Start.isValid())
     Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(
         toCharSourceRange(Engine->SourceMgr, Start, End), Str));
   return *this;
