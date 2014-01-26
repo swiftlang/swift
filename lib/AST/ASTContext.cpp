@@ -140,6 +140,9 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
 
+    llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
+      BoundGenericSubstitutions;
+
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -170,10 +173,6 @@ struct ASTContext::Implementation {
   
   /// \brief The permanent arena.
   Arena Permanent;
-
-    /// FIXME: Move into arena.
-  llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
-    BoundGenericSubstitutions;
 
   using ConformanceListPair = std::pair<unsigned, SmallVector<Decl *, 8>>;
 
@@ -671,6 +670,13 @@ bool ASTContext::hadError() const {
   return Diags.hadAnyError();
 }
 
+/// \brief Retrieve the arena from which we should allocate storage for a type.
+static AllocationArena getArena(RecursiveTypeProperties properties) {
+  bool hasTypeVariable = properties.hasTypeVariable();
+  return hasTypeVariable? AllocationArena::ConstraintSolver
+                        : AllocationArena::Permanent;
+}
+
 Optional<ArrayRef<Substitution>>
 ASTContext::createTrivialSubstitutions(BoundGenericType *BGT) const {
   assert(BGT->isCanonical() && "Requesting non-canonical substitutions");
@@ -683,15 +689,20 @@ ASTContext::createTrivialSubstitutions(BoundGenericType *BGT) const {
   Subst.Archetype = Param.getAsTypeParam()->getArchetype();
   Subst.Replacement = BGT->getGenericArgs()[0];
   auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
-  Impl.BoundGenericSubstitutions.insert(std::make_pair(BGT, Substitutions));
+  auto arena = getArena(BGT->getRecursiveProperties());
+  Impl.getArena(arena).BoundGenericSubstitutions.
+    insert(std::make_pair(BGT, Substitutions));
   return Substitutions;
 }
 
 Optional<ArrayRef<Substitution>>
 ASTContext::getSubstitutions(BoundGenericType* bound) const {
+  auto arena = getArena(bound->getRecursiveProperties());
   assert(bound->isCanonical() && "Requesting non-canonical substitutions");
-  auto known = Impl.BoundGenericSubstitutions.find(bound);
-  if (known != Impl.BoundGenericSubstitutions.end())
+  auto &boundGenericSubstitutions 
+    = Impl.getArena(arena).BoundGenericSubstitutions;
+  auto known = boundGenericSubstitutions.find(bound);
+  if (known != boundGenericSubstitutions.end())
     return known->second;
 
   // We can trivially create substitutions for Slice and Optional.
@@ -704,10 +715,13 @@ ASTContext::getSubstitutions(BoundGenericType* bound) const {
 
 void ASTContext::setSubstitutions(BoundGenericType* Bound,
                                   ArrayRef<Substitution> Subs) const {
+  auto arena = getArena(Bound->getRecursiveProperties());
+  auto &boundGenericSubstitutions 
+    = Impl.getArena(arena).BoundGenericSubstitutions;
   assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
-  assert(Impl.BoundGenericSubstitutions.count(Bound) == 0 &&
+  assert(boundGenericSubstitutions.count(Bound) == 0 &&
          "Already have substitutions?");
-  Impl.BoundGenericSubstitutions[Bound] = Subs;
+  boundGenericSubstitutions[Bound] = Subs;
 }
 
 Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
@@ -865,13 +879,6 @@ ASTContext::createDefaultArgumentContext(DeclContext *fn, unsigned index) {
 void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
   // There isn't much value in caching more than one of these.
   Impl.UnusedDefaultArgumentContext = DC;
-}
-
-/// \brief Retrieve the arena from which we should allocate storage for a type.
-static AllocationArena getArena(RecursiveTypeProperties properties) {
-  bool hasTypeVariable = properties.hasTypeVariable();
-  return hasTypeVariable? AllocationArena::ConstraintSolver
-                        : AllocationArena::Permanent;
 }
 
 Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type, 
