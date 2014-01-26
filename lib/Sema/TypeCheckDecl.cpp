@@ -1299,7 +1299,10 @@ public:
       // setter, then change its storage kind to reflect that.
       if (VD->getASTContext().LangOpts.EnableNewObjCProperties &&
           VD->getStorageKind() == VarDecl::Stored &&
-          VD->usesObjCGetterAndSetter()) {
+          VD->usesObjCGetterAndSetter() &&
+          // FIXME: properties in protocols should not be modeled as stored
+          // properties!
+          !isa<ProtocolDecl>(VD->getDeclContext())) {
         convertStoredVarToStoredObjC(VD);
         
         // Type check the body of the getter and setter.
