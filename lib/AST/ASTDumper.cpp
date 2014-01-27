@@ -555,6 +555,8 @@ namespace {
         case FuncDecl::NotAccessor: assert(0 && "Isn't an accessor?");
         case FuncDecl::IsGetter: OS << " getter"; break;
         case FuncDecl::IsSetter: OS << " setter"; break;
+        case FuncDecl::IsWillSet: OS << " willset"; break;
+        case FuncDecl::IsDidSet: OS << " didset"; break;
         }
 
         OS << "_for=" << ASD->getName();

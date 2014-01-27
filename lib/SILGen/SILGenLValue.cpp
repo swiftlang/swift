@@ -515,6 +515,8 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 
   // If it's a computed variable, push a reference to the getter and setter.
   switch (var->getStorageKind()) {
+  case VarDecl::WillSetDidSet:
+    assert(0 && "FIXME: Global willSet/didSet not impl");
   case VarDecl::StoredObjC: assert(0 && "Can't happen, always a member");
   case VarDecl::Stored: {
     // If it's a physical value (e.g. a local variable in memory), push its

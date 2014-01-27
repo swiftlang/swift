@@ -2369,7 +2369,11 @@ public:
     /// There is no memory associated with this decl anywhere.  It is accessed
     /// by calling a getter and setter.  If the setter is absent, then the value
     /// is only loadable, but not storable.
-    Computed
+    Computed,
+
+    /// This property has storage, a didSet specifier, a willSet specifier, or
+    /// both.  Sema synthesizes a getter and setter that use these.
+    WillSetDidSet
   };
 private:
   llvm::PointerIntPair<AbstractStorageDecl*, 2, StorageKindTy> OverriddenDecl;
@@ -2380,8 +2384,18 @@ private:
     FuncDecl *Set = nullptr;       // User-defined setter
   };
 
+  struct WillSetDidSetRecord : GetSetRecord {
+    FuncDecl *WillSet = nullptr;   // willSet(value):
+    FuncDecl *DidSet = nullptr;    // didSet:
+  };
+
   GetSetRecord *GetSetInfo = nullptr;
-  
+
+  WillSetDidSetRecord &getDidSetInfo() const {
+    assert(getStorageKind() == WillSetDidSet);
+    return *static_cast<WillSetDidSetRecord*>(GetSetInfo);
+  }
+
   void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, Identifier Name,
@@ -2404,6 +2418,7 @@ public:
     switch (getStorageKind()) {
     case Stored:
     case StoredObjC:
+    case WillSetDidSet:
       return true;
     case Computed:
       return false;
@@ -2414,6 +2429,7 @@ public:
     switch (getStorageKind()) {
     case Computed:
     case StoredObjC:
+    case WillSetDidSet:
       return true;
     case Stored:
       return false;
@@ -2427,16 +2443,34 @@ public:
   /// \brief Turn this into a StorageObjC var, providing a getter and setter.
   void makeStoredObjC(FuncDecl *Get, FuncDecl *Set);
 
+  /// \brief Turn this into a DidSetWillSet var, providing the didSet/willSet
+  /// specifiers.
+  void makeWillSetDidSet(SourceLoc LBraceLoc,
+                         FuncDecl *WillSet, FuncDecl *DidSet,
+                         SourceLoc RBraceLoc);
+
+  /// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
+  /// This is used by Sema.
+  void setDidSetWillSetAccessors(FuncDecl *Get, FuncDecl *Set);
+
+  SourceRange getBracesRange() const {
+    assert(GetSetInfo && "Not computed!");
+    return GetSetInfo->Braces;
+  }
+
   /// \brief Retrieve the getter used to access the value of this variable.
   FuncDecl *getGetter() const { return GetSetInfo ? GetSetInfo->Get : nullptr; }
   
   /// \brief Retrieve the setter used to mutate the value of this variable.
   FuncDecl *getSetter() const { return GetSetInfo ? GetSetInfo->Set : nullptr; }
   
-  SourceRange getBracesRange() const {
-    assert(GetSetInfo && "Not computed!");
-    return GetSetInfo->Braces;
-  }
+  /// \brief Return the funcdecl for the willSet specifier if it exists, this is
+  /// only valid on a VarDecl with DidSetWillSet storage.
+  FuncDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
+
+  /// \brief Return the funcdecl for the didSet specifier if it exists, this is
+  /// only valid on a VarDecl with DidSetWillSet storage.
+  FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
   /// Return true if this storage needs to be accessed with getters and
   /// setters for Objective-C.
@@ -2870,9 +2904,13 @@ public:
     /// \brief This is not a property accessor.
     NotAccessor = -1,
     /// \brief This is a getter for a property or subscript.
-    IsGetter = 0,
+    IsGetter,
     /// \brief This is a setter for a property or subscript.
-    IsSetter = 1
+    IsSetter,
+    /// \brief This is a willSet specifier for a property.
+    IsWillSet,
+    /// \brief This is a didSet specifier for a property.
+    IsDidSet
   };
 private:
   friend class AbstractFunctionDecl;
@@ -2889,7 +2927,7 @@ private:
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
-  llvm::PointerIntPair<AbstractStorageDecl*, 1, AccessorKind> AccessorDecl;
+  llvm::PointerIntPair<AbstractStorageDecl*, 2, AccessorKind> AccessorDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 

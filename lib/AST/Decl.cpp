@@ -1062,6 +1062,42 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   setStorageKind(StoredObjC);
 }
 
+void AbstractStorageDecl::makeWillSetDidSet(SourceLoc LBraceLoc,
+                                            FuncDecl *WillSet, FuncDecl *DidSet,
+                                            SourceLoc RBraceLoc) {
+  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
+  assert((WillSet || DidSet) &&
+         "Can't be WillSetDidSet without one or the other");
+  auto &Context = getASTContext();
+  void *Mem = Context.Allocate(sizeof(WillSetDidSetRecord),
+                               alignof(WillSetDidSetRecord));
+  GetSetInfo = new (Mem) WillSetDidSetRecord;
+  GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+  getDidSetInfo().WillSet = WillSet;
+  getDidSetInfo().DidSet = DidSet;
+  
+  if (WillSet) WillSet->makeAccessor(this, FuncDecl::IsWillSet);
+  if (DidSet) DidSet->makeAccessor(this, FuncDecl::IsDidSet);
+  
+  // Mark that this is a StorageObjC property.
+  setStorageKind(WillSetDidSet);
+}
+
+/// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
+/// This is used by Sema.
+void AbstractStorageDecl::setDidSetWillSetAccessors(FuncDecl *Get,
+                                                    FuncDecl *Set) {
+  assert(getStorageKind() == WillSetDidSet && "VarDecl is wrong type");
+  assert(!getGetter() && !getSetter() && "getter and setter already set");
+  assert(Get && Set && "Must specify getter and setter");
+
+  GetSetInfo->Get = Get;
+  GetSetInfo->Set = Set;
+
+  Get->makeAccessor(this, FuncDecl::IsGetter);
+  Set->makeAccessor(this, FuncDecl::IsSetter);
+}
+
 
 
 /// \brief Returns whether the var is settable in the specified context: this

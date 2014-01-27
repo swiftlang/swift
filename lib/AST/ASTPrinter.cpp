@@ -684,8 +684,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     case FuncDecl::IsGetter:
       Printer << "get:";
       break;
+    case FuncDecl::IsDidSet:
+      Printer << "didSet:";
+      break;
     case FuncDecl::IsSetter:
-      Printer << "set";
+    case FuncDecl::IsWillSet:
+      Printer << (decl->isSetter() ? "set" : "willSet");
 
       auto BodyParams = decl->getBodyParamPatterns();
       auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();

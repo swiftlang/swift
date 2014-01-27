@@ -122,6 +122,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
       return var->getSetter()
         ? CaptureKind::GetterSetter : CaptureKind::Getter;
     case VarDecl::StoredObjC:
+    case VarDecl::WillSetDidSet:
       return CaptureKind::GetterSetter;
     case VarDecl::Stored:
       if (var->isLet())
