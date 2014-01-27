@@ -159,44 +159,6 @@ public:
   /// type for non-type contexts.
   Type getDeclaredInterfaceType();
 
-  /// Determine the type of 'self' within the given context.
-  ///
-  /// \param isStatic Whether we're referring to a static method or some other
-  /// static entity, for which the 'self' type will be a metatype.
-  ///
-  /// \param isInOutFunc True if this is an @inout method on a struct or enum
-  /// type.
-  ///
-  /// \param selfTypeOverride If non-null, this is the base 'self' type to use.
-  /// This routine will compose it properly (with @inout, .metatype, etc.). If
-  /// null, the base 'self' type will be determined from the context.
-  ///
-  /// \param outerGenericParams If non-null, receives the generic parameters
-  /// corresponding to this declaration (if any).
-  ///
-  /// \returns the type of the 'self' parameter.
-  Type getSelfTypeInContext(bool isStatic,
-                            bool isInOutFunc,
-                            Type selfTypeOverride,
-                            GenericParamList **outerGenericParams);
-
-  /// Determine the interface type of 'self' as seen outside of the given
-  /// context.
-  ///
-  /// \param isStatic Whether we're referring to a static method or some other
-  /// static entity, for which the 'self' type will be a metatype.
-  ///
-  /// \param isInOutFunc True if this is an @inout method on a struct or enum
-  /// type.
-  ///
-  /// \param selfTypeOverride If non-null, this is the base 'self' type to use. This
-  /// routine will compose it properly (with @inout, .metatype, etc.). If
-  /// null, the base 'self' type will be determined from the context.
-  ///
-  /// \returns the type of the 'self' parameter.
-  Type getInterfaceSelfType(bool isStatic, bool isInOutFunc,
-                            Type selfTypeOverride);
-  
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not
   /// directly dependent on any generic parameters.

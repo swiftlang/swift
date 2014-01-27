@@ -1251,6 +1251,59 @@ SourceRange SubscriptDecl::getSourceRange() const {
 }
 
 
+static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
+                                    Type selfTypeOverride,
+                                    bool isStatic, bool isMutatingFunc,
+                                    bool wantInterfaceType,
+                                    GenericParamList **outerGenericParams) {
+  if (outerGenericParams)
+    *outerGenericParams = nullptr;
+  
+  Type selfTy = selfTypeOverride;
+  if (!selfTy) {
+    // For a protocol, the type of 'self' is the parameter type 'Self', not
+    // the protocol itself.
+    selfTy = containerTy;
+    if (auto proto = containerTy->getAs<ProtocolType>()) {
+      auto self = proto->getDecl()->getSelf();
+      assert(self && "Missing 'Self' type in protocol");
+      if (wantInterfaceType)
+        selfTy = self->getDeclaredType();
+      else
+        selfTy = self->getArchetype();
+    }
+  }
+  
+  // Capture the generic parameters, if requested.
+  if (outerGenericParams)
+    *outerGenericParams = dc->getGenericParamsOfContext();
+  
+  // 'static' functions have 'self' of type metatype<T>.
+  if (isStatic)
+    return MetatypeType::get(selfTy, dc->getASTContext());
+  
+  // Reference types have 'self' of type T.
+  if (containerTy->hasReferenceSemantics())
+    return selfTy;
+  
+  // Mutating methods are always passed @inout so we can receive the side
+  // effect.
+  //
+  // With non-mutating methods on value types, we generally pass the value
+  // directly in at +1.  The exception is for protocol methods, which we pass
+  // @inout at +0. We handle the abstraction difference in the witness thunk for
+  // the received method, where we know the concrete receiver type.  We do this
+  // by having existential_member_ref and archetype_member_ref take the 'self'
+  // base object as an rvalue for @!mutating protocol members, even though that
+  // doesn't match the type of the protocol requirement.
+  if (isMutatingFunc || isa<ProtocolDecl>(dc))
+    return InOutType::get(selfTy);
+  
+  // Non-mutating methods on structs and enums pass the receiver by value.
+  return selfTy;
+}
+
+
 Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
   bool isStatic = false;
@@ -1267,9 +1320,15 @@ computeSelfType(GenericParamList **outerGenericParams) {
     isMutating = true;
   }
 
-  return getDeclContext()->getSelfTypeInContext(isStatic, isMutating,
-                                                selfTypeOverride,
-                                                outerGenericParams);
+  
+  // Determine the type of the container.
+  Type containerTy = getDeclContext()->getDeclaredTypeInContext();
+  if (!containerTy)
+    return nullptr;
+  
+  return getSelfTypeForContainer(getDeclContext(), containerTy,
+                                 selfTypeOverride, isStatic, isMutating,
+                                 false, outerGenericParams);
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
@@ -1295,9 +1354,17 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
     isMutating = true;
   }
 
-  return getDeclContext()->getInterfaceSelfType(isStatic, isMutating,
-                                                selfTypeOverride);
+  
+  // Determine the type of the container.
+  Type containerTy = getDeclContext()->getDeclaredInterfaceType();
+  if (!containerTy)
+    return nullptr;
+  
+  return getSelfTypeForContainer(getDeclContext(), containerTy,
+                                 selfTypeOverride, isStatic, isMutating,
+                                 true, nullptr);
 }
+
 
 VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
   if (auto FD = dyn_cast<FuncDecl>(this)) {
