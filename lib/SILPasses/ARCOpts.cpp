@@ -114,7 +114,9 @@ public:
 
   /// Return the value with reference semantics that is the operand of our
   /// increment.
-  SILValue getValue() const { return getInstruction()->getOperand(0); }
+  SILValue getValue() const {
+    return getInstruction()->getOperand(0).stripCasts();
+  }
 
   /// The latest point we can move the increment without bypassing instructions
   /// that may have reference semantics.
@@ -298,7 +300,7 @@ processBBTopDown(SILBasicBlock &BB,
     if (isRefCountIncrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      SILValue Operand = I.getOperand(0);
+      SILValue Operand = I.getOperand(0).stripCasts();
       ReferenceCountState &RefCountState = BBState[Operand];
       NestingDetected |= RefCountState.init(&I);
 
@@ -320,7 +322,7 @@ processBBTopDown(SILBasicBlock &BB,
     // If we have a reference count decrement...
     if (isRefCountDecrement(I)) {
       // Look up the state associated with its operand...
-      SILValue Operand = I.getOperand(0);
+      SILValue Operand = I.getOperand(0).stripCasts();
       ReferenceCountState &RefCountState = BBState[Operand];
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
@@ -339,7 +341,7 @@ processBBTopDown(SILBasicBlock &BB,
         // and remove it so we do not attempt to remove the copy_value twice.
         if (auto *CV =
               dyn_cast<CopyValueInst>(RefCountState.getInstruction())) {
-          SILValue CVOperand = CV->getOperand();
+          SILValue CVOperand = RefCountState.getValue();
           if (CVOperand == Operand) {
             // We matched the copy value's operand, clear the state associated
             // with its result.
