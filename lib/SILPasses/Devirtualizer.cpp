@@ -355,8 +355,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
       AI->getModule().lookUpWitnessTable(AMI->getConformance());
 
-    // We do not handle remapping of the substitution list. rdar://15884344.
-    if (!Ret.first || Ret.second.size())
+    if (!Ret.first)
       return;
 
     for (auto &Entry : Ret.first->getEntries()) {
@@ -373,22 +372,25 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
       SILLocation Loc = AI->getLoc();
       SILFunction *F = MethodEntry.Witness;
       FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
-      SILType FnTy = FRI->getType();
-
-      // Do not devirtualize polymorphic types.
-      if (FnTy.castTo<SILFunctionType>()->isPolymorphic())
-        return;
 
       // Collect the function arguments.
       SmallVector<SILValue, 4> Args;
       for (auto &A : AI->getArgumentOperands())
         Args.push_back(A.get());
 
-      SILType RetTy = FnTy.castTo<SILFunctionType>()->getInterfaceResult().
-        getSILType();
+      SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
+                                                 Ret.second.end());
 
-      ApplyInst *SAI = Builder.createApply(Loc, FRI, FnTy, RetTy,
-                                           ArrayRef<Substitution>(), Args);
+      assert(AI->getSubstitutions().size() && "Subst list must not be empty");
+      assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
+             "The first substitution needs to be a 'self' substitution.");
+
+      ArrayRef<Substitution> NonSelfSubsts = AI->getSubstitutions().slice(1);
+      NewSubstList.append(NonSelfSubsts.begin(), NonSelfSubsts.end());
+
+      ApplyInst *SAI = Builder.createApply(Loc, FRI,
+                                           AI->getSubstCalleeSILType(),
+                                           AI->getType(), NewSubstList, Args);
       AI->replaceAllUsesWith(SAI);
       AI->eraseFromParent();
       NumAMI++;
