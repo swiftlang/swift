@@ -1490,7 +1490,7 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         bool Diagnose) {
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    if (!FD->getGetterOrSetterDecl()) {
+    if (!FD->isGetterOrSetter()) {
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;

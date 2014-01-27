@@ -213,11 +213,10 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
       // Map getter or setter FuncDecls to Getter or Setter SILDeclRefs of the
       // variable.
       if (fd->isGetterOrSetter()) {
-        ValueDecl *variable = cast<ValueDecl>(fd->getGetterOrSetterDecl());
-        loc = variable;
-        if (fd->getGetterDecl()) {
+        loc = fd->getAccessorStorageDecl();
+        if (fd->isGetter()) {
           kind = Kind::Getter;
-        } else if (fd->getSetterDecl()) {
+        } else if (fd->isSetter()) {
           kind = Kind::Setter;
         } else {
           llvm_unreachable("no getter or setter decl?!");

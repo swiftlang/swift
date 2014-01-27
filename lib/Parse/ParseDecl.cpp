@@ -1440,7 +1440,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 
   // If things went well, turn this into a computed variable.
   if (!Invalid && PrimaryVar && (Set || Get))
-    PrimaryVar->setComputedAccessors(LBLoc, Get, Set, RBLoc);
+    PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
@@ -2547,11 +2547,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
       Subscript->getMutableAttrs() = Attributes;
 
     Decls.push_back(Subscript);
-
-    if (Set)
-      Set->makeSetter(Subscript);
-    if (Get)
-      Get->makeGetter(Subscript);
 
     // Add get/set in source order.
     FuncDecl* Accessors[2] = {Get, Set};

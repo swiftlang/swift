@@ -1172,7 +1172,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
   auto *Get = createGetterPrototype(VD, SelfDecl);
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->setComputedAccessors(VD->getLoc(), Get, nullptr, VD->getLoc());
+  VD->makeComputed(VD->getLoc(), Get, nullptr, VD->getLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -1222,7 +1222,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
 
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->setStorageObjCAccessors(Get, Set);
+  VD->makeStoredObjC(Get, Set);
   
   
   // We've added some members to our containing class, add them to the members
@@ -2284,7 +2284,7 @@ public:
         // The only additional condition we need to check is if the var decl
         // had an @objc or @iboutlet property.
 
-        ValueDecl *prop = cast<ValueDecl>(FD->getGetterOrSetterDecl());
+        ValueDecl *prop = cast<ValueDecl>(FD->getAccessorStorageDecl());
         // Validate the subscript or property because it might not be type
         // checked yet.
         if (isa<SubscriptDecl>(prop))
@@ -3172,7 +3172,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       if (!D->getDeclContext()->isModuleScopeContext())
         error = diag::objc_class_not_top_level;
     } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
-      if (isOperator || cast<FuncDecl>(D)->getGetterOrSetterDecl())
+      if (isOperator || cast<FuncDecl>(D)->isGetterOrSetter())
         error = diag::invalid_objc_decl;
     } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
       /* ok */

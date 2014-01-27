@@ -2376,8 +2376,8 @@ private:
 
   struct GetSetRecord {
     SourceRange Braces;
-    FuncDecl *Get;       // User-defined getter
-    FuncDecl *Set;       // User-defined setter
+    FuncDecl *Get = nullptr;       // User-defined getter
+    FuncDecl *Set = nullptr;       // User-defined setter
   };
 
   GetSetRecord *GetSetInfo = nullptr;
@@ -2421,11 +2421,11 @@ public:
   }
 
   /// \brief Turn this into a computed variable, providing a getter and setter.
-  void setComputedAccessors(SourceLoc LBraceLoc,
-                            FuncDecl *Get, FuncDecl *Set, SourceLoc RBraceLoc);
+  void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
+                    SourceLoc RBraceLoc);
 
   /// \brief Turn this into a StorageObjC var, providing a getter and setter.
-  void setStorageObjCAccessors(FuncDecl *Get, FuncDecl *Set);
+  void makeStoredObjC(FuncDecl *Get, FuncDecl *Set);
 
   /// \brief Retrieve the getter used to access the value of this variable.
   FuncDecl *getGetter() const { return GetSetInfo ? GetSetInfo->Get : nullptr; }
@@ -2577,7 +2577,7 @@ public:
     : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy) {
     assert(Get && "subscripts should always have at least a getter");
-    setComputedAccessors(Braces.Start, Get, Set, Braces.End);
+    makeComputed(Braces.Start, Get, Set, Braces.End);
   }
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
@@ -2863,6 +2863,18 @@ class OperatorDecl;
 
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
+public:
+  // This enum indicates what kind of property/subscript accessor this FuncDecl
+  // is.
+  enum AccessorKind {
+    /// \brief This is not a property accessor.
+    NotAccessor = -1,
+    /// \brief This is a getter for a property or subscript.
+    IsGetter = 0,
+    /// \brief This is a setter for a property or subscript.
+    IsSetter = 1
+  };
+private:
   friend class AbstractFunctionDecl;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
@@ -2875,7 +2887,9 @@ class FuncDecl : public AbstractFunctionDecl {
   /// \sa getBodyResultType()
   Type BodyResultType;
 
-  llvm::PointerIntPair<ValueDecl *, 1, bool> GetOrSetDecl;
+  /// \brief If this FuncDecl is an accessor for a property, this indicates
+  /// which property and what kind of accessor.
+  llvm::PointerIntPair<AbstractStorageDecl*, 1, AccessorKind> AccessorDecl;
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
@@ -3020,39 +3034,29 @@ public:
   /// prior to type checking.
   bool isBinaryOperator() const;
   
-  /// makeGetter - Note that this function is the getter for the given
-  /// declaration, which may be either a variable or a subscript declaration.
-  void makeGetter(ValueDecl *D) {
-    GetOrSetDecl.setPointer(D);
-    GetOrSetDecl.setInt(false);
-  }
-  
-  /// makeSetter - Note that this function is the setter for the given
-  /// declaration, which may be either a variable or a subscript declaration.
-  void makeSetter(ValueDecl *D) {
-    GetOrSetDecl.setPointer(D);
-    GetOrSetDecl.setInt(true);
-  }
-  
-  /// getGetterDecl - If this function is a getter, retrieve the declaration for
-  /// which it is a getter. Otherwise, returns null.
-  ValueDecl *getGetterDecl() const {
-    return GetOrSetDecl.getInt()? nullptr : GetOrSetDecl.getPointer();
+  /// makeAccessor - Note that this function is an accessor for the given
+  /// VarDecl or SubscriptDecl.
+  void makeAccessor(AbstractStorageDecl *D, AccessorKind Kind) {
+    assert(Kind != NotAccessor && "Must specify an accessor kind");
+    AccessorDecl.setPointerAndInt(D, Kind);
   }
 
-  /// getSetterDecl - If this function is a setter, retrieve the declaration for
-  /// which it is a setter. Otherwise, returns null.
-  ValueDecl *getSetterDecl() const {
-    return GetOrSetDecl.getInt()? GetOrSetDecl.getPointer() : nullptr;
+  AbstractStorageDecl *getAccessorStorageDecl() const {
+    return AccessorDecl.getPointer();
   }
+
+  AccessorKind getAccessorKind() const {
+    if (AccessorDecl.getPointer() == nullptr)
+      return NotAccessor;
+    return AccessorDecl.getInt();
+  }
+
+  bool isGetter() const { return getAccessorKind() == IsGetter; }
+  bool isSetter() const { return getAccessorKind() == IsSetter; }
 
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
   /// a normal function.
-  bool isGetterOrSetter() const { return getGetterOrSetterDecl() != 0; }
-
-  /// getGetterOrSetterDecl - Return the declaration for which this function
-  /// is a getter or setter, if it is one.
-  ValueDecl *getGetterOrSetterDecl() const { return GetOrSetDecl.getPointer(); }
+  bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   /// Creates the implicit 'DynamicSelf' generic parameter.
   ///

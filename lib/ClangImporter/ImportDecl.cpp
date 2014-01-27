@@ -2274,9 +2274,6 @@ namespace {
 
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
-      getterThunk->makeGetter(subscript);
-      if (setterThunk)
-        setterThunk->makeSetter(subscript);
       subscript->setIsObjC(true);
 
       // Optional subscripts in protocols.
@@ -2885,18 +2882,14 @@ namespace {
 
       // Build thunks.
       FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
-      getterThunk->makeGetter(result);
 
       FuncDecl *setterThunk = nullptr;
-      if (setter) {
+      if (setter)
         setterThunk = buildSetterThunk(setter, dc, nullptr);
-        setterThunk->makeSetter(result);
-      }
 
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->setComputedAccessors(SourceLoc(), getterThunk, setterThunk,
-                                   SourceLoc());
+      result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
       result->setIsObjC(true);
 
       // Handle attributes.
@@ -3344,9 +3337,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                   ASTNode(ret),
                                   SourceLoc()));
 
-  // Write the function up as the getter.
-  func->makeGetter(var);
-  var->setComputedAccessors(SourceLoc(), func, nullptr, SourceLoc());
+  // Set the function up as the getter.
+  var->makeComputed(SourceLoc(), func, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
   SwiftContext.addedExternalDecl(func);

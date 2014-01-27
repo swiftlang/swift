@@ -679,9 +679,12 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     // FIXME: Attributes
     printImplicitObjCNote(decl);
     recordDeclLoc(decl);
-    if (decl->getGetterDecl()) {
+    switch (decl->getAccessorKind()) {
+    case FuncDecl::NotAccessor: break;
+    case FuncDecl::IsGetter:
       Printer << "get:";
-    } else {
+      break;
+    case FuncDecl::IsSetter:
       Printer << "set";
 
       auto BodyParams = decl->getBodyParamPatterns();

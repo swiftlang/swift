@@ -121,11 +121,11 @@ bool Decl::isTransparent() const {
       return ED->isTransparent();
   }
 
-  // If this is a getter or a seter, check if the transparent attribute was set
+  // If this is an accessor, check if the transparent attribute was set
   // on the value decl.
   if (const FuncDecl *FD = dyn_cast<FuncDecl>(this)) {
-    if (ValueDecl *VD = FD->getGetterOrSetterDecl())
-      return VD->isTransparent();
+    if (auto *ASD = FD->getAccessorStorageDecl())
+      return ASD->isTransparent();
   }
 
   return false;
@@ -1024,11 +1024,11 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams()[0].getAsTypeParam();
 }
 
-void AbstractStorageDecl::setComputedAccessors(SourceLoc LBraceLoc,
-                                               FuncDecl *Get, FuncDecl *Set,
-                                               SourceLoc RBraceLoc) {
+void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
+                                       FuncDecl *Get, FuncDecl *Set,
+                                       SourceLoc RBraceLoc) {
+  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   auto &Context = getASTContext();
-  assert(!GetSetInfo && "Variable already has accessors?");
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   GetSetInfo = new (Mem) GetSetRecord;
   GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
@@ -1036,27 +1036,27 @@ void AbstractStorageDecl::setComputedAccessors(SourceLoc LBraceLoc,
   GetSetInfo->Set = Set;
   
   if (Get)
-    Get->makeGetter(this);
+    Get->makeAccessor(this, FuncDecl::IsGetter);
   if (Set)
-    Set->makeSetter(this);
+    Set->makeAccessor(this, FuncDecl::IsSetter);
   
   // Mark that this is a computed property.
   setStorageKind(Computed);
 }
 
 /// \brief Turn this into a StorageObjC var, providing a getter and setter.
-void AbstractStorageDecl::setStorageObjCAccessors(FuncDecl *Get, FuncDecl *Set){
+void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
+  assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert(Get && Set);
   auto &Context = getASTContext();
-  assert(!GetSetInfo && "Variable already has accessors?");
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   GetSetInfo = new (Mem) GetSetRecord;
   GetSetInfo->Braces = SourceRange();
   GetSetInfo->Get = Get;
   GetSetInfo->Set = Set;
   
-  Get->makeGetter(this);
-  Set->makeSetter(this);
+  Get->makeAccessor(this, FuncDecl::IsGetter);
+  Set->makeAccessor(this, FuncDecl::IsSetter);
   
   // Mark that this is a StorageObjC property.
   setStorageKind(StoredObjC);

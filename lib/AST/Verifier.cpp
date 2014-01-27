@@ -1427,7 +1427,7 @@ struct ASTNodeBase {};
         unsigned NumExpectedParamPatterns = 1;
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
-        if (isa<SubscriptDecl>(FD->getGetterOrSetterDecl()))
+        if (isa<SubscriptDecl>(FD->getAccessorStorageDecl()))
           NumExpectedParamPatterns++;
         if (FD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
           Out << "getters and setters should not be curried";
@@ -1435,12 +1435,7 @@ struct ASTNodeBase {};
         }
       }
 
-      if (auto *VD = FD->getGetterOrSetterDecl()) {
-        if (!isa<VarDecl>(VD) && !isa<SubscriptDecl>(VD)) {
-          Out << "only variables and subscript can have getters and setters";
-          abort();
-        }
-        
+      if (auto *VD = FD->getAccessorStorageDecl()) {
         if (isa<VarDecl>(VD)
             && cast<VarDecl>(VD)->isStatic() != FD->isStatic()) {
           Out << "getter or setter static-ness must match static-ness of var";

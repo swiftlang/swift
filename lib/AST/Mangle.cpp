@@ -278,11 +278,12 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
     } else if (auto dtor = dyn_cast<DestructorDecl>(fn)) {
       return mangleDestructorEntity(dtor, /*deallocating*/ false);
     } else if (auto func = dyn_cast<FuncDecl>(fn)) {
-      if (auto value = func->getGetterDecl()) {
-        return mangleGetterEntity(value, ResilienceExpansion::Minimal);
-      } else if (auto value = func->getSetterDecl()) {
-        return mangleSetterEntity(value, ResilienceExpansion::Minimal);
-      }
+      if (func->isGetter())
+        return mangleGetterEntity(func->getAccessorStorageDecl(),
+                                  ResilienceExpansion::Minimal);
+      if (func->isSetter())
+        return mangleSetterEntity(func->getAccessorStorageDecl(),
+                                  ResilienceExpansion::Minimal);
     }
     return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }

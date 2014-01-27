@@ -1511,10 +1511,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->setInterfaceType(interfaceType);
 
     if (getterID || setterID) {
-      var->setComputedAccessors(SourceLoc(),
-                                cast_or_null<FuncDecl>(getDecl(getterID)),
-                                cast_or_null<FuncDecl>(getDecl(setterID)),
-                                SourceLoc());
+      var->makeComputed(SourceLoc(),
+                        cast_or_null<FuncDecl>(getDecl(getterID)),
+                        cast_or_null<FuncDecl>(getDecl(setterID)),
+                        SourceLoc());
     }
 
     if (isImplicit)
@@ -1981,11 +1981,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
     subscript->setOverriddenDecl(overriddenDecl);
-
-    if (getter)
-      getter->makeGetter(subscript);
-    if (setter)
-      setter->makeSetter(subscript);
     break;
   }
 

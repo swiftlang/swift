@@ -138,8 +138,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
   if (!fn || !fn->isGetterOrSetter())
     return;
 
-  auto var = dyn_cast<VarDecl>(fn->getGetterOrSetterDecl());
-  if (!var)
+  auto var = dyn_cast<VarDecl>(fn->getAccessorStorageDecl());
+  if (!var)  // Ignore subscripts
     return;
 
   class DiagnoseWalker : public ASTWalker {
@@ -198,7 +198,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
     }
   };
 
-  DiagnoseWalker walker(TC, var, fn->getSetterDecl());
+  DiagnoseWalker walker(TC, var, fn->isSetter());
   const_cast<Expr *>(E)->walk(walker);
 }
 

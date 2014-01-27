@@ -550,17 +550,16 @@ namespace {
       printCommonAFD(FD, "func_decl");
       if (FD->isStatic())
         OS << " type";
-      if (FD->isGetterOrSetter()) {
-        if (FD->getGetterDecl()) {
+      if (auto *ASD = FD->getAccessorStorageDecl()) {
+        switch (FD->getAccessorKind()) {
+        case FuncDecl::NotAccessor: assert(0 && "Isn't an accessor?");
+        case FuncDecl::IsGetter:
           OS << " getter";
-        } else {
-          assert(FD->getSetterDecl() && "no getter or setter!");
+        case FuncDecl::IsSetter:
           OS << " setter";
         }
-        
-        if (ValueDecl *vd = dyn_cast<ValueDecl>(FD->getGetterOrSetterDecl())) {
-          OS << "_for=" << vd->getName();
-        }
+
+        OS << "_for=" << ASD->getName();
       }
       
       for (auto VD: FD->getConformances()) {
