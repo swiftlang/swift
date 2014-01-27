@@ -814,6 +814,17 @@ public:
             && selfRequirement.getSecondType()->getAs<ProtocolType>()
               ->getDecl() == protocol,
             "method's Self parameter should be constrained by protocol");
+    
+    if (AMI->getLookupType().is<ArchetypeType>()) {
+      require(AMI->getConformance() == nullptr,
+              "archetype lookup should have null conformance");
+    } else {
+      require(AMI->getConformance(),
+              "concrete type lookup requires conformance");
+      require(AMI->getConformance()->getType()
+                ->isEqual(AMI->getLookupType().getSwiftRValueType()),
+              "concrete type lookup requires conformance that matches type");
+    }
   }
   
   bool isSelfArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {

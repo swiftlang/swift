@@ -316,3 +316,57 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
   }
   }
 }
+
+ProtocolConformance *
+ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
+  // Preserve specialization through this operation by peeling off the
+  // substitutions from a specialized conformance so we can apply them later.
+  const ProtocolConformance *unspecialized;
+  ArrayRef<Substitution> subs;
+  switch (getKind()) {
+  case ProtocolConformanceKind::Specialized: {
+    auto spec = cast<SpecializedProtocolConformance>(this);
+    unspecialized = spec->getGenericConformance();
+    subs = spec->getGenericSubstitutions();
+    break;
+  }
+    
+  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Inherited:
+    unspecialized = this;
+    break;
+  }
+  
+  
+  ProtocolConformance *foundInherited;
+  
+  // Search for the inherited conformance among our immediate parents.
+  auto &inherited = unspecialized->getInheritedConformances();
+  auto known = inherited.find(protocol);
+  if (known != inherited.end()) {
+    foundInherited = known->second;
+    goto found_inherited;
+  }
+
+  // If not there, the inherited conformance must be available through one of
+  // our parents.
+  for (auto &inheritedMapping : inherited)
+    if (inheritedMapping.first->inheritsFrom(protocol)) {
+      foundInherited = inheritedMapping.second->
+        getInheritedConformance(protocol);
+      goto found_inherited;
+    }
+
+  llvm_unreachable("Can't find the inherited conformance.");
+
+found_inherited:
+  
+  // Specialize the inherited conformance, if necessary.
+  if (!subs.empty()) {
+    return getType()->getASTContext()
+      .getSpecializedConformance(getType(), foundInherited, subs);
+  }
+  assert(getType()->isEqual(foundInherited->getType())
+         && "inherited conformance does not match type");
+  return foundInherited;
+}
