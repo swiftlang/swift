@@ -1260,7 +1260,7 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   // Determine the type of the container.
   Type containerTy = wantInterfaceType ? dc->getDeclaredInterfaceType()
                                        : dc->getDeclaredTypeInContext();
-  //assert(containerTy && "stand alone functions don't have 'self'");
+  assert(containerTy && "stand alone functions don't have 'self'");
   if (!containerTy) return Type();
 
   bool isStatic = false;

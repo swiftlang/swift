@@ -689,11 +689,9 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     Type initArgTy;
 
     Type selfTy;
-    if (i == e-1 &&
-        (selfTy
-           = func->computeInterfaceSelfType(/*isInitializingCtor=*/false))) {
+    if (i == e-1 && func->getDeclContext()->isTypeContext()) {
+      selfTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/false);
       // Substitute in our own 'self' parameter.
-      assert(selfTy && "Missing self type?");
 
       argTy = selfTy;
       if (initFuncTy) {

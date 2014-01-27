@@ -2215,9 +2215,10 @@ public:
     if (checkDynamicSelfReturn(FD))
       isInvalid = true;
 
-    // Before anything else, set up the 'self' argument correctly.
+    // Before anything else, set up the 'self' argument correctly if present.
     GenericParamList *outerGenericParams = nullptr;
-    configureImplicitSelf(FD, outerGenericParams);
+    if (FD->getDeclContext()->isTypeContext())
+      configureImplicitSelf(FD, outerGenericParams);
 
     // If we have generic parameters, check the generic signature now.
     if (auto gp = FD->getGenericParams()) {
