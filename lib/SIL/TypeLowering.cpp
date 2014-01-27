@@ -1105,27 +1105,36 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // representation if the type also appears as a static metatype in the
   // original abstraction pattern.
   if (auto substMeta = dyn_cast<MetatypeType>(substType)) {
-    bool isThin;
+    SILType loweredTy;
     
-    auto origMeta = dyn_cast<MetatypeType>(origType.getAsType());
-    if (!origMeta) {
-      // If the metatype matches a dependent type, it cannot be thin.
-      assert((isa<SubstitutableType>(origType.getAsType())
-              || isa<DependentMemberType>(origType.getAsType()))
-         && "metatype matches in position that isn't a dependent type "
-            "or metatype?!");
-      isThin = false;
+    // If the metatype has already been lowered, it will already carry its
+    // thinness.
+    if (substMeta->hasThin()) {
+      loweredTy = SILType::getPrimitiveObjectType(substMeta);
     } else {
-      // Otherwise, we're thin if the metatype is thinnable both substituted and
-      // in the abstraction pattern.
-      isThin = hasTrivialMetatype(substMeta.getInstanceType())
-        && hasTrivialMetatype(origMeta.getInstanceType());
+      bool isThin;
+      
+      auto origMeta = dyn_cast<MetatypeType>(origType.getAsType());
+      if (!origMeta) {
+        // If the metatype matches a dependent type, it cannot be thin.
+        assert((isa<SubstitutableType>(origType.getAsType())
+                || isa<DependentMemberType>(origType.getAsType()))
+           && "metatype matches in position that isn't a dependent type "
+              "or metatype?!");
+        isThin = false;
+      } else {
+        // Otherwise, we're thin if the metatype is thinnable both substituted and
+        // in the abstraction pattern.
+        isThin = hasTrivialMetatype(substMeta.getInstanceType())
+          && hasTrivialMetatype(origMeta.getInstanceType());
+      }
+      
+      // Regardless of thinness, metatypes are always trivial.
+      auto thinnedTy = CanMetatypeType::get(substMeta.getInstanceType(),
+                                            isThin, substMeta->getASTContext());
+      loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
     }
     
-    // Regardless of thinness, metatypes are always trivial.
-    auto thinnedTy = CanMetatypeType::get(substMeta.getInstanceType(),
-                                          isThin, substMeta->getASTContext());
-    auto loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
     auto *theInfo
       = new (*this, key.isDependent()) TrivialTypeLowering(loweredTy);
     insert(key, theInfo);
