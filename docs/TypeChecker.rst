@@ -6,25 +6,56 @@ Type Checker Design and Implementation
 Purpose
 -----------------
 
-This document describes the design and implementation of the Swift type checker. It is intended for developers who wish to modify, extend, or improve on the type checker, or simplify to understand in greater depth how the Swift type system works. Familiarity with the Swift programming language is assumed.
+This document describes the design and implementation of the Swift
+type checker. It is intended for developers who wish to modify,
+extend, or improve on the type checker, or simply to understand in
+greater depth how the Swift type system works. Familiarity with the
+Swift programming language is assumed.
 
 Approach
 -------------------
 
-The Swift language and its type system incorporate a number of popular language features, including object-oriented programming via classes, function and operator overloading, subtyping, and constrained parametric polymorphism. Swift makes extensive use of type inference, allowing one to omit the types of many variables and expressions. For example::
+The Swift language and its type system incorporate a number of popular
+language features, including object-oriented programming via classes,
+function and operator overloading, subtyping, and constrained
+parametric polymorphism. Swift makes extensive use of type inference,
+allowing one to omit the types of many variables and expressions. For
+example::
 
-  func round(x : Double) -> Int { /* ... */ }
-  var pi : Double = 3.14159
+  func round(x: Double) -> Int { /* ... */ }
+  var pi: Double = 3.14159
   var three = round(pi) // 'three' has type 'Int'
 
-  func identity<T>(x : T) -> T { return x }
-  var eFloat : Float = -identity(2.71828)  // numeric literal gets type 'Float'
+  func identity<T>(x: T) -> T { return x }
+  var eFloat: Float = -identity(2.71828)  // numeric literal gets type 'Float'
 
-Swift's type inference allows type information to flow in two directions. As in most mainstream languages, type information can flow from the leaves of the expression tree (e.g., the expression 'pi', which refers to a double) up to the root (the type of the variable 'three'). However, Swift also allows type information to flow from the context (e.g., the fixed type of the variable 'eFloat') at the root of the expression tree down to the leaves (the type of the numeric literal 2.71828). This bi-directional type inference is common in languages that use ML-like type systems, but is not present in mainstream languages like C++, Java, C#, or Objective-C.
+Swift's type inference allows type information to flow in two
+directions. As in most mainstream languages, type information can flow
+from the leaves of the expression tree (e.g., the expression 'pi',
+which refers to a double) up to the root (the type of the variable
+'three'). However, Swift also allows type information to flow from the
+context (e.g., the fixed type of the variable 'eFloat') at the root of
+the expression tree down to the leaves (the type of the numeric
+literal 2.71828). This bi-directional type inference is common in
+languages that use ML-like type systems, but is not present in
+mainstream languages like C++, Java, C#, or Objective-C.
 
-Swift implements bi-directional type inference using a constraint-based type checker that is reminiscent of the classical Hindley-Milner type inference algorithm. The use of a constraint system allows a straightforward, general presentation of language semantics that is decoupled from the actual implementation of the solver. It is expected that the constraints themselves will be relatively stable, while the solver will evolve over time to improve performance and diagnostics.
+Swift implements bi-directional type inference using a
+constraint-based type checker that is reminiscent of the classical
+Hindley-Milner type inference algorithm. The use of a constraint
+system allows a straightforward, general presentation of language
+semantics that is decoupled from the actual implementation of the
+solver. It is expected that the constraints themselves will be
+relatively stable, while the solver will evolve over time to improve
+performance and diagnostics.
 
-The Swift language contains a number of features not part of the Hindley-Milner type system, including constrained polymorphic types and function overloading, which complicate the presentation and implementation somewhat. On the other hand, Swift limits the scope of type inference to a single expression or statement, for purely practical reasons: we expect that we can provide better performance and vastly better diagnostics when the problem is limited in scope.
+The Swift language contains a number of features not part of the
+Hindley-Milner type system, including constrained polymorphic types
+and function overloading, which complicate the presentation and
+implementation somewhat. On the other hand, Swift limits the scope of
+type inference to a single expression or statement, for purely
+practical reasons: we expect that we can provide better performance
+and vastly better diagnostics when the problem is limited in scope.
 
 Type checking proceeds in three main stages:
 
@@ -61,7 +92,7 @@ the Swift type system including, e.g., builtin types, tuple types,
 function types, enum/struct/class types, protocol types, and generic
 types. Additionally, a type can be a type variable ``T`` (which are
 typically numbered, ``T0``, ``T1``, ``T2``, etc., and are introduced
-as needed), and type variables can be used in place of any other type,
+as needed). Type variables can be used in place of any other type,
 e.g., a tuple type ``(T0, Int, (T0) -> Int)`` involving the type
 variable ``T0``.
 
@@ -71,23 +102,24 @@ the Swift type system:
 **Equality**
   An equality constraint requires two types to be identical. For
   example, the constraint ``T0 == T1`` effectively ensures that ``T0`` and
-  ``T1`` get the same concrete type binding. There are three different
+  ``T1`` get the same concrete type binding. There are two different
   flavors of equality constraints: 
 
-    -  Exact equality constraints, or  "binding", written ``T0 := X``
-       for some type variable ``T0`` and  type ``X``, which requires
-       that ``T0`` be exactly identical to ``X``;
-    - Equality constraints, written ``X == Y`` for types ``X`` and ``Y``, which require ``X`` and ``Y`` to have the same type, ignoring lvalue types in the process. For example, the constraint ``T0 == X`` would be satisfied by assigning ``T0`` the type ``X`` and by assigning ``T0`` the type ``[inout] X``.
+    - Exact equality constraints, or  "binding", written ``T0 := X``
+      for some type variable ``T0`` and  type ``X``, which requires
+      that ``T0`` be exactly identical to ``X``;
+    - Equality constraints, written ``X == Y`` for types ``X`` and
+      ``Y``, which require ``X`` and ``Y`` to have the same type,
+      ignoring lvalue types in the process. For example, the
+      constraint ``T0 == X`` would be satisfied by assigning ``T0``
+      the type ``X`` and by assigning ``T0`` the type ``@lvalue X``.
 
 **Subtyping**
   A subtype constraint requires the first type to be equivalent to or
   a subtype of the second. For example, a class type ``Dog`` is a
   subtype of a class type ``Animal`` if ``Dog`` inherits from
-  ``Animal`` either directly or indirectly. There are two forms of
-  subtyping constraint:
-
-    - Normal subtyping, written ``X < Y``, which requires that ``X`` be a subtype of ``Y``, and
-    - Trivial subtyping, written ``X <t Y``, which requires that ``X`` be a subtype of ``Y`` and that the runtime representation of an instance of type ``X`` be substitutable for the runtime representation of an instance of type ``Y``.
+  ``Animal`` either directly or indirectly. Subtyping constraints are
+  written ``X < Y``.
 
 **Conversion**
   A conversion constraint requires that the first type be convertible
@@ -97,8 +129,7 @@ the Swift type system:
   ```X`` can be converted to ``Y```.
 
 **Construction**
-  A construction constraint, written ``X <C Y`` requires either that
-  the first type can be convertible to the second type or that the
+  A construction constraint, written ``X <C Y`` requires that the
   second type be a nominal type with a constructor that accepts a
   value of the first type. For example, the constraint``Int <C
   String`` is satisfiable because ``String`` has a constructor that
@@ -117,17 +148,52 @@ the Swift type system:
   A conformance constraint ``X conforms to Y`` specifies that the
   first type (''X'') must conform to the protocol ``Y``.
 
-**Archetype**
-  An archetype constraint requires that the constrained type be bound
-  to an archetype. This is a very specific kind of constraint that is
-  only used for calls to operators in protocols.
+**Checked cast**
+  A constraint describing a checked cast from the first type to the
+  second, i.e., for ''x as T''.
 
-**ApplicableFunction**
+**Applicable function**
   An applicable function requires that both types are function types 
   with the same input and output types. It is used when the function
   type on the left-hand side is being split into its input and output
   types for function application purposes. Note, that it does not
   require the type attributes to match.
+
+**Overload binding**
+  An overload binding constraint binds a type variable by selecting a
+  particular choice from an overload set. Multiple overloads are
+  represented by a disjunction constraint.
+
+**Conjunction**
+  A constraint that is the conjunction of two or more other
+  constraints. Typically used within a disjunction.
+
+**Disjunction**
+  A constraint that is the disjunction of two or more
+  constraints. Disjunctions are used to model different decisions that
+  the solver could make, i.e., the sets of overloaded functions from
+  which the solver could choose, or different potential conversions,
+  each of which might resolve in a (different) solution.
+
+**Archetype**
+  An archetype constraint requires that the constrained type be bound
+  to an archetype. This is a very specific kind of constraint that is
+  only used for calls to operators in protocols.
+
+**Class**
+  A class constraint requires that the constrained type be bound to a
+  class type.
+
+**Self object of protocol**
+  An internal-use-only constraint that describes the conformance of a
+  ``Self`` type to a protocol. It is similar to a conformance
+  constraint but "looser" because it allows a protocol type to be the
+  self object of its own protocol (even when an existential type would
+  not conform to its own protocol).
+
+**Dynamic lookup value**
+  A constraint that requires that the constrained type be
+  DynamicLookup or an lvalue thereof.
 
 Constraint Generation
 ``````````````````````````
@@ -135,13 +201,13 @@ The process of constraint generation produces a constraint system
 that relates the types of the various subexpressions within an
 expression. Programmatically, constraint generation walks an
 expression from the leaves up to the root, assigning a type (which
-often involves type  variables) to each subexpression as it goes. 
+often involves type variables) to each subexpression as it goes. 
 
 Constraint generation is driven by the syntax of the
 expression, and each different kind of expression---function
 application, member access, etc.---generates a specific set of
 constraints. Here, we enumerate the primary expression kinds in the
-language and describe both the type assigned to the expression and the
+language and describe the type assigned to the expression and the
 constraints generated from such as expression. We use ``T(a)`` to
 refer to the type assigned to the subexpression ``a``. The constraints
 and types generated from the primary expression kinds are:
@@ -149,8 +215,8 @@ and types generated from the primary expression kinds are:
 **Declaration reference**
   An expression that refers to a declaration ``x`` is assigned the
   type of a reference to ``x``. For example, if ``x`` is declared as
-  ``var x : Int``, the expression ``x`` is assigned the type
-  ``[inout(implicit)] Int``. No constraints are generated.
+  ``var x: Int``, the expression ``x`` is assigned the type
+  ``@lvalue Int``. No constraints are generated.
 
   When a name refers to a set of overloaded declarations, the
   selection of the appropriate declaration is handled by the
@@ -174,35 +240,38 @@ and types generated from the primary expression kinds are:
 **Unresolved member reference**
   An unresolved member reference ``.name`` refers to a member of a
   enum type. The enum type is assumed to have a fresh variable
-  type``T0`` (since that type can only be known from context), and a
+  type ``T0`` (since that type can only be known from context), and a
   value member constraint ``T0.name == T1``, for fresh type variable
   ``T1``, captures the fact that it has a member named ``name`` with
   some as-yet-unknown type ``T1``. The type of the unresolved member
-  reference is ``T1``, the type of the member. 
+  reference is ``T1``, the type of the member. When the unresolved
+  member reference is actually a call ``.name(x)``, the function
+  application is folded into the constraints generated by the
+  unresolved member reference.
 
   Note that the constraint system above actually has insufficient
-  information to determine the type ``T0`` without guesswork. The
-  `Overloading`_ section describes how the overload-selection
-  mechanism is used to resolve this problem.
+  information to determine the type ``T0`` without additional
+  contextual information. The `Overloading`_ section describes how the
+  overload-selection mechanism is used to resolve this problem.
 
 **Function application**
-  A function application ``a(b)`` generates two
-  constraints. First, the applicable function constraint ``T0 -> T1 ==Fn
-  T(a)`` (for fresh type variables ``T0`` and ``T1``) captures the
-  rvalue-to-lvalue conversion applied on the function (``a``) and
-  decomposes the function type into its argument and result
-  types. Second, the conversion constraint ``T(b) <c T0`` captures the
-  requirement that the actual argument type (``b``) be convertible to
-  the argument type of the function. Finally, the expression is given
-  the type ``T1``, i.e.,  the result type of the function.
+  A function application ``a(b)`` generates two constraints. First,
+  the applicable function constraint ``T0 -> T1 ==Fn T(a)`` (for fresh
+  type variables ``T0`` and ``T1``) captures the rvalue-to-lvalue
+  conversion applied on the function (``a``) and decomposes the
+  function type into its argument and result types. Second, the
+  conversion constraint ``T(b) <c T0`` captures the requirement that
+  the actual argument type (``b``) be convertible to the argument type
+  of the function. Finally, the expression is given the type ``T1``,
+  i.e., the result type of the function.
 
-**Coercion/construction**
-  A type coercion ``A(b)``, where ``A`` refers to a type, generates a
-  construction constraint ``T(b) <C  A``, which requires that ``T(b)``
-  either be a subtype of ``A`` or  that ``A`` have a constructor that
-  accepts ``b``. The type of the expression is ``A``.
+**Construction**
+  A type construction``A(b)``, where ``A`` refers to a type, generates
+  a construction constraint ``T(b) <C A``, which requires that ``A``
+  have a constructor that accepts ``b``. The type of the expression is
+  ``A``.
 
-  Note that coercion/construction and function application use the
+  Note that construction and function application use the same
   syntax. Here, the constraint generator performs a shallow analysis
   of the type of the "function" argument (``A`` or ``a``, in the
   exposition above); if it obviously has metatype type, the expression
@@ -210,10 +279,10 @@ and types generated from the primary expression kinds are:
   application. This particular area of the language needs more work.
 
 **Subscripting**
-  A subscript operation ``a[b]`` is similar to function
-  application. A value member constraint ``T(a).subscript == T0 -> T1``
-  treats the subscript as a function from the key type to the
-  value type, represented by fresh type variables ``T0`` and ``T1``,
+  A subscript operation ``a[b]`` is similar to function application. A
+  value member constraint ``T(a).subscript == T0 -> T1`` treats the
+  subscript as a function from the key type to the value type,
+  represented by fresh type variables ``T0`` and ``T1``,
   respectively. The constraint ``T(b) <c T0`` requires the key
   argument to be convertible to the key type, and the type of the
   subscript operation is ``T1``.
@@ -223,19 +292,6 @@ and types generated from the primary expression kinds are:
   world!``, is assigned a fresh type variable ``T0``. Additionally, a
   literal constraint is placed on that type variable depending on the
   kind of literal, e.g., "``T0`` is an integer literal."
-
-**Function expressions**
-  A function expression ``func (params) -> result { body }`` is
-  assigned a function type based on the specified parameters and
-  result type. The parameter pattern is walked to construct the
-  parameter type of the function: wherever types are omitted for a
-  parameter, a fresh type variable is introduced for that
-  parameter. If the result type is not specified, a fresh type
-  variable is introduced for the return type. The function expression
-  is assigned a function type comprised of the computed parameter and
-  return types. Note that the function body is not considered as part
-  of the constraint system; it will be type-checked once the function
-  expression has been given a concrete type.
 
 **Closures**
   A closure is assigned a function type based on the parameters and
@@ -256,11 +312,22 @@ and types generated from the primary expression kinds are:
   type.
 
 **Address of**
-  An address-of expression ``&a`` always returns a ``[inout]``
-  type. Therefore, it is assigned the type ``[inout] T0`` for a fresh
-  type variable ``T0``. The subtyping constraint ``[inout] T0 <
+  An address-of expression ``&a`` always returns an ``@inout``
+  type. Therefore, it is assigned the type ``@inout T0`` for a fresh
+  type variable ``T0``. The subtyping constraint ``@inout T0 < @lvalue
   T(a)`` captures the requirement that input expression be an lvalue
   of some type.
+
+**Ternary operator**
+  A ternary operator``x ? y : z`` generates a number of
+  constraints. The type ``T(x)`` must conform to the ``LogicValue``
+  protocol to determine which branch is taken. Then, a new type
+  variable ``T0`` is introduced to capture the result type, and the
+  constraints ``T(y) <c T0`` and ``T(z) <c T0`` capture the need for
+  both branches of the ternary operator to convert to a common type.
+
+There are a number of other expression kinds within the language; see
+the constraint generator for their mapping to constraints.
 
 Overloading
 ''''''''''''''''''''''''''
@@ -269,11 +336,11 @@ Overloading is the process of giving multiple, different definitions
 to the same name. For example, we might overload a ``negate`` function
 to work on both ``Int`` and ``Double`` types, e.g.::
 
-  func negate(x : Int) -> Int { return -x }
-  func negate(x : Double) -> Double { return -x }
+  func negate(x: Int) -> Int { return -x }
+  func negate(x: Double) -> Double { return -x }
 
-Given that there are two definitions of ``negate``, what is the type of
-the declaration reference expression ``negate``? If one selects the
+Given that there are two definitions of ``negate``, what is the type
+of the declaration reference expression ``negate``? If one selects the
 first overload, the type is ``(Int) -> Int``; for the second overload,
 the type is ``(Double) -> Double``. However, constraint generation
 needs to assign some specific type to the expression, so that its
@@ -305,20 +372,18 @@ guesswork. However, we note that the type of a enum member actually
 has a regular structure. For example, consider the ``Optional`` type::
 
   enum Optional<T> {
-    case none
-    case value(value : T)
+    case None
+    case Some(T)
   }
 
-The type of ``Optional<T>.none`` is ``Optional<T>``, while the type of
-``Optional<T>.value`` is ``(value : T) -> Optional<T>``. In fact, the
+The type of ``Optional<T>.Vone`` is ``Optional<T>``, while the type of
+``Optional<T>.Some`` is ``(T) -> Optional<T>``. In fact, the
 type of a enum element can have one of two forms: it can be ``T0``,
 for a enum element that has no extra data, or it can be ``T2 -> T0``,
-where ``T2`` is the data associated with the enum element.  Letting
-``T2`` by a fresh type variable, we introduce a disjunction constraint
-``T1 := T0 or T1 := T2 -> T0``. Note that, in both cases, the context
-of the unresolved member reference helps determine which form matches,
-and can therefore determine a binding for ``T0``. That binding allows
-the resolution of the actual member.
+where ``T2`` is the data associated with the enum element.  For the
+latter case, the actual arguments are parsed as part of the unresolved
+member reference, so that a function application constraint describes
+their conversion to the input tyoe ``T2``.
 
 Polymorphic Types
 ''''''''''''''''''''''''''''''''''''''''''''''
@@ -328,18 +393,18 @@ parameter polymorphism that enables polymorphic types and
 functions. For example, one can implement a ``min`` function as,
 e.g.,::
 
-  func min<T : Comparable>(x : T, y : T) -> T {
+  func min<T : Comparable>(x: T, y: T) -> T {
     if y < x { return y }
     return x
   }
 
-Here, ``T`` is a generic parameter that can be replaced with
-any concrete type, so long as that type conforms to the protocol
-``Comparable``. The type of ``min`` is (internally) written as ``<T : Comparable> (x :
-T, y : T) -> T``, which can be read as "for all ``T``, where ``T``
-conforms to ``Comparable``, the type of the function is ``(x : T, y : T)
--> T``. Different uses of the ``min`` function may have different
-bindings for the generic parameter``T``.
+Here, ``T`` is a generic parameter that can be replaced with any
+concrete type, so long as that type conforms to the protocol
+``Comparable``. The type of ``min`` is (internally) written as ``<T :
+Comparable> (x: T, y: T) -> T``, which can be read as "for all ``T``,
+where ``T`` conforms to ``Comparable``, the type of the function is
+``(x: T, y: T) -> T``. Different uses of the ``min`` function may
+have different bindings for the generic parameter``T``.
 
 When the constraint generator encounters a reference to a generic
 function, it immediately replaces each of the generic parameters within
@@ -359,7 +424,7 @@ effective) way to model the use of polymorphic functions within the
 constraint system without complicating the solver. Note that this
 immediate opening of generic function types is only valid because
 Swift does not support first-class polymorphic functions, e.g., one
-cannot declare a variable of type ``<T> (T) -> T``.
+cannot declare a variable of type ``<T> T -> T``.
 
 Uses of generic types are also immediately opened by the constraint
 solver. For example, consider the following generic dictionary type::
@@ -421,8 +486,8 @@ down to only simple constraints that are trivially satisfied.
 The simplification process breaks down constraints into simpler
 constraints, and each different kind of constraint is handled by
 different rules based on the Swift type system. The constraints fall
-into four categories: relational constraints, member constraints,
-literal constraints, and archetype constraints. Only the first two
+intofive categories: relational constraints, member constraints,
+type properties, conjunctions, and disjunctions. Only the first three
 kinds of constraints have interesting simplification rules, and are
 discussed in the following sections.
 
@@ -586,30 +651,21 @@ The solver explores a potentially large solution space, and it is
 possible that it will find multiple solutions to the constraint system
 as given. Such cases are not necessarily ambiguities, because the
 solver can then compare the solutions to to determine whether one of
-the solutions is better than all of the others. To do so, it compares
-the concrete type variable bindings and selected overloads from the
-solutions using a scoring system. The score of a solution comes in two
-parts: a fixed score and a relative score.
+the solutions is better than all of the others. To do so, it computes
+a "score" for each solution based on a number of factors:
 
-The fixed score for a solution depends entirely on the fitness of the
-solution itself. There are two sources of scores:
+- How many user-defined conversions were applied.
+- How many non-trivial function conversions were applied.
+- How many literals were given "non-default" types.
 
-- If a type variable that is the subject of a conformance constraint
-  to a literal protocol is bound to the default literal type for that
-  protocol, the solution earns +1.
+Solutions with smaller scores are considered better solutions. When
+two solutions have the same score, the type variables and overload
+choices of the two systems are compared to produce a relative score:
 
-- For each user-defined conversion required by the solution, the
-  solution earns -2.
-
-To determine whether one solution is better than another, the scores
-of the two systems are compared. Each solution starts with its fixed
-score, which is modified by the relative score based on comparing the
-two systems:
-
-- If a type variable has different concrete type bindings in the
-  two solutions, the bindings are compared. If the concrete
-  type bound in one of the solutions is convertible to the type bound
-  to the other solution, the first solution earns +1.
+- If the two solutions have selected different type variable bindings
+  for a type variable where a "more specific" type variable is a
+  better match, and one of the type variable bindings is a subtype of
+  the other, the solution with the subtype earns +1.
 
 - If an overload set has different selected overloads in the two
   soluions, the overloads are compared. If the type of the
@@ -617,7 +673,7 @@ two systems:
   the overload picked in the other solution, then first solution earns
   +1.
 
-The solution with the greater composite score is considered to be
+The solution with the greater relative score is considered to be
 better than the other solution.
 
 Solution Application
@@ -654,9 +710,10 @@ node based on the kind of expression:
   the body of the closure is type-checked with that
   complete function type.
 
-The solution application step cannot fail, because every potential
-failure is modeled as a constraint in the constraint system. If any
-failures do occur at this step, it is a bug in the type checker.
+The solution application step cannot fail for any type checking rule
+modeled by the constraint system. However, there are some failures
+that are intentionally left to the solution application phase, such as
+a postfix '!' applied to a non-optional type.
 
 Locators
 ```````````
@@ -800,9 +857,95 @@ simplified locator::
 
 Performance
 -----------------
-The performance of the type checker is currently terrible. We plan to
-implement a number of heuristics to prune the solution space more
-quickly, since much of the work we perform is completely wasted.
+The performance of the type checker is dependent on a number of
+factors, but the chief concerns are the size of the solution space
+(which is exponential in the worst case) and the effectiveness of the
+solver in exploring that solution space. This section describes some
+of the techniques used to improve solver performance, many of which
+can doubtless be improved.
+
+Constraint Graph
+````````````````
+The constraint graph describes the relationships among type variables
+in the constraint system. Each vertex in the constraint graph
+corresponds to a single type variable. The edges of the graph
+correspond to constraints in the constraint system, relating sets of
+type variables together. Technically, this makes the constraint graph
+a *multigraph*, although the internal representation is more akin to a
+graph with multiple kinds of edges: each vertex (node) tracks the set
+of constraints that mention the given type variable as well as the set
+of type variables that are adjacent to this type variable. A vertex
+also includes information about the equivalence class corresponding to
+a given type variable (when type variables have been merged) or the
+binding of a type variable to a specific type.
+
+The constraint graph is critical to a number of solver
+optimizations. For example, it is used to compute the connected
+components within the constraint graph, so that each connected
+component can be solved independently. The partial results from all of
+the connected components are then combined into a complete
+solution. Additionally, the constraint graph is used to direct
+simplification, described below.
+
+Simplification Worklist
+```````````````````````
+When the solver has attempted a type variable binding, that binding
+often leads to additional simplifications in the constraint
+system. The solver will query the constraint graph to determine which
+constraints mention the type variable and will place those constraints
+onto the simplification worklist. If those constraints can be
+simplified further, it may lead to additional type variable bindings,
+which in turn adds more constraints to the worklist. Once the worklist
+is exhausted, simplification has completed. The use of the worklist
+eliminates the need to reprocess constraints that could not have
+changed because the type variables they mention have not changed.
+
+Solver Scopes
+`````````````
+The solver proceeds through the solution space in a depth-first
+manner. Whenever the solver is about to make a guess---such as a
+speculative type variable binding or the selection of a term from a
+disjunction---it introduces a new solver scope to capture the results
+of that assumption. Subsequent solver scopes are nested as the solver
+builds up a set of assumptions, eventually leading to either a
+solution or an error. When a solution is found, the stack of solver
+scopes contains all of the assumptions needed to produce that
+solution, and is saved in a separate solution data structure.
+
+The solver scopes themselves are designed to be fairly cheap to create
+and destroy. To support this, all of the major data structures used by
+the constraint solver have reversible operations, allowing the solver
+to easily backtrack. For example, the addition of a constraint to the
+constraint graph can be reversed by removing that same constraint. The
+constraint graph tracks all such additions in a stack: pushing a new
+solver scope stores a marker to the current top of the stack, and
+popping that solver scope reverses all of the operations on that stack
+until it hits the marker.
+
+Online Scoring
+``````````````
+As the solver evaluates potential solutions, it keeps track of the
+score of the current solution and of the best complete solution found
+thus far. If the score of the current solution is ever greater than
+that of the best complete solution, it abandons the current solution
+and backtracks to continue its search.
+
+The solver makes some attempt at evaluating cheaper solutions before
+more expensive solutions. For example, it will prefer to try normal
+conversions before user-defined conversions, prefer the "default"
+literal types over other literal types, and prefer cheaper conversions
+to more expensive conversions. However, some of the rules are fairly
+ad hoc, and could benefit from more study.
+
+Arena Memory Management
+```````````````````````
+Each constraint system introduces its own memory allocation arena,
+making allocations cheap and deallocation essentially free. The
+allocation arena extends all the way into the AST context, so that
+types composed of type variables (e.g., ``T0 -> T1``) will be
+allocated within the constraint system's arena rather than the
+permanent arena. Most data structures involved in constraint solving
+use this same arena.
 
 Diagnostics
 -----------------
@@ -829,8 +972,4 @@ well-typed suggestions.
 .. [#] Again, as of this writing, the solver doesn't actually compute
   meets and joins, so the solver continues until it runs out of
   supertypes to enumerate.
-
-.. [#] This overload resolution has yet to be implemented. Moreover,
-   there is an optimization opportunity here to explore the
-   more-specific overloads before the less-specific overloads.
 
