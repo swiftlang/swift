@@ -1238,18 +1238,10 @@ namespace {
   public:
     /// Variables might be stored or computed.
     void visitVarDecl(VarDecl *var) {
-      switch (var->getStorageKind()) {
-      case VarDecl::StoredObjC:
-      case VarDecl::Stored:
-        if (!isBuildingProtocol()) {
-          visitStoredVar(var);
-          break;
-        }
-        // FALLTHROUGH
-      case VarDecl::Computed:
+      if (var->hasStorage())
+        visitStoredVar(var);
+      else
         visitProperty(var);
-        break;
-      }
     }
 
   private:
