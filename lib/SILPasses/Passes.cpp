@@ -37,9 +37,9 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // the diagnostic passes.
   if (Module.getStage() == SILStage::Canonical)
     return false;
-  
+
   auto &Ctx = Module.getASTContext();
- 
+
   performSILMandatoryInlining(&Module);
 
   performSILCapturePromotion(&Module);
@@ -83,7 +83,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     performSimplifyCFG(&Module);
     Changed |= performSILDevirtualization(&Module);
     performSILARCOpts(&Module);
-    performSILAllocBoxToStackPromotion(&Module);    
+    performSILAllocBoxToStackPromotion(&Module);
+    performSILAllocRefElimination(&Module);
 
     DEBUG(Module.verify());
     // Stats

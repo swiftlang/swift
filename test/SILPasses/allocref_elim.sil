@@ -1,0 +1,302 @@
+// RUN: %sil-opt -allocref-elim -verify %s | FileCheck %s
+
+import swift
+import Builtin
+
+//////////
+// Data //
+//////////
+
+class TrivialDestructor {
+  var int : Builtin.Int32
+  var ptr : Builtin.ObjectPointer
+  destructor() { }
+}
+
+sil @_TFC4main17TrivialDestructorD : $@cc(method) @thin (@owned TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  // Alloc/Dealloc stack should not disrupt elimination of the
+  // alloc_ref.
+  %1 = alloc_stack $Builtin.Int64
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int64
+
+  // Storing into the struct should not disrupt elimination of the
+  // alloc_ref.
+  %2 = ref_element_addr %0 : $TrivialDestructor, #int
+  %3 = integer_literal $Builtin.Int32, 1
+  store %3 to %2 : $*Builtin.Int32
+
+  // Calling a builtin without side effects should not disrupt
+  // elimination of the alloc_ref.
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = builtin_function_ref "xor_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %6 = apply %5 (%4, %3) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+
+  // Calling dealloc ref on self should not disrupt elimination of the
+  // alloc_ref.
+  dealloc_ref %0 : $TrivialDestructor
+
+  %7 = tuple()
+  return %7 : $()
+}
+
+sil @ptr_user : $@thin (Builtin.ObjectPointer) -> ()
+sil @int_user : $@thin (Builtin.Int32) -> ()
+
+///////////
+// Tests //
+///////////
+
+// Trivial case. Remove the alloc_ref.
+//
+// CHECK-LABEL: sil @trivial_destructor_trivial : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_trivial : $@thin () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  strong_release %0 : $TrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// We load/use a pointer from the alloc_ref, do nothing.
+//
+// CHECK-LABEL: sil @trivial_destructor_load : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_load : $@thin () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  %1 = ref_element_addr %0 : $TrivialDestructor, #int
+  %2 = load %1 : $*Builtin.Int32
+  %3 = function_ref @int_user : $@thin (Builtin.Int32) -> ()
+  apply %3 (%2) : $@thin (Builtin.Int32) -> ()
+  strong_release %0 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// We store into the alloc_ref, eliminate it!
+//
+// CHECK-LABEL: sil @trivial_destructor_store_into : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_store_into : $@thin () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  %1 = ref_element_addr %0 : $TrivialDestructor, #int
+  %2 = integer_literal $Builtin.Int32, 5
+  store %2 to %1 : $*Builtin.Int32
+  strong_release %0 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// We store a pointer from the alloc_ref, dont do anything!
+//
+// CHECK-LABEL: sil @trivial_destructor_store_ptr
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: address_to_pointer
+// CHECK-NEXT: store
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_store_ptr : $@thin (@inout Builtin.RawPointer) -> () {
+bb0(%0 : $*Builtin.RawPointer):
+  %1 = alloc_ref $TrivialDestructor
+  %2 = ref_element_addr %1 : $TrivialDestructor, #int
+  %3 = address_to_pointer %2 : $*Builtin.Int32 to $Builtin.RawPointer
+  store %3 to %0 : $*Builtin.RawPointer
+  strong_release %1 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+// We are returning the alloc_ref, do nothing.
+//
+// CHECK-LABEL: sil @trivial_destructor_return_value_use : $@thin () -> TrivialDestructor {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: return
+sil @trivial_destructor_return_value_use : $@thin () -> TrivialDestructor {
+  %0 = alloc_ref $TrivialDestructor
+  return %0 : $TrivialDestructor
+}
+
+// Retains/releases on the alloc_ref can be ignored.
+//
+// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
+  %0 = alloc_ref $TrivialDestructor
+  strong_retain %0 : $TrivialDestructor
+  strong_release %0 : $TrivialDestructor
+  strong_release %0 : $TrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// Retains/Releases on a different value in the use list implies abort.
+//
+// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.ObjectPointer) -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: ref_element_addr
+// CHECK-NEXT: store
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  %1 = alloc_ref $TrivialDestructor
+  %2 = ref_element_addr %1 : $TrivialDestructor, #ptr
+  store %0 to %2 : $*Builtin.ObjectPointer
+  %3 = load %2 : $*Builtin.ObjectPointer
+  strong_release %3 : $Builtin.ObjectPointer
+  strong_release %1 : $TrivialDestructor
+  %4 = tuple()
+  return %4 : $()
+}
+
+/*
+sil @trivial_destructor_apply_use
+
+sil @trivial_destructor_side_effect_use
+*/
+
+//sil @non_trivial_destructor
+
+class NonTrivialDestructor {
+  var ptr : Builtin.ObjectPointer
+
+  destructor() { }
+}
+
+sil @_TFC4main17NonTrivialDestructorD : $@cc(method) @thin (@owned NonTrivialDestructor) -> () {
+bb0(%0 : $NonTrivialDestructor):
+  %1 = ref_element_addr %0 : $NonTrivialDestructor, #ptr
+  %2 = load %1 : $*Builtin.ObjectPointer
+  strong_retain %2 : $Builtin.ObjectPointer
+  dealloc_ref %0 : $NonTrivialDestructor
+  %3 = tuple()
+  return %3 : $()
+}
+
+// Make sure that a ref count operation on a different value in the
+// destructor disrupts the algorithm.
+//
+// CHECK-LABEL: sil @non_trivial_destructor_refcount_on_different_value : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @non_trivial_destructor_refcount_on_different_value : $@thin () -> () {
+  %0 = alloc_ref $NonTrivialDestructor
+  strong_release %0 : $NonTrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+class NonTrivialDestructor2 {
+  var ptr : NonTrivialDestructor
+
+  destructor() { }
+}
+
+// Test if dealloc_ref on a different value disrupts the algorithm.
+sil @_TFC4main17NonTrivialDestructor2D : $@cc(method) @thin (@owned NonTrivialDestructor2) -> () {
+bb0(%0 : $NonTrivialDestructor2):
+  %1 = ref_element_addr %0 : $NonTrivialDestructor2, #ptr
+  %2 = load %1 : $*NonTrivialDestructor
+  dealloc_ref %2 : $NonTrivialDestructor
+  dealloc_ref %0 : $NonTrivialDestructor2
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
+  %0 = alloc_ref $NonTrivialDestructor
+  strong_release %0 : $NonTrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+class NonTrivialDestructor3 {
+  var ptr : Builtin.ObjectPointer
+
+  destructor() { }
+}
+
+// Make sure a non-builtin apply disrupts the algorithm.
+sil @_TFC4main17NonTrivialDestructor3D : $@cc(method) @thin (@owned NonTrivialDestructor3) -> () {
+bb0(%0 : $NonTrivialDestructor3):
+  %1 = ref_element_addr %0 : $NonTrivialDestructor3, #ptr
+  %2 = load %1 : $*Builtin.ObjectPointer
+  %3 = function_ref @ptr_user : $@thin (Builtin.ObjectPointer) -> ()
+  apply %3 (%2) : $@thin (Builtin.ObjectPointer) -> ()
+  dealloc_ref %0 : $NonTrivialDestructor3
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
+  %0 = alloc_ref $NonTrivialDestructor
+  strong_release %0 : $NonTrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+class NonTrivialObjCDestructor {
+  var ptr : Builtin.ObjectPointer
+
+  destructor() { }
+}
+
+// Make sure we do not handle objc_methods
+sil @_TFC4main17NonTrivialObjCDestructorD : $@cc(objc_method) @thin (@owned NonTrivialObjCDestructor) -> () {
+bb0(%0 : $NonTrivialObjCDestructor):
+  dealloc_ref %0 : $NonTrivialObjCDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @non_trivial_destructor_objc_destructor : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @non_trivial_destructor_objc_destructor : $@thin () -> () {
+  %0 = alloc_ref $NonTrivialObjCDestructor
+  strong_release %0 : $NonTrivialObjCDestructor
+  %1 = tuple()
+  return %1 : $()
+}

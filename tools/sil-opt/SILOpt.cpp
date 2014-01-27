@@ -48,6 +48,7 @@ enum class PassKind {
   SROA,
   ARCOpts,
   StripDebugInfo,
+  AllocRefElimination,
 };
 
 static llvm::cl::opt<std::string>
@@ -127,6 +128,10 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::StripDebugInfo,
                                    "strip-debug-info",
                                    "Strip debug info."),
+                        clEnumValN(PassKind::AllocRefElimination,
+                                   "allocref-elim",
+                                   "Eliminate alloc refs with no side effect "
+                                   "destructors that are only stored into."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -257,6 +262,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::StripDebugInfo:
       performSILStripDebugInfo(CI.getSILModule());
+      break;
+    case PassKind::AllocRefElimination:
+      performSILAllocRefElimination(CI.getSILModule());
       break;
     }
 

@@ -109,6 +109,10 @@ namespace swift {
 
   /// \brief Eliminate debug info instructions.
   void performSILStripDebugInfo(SILModule *M);
+
+  /// \brief Eliminate alloc_ref with well behaved destructors that have no uses
+  /// with side effects.
+  void performSILAllocRefElimination(SILModule *M);
   
 } // end namespace swift
 
