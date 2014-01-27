@@ -592,6 +592,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.DisableLLVMOptzns = true;
   }
 
+  if (Args.hasArg(OPT_disable_llvm_arc_opts)) {
+    Opts.DisableLLVMARCOpts = true;
+  }
+
   if (Args.hasArg(OPT_enable_dynamic_value_type_layout)) {
     Opts.EnableDynamicValueTypeLayout = true;
   }

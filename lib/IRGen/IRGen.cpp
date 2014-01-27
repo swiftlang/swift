@@ -242,10 +242,12 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
   // and the Expand pass as late as possible.
-  PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
-                         addSwiftARCOptPass);
-  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                         addSwiftExpandPass);
+  if (!Opts.DisableLLVMARCOpts) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
+                           addSwiftARCOptPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftExpandPass);
+  }
   
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);

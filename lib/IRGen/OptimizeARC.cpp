@@ -38,10 +38,6 @@
 #include "llvm/Support/CommandLine.h"
 using namespace llvm;
 
-static llvm::cl::opt<bool>
-DisableLLVMARCOpts("disable-llvm-arc-opts",
-                   llvm::cl::desc("Don't run LLVM ARC optimization passes."));
-
 STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
 STATISTIC(NumRetainReleasePairs,
@@ -1001,9 +997,6 @@ llvm::FunctionPass *swift::createSwiftARCOptPass() {
 
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
-  if (DisableLLVMARCOpts)
-    return false;
-
   bool Changed = false;
   
   // First thing: canonicalize swift_retain and similar calls so that nothing
@@ -1183,9 +1176,6 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
 static bool performARCExpansion(Function &F) {
-  if (DisableLLVMARCOpts)
-    return false;
-
   Constant *RetainCache = nullptr;
   bool Changed = false;
   
