@@ -243,6 +243,10 @@ namespace {
     }
 
     void visitFunc(FuncDecl *func) {
+      if (func->isGetterOrSetter())
+        // FIXME: To be implemented.
+        return;
+      
       if (func->isStatic()) {
         asDerived().addStaticMethod(func);
       } else {

@@ -1082,6 +1082,7 @@ void Parser::addVarsToScope(Pattern *Pat,
                             bool IsStatic,
                             DeclAttributes &Attributes,
                             PatternBindingDecl *PBD) {
+  // FIXME: This would be simpler if it used Pat->CollectVariables
   Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
                            Decls, IsStatic, Attributes, PBD));
 }
@@ -1514,7 +1515,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
       HasGetSet = true;
       if (boundVar) hasStorage = boundVar->hasStorage();
     }
-
+    
     if (isLet && Tok.isNot(tok::equal) &&
         !(Flags & PD_HasContainerType)) {
       diagnose(VarLoc, diag::let_requires_initializer);
@@ -1588,6 +1589,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
         Status.setIsParseError();
+        init = nullptr;
       }
 
       PBD->setInit(init.getPtrOrNull(), false);
@@ -1630,10 +1632,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
   if (HasGetSet) {
     if (Bindings.All.size() > 1) {
       diagnose(VarLoc, diag::disallowed_var_multiple_getset);
-      Status.setIsParseError();
-    }
-    if (Flags & PD_DisallowComputedVar) {
-      diagnose(VarLoc, diag::disallowed_computed_var_decl);
       Status.setIsParseError();
     }
   } else if (!StaticLoc.isValid() && (Flags & PD_DisallowStoredInstanceVar)) {
@@ -2412,7 +2410,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       Status.setIsParseError();
     } else {
       // Parse the members.
-      ParseDeclOptions Options(PD_HasContainerType | PD_DisallowComputedVar |
+      ParseDeclOptions Options(PD_HasContainerType |
                                PD_DisallowNominalTypes |
                                PD_DisallowInit | PD_DisallowTypeAliasDef |
                                PD_InProtocol);

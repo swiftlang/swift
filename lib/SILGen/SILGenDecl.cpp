@@ -1849,6 +1849,11 @@ public:
   }
   
   void visitFuncDecl(FuncDecl *fd) {
+    // FIXME: Emit getter and setter (if settable) witnesses.
+    // For now we ignore them, like the IRGen witness table builder did.
+    if (fd->isGetterOrSetter())
+      return;
+    
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
 

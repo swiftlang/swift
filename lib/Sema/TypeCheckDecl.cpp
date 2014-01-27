@@ -1101,55 +1101,45 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
   
   TuplePatternElt ValueElt(ValuePattern);
   Pattern *ValueParamsPattern
-    = TuplePattern::create(Context, SourceLoc(), ValueElt, SourceLoc());
+    = TuplePattern::create(Context, VD->getLoc(), ValueElt, VD->getLoc());
   ValueParamsPattern->setImplicit();
   return ValueParamsPattern;
 }
 
-/// Given a "Stored" property that needs to be converted to StoreObjC (i.e.,
-/// has @objc getters and setters), create the getter and setter, and switch the
-/// storage kind.
-static void convertStoredVarToStoredObjC(VarDecl *VD) {
+static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
-  VarDecl *SelfDecl = nullptr;
   // Create the parameter list for the getter.
   Pattern *GetterParams[] = {
     // The implicit 'self' argument.
     buildGetterSetterSelf(Loc, VD->getDeclContext(), &SelfDecl),
-  
+    
     // Add a no-parameters clause.
-    TuplePattern::create(Context, SourceLoc(),
-                         ArrayRef<TuplePatternElt>(),
-                         SourceLoc(), /*hasVararg=*/false,
-                         SourceLoc(), /*Implicit=*/true)
+    TuplePattern::create(VD->getASTContext(), Loc, ArrayRef<TuplePatternElt>(),
+                         Loc, /*hasVararg=*/false, SourceLoc(),
+                         /*Implicit=*/true)
   };
   
+  SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
   
-  // Start the function.
-  auto *Get = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), Loc,
-                               Identifier(), Loc, /*GenericParams=*/nullptr,
-                               Type(), GetterParams, GetterParams,
-                               TypeLoc::withoutLoc(VD->getType()),
-                               VD->getDeclContext());
-  // Self comes in at +0 for this accessor.
-  Get->setIsObjC(true);
+  auto Get = FuncDecl::create(Context, StaticLoc, Loc,
+                          Identifier(), Loc, /*GenericParams=*/nullptr,
+                          Type(), GetterParams, GetterParams,
+                          TypeLoc::withoutLoc(VD->getType()),
+                          VD->getDeclContext());
+  
   
   // Reparent the self argument.
   SelfDecl->setDeclContext(Get);
-  
-  
-  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
-  auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-  auto *MRE = new (Context) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                          /*implicit*/true,/*direct ivar*/true);
-  ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
-  Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
 
-  
-  // Okay, the getter is set up, create the setter next.
-  VarDecl *ValueDecl = nullptr;
+  return Get;
+}
+
+static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
+                                       VarDecl *&ValueDecl) {
+  auto &Context = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
   
   // Create the parameter list for the setter.
   Pattern *SetterParams[] = {
@@ -1165,12 +1155,61 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
                                SetterParams, SetterParams,
                                TypeLoc::withoutLoc(SetterRetTy),
                                VD->getDeclContext());
-  // Self comes in at +0 for this accessor.
-  Set->setIsObjC(true);
-
+  
   // Reparent the self and value arguments.
   SelfDecl->setDeclContext(Set);
   ValueDecl->setDeclContext(Set);
+
+  // Setters default to mutating.
+  Set->setMutating();
+  
+  return Set;
+}
+
+
+static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
+  VarDecl *SelfDecl = nullptr;
+  auto *Get = createGetterPrototype(VD, SelfDecl);
+  
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->setComputedAccessors(VD->getLoc(), Get, nullptr, VD->getLoc());
+  
+  // We've added some members to our containing class, add them to the members
+  // list.
+  ProtocolDecl *PD = cast<ProtocolDecl>(VD->getDeclContext());
+  SmallVector<Decl*, 4> members(PD->getMembers().begin(),
+                                PD->getMembers().end());
+  members.push_back(Get);
+  PD->setMembers(PD->getASTContext().AllocateCopy(members), PD->getBraces());
+}
+
+/// Given a "Stored" property that needs to be converted to StoreObjC (i.e.,
+/// has @objc getters and setters), create the getter and setter, and switch the
+/// storage kind.
+static void convertStoredVarToStoredObjC(VarDecl *VD) {
+  auto &Context = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
+  
+  VarDecl *SelfDecl = nullptr;
+
+  auto *Get = createGetterPrototype(VD, SelfDecl);
+  Get->setIsObjC(true);
+  
+  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
+  auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+  auto *MRE = new (Context) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                          /*implicit*/true,/*direct ivar*/true);
+  ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
+  Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
+
+  
+  // Okay, the getter is set up, create the setter next.
+  VarDecl *ValueDecl = nullptr;
+
+  auto *Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
+
+  // Self comes in at +0 for this accessor.
+  Set->setIsObjC(true);
 
   // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
   //                decl_ref_expr(value))
@@ -1193,7 +1232,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
                                 CD->getMembers().end());
   members.push_back(Get);
   members.push_back(Set);
-  CD->setMembers(CD->getASTContext().AllocateCopy(members), CD->getBraces());
+  CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
 }
 
 namespace {
@@ -1293,6 +1332,16 @@ public:
                         (classContext && classContext->isObjC()) ||
                         (protocolContext && protocolContext->isObjC()));
         }
+      }
+      
+      // In a protocol context, variables written as "var x : Int" are really
+      // computed properties with just a getter.  Create the getter decl now.
+      if (isa<ProtocolDecl>(VD->getDeclContext()) &&
+          VD->getStorageKind() == VarDecl::Stored) {
+        convertStoredVarInProtocolToComputed(VD);
+
+        // Type check the getter declaration.
+        TC.typeCheckDecl(VD->getGetter(), true);
       }
       
       // If this is a stored ObjC ivar and should have an objc getter and
