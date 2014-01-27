@@ -762,6 +762,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   bool HadError = SC.typeCheckBody(body);
 
+  if (ctor->isInvalid())
+    return HadError;
+
   // Determine whether we need to introduce a super.init call.
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
     ->getNominalOrBoundGenericNominal();

@@ -777,9 +777,6 @@ bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
 
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
-  if (AFD->isInvalid())
-    return false;
-
   auto &Ctx = AFD->getASTContext();
 
   // Set up a diagnostics engine that swallows diagnostics.
