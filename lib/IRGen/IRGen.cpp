@@ -84,14 +84,7 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
                                 SourceFile *SF = nullptr,
                                 unsigned StartElem = 0) {
   assert(!M->Ctx.hadError());
-
-  std::unique_ptr<LLVMContext> Context;
-  std::unique_ptr<llvm::Module> ModuleOwner;
-  if (!Module) {
-    Context.reset(new LLVMContext);
-    ModuleOwner.reset(new llvm::Module(Opts.OutputFilename, *Context));
-    Module = ModuleOwner.get();
-  }
+  assert(Module && "Expected llvm:Module for IR generation!");
 
   Module->setTargetTriple(Opts.Triple);
   // Set the dwarf version to 3, which is what the Xcode 5.0 tool chain

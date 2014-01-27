@@ -223,17 +223,18 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  // FIXME: We shouldn't need to use the global context here, but something
+  // is persisting across calls to performIRGeneration.
+  std::unique_ptr<llvm::Module> LLVMModule{
+    new llvm::Module(Invocation.getFrontendOptions().OutputFilename,
+                     llvm::getGlobalContext())
+  };
   if (PrimarySourceFile) {
-    // FIXME: We shouldn't need to use the global context here, but something
-    // is persisting across calls to performIRGeneration.
-    std::unique_ptr<llvm::Module> LLVMModule{
-      new llvm::Module(Invocation.getFrontendOptions().OutputFilename,
-                       llvm::getGlobalContext())
-    };
     performIRGeneration(IRGenOpts, LLVMModule.get(), *PrimarySourceFile,
                         SM.get());
   } else {
-    performIRGeneration(IRGenOpts, nullptr, Instance.getMainModule(), SM.get());
+    performIRGeneration(IRGenOpts, LLVMModule.get(), Instance.getMainModule(),
+                        SM.get());
   }
 
   return false;
