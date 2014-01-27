@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <new>
 #include <string.h>
-#include <unordered_map>
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Hashing.h"
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -34,7 +36,6 @@ namespace {
 
   /// A CRTP class for defining entries in a metadata cache.
   template <class Impl> class CacheEntry {
-    const Impl *Next;
     friend class MetadataCache<Impl>;
 
     CacheEntry(const CacheEntry &other) = delete;
@@ -45,17 +46,6 @@ namespace {
 
   protected:
     CacheEntry() = default;
-
-    /// Determine whether the arguments buffer matches the given data.
-    /// Assumes that the number of arguments in the buffer is the same
-    /// as the number in the data.
-    bool argumentsBufferMatches(const void * const *arguments,
-                                size_t numArguments) const {
-      // TODO: exploit our knowledge about the pointer alignment of
-      // the arguments.
-      const void *storedArguments = getArgumentsBuffer();
-      return memcmp(storedArguments, arguments, numArguments * sizeof(void*)) == 0;
-    }
 
   public:
     static Impl *allocate(const void * const *arguments,
@@ -72,8 +62,6 @@ namespace {
       return result;
     }
 
-    const Impl *getNext() const { return Next; }
-
     void **getArgumentsBuffer() {
       return reinterpret_cast<void**>(asImpl() + 1);
     }
@@ -87,48 +75,118 @@ namespace {
     template <class T> const T *getData(size_t numArguments) const {
       return const_cast<CacheEntry*>(this)->getData<T>(numArguments);
     }
+    
+    static const Impl *fromArgumentsBuffer(const void * const *argsBuffer) {
+      return reinterpret_cast<const Impl *>(argsBuffer) - 1;
+    }
   };
+  
+  // A wrapper around a pointer to a metadata cache entry that provides
+  // DenseMap semantics that compare values in the key vector for the metadata
+  // instance.
+  //
+  // This is stored as a pointer to the arguments buffer, so that we can save
+  // an offset while looking for the matching argument given a key.
+  template<class Entry>
+  class EntryRef {
+    const void * const *args;
+    unsigned length;
+    
+    EntryRef(const void * const *args, unsigned length)
+    : args(args), length(length)
+    {}
 
+    friend struct llvm::DenseMapInfo<EntryRef>;
+  public:
+    static EntryRef forEntry(const Entry *e, unsigned numArguments) {
+      return EntryRef(e->getArgumentsBuffer(), numArguments);
+    }
+    
+    static EntryRef forArguments(const void * const *args,
+                                 unsigned numArguments) {
+      return EntryRef(args, numArguments);
+    }
+    
+    const Entry *getEntry() const {
+      return Entry::fromArgumentsBuffer(args);
+    }
+    
+    const void * const *begin() const { return args; }
+    const void * const *end() const { return args + length; }
+    unsigned size() const { return length; }
+  };
+}
+
+namespace llvm {
+  template<class Entry>
+  struct DenseMapInfo<EntryRef<Entry>> {
+    static inline EntryRef<Entry> getEmptyKey() {
+      // {nullptr, 0} is a legitimate "no arguments" representation.
+      return {(const void * const *)UINTPTR_MAX, 1};
+    }
+    
+    static inline EntryRef<Entry> getTombstoneKey() {
+      return {(const void * const *)UINTPTR_MAX, 2};
+    }
+    
+    static inline unsigned getHashValue(EntryRef<Entry> val) {
+      llvm::hash_code hash
+        = llvm::hash_combine_range(val.begin(), val.end());
+      return (unsigned)hash;
+    }
+    
+    static inline bool isEqual(EntryRef<Entry> a, EntryRef<Entry> b) {
+      unsigned asize = a.size(), bsize = b.size();
+      if (asize != bsize)
+        return false;
+      auto abegin = a.begin(), bbegin = b.begin();
+      if (abegin == (const void * const *)UINTPTR_MAX
+          || bbegin == (const void * const *)UINTPTR_MAX)
+        return abegin == bbegin;
+      for (unsigned i = 0; i < asize; ++i) {
+        if (abegin[i] != bbegin[i])
+          return false;
+      }
+      return true;
+    }
+  };
+}
+
+namespace {
   /// A CacheEntry implementation where the entries in the cache may
   /// have different numbers of arguments.
   class HeterogeneousCacheEntry : public CacheEntry<HeterogeneousCacheEntry> {
-    const size_t NumArguments;
-
+    unsigned NumArguments;
   public:
     HeterogeneousCacheEntry(size_t numArguments) : NumArguments(numArguments) {}
-
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      if (NumArguments != numArguments) return false;
-      return argumentsBufferMatches(arguments, numArguments);
-    }
+    
+    unsigned getNumArguments() const { return NumArguments; }
   };
 
   /// A CacheEntry implementation where all the entries in the cache
   /// have the same number of arguments.
   class HomogeneousCacheEntry : public CacheEntry<HomogeneousCacheEntry> {
+    // FIXME: Shouldn't have to store this in every entry.
+    unsigned NumArguments;
   public:
-    HomogeneousCacheEntry(size_t numArguments) { /*do nothing*/ }
-
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      return argumentsBufferMatches(arguments, numArguments);
-    }
+    HomogeneousCacheEntry(size_t numArguments) : NumArguments(numArguments) {}
+    
+    unsigned getNumArguments() const { return NumArguments; }
   };
 
   /// The implementation of a metadata cache.  Note that all-zero must
   /// be a valid state for the cache.
   template <class Entry> class MetadataCache {
-    /// The head of a linked list of metadata cache entries.
-    const Entry *Head;
+    llvm::DenseMap<EntryRef<Entry>, bool> Entries;
 
   public:
     /// Try to find an existing entry in this cache.
-    const Entry *find(const void * const *arguments, size_t numArguments) const {
-      for (auto entry = Head; entry != nullptr; entry = entry->getNext())
-        if (entry->matches(arguments, numArguments))
-          return entry;
-      return nullptr;
+    const Entry *find(const void * const *arguments, size_t numArguments) const{
+      auto found
+        = Entries.find(EntryRef<Entry>::forArguments(arguments, numArguments));
+      if (found == Entries.end())
+        return nullptr;
+      return found->first.getEntry();
     }
 
     /// Add the given entry to the cache, taking responsibility for
@@ -136,9 +194,11 @@ namespace {
     /// the same as the argument if we lost a race to instantiate it.
     /// Regardless, the argument should be considered potentially
     /// invalid after this call.
+    ///
+    /// FIXME: This doesn't actually handle races yet.
     const Entry *add(Entry *entry) {
-      entry->Next = Head;
-      Head = entry;
+      Entries[EntryRef<Entry>::forEntry(entry, entry->getNumArguments())]
+        = true;
       return entry;
     }
   };
@@ -478,11 +538,7 @@ namespace {
       return &Metadata;
     }
 
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      assert(numArguments == 1);
-      return (arguments[0] == Metadata.Class);
-    }
+    unsigned getNumArguments() const { return 1; }
   };
 }
 
@@ -516,9 +572,10 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 namespace {
   class FunctionCacheEntry : public CacheEntry<FunctionCacheEntry> {
     FullMetadata<FunctionTypeMetadata> Metadata;
+    unsigned NumArguments;
 
   public:
-    FunctionCacheEntry(size_t numArguments) {}
+    FunctionCacheEntry(size_t numArguments) : NumArguments(numArguments) {}
 
     FullMetadata<FunctionTypeMetadata> *getData() {
       return &Metadata;
@@ -527,11 +584,8 @@ namespace {
       return &Metadata;
     }
 
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      assert(numArguments == 2);
-      return (arguments[0] == Metadata.ArgumentType &&
-              arguments[1] == Metadata.ResultType);
+    unsigned getNumArguments() const {
+      return NumArguments;
     }
   };
 }
@@ -574,27 +628,16 @@ namespace {
     TupleCacheEntry(size_t numArguments) {
       Metadata.NumElements = numArguments;
     }
+    
+    unsigned getNumArguments() const {
+      return Metadata.NumElements;
+    }
 
     FullMetadata<TupleTypeMetadata> *getData() {
       return &Metadata;
     }
     const FullMetadata<TupleTypeMetadata> *getData() const {
       return &Metadata;
-    }
-
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      // Same number of elements.
-      if (numArguments != Metadata.NumElements)
-        return false;
-
-      // Arguments match up element-wise.
-      for (size_t i = 0; i != numArguments; ++i) {
-        if (arguments[i] != Metadata.getElements()[i].Type)
-          return false;
-      }
-
-      return true;
     }
   };
 }
@@ -1062,11 +1105,7 @@ namespace {
       return &Metadata;
     }
 
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      assert(numArguments == 1);
-      return (arguments[0] == Metadata.InstanceType);
-    }
+    unsigned getNumArguments() const { return 1; }
   };
 }
 
@@ -1131,20 +1170,8 @@ namespace {
       return &Metadata;
     }
 
-    /// Does this cache entry match the given set of arguments?
-    bool matches(const void * const *arguments, size_t numArguments) const {
-      // Same number of elements.
-      if (numArguments != Metadata.Protocols.NumProtocols)
-        return false;
-
-      // Arguments match up element-wise.
-      // The arguments must be sorted prior to searching the cache!
-      for (size_t i = 0; i != numArguments; ++i) {
-        if (arguments[i] != Metadata.Protocols[i])
-          return false;
-      }
-
-      return true;
+    unsigned getNumArguments() const {
+      return Metadata.Protocols.NumProtocols;
     }
   };
 }
@@ -1451,7 +1478,7 @@ OpaqueExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
   /*stride*/ Container::stride()
 };
 
-static std::unordered_map<unsigned, const ValueWitnessTable*>
+static llvm::DenseMap<unsigned, const ValueWitnessTable*>
   OpaqueExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for an opaque existential container with
@@ -1778,7 +1805,7 @@ ClassExistentialValueWitnesses<NUM_VALUE_WITNESSES>::ValueWitnessTable = {
 #undef FIXED_CLASS_EXISTENTIAL_WITNESS
 };
   
-static std::unordered_map<unsigned, const ValueWitnessTable*>
+static llvm::DenseMap<unsigned, const ValueWitnessTable*>
   ClassExistentialValueWitnessTables;
 
 /// Instantiate a value witness table for a class-constrained existential
@@ -1956,5 +1983,15 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
       ::assignWithCopy(destVal, srcVal, type);
 
   return reinterpret_cast<OpaqueValue*>(result);
+}
+
+namespace llvm {
+namespace hashing {
+namespace detail {
+  // An extern variable expected by LLVM's hashing templates. We don't link any
+  // LLVM libs into the runtime, so define this here.
+  size_t fixed_seed_override = 0;
+}
+}
 }
 
