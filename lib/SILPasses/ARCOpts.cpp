@@ -443,7 +443,7 @@ performCodeMotion(llvm::DenseMap<SILInstruction *,
     Inst->eraseFromParent();
 
   // If we found instructions to delete, return true.
-  return !DeleteList.empty();;
+  return !DeleteList.empty();
 }
 
 
