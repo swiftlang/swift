@@ -9,6 +9,17 @@
 
   The long-term fix is tracked as <rdar://problem/15877160>.
 
+2014-01-24
+----------
+
+* Computed 'type' properties (that is, properties of types, rather
+  than of values of the type) are now permitted on classes, on generic
+  structs and enums, and in extensions.  Stored 'type' properties in
+  these contexts remain unimplemented.
+
+  The implementation of stored 'type' properties is tracked as
+  <rdar://problem/15915785> (for classes) and <rdar://problem/15915867>
+  (for generic types).
 
 2014-01-22
 ----------
