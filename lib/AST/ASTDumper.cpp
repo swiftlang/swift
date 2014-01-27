@@ -553,10 +553,8 @@ namespace {
       if (auto *ASD = FD->getAccessorStorageDecl()) {
         switch (FD->getAccessorKind()) {
         case FuncDecl::NotAccessor: assert(0 && "Isn't an accessor?");
-        case FuncDecl::IsGetter:
-          OS << " getter";
-        case FuncDecl::IsSetter:
-          OS << " setter";
+        case FuncDecl::IsGetter: OS << " getter"; break;
+        case FuncDecl::IsSetter: OS << " setter"; break;
         }
 
         OS << "_for=" << ASD->getName();
