@@ -535,14 +535,11 @@ ManagedValue SILGenFunction::
 emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           VarDecl *FieldDecl,
                           ArrayRef<Substitution> substitutions,
+                          bool isDirectPropertyAccess,
                           Type propTy, SGFContext C) {
 
-  // If this is a get-only computed property being accessed, call the getter.
-  switch (FieldDecl->getStorageKind()) {
-  case VarDecl::StoredObjC:
-    assert(0 && "Cannot happen as an rvalue-only access, "
-           "these are always class properties");
-  case VarDecl::Computed: {
+  // If this is a non-direct access to a computed property, call the getter.
+  if (FieldDecl->hasAccessorFunctions() && !isDirectPropertyAccess) {
     // If the base is +0, emit a copy_value to bring it to +1 since getters
     // always take the base object at +1.
     if (base.isPlusZeroRValueOrTrivial())
@@ -553,9 +550,9 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     return emitGetAccessor(loc, FieldDecl, substitutions,
                            std::move(baseRV), RValueSource(), C);
   }
-  case VarDecl::Stored:
-    break;
-  }
+
+  assert(FieldDecl->hasStorage() &&
+         "Cannot directly access value without storage");
 
   // For static variables, emit a reference to the global variable backing
   // them.
@@ -1277,6 +1274,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
                                                   SGFContext::AllowPlusZero);
   ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
                                              E->getMember().getSubstitutions(),
+                                                   E->isDirectPropertyAccess(),
                                                    E->getType(), C);
   return RValue(SGF, E, res);
 }

@@ -584,6 +584,7 @@ public:
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                                          VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
+                                         bool isDirectPropertyAccess,
                                          Type propTy, SGFContext C);
 
 
