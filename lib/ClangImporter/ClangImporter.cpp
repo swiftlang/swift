@@ -96,8 +96,9 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   // Don't stop emitting messages if we ever can't find a file.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
   // the CompilerInvocation.
-  clangDiags->setDiagnosticErrorAsFatal(clang::diag::err_module_not_found,
-                                        false);
+  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
+                                   clang::diag::Mapping::MAP_ERROR,
+                                   clang::SourceLocation());
 
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
