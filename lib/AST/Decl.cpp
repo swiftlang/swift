@@ -1251,11 +1251,41 @@ SourceRange SubscriptDecl::getSourceRange() const {
 }
 
 
-static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
-                                    Type selfTypeOverride,
-                                    bool isStatic, bool isMutatingFunc,
+static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
+                                    bool isInitializingCtor,
                                     bool wantInterfaceType,
                                     GenericParamList **outerGenericParams) {
+  auto *dc = theMethod->getDeclContext();
+  
+  // Determine the type of the container.
+  Type containerTy = wantInterfaceType ? dc->getDeclaredInterfaceType()
+                                       : dc->getDeclaredTypeInContext();
+  //assert(containerTy && "stand alone functions don't have 'self'");
+  if (!containerTy) return Type();
+
+  bool isStatic = false;
+  bool isMutating = false;
+  Type selfTypeOverride;
+  
+  if (auto *FD = dyn_cast<FuncDecl>(theMethod)) {
+    isStatic = FD->isStatic();
+    isMutating = FD->isMutating();
+    selfTypeOverride = FD->getDynamicSelf();
+  } else if (isa<ConstructorDecl>(theMethod)) {
+    if (isInitializingCtor) {
+      // initializing constructors of value types always have an implicitly
+      // @inout self.
+      isMutating = true;
+    } else {
+      // allocating constructors have metatype 'self'.
+      isStatic = true;
+    }
+  } else if (isa<DestructorDecl>(theMethod)) {
+    // destructors of value types always have an implicitly @inout self.
+    isMutating = true;
+  }
+
+  
   if (outerGenericParams)
     *outerGenericParams = nullptr;
   
@@ -1296,7 +1326,7 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
   // by having existential_member_ref and archetype_member_ref take the 'self'
   // base object as an rvalue for @!mutating protocol members, even though that
   // doesn't match the type of the protocol requirement.
-  if (isMutatingFunc || isa<ProtocolDecl>(dc))
+  if (isMutating || isa<ProtocolDecl>(dc))
     return InOutType::get(selfTy);
   
   // Non-mutating methods on structs and enums pass the receiver by value.
@@ -1306,63 +1336,11 @@ static Type getSelfTypeForContainer(DeclContext *dc, Type containerTy,
 
 Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
-  bool isStatic = false;
-  bool isMutating = false;
-  Type selfTypeOverride;
-
-  if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    isStatic = FD->isStatic();
-    isMutating = FD->isMutating();
-    selfTypeOverride = FD->getDynamicSelf();
-  } else if (isa<ConstructorDecl>(this) || isa<DestructorDecl>(this)) {
-    // constructors and destructors of value types always have an implicitly
-    // @inout self.
-    isMutating = true;
-  }
-
-  
-  // Determine the type of the container.
-  Type containerTy = getDeclContext()->getDeclaredTypeInContext();
-  if (!containerTy)
-    return nullptr;
-  
-  return getSelfTypeForContainer(getDeclContext(), containerTy,
-                                 selfTypeOverride, isStatic, isMutating,
-                                 false, outerGenericParams);
+  return getSelfTypeForContainer(this, true, false, outerGenericParams);
 }
 
 Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
-  bool isStatic = false;
-  bool isMutating = false;
-  Type selfTypeOverride;
-
-  if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    isStatic = FD->isStatic();
-    isMutating = FD->isMutating();
-    selfTypeOverride = FD->getDynamicSelf();
-  } else if (isa<ConstructorDecl>(this)) {
-    if (isInitializingCtor) {
-      // initializing constructors of value types always have an implicitly
-      // @inout self.
-      isMutating = true;
-    } else {
-      // allocating constructors have metatype 'self'.
-      isStatic = true;
-    }
-  } else if (isa<DestructorDecl>(this)) {
-    // destructors of value types always have an implicitly @inout self.
-    isMutating = true;
-  }
-
-  
-  // Determine the type of the container.
-  Type containerTy = getDeclContext()->getDeclaredInterfaceType();
-  if (!containerTy)
-    return nullptr;
-  
-  return getSelfTypeForContainer(getDeclContext(), containerTy,
-                                 selfTypeOverride, isStatic, isMutating,
-                                 true, nullptr);
+  return getSelfTypeForContainer(this, isInitializingCtor, true, nullptr);
 }
 
 
