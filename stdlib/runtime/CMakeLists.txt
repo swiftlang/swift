@@ -23,8 +23,16 @@ add_swift_library(swift_runtime INSTALL
 
 add_swift_optimization_flags(swift_runtime)
 
-set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS OFF
-    CACHE BOOL "Overwrite memory for deallocated Swift objects")
+if (SWIFT_OPTIMIZED)
+  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT OFF)
+else()
+  set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT ON)
+endif()
+
+set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  ${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_DEFAULT}
+  CACHE BOOL "Overwrite memory for deallocated Swift objects")
+
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
