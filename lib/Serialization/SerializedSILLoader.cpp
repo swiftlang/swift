@@ -57,5 +57,11 @@ void SerializedSILLoader::getAllVTables() {
     Des->getAllVTables();
 }
 
+/// Deserialize all WitnessTables in all SILModules.
+void SerializedSILLoader::getAllWitnessTables() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllWitnessTables();
+}
+
 // Anchor the SerializedSILLoader v-table.
 void SerializedSILLoader::Callback::_anchor() {}

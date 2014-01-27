@@ -133,6 +133,12 @@ namespace {
     std::vector<BitOffset> GlobalVarOffset;
     DeclID GlobalVarID;
 
+    /// Maps witness table identifier to an ID.
+    Table WitnessTableList;
+    /// Holds the list of WitnessTables.
+    std::vector<BitOffset> WitnessTableOffset;
+    DeclID WitnessTableID;
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
 
@@ -160,6 +166,7 @@ namespace {
     void writeSILInstruction(const SILInstruction &SI);
     void writeVTable(const SILVTable &vt);
     void writeGlobalVar(const SILGlobalVariable &g);
+    void writeWitnessTable(const SILWitnessTable &wt);
     void writeTables();
 
   public:
@@ -173,7 +180,7 @@ namespace {
 SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
                              llvm::BitstreamWriter &Out) :
                             S(S), Ctx(Ctx), Out(Out), FuncID(1),
-                            VTableID(1), GlobalVarID(1) {
+                            VTableID(1), GlobalVarID(1), WitnessTableID(1) {
 }
 
 /// We enumerate all values in a SILFunction beforehand to correctly
@@ -1159,14 +1166,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 }
 
 /// Depending on the RecordKind, we write the SILFunction table, the global
-/// varaible table or the table for SILVTable.
+/// variable table, the table for SILVTable, or the table for SILWitnessTable.
 static void writeTable(const sil_index_block::ListLayout &List,
                        sil_index_block::RecordKind kind,
                        const SILSerializer::Table &table) {
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
           kind == sil_index_block::SIL_VTABLE_NAMES ||
-          kind == sil_index_block::SIL_GLOBALVAR_NAMES) &&
-         "SIL function table, SIL global and SIL vtable are supported");
+          kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
+          kind == sil_index_block::SIL_WITNESSTABLE_NAMES) &&
+         "SIL function table, global, vtable and witness table are supported");
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
@@ -1202,6 +1210,12 @@ void SILSerializer::writeTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_GLOBALVAR_OFFSETS,
                 GlobalVarOffset);
   }
+
+  if (!WitnessTableList.empty()) {
+    writeTable(List, sil_index_block::SIL_WITNESSTABLE_NAMES, WitnessTableList);
+    Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESSTABLE_OFFSETS,
+                WitnessTableOffset);
+  }
 }
 
 void SILSerializer::writeGlobalVar(const SILGlobalVariable &g) {
@@ -1233,6 +1247,40 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   }
 }
 
+/// Generates an identifier for a given NormalProtocolConformance. We use
+/// the identifier to look for a witness table in sil_index block.
+static Identifier getIdOfConformance(const NormalProtocolConformance *npc) {
+  // FIXME: generates a better name. Right now, we don't support look up
+  // a specific witness table in deserialization. So this function and the
+  // corresponding sil_index block is not used.
+  return npc->getProtocol()->getName();
+}
+
+void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
+  WitnessTableList[getIdOfConformance(wt.getConformance())] = WitnessTableID++;
+  WitnessTableOffset.push_back(Out.GetCurrentBitNo());
+  WitnessTableLayout::emitRecord(Out, ScratchRecord,
+                           SILAbbrCodes[WitnessTableLayout::Code],
+                           S.addTypeRef(wt.getConformance()->getType()));
+
+  S.writeConformance(wt.getConformance()->getProtocol(), wt.getConformance(),
+                     nullptr, SILAbbrCodes);
+  for (auto &entry : wt.getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      // FIXME: handle other entry kinds.
+      continue;
+    auto &methodWitness = entry.getMethodWitness();
+    SmallVector<ValueID, 4> ListOfValues;
+    handleSILDeclRef(S, methodWitness.Requirement, ListOfValues);
+    FuncsToDeclare.insert(methodWitness.Witness);
+    WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[WitnessMethodEntryLayout::Code],
+        // SILFunction name
+        S.addIdentifierRef(Ctx.getIdentifier(methodWitness.Witness->getName())),
+        ListOfValues);
+  }
+}
+
 void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
   if (!EnableSerialize && !EnableSerializeAll)
     return;
@@ -1253,6 +1301,8 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
     registerSILAbbr<VTableLayout>();
     registerSILAbbr<VTableEntryLayout>();
     registerSILAbbr<GlobalVarLayout>();
+    registerSILAbbr<WitnessTableLayout>();
+    registerSILAbbr<WitnessMethodEntryLayout>();
 
     registerSILAbbr<SILInstCastLayout>();
 
@@ -1278,6 +1328,12 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
       if (EnableSerializeAll ||
           cd->getAttrs().getResilienceKind() == Resilience::Fragile)
         writeVTable(vt);
+    }
+
+    // Write out WitnessTables. For now, write out only if EnableSerializeAll.
+    for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
+      if (EnableSerializeAll)
+        writeWitnessTable(wt);
     }
 
     // Helper function for whether to emit a function body.

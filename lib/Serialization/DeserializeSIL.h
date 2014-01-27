@@ -46,6 +46,9 @@ namespace swift {
     std::unique_ptr<SerializedFuncTable> GlobalVarList;
     std::vector<ModuleFile::Serialized<SILGlobalVariable*>> GlobalVars;
 
+    std::unique_ptr<SerializedFuncTable> WitnessTableList;
+    std::vector<ModuleFile::Serialized<SILWitnessTable*>> WitnessTables;
+
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
     llvm::DenseMap<uint32_t, std::vector<SILValue>> ForwardMRVLocalValues;
@@ -86,12 +89,15 @@ namespace swift {
     SILFunction *lookupSILFunction(Identifier Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *readGlobalVar(Identifier Name);
+    SILWitnessTable *readWitnessTable(serialization::DeclID);
 
 public:
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILVTable *lookupVTable(Identifier Name);
     /// Deserialize all VTables inside the module and add them to SILMod.
     void getAllVTables();
+    /// Deserialize all WitnessTables inside the module and add them to SILMod.
+    void getAllWitnessTables();
     SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx,
                     SerializedSILLoader::Callback *callback);
 

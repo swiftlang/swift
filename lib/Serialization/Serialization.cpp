@@ -279,6 +279,20 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
   BLOCK_RECORD(sil_block, SIL_INST_CAST);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
+  BLOCK_RECORD(sil_block, SIL_WITNESSTABLE);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
+  // These layouts can exist in both decl blocks and sil blocks.
+#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::BOUND_GENERIC_SUBSTITUTION);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::NO_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::NORMAL_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::INHERITED_PROTOCOL_CONFORMANCE);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -287,6 +301,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_index_block, SIL_VTABLE_OFFSETS);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_NAMES);
   BLOCK_RECORD(sil_index_block, SIL_GLOBALVAR_OFFSETS);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_NAMES);
+  BLOCK_RECORD(sil_index_block, SIL_WITNESSTABLE_OFFSETS);
 
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) BLOCK_RECORD(index_block, Id);

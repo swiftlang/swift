@@ -57,17 +57,19 @@ namespace sil_index_block {
     SIL_VTABLE_NAMES,
     SIL_VTABLE_OFFSETS,
     SIL_GLOBALVAR_NAMES,
-    SIL_GLOBALVAR_OFFSETS
+    SIL_GLOBALVAR_OFFSETS,
+    SIL_WITNESSTABLE_NAMES,
+    SIL_WITNESSTABLE_OFFSETS
   };
 
   using ListLayout = BCGenericRecordLayout<
-    BCFixed<3>,  // record ID
+    BCFixed<4>,  // record ID
     BCVBR<16>,  // table offset within the blob
     BCBlob      // map from identifier strings to IDs.
   >;
 
   using OffsetLayout = BCGenericRecordLayout<
-    BCFixed<3>,  // record ID
+    BCFixed<4>,  // record ID
     BCArray<BitOffsetField>
   >;
 }
@@ -94,6 +96,8 @@ namespace sil_block {
     SIL_GLOBALVAR,
     SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
+    SIL_WITNESSTABLE,
+    SIL_WITNESS_METHOD_ENTRY
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -108,6 +112,18 @@ namespace sil_block {
 
   using VTableEntryLayout = BCRecordLayout<
     SIL_VTABLE_ENTRY,
+    DeclIDField,  // SILFunction name
+    BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using WitnessTableLayout = BCRecordLayout<
+    SIL_WITNESSTABLE,
+    TypeIDField          // Conforming Type.
+    // Normal Protocol Conformance will be serialized immediately after.
+  >;
+
+  using WitnessMethodEntryLayout = BCRecordLayout<
+    SIL_WITNESS_METHOD_ENTRY,
     DeclIDField,  // SILFunction name
     BCArray<ValueIDField> // SILDeclRef
   >;

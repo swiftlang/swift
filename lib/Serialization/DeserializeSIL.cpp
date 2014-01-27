@@ -108,10 +108,10 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
-  // SIL_GLOBALVAR_NAMES. But each one can be omitted if no entries exist
-  // in the module file.
+  // SIL_GLOBALVAR_NAMES, and SIL_WITNESSTABLE_NAMES. But each one can be
+  // omitted if no entries exist in the module file.
   unsigned kind = 0;
-  while (kind != sil_index_block::SIL_GLOBALVAR_NAMES) {
+  while (kind != sil_index_block::SIL_WITNESSTABLE_NAMES) {
     auto next = cursor.advance();
     if (next.Kind == llvm::BitstreamEntry::EndBlock)
       return;
@@ -124,8 +124,10 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
             kind > prevKind &&
             (kind == sil_index_block::SIL_FUNC_NAMES ||
              kind == sil_index_block::SIL_VTABLE_NAMES ||
-             kind == sil_index_block::SIL_GLOBALVAR_NAMES)) &&
-         "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, or SIL_GLOBALVAR_NAMES.");
+             kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
+             kind == sil_index_block::SIL_WITNESSTABLE_NAMES)) &&
+         "Expect SIL_FUNC_NAMES, SIL_VTABLE_NAMES, SIL_GLOBALVAR_NAMES or \
+          SIL_WITNESSTABLE_NAMES.");
     (void)prevKind;
 
     if (kind == sil_index_block::SIL_FUNC_NAMES)
@@ -134,6 +136,8 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
       VTableList = readFuncTable(scratch, blobData);
     else if (kind == sil_index_block::SIL_GLOBALVAR_NAMES)
       GlobalVarList = readFuncTable(scratch, blobData);
+    else if (kind == sil_index_block::SIL_WITNESSTABLE_NAMES)
+      WitnessTableList = readFuncTable(scratch, blobData);
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
     next = cursor.advance();
@@ -155,6 +159,11 @@ SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
               offKind == sil_index_block::SIL_GLOBALVAR_OFFSETS) &&
              "Expect a SIL_GLOBALVAR_OFFSETS record.");
       GlobalVars.assign(scratch.begin(), scratch.end());
+    } else if (kind == sil_index_block::SIL_WITNESSTABLE_NAMES) {
+      assert((next.Kind == llvm::BitstreamEntry::Record &&
+              offKind == sil_index_block::SIL_WITNESSTABLE_OFFSETS) &&
+             "Expect a SIL_WITNESSTABLE_OFFSETS record.");
+      WitnessTables.assign(scratch.begin(), scratch.end());
     }
   }
 }
@@ -424,8 +433,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   ForwardMRVLocalValues.clear();
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
-  // SIL_VTABLE or SIL_GLOBALVAR record also means the end of this SILFunction.
-  while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR) {
+  // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESSTABLE record also means the end
+  // of this SILFunction.
+  while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
+         kind != SIL_WITNESSTABLE) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, scratch);
@@ -1462,7 +1473,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   std::vector<SILVTable::Pair> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
-  while (kind != SIL_VTABLE && kind != SIL_FUNCTION) {
+  while (kind != SIL_VTABLE && kind != SIL_WITNESSTABLE &&
+         kind != SIL_FUNCTION) {
     assert(kind == SIL_VTABLE_ENTRY &&
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
@@ -1505,6 +1517,94 @@ void SILDeserializer::getAllVTables() {
 
   for (unsigned I = 0, E = VTables.size(); I < E; I++)
     readVTable(I+1);
+}
+
+SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
+  if (WId == 0)
+    return nullptr;
+  assert(WId <= WitnessTables.size() && "invalid WitnessTable ID");
+  auto &wTableOrOffset = WitnessTables[WId-1];
+
+  if (wTableOrOffset.isComplete())
+    return wTableOrOffset;
+
+  BCOffsetRAII restoreOffset(SILCursor);
+  SILCursor.JumpToBit(wTableOrOffset);
+  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::Error) {
+    DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable.\n");
+    return nullptr;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  assert(kind == SIL_WITNESSTABLE && "expect a sil witnesstable");
+  (void)kind;
+
+  TypeID TyID;
+  WitnessTableLayout::readRecord(scratch, TyID);
+  if (TyID == 0) {
+    DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
+    return nullptr;
+  }
+
+  // Deserialize Conformance.
+  auto conformancePair = MF->maybeReadConformance(MF->getType(TyID),
+                                                  SILCursor);
+  ProtocolConformance *conformance
+    = conformancePair ? conformancePair->second : nullptr;
+  assert((conformance && isa<NormalProtocolConformance>(conformance)) &&
+         "Protocol conformance in witness table should be normal.");
+  NormalProtocolConformance *theConformance =
+      cast<NormalProtocolConformance>(conformance);
+
+  // Fetch the next record.
+  scratch.clear();
+  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+    // This witnesstable has no contents.
+    return nullptr;
+  kind = SILCursor.readRecord(entry.ID, scratch);
+
+  std::vector<SILWitnessTable::Entry> witnessEntries;
+  // Another SIL_WITNESSTABLE record means the end of this WitnessTable.
+  while (kind != SIL_WITNESSTABLE && kind != SIL_FUNCTION) {
+    // FIXME: handle other witness entries.
+    assert(kind == SIL_WITNESS_METHOD_ENTRY &&
+           "Content of WitnessTable should be in SIL_WITNESS_METHOD_ENTRY.");
+    ArrayRef<uint64_t> ListOfValues;
+    DeclID NameID;
+    WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
+    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
+    if (Func)
+      witnessEntries.push_back(SILWitnessTable::MethodWitness{
+        getSILDeclRef(MF, ListOfValues, 0), Func
+      });
+
+    // Fetch the next record.
+    scratch.clear();
+    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      // EndBlock means the end of this WitnessTable.
+      break;
+    kind = SILCursor.readRecord(entry.ID, scratch);
+  }
+  SILWitnessTable *wT = SILWitnessTable::create(SILMod, theConformance,
+                                                witnessEntries);
+  wTableOrOffset = wT;
+
+  if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  return wT;
+}
+
+/// Deserialize all WitnessTables inside the module and add them to SILMod.
+void SILDeserializer::getAllWitnessTables() {
+  if (!WitnessTableList)
+    return;
+
+  for (unsigned I = 0, E = WitnessTables.size(); I < E; I++)
+    readWitnessTable(I+1);
 }
 
 SILDeserializer::~SILDeserializer() = default;

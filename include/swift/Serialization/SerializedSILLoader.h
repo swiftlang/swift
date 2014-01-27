@@ -21,6 +21,7 @@ class SILFunction;
 class SILGlobalVariable;
 class SILModule;
 class SILVTable;
+class SILWitnessTable;
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -40,6 +41,9 @@ public:
 
     /// Observe that we deserialized a v-table declaration.
     virtual void didDeserialize(Module *M, SILVTable *vtable) {}
+
+    /// Observe that we deserialized a witness-table declaration.
+    virtual void didDeserialize(Module *M, SILWitnessTable *wtable) {}
 
     virtual ~Callback() = default;
   private:
@@ -66,6 +70,8 @@ public:
   SILVTable *lookupVTable(Identifier Name);
   /// Deserialize all VTables in all SILModules.
   void getAllVTables();
+  /// Deserialize all WitnessTables in all SILModules.
+  void getAllWitnessTables();
 
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;
