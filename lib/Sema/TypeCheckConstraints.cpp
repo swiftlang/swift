@@ -268,8 +268,9 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
-  if (Lookup.Results.size() == 1 &&
+  if (!Lookup.Results.empty() &&
       Lookup.Results[0].Kind == UnqualifiedLookupResult::ModuleName) {
+    assert(Lookup.Results.size() == 1 && "module names should be unique");
     ModuleType *MT = ModuleType::get(Lookup.Results[0].getNamedModule());
     return new (TC.Context) ModuleExpr(Loc, MT);
   }
@@ -278,13 +279,15 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SmallVector<ValueDecl*, 4> ResultValues;
   for (auto Result : Lookup.Results) {
     switch (Result.Kind) {
+      case UnqualifiedLookupResult::ModuleName:
+        llvm_unreachable("handled above");
+
       case UnqualifiedLookupResult::MemberProperty:
       case UnqualifiedLookupResult::MemberFunction:
       case UnqualifiedLookupResult::MetatypeMember:
       case UnqualifiedLookupResult::ExistentialMember:
       case UnqualifiedLookupResult::ArchetypeMember:
       case UnqualifiedLookupResult::MetaArchetypeMember:
-      case UnqualifiedLookupResult::ModuleName:
         // Types are never referenced with an implicit 'self'.
         if (!isa<TypeDecl>(Result.getValueDecl())) {
           AllDeclRefs = false;
@@ -296,6 +299,12 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       case UnqualifiedLookupResult::ModuleMember:
       case UnqualifiedLookupResult::LocalDecl: {
         ValueDecl *D = Result.getValueDecl();
+        if (!D->hasType()) {
+          assert(D->getDeclContext()->isLocalContext());
+          TC.diagnose(Loc, diag::use_local_before_declaration, Name);
+          TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
+          return new (TC.Context) ErrorExpr(Loc);
+        }
         if (matchesDeclRefKind(D, UDRE->getRefKind()))
           ResultValues.push_back(D);
         break;
