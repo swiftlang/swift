@@ -2696,7 +2696,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     // The argument to the has-member block is the uncurried method.
     auto valueTy = e->getType()->getOptionalObjectType()->getCanonicalType();
     auto subscript = cast<SubscriptDecl>(e->getMember().getDecl());
-    auto methodTy = subscript->getGetterType()->castTo<AnyFunctionType>()
+    auto methodTy = subscript->getGetter()->getType()->castTo<AnyFunctionType>()
                       ->getResult();
     auto dynamicMethodTy = getDynamicMethodType(SGM, base, member,
                                                 methodTy);

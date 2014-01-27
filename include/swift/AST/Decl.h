@@ -2438,14 +2438,6 @@ public:
     return GetSetInfo->Braces;
   }
 
-  /// Retrieve the type of the getter.
-  Type getGetterType() const;
-  Type getGetterInterfaceType() const;
-
-  /// Retrieve the type of the setter.
-  Type getSetterType() const;
-  Type getSetterInterfaceType() const;
-
   /// Return true if this storage needs to be accessed with getters and
   /// setters for Objective-C.
   bool usesObjCGetterAndSetter() const;

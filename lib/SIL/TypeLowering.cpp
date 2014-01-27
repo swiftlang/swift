@@ -1584,13 +1584,13 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy = cast<AbstractStorageDecl>(capture)->getSetterType();
+      Type setterTy =cast<AbstractStorageDecl>(capture)->getSetter()->getType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy = cast<AbstractStorageDecl>(capture)->getGetterType();
+      Type getterTy =cast<AbstractStorageDecl>(capture)->getGetter()->getType();
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
@@ -1667,14 +1667,14 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
       Type setterTy =
-        cast<AbstractStorageDecl>(capture)->getSetterInterfaceType();
+        cast<AbstractStorageDecl>(capture)->getSetter()->getInterfaceType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
       Type getterTy =
-        cast<AbstractStorageDecl>(capture)->getGetterInterfaceType();
+        cast<AbstractStorageDecl>(capture)->getGetter()->getInterfaceType();
 
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
@@ -1754,25 +1754,22 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
     auto *asd = cast<AbstractStorageDecl>(vd);
-      auto fnType = c.kind == SILDeclRef::Kind::Getter
-        ? asd->getGetterInterfaceType() : asd->getSetterInterfaceType();
+    assert(asd->hasAccessorFunctions() &&
+           "Can't get the getter or setter of something that isn't computed");
+    FuncDecl *accessor =
+      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
+    auto fnType = accessor->getInterfaceType();
     auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (asd->hasAccessorFunctions()) {
-      FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
-        ? asd->getGetter()
-        : asd->getSetter();
-      SmallVector<ValueDecl*, 4> LocalCaptures;
-      property->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
-                                                       LocalCaptures,
-                                                       asd->getDeclContext());
-      return cast<AnyFunctionType>(
-        getInterfaceTypeInContext(fnTy, asd->getDeclContext()));
-    }
-    return accessorMethodType;
+    SmallVector<ValueDecl*, 4> LocalCaptures;
+    accessor->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
+                                                     LocalCaptures,
+                                                     asd->getDeclContext());
+    return cast<AnyFunctionType>(
+      getInterfaceTypeInContext(fnTy, asd->getDeclContext()));
   }
       
   case SILDeclRef::Kind::Allocator:
@@ -1833,23 +1830,20 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   case SILDeclRef::Kind::Getter:
   case SILDeclRef::Kind::Setter: {
     auto *asd = cast<AbstractStorageDecl>(vd);
-    auto fnType = c.kind == SILDeclRef::Kind::Getter
-      ? asd->getGetterType() : asd->getSetterType();
+    assert(asd->hasAccessorFunctions() &&
+           "Can't get the getter or setter of something that isn't computed");
+    FuncDecl *accessor =
+      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
+    auto fnType = accessor->getType();
     auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
 
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    if (asd->hasAccessorFunctions()) {
-      FuncDecl *property = c.kind == SILDeclRef::Kind::Getter
-        ? asd->getGetter()
-        : asd->getSetter();
-      SmallVector<ValueDecl*, 4> LocalCaptures;
-      property->getCaptureInfo().getLocalCaptures(LocalCaptures);
-      return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
-                                         asd->getDeclContext());
-    }
-    return accessorMethodType;
+    SmallVector<ValueDecl*, 4> LocalCaptures;
+    accessor->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
+                                       asd->getDeclContext());
   }
       
   case SILDeclRef::Kind::Allocator:

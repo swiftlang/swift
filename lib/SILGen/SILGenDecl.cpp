@@ -790,7 +790,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = cast<AbstractStorageDecl>(capture)->getSetterType();
+    Type setTy = cast<AbstractStorageDecl>(capture)->getSetter()->getType();
     SILType lSetTy = gen.getLoweredType(setTy);
     SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
@@ -799,7 +799,7 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = cast<AbstractStorageDecl>(capture)->getGetterType();
+    Type getTy = cast<AbstractStorageDecl>(capture)->getGetter()->getType();
     SILType lGetTy = gen.getLoweredType(getTy);
     SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
     gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
