@@ -1745,7 +1745,7 @@ namespace {
     AbstractCC CC;
 
     ParamLowering(CanSILFunctionType fnType) :
-      Params(fnType->getParametersWithoutIndirectResult()),
+      Params(fnType->getInterfaceParametersWithoutIndirectResult()),
       CC(fnType->getAbstractCC()) {}
 
     ArrayRef<SILParameterInfo>
