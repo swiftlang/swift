@@ -56,8 +56,6 @@ class CompilerInvocation {
   DiagnosticOptions DiagnosticOpts;
   IRGenOptions IRGenOpts;
 
-  bool Immediate = false;
-
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
   /// \brief Code completion offset in bytes from the beginning of the main
@@ -262,14 +260,6 @@ public:
 
   bool isDelayedFunctionBodyParsing() const {
     return FrontendOpts.DelayedFunctionBodyParsing;
-  }
-
-  void setImmediate(bool Val) {
-    Immediate = Val;
-  }
-  
-  bool isImmediate() const {
-    return Immediate;
   }
 };
 

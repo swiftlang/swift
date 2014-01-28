@@ -42,8 +42,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
                                Invocation.getSearchPathOptions(),
                                SourceMgr, Diagnostics));
 
-  Context->addModuleLoader(SourceLoader::create(*Context,
-                                                !Invocation.isImmediate()));
+  bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
+  Context->addModuleLoader(SourceLoader::create(*Context, !immediate));
   SML = SerializedModuleLoader::create(*Context);
   Context->addModuleLoader(SML);
 

@@ -38,3 +38,25 @@ bool FrontendOptions::actionHasOutput() {
   }
   llvm_unreachable("Unknown ActionType");
 }
+
+bool FrontendOptions::actionIsImmediate() {
+  switch (RequestedAction) {
+  case Parse:
+  case DumpParse:
+  case DumpAST:
+  case PrintAST:
+  case EmitSILGen:
+  case EmitSIL:
+  case EmitModuleOnly:
+    return false;
+  case Immediate:
+  case REPL:
+    return true;
+  case EmitAssembly:
+  case EmitIR:
+  case EmitBC:
+  case EmitObject:
+    return false;
+  }
+  llvm_unreachable("Unknown ActionType");
+}

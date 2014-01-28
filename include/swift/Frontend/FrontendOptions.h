@@ -138,6 +138,9 @@ public:
 
   /// Indicates whether the RequestedAction has output.
   bool actionHasOutput();
+
+  /// Indicates whether the RequestedAction will immediately run code.
+  bool actionIsImmediate();
 };
 
 }
