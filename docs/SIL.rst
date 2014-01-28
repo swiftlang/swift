@@ -1075,10 +1075,16 @@ gets called in SIL as::
 Reference Counts
 ````````````````
 
-Reference type arguments are passed in at +1 retain count and consumed by the
-callee. A reference type return value is returned at +1 and consumed by the
-caller. Value types with reference type components have their reference
-type components each retained and released the same way. This Swift function::
+*NOTE* This section only is speaking in terms of rules of thumb. The
+actual behavior of arguments with respect to arguments is defined by
+the argument's convention attribute (e.g. ``@owned``), not the
+calling convention itself.
+
+Reference type arguments are passed in at +1 retain count and consumed
+by the callee. A reference type return value is returned at +1 and
+consumed by the caller. Value types with reference type components
+have their reference type components each retained and released the
+same way. This Swift function::
 
   class A {}
 
