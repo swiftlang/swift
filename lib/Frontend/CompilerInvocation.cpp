@@ -160,16 +160,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   }
   Opts.RequestedAction = Action;
 
-  if (Opts.RequestedAction == FrontendOptions::REPL &&
-      !Opts.InputFilenames.empty()) {
-    // TODO: emit diagnostic
-    llvm::errs() << "error: REPL mode requires no input files\n";
-    return true;
-  } else if (Opts.RequestedAction == FrontendOptions::Immediate &&
-             Opts.PrimaryInput.hasValue()) {
+  if (Opts.RequestedAction == FrontendOptions::Immediate &&
+      Opts.PrimaryInput.hasValue()) {
     // TODO: emit diagnostic
     llvm::errs() << "error: immediate mode is incompatible with -primary-file"
-                 << '\n';
+    "\n";
     return true;
   }
 
@@ -179,6 +174,26 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     // treat the input as SIL.
     StringRef Input(Opts.InputFilenames[0]);
     TreatAsSIL = llvm::sys::path::extension(Input).endswith(SIL_EXTENSION);
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::REPL) {
+    if (!Opts.InputFilenames.empty()) {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: REPL mode requires no input files\n";
+      return true;
+    }
+  } else if (TreatAsSIL) {
+    if (Opts.InputFilenames.size() != 1) {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: this mode requires a single input file\n";
+      return true;
+    }
+  } else {
+    if (Opts.InputFilenames.empty()) {
+      // TODO: emit diagnostic
+      llvm::errs() << "error: this mode requires at least one input file\n";
+      return true;
+    }
   }
 
   if (TreatAsSIL)
@@ -398,6 +413,27 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       // OutputFilename, so determine an output path based on other inputs.
       Opts.ModuleOutputPath =
         determineOutputFilename(SERIALIZED_MODULE_EXTENSION);
+  }
+
+  if (!Opts.ModuleOutputPath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::Parse:
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      llvm::errs() << "swift: this mode is incompatible with -emit-module.\n";
+      return true;
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+      break;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
