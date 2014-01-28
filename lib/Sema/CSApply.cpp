@@ -190,7 +190,8 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 
 /// Adjust the given type to become the self type when referring to
 /// the given member.
-static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
+static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
+                                    bool IsDirectPropertyAccess) {
   auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an @inout type, turn the base type into an lvalue
@@ -216,7 +217,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
   // If the base of the access is mutable, then we may be invoking a getter or
   // setter and the base needs to be mutable.
   if (auto *VD = dyn_cast<VarDecl>(member)) {
-    if (VD->hasAccessorFunctions() && baseTy->is<InOutType>())
+    if (VD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
+        !IsDirectPropertyAccess)
       return InOutType::get(baseObjectTy);
    
     // If the member is a let, the base is always an unqualified baseObjectTy.
@@ -246,17 +248,26 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member) {
 /// "isDirectPropertyAccess".
 static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
                                             DeclContext *DC) {
-  // Properties with "StoredObjC" storage have storage the class, but are
-  // usually accessed through accessors.  However, in init and destructor
-  // methods, accesses are done direct.
-  if (member->getStorageKind() == VarDecl::StoredObjC &&
+
+  // "StoredObjC" and "WillSetDidSet" properties have storage, but are usually
+  // accessed through accessors.  However, in init and destructor methods,
+  // accesses are done direct.
+  if ((member->getStorageKind() == VarDecl::StoredObjC ||
+       member->getStorageKind() == VarDecl::WillSetDidSet) &&
       (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
       isa<DeclRefExpr>(base) &&
       cast<AbstractFunctionDecl>(DC)->getImplicitSelfDecl() ==
       cast<DeclRefExpr>(base)->getDecl()) {
     return true;
   }
-  
+
+  // WillSetDidSet member are accessed directly from within their didSet/willSet
+  // specifiers.  This prevents assignments from becoming infinite loops.
+  if (member->getStorageKind() == VarDecl::WillSetDidSet)
+    if (auto *FD = dyn_cast<FuncDecl>(DC))
+      if (FD->getAccessorStorageDecl() == member)
+        return true;
+
   return false;
 }
 
@@ -468,6 +479,11 @@ namespace {
         baseTy = proto->getDeclaredType();
       }
 
+      // References to properties with accessors and storage usually go
+      // through the accessors, but sometimes are direct.
+      if (auto *VD = dyn_cast<VarDecl>(member))
+        IsDirectPropertyAccess |= isImplicitDirectMemberReference(base, VD, dc);
+
       if (baseIsInstance) {
         // Convert the base to the appropriate container type, turning it
         // into an lvalue if required.
@@ -484,7 +500,7 @@ namespace {
         }
         base = coerceObjectArgumentToType(
                  base, 
-                 adjustSelfTypeForMember(selfTy, member),
+                 adjustSelfTypeForMember(selfTy, member,IsDirectPropertyAccess),
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
@@ -526,11 +542,6 @@ namespace {
         return ref;
       }
 
-      // References to properties with accessors and storage usually go
-      // through the accessors, but sometimes are direct.
-      if (auto *VD = dyn_cast<VarDecl>(member))
-        IsDirectPropertyAccess |= isImplicitDirectMemberReference(base, VD, dc);
-      
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         auto result
@@ -773,10 +784,10 @@ namespace {
           baseTy = proto->getDeclaredType();
         }
 
-        // Materialize if we need to.
-        base = coerceObjectArgumentToType(base, 
+        base = coerceObjectArgumentToType(base,
                                           adjustSelfTypeForMember(baseTy, 
-                                                                  subscript), 
+                                                                  subscript,
+                                                                  false),
                                           locator);
         if (!base)
           return nullptr;
@@ -793,7 +804,8 @@ namespace {
         // Coerce as an object argument.
         base = coerceObjectArgumentToType(base, 
                                           adjustSelfTypeForMember(baseTy, 
-                                                                  subscript),
+                                                                  subscript,
+                                                                  false),
                                           locator);
         if (!base)
           return nullptr;
@@ -823,7 +835,8 @@ namespace {
         containerTy = solution.simplifyType(tc, openedBaseType);
         base = coerceObjectArgumentToType(base, 
                                           adjustSelfTypeForMember(containerTy, 
-                                                                  subscript),
+                                                                  subscript,
+                                                                  false),
                                           locator);
                  locator.withPathElement(ConstraintLocator::MemberRefBase);
         if (!base)
@@ -844,7 +857,8 @@ namespace {
         // Materialize if we need to.
         base = coerceObjectArgumentToType(base, 
                                           adjustSelfTypeForMember(baseTy,
-                                                                  subscript),
+                                                                  subscript,
+                                                                  false),
                                           locator);
         if (!base)
           return nullptr;
@@ -860,7 +874,7 @@ namespace {
         if (base->getType()->is<LValueType>())
           selfTy = InOutType::get(selfTy);
 
-      selfTy = adjustSelfTypeForMember(selfTy, subscript);
+      selfTy = adjustSelfTypeForMember(selfTy, subscript, false);
 
       // Coerce the base to the container type.
       base = coerceObjectArgumentToType(base, selfTy, locator);
