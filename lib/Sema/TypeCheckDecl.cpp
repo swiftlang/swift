@@ -1193,7 +1193,6 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   VarDecl *SelfDecl = nullptr;
 
   auto *Get = createGetterPrototype(VD, SelfDecl);
-  Get->setIsObjC(true);
   
   // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
   auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
@@ -1207,9 +1206,6 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   VarDecl *ValueDecl = nullptr;
 
   auto *Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
-
-  // Self comes in at +0 for this accessor.
-  Set->setIsObjC(true);
 
   // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
   //                decl_ref_expr(value))
@@ -1234,6 +1230,87 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   members.push_back(Set);
   CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
 }
+
+/// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
+/// (trivial) getter and the setter, which calls these.
+static void synthesizeWillSetDidSetAccessors(VarDecl *VD) {
+  assert(VD->getStorageKind() == VarDecl::WillSetDidSet);
+  assert(!VD->getGetter() && !VD->getSetter() &&
+         "willSet/didSet var already has a getter or setter");
+  
+  auto &Ctx = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
+  
+  VarDecl *SelfDecl = nullptr;
+  
+  /// The getter is always trivial: just perform a (direct!) load of storage.
+  auto *Get = createGetterPrototype(VD, SelfDecl);
+  
+  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
+  auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+  auto *MRE = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                      /*implicit*/true,/*direct ivar*/true);
+  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
+  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+  
+
+  // Okay, the getter is done, create the setter now.
+  VarDecl *ValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
+  
+  // The setter invokes willSet with the incoming value, then does a direct
+  // store, then invokes didSet.
+  SmallVector<ASTNode, 3> SetterBody;
+
+  // Create: (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
+  //                                          (decl_ref_expr(self))),
+  //                    (declrefexpr(value)))
+  if (VD->getWillSetFunc()) {
+    auto *WillSetDRE = new (Ctx) DeclRefExpr(VD->getWillSetFunc(),
+                                             SourceLoc(), /*imp*/true);
+    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+    auto *DSCE = new (Ctx) DotSyntaxCallExpr(WillSetDRE, SourceLoc(), SelfDRE);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+    SetterBody.push_back(new (Ctx) CallExpr(DSCE, ValueDRE, true));
+  }
+  
+  // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
+  //                decl_ref_expr(value))
+  auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+  MRE = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
+                                    /*implicit*/true, /*direct ivar*/true);
+  SetterBody.push_back(new (Ctx) AssignExpr(MRE, SourceLoc(),
+                                                ValueDRE, true));
+  
+  // Create: (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
+  //                                          (decl_ref_expr(self))),
+  //                    (tuple_expr()))
+  if (VD->getDidSetFunc()) {
+    auto *DidSetDRE = new (Ctx) DeclRefExpr(VD->getDidSetFunc(),
+                                            SourceLoc(), /*imp*/true);
+    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+    auto *DSCE = new (Ctx) DotSyntaxCallExpr(DidSetDRE, SourceLoc(), SelfDRE);
+    auto *Tuple = new (Ctx) TupleExpr(SourceLoc(), {}, nullptr, SourceLoc(),
+                                      /*trailing closure*/false, /*impl*/true);
+    SetterBody.push_back(new (Ctx) CallExpr(DSCE, Tuple, true));
+  }
+  
+  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
+  
+  
+  VD->setDidSetWillSetAccessors(Get, Set);
+  
+  // We've added some members to our containing class, add them to the members
+  // list.
+  auto *NTD = cast<NominalTypeDecl>(VD->getDeclContext());
+  SmallVector<Decl*, 4> members(NTD->getMembers().begin(),
+                                NTD->getMembers().end());
+  members.push_back(Get);
+  members.push_back(Set);
+  NTD->setMembers(Ctx.AllocateCopy(members), NTD->getBraces());
+}
+
 
 namespace {
 
@@ -1344,8 +1421,8 @@ public:
         TC.typeCheckDecl(VD->getGetter(), true);
       }
       
-      // If this is a stored ObjC ivar and should have an objc getter and
-      // setter, then change its storage kind to reflect that.
+      // If this is a stored ObjC property and should have an objc getter and
+      // setter, then synthesize the accessors and change its storage kind.
       if (VD->getStorageKind() == VarDecl::Stored &&
           VD->usesObjCGetterAndSetter() &&
           // FIXME: properties in protocols should not be modeled as stored
@@ -1358,6 +1435,15 @@ public:
         TC.typeCheckDecl(VD->getSetter(), true);
       }
 
+      // If this is a willSet/didSet property, synthesize the getter and setter
+      // decl.
+      if (VD->getStorageKind() == VarDecl::WillSetDidSet && !VD->getGetter()) {
+        synthesizeWillSetDidSetAccessors(VD);
+        
+        // Type check the body of the getter and setter.
+        TC.typeCheckDecl(VD->getGetter(), true);
+        TC.typeCheckDecl(VD->getSetter(), true);
+      }
       return;
     }
 
