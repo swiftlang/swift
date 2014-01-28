@@ -1030,7 +1030,7 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSetInfo = new (Mem) GetSetRecord;
+  GetSetInfo = new (Mem) GetSetRecord();
   GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
   GetSetInfo->Get = Get;
   GetSetInfo->Set = Set;
@@ -1050,7 +1050,7 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   assert(Get && Set);
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
-  GetSetInfo = new (Mem) GetSetRecord;
+  GetSetInfo = new (Mem) GetSetRecord();
   GetSetInfo->Braces = SourceRange();
   GetSetInfo->Get = Get;
   GetSetInfo->Set = Set;
@@ -1073,14 +1073,15 @@ void AbstractStorageDecl::makeWillSetDidSet(SourceLoc LBraceLoc,
                                alignof(WillSetDidSetRecord));
   GetSetInfo = new (Mem) WillSetDidSetRecord;
   GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
+
+  // Mark that this is a WillSetDidSet property.
+  setStorageKind(WillSetDidSet);
+
   getDidSetInfo().WillSet = WillSet;
   getDidSetInfo().DidSet = DidSet;
   
   if (WillSet) WillSet->makeAccessor(this, FuncDecl::IsWillSet);
   if (DidSet) DidSet->makeAccessor(this, FuncDecl::IsDidSet);
-  
-  // Mark that this is a StorageObjC property.
-  setStorageKind(WillSetDidSet);
 }
 
 /// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
