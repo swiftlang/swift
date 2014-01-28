@@ -397,13 +397,7 @@ namespace {
     void set(SILGenFunction &gen, SILLocation loc,
              RValueSource &&rvalue, ManagedValue base) const override {
       // Pass in just the setter.
-      AbstractFunctionDecl *setter;
-      if (auto *VD = dyn_cast<VarDecl>(decl))
-        setter = VD->getSetter();
-      else
-        setter = cast<SubscriptDecl>(decl)->getSetter();
-      
-      auto args = prepareAccessorArgs(gen, loc, base, setter);
+      auto args = prepareAccessorArgs(gen, loc, base, decl->getSetter());
       
       return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
@@ -413,13 +407,7 @@ namespace {
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
                      ManagedValue base, SGFContext c) const override {
-      AbstractFunctionDecl *getter;
-      if (auto *VD = dyn_cast<VarDecl>(decl))
-        getter = VD->getGetter();
-      else
-        getter = cast<SubscriptDecl>(decl)->getGetter();
-
-      auto args = prepareAccessorArgs(gen, loc, base, getter);
+      auto args = prepareAccessorArgs(gen, loc, base, decl->getGetter());
       
       return gen.emitGetAccessor(loc, decl, substitutions,
                                  std::move(args.base),
