@@ -530,10 +530,10 @@ void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
 
   // Inject the SDK path if it is missing.
   for (auto A : Args) {
-    if (StringRef(A).startswith("-sdk="))
+    if (StringRef(A).startswith("-sdk"))
       return;
   }
-  OS << " -sdk=";
+  OS << " -sdk ";
   PrintArg(OS, SDKPath.data(), false);
 }
 
