@@ -115,10 +115,8 @@ namespace {
 }
 
 ArrayRef<Substitution> SILGenFunction::getForwardingSubstitutions() {
-  auto outerFTy = F.getLoweredFunctionType();
-  if (outerFTy->isPolymorphic()) {
-    return buildForwardingSubstitutions(outerFTy->getGenericParams());
-  }
+  if (auto gp = F.getContextGenericParams())
+    return buildForwardingSubstitutions(gp);
   return {};
 }
 
