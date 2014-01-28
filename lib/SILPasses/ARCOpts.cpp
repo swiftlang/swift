@@ -31,7 +31,6 @@ static llvm::cl::opt<bool>
 EnableARCOpts("enable-arc-opts", llvm::cl::Hidden, llvm::cl::init(true));
 
 STATISTIC(NumIncrements, "Total number of increments seen");
-STATISTIC(NumMovedIncrements, "Total number of increments moved");
 STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
 
 //===----------------------------------------------------------------------===//
@@ -438,11 +437,6 @@ performCodeMotion(llvm::DenseMap<SILInstruction *,
 
       ++NumIncrementsRemoved;
       continue;
-    }
-    
-    if (Pair.second.canBeMoved() && InsertPt) {
-      Pair.second.getInstruction()->moveBefore(InsertPt);
-      ++NumMovedIncrements;
     }
   }
 
