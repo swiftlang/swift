@@ -171,6 +171,8 @@ ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
 // Variable getters/setters
+ERROR(willsetdidset_requires_type,decl_parsing,none,
+      "willSet/didSet properties must be defined in a type right now", ())
 ERROR(expected_getset_in_protocol,decl_parsing,none,
       "expected get or set in a protocol property", ())
 ERROR(getset_missing_type,decl_parsing,none,

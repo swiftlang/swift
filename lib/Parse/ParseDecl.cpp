@@ -1426,6 +1426,14 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       Set = nullptr;
     }
 
+    // We don't support willSet/didSet properties defined outside of a type.
+    if (!(Flags & PD_HasContainerType)) {
+      diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
+               diag::willsetdidset_requires_type);
+      Invalid = true;
+      return;
+    }
+    
     PrimaryVar->makeWillSetDidSet(LBLoc, WillSet, DidSet, RBLoc);
     return;
   }
