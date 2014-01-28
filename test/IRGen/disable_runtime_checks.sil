@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 -disable-all-runtime-checks -emit-llvm %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -disable-all-runtime-checks -emit-ir %s | FileCheck %s
 
 sil_stage canonical
 import Builtin

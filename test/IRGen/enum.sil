@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-llvm -enable-dynamic-value-type-layout | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -enable-dynamic-value-type-layout | FileCheck %s
 
 sil_stage canonical
 

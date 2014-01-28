@@ -1,4 +1,4 @@
-// RUN: %swift -emit-llvm -target x86_64-apple-darwin10 %s | FileCheck %s
+// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
 
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TYPE:%swift.type]] = type
