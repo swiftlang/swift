@@ -918,6 +918,14 @@ private:
       entityKind = Node::Kind::Setter;
       name = demangleDeclName();
       if (!name) return nullptr;
+    } else if (Mangled.nextIf('w')) {
+      entityKind = Node::Kind::WillSet;
+      name = demangleDeclName();
+      if (!name) return nullptr;
+    } else if (Mangled.nextIf('W')) {
+      entityKind = Node::Kind::DidSet;
+      name = demangleDeclName();
+      if (!name) return nullptr;
     } else if (Mangled.nextIf('U')) {
       entityKind = Node::Kind::ExplicitClosure;
       name = demangleIndexAsNode();
@@ -2122,6 +2130,12 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::Setter:
     printEntity(true, true, ".setter");
+    return;
+  case Node::Kind::WillSet:
+    printEntity(true, true, ".willset");
+    return;
+  case Node::Kind::DidSet:
+    printEntity(true, true, ".didset");
     return;
   case Node::Kind::Allocator:
     printEntity(false, true, "__allocating_init");

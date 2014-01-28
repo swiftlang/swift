@@ -275,15 +275,23 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
       return mangleConstructorEntity(ctor, /*allocating*/ false,
                                      ResilienceExpansion::Minimal,
                                      /*uncurry*/ 0);
-    } else if (auto dtor = dyn_cast<DestructorDecl>(fn)) {
+    }
+    
+    if (auto dtor = dyn_cast<DestructorDecl>(fn))
       return mangleDestructorEntity(dtor, /*deallocating*/ false);
-    } else if (auto func = dyn_cast<FuncDecl>(fn)) {
-      if (func->isGetter())
-        return mangleGetterEntity(func->getAccessorStorageDecl(),
-                                  ResilienceExpansion::Minimal);
-      if (func->isSetter())
-        return mangleSetterEntity(func->getAccessorStorageDecl(),
-                                  ResilienceExpansion::Minimal);
+    
+    if (auto func = dyn_cast<FuncDecl>(fn)) {
+      char Code = '\0';
+      switch (func->getAccessorKind()) {
+      case FuncDecl::IsGetter: Code = 'g'; break;
+      case FuncDecl::IsSetter: Code = 's'; break;
+      case FuncDecl::IsWillSet: Code = 'w'; break;
+      case FuncDecl::IsDidSet: Code = 'W'; break;
+      case FuncDecl::NotAccessor: break;
+      }
+      if (Code)
+        return mangleAccessorEntity(Code, func->getAccessorStorageDecl(),
+                                    ResilienceExpansion::Minimal);
     }
     return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
@@ -1108,21 +1116,14 @@ void Mangler::mangleDestructorEntity(DestructorDecl *dtor,
 void Mangler::mangleIVarInitDestroyEntity(ClassDecl *decl, bool isDestroyer) {
   Buffer << 'F';
   mangleContext(decl, BindGenerics::Enclosing);
-  Buffer << (isDestroyer? 'E' : 'e');
+  Buffer << (isDestroyer ? 'E' : 'e');
 }
 
-void Mangler::mangleGetterEntity(ValueDecl *decl, ResilienceExpansion explosion) {
+void Mangler::mangleAccessorEntity(char Code, ValueDecl *decl,
+                                   ResilienceExpansion explosion) {
   Buffer << 'F';
   mangleContextOf(decl, BindGenerics::All);
-  Buffer << 'g';
-  mangleDeclName(decl);
-  mangleDeclType(decl, explosion, 0);
-}
-
-void Mangler::mangleSetterEntity(ValueDecl *decl, ResilienceExpansion explosion) {
-  Buffer << 'F';
-  mangleContextOf(decl, BindGenerics::All);
-  Buffer << 's';
+  Buffer << Code;
   mangleDeclName(decl);
   mangleDeclType(decl, explosion, 0);
 }
@@ -1152,7 +1153,7 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  assert(!isa<FuncDecl>(decl) || !cast<FuncDecl>(decl)->isGetterOrSetter());
+  assert(!isa<FuncDecl>(decl) || !cast<FuncDecl>(decl)->isAccessor());
 
   BindGenerics shouldBindParent = BindGenerics::All;
 

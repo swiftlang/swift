@@ -690,6 +690,8 @@ Globals
   entity-name ::= 's' decl-name type     // setter
   entity-name ::= 'U' index type         // explicit anonymous closure expression
   entity-name ::= 'u' index type         // implicit anonymous closure
+  entity-name ::= 'w' decl-name type     // willSet
+  entity-name ::= 'W' decl-name type     // didSet
   decl-name ::= identifier
   decl-name ::= local-decl-name
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration

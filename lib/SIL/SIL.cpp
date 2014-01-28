@@ -360,6 +360,26 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
       buffer << c.getDecl()->getAttrs().AsmName;
       return;
     }
+      
+    if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
+      switch (FD->getAccessorKind()) {
+      default: assert(0 && "Unhandled accessor");
+      case FuncDecl::NotAccessor: break;
+      case FuncDecl::IsWillSet:
+        //   entity ::= declaration 'w'                 // willSet
+        buffer << introducer;
+        mangler.mangleAccessorEntity('w', FD->getAccessorStorageDecl(),
+                                     expansion);
+        return;
+
+      case FuncDecl::IsDidSet:
+        //   entity ::= declaration 'W'                 // didSet
+        buffer << introducer;
+        mangler.mangleAccessorEntity('W', FD->getAccessorStorageDecl(),
+                                     expansion);
+        return;
+      }
+    }
 
     // Otherwise, fall through into the 'other decl' case.
     SWIFT_FALLTHROUGH;
@@ -429,13 +449,13 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
   //   entity ::= declaration 'g'                 // getter
   case SILDeclRef::Kind::Getter:
     buffer << introducer;
-    mangler.mangleGetterEntity(c.getDecl(), expansion);
+    mangler.mangleAccessorEntity('g', c.getDecl(), expansion);
     return;
 
   //   entity ::= declaration 's'                 // setter
   case SILDeclRef::Kind::Setter:
     buffer << introducer;
-    mangler.mangleSetterEntity(c.getDecl(), expansion);
+    mangler.mangleAccessorEntity('s', c.getDecl(), expansion);
     return;
 
   //   entity ::= declaration 'a'                 // addressor

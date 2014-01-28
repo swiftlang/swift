@@ -1055,7 +1055,15 @@ namespace {
         
         if (VD->hasAccessorFunctions()) {
           // Add getter & setter in source order.
-          FuncDecl* Accessors[2] = {VD->getGetter(), VD->getSetter()};
+          FuncDecl *Accessors[2];
+          
+          if (VD->getStorageKind() == VarDecl::WillSetDidSet) {
+            Accessors[0] = VD->getWillSetFunc();
+            Accessors[1] = VD->getDidSetFunc();
+          } else {
+            Accessors[0] = VD->getGetter();
+            Accessors[1] = VD->getSetter();
+          }
           if (Accessors[0] && Accessors[1] &&
               !Context.SourceMgr.isBeforeInBuffer(
                   Accessors[0]->getFuncLoc(), Accessors[1]->getFuncLoc())) {
