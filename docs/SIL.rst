@@ -452,7 +452,8 @@ number of ways:
 A direct parameter or result of trivial type must always be unowned.
 
 An owned direct parameter or result is transferred to the recipient,
-which becomes responsible for destroying the value.
+which becomes responsible for destroying the value. This means that
+the value is passed at +1.
 
 An unowned direct parameter or result is instantaneously valid at the
 point of transfer.  The recipient does not need to worry about race
@@ -462,7 +463,9 @@ needed sooner rather than later.
 
 A guaranteed direct parameter is like an unowned direct parameter
 value, except that it is guaranteed by the caller to remain valid
-throughout the execution of the call.
+throughout the execution of the call. This means that any
+``strong_retain``, ``strong_release`` pairs in the callee on the
+argument can be eliminated.
 
 An autoreleased direct result must have object pointer type.  It may
 have been autoreleased, and the caller should take action to reclaim
