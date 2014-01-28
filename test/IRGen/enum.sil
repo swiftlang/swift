@@ -82,6 +82,7 @@ import Builtin
 // -- Dynamic enums. The type layout is opaque; we dynamically bitcast to
 //    the element type.
 // CHECK: %O4enum20DynamicSinglePayload = type <{}>
+// CHECK: [[DYNAMIC_SINGLE_EMPTY_PAYLOAD:%O4enum20DynamicSinglePayload\.[0-9]+]] = type <{ [1 x i8] }>
 // CHECK: %O4enum16DynamicSingleton = type <{}>
 
 // -- Dynamic metadata template carries a value witness table pattern
@@ -1131,9 +1132,9 @@ end(%z : $()):
   return %z : $()
 }
 
-// CHECK: define i2 @dynamic_single_payload_empty_payload_load(%O4enum20DynamicSinglePayload.0* noalias) {
+// CHECK: define i2 @dynamic_single_payload_empty_payload_load([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* noalias) {
 // CHECK: entry:
-// CHECK:   %1 = bitcast %O4enum20DynamicSinglePayload.0* %0 to i2*
+// CHECK:   %1 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
 // CHECK:   %2 = load i2* %1, align 1
 // CHECK:   ret i2 %2
 // CHECK: }
@@ -1143,9 +1144,9 @@ entry(%p : $*DynamicSinglePayload<()>):
   return %x : $DynamicSinglePayload<()>
 }
 
-// CHECK: define void @dynamic_single_payload_empty_payload_store(%O4enum20DynamicSinglePayload.0* noalias, i2) {
+// CHECK: define void @dynamic_single_payload_empty_payload_store([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* noalias, i2) {
 // CHECK: entry:
-// CHECK:   %2 = bitcast %O4enum20DynamicSinglePayload.0* %0 to i2*
+// CHECK:   %2 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
 // CHECK:   store i2 %1, i2* %2, align 1
 // CHECK:   ret void
 // CHECK: }
