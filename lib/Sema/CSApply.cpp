@@ -499,8 +499,7 @@ namespace {
               selfTy = InOutType::get(selfTy);
         }
         base = coerceObjectArgumentToType(
-                 base, 
-                 adjustSelfTypeForMember(selfTy, member,IsDirectPropertyAccess),
+                 base,  selfTy, member, IsDirectPropertyAccess,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
@@ -721,12 +720,17 @@ namespace {
     ///
     /// \param expr The expression to coerce.
     ///
-    /// \param toType The type to coerce to. This function ignores whether
-    /// the 'to' type is an lvalue type or not, and produces an expression
-    /// with the correct type for use as an lvalue.
+    /// \param baseTy The base type
+    ///
+    /// \param member The member being accessed.
+    ///
+    /// \param IsDirectPropertyAccess True if this is a direct access to
+    ///        computed properties that have storage.
     ///
     /// \param locator Locator used to describe where in this expression we are.
-    Expr *coerceObjectArgumentToType(Expr *expr, Type toType,
+    Expr *coerceObjectArgumentToType(Expr *expr,
+                                     Type baseTy, ValueDecl *member,
+                                     bool IsDirectPropertyAccess,
                                      ConstraintLocatorBuilder locator);
 
   private:
@@ -784,10 +788,7 @@ namespace {
           baseTy = proto->getDeclaredType();
         }
 
-        base = coerceObjectArgumentToType(base,
-                                          adjustSelfTypeForMember(baseTy, 
-                                                                  subscript,
-                                                                  false),
+        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
                                           locator);
         if (!base)
           return nullptr;
@@ -802,10 +803,7 @@ namespace {
       // Handle subscripting of archetypes.
       if (baseTy->is<ArchetypeType>() && containerTy->is<ProtocolType>()) {
         // Coerce as an object argument.
-        base = coerceObjectArgumentToType(base, 
-                                          adjustSelfTypeForMember(baseTy, 
-                                                                  subscript,
-                                                                  false),
+        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
                                           locator);
         if (!base)
           return nullptr;
@@ -833,10 +831,7 @@ namespace {
         auto openedFullFnType = selected.openedFullType->castTo<FunctionType>();
         auto openedBaseType = openedFullFnType->getInput();
         containerTy = solution.simplifyType(tc, openedBaseType);
-        base = coerceObjectArgumentToType(base, 
-                                          adjustSelfTypeForMember(containerTy, 
-                                                                  subscript,
-                                                                  false),
+        base = coerceObjectArgumentToType(base, containerTy, subscript, false,
                                           locator);
                  locator.withPathElement(ConstraintLocator::MemberRefBase);
         if (!base)
@@ -855,10 +850,7 @@ namespace {
       // Handle subscripting of existential types.
       if (baseTy->isExistentialType()) {
         // Materialize if we need to.
-        base = coerceObjectArgumentToType(base, 
-                                          adjustSelfTypeForMember(baseTy,
-                                                                  subscript,
-                                                                  false),
+        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
                                           locator);
         if (!base)
           return nullptr;
@@ -874,15 +866,14 @@ namespace {
         if (base->getType()->is<LValueType>())
           selfTy = InOutType::get(selfTy);
 
-      selfTy = adjustSelfTypeForMember(selfTy, subscript, false);
-
       // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, selfTy, locator);
+      base = coerceObjectArgumentToType(base, selfTy, subscript, false,
+                                        locator);
       if (!base)
         return nullptr;
 
       // Form a normal subscript.
-      SubscriptExpr *subscriptExpr
+      auto *subscriptExpr
         = new (tc.Context) SubscriptExpr(base, index, subscript);
       subscriptExpr->setType(resultTy);
       return subscriptExpr;
@@ -3099,8 +3090,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 }
 
 Expr *
-ExprRewriter::coerceObjectArgumentToType(Expr *expr, Type toType,
+ExprRewriter::coerceObjectArgumentToType(Expr *expr,
+                                         Type baseTy, ValueDecl *member,
+                                         bool IsDirectPropertyAccess,
                                          ConstraintLocatorBuilder locator) {
+  Type toType = adjustSelfTypeForMember(baseTy, member, IsDirectPropertyAccess);
+
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();
   if (fromType->isEqual(toType))
@@ -3232,12 +3227,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = nullptr;
-    if (isa<SelfApplyExpr>(apply))
-      arg = coerceObjectArgumentToType(origArg, fnType->getInput(), nullptr);
-    else
-      arg = coerceToType(origArg, fnType->getInput(),
-                         locator.withPathElement(
+    Expr *arg = coerceToType(origArg, fnType->getInput(),
+                             locator.withPathElement(
                            ConstraintLocator::ApplyArgument));
 
     if (!arg) {
