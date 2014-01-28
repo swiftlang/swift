@@ -333,7 +333,7 @@ function set_ios_options {
     local internal_suffix=$4
     local arch=$5
 
-    local sdkroot=`xcrun -sdk ${platform}${internal_suffix} -show-sdk-path`
+    local sdkroot=$(xcrun -sdk ${platform}${internal_suffix} -show-sdk-path)
 
     local opts=(
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
@@ -354,8 +354,11 @@ function set_ios_options {
     eval $1=\(\${opts[@]}\)
 }
 
-set_ios_options SWIFT_STDLIB_IOS_ARM64_CMAKE_OPTIONS iphoneos 7.0 .internal arm64
-set_ios_options SWIFT_STDLIB_IOS_SIMULATOR_X86_64_CMAKE_OPTIONS iphonesimulator 7.0 "" x86_64
+
+if [[ ! "$SKIP_BUILD_IOS" ]]; then
+    set_ios_options SWIFT_STDLIB_IOS_ARM64_CMAKE_OPTIONS iphoneos 7.0 .internal arm64
+    set_ios_options SWIFT_STDLIB_IOS_SIMULATOR_X86_64_CMAKE_OPTIONS iphonesimulator 7.0 "" x86_64
+fi
 
 SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
