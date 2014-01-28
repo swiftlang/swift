@@ -97,7 +97,7 @@ namespace sil_block {
     SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESSTABLE,
-    SIL_WITNESS_METHOD_ENTRY,
+    SIL_WITNESS_METHOD_ENTRY
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -139,7 +139,6 @@ namespace sil_block {
     SILLinkageField,
     BCFixed<1>,        // transparent
     TypeIDField
-                       // followed by generic param list, if any
   >;
 
   // Has an optional argument list where each argument is a typed valueref.

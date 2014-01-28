@@ -372,9 +372,6 @@ struct SILConstantInfo {
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
-  
-  /// The context generic parameters used by the constant.
-  GenericParamList *ContextGenericParams;
 
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);

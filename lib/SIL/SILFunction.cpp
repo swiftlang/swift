@@ -20,7 +20,6 @@ using namespace swift;
 SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
                                  StringRef name,
                                  CanSILFunctionType loweredType,
-                                 GenericParamList *contextGenericParams,
                                  Optional<SILLocation> loc,
                                  IsBare_t isBareSILFunction,
                                  IsTransparent_t isTrans,
@@ -36,8 +35,7 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto fn = new (M) SILFunction(M, linkage, name,
-                                loweredType, contextGenericParams, loc,
+  auto fn = new (M) SILFunction(M, linkage, name, loweredType, loc,
                                 isBareSILFunction, isTrans, insertBefore,
                                 debugScope, DC);
 
@@ -47,7 +45,6 @@ SILFunction *SILFunction::create(SILModule &M, SILLinkage linkage,
 
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
                          StringRef Name, CanSILFunctionType LoweredType,
-                         GenericParamList *contextGenericParams,
                          Optional<SILLocation> Loc,
                          IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans,
@@ -58,7 +55,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     Name(Name),
     LoweredType(LoweredType),
     // FIXME: Context params should be independent of the function type.
-    ContextGenericParams(contextGenericParams),
+    ContextGenericParams(LoweredType->getGenericParams()),
     Location(Loc),
     DeclCtx(DC),
     DebugScope(DebugScope),

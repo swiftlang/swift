@@ -282,7 +282,6 @@ public:
   SILFunction *getOrCreateSharedFunction(SILLocation loc,
                                          StringRef name,
                                          CanSILFunctionType type,
-                                         GenericParamList *contextGenericParams,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent);
   

@@ -178,6 +178,9 @@ private:
   /// Writes a set of generic requirements.
   void writeRequirements(ArrayRef<Requirement> requirements);
 
+  /// Writes a generic parameter list.
+  bool writeGenericParams(const GenericParamList *genericParams);
+
   /// Encode the underlying conformance of a generic or specialized
   /// conformance.
   ///
@@ -304,11 +307,6 @@ public:
                         const ProtocolConformance *conformance,
                         const Decl *associatedDecl,
                         const std::array<unsigned, 256> &abbrCodes);
-
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams,
-                          const std::array<unsigned, 256> &abbrCodes);
-  
 };
 } // end namespace serialization
 } // end namespace swift

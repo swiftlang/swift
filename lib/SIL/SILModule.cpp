@@ -103,19 +103,17 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,
                                                   CanSILFunctionType type,
-                                                  GenericParamList *params,
                                                   IsBare_t isBareSILFunction,
                                                 IsTransparent_t isTransparent) {
   auto linkage = SILLinkage::Shared;
 
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
-    assert(fn->getContextGenericParams() == params);
     assert(fn->getLinkage() == linkage);
     return fn;
   }
 
-  return SILFunction::create(*this, linkage, name, type, params,
+  return SILFunction::create(*this, linkage, name, type,
                              loc, isBareSILFunction, isTransparent);
 }
 

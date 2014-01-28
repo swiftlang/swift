@@ -90,7 +90,6 @@ private:
 
   SILFunction(SILModule &module, SILLinkage linkage,
               StringRef mangledName, CanSILFunctionType loweredType,
-              GenericParamList *contextGenericParams,
               Optional<SILLocation> loc,
               IsBare_t isBareSILFunction,
               IsTransparent_t isTrans,
@@ -101,7 +100,6 @@ private:
 public:
   static SILFunction *create(SILModule &M, SILLinkage linkage, StringRef name,
                              CanSILFunctionType loweredType,
-                             GenericParamList *contextGenericParams,
                              Optional<SILLocation> loc = Nothing,
                              IsBare_t isBareSILFunction = IsNotBare,
                              IsTransparent_t isTrans = IsNotTransparent,

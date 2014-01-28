@@ -263,7 +263,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     if (Fn->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
+      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                SILFileLocation(Loc));
     }
     
@@ -276,13 +276,12 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    return SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
+    return SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                SILFileLocation(Loc));
   }
 
   // Otherwise, this definition is the first use of this name.
-  return SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
-                             Ty, nullptr,
+  return SILFunction::create(SILMod, SILLinkage::Private, Name.str(), Ty,
                              SILFileLocation(Loc));
 }
 
@@ -300,7 +299,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType());
-      FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
+      FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
                                   SILFileLocation(Loc));
     }
     return FnRef;
@@ -309,7 +308,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
   auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
-                                Name.str(), Ty, nullptr, SILFileLocation(Loc));
+                                Name.str(), Ty, SILFileLocation(Loc));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
   return Fn;
@@ -2513,12 +2512,6 @@ bool Parser::parseDeclSIL() {
     SourceLoc LBraceLoc = Tok.getLoc();
     if (consumeIf(tok::l_brace)) {
       isDefinition = true;
-      
-      // FIXME: Get the generic parameters from the function type. We'll want
-      // to parse this from the TypeRepr when SILFunctionType loses its context
-      // params.
-      FunctionState.F->setContextGenericParams(SILFnType->getGenericParams());
-      
       // Parse the basic block list.
       do {
         if (FunctionState.parseSILBasicBlock())
