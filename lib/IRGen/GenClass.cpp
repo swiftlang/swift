@@ -1083,7 +1083,7 @@ namespace {
       
       // getters and setters funcdecls will be handled by their parent
       // var/subscript.
-      if (method->isGetterOrSetter()) return;
+      if (method->isAccessor()) return;
       
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {

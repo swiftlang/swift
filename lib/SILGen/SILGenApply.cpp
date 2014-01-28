@@ -800,7 +800,10 @@ public:
     // FIXME: Or if it's an ObjC method. Extension methods on classes will
     // hopefully become dynamically dispatched too.
     if (auto *fd = dyn_cast<FuncDecl>(e->getDecl())) {
-      if (isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) {
+      if (fd->isObjC() ||
+          (isa<ClassDecl>(fd->getDeclContext()) &&
+           // didSet and willSet methods can always be directly dispatched.
+           !fd->isDidSetWillSet())) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);

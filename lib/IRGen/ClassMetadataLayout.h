@@ -210,7 +210,7 @@ private:
   void maybeAddMethod(FuncDecl *fn, ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
     // Ignore getters and setters.  This is probably wrong!
-    if (fn->isGetterOrSetter())
+    if (fn->isAccessor())
       return;
 
     // If the method overrides something, we don't need a new entry.

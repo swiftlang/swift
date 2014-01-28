@@ -1171,7 +1171,7 @@ irgen::emitObjCSubscriptMethodDescriptors(IRGenModule &IGM,
 
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
-  if (method->isGetterOrSetter())
+  if (method->isAccessor())
     return false;
     
     // We don't export generic methods or subclasses to IRGen yet.

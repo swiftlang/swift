@@ -3095,6 +3095,9 @@ public:
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
   /// a normal function.
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
+  bool isDidSetWillSet() const {
+    return getAccessorKind() == IsDidSet || getAccessorKind() == IsWillSet;
+  }
   bool isAccessor() const { return getAccessorKind() != NotAccessor; }
 
   /// Creates the implicit 'DynamicSelf' generic parameter.

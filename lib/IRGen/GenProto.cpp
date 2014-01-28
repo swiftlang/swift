@@ -243,7 +243,7 @@ namespace {
     }
 
     void visitFunc(FuncDecl *func) {
-      if (func->isGetterOrSetter())
+      if (func->isAccessor())
         // FIXME: To be implemented.
         return;
       

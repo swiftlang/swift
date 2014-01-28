@@ -366,11 +366,19 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
 StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
   // Getters and Setters are anonymous functions, so we forge a name
   // using its parent declaration.
-  if (FD.isGetterOrSetter())
+  if (FD.isAccessor())
     if (ValueDecl *VD = FD.getAccessorStorageDecl()) {
+      const char *Kind;
+      switch (FD.getAccessorKind()) {
+      case FuncDecl::NotAccessor: assert(0 && "we know this is an accessor");
+      case FuncDecl::IsGetter: Kind = ".get"; break;
+      case FuncDecl::IsSetter: Kind = ".set"; break;
+      case FuncDecl::IsWillSet: Kind = ".willset"; break;
+      case FuncDecl::IsDidSet: Kind = ".didset"; break;
+      }
+      
       SmallVector<char, 64> Buf;
-      StringRef Name = (VD->getName().str() +
-                        Twine(FD.isGetter() ? ".get":".set")).toStringRef(Buf);
+      StringRef Name = (VD->getName().str() +Twine(Kind)).toStringRef(Buf);
       return BumpAllocatedString(Name);
     }
 
