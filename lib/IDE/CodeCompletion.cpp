@@ -1561,24 +1561,6 @@ public:
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                                TypeResolver.get());
     }
-    {
-      // Add the special qualified keyword 'metatype' so that, for example,
-      // 'Int.metatype' can be completed.
-      Type Annotation = ExprType;
-
-      // First, unwrap the outer LValue.  LValueness of the expr is unrelated
-      // to the LValueness of the metatype.
-      if (auto *LVT = dyn_cast<LValueType>(Annotation.getPointer())) {
-        Annotation = LVT->getObjectType();
-      }
-
-      Annotation = MetatypeType::get(Annotation, Ctx);
-
-      // Use the canonical type as a type annotation because looking at the
-      // '.metatype' in the IDE is a way to understand what type the expression
-      // has.
-      addKeyword("metatype", Annotation->getCanonicalType());
-    }
   }
 
   void getValueCompletionsInDeclContext(SourceLoc Loc) {
@@ -1632,8 +1614,11 @@ public:
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
-    lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType, Ctx),
+    Type MetaBase = MetatypeType::get(BaseType, Ctx);
+    lookupVisibleMemberDecls(*this, MetaBase,
                              CurrDeclContext, TypeResolver.get());
+
+    addKeyword("metatype", MetaBase);
   }
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
