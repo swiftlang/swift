@@ -348,6 +348,7 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
   // This inserts the new cloned function before the original function.
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
+                             Orig->getContextGenericParams(),
                              Orig->getLocation(), Orig->isBare(),
                              IsNotTransparent, Orig,
                              Orig->getDebugScope());

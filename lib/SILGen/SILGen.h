@@ -182,7 +182,8 @@ public:
   void emitForeignThunk(SILDeclRef thunk);
   
   template<typename T>
-  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode, SILLocation L);
+  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode,
+                               SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.

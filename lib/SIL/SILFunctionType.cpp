@@ -913,7 +913,11 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   SILConstantInfo result = {
     formalType, formalInterfaceType,
     loweredType, loweredInterfaceType,
-    silFnType
+    silFnType,
+    // FIXME: Lower this independently from the AST using
+    // getEffectiveGenericParamsOfContext, which currently happens as part of
+    // makeConstantType.
+    silFnType->getGenericParams()
   };
   ConstantTypes[constant] = result;
   return result;
