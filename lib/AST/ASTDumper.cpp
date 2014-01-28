@@ -421,6 +421,20 @@ namespace {
         OS << "set =";
         printRec(Set);
       }
+      if (VD->getStorageKind() == VarDecl::WillSetDidSet) {
+        if (FuncDecl *WillSet = VD->getWillSetFunc()) {
+          OS << "\n";
+          OS.indent(Indent + 2);
+          OS << "willSet =";
+          printRec(WillSet);
+        }
+        if (FuncDecl *DidSet = VD->getDidSetFunc()) {
+          OS << "\n";
+          OS.indent(Indent + 2);
+          OS << "didSet =";
+          printRec(DidSet);
+        }
+      }
       OS << ')';
     }
 
