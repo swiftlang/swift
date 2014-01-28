@@ -28,9 +28,6 @@
 static llvm::cl::opt<bool>
 EnableSerializeAll("sil-serialize-all", llvm::cl::Hidden,
                    llvm::cl::init(false));
-static llvm::cl::opt<bool>
-EnableSerialize("enable-sil-serialization", llvm::cl::Hidden,
-                llvm::cl::init(true));
 
 using namespace swift;
 using namespace swift::serialization;
@@ -1282,8 +1279,6 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
 }
 
 void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
-  if (!EnableSerialize && !EnableSerializeAll)
-    return;
   {
     BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 5);
     registerSILAbbr<SILFunctionLayout>();
