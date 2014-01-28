@@ -844,6 +844,14 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       llvm::sys::path::replace_extension(Path, "dia");
       Output->setAdditionalOutputForType(types::TY_SerializedDiagnostics, Path);
     }
+
+    // Remove any existing diagnostics files so that clients can detect their
+    // presence to determine if a command was run.
+    StringRef OutputPath =
+      Output->getAnyOutputForType(types::TY_SerializedDiagnostics);
+    if (llvm::sys::fs::can_write(OutputPath) &&
+        llvm::sys::fs::is_regular_file(OutputPath))
+      llvm::sys::fs::remove(OutputPath);
   }
 
   if (DriverPrintBindings) {
