@@ -151,9 +151,10 @@ two important exceptions:
 - A variable with observing accessors is still a stored variable, which means
   it must still be initialized before use. Initialization does not run the
   code in the observing accessors.
-- Because the storage is no longer separate from the variable, all assignments
-  to the variable will trigger the observing accessors, *including those*
-  *within the accessors themselves.*
+- All assignments to the variable will trigger the observing accessors with
+  the following exceptions: assignments in the init and destructor function for
+  the enclosing type, and those from within the accessors themselves.  In this
+  context, assignments directly store to the underlying storage.
 
 Computed properties may not have observing accessors. That is, a property may
 have a custom getter or observing accessors, but not both.
