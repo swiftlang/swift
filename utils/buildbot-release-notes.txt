@@ -1,14 +1,14 @@
 2014-01-29
 ----------
 
-* Properties in structs in classes may now have "willSet:" and "didSet:"
+* Properties in structs and classes may now have "willSet:" and "didSet:"
   observing accessors defined on them:
 
   For example, where before you may have written something like this in a class:
   
     class MyAwesomeView : UIView {
       var _enabled : Bool  // storage
-      var enabled : Bool {
+      var enabled : Bool { // computed property
       get:
         return _enabled
       set: 
@@ -21,7 +21,7 @@
   you can now simply write:
 
     class MyAwesomeView : UIView {
-      var enabled : Bool {
+      var enabled : Bool {  // Has storage & observing methods
       didSet: self.setNeedsDisplay(true)
       }
       ...
@@ -38,13 +38,13 @@
     }
     
   The willSet/didSet observers are triggered on any store to the property,
-  except stores from init() methods, destructors, and from within the observers
+  except stores from init(), destructors, or from within the observers
   themselves.
     
-  A property may either be "stored" (the default), "computed" (have a get: and
-  optionally a set: specifier), or a willSet/didSet property.  It is not
-  possible to have a custom getter or setter on a willSet/DidSset property,
-  since they have storage.
+  Overall, a property now may either be "stored" (the default), "computed" 
+  (have a get: and optionally a set: specifier), or a observed 
+  (willSet/didSet) property.  It is not possible to have a custom getter 
+  or setter on a observed property, since they have storage.
 
   Two known-missing bits are:
    <rdar://problem/15920332> didSet/willSet variables need to allow initializers
