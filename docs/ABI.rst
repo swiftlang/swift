@@ -671,8 +671,7 @@ Globals
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
   global ::= 'TW' protocol-conformance entity
-                                         // protocol witness thunk (new)
-  global ::= 'nk_' entity                // protocol witness thunk (old)
+                                         // protocol witness thunk
   entity ::= nominal-type                // named type declaration
   entity ::= entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)

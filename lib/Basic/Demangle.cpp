@@ -466,15 +466,6 @@ private:
       appendNode(Node::Kind::TypeMetadata)->addChild(type);
       return true;
     }
-    if (Mangled.nextIf('n')) {
-      if (Mangled.nextIf('k') && Mangled.nextIf('_')) {
-        bool entity_ok = demangleEntity(appendNode(Node::Kind::ProtocolWitness));
-        if (!entity_ok)
-          return failure();
-        return true;
-      } else
-        return failure();
-    }
     if (Mangled.nextIf('t')) {
       NodePointer type = demangleType();
       if (!type)
@@ -566,6 +557,21 @@ private:
       if (Mangled.nextIf('r')) {
         NodePointer thunk = appendNode(Node::Kind::ReabstractionThunk);
         return demangleReabstractSignature(thunk);
+      }
+      if (Mangled.nextIf('W')) {
+        NodePointer thunk = appendNode(Node::Kind::ProtocolWitness);
+
+        NodePointer conformance = demangleProtocolConformance();
+        if (!conformance)
+          return failure();
+        thunk->addChild(std::move(conformance));
+
+        NodePointer entity = demangleEntity();
+        if (!entity)
+          return failure();
+        thunk->addChild(std::move(entity));
+
+        return thunk;
       }
       return failure();
     }
@@ -1996,7 +2002,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::ProtocolWitness: {
     Printer << "protocol witness for ";
-    print(pointer->getFirstChild());
+    print(pointer->getChild(1));
+    Printer << " in conformance ";
+    print(pointer->getChild(0));
     return;
   }
   case Node::Kind::FieldOffset: {
