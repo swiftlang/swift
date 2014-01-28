@@ -957,7 +957,7 @@ public:
       if (auto NTD = BaseTy->getAnyNominal()) {
         auto &Types = getAssociatedTypeMap(NTD);
         if (Type T = Types.lookup(ATD))
-          return MetatypeType::get(T, Ctx);
+          return T;
       }
     }
     return Type();
@@ -1230,8 +1230,7 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(NTD->getName().str());
-    addTypeAnnotation(Builder,
-                      MetatypeType::get(NTD->getDeclaredType(), Ctx));
+    addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
@@ -1244,11 +1243,9 @@ public:
       Builder.addLeadingDot();
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType())
-      addTypeAnnotation(Builder,
-                        MetatypeType::get(TAD->getUnderlyingType(), Ctx));
+      addTypeAnnotation(Builder, TAD->getUnderlyingType());
     else {
-      addTypeAnnotation(Builder,
-                        MetatypeType::get(TAD->getDeclaredType(), Ctx));
+      addTypeAnnotation(Builder, TAD->getDeclaredType());
     }
   }
 
@@ -1262,8 +1259,7 @@ public:
     if (needDot())
       Builder.addLeadingDot();
     Builder.addTextChunk(GP->getName().str());
-    addTypeAnnotation(Builder,
-                      MetatypeType::get(GP->getDeclaredType(), Ctx));
+    addTypeAnnotation(Builder, GP->getDeclaredType());
   }
 
   void addAssociatedTypeRef(const AssociatedTypeDecl *AT,
