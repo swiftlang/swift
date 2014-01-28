@@ -294,10 +294,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
 
     case FrontendOptions::EmitBC: {
-      if (Opts.OutputFilename.empty())
-        Opts.OutputFilename = "-";
-      else
-        Suffix = "bc";
+      Suffix = "bc";
       break;
     }
 
@@ -317,7 +314,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       else {
         // We have a suffix, so determine an appropriate name.
         llvm::SmallString<128> Path(Opts.OutputFilename);
-        
+
         StringRef BaseName;
         if (Opts.PrimaryInput.hasValue() && Opts.PrimaryInput->isFilename()) {
           unsigned Index = Opts.PrimaryInput->Index;
@@ -332,7 +329,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         llvm::sys::path::append(Path, BaseName);
         llvm::sys::path::replace_extension(Path, Suffix);
 
-        Opts.OutputFilename = Path.c_str();
+        Opts.OutputFilename = Path.str();
       }
     }
 
