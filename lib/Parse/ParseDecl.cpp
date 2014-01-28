@@ -1089,105 +1089,113 @@ void Parser::addVarsToScope(Pattern *Pat,
 
 /// createGetterFunc - This function creates the getter function (with no body)
 /// for a computed property or subscript.
-static FuncDecl *createGetterFunc(SourceLoc GetLoc, TypeLoc ElementTy,
-                                  Pattern *Indices, SourceLoc StaticLoc,
-                                  Parser::ParseDeclOptions Flags, Parser *P) {
+static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
+                                    TypeLoc ElementTy,
+                                    Pattern *Indices, SourceLoc StaticLoc,
+                                    Parser::ParseDeclOptions Flags,
+                                    unsigned Kind, Parser *P) {
   // Create the parameter list(s) for the getter.
-  SmallVector<Pattern *, 3> Params;
+  SmallVector<Pattern *, 4> Params;
   
   // Add the implicit 'self' to Params, if needed.
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(P->buildImplicitSelfParameter(GetLoc));
+    Params.push_back(P->buildImplicitSelfParameter(DeclLoc));
   
   // Add the index clause if necessary.
   if (Indices)
     Params.push_back(Indices->clone(P->Context, /*Implicit=*/true));
-  
-  // Add a no-parameters clause.
-  Params.push_back(TuplePattern::create(P->Context, SourceLoc(),
-                                        ArrayRef<TuplePatternElt>(),
-                                        SourceLoc(), /*hasVararg=*/false,
-                                        SourceLoc(), /*Implicit=*/true));
-  
+
+  // Add the (value) or () parameter clause.
+  Params.push_back(NamePattern);
+
+  TypeLoc ReturnType;
+  if (Kind == 0) // Getters return something
+    ReturnType = ElementTy.clone(P->Context);
+  else  // Nothing else does.
+    ReturnType = TypeLoc::withoutLoc(TupleType::getEmpty(P->Context));
+
   // Start the function.
-  auto *Get = FuncDecl::create(P->Context, /*StaticLoc=*/SourceLoc(), GetLoc,
-                               Identifier(), GetLoc, /*GenericParams=*/nullptr,
-                               Type(), Params, Params,
-                               ElementTy.clone(P->Context),
-                               P->CurDeclContext);
-  if (StaticLoc.isValid())
-    Get->setStatic(true);
-  return Get;
+  auto *D = FuncDecl::create(P->Context, StaticLoc, DeclLoc,
+                             Identifier(), DeclLoc, /*GenericParams=*/nullptr,
+                             Type(), Params, Params, ReturnType,
+                             P->CurDeclContext);
+
+  // non-static set:/willSet:/didSet: default to @mutating.
+  if (!D->isStatic() && Kind != 0)
+    D->setMutating();
+
+  return D;
 }
 
-/// createSetterFunc - This function creates the setter function (with no body)
-/// for a computed property or subscript.
-static FuncDecl *createSetterFunc(SourceLoc SetLoc, Identifier SetName,
-                                  SourceLoc SetNameLoc,
-                                  SourceRange SetNameParens, TypeLoc ElementTy,
-                                  Pattern *Indices, SourceLoc StaticLoc,
-                                  Parser::ParseDeclOptions Flags, Parser *P) {
-  auto &Context = P->Context;
-  
-  // Create the parameter list(s) for the setter.
-  SmallVector<Pattern *, 3> Params;
-  
-  // Add the implicit 'self' to Params, if needed.
-  if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(P->buildImplicitSelfParameter(SetLoc));
-  
-  // Add the index parameters, if necessary.
-  if (Indices)
-    Params.push_back(Indices->clone(Context, /*Implicit=*/true));
-  
-  bool IsNameImplicit = false;
+/// Parse a "(value)" specifier for "set:" or "willSet:" if present.  Create a
+/// pattern to represent the spelled argument or the implicit one if it is
+/// missing.
+static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
+                                              TypeLoc ElementTy,
+                                              Parser &P, unsigned Kind) {
+  // Only set: and willSet: have a (value) parameter.  get: and didSet: take a
+  // () parameter always.
+  if (Kind != 1 && Kind != 2)
+    return TuplePattern::create(P.Context, SourceLoc(),
+                                ArrayRef<TuplePatternElt>(),
+                                SourceLoc(), /*hasVararg=*/false,
+                                SourceLoc(), /*Implicit=*/true);
+
+
+  SourceLoc StartLoc, NameLoc, EndLoc;
+  Identifier Name;
+  ASTContext &Context = P.Context;
+
+  if (P.Tok.is(tok::l_paren)) {
+    StartLoc = P.consumeToken(tok::l_paren);
+    if (P.Tok.isNot(tok::identifier)) {
+      P.diagnose(P.Tok, diag::expected_accessor_name, Kind != 1);
+      P.skipUntil(tok::r_paren, tok::l_brace);
+      if (P.Tok.is(tok::r_paren))
+        P.consumeToken();
+    } else {
+      // We have a name.
+      Name = P.Context.getIdentifier(P.Tok.getText());
+      NameLoc = P.consumeToken();
+
+      // Look for the closing ')'.
+      P.parseMatchingToken(tok::r_paren, EndLoc,
+                           Kind == 1 ? diag::expected_rparen_set_name
+                           : diag::expected_rparen_willSet_name, StartLoc);
+    }
+  }
+
+  bool IsNameImplicit = EndLoc.isInvalid();
+
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
-  if (SetName.empty()) {
-    SetName = Context.getIdentifier("value");
-    SetNameLoc = SetLoc;
-    IsNameImplicit = true;
+  if (IsNameImplicit) {
+    Name = P.Context.getIdentifier("value");
+    NameLoc = SpecifierLoc;
+    StartLoc = SourceLoc();
   }
-  
-  {
-    VarDecl *Value = new (Context) VarDecl(StaticLoc.isValid(),
-                                           /*IsLet*/true,
-                                           SetNameLoc, SetName,
-                                           Type(), P->CurDeclContext);
-    if (IsNameImplicit)
-      Value->setImplicit();
-    
-    Pattern *ValuePattern
-      = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                   ElementTy.clone(Context));
-    // The TypedPattern is always implicit because the ElementTy is not
-    // spelled inside the parameter list.  It comes from elsewhere, and its
-    // source location should be ignored.
-    ValuePattern->setImplicit();
-    
-    TuplePatternElt ValueElt(ValuePattern);
-    Pattern *ValueParamsPattern
-    = TuplePattern::create(Context, SetNameParens.Start, ValueElt,
-                           SetNameParens.End);
-    if (IsNameImplicit)
-      ValueParamsPattern->setImplicit();
-    
-    Params.push_back(ValueParamsPattern);
-  }
-  
-  // Start the function.
-  Type SetterRetTy = TupleType::getEmpty(Context);
-  auto *Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), SetLoc,
-                               Identifier(), SetLoc, /*generic=*/nullptr,Type(),
-                               Params, Params, TypeLoc::withoutLoc(SetterRetTy),
-                               P->CurDeclContext);
-  if (StaticLoc.isValid())
-    Set->setStatic(true);
-  else  // non-static setters default to @mutating.
-    Set->setMutating();
-  return Set;
-}
 
+  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
+                                         NameLoc, Name,
+                                         Type(), P.CurDeclContext);
+  Pattern *ValuePattern
+    = new (Context) TypedPattern(new (Context) NamedPattern(Value),
+                                 ElementTy.clone(Context));
+
+  TuplePatternElt ValueElt(ValuePattern);
+  Pattern *ValueParamsPattern
+    = TuplePattern::create(Context, StartLoc, ValueElt, EndLoc);
+  if (IsNameImplicit) {
+    Value->setImplicit();
+    ValueParamsPattern->setImplicit();
+  }
+
+  // The TypedPattern is always implicit because the ElementTy is not
+  // spelled inside the parameter list.  It comes from elsewhere, and its
+  // source location should be ignored.
+  ValuePattern->setImplicit();
+  return ValueParamsPattern;
+}
 
 
 /// \brief Parse a get-set clause, containing a getter and (optionally)
@@ -1209,163 +1217,135 @@ static FuncDecl *createSetterFunc(SourceLoc SetLoc, Identifier SetName,
 /// \endverbatim
 bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
-                         SourceLoc &LastValidLoc,
-                         SourceLoc StaticLoc) {
-  bool Invalid = false;
-  Get = nullptr;
-  Set = nullptr;
-  
-  bool isInProtocol = Flags.contains(PD_InProtocol);
-  
-  while (Tok.isNot(tok::r_brace)) {
-    if (Tok.is(tok::eof)) {
-      Invalid = true;
-      break;
+                         FuncDecl *&WillSet, FuncDecl *&DidSet,
+                         SourceLoc &LastValidLoc, SourceLoc StaticLoc) {
+  Get = Set = WillSet = DidSet = nullptr;
+
+  // Properties in protocols use sufficiently limited syntax that we have a
+  // special parsing loop for them.
+  if (Flags.contains(PD_InProtocol)) {
+    while (Tok.isNot(tok::r_brace)) {
+      if (Tok.is(tok::eof))
+        return true;
+
+      // Parse any leading attributes.
+      DeclAttributes Attributes;
+      parseDeclAttributeList(Attributes);
+
+      unsigned Kind;
+      if (Tok.isContextualKeyword("get"))
+        Kind = 0;
+      else if (Tok.isContextualKeyword("set"))
+        Kind = 1;
+      else {
+        diagnose(Tok, diag::expected_getset_in_protocol);
+        return true;
+      }
+
+      FuncDecl *&TheDecl = Kind ? Set : Get;
+      SourceLoc Loc = consumeToken();
+
+      // Have we already parsed this kind of clause?
+      if (TheDecl) {
+        diagnose(Loc, diag::duplicate_property_accessor, Kind);
+        diagnose(TheDecl->getLoc(), diag::previous_accessor, Kind);
+        TheDecl = nullptr;  // Forget the previous decl.
+      }
+
+      // "set" could have a name associated with it.  This isn't valid in a
+      // protocol, but we parse and then reject it, for better QoI.
+      if (Tok.is(tok::l_paren))
+        diagnose(Loc, diag::protocol_setter_name);
+
+      Pattern *ValueNamePattern
+        = parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
+
+      // Set up a function declaration.
+      TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
+                                   StaticLoc, Flags, Kind, this);
+      if (Attributes.isValid())
+        TheDecl->getMutableAttrs() = Attributes;
     }
+
+    return false;
+  }
+
+
+  // Otherwise, we have a normal var or subscript declaration, parse the full
+  // complement of specifiers, along with their bodies.
+  while (Tok.isNot(tok::r_brace)) {
+    if (Tok.is(tok::eof))
+      return true;
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
-    
-    if (Tok.isContextualKeyword("get") ||
-        (!Tok.isContextualKeyword("set") && !isInProtocol)) {
-      //   get         ::= 'get' stmt-brace
 
-      // Have we already parsed a get clause?
-      if (Get) {
-        diagnose(Tok, diag::duplicate_getset, false);
-        diagnose(Get->getLoc(), diag::previous_getset, false);
-        
-        // Forget the previous version.
-        Get = nullptr;
-      }
-      
-      SourceLoc GetLoc = Tok.getLoc(), ColonLoc = Tok.getLoc();
-      if (Tok.isContextualKeyword("get")) {
-        GetLoc = consumeToken();
-
-        // Protocols don't allow the : because they also don't allow a body.
-        if (!isInProtocol) {
-          if (Tok.isNot(tok::colon)) {
-            diagnose(Tok, diag::expected_colon_get);
-            Invalid = true;
-            break;
-          }
-        
-          ColonLoc = consumeToken(tok::colon);
-        }
-      }
-
-      // Set up a function declaration for the getter.
-      Get = createGetterFunc(GetLoc, ElementTy, Indices, StaticLoc, Flags,this);
-      if (Attributes.isValid())
-        Get->getMutableAttrs() = Attributes;
-
-      // In a protocol, we just allow "get" by itself.
-      if (isInProtocol)
-        continue;
-      
-      Scope S(this, ScopeKind::FunctionBody);
-
-      addFunctionParametersToScope(Get->getBodyParamPatterns(), Get);
-
-      // Establish the new context.
-      ParseFunctionBody CC(*this, Get);
-
-      SmallVector<ASTNode, 16> Entries;
-      parseBraceItems(Entries, BraceItemListKind::Variable);
-      BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
-                                          Entries, Tok.getLoc());
-      Get->setBody(Body);
-
-      LastValidLoc = Body->getRBraceLoc();
-      continue;
+    bool isImplicitGet = false;
+    unsigned Kind;
+    if (Tok.isContextualKeyword("get"))
+      Kind = 0;
+    else if (Tok.isContextualKeyword("set"))
+      Kind = 1;
+    else if (Tok.isContextualKeyword("willSet"))
+      Kind = 2;
+    else if (Tok.isContextualKeyword("didSet"))
+      Kind = 3;
+    else {
+      Kind = 0;
+      isImplicitGet = true;
     }
 
-    //   var-set         ::= 'set' var-set-name? stmt-brace
-    
-    // Have we already parsed a var-set clause?
-    if (Set) {
-      diagnose(Tok, diag::duplicate_getset, true);
-      diagnose(Set->getLoc(), diag::previous_getset, true);
+    // Consume the contextual keyword, if present.
+    SourceLoc Loc = isImplicitGet ? Tok.getLoc() : consumeToken();
 
-      // Forget the previous setter.
-      Set = nullptr;
+    FuncDecl *&TheDecl =
+      Kind == 0 ? Get : Kind == 1 ? Set : Kind == 2 ? WillSet : DidSet;
+
+    // Have we already parsed this kind of clause?
+    if (TheDecl) {
+      diagnose(Loc, diag::duplicate_property_accessor, Kind);
+      diagnose(TheDecl->getLoc(), diag::previous_accessor, Kind);
+      TheDecl = nullptr;  // Forget the previous decl.
     }
-    
-    SourceLoc SetLoc = consumeToken();
+
+    // set: and willSet: can have an optional name.
 
     //   var-set-name    ::= '(' identifier ')'
-    Identifier SetName;
-    SourceLoc SetNameLoc;
-    SourceRange SetNameParens;
-    if (Tok.is(tok::l_paren)) {
-      SourceLoc StartLoc = consumeToken();
-      if (Tok.is(tok::identifier)) {
-        // We have a name.
-        SetName = Context.getIdentifier(Tok.getText());
-        SetNameLoc = consumeToken();
-        
-        // Look for the closing ')'.
-        SourceLoc EndLoc;
-        if (parseMatchingToken(tok::r_paren, EndLoc,
-                               diag::expected_rparen_setname, StartLoc))
-          EndLoc = SetNameLoc;
-        SetNameParens = SourceRange(StartLoc, EndLoc);
-      } else {
-        diagnose(Tok, diag::expected_setname);
-        skipUntil(tok::r_paren, tok::l_brace);
-        if (Tok.is(tok::r_paren))
-          consumeToken();
-      }
-      
-      // Protocols don't take a name for the setter.  We parse it but reject it
-      // for good QoI.
-      if (isInProtocol) {
-        diagnose(SetNameLoc, diag::protocol_setter_name);
-        SetName = Identifier();
-        SetNameLoc = SourceLoc();
-        SetNameParens = SourceRange();
-      }
-    }
-    SourceLoc ColonLoc = Tok.getLoc();
-    
-    if (!isInProtocol) {
-      if (Tok.isNot(tok::colon)) {
-        diagnose(Tok, diag::expected_colon_set);
-        Invalid = true;
-        break;
-      }
-      ColonLoc = consumeToken(tok::colon);
-    }
-    
-    // Set up a function declaration for the setter.
-    Set = createSetterFunc(SetLoc, SetName, SetNameLoc, SetNameParens,
-                           ElementTy, Indices, StaticLoc, Flags, this);
-    if (Attributes.isValid())
-      Set->getMutableAttrs() = Attributes;
+    Pattern *ValueNamePattern =
+      parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
-    if (isInProtocol)
-      continue;
+    SourceLoc ColonLoc = Tok.getLoc();
+    if (!isImplicitGet && !consumeIf(tok::colon)) {
+      diagnose(Tok, diag::expected_colon_accessor, Kind);
+      return true;
+    }
+
+    // Set up a function declaration.
+    TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
+                                 StaticLoc, Flags, Kind, this);
+
+    if (Attributes.isValid())
+      TheDecl->getMutableAttrs() = Attributes;
 
     // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
-    addFunctionParametersToScope(Set->getBodyParamPatterns(), Set);
+    addFunctionParametersToScope(TheDecl->getBodyParamPatterns(), TheDecl);
 
     // Establish the new context.
-    ParseFunctionBody CC(*this, Set);
-    
+    ParseFunctionBody CC(*this, TheDecl);
+
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
     parseBraceItems(Entries, BraceItemListKind::Variable);
     BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
                                         Entries, Tok.getLoc());
-    Set->setBody(Body);
-
+    TheDecl->setBody(Body);
+    
     LastValidLoc = Body->getRBraceLoc();
   }
-  
-  return Invalid;
+
+  return false;
 }
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
@@ -1411,11 +1391,11 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   SourceLoc LBLoc = consumeToken(tok::l_brace);
     
   // Parse getter and setter.
-  FuncDecl *Get = nullptr;
-  FuncDecl *Set = nullptr;
+  FuncDecl *Get = nullptr, *Set = nullptr;
+  FuncDecl *WillSet = nullptr, *DidSet = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(Flags, /*Indices=*/0, TyLoc,
-                  Get, Set, LastValidLoc, StaticLoc))
+                  Get, Set, WillSet, DidSet, LastValidLoc, StaticLoc))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1426,10 +1406,24 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   }
 
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc)) {
+                         LBLoc))
     RBLoc = LastValidLoc;
+
+  // If this is a willSet/didSet property, record this and we're done.
+  if (WillSet || DidSet) {
+    if (Get || Set) {
+      diagnose(Get ? Get->getLoc() : Set->getLoc(),
+               diag::willsetdidset_with_getset, bool(DidSet), bool(Set));
+      Get = nullptr;
+      Set = nullptr;
+    }
+
+    PrimaryVar->makeWillSetDidSet(LBLoc, WillSet, DidSet, RBLoc);
+    return;
   }
-  
+
+  // Otherwise, this must be a get/set property.  The set is optional, but get
+  // is not.
   if (Set && !Get) {
     if (!Invalid)
       diagnose(Set->getLoc(), diag::var_set_without_get);
@@ -2491,8 +2485,10 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     SourceLoc LBLoc = consumeToken();
     
     SourceLoc LastValidLoc = LBLoc;
+    FuncDecl *WillSet = nullptr, *DidSet = nullptr;
     if (parseGetSet(Flags, Indices.get(),ElementTy.get(),
-                    Get, Set, LastValidLoc, /*StaticLoc*/ SourceLoc()))
+                    Get, Set, WillSet, DidSet, LastValidLoc,
+                    /*StaticLoc*/ SourceLoc()))
       Status.setIsParseError();
 
     // Parse the final '}'.
@@ -2507,8 +2503,13 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
       RBLoc = LastValidLoc;
     }
 
-    if (!Get && Status.isSuccess())
-      diagnose(SubscriptLoc, diag::subscript_without_get);
+    if (Status.isSuccess()) {
+      if (!Get)
+        diagnose(SubscriptLoc, diag::subscript_without_get);
+      if (WillSet || DidSet)
+        diagnose(DidSet ? DidSet->getLoc() : WillSet->getLoc(),
+                 diag::willsetdidset_in_subscript, bool(DidSet));
+    }
 
     DefRange = SourceRange(LBLoc, RBLoc);
   }
@@ -2524,9 +2525,12 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     // If we had no getter (e.g., because we're in SIL mode or because the
     // program isn't valid) create a stub here.
     if (!Get) {
-      Get = createGetterFunc(SubscriptLoc, ElementTy.get(),
-                             Indices.get(), /*StaticLoc*/ SourceLoc(),
-                             Flags, this);
+      auto ArgPattern =
+        parseOptionalAccessorArgument(SubscriptLoc, ElementTy.get(), *this,
+                                      0/*getter*/);
+      Get = createAccessorFunc(SubscriptLoc, ArgPattern, ElementTy.get(),
+                               Indices.get(), /*StaticLoc*/ SourceLoc(),
+                               Flags, 0/*getter*/, this);
      
       if (!isInSILMode()) {
         Get->setInvalid();

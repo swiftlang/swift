@@ -560,7 +560,8 @@ public:
                             SourceLoc StaticLoc);
   bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
-                   FuncDecl *&Get, FuncDecl *&Set, SourceLoc &LastValidLoc,
+                   FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
+                   FuncDecl *&DidSet, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc);
   void parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                           SourceLoc StaticLoc,

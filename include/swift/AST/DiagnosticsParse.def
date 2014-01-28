@@ -171,27 +171,36 @@ ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
 // Variable getters/setters
+ERROR(expected_getset_in_protocol,decl_parsing,none,
+      "expected get or set in a protocol property", ())
 ERROR(getset_missing_type,decl_parsing,none,
       "variable with getter/setter must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,decl_parsing,none,
       "getter/setter can only be defined for a single variable", ())
 ERROR(expected_rbrace_in_getset,decl_parsing,none,
       "expected '}' at end of variable get/set clause", ())
-ERROR(duplicate_getset,decl_parsing,none,
-      "duplicate definition of %select{getter|setter}0",
-      (bool))
-NOTE(previous_getset,decl_parsing,none,
-     "previous definition of %select{getter|setter}0 is here", (bool))
-ERROR(expected_colon_get,decl_parsing,none,
-      "expected ':' to start getter definition", ())
-ERROR(expected_setname,decl_parsing,none,
-      "expected the name of the setter value",())
-ERROR(expected_rparen_setname,decl_parsing,none,
+ERROR(duplicate_property_accessor,decl_parsing,none,
+      "duplicate definition of %select{getter|setter|willSet:|didSet:}0",
+      (unsigned))
+NOTE(previous_accessor,decl_parsing,none,
+     "previous definition of %select{getter|setter|willSet:|didSet:}0 is here",
+     (unsigned))
+ERROR(expected_accessor_name,decl_parsing,none,
+      "expected the name of the %select{setter|willSet}0 value",(unsigned))
+ERROR(expected_rparen_set_name,decl_parsing,none,
       "expected ')' after setter value name",())
-ERROR(expected_colon_set,decl_parsing,none,
-      "expected ':' to start setter definition", ())
+ERROR(expected_rparen_willSet_name,decl_parsing,none,
+      "expected ')' after willSet value name",())
+ERROR(expected_colon_accessor,decl_parsing,none,
+      "expected ':' to start %select{getter|setter|willSet|didSet}0 definition",
+     (unsigned))
 ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
+ERROR(willsetdidset_with_getset,decl_parsing,none,
+      "%select{willSet|didSet}0 variable may not also have a "
+      "%select{get|set}1 specifier", (unsigned, unsigned))
+ERROR(willsetdidset_in_subscript,decl_parsing,none,
+      "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,decl_parsing,none,
       "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,decl_parsing,none,
