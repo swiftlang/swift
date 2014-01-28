@@ -1,6 +1,58 @@
 2014-01-29
 ----------
 
+* Properties in structs in classes may now have "willSet:" and "didSet:"
+  observing accessors defined on them:
+
+  For example, where before you may have written something like this in a class:
+  
+    class MyAwesomeView : UIView {
+      var _enabled : Bool  // storage
+      var enabled : Bool {
+      get:
+        return _enabled
+      set: 
+        _enabled = value
+        self.setNeedsDisplay(true)
+      }
+      ...
+    }
+
+  you can now simply write:
+
+    class MyAwesomeView : UIView {
+      var enabled : Bool {
+      didSet: self.setNeedsDisplay(true)
+      }
+      ...
+    }
+
+  Similarly, if you want notification before the value is stored, you can use
+  willSet, which gets the incoming value before it is stored:
+  
+    var x : Int {
+    willSet(value):  // value is the default and may be elided, as with set:
+      println("changing from \(x) to \(value)")
+    didSet:
+      println("we've got a value of \(x) now.\n")
+    }
+    
+  The willSet/didSet observers are triggered on any store to the property,
+  except stores from init() methods, destructors, and from within the observers
+  themselves.
+    
+  A property may either be "stored" (the default), "computed" (have a get: and
+  optionally a set: specifier), or a willSet/didSet property.  It is not
+  possible to have a custom getter or setter on a willSet/DidSset property,
+  since they have storage.
+
+  Two known-missing bits are:
+   <rdar://problem/15920332> didSet/willSet variables need to allow initializers
+   <rdar://problem/15922884> support non-member didset/willset properties
+   
+  Because of the first one, for now, you need to explicitly store an initial
+  value to the property in your init() method.
+
 * Objective-C properties with custom getter or setter names are (temporarily)
   not imported into Swift; the getter and setter will be imported individually
   as methods instead. Previously, they would appear as properties within the
