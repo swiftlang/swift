@@ -1,5 +1,5 @@
-// RUN: %swift -emit-llvm -triple=x86_64-apple-ios6 %s | FileCheck %s
-// RUN: %swift -emit-llvm -triple=i386-apple-ios6 %s | FileCheck %s
+// RUN: %swift -emit-llvm -target x86_64-apple-ios6 %s | FileCheck %s
+// RUN: %swift -emit-llvm -target i386-apple-ios6 %s | FileCheck %s
 
 // rdar://15806697 - use null pointers for &_objc_empty_vtable in the simulator
 

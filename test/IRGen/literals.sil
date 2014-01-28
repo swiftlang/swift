@@ -1,4 +1,4 @@
-// RUN: %swift -emit-llvm -triple=x86_64-apple-darwin10 %s | FileCheck %s
+// RUN: %swift -emit-llvm -target x86_64-apple-darwin10 %s | FileCheck %s
 
 // CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00"
 // CHECK: [[U8_1:@.*]] = private unnamed_addr constant [5 x i8] c"\00x\C6\AB\00"
