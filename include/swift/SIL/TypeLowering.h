@@ -363,11 +363,11 @@ struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
   /// setter, computing this can be more involved.
-  CanAnyFunctionType FormalType;
+  CanAnyFunctionType FormalType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType FormalInterfaceType;
 
   /// The uncurried and bridged type of the constant.
-  CanAnyFunctionType LoweredType;
+  CanAnyFunctionType LoweredType SIL_FUNCTION_TYPE_DEPRECATED;
   CanAnyFunctionType LoweredInterfaceType;
 
   /// The SIL function type of the constant.

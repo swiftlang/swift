@@ -385,9 +385,10 @@ static void collectParams(SILGenFunction &gen,
                           SILLocation loc,
                           SmallVectorImpl<ManagedValue> &params) {
   auto paramTypes =
-    gen.F.getLoweredFunctionType()->getParametersWithoutIndirectResult();
+    gen.F.getLoweredFunctionType()->getInterfaceParametersWithoutIndirectResult();
   for (auto param : paramTypes) {
-    auto paramValue = new (gen.SGM.M) SILArgument(param.getSILType(),
+    auto paramTy = gen.F.mapTypeIntoContext(param.getSILType());
+    auto paramValue = new (gen.SGM.M) SILArgument(paramTy,
                                                   gen.F.begin());
     params.push_back(manageParam(gen, loc, paramValue, param));
   }
@@ -659,7 +660,7 @@ void forwardFunctionArguments(SILGenFunction &gen,
                               CanSILFunctionType fTy,
                               ArrayRef<ManagedValue> managedArgs,
                               SmallVectorImpl<SILValue> &forwardedArgs) {
-  auto argTypes = fTy->getParametersWithoutIndirectResult();
+  auto argTypes = fTy->getInterfaceParametersWithoutIndirectResult();
   for (auto index : indices(managedArgs)) {
     auto &arg = managedArgs[index];
     auto argTy = argTypes[index];
@@ -675,7 +676,8 @@ SILValue getThunkInnerResultAddr(SILGenFunction &gen,
                                  CanSILFunctionType fTy,
                                  SILValue outerResultAddr) {
   if (fTy->hasIndirectResult()) {
-    auto resultType = fTy->getIndirectResult().getSILType();
+    auto resultType = fTy->getIndirectInterfaceResult().getSILType();
+    resultType = gen.F.mapTypeIntoContext(resultType);
     
     // Re-use the original result if possible.
     if (outerResultAddr && outerResultAddr.getType() == resultType)
@@ -697,9 +699,10 @@ SILValue getThunkResult(SILGenFunction &gen,
                         SILValue innerResultAddr,
                         SILValue outerResultAddr) {
   // Convert the direct result to +1 if necessary.
-  auto &innerResultTL = gen.getTypeLowering(fTy->getSemanticResultSILType());
+  auto resultTy = gen.F.mapTypeIntoContext(fTy->getSemanticInterfaceResultSILType());
+  auto &innerResultTL = gen.getTypeLowering(resultTy);
   if (!fTy->hasIndirectResult()) {
-    switch (fTy->getResult().getConvention()) {
+    switch (fTy->getInterfaceResult().getConvention()) {
     case ResultConvention::Owned:
       break;
     case ResultConvention::Autoreleased:
@@ -767,7 +770,8 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
 
   SILValue outerResultAddr;
   if (thunkType->hasIndirectResult()) {
-    auto resultType = thunkType->getIndirectResult().getSILType();
+    auto resultType = thunkType->getIndirectInterfaceResult().getSILType();
+    resultType = gen.F.mapTypeIntoContext(resultType);
     outerResultAddr = new (gen.SGM.M) SILArgument(resultType, gen.F.begin());
   }
 
@@ -777,7 +781,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
-  auto argTypes = fnType->getParametersWithoutIndirectResult();
+  auto argTypes = fnType->getInterfaceParametersWithoutIndirectResult();
 
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
@@ -808,7 +812,7 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   SILValue innerResultValue =
     gen.B.createApply(loc, fnValue.forward(gen),
                       /*substFnType*/ fnValue.getType(),
-                      fnType->getResult().getSILType(),
+                      fnType->getInterfaceResult().getSILType(),
                       /*substitutions*/ {},
                       argValues);
 
@@ -847,8 +851,8 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
 
   // Add the function type as the parameter.
   SmallVector<SILParameterInfo, 4> params;
-  params.append(expectedType->getParameters().begin(),
-                expectedType->getParameters().end());
+  params.append(expectedType->getInterfaceParameters().begin(),
+                expectedType->getInterfaceParameters().end());
   params.push_back({sourceType,
                     sourceType->isThin() ? ParameterConvention::Direct_Unowned
                                          : DefaultThickCalleeConvention});
@@ -867,13 +871,13 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   }
   
   auto interfaceResult = SILResultInfo(
-    Types.getInterfaceTypeInContext(expectedType->getResult().getType(), generics),
-    expectedType->getResult().getConvention());
+    Types.getInterfaceTypeInContext(expectedType->getInterfaceResult().getType(), generics),
+    expectedType->getInterfaceResult().getConvention());
   
   // The type of the thunk function.
   auto thunkType = SILFunctionType::get(generics, genericSig, extInfo,
                                         ParameterConvention::Direct_Unowned,
-                                        params, expectedType->getResult(),
+                                        params, expectedType->getInterfaceResult(),
                                         interfaceParams, interfaceResult,
                                         gen.getASTContext());
 
@@ -883,8 +887,8 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   } else {
     substFnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                        ParameterConvention::Direct_Unowned,
-                                       params, expectedType->getResult(),
-                                       params, expectedType->getResult(),
+                                       params, expectedType->getInterfaceResult(),
+                                       params, expectedType->getInterfaceResult(),
                                        gen.getASTContext());
   }
 
@@ -956,8 +960,8 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   }
 
   // Any of these changes requires a conversion thunk.
-  if (fnType->getResult() != expectedFnType->getResult() ||
-      fnType->getParameters() != expectedFnType->getParameters() ||
+  if (fnType->getInterfaceResult() != expectedFnType->getInterfaceResult() ||
+      fnType->getInterfaceParameters() != expectedFnType->getInterfaceParameters() ||
       (!fnType->isThin() &&
        fnType->getCalleeConvention() != expectedFnType->getCalleeConvention()) ||
       fnType->getAbstractCC() != expectedFnType->getAbstractCC()) {
@@ -1279,6 +1283,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                ArrayRef<Substitution> witnessSubs,
                                IsFreeFunctionWitness_t isFree,
                                HasInOutSelfAbstractionDifference_t inOutSelf) {
+  // FIXME: Disable checks that the protocol witness carries debug info.
+  // Should we carry debug info for witnesses?
   F.setBare(IsBare);
   
   assert((!isFree || !inOutSelf)
@@ -1292,7 +1298,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // Emit the indirect return and arguments.
   SILValue reqtResultAddr;
   if (thunkTy->hasIndirectResult()) {
-    auto resultType = thunkTy->getIndirectResult().getSILType();
+    auto resultType = thunkTy->getIndirectInterfaceResult().getSILType();
+    resultType = F.mapTypeIntoContext(resultType);
     reqtResultAddr = new (SGM.M) SILArgument(resultType, F.begin());
   }
 
@@ -1399,7 +1406,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   SILValue witnessFnRef = B.createFunctionRef(loc, witnessFn);
   SILValue witnessResultValue
     = B.createApply(loc, witnessFnRef, witnessSILTy,
-                    witnessFTy->getResult().getSILType(),
+                    witnessFTy->getInterfaceResult().getSILType(),
                     witnessSubs, args);
   
   // Reabstract the result value:
