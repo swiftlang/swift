@@ -680,6 +680,11 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  if (FrontendOpts.RequestedAction == FrontendOptions::REPL ||
+      FrontendOpts.RequestedAction == FrontendOptions::Immediate) {
+    setImmediate(true);
+  }
+
   if (ParseLangArgs(LangOpts, *ParsedArgs, Diags)) {
     return true;
   }
