@@ -138,9 +138,9 @@ bb0(%0 : $S):
 
 // CHECK-LABEL: sil @move_delete_retain_over_decrement_use_when_knownsafe : $@thin (Builtin.ObjectPointer) -> ()
 // CHECK: bb0
-// CHECK: strong_retain
+// CHECK: integer_literal
 // CHECK-NEXT: integer_literal
-// CHECK-NEXT: integer_literal
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
