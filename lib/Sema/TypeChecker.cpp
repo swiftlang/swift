@@ -261,6 +261,11 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         continue;
       }
 
+      if (isa<FuncDecl>(MemberVD)) {
+        // Methods are handled as part of type checking the method signature.
+        continue;
+      }
+
       ValueDecl *OverriddenDecl = nullptr;
 
       // First, check for an exact type match.

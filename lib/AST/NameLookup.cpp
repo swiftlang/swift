@@ -889,6 +889,15 @@ bool DeclContext::lookupQualified(Type type,
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
     for (auto decl : current->lookupDirect(name)) {
+      // Resolve the declaration signature when we find the
+      // declaration.
+      if (typeResolver && !decl->hasType()) {
+        typeResolver->resolveDeclSignature(decl);
+
+        if (!decl->hasType())
+          continue;
+      }
+
       decls.push_back(decl);
     }
 

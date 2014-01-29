@@ -382,6 +382,12 @@ ERROR(override_decl_extension,sema_tcd,none,
       "%select{override|be overridden}0 yet", (bool))
 NOTE(overridden_here,sema_tcd,none,
      "overridden declaration is here", ())
+ERROR(override_objc_type_mismatch,sema_tcd,none,
+      "overriding method with selector '%0' has incompatible type %1", 
+      (StringRef, Type))
+NOTE(overridden_here_with_type,sema_tcd,none,
+     "overridden declaration here has type %0", (Type))
+
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a superclass", ())
 

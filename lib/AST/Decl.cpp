@@ -1643,11 +1643,20 @@ StringRef VarDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
+  // For a getter or setter, go through the variable or subscript decl.
+  if (isGetterOrSetter()) {
+    if (auto var = dyn_cast<VarDecl>(getAccessorStorageDecl())) {
+      return isGetter()? var->getObjCGetterSelector(buffer)
+                       : var->getObjCSetterSelector(buffer);
+    }
+
+    auto subscript = cast<SubscriptDecl>(getAccessorStorageDecl());
+    return isGetter()? subscript->getObjCGetterSelector()
+                     : subscript->getObjCSetterSelector();
+  }
+
   assert(buffer.empty());
   
-  // Property accessors should go through a different path.
-  assert(!isGetterOrSetter());
-
   llvm::raw_svector_ostream out(buffer);
 
   // Start with the method name.

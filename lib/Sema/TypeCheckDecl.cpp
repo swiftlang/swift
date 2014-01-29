@@ -2388,6 +2388,184 @@ public:
         isObjC = false;
       FD->setIsObjC(isObjC);
     }
+
+    checkMethodOverrides(FD);
+  }
+
+  /// Adjust the type of the given declaration to appear as if it were
+  /// in the given subclass of its actual declared class.
+  Type adjustSuperclassMemberDeclType(ValueDecl *decl, Type subclass) {
+    ClassDecl *superclassDecl =
+      decl->getDeclContext()->getDeclaredTypeInContext()
+        ->getClassOrBoundGenericClass();
+    while (subclass->getClassOrBoundGenericClass() != superclassDecl)
+      subclass = TC.getSuperClassOf(subclass);
+    return TC.substMemberTypeWithBase(decl->getModuleContext(),
+                                      decl->getInterfaceType(), decl, subclass);
+  }
+
+  /// Record that the \c overriding declarations overrides the \c
+  /// overridden declaration.
+  ///
+  /// \returns true if an error occurred.
+  bool recordOverride(ValueDecl *overriding, ValueDecl *overridden) {
+    // Non-Objective-C declarations in extensions cannot override or
+    // be overridden.
+    if ((overridden->getDeclContext()->isExtensionContext() ||
+         overriding->getDeclContext()->isExtensionContext()) &&
+        !overridden->isObjC()) {
+      TC.diagnose(overriding, diag::override_decl_extension,
+                  !overriding->getDeclContext()->isExtensionContext());
+      TC.diagnose(overridden, diag::overridden_here);
+      return true;
+    }
+
+    if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
+      overridingFunc->setOverriddenDecl(cast<FuncDecl>(overridden));
+    } else if (auto overridingVar = dyn_cast<VarDecl>(overriding)) {
+      overridingVar->setOverriddenDecl(cast<VarDecl>(overridden));
+    } else if (auto overridingSubscript = dyn_cast<SubscriptDecl>(overriding)) {
+      overridingSubscript->setOverriddenDecl(cast<SubscriptDecl>(overridden));
+    } else {
+      llvm_unreachable("Unexpected decl");
+    }
+
+    return false;
+  }
+
+  /// Determine which methods this method overrides.
+  ///
+  /// \returns true if an error occurred.
+  bool checkMethodOverrides(FuncDecl *method) {
+    if (method->isInvalid())
+      return false;
+
+    auto owningTy = method->getExtensionType();
+    if (!owningTy)
+      return false;
+
+    auto classDecl = owningTy->getClassOrBoundGenericClass();
+    if (!classDecl)
+      return false;
+
+    Type superclass = classDecl->getSuperclass();
+    if (!superclass)
+      return false;
+
+    if (method->getName().empty())
+      return false;
+
+    // Figure out the type of the method that we're use for comparisons.
+    auto methodTy = method->getInterfaceType();
+    auto uncurriedMethodTy = methodTy->castTo<AnyFunctionType>()->getResult();
+    if (method->isObjC())
+      uncurriedMethodTy = uncurriedMethodTy->getUnlabeledType(TC.Context);
+
+    // If the method is an Objective-C method, compute its selector.
+    llvm::SmallString<32> methodSelectorBuffer;
+    StringRef methodSelector;
+    if (method->isObjC())
+      methodSelector = method->getObjCSelector(methodSelectorBuffer);
+
+    // Look for members with the same name and matching types as this
+    // one.
+    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
+    auto members = TC.lookupMember(superclassMetaTy, method->getName(), method,
+                                   /*allowDynamicLookup=*/false);
+    unsigned numExactMatches = false;
+    SmallVector<llvm::PointerIntPair<FuncDecl *, 1, bool>, 2> matches;
+    FuncDecl *exactMatch = nullptr;
+    for (auto member : members) {
+      if (member->isInvalid())
+        continue;
+
+      auto parentMethod = dyn_cast<FuncDecl>(member);
+      if (!parentMethod)
+        continue;
+
+      // Class and non-class methods are different.
+      if (method->isStatic() != parentMethod->isStatic())
+        continue;
+
+      // If both are Objective-C, then match based on selectors and
+      // check the types separately.
+      bool objCSelectorMatch = false;
+      if (method->isObjC() && parentMethod->isObjC()) {
+        // If the selectors don't match, it's not an override.
+        llvm::SmallString<32> buffer;
+        if (methodSelector != parentMethod->getObjCSelector(buffer))
+          continue;
+
+        objCSelectorMatch = true;
+      }
+
+      // Check whether the types are identical.
+      // FIXME: It's wrong to use the uncurried types here.
+      auto parentMethodTy = adjustSuperclassMemberDeclType(parentMethod, 
+                                                           superclass);
+      auto uncurriedParentMethodTy
+        = parentMethodTy->castTo<AnyFunctionType>()->getResult();
+      if (objCSelectorMatch)
+        uncurriedParentMethodTy = uncurriedParentMethodTy->getUnlabeledType(
+                                    TC.Context);
+      if (uncurriedMethodTy->isEqual(uncurriedParentMethodTy)) {
+        ++numExactMatches;
+        matches.push_back({parentMethod, true});
+        if (!exactMatch)
+          exactMatch = parentMethod;
+        continue;
+      }
+
+      // Failing that, check for subtyping.
+      if (TC.isTrivialSubtypeOf(uncurriedMethodTy, uncurriedParentMethodTy,
+                                method->getDeclContext())) {
+        // If the Objective-C selectors match, always call it exact.
+        if (objCSelectorMatch) {
+          ++numExactMatches;
+          if (!exactMatch)
+            exactMatch = parentMethod;
+        }
+
+        matches.push_back({parentMethod, objCSelectorMatch});
+        continue;
+      }
+
+      // Not a match. If the Objective-C selectors matched, this is a
+      // serious problem.
+      if (objCSelectorMatch) {
+        TC.diagnose(method, diag::override_objc_type_mismatch,
+                    methodSelector, uncurriedMethodTy);
+        TC.diagnose(parentMethod, diag::overridden_here_with_type,
+                    uncurriedParentMethodTy);
+        return true;
+      }
+    }
+
+    // If we have no matches, there's nothing to do.
+    if (matches.empty()) {
+      return false;
+    }
+
+    // If we have a single exact match, take it.
+    if (numExactMatches == 1) {
+      return recordOverride(method, exactMatch);
+    }
+
+    // If we have a single subtype match, take it.
+    if (numExactMatches == 0 && matches.size() == 1) {
+      return recordOverride(method, matches.front().getPointer());
+    }
+
+    // We override more than one method. Complain.
+    TC.diagnose(method, diag::override_multiple_decls_base);
+    for (auto match : matches) {
+      // If we had exact matches, skip non-exact ones.
+      if (exactMatch && !match.getInt())
+        continue;
+
+      TC.diagnose(match.getPointer(), diag::overridden_here);
+    }
+    return true;
   }
 
   /// Compute the interface type of the given enum element.
