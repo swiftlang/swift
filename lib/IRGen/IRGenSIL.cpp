@@ -1440,6 +1440,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
 }
 
 static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
+                                                   ApplyInst *AI,
                                          CanSILFunctionType origCalleeType,
                                          CanSILFunctionType substCalleeType,
                                          const LoweredValue &lv,
@@ -1448,6 +1449,12 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   ExtraData extraData;
   ResilienceExpansion explosionLevel;
   
+  if (origCalleeType->isBlock()) {
+    IGF.unimplemented(AI->getLoc().getSourceLoc(),
+                      "calling Objective-C block");
+    exit(1);
+  }
+
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
@@ -1474,6 +1481,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     Explosion calleeValues = lv.getExplosion(IGF);
     
     calleeFn = calleeValues.claimNext();
+    
     if (!origCalleeType->isThin())
       calleeData = calleeValues.claimNext();
     else
@@ -1589,7 +1597,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   auto substCalleeType = i->getSubstCalleeType();
   
   CallEmission emission =
-    getCallEmissionForLoweredValue(*this, origCalleeType, substCalleeType,
+    getCallEmissionForLoweredValue(*this, i, origCalleeType, substCalleeType,
                                    calleeLV, i->getSubstitutions());
   
   auto params = origCalleeType->getInterfaceParametersWithoutIndirectResult();
