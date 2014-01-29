@@ -23,8 +23,8 @@ SHARED_LIBRARY := 1
 # sed is used here to strip comments.
 SWIFT_SOURCES := $(shell sed -e "s/\#.*//g" "$(PROJ_SRC_DIR)/tools/swift/stdlib/core/SwiftLibSources.txt" )
 
-# Replace Word.swift with Word64.swift or Word32.swift, according to
-# the target architecture
+# Replace FixedPoint.swift with FixedPoint64.swift or FixedPoint32.swift, 
+# according to the target architecture
 ifeq ($(ARCH),x86_64)
   WORD_SIZE := 64
 else ifeq ($(ARCH),x86)
@@ -36,7 +36,7 @@ else ifeq ($(ARCH),ARM)
 else
   $(error unknown architecture $(ARCH))
 endif
-SWIFT_SOURCES := $(subst WordXX.swift,Word$(WORD_SIZE).swift,$(SWIFT_SOURCES))
+SWIFT_SOURCES := $(subst FixedPointXX.swift,FixedPoint(WORD_SIZE).swift,$(SWIFT_SOURCES))
 
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 ifneq ($(DISABLE_ASSERTIONS),1)
