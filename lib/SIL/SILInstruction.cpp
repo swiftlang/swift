@@ -140,7 +140,70 @@ namespace {
 
     /// Make sure we only process instructions we know how to process.
     bool visitValueBase(const ValueBase *RHS) {
-      llvm_unreachable("Unimplemented comparison.");
+      return false;
+    }
+
+    bool visitInjectEnumAddrInst(const InjectEnumAddrInst *RHS) {
+        auto *X = cast<InjectEnumAddrInst>(LHS);
+        return (X->getOperand() == RHS->getOperand()) &&
+               (X->getElement() == RHS->getElement());
+    }
+
+    bool visitDestroyAddrInst(const DestroyAddrInst *RHS) {
+      auto *X = cast<DestroyAddrInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitDestroyValueInst(const DestroyValueInst *RHS) {
+      auto *X = cast<DestroyValueInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitDeallocStackInst(const DeallocStackInst *RHS) {
+      auto *X = cast<DeallocStackInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitAllocStackInst(const AllocStackInst *RHS) {
+      return false;
+    }
+
+    bool visitDeallocBoxInst(const DeallocBoxInst *RHS) {
+      auto *X = cast<DeallocBoxInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitAllocBoxInst(const AllocBoxInst *RHS) {
+      return false;
+    }
+
+    bool visitDeallocRefInst(const DeallocRefInst *RHS) {
+      auto *X = cast<DeallocRefInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitAllocRefInst(const AllocRefInst *RHS) {
+      return false;
+    }
+
+    bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
+      auto *X = cast<StrongReleaseInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitStrongRetainInst(const StrongRetainInst *RHS) {
+      auto *X = cast<StrongRetainInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitLoadInst(const LoadInst *RHS) {
+      auto *X = cast<LoadInst>(LHS);
+      return X->getOperand() == RHS->getOperand();
+    }
+
+    bool visitStoreInst(const StoreInst *RHS) {
+      auto *X = cast<StoreInst>(LHS);
+      return (X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest());
     }
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
