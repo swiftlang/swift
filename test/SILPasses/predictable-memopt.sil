@@ -5,49 +5,49 @@ import swift
 
 
 // CHECK-LABEL: sil @simple_reg_promotion
-sil @simple_reg_promotion : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
-  store %0 to %1#1 : $*Int64
-  %3 = alloc_box $Int64
-  %4 = load %1#1 : $*Int64
-  store %4 to %3#1 : $*Int64
-  %6 = load %3#1 : $*Int64
+sil @simple_reg_promotion : $@thin (Int) -> Int {
+bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
+  %1 = alloc_box $Int
+  store %0 to %1#1 : $*Int
+  %3 = alloc_box $Int
+  %4 = load %1#1 : $*Int
+  store %4 to %3#1 : $*Int
+  %6 = load %3#1 : $*Int
   strong_release %3#0 : $Builtin.ObjectPointer
   strong_release %1#0 : $Builtin.ObjectPointer
-  return %6 : $Int64
+  return %6 : $Int
 
-  // CHECK-NEXT: return %0 : $Int64
+  // CHECK-NEXT: return %0 : $Int
 }
 
 
 // CHECK-LABEL: sil @tuple_reg_promotion
-sil @tuple_reg_promotion : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):                         // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_box $(Int64, Int64)
+sil @tuple_reg_promotion : $@thin (Int) -> Int {
+bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
+  %1 = alloc_box $(Int, Int)
   
-  %a = tuple_element_addr %1#1 : $*(Int64, Int64), 0
-  %b = tuple_element_addr %1#1 : $*(Int64, Int64), 1
-  store %0 to %a : $*Int64
-  store %0 to %b : $*Int64
+  %a = tuple_element_addr %1#1 : $*(Int, Int), 0
+  %b = tuple_element_addr %1#1 : $*(Int, Int), 1
+  store %0 to %a : $*Int
+  store %0 to %b : $*Int
 
-  %c = load %1#1 : $*(Int64, Int64)
-  %d = tuple_extract %c : $(Int64, Int64), 0
+  %c = load %1#1 : $*(Int, Int)
+  %d = tuple_extract %c : $(Int, Int), 0
 
   strong_release %1#0 : $Builtin.ObjectPointer
 
-  return %d : $Int64
+  return %d : $Int
 
   // Verify that promotion has promoted the tuple load away, and we know that
   // %0 is being returned through scalar instructions in SSA form.
-  // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int64, {{.*}} : $Int64)
-  // CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int64, Int64), 0
+  // CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int, {{.*}} : $Int)
+  // CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int, Int), 0
 
-  // CHECK-NEXT: return [[TUPLE_ELT]] : $Int64
+  // CHECK-NEXT: return [[TUPLE_ELT]] : $Int
 }
 
 
-sil @takes_Int_inout : $@thin (@inout Int64) -> ()
+sil @takes_Int_inout : $@thin (@inout Int) -> ()
 
 
 
@@ -59,27 +59,27 @@ sil @takes_Int_inout : $@thin (@inout Int64) -> ()
 //  return (t,a)
 //}
 // CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $@thin (Int64) -> (Int64, Int64) {
-bb0(%0 : $Int64):
+sil @used_by_inout : $@thin (Int) -> (Int, Int) {
+bb0(%0 : $Int):
   // This alloc_stack can't be removed since it is used by a inout call.
-  // CHECK: %1 = alloc_box $Int64
-  %1 = alloc_box $Int64
-  %2 = store %0 to %1#1 : $*Int64
+  // CHECK: %1 = alloc_box $Int
+  %1 = alloc_box $Int
+  %2 = store %0 to %1#1 : $*Int
   
   // This load should be eliminated.
-  %3 = load %1#1 : $*Int64
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int64) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int64) -> ()
+  %3 = load %1#1 : $*Int
+  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
+  %6 = apply %5(%1#1) : $@thin (@inout Int) -> ()
   
   // This load is needed in case the callee modifies the allocation.
   // CHECK: [[RES:%[0-9]+]] = load
-  %7 = load %1#1 : $*Int64
+  %7 = load %1#1 : $*Int
   
   // This should use the incoming argument to the function.
-  // CHECK: tuple ({{.*}} : $Int64, {{.*}} : $Int64)
-  %8 = tuple (%3 : $Int64, %7 : $Int64)
+  // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
+  %8 = tuple (%3 : $Int, %7 : $Int)
   strong_release %1#0 : $Builtin.ObjectPointer
-  %11 = return %8 : $(Int64, Int64)
+  %11 = return %8 : $(Int, Int)
 }
 
 
@@ -94,27 +94,27 @@ sil @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
 
 
 sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()
+sil @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
 
 
 // CHECK-LABEL: sil @closure_test2
-sil @closure_test2 : $@thin (Int64) -> Int64 {
-bb0(%1 : $Int64):
-  %0 = alloc_box $Int64
-  store %1 to %0#1 : $*Int64  // CHECK: store
+sil @closure_test2 : $@thin (Int) -> Int {
+bb0(%1 : $Int):
+  %0 = alloc_box $Int
+  store %1 to %0#1 : $*Int  // CHECK: store
 
   %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()
+  %6 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
   %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
-  store %1 to %0#1 : $*Int64 // CHECK: store
+  store %1 to %0#1 : $*Int // CHECK: store
 
   // In an escape region, we should not promote loads.
-  %r = load %0#1 : $*Int64 // CHECK: load
-  return %r : $Int64
+  %r = load %0#1 : $*Int // CHECK: load
+  return %r : $Int
 }
 
 
@@ -125,19 +125,19 @@ sil @getSomeClass : $@thin () -> @owned SomeClass
 
 
 // CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
+sil @assign_test_trivial : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_box $Int
 
-  store %0 to %1#1 : $*Int64
-  store %0 to %1#1 : $*Int64
-  store %0 to %1#1 : $*Int64
+  store %0 to %1#1 : $*Int
+  store %0 to %1#1 : $*Int
+  store %0 to %1#1 : $*Int
 
-  %2 = load %1#1 : $*Int64
+  %2 = load %1#1 : $*Int
   strong_release %1#0 : $Builtin.ObjectPointer
 
   // Verify that the load got forwarded from an assign.
-  return %2 : $Int64                        // CHECK: return %0 : $Int64
+  return %2 : $Int                        // CHECK: return %0 : $Int
 }
 
 
@@ -150,39 +150,39 @@ var int_global : Int
 
 
 // CHECK-LABEL: sil @promote_alloc_stack
-sil @promote_alloc_stack : $@thin (Int64) -> Builtin.Int64 {
-bb0(%0 : $Int64):
-  %5 = integer_literal $Builtin.Int64, 1
+sil @promote_alloc_stack : $@thin (Int) -> Builtin.Word {
+bb0(%0 : $Int):
+  %5 = integer_literal $Builtin.Word, 1
   // CHECK: [[IL:%[0-9]+]] = integer_literal
 
-  %18 = struct $Int64 (%5 : $Builtin.Int64)
-  %22 = alloc_stack $Int64
+  %18 = struct $Int (%5 : $Builtin.Word)
+  %22 = alloc_stack $Int
 
   // CHECK-NOT: alloc_stack
 
-  store %18 to %22#1 : $*Int64
-  %24 = struct_element_addr %22#1 : $*Int64, #value
-  %25 = load %24 : $*Builtin.Int64
-  dealloc_stack %22#0 : $*@local_storage Int64
+  store %18 to %22#1 : $*Int
+  %24 = struct_element_addr %22#1 : $*Int, #value
+  %25 = load %24 : $*Builtin.Word
+  dealloc_stack %22#0 : $*@local_storage Int
   // CHECK-NEXT: return [[IL]]
-  return %25 : $Builtin.Int64
+  return %25 : $Builtin.Word
 }
 
 // CHECK-LABEL: sil @copy_addr_to_load
-sil @copy_addr_to_load : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):               // CHECK: bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64
-  store %0 to %1#1 : $*Int64
-  %2 = alloc_stack $Int64
+sil @copy_addr_to_load : $@thin (Int) -> Int {
+bb0(%0 : $Int):               // CHECK: bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1#1 : $*Int
+  %2 = alloc_stack $Int
   
-  copy_addr %1#1 to [initialization] %2#1 : $*Int64
+  copy_addr %1#1 to [initialization] %2#1 : $*Int
 
-  %3 = load %2#1 : $*Int64
+  %3 = load %2#1 : $*Int
 
-  dealloc_stack %2#0 : $*@local_storage Int64
-  dealloc_stack %1#0 : $*@local_storage Int64
+  dealloc_stack %2#0 : $*@local_storage Int
+  dealloc_stack %1#0 : $*@local_storage Int
   // CHECK-NEXT: return %0
-  return %3 : $Int64
+  return %3 : $Int
 }
 
 // rdar://15170149
@@ -202,10 +202,10 @@ bb0(%0 : $Bool):  // CHECK: bb0(%0 :
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion
-sil @cross_block_load_promotion : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_stack $Int64
-  store %0 to %1#1 : $*Int64
+sil @cross_block_load_promotion : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1#1 : $*Int
   %11 = integer_literal $Builtin.Int1, 1
   cond_br %11, bb1, bb2
 
@@ -216,11 +216,11 @@ bb2:
   br bb5
 
 bb5:
-  %15 = load %1#1 : $*Int64
-  dealloc_stack %1#0 : $*@local_storage Int64
-  return %15 : $Int64
+  %15 = load %1#1 : $*Int
+  dealloc_stack %1#0 : $*@local_storage Int
+  return %15 : $Int
 
-// CHECK: return %0 : $Int64
+// CHECK: return %0 : $Int
 }
 
 struct XYStruct { var x, y : Int }
@@ -228,8 +228,8 @@ sil @init_xy_struct : $@thin () -> XYStruct
 
 
 // CHECK-LABEL: sil @cross_block_load_promotion_struct
-sil @cross_block_load_promotion_struct : $@thin (Int64, Int64) -> Int64 {
-bb0(%0 : $Int64, %2 : $Int64):
+sil @cross_block_load_promotion_struct : $@thin (Int, Int) -> Int {
+bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
   
   %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
@@ -237,30 +237,30 @@ bb0(%0 : $Int64, %2 : $Int64):
   store %9 to %1#1 : $*XYStruct
 
   %11 = struct_element_addr %1#1 : $*XYStruct, #y
-  store %0 to %11 : $*Int64
+  store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
   %13 = struct_element_addr %1#1 : $*XYStruct, #x
-  store %2 to %13 : $*Int64
+  store %2 to %13 : $*Int
   br bb5
 
 bb2:                                              // Preds: bb0
   br bb5
 
 bb5:                                              // Preds: bb4
-  %15 = load %11 : $*Int64
+  %15 = load %11 : $*Int
   dealloc_stack %1#0 : $*@local_storage XYStruct
-  return %15 : $Int64
+  return %15 : $Int
 
-// CHECK: return %0 : $Int64
+// CHECK: return %0 : $Int
 }
 
 // CHECK-LABEL: sil @cross_block_load_promotion_struct2
-sil @cross_block_load_promotion_struct2 : $@thin (Int64, Int64) -> Int64 {
-bb0(%0 : $Int64, %2 : $Int64):
+sil @cross_block_load_promotion_struct2 : $@thin (Int, Int) -> Int {
+bb0(%0 : $Int, %2 : $Int):
   %1 = alloc_stack $XYStruct
   
   %7 = function_ref @init_xy_struct : $@thin () -> XYStruct
@@ -268,25 +268,25 @@ bb0(%0 : $Int64, %2 : $Int64):
   store %9 to %1#1 : $*XYStruct
 
   %11 = struct_element_addr %1#1 : $*XYStruct, #x
-  store %0 to %11 : $*Int64
+  store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
   %13 = struct_element_addr %1#1 : $*XYStruct, #x
-  store %0 to %13 : $*Int64
+  store %0 to %13 : $*Int
   br bb5
 
 bb2:                                              // Preds: bb0
   br bb5
 
 bb5:                                              // Preds: bb4
-  %15 = load %11 : $*Int64
+  %15 = load %11 : $*Int
   dealloc_stack %1#0 : $*@local_storage XYStruct
-  return %15 : $Int64
+  return %15 : $Int
 
-// CHECK: return %0 : $Int64
+// CHECK: return %0 : $Int
 }
 
 

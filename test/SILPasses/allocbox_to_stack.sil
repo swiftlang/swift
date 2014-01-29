@@ -5,13 +5,13 @@ import swift
 
 
 // CHECK-LABEL: sil @simple_promotion
-sil @simple_promotion : $(Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
-  %2 = store %0 to %1#1 : $*Int64
-  %3 = load %1#1 : $*Int64
+sil @simple_promotion : $(Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_box $Int
+  %2 = store %0 to %1#1 : $*Int
+  %3 = load %1#1 : $*Int
   %4 = strong_release %1#0 : $Builtin.ObjectPointer
-  %5 = return %3 : $Int64
+  %5 = return %3 : $Int
 
 // CHECK: alloc_stack
 // CHECK-NOT: alloc_box
@@ -20,38 +20,38 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil @init_var
-sil @init_var : $() -> Int64 {
+sil @init_var : $() -> Int {
 bb0:
-  %1 = alloc_box $Int64
-  %3 = load %1#1 : $*Int64
+  %1 = alloc_box $Int
+  %3 = load %1#1 : $*Int
   %4 = strong_release %1#0 : $Builtin.ObjectPointer
-  %5 = return %3 : $Int64
+  %5 = return %3 : $Int
 
 // CHECK: %0 = alloc_stack
 // CHECK-NOT: alloc_box
 // CHECK-NOT: strong_release
 // CHECK-NOT: destroy_addr
-// CHECK: dealloc_stack %0#0 : $*@local_storage Int64
+// CHECK: dealloc_stack %0#0 : $*@local_storage Int
 // CHECK: return
 }
 
 // CHECK-LABEL: sil @multi_strong_release
-sil @multi_strong_release : $() -> Int64 {
+sil @multi_strong_release : $() -> Int {
 bb0:
-  %1 = alloc_box $Int64
-  %2 = mark_uninitialized [rootself] %1#1 : $*Int64
-  %3 = load %2 : $*Int64
+  %1 = alloc_box $Int
+  %2 = mark_uninitialized [rootself] %1#1 : $*Int
+  %3 = load %2 : $*Int
   %x = strong_retain %1#0 : $Builtin.ObjectPointer
   %y = strong_release %1#0 : $Builtin.ObjectPointer
   %b = br bb1
 bb1:
 
   %4 = strong_release %1#0 : $Builtin.ObjectPointer
-  %5 = return %3 : $Int64
+  %5 = return %3 : $Int
 
 // CHECK: %0 = alloc_stack
 // CHECK: bb1:
-// CHECK: dealloc_stack %0#0 : $*@local_storage Int64
+// CHECK: dealloc_stack %0#0 : $*@local_storage Int
 // CHECK: return
 }
 
@@ -60,24 +60,24 @@ struct TestStruct {
 }
 
 // CHECK-LABEL: sil @struct_tuple_element_addr
-sil @struct_tuple_element_addr : $(Int64) -> Int64 {
-bb1(%0 : $Int64):
+sil @struct_tuple_element_addr : $(Int) -> Int {
+bb1(%0 : $Int):
   %1 = alloc_box $TestStruct
   %a = alloc_box $(Int, Int)
   
   %2 = struct_element_addr %1#1 : $*TestStruct, #Elt
-  %3 = store %0 to %2 : $*Int64
+  %3 = store %0 to %2 : $*Int
 
   %b = tuple_element_addr %a#1 : $*(Int, Int), 0
   %c = store %0 to %b : $*Int
 
   %6 = struct_element_addr %1#1 : $*TestStruct, #Elt
-  %7 = load %6 : $*Int64
+  %7 = load %6 : $*Int
   %x = strong_release %a#0 : $Builtin.ObjectPointer
   %8 = strong_release %1#0 : $Builtin.ObjectPointer
 
 
-  %9 = return %7 : $Int64
+  %9 = return %7 : $Int
 
 // CHECK: %1 = alloc_stack $TestStruct
 // CHECK: dealloc_stack %1
@@ -87,18 +87,18 @@ bb1(%0 : $Int64):
 
 
 
-sil @callee : $@thin (@inout Int64) -> ()
+sil @callee : $@thin (@inout Int) -> ()
 
 // CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $@thin () -> Int64 {
+sil @inout_nocapture : $@thin () -> Int {
 bb0:
   // CHECK: alloc_stack
-  %1 = alloc_box $Int64
-  %6 = function_ref @callee : $@thin (@inout Int64) -> ()
-  %7 = apply %6(%1#1) : $@thin (@inout Int64) -> ()
-  %8 = load %1#1 : $*Int64
+  %1 = alloc_box $Int
+  %6 = function_ref @callee : $@thin (@inout Int) -> ()
+  %7 = apply %6(%1#1) : $@thin (@inout Int) -> ()
+  %8 = load %1#1 : $*Int
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
-  %10 = return %8 : $Int64
+  %10 = return %8 : $Int
   // CHECK: return
 }
 

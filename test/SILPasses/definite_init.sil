@@ -4,28 +4,28 @@ import Builtin
 import swift
 
 
-sil @takes_Int_inout : $@thin (@inout Int64) -> ()
-sil @makesInt : $@thin () -> Int64
+sil @takes_Int_inout : $@thin (@inout Int) -> ()
+sil @makesInt : $@thin () -> Int
 
 
 
 // CHECK-LABEL: sil @use_before_init
-sil @use_before_init : $@thin () -> Int64 {
+sil @use_before_init : $@thin () -> Int {
 bb0:
-  %1 = alloc_box $Int64                   // expected-note {{variable defined here}}
-  %4 = load %1#1 : $*Int64                // expected-error {{variable '<unknown>' used before being initialized}}
+  %1 = alloc_box $Int                   // expected-note {{variable defined here}}
+  %4 = load %1#1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
   strong_release %1#0 : $Builtin.ObjectPointer
-  %9 = return %4 : $Int64
+  %9 = return %4 : $Int
 }
 
 
 // CHECK-LABEL: @inout_uninit
 sil @inout_uninit : $@thin () -> () {
 bb0:
-  %1 = alloc_box $Int64                                   // expected-note {{variable defined here}}
+  %1 = alloc_box $Int                                   // expected-note {{variable defined here}}
 
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int64) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int64) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
+  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
+  %6 = apply %5(%1#1) : $@thin (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %0 = tuple ()
   strong_release %1#0 : $Builtin.ObjectPointer
@@ -43,17 +43,17 @@ bb0:
 //  return (t,a)
 //}
 // CHECK-LABEL: sil @used_by_inout
-sil @used_by_inout : $@thin (Int64) -> (Int64, Int64) {
-bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
-  %2 = store %0 to %1#1 : $*Int64
-  %3 = load %1#1 : $*Int64
-  %5 = function_ref @takes_Int_inout : $@thin (@inout Int64) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int64) -> ()
-  %7 = load %1#1 : $*Int64
-  %8 = tuple (%3 : $Int64, %7 : $Int64)
+sil @used_by_inout : $@thin (Int) -> (Int, Int) {
+bb0(%0 : $Int):
+  %1 = alloc_box $Int
+  %2 = store %0 to %1#1 : $*Int
+  %3 = load %1#1 : $*Int
+  %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
+  %6 = apply %5(%1#1) : $@thin (@inout Int) -> ()
+  %7 = load %1#1 : $*Int
+  %8 = tuple (%3 : $Int, %7 : $Int)
   strong_release %1#0 : $Builtin.ObjectPointer
-  %11 = return %8 : $(Int64, Int64)
+  %11 = return %8 : $(Int, Int)
 }
 
 
@@ -67,27 +67,27 @@ sil @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
 
 // There should be no error in this function.
 // CHECK-LABEL: sil @call_struct_return_function
-sil @call_struct_return_function : $@thin () -> Int64 {
+sil @call_struct_return_function : $@thin () -> Int {
 bb0:
   %1 = alloc_box $AddressOnlyStruct
   %2 = function_ref @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
   %3 = apply %2(%1#1) : $@thin (@out AddressOnlyStruct) -> ()
   %4 = struct_element_addr %1#1 : $*AddressOnlyStruct, #b
-  %5 = load %4 : $*Int64
+  %5 = load %4 : $*Int
   strong_release %1#0 : $Builtin.ObjectPointer
-  return %5 : $Int64
+  return %5 : $Int
 }
 
 
 // CHECK-LABEL: sil @tuple_elements1
-sil @tuple_elements1 : $@thin (Int64) -> () {
-bb0(%0 : $Int64):
-  %3 = alloc_box $(Int64, Int64)     // expected-note 1 {{variable defined here}}
-  %4 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
-  %5 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
-  %14 = function_ref @takes_Int_inout : $@thin (@inout Int64) -> ()
-  %15 = tuple_element_addr %3#1 : $*(Int64, Int64), 1
-  %16 = apply %14(%15) : $@thin (@inout Int64) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
+sil @tuple_elements1 : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %3 = alloc_box $(Int, Int)     // expected-note 1 {{variable defined here}}
+  %4 = tuple_element_addr %3#1 : $*(Int, Int), 0
+  %5 = tuple_element_addr %3#1 : $*(Int, Int), 1
+  %14 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
+  %15 = tuple_element_addr %3#1 : $*(Int, Int), 1
+  %16 = apply %14(%15) : $@thin (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
   strong_release %3#0 : $Builtin.ObjectPointer
   %99 = tuple ()
@@ -95,17 +95,17 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil @tuple_elements2
-sil @tuple_elements2 : $@thin (Int64) -> (Int64, Int64) {
-bb0(%0 : $Int64):
-  %3 = alloc_box $(Int64, Int64)     // expected-note {{variable defined here}}
-  %18 = tuple_element_addr %3#1 : $*(Int64, Int64), 0
-  store %0 to %18 : $*Int64
-  %20 = load %3#1 : $*(Int64, Int64) // expected-error {{variable '<unknown>.1' used before being initialized}}
-  %21 = tuple_extract %20 : $(Int64, Int64), 0
-  %22 = tuple_extract %20 : $(Int64, Int64), 1
-  %23 = tuple (%21 : $Int64, %22 : $Int64)
+sil @tuple_elements2 : $@thin (Int) -> (Int, Int) {
+bb0(%0 : $Int):
+  %3 = alloc_box $(Int, Int)     // expected-note {{variable defined here}}
+  %18 = tuple_element_addr %3#1 : $*(Int, Int), 0
+  store %0 to %18 : $*Int
+  %20 = load %3#1 : $*(Int, Int) // expected-error {{variable '<unknown>.1' used before being initialized}}
+  %21 = tuple_extract %20 : $(Int, Int), 0
+  %22 = tuple_extract %20 : $(Int, Int), 1
+  %23 = tuple (%21 : $Int, %22 : $Int)
   strong_release %3#0 : $Builtin.ObjectPointer
-  return %23 : $(Int64, Int64)
+  return %23 : $(Int, Int)
 }
 
 
@@ -133,17 +133,17 @@ bb0(%0 : $*T, %1 : $*T):
 
 
 sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()
+sil @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
 
 // CHECK-LABEL: sil @closure_test
 sil @closure_test : $@thin () -> () {
 bb0:
-  %0 = alloc_box $Int64    // expected-note {{variable defined here}}
+  %0 = alloc_box $Int    // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()
+  %6 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
   strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int64) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
   %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
   strong_release %0#0 : $Builtin.ObjectPointer
 
@@ -158,20 +158,20 @@ sil @getSomeClass : $@thin () -> @owned SomeClass
 
 
 // CHECK-LABEL: sil @assign_test_trivial
-sil @assign_test_trivial : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = alloc_box $Int64
+sil @assign_test_trivial : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_box $Int
 
   // These assigns are a mix of init + store forms, but because Int is trivial,
   // they all turn into stores.
-  assign %0 to %1#1 : $*Int64
-  assign %0 to %1#1 : $*Int64
-  assign %0 to %1#1 : $*Int64
+  assign %0 to %1#1 : $*Int
+  assign %0 to %1#1 : $*Int
+  assign %0 to %1#1 : $*Int
 
-  %2 = load %1#1 : $*Int64
+  %2 = load %1#1 : $*Int
   strong_release %1#0 : $Builtin.ObjectPointer
 
-  return %2 : $Int64
+  return %2 : $Int
 }
 
 // CHECK-LABEL: sil @assign_test_nontrivial
@@ -362,8 +362,8 @@ var int_global : Int
 // CHECK-NOT: mark_uninitialized
 // CHECK: return
 sil @test_tlc : $() -> () {
-  %0 = global_addr #int_global : $*Int64
-  %1 = mark_uninitialized [globalvar] %0 : $*Int64
+  %0 = global_addr #int_global : $*Int
+  %1 = mark_uninitialized [globalvar] %0 : $*Int
 
   %9 = tuple ()
   return %9 : $()
@@ -528,51 +528,51 @@ class RootClassWithIVars {
 
 
 // CHECK-LABEL: sil @rootclass_test1
-sil @rootclass_test1 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
-bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+sil @rootclass_test1 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %10 = ref_element_addr %3 : $RootClassWithIVars, #x
-  assign %1 to %10 : $*Int64
+  assign %1 to %10 : $*Int
 
   %11 = ref_element_addr %3 : $RootClassWithIVars, #y
-  assign %1 to %11 : $*Int64
+  assign %1 to %11 : $*Int
 
   %12 = ref_element_addr %3 : $RootClassWithIVars, #z
-  %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
-  assign %1 to %13 : $*Int64
-  %14 = tuple_element_addr %12 : $*(Int64, Int64), 1
-  assign %1 to %14 : $*Int64
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
+  %14 = tuple_element_addr %12 : $*(Int, Int), 1
+  assign %1 to %14 : $*Int
 
   return %3 : $RootClassWithIVars
 }
 
 // CHECK-LABEL: sil @rootclass_test2
-sil @rootclass_test2 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
-bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+sil @rootclass_test2 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
   %10 = ref_element_addr %3 : $RootClassWithIVars, #x
-  assign %1 to %10 : $*Int64
+  assign %1 to %10 : $*Int
 
   %11 = ref_element_addr %3 : $RootClassWithIVars, #y
-  assign %1 to %11 : $*Int64
+  assign %1 to %11 : $*Int
 
   %12 = ref_element_addr %3 : $RootClassWithIVars, #z
-  %13 = tuple_element_addr %12 : $*(Int64, Int64), 0
-  assign %1 to %13 : $*Int64
+  %13 = tuple_element_addr %12 : $*(Int, Int), 0
+  assign %1 to %13 : $*Int
 
   return %3 : $RootClassWithIVars  // expected-error {{property '<unknown>.z.1' not initialized}}
 }
 
 // CHECK-LABEL: sil @rootclass_test3
-sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int64) -> @owned RootClassWithIVars {
-bb0(%0 : $RootClassWithIVars, %1 : $Int64):
+sil @rootclass_test3 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @owned RootClassWithIVars {
+bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
 
   strong_retain %3 : $RootClassWithIVars             // id: %11
   %11 = ref_element_addr %3 : $RootClassWithIVars, #y
-  assign %1 to %11 : $*Int64
+  assign %1 to %11 : $*Int
   strong_release %3 : $RootClassWithIVars            // id: %14
 
   return %3 : $RootClassWithIVars    // expected-error {{property '<unknown>.x' not initialized}}
@@ -593,13 +593,13 @@ bb0(%0 : $DerivedClassWithIVars):
   store %3 to %1#1 : $*DerivedClassWithIVars
 
   // Get an int
-  %5 = function_ref @makesInt : $@thin () -> Int64
-  %7 = apply [transparent] %5() : $@thin () -> Int64
+  %5 = function_ref @makesInt : $@thin () -> Int
+  %7 = apply [transparent] %5() : $@thin () -> Int
 
   // Initialize the 'a' ivar with the int.
   %8 = load %1#1 : $*DerivedClassWithIVars
   %9 = ref_element_addr %8 : $DerivedClassWithIVars, #a
-  assign %7 to %9 : $*Int64
+  assign %7 to %9 : $*Int
   
 
   %11 = load %1#1 : $*DerivedClassWithIVars

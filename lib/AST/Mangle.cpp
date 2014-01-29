@@ -1028,10 +1028,10 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   // reserved for the swift module itself) or a digit or '_'.
 
   StringRef name = decl->getName().str();
-  if (name == "Int64") {
+  if (name == "Int") {
     Buffer << "Si";
     return true;
-  } else if (name == "UInt64") {
+  } else if (name == "UInt") {
     Buffer << "Su";
     return true;
   } else if (name == "Bool") {

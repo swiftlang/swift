@@ -181,16 +181,16 @@ bb2:
   %33 = return %32 : $()
 }                                                 // CHECK: }
 
-sil @testCondBranchBBArgs : $@thin (Int64, Int64) -> Int64 {
-bb0(%0 : $Int64, %1 : $Int64):
+sil @testCondBranchBBArgs : $@thin (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $Int64), bb2(%1 : $Int64)
-bb1(%3 : $Int64):
-  br bb3(%3 : $Int64)
-bb2(%4 : $Int64):
-  br bb3(%4 : $Int64)
-bb3(%5 : $Int64):
-  return %5 : $Int64
+  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
+bb1(%3 : $Int):
+  br bb3(%3 : $Int)
+bb2(%4 : $Int):
+  br bb3(%4 : $Int)
+bb3(%5 : $Int):
+  return %5 : $Int
 }
 // CHECK-LABEL: sil @testCondBranchBBArgs
 // CHECK: bb0
@@ -201,19 +201,19 @@ bb3(%5 : $Int64):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @removePredecessorWithBBArgs : $@thin (Int64, Int64) -> Int64 {
-bb0(%0 : $Int64, %1 : $Int64):
+sil @removePredecessorWithBBArgs : $@thin (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
  %2 = integer_literal $Builtin.Int1, 0
- %3 = cond_br %2, bb2(%0 : $Int64), bb3(%1 : $Int64)
-bb2(%4 : $Int64): 
- br bb4(%4 : $Int64)
-bb3(%5 : $Int64):
-  br bb4(%5 : $Int64)
-bb4(%6 : $Int64):
-  return %6 : $Int64
+ %3 = cond_br %2, bb2(%0 : $Int), bb3(%1 : $Int)
+bb2(%4 : $Int): 
+ br bb4(%4 : $Int)
+bb3(%5 : $Int):
+  br bb4(%5 : $Int)
+bb4(%6 : $Int):
+  return %6 : $Int
 }
 // CHECK-LABEL:sil @removePredecessorWithBBArgs
-// CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $Int64):
+// CHECK: bb0(%{{[0-9]+}} : $Int, %{{[0-9]+}} : $Int):
 // CHECK-NEXT:  br bb1
 // CHECK:      bb1:
 // CHECK-NEXT:  br bb2
@@ -221,8 +221,8 @@ bb4(%6 : $Int64):
 // CHECK-NEXT:  return
 // CHECK: }
 
-sil @code_removed_after_a_call_to_noreturn : $@thin (Int64, Builtin.Int1) -> () {
-bb0(%0 : $Int64, %1 : $Builtin.Int1):
+sil @code_removed_after_a_call_to_noreturn : $@thin (Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
   %6 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %7 = apply %6() : $@thin @noreturn () -> ()
   cond_br %1, bb1, bb2
@@ -256,8 +256,8 @@ bb0:
 
 enum BoolLike { case true, false }
 
-sil @constant_fold_switch_enum : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
+sil @constant_fold_switch_enum : $@thin (Int) -> Int {
+bb0(%0 : $Int):
   %6 = enum $BoolLike, #BoolLike.false!enumelt          // user: %9
   switch_enum %6 : $BoolLike, case #BoolLike.true!enumelt: bb1, case #BoolLike.false!enumelt: bb2
 
@@ -268,9 +268,9 @@ bb2:
   br bb3
 
 bb3:
-  return %0 : $Int64
+  return %0 : $Int
 // CHECK-LABEL: sil @constant_fold_switch_enum
-// CHECK: bb0(%0 : $Int64):
+// CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: br bb1
 // CHECK-NOT: switch_enum
 // CHECK: }
@@ -279,30 +279,30 @@ bb3:
 enum Singleton {
   case x(Int, UnicodeScalar)
 };
-sil @constant_fold_switch_enum_with_payload : $@thin (Int64, UnicodeScalar) -> (Int64, UnicodeScalar) {
-bb0(%6 : $Int64, %10 : $UnicodeScalar):
-  %11 = tuple (%6 : $Int64, %10 : $UnicodeScalar)
-  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int64, UnicodeScalar)
+sil @constant_fold_switch_enum_with_payload : $@thin (Int, UnicodeScalar) -> (Int, UnicodeScalar) {
+bb0(%6 : $Int, %10 : $UnicodeScalar):
+  %11 = tuple (%6 : $Int, %10 : $UnicodeScalar)
+  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int, UnicodeScalar)
   switch_enum %12 : $Singleton, case #Singleton.x!enumelt.1: bb1
 
-bb1(%15 : $(Int64, UnicodeScalar)):
-  return %15 : $(Int64, UnicodeScalar)
+bb1(%15 : $(Int, UnicodeScalar)):
+  return %15 : $(Int, UnicodeScalar)
 
 b2:
-  %111 = tuple (%6 : $Int64, %10 : $UnicodeScalar)
-  br bb1(%111 : $(Int64, UnicodeScalar))
+  %111 = tuple (%6 : $Int, %10 : $UnicodeScalar)
+  br bb1(%111 : $(Int, UnicodeScalar))
 
 // CHECK-LABEL: sil @constant_fold_switch_enum_with_payload
-// CHECK: bb0(%{{[0-9]+}} : $Int64, %{{[0-9]+}} : $UnicodeScalar):
+// CHECK: bb0(%{{[0-9]+}} : $Int, %{{[0-9]+}} : $UnicodeScalar):
 // CHECK:   br bb1
 // CHECK: bb1:
 // CHECK:   return
 }
 
-sil @constant_fold_switch_int : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
-  %1 = integer_literal $Builtin.Int64, 2
-  switch_int %1 : $Builtin.Int64, case 1: bb1, case 2: bb2
+sil @constant_fold_switch_int : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 2
+  switch_int %1 : $Builtin.Word, case 1: bb1, case 2: bb2
 bb1:
   br bb3
 
@@ -310,16 +310,16 @@ bb2:
   br bb3
 
 bb3:
-  return %0 : $Int64
+  return %0 : $Int
 // CHECK-LABEL: sil @constant_fold_switch_int
-// CHECK: bb0(%0 : $Int64):
+// CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: br bb1
 // CHECK-NOT: switch_int
 // CHECK: }
 }
 
-sil @propagate_BB_args : $@thin (Int64) -> Int64 {
-bb0(%0 : $Int64):
+sil @propagate_BB_args : $@thin (Int) -> Int {
+bb0(%0 : $Int):
   %1 = integer_literal $Builtin.Int1, 0
   br bb1(%1 : $Builtin.Int1)
 
@@ -336,9 +336,9 @@ bb4:
   br bb5
 
 bb5:
-  return %0 : $Int64
+  return %0 : $Int
 // CHECK-LABEL:sil @propagate_BB_args
-// CHECK: bb0(%0 : $Int64):
+// CHECK: bb0(%0 : $Int):
 // CHECK-NEXT: br bb1
 // CHECK: bb1:
 // CHECK-NOT: cond_br

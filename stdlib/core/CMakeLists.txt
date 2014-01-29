@@ -8,18 +8,18 @@ configure_file(SwiftLibSources.txt SwiftLibSources.txt.copy)
 
 file(STRINGS SwiftLibSources.txt SWIFTLIB_SOURCES)
 
-# Replace WordXX.swift with Word64.swift or Word32.swift, according to
-# the target architecture
+# Replace FixedPointXX.swift with FixedPoint64.swift or FixedPoint32.swift, 
+# according to the target architecture
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(word_size 64)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
   set(word_size 32)
 else()
   message(SEND_ERROR
-    "Target word size of ${CMAKE_SIZEOF_VOID_P} bytes not accounted for with an appropriate WordXX.swift")
+    "Target word size of ${CMAKE_SIZEOF_VOID_P} bytes does not have a matching FixedPoint${CMAKE_SIZEOF_VOID_P}.swift implementation")
 endif()
 
-string(REPLACE ";WordXX.swift" ";Word${word_size}.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
+string(REPLACE ";FixedPointXX.swift" ";FixedPoint${word_size}.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 if(SWIFT_ASSERTS)

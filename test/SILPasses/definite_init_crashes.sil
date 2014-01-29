@@ -13,13 +13,13 @@ struct Triple {
 }
 
 // CHECK-LABEL: sil @TripleTest
-sil @TripleTest : $@cc(method) @thin (Int64, @inout Triple) -> Triple {
-bb0(%0 : $Int64, %1 : $*Triple):
+sil @TripleTest : $@cc(method) @thin (Int, @inout Triple) -> Triple {
+bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $Triple
   %5 = load %1 : $*Triple
   store %5 to %4#1 : $*Triple
   %8 = struct_element_addr %4#1 : $*Triple, #b
-  store %0 to %8 : $*Int64
+  store %0 to %8 : $*Int
   %10 = load %4#1 : $*Triple
   strong_release %4#0 : $Builtin.ObjectPointer
   return %10 : $Triple
@@ -31,14 +31,14 @@ struct Single {
 }
 
 // CHECK-LABEL: sil @SingleTest
-sil @SingleTest : $@cc(method) @thin (@inout  Single, Int64) -> Single {
-bb0(%0 : $*Single, %1 : $Int64):
+sil @SingleTest : $@cc(method) @thin (@inout  Single, Int) -> Single {
+bb0(%0 : $*Single, %1 : $Int):
   %4 = alloc_box $Single
   %5 = load %0 : $*Single
   store %5 to %4#1 : $*Single
   
   %8 = struct_element_addr %4#1 : $*Single, #a
-  store %1 to %8 : $*Int64
+  store %1 to %8 : $*Int
 
   %10 = load %4#1 : $*Single
   strong_release %4#0 : $Builtin.ObjectPointer

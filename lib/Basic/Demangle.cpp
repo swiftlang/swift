@@ -714,7 +714,7 @@ private:
     if (Mangled.nextIf('f'))
       return createSwiftType(Node::Kind::Structure, "Float32");
     if (Mangled.nextIf('i'))
-      return createSwiftType(Node::Kind::Structure, "Int64");
+      return createSwiftType(Node::Kind::Structure, "Int");
     if (Mangled.nextIf('q'))
       return createSwiftType(Node::Kind::Enum, "Optional");
     if (Mangled.nextIf('Q'))
@@ -722,7 +722,7 @@ private:
     if (Mangled.nextIf('S'))
       return createSwiftType(Node::Kind::Structure, "String");
     if (Mangled.nextIf('u'))
-      return createSwiftType(Node::Kind::Structure, "UInt64");
+      return createSwiftType(Node::Kind::Structure, "UInt");
     Node::IndexType index_sub;
     if (!demangleIndex(index_sub))
       return Node::create(Node::Kind::Failure);

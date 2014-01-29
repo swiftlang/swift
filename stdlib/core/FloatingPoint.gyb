@@ -17,10 +17,7 @@ if int(withExtendedPrecision) != 0:
     allFloatBits += [80]
 
 # Bit counts for all int types
-allIntBits = [8, 16, 32, 64]
-
-# Number of bits in an Int
-intBits = 64
+allIntBits = [8, 16, 32, 64, 'Int']
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
@@ -33,8 +30,14 @@ def allInts():
         for signed in False, True:
             yield bits,signed
 
-def intName(bits, signed):
-    return ('' if signed else 'U') + 'Int' + str(bits)
+def baseIntName(name):
+    return 'Int' if name == 'Int' else 'Int' + str(name)
+
+def builtinIntName(name):
+    return 'Word' if name == 'Int' else 'Int' + str(name)
+
+def intName(name, signed):
+    return ('' if signed else 'U') + baseIntName(name)
 
 def floatName(bits):
     return 'Float' + str(bits)
@@ -282,8 +285,8 @@ extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible 
     return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(val))
   }
 
-  type func convertFromIntegerLiteral(value: Int${intBits}) -> ${Self} {
-    return ${Self}(Builtin.uitofp_Int${intBits}_FPIEEE${bits}(value.value))
+  type func convertFromIntegerLiteral(value: Int64) -> ${Self} {
+    return ${Self}(Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
   }
 }
 
@@ -324,13 +327,13 @@ extension ${Self} : Comparable {
 
 extension ${Self} : Hashable {
   func hashValue() -> Int {
-@   if bits > intBits:
-      var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
-      return Int(Builtin.trunc_Int${bits}_Int${intBits}(asBuiltinInt))
-@   elif bits == intBits:
-      return Int${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
+    var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
+@   if bits >= 64:
+    return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
+@   elif bits <= 32:
+    return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
 @   else:
-      return Int(Int${bits}(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)))
+    error unhandled float size ${bits}
 @   end
   }
 }
@@ -357,9 +360,10 @@ extension ${Self} : SignedNumber {
 extension ${Self} {
 @ for (srcBits, srcSigned) in allInts():
 @    That = intName(srcBits, srcSigned)
+@    ThatBuiltinName = builtinIntName(srcBits)
 @    sign = 's' if srcSigned else 'u'
   init(v: ${That}) {
-    value = Builtin.${sign}itofp_Int${srcBits}_FPIEEE${bits}(v.value)
+    value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v.value)
   }
 @ end
 }
@@ -429,15 +433,17 @@ func ${op}= (lhs: @@inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 @ for (bits, signed) in allInts():
 @   sign = 's' if signed else 'u'
 @   Self = intName(bits, signed)
+@   BuiltinName = builtinIntName(bits)
 @@transparent
 extension ${Self} {
 @   for srcBits in allFloatBits:
 @     That = floatName(srcBits)
   init(v: ${That}) {
-    value = Builtin.fpto${sign}i_FPIEEE${srcBits}_Int${bits}(v.value)
+    value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
   }
 @   end
 }
+
 @ end
 
 
