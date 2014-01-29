@@ -77,6 +77,8 @@
   -triple                 ->  -target
   -serialize-diagnostics  ->  -serialize-diagnostics-path
 
+* Imported NS_OPTIONS types now have a default initializer which produces a
+  value with no options set.
 
 2014-01-22
 ----------
