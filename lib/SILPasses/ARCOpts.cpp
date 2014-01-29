@@ -94,7 +94,7 @@ class ReferenceCountState {
   SILInstruction *InsertPt = nullptr;
 
   /// Current place in the sequence of the value.
-  SequenceState State = SequenceState::None;
+  SequenceState SeqState = SequenceState::None;
 
 public:
   ReferenceCountState() { }
@@ -104,7 +104,7 @@ public:
   bool isInitialized() const { return Instruction != nullptr; }
 
   /// Can we gaurantee that the given reference counted value is incremented?
-  bool isIncremented() const { return SequenceState::Incremented == State; }
+  bool isIncremented() const { return SequenceState::Incremented == SeqState; }
 
   /// Are we tracking an instruction currently? This returns false when given
   /// an uninitialized ReferenceCountState.
@@ -162,7 +162,7 @@ bool ReferenceCountState::init(SILInstruction *I) {
   KnownSafe = isIncremented();
 
   // Reset our state to Incremented.
-  State = SequenceState::Incremented;
+  SeqState = SequenceState::Incremented;
 
   // Stash the incrementing instruction we are tracking.
   Instruction = I;
@@ -174,7 +174,7 @@ bool ReferenceCountState::init(SILInstruction *I) {
 }
 
 void ReferenceCountState::clear() {
-  State = SequenceState::None;
+  SeqState = SequenceState::None;
   Instruction = nullptr;
   InsertPt = nullptr;
   KnownSafe = false;
@@ -195,9 +195,9 @@ bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
   // Attempt to advance the sequence. If we do advance the sequence, return
   // true. If we can not advance the sequence then this information is not
   // relevant, so return false.
-  switch (State) {
+  switch (SeqState) {
     case SequenceState::Incremented:
-      State = SequenceState::MightBeDecremented;
+      SeqState = SequenceState::MightBeDecremented;
       InsertPt = Other;
       return true;
     case SequenceState::None:
@@ -219,9 +219,9 @@ bool ReferenceCountState::handlePotentialUser(SILInstruction *Other) {
     return false;
 
   // Otherwise advance the sequence...
-  switch (State) {
+  switch (SeqState) {
     case SequenceState::MightBeDecremented:
-      State = SequenceState::MightBeUsed;
+      SeqState = SequenceState::MightBeUsed;
       return true;
     case SequenceState::Incremented:
     case SequenceState::None:
@@ -240,7 +240,7 @@ ReferenceCountState::doesDecrementMatchInstruction(SILInstruction *Decrement) {
 
   // Otherwise modify the state appropriately in preparation for removing the
   // increment, decrement pair.
-  switch (State) {
+  switch (SeqState) {
     case SequenceState::None:
       return false;
     case SequenceState::Incremented:
