@@ -78,7 +78,12 @@
   -serialize-diagnostics  ->  -serialize-diagnostics-path
 
 * Imported NS_OPTIONS types now have a default initializer which produces a
-  value with no options set.
+  value with no options set. They can also be initialized to the empty set with
+  'nil'. These are equivalent:
+
+    var x = NSMatchingOptions()
+    var y: NSMatchingOptions = nil
+
 
 2014-01-22
 ----------
