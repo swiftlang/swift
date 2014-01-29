@@ -610,3 +610,23 @@ bb3:
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @do_not_sink_local_uses
+// CHECK: integer_literal
+// CHECK: integer_literal
+// CHECK: return
+sil @do_not_sink_local_uses : $@thin (Builtin.Int1) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %1 = integer_literal $Builtin.Int32, 7
+  br bb2(%1 : $Builtin.Int32)
+
+bb3:
+  %2 = integer_literal $Builtin.Int32, 7
+  br bb2(%2 : $Builtin.Int32)
+
+bb2(%3 : $Builtin.Int32):
+  return %3 : $Builtin.Int32
+}
+
