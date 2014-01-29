@@ -473,7 +473,8 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
         --output benchmark/lnt_results.json \
         --machine-name "matte.apple.com--${BUILD_TYPE}--x86_64--O3" \
         --run-order "$swift_source_revision" \
-        --submit http://localhost:32169/submitRun) || exit 1
+        --submit http://localhost:32169/submitRun) \
+  || echo "*** Swift performance test results not submitted."
 
   # If the performance tests failed, fail the build.
   if [ "$PERFORMANCE_TESTS_PASSED" -ne 1 ]; then
