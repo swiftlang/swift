@@ -70,9 +70,12 @@
   <rdar://problem/15915785> (for classes) and <rdar://problem/15915867>
   (for generic types).
 
-* The "-triple" and "-emit-llvm" arguments have been deprecated in favor of
-  "-target" and "-emit-ir". The old arguments will be removed in the following
-  week's build.
+* The following command-line flags have been deprecated in favor of new
+  spellings. The old spellings will be removed in the following week's build:
+
+  -emit-llvm              ->  -emit-ir
+  -triple                 ->  -target
+  -serialize-diagnostics  ->  -serialize-diagnostics-path
 
 
 2014-01-22
