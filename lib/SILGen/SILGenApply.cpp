@@ -2422,8 +2422,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   if (gen.SGM.requiresObjCDispatch(decl)) {
     auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
 
-    if (isSuper)
+    if (isSuper) {
+      if (auto *upcast = dyn_cast<UpcastInst>(self))
+        self = upcast->getOperand();
       return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
+    }
 
     return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
   }
