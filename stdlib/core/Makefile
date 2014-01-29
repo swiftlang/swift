@@ -36,7 +36,7 @@ else ifeq ($(ARCH),ARM)
 else
   $(error unknown architecture $(ARCH))
 endif
-SWIFT_SOURCES := $(subst FixedPointXX.swift,FixedPoint(WORD_SIZE).swift,$(SWIFT_SOURCES))
+SWIFT_SOURCES := $(subst FixedPointXX.swift,FixedPoint$(WORD_SIZE).swift,$(SWIFT_SOURCES))
 
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 ifneq ($(DISABLE_ASSERTIONS),1)
