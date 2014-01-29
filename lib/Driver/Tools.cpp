@@ -47,34 +47,55 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
 
 /// Swift Tool
 
-namespace {
-  static void addInputsOfType(ArgStringList &Arguments, const Job *J,
-                              types::ID InputType) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
-      if (!output.empty())
-        Arguments.push_back(output.c_str());
-    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-      for (const Job *J : *JL)
-        addInputsOfType(Arguments, J, InputType);
-    } else {
-      llvm_unreachable("Unable to add input arguments for unknown Job class");
-    }
+static void addInputsOfType(ArgStringList &Arguments, const Job *J,
+                            types::ID InputType) {
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
+    if (!output.empty())
+      Arguments.push_back(output.c_str());
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    for (const Job *J : *JL)
+      addInputsOfType(Arguments, J, InputType);
+  } else {
+    llvm_unreachable("Unable to add input arguments for unknown Job class");
+  }
+}
+
+static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
+                                   types::ID InputType) {
+  if (const Command *Cmd = dyn_cast<Command>(J)) {
+    auto &outputInfo = Cmd->getOutput();
+    if (outputInfo.getPrimaryOutputType() == InputType)
+      Arguments.push_back(outputInfo.getPrimaryOutputFilename().c_str());
+  } else if (const JobList *JL = dyn_cast<JobList>(J)) {
+    for (const Job *J : *JL)
+      addPrimaryInputsOfType(Arguments, J, InputType);
+  } else {
+    llvm_unreachable("Unable to add input arguments for unknown Job class");
+  }
+}
+
+/// Handle arguments common to all invocations of the frontend (compilation,
+/// module-merging, etc).
+static void addCommonFrontendArgs(const ToolChain &TC,
+                                  const OutputInfo &OI,
+                                  const ArgList &inputArgs,
+                                  ArgStringList &arguments) {
+  arguments.push_back("-target");
+  std::string TripleStr = TC.getTripleString();
+  arguments.push_back(inputArgs.MakeArgString(TripleStr));
+
+  arguments.push_back("-module-name");
+  arguments.push_back(inputArgs.MakeArgString(OI.ModuleName));
+
+  if (!OI.SDKPath.empty()) {
+    arguments.push_back("-sdk");
+    arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
-  static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
-                                     types::ID InputType) {
-    if (const Command *Cmd = dyn_cast<Command>(J)) {
-      auto &outputInfo = Cmd->getOutput();
-      if (outputInfo.getPrimaryOutputType() == InputType)
-        Arguments.push_back(outputInfo.getPrimaryOutputFilename().c_str());
-    } else if (const JobList *JL = dyn_cast<JobList>(J)) {
-      for (const Job *J : *JL)
-        addPrimaryInputsOfType(Arguments, J, InputType);
-    } else {
-      llvm_unreachable("Unable to add input arguments for unknown Job class");
-    }
-  }
+  inputArgs.AddAllArgs(arguments, options::OPT_I);
+
+  inputArgs.AddLastArg(arguments, options::OPT_g);
 }
 
 
@@ -88,10 +109,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   
   // Invoke ourselves in -frontend mode.
   Arguments.push_back("-frontend");
-
-  Arguments.push_back("-target");
-  std::string TripleStr = getToolChain().getTripleString();
-  Arguments.push_back(Args.MakeArgString(TripleStr));
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -187,21 +204,12 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
   }
 
-  Arguments.push_back("-module-name");
-  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
+  addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
 
   Args.AddLastArg(Arguments, options::OPT_module_link_name);
 
-  Args.AddLastArg(Arguments, options::OPT_g);
-
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
-  
-  // Set the SDK for the frontend.
-  if (!OI.SDKPath.empty()) {
-    Arguments.push_back("-sdk");
-    Arguments.push_back(Args.MakeArgString(OI.SDKPath));
-  }
 
   // Pass through the values passed to -Xfrontend.
   Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
@@ -213,8 +221,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
 
   Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
-
-  Args.AddAllArgs(Arguments, options::OPT_I);
 
   Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
@@ -261,28 +267,27 @@ Job *MergeModule::constructJob(const JobAction &JA,
   // Invoke ourself in -frontend mode.
   Arguments.push_back("-frontend");
 
-  // Tell all files to parse as library, which is necessary to load them as
-  // serialized ASTs.
-  Arguments.push_back("-parse-as-library");
-
-  Arguments.push_back("-module-name");
-  Arguments.push_back(Args.MakeArgString(OI.ModuleName));
-
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
   Arguments.push_back("-emit-module");
-
-  assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
-         "The MergeModule tool only produces swiftmodule files!");
-
-  Arguments.push_back("-o");
-  Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
   size_t origLen = Arguments.size();
   (void)origLen;
   addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
   assert(Arguments.size() - origLen == Inputs->size() &&
          "every input to MergeModule must generate a swiftmodule");
+
+  // Tell all files to parse as library, which is necessary to load them as
+  // serialized ASTs.
+  Arguments.push_back("-parse-as-library");
+
+  addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
+
+  assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
+         "The MergeModule tool only produces swiftmodule files!");
+
+  Arguments.push_back("-o");
+  Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
