@@ -485,17 +485,6 @@ static SILInstruction *getLastNonTerminator(SILBasicBlock *BB) {
   return std::prev(Term);
 }
 
-/// \brief returns True if the instruction has users inside the same basic
-/// block.
-static bool hasInBlockUses(SILInstruction *Inst) {
-  SILBasicBlock *Parent = Inst->getParent();
-  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;)
-    if (UI.getUser()->getParent() == Parent)
-      return true;
-
-    return false;
-}
-
 static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
   if (BB->pred_empty())
     return;
@@ -518,7 +507,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
 
     // Pick the last instruction from the first pred.
     SILInstruction *FirstPredInst = getLastNonTerminator(FirstPred);
-    if (!FirstPredInst)
+    if (!FirstPredInst || !FirstPredInst->use_empty())
       return;
 
     // Save the duplicated instructions in case we need to remove them.
@@ -533,7 +522,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
       // of the first pred.
       SILInstruction *Last = getLastNonTerminator(P);
       if (!Last || !FirstPredInst->isIdenticalTo(Last) ||
-          hasInBlockUses(Last)) {
+          !Last->use_empty()) {
         Dups.clear();
         break;
       }
@@ -555,8 +544,6 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
     }
   }
 }
-
-
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
