@@ -1047,7 +1047,7 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
 /// \brief Turn this into a StorageObjC var, providing a getter and setter.
 void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
-  assert(Get && Set);
+  assert(Get);
   auto &Context = getASTContext();
   void *Mem = Context.Allocate(sizeof(GetSetRecord), alignof(GetSetRecord));
   GetSetInfo = new (Mem) GetSetRecord();
@@ -1056,9 +1056,9 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   GetSetInfo->Set = Set;
   
   Get->makeAccessor(this, FuncDecl::IsGetter);
-  Set->makeAccessor(this, FuncDecl::IsSetter);
+  if (Set) Set->makeAccessor(this, FuncDecl::IsSetter);
   
-  // Mark that this is a StorageObjC property.
+  // Mark that this is a StoredObjC property.
   setStorageKind(StoredObjC);
 }
 

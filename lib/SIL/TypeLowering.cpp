@@ -118,10 +118,10 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
 CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
     switch (var->getStorageKind()) {
+    case VarDecl::StoredObjC:
     case VarDecl::Computed:
       return var->getSetter()
         ? CaptureKind::GetterSetter : CaptureKind::Getter;
-    case VarDecl::StoredObjC:
     case VarDecl::WillSetDidSet:
       return CaptureKind::GetterSetter;
     case VarDecl::Stored:

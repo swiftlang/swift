@@ -1201,21 +1201,22 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
   Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
 
-  
-  // Okay, the getter is set up, create the setter next.
-  VarDecl *ValueDecl = nullptr;
+  FuncDecl *Set = nullptr;
+  if (!VD->isLet()) {
+    // Okay, the getter is set up, create the setter next.
+    VarDecl *ValueDecl = nullptr;
 
-  auto *Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
+    Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
 
-  // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
-  //                decl_ref_expr(value))
-  auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-  auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                    /*implicit*/true, /*direct ivar*/true);
-  ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
-  Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
-
+    // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
+    //                decl_ref_expr(value))
+    auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+    auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
+    MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
+                                      /*implicit*/true, /*direct ivar*/true);
+    ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
+    Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
+  }
   
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeStoredObjC(Get, Set);
@@ -1227,7 +1228,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   SmallVector<Decl*, 4> members(CD->getMembers().begin(),
                                 CD->getMembers().end());
   members.push_back(Get);
-  members.push_back(Set);
+  if (Set) members.push_back(Set);
   CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
 }
 
@@ -1432,7 +1433,7 @@ public:
         
         // Type check the body of the getter and setter.
         TC.typeCheckDecl(VD->getGetter(), true);
-        TC.typeCheckDecl(VD->getSetter(), true);
+        if (VD->getSetter()) TC.typeCheckDecl(VD->getSetter(), true);
       }
 
       // If this is a willSet/didSet property, synthesize the getter and setter
