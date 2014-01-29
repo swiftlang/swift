@@ -42,20 +42,20 @@ class Tool {
   std::string Name;
 
   /// The human readable name of the tool, for use in diagnostics.
-  std::string ShortName;
+  std::string DiagName;
 
   /// The tool chain of which this tool is a part.
   const ToolChain &TheToolChain;
 
 public:
-  Tool(const char *Name, const char *ShortName, const ToolChain &TC)
-      : Name(Name), ShortName(ShortName), TheToolChain(TC) {}
+  Tool(StringRef Name, StringRef DiagName, const ToolChain &TC)
+      : Name(Name), DiagName(DiagName), TheToolChain(TC) {}
 
   virtual ~Tool() = default;
 
   StringRef getName() const { return Name; }
 
-  StringRef getShortName() const { return ShortName; }
+  StringRef getNameForDiagnostics() const { return DiagName; }
 
   const ToolChain &getToolChain() const { return TheToolChain; }
 

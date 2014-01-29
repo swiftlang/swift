@@ -30,7 +30,7 @@ namespace tools {
 
 class LLVM_LIBRARY_VISIBILITY Swift : public Tool {
 public:
-  Swift(const ToolChain &TC) : Tool("swift", "swift frontend", TC) {}
+  explicit Swift(const ToolChain &TC) : Tool("swift", "swift frontend", TC) {}
 
   virtual bool hasGoodDiagnostics() const { return true; }
 
@@ -44,7 +44,8 @@ public:
 
 class LLVM_LIBRARY_VISIBILITY MergeModule : public Tool {
 public:
-  MergeModule(const ToolChain &TC) : Tool("merge-module", "merge-module", TC) {}
+  explicit MergeModule(const ToolChain &TC)
+    : Tool("merge-module", "merge-module", TC) {}
 
   virtual bool hasGoodDiagnostics() const { return true; }
 
@@ -78,7 +79,8 @@ public:
 
 class LLVM_LIBRARY_VISIBILITY Linker : public DarwinTool {
 public:
-  Linker(const ToolChain &TC) : DarwinTool("darwin::Linker", "linker", TC) {}
+  explicit Linker(const ToolChain &TC)
+    : DarwinTool("darwin::Linker", "linker", TC) {}
 
   virtual Job *constructJob(const JobAction &JA,
                             std::unique_ptr<JobList> Inputs,
