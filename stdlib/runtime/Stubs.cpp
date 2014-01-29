@@ -225,6 +225,10 @@ posix_set_errno(int value)
   errno = value; // errno is not a global, but a macro
 }
 
+extern "C" void *swift_makeUnsafeNil() {
+  return 0;
+}
+
 
 #if __arm64__
 

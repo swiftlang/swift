@@ -2,8 +2,7 @@
 set(SHARED_LIBRARY ON)
 
 set(SWIFTOBJC_SOURCES
-    ObjectiveC.swift
-    BridgeObjectiveC.mm)
+    ObjectiveC.swift)
 
 # Definition of ObjCBool is platform-specific.
 if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx" 
