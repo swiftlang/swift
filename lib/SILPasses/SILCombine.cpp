@@ -92,7 +92,8 @@ public:
   // If I is in the worklist, remove it.
   void remove(SILInstruction *I) {
     auto It = WorklistMap.find(I);
-    if (It == WorklistMap.end()) return; // Not in worklist.
+    if (It == WorklistMap.end())
+      return; // Not in worklist.
 
     // Don't bother moving everything down, just null out the slot. We will
     // check before we process any instruction if it is null.
@@ -160,9 +161,8 @@ public:
     Builder = &B;
 
     // Perform iterations until we do not make any changes.
-    while (doOneIteration(F, Iteration)) {
+    while (doOneIteration(F, Iteration))
       Iteration++;
-    }
 
     // Cleanup the builder and return whether or not we made any changes.
     Builder = 0;
@@ -233,11 +233,11 @@ public:
     assert(I.use_empty() && "Cannot erase instruction that is used!");
     // Make sure that we reprocess all operands now that we reduced their
     // use counts.
-    if (I.getNumOperands() < 8) {
+    if (I.getNumOperands() < 8)
       for (auto &OpI : I.getAllOperands())
         if (SILInstruction *Op = llvm::dyn_cast<SILInstruction>(&*OpI.get()))
           Worklist.add(Op);
-    }
+
     Worklist.remove(&I);
     I.eraseFromParent();
     MadeChange = true;
@@ -428,9 +428,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // SILBuilder during this iteration. Go through the tracking list and add
     // its contents to the worklist and then clear said list in preparation for
     // the next iteration.
-    for (SILInstruction *I : TrackingList) {
+    for (SILInstruction *I : TrackingList)
       Worklist.add(I);
-    }
     TrackingList.clear();
   }
 
@@ -508,14 +507,12 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
       return eraseInstFromFunction(*DI);
 
   // DestroyValueInst of a reference type is a strong_release.
-  if (OperandTy.hasReferenceSemantics()) {
+  if (OperandTy.hasReferenceSemantics())
     return new (Module) StrongReleaseInst(DI->getLoc(), Operand);
-  }
 
   // DestroyValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(Module)) {
+  if (OperandTy.isTrivial(Module))
     return eraseInstFromFunction(*DI);
-  }
 
   // Do nothing for non-trivial non-reference types.
   return nullptr;
