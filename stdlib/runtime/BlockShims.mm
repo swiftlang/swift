@@ -285,3 +285,12 @@ MAKE_BLOCK_SHIM(FUNC(CAT4(OWNED(SS),
 
 /// NSURLSession
 /// FIXME lots
+
+/// UIView +(void)animateWithDuration:(NSTimeInterval)duration
+///                             delay:(NSTimeInterval)delay
+///                           options:(UIViewAnimationOptions)options
+///                        animations:(void (^)(void))animations
+///                        completion:(void (^)(BOOL finished))completion
+MAKE_BLOCK_SHIM(FUNC(DIRECT(Sb),
+                     VOID),
+                void(BOOL));
