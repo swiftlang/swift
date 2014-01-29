@@ -34,6 +34,7 @@ STATISTIC(NumSimplify, "Number of instructions simplified or DCE'd");
 STATISTIC(NumCSE,      "Number of instructions CSE'd");
 STATISTIC(NumCSEDeadStores, "Number of dead stores removed");
 STATISTIC(NumCSEDupLoads,   "Number of dup loads removed");
+STATISTIC(NumCSESunk,   "Number of instructions sunk");
 
 using namespace swift;
 
@@ -473,6 +474,78 @@ void promoteMemoryOperationsInBlock(SILBasicBlock*BB) {
   }
 }
 
+/// \brief Returns the instruction before the terminator or null if there isn't
+/// any.
+static SILInstruction *getLastNonTerminator(SILBasicBlock *BB) {
+  // Check if the first instruction is the terminator.
+  SILBasicBlock::iterator Term = BB->getTerminator();
+  if (BB->begin() == Term)
+    return nullptr;
+
+  return std::prev(Term);
+}
+
+static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
+  if (BB->pred_empty())
+    return;
+
+  // This block must be the only successor of all the predecessors.
+  for (auto P : BB->getPreds())
+    if (P->getSingleSuccessor() != BB)
+      return;
+
+  // Try removing instructions from the first predecessor.
+  SILBasicBlock *FirstPred = *BB->pred_begin();
+  if (!FirstPred)
+    return;
+
+
+  // Keep trying to remove instructions as long as we are able to.
+  bool Changed = true;
+  while (Changed) {
+    Changed = false;
+
+    // Pick the last instruction from the first pred.
+    SILInstruction *FirstPredInst = getLastNonTerminator(FirstPred);
+    if (!FirstPredInst)
+      return;
+
+    // Save the duplicated instructions in case we need to remove them.
+    SmallVector<SILInstruction*, 4> Dups;
+
+    // For all preds:
+    for (auto P : BB->getPreds()) {
+      if (P == FirstPred)
+        continue;
+
+      // Check if the last instruction is identical to the last instruction
+      // of the first pred.
+      SILInstruction *Last = getLastNonTerminator(P);
+      if (!Last || !FirstPredInst->isIdenticalTo(Last)) {
+        Dups.clear();
+        break;
+      }
+      Dups.push_back(Last);
+    }
+
+    // If we found duplicated instructions, sink one of the copies and delete
+    // the rest.
+    if (Dups.size()) {
+      FirstPredInst->moveBefore(BB->begin());
+
+      for (auto I : Dups) {
+        I->replaceAllUsesWith(FirstPredInst);
+        I->eraseFromParent();
+        NumCSESunk++;
+      }
+      
+      Changed = true;
+    }
+  }
+}
+
+
+
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -491,5 +564,9 @@ void swift::performSILCSE(SILModule *M) {
     // Remove dead stores and merge duplicate loads.
     for (auto &BB : F)
       promoteMemoryOperationsInBlock(&BB);
+
+    // Sink duplicated code from predecessors.
+    for (auto &BB : F)
+      sinkCodeFromPredecessors(&BB);
   }
 }
