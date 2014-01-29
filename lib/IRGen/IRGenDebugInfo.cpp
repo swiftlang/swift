@@ -830,6 +830,7 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DTI) {
     Mangle::Mangler M(S, /* DWARF */ true);
     M.mangleTypeForDebugger(DTI.getType(), DTI.getDeclContext());
   }
+  assert(!Buffer.empty() && "mangled name came back empty");
   return BumpAllocatedString(Buffer);
 }
 
