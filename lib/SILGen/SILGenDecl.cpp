@@ -124,9 +124,10 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
   // Generate the local function body.
   SGM.emitFunction(fd);
   
-  // If there are captures, build the local closure value for the function and
-  // store it as a local constant.
-  if (fd->getCaptureInfo().hasLocalCaptures()) {
+  // If there are captures or we are in a generic context, build the local
+  // closure value for the function and store it as a local constant.
+  if (fd->getCaptureInfo().hasLocalCaptures()
+      || F.getContextGenericParams()) {
     SILValue closure = emitClosureValue(fd, SILDeclRef(fd),
                                         getForwardingSubstitutions(), fd)
       .forward(*this);
