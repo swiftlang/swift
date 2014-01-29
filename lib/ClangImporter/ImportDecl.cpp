@@ -563,6 +563,62 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   return getLVDecl;
 }
 
+// Build the default initializer for an option set.
+// struct NSSomeOptionSet : RawOptionSet {
+//   var value: RawType
+//   init() {
+//     return 0
+//   }
+// }
+static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDecl,
+                                                        ValueDecl *valueDecl) {
+  ASTContext &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+  auto metaTy = MetatypeType::get(optionSetType, C);
+
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
+                                      SourceLoc(),
+                                      C.Id_self,
+                                      Type(),
+                                      optionSetDecl);
+  selfDecl->setImplicit();
+  selfDecl->setType(optionSetType);
+
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+
+  ConstructorDecl *ctorDecl = new (C) ConstructorDecl(C.Id_init, SourceLoc(),
+                                                      methodParam, methodParam,
+                                                      selfDecl, nullptr,
+                                                      optionSetDecl);
+  ctorDecl->setImplicit();
+  
+  auto fnTy = FunctionType::get(TupleType::getEmpty(C), optionSetType);
+  auto allocFnTy = FunctionType::get(metaTy, fnTy);
+  auto initFnTy = FunctionType::get(optionSetType, fnTy);
+  ctorDecl->setType(allocFnTy);
+  ctorDecl->setInitializerType(initFnTy);
+  
+  selfDecl->setDeclContext(ctorDecl);
+  
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
+                                        valueDecl, SourceLoc(),
+                                        /*implicit*/ true);
+  auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(),
+                                         /*implicit*/ true);
+  auto assign = new (C) AssignExpr(valueRef, SourceLoc(), zero,
+                                   /*implicit*/ true);
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assign), SourceLoc(),
+                                /*implicit*/ true);
+  
+  ctorDecl->setBody(body);
+  
+  C.addedExternalDecl(ctorDecl);
+  
+  return ctorDecl;
+}
+
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
@@ -1016,10 +1072,14 @@ namespace {
                                                        /*storage*/ true,
                                                        structDecl);
 
+        // Create a default initializer to get the value with no options set.
+        auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,
+                                                                  var);
+        
         // Create a constructor to initialize that value from a value of the
         // underlying type.
         Decl *varDecl = var;
-        auto constructor = createValueConstructor(structDecl, varDecl);
+        auto valueConstructor = createValueConstructor(structDecl, varDecl);
 
         // Build a RawOptionSet conformance for the type.
         ProtocolDecl *rawOptionSet = Impl.SwiftContext
@@ -1037,7 +1097,8 @@ namespace {
         
         // Set the members of the struct.
         Decl *members[] = {
-          constructor,
+          defaultConstructor,
+          valueConstructor,
           patternBinding,
           var,
           fromMask,
