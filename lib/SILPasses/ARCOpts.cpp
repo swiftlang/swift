@@ -100,15 +100,12 @@ public:
   ReferenceCountState() { }
   ~ReferenceCountState() { }
 
-  /// Are we initialized for tracking a pointer?
-  bool isInitialized() const { return Instruction != nullptr; }
-
   /// Can we gaurantee that the given reference counted value is incremented?
   bool isIncremented() const { return SequenceState::Incremented == SeqState; }
 
   /// Are we tracking an instruction currently? This returns false when given
   /// an uninitialized ReferenceCountState.
-  bool hasInstruction() const { return Instruction != nullptr; }
+  bool isTrackingInstruction() const { return Instruction != nullptr; }
 
   /// Return the increment we are tracking.
   SILInstruction *getInstruction() const { return Instruction; }
@@ -155,7 +152,7 @@ public:
 } // end anonymous namespace
 
 bool ReferenceCountState::init(SILInstruction *I) {
-  bool AlreadyInitialized = isInitialized();
+  bool Nested = isTrackingInstruction();
 
   // This retain is known safe if the operand we are tracking was already
   // known incremented previously. This occurs when you have nested increments.
@@ -170,7 +167,7 @@ bool ReferenceCountState::init(SILInstruction *I) {
   // Reset our insertion point to null.
   InsertPt = nullptr;
 
-  return AlreadyInitialized;
+  return Nested;
 }
 
 void ReferenceCountState::clear() {
@@ -183,7 +180,7 @@ void ReferenceCountState::clear() {
 bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
   // If our state is not initialized, return false since we are not tracking
   // anything.
-  if (!isInitialized())
+  if (!isTrackingInstruction())
     return false;
 
   // If we can prove that Other can not decrement the reference counted
@@ -210,7 +207,7 @@ bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
 bool ReferenceCountState::handlePotentialUser(SILInstruction *Other) {
   // If our state is not initialized, return false since we are not tracking
   // anything.
-  if (!isInitialized())
+  if (!isTrackingInstruction())
     return false;
 
   // If we can prove that Other can not use the pointer we are tracking,
@@ -235,7 +232,8 @@ ReferenceCountState::doesDecrementMatchInstruction(SILInstruction *Decrement) {
   // If our state is not initialized, return false since we are not tracking
   // anything. If the ValueKind of our increments, decrement do not match, we
   // can not eliminate the pair so return false.
-  if (!isInitialized() || !matchingRefCountPairType(Instruction, Decrement))
+  if (!isTrackingInstruction() ||
+      !matchingRefCountPairType(Instruction, Decrement))
     return false;
 
   // Otherwise modify the state appropriately in preparation for removing the
