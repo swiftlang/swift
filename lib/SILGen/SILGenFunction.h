@@ -582,7 +582,7 @@ public:
 
   /// Produce a singular RValue for a load from the specified property.
   ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
-                                         VarDecl *property,
+                                         bool isSuper, VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
                                          bool isDirectPropertyAccess,
                                          Type propTy, SGFContext C);
@@ -601,11 +601,13 @@ public:
   ManagedValue emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
+                               bool isSuper,
                                RValueSource &&optionalSubscripts,
                                SGFContext C);
   void emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                        ArrayRef<Substitution> substitutions,
                        RValueSource &&optionalSelfValue,
+                       bool isSuper,
                        RValueSource &&optionalSubscripts,
                        RValueSource &&value);
 

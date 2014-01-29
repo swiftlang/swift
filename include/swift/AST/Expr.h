@@ -102,9 +102,18 @@ class alignas(8) Expr {
     friend class MemberRefExpr;
     unsigned : NumExprBits;
     unsigned IsDirectPropertyAccess : 1;
+    unsigned IsSuper : 1;
   };
-  enum { NumMemberRefExprBits = NumExprBits + 1 };
+  enum { NumMemberRefExprBits = NumExprBits + 2 };
   static_assert(NumMemberRefExprBits <= 32, "fits in an unsigned");
+
+  class SubscriptExprBitfields {
+    friend class SubscriptExpr;
+    unsigned : NumExprBits;
+    unsigned IsSuper : 1;
+  };
+  enum { NumSubscriptExprBits = NumExprBits + 1 };
+  static_assert(NumSubscriptExprBits <= 32, "fits in an unsigned");
 
   class MagicIdentifierLiteralExprBitfields {
     friend class MagicIdentifierLiteralExpr;
@@ -146,6 +155,7 @@ protected:
     IntegerLiteralExprBitfields IntegerLiteralExprBits;
     StringLiteralExprBitfields StringLiteralExprBits;
     MemberRefExprBitfields MemberRefExprBits;
+    SubscriptExprBitfields SubscriptExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
@@ -783,11 +793,20 @@ public:
   
   void setBase(Expr *E) { Base = E; }
   
-  /// Return true if this member access is
+  /// Return true if this member access is direct, meaning that it
+  /// does not call the getter or setter.
   bool isDirectPropertyAccess() const {
     return MemberRefExprBits.IsDirectPropertyAccess;
   }
-  
+
+  /// Determine whether this member reference refers to the
+  /// superclass's property.
+  bool isSuper() const { return MemberRefExprBits.IsSuper; }
+
+  /// Set whether this member reference refers to the superclass's
+  /// property.
+  void setIsSuper(bool isSuper) { MemberRefExprBits.IsSuper = isSuper; }
+
   SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     if (Base->isImplicit())
@@ -1252,7 +1271,9 @@ public:
   SubscriptExpr(Expr *base, Expr *index,
                 ConcreteDeclRef decl = ConcreteDeclRef())
     : Expr(ExprKind::Subscript, /*Implicit=*/false, Type()),
-      TheDecl(decl), Base(base), Index(index) { }
+      TheDecl(decl), Base(base), Index(index) {
+    SubscriptExprBits.IsSuper = false;
+  }
   
   /// getBase - Retrieve the base of the subscript expression, i.e., the
   /// value being indexed.
@@ -1264,6 +1285,14 @@ public:
   Expr *getIndex() const { return Index; }
   void setIndex(Expr *E) { Index = E; }
   
+  /// Determine whether this member reference refers to the
+  /// superclass's property.
+  bool isSuper() const { return SubscriptExprBits.IsSuper; }
+
+  /// Set whether this member reference refers to the superclass's
+  /// property.
+  void setIsSuper(bool isSuper) { SubscriptExprBits.IsSuper = isSuper; }
+
   /// Determine whether subscript operation has a known underlying
   /// subscript declaration or not.
   bool hasDecl() const { return static_cast<bool>(TheDecl); }

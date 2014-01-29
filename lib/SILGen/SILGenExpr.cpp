@@ -459,7 +459,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // Global properties have no base or subscript.
     return emitGetAccessor(loc, var,
                            ArrayRef<Substitution>(), RValueSource(),
-                           RValueSource(), C);
+                           /*isSuper=*/false, RValueSource(), C);
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
@@ -533,6 +533,7 @@ static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
 /// is designed to work with RValue ManagedValue bases that are either +0 or +1.
 ManagedValue SILGenFunction::
 emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
+                          bool isSuper,
                           VarDecl *FieldDecl,
                           ArrayRef<Substitution> substitutions,
                           bool isDirectPropertyAccess,
@@ -548,7 +549,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,
                                                  FieldDecl->getGetter());
     return emitGetAccessor(loc, FieldDecl, substitutions,
-                           std::move(baseRV), RValueSource(), C);
+                           std::move(baseRV), isSuper, RValueSource(), C);
   }
 
   assert(FieldDecl->hasStorage() &&
@@ -1272,7 +1273,8 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   // works with +0 bases correctly, we ask for them to come back.
   ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(),
                                                   SGFContext::AllowPlusZero);
-  ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, FieldDecl,
+  ManagedValue res = SGF.emitRValueForPropertyLoad(E, base, E->isSuper(), 
+                                                   FieldDecl,
                                              E->getMember().getSubstitutions(),
                                                    E->isDirectPropertyAccess(),
                                                    E->getType(), C);
@@ -1330,7 +1332,8 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
   ManagedValue MV =
     SGF.emitGetAccessor(E, decl, E->getDecl().getSubstitutions(),
-                        std::move(baseRV), std::move(subscriptRV), C);
+                        std::move(baseRV), E->isSuper(),
+                        std::move(subscriptRV), C);
   return RValue(SGF, E, MV);
 }
 

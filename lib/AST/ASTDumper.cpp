@@ -1090,6 +1090,8 @@ public:
     
     if (E->isDirectPropertyAccess())
       OS << " direct_property_access";
+    if (E->isSuper())
+      OS << " super";
             
     OS << '\n';
     printRec(E->getBase());
@@ -1162,6 +1164,8 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
     printCommon(E, "subscript_expr");
+    if (E->isSuper())
+      OS << " super";
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';

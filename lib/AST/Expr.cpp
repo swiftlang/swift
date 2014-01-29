@@ -197,6 +197,7 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
     Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
    
   MemberRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
+  MemberRefExprBits.IsSuper = false;
 }
 
 ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,

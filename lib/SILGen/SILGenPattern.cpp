@@ -382,7 +382,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
     
     for (auto &elt : np->getElements()) {
       ManagedValue MV = ManagedValue::forUnmanaged(v);
-      auto Val = gen.emitRValueForPropertyLoad(loc, MV, elt.getProperty(),
+      auto Val = gen.emitRValueForPropertyLoad(loc, MV, false, elt.getProperty(),
                                                // FIXME: No generic substitions.
                                                {}, false,
                                                elt.getSubPattern()->getType(),

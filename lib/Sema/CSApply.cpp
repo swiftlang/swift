@@ -401,6 +401,8 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
+      bool isSuper = isa<SuperRefExpr>(base->getSemanticsProvidingExpr());
+
       Type baseTy = base->getType()->getRValueType();
 
       // Explicit member accesses are permitted to implicitly look
@@ -547,6 +549,7 @@ namespace {
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit,
                                         IsDirectPropertyAccess);
+        result->setIsSuper(isSuper);
 
         // Skip the synthesized 'self' input type of the opened type.
         result->setType(simplifyType(openedType));
@@ -752,6 +755,9 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto baseTy = base->getType()->getRValueType();
 
+      // Check whether the base is 'super'.
+      bool isSuper = isa<SuperRefExpr>(base->getSemanticsProvidingExpr());
+
       // Handle accesses that implicitly look through UncheckedOptional<T>.
       if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
         base = coerceUncheckedOptionalToValue(base, objTy, locator);
@@ -844,6 +850,7 @@ namespace {
                                                            subscript,
                                                            substitutions));
         subscriptExpr->setType(resultTy);
+        subscriptExpr->setIsSuper(isSuper);
         return subscriptExpr;
       }
 
@@ -876,6 +883,7 @@ namespace {
       auto *subscriptExpr
         = new (tc.Context) SubscriptExpr(base, index, subscript);
       subscriptExpr->setType(resultTy);
+      subscriptExpr->setIsSuper(isSuper);
       return subscriptExpr;
     }
 

@@ -2410,6 +2410,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILLocation loc,
                                          SILDeclRef constant,
                                          RValueSource &selfValue,
+                                         bool isSuper,
                                          CanAnyFunctionType substAccessorType) {
   ValueDecl *decl = constant.getDecl();
 
@@ -2420,6 +2421,10 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   // getters and setters.
   if (gen.SGM.requiresObjCDispatch(decl)) {
     auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
+
+    if (isSuper)
+      return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
+
     return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
   }
 
@@ -2431,7 +2436,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
                                    SILLocation loc,
                                    SILDeclRef constant,
                                    ArrayRef<Substitution> substitutions,
-                                   RValueSource &selfValue)
+                                   RValueSource &selfValue,
+                                   bool isSuper)
 {
   // If the accessor is a local constant, use it.
   // FIXME: Can local properties ever be generic?
@@ -2457,7 +2463,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // the Self type is generic.
   // FIXME: Dynamic dispatch for archetype/existential methods.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
-                                             substAccessorType);
+                                             isSuper, substAccessorType);
   
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
@@ -2501,6 +2507,7 @@ ManagedValue SILGenFunction::
 emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                 ArrayRef<Substitution> substitutions,
                 RValueSource &&selfValue,
+                bool isSuper,
                 RValueSource &&subscripts,
                 SGFContext c) {
  
@@ -2509,7 +2516,8 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                  decl->usesObjCGetterAndSetter());
 
   Callee getter = emitSpecializedAccessorFunctionRef(*this, loc, get,
-                                                     substitutions, selfValue);
+                                                     substitutions, selfValue,
+                                                     isSuper);
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter));
@@ -2533,6 +2541,7 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
 void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
+                                     bool isSuper,
                                      RValueSource &&subscripts,
                                      RValueSource &&setValue) {
   SILDeclRef set(decl, SILDeclRef::Kind::Setter,
@@ -2540,7 +2549,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                  decl->usesObjCGetterAndSetter());
 
   Callee setter = emitSpecializedAccessorFunctionRef(*this, loc, set,
-                                                     substitutions, selfValue);
+                                                     substitutions, selfValue,
+                                                     isSuper);
   CanAnyFunctionType accessType = setter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(setter));

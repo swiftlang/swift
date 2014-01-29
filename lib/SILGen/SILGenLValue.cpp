@@ -341,6 +341,7 @@ namespace {
   class GetterSetterComponent : public LogicalPathComponent {
     // The VarDecl or SubscriptDecl being get/set.
     AbstractStorageDecl *decl;
+    bool IsSuper;
     std::vector<Substitution> substitutions;
     Expr *subscriptIndexExpr;
     mutable RValue origSubscripts;
@@ -373,11 +374,13 @@ namespace {
     
   public:
     GetterSetterComponent(AbstractStorageDecl *decl,
+                          bool isSuper,
                           ArrayRef<Substitution> substitutions,
                           LValueTypeData typeData,
                           Expr *subscriptIndexExpr = nullptr)
       : LogicalPathComponent(typeData),
         decl(decl),
+        IsSuper(isSuper),
         substitutions(substitutions.begin(), substitutions.end()),
         subscriptIndexExpr(subscriptIndexExpr)
     {
@@ -388,6 +391,7 @@ namespace {
                           SILLocation loc)
       : LogicalPathComponent(copied.getTypeData()),
         decl(copied.decl),
+        IsSuper(copied.IsSuper),
         substitutions(copied.substitutions),
         subscriptIndexExpr(copied.subscriptIndexExpr),
         origSubscripts(copied.origSubscripts.copy(gen, loc))
@@ -400,7 +404,7 @@ namespace {
       auto args = prepareAccessorArgs(gen, loc, base, decl->getSetter());
       
       return gen.emitSetAccessor(loc, decl, substitutions,
-                                 std::move(args.base),
+                                 std::move(args.base), IsSuper,
                                  std::move(args.subscripts),
                                  std::move(rvalue));
     }
@@ -410,7 +414,7 @@ namespace {
       auto args = prepareAccessorArgs(gen, loc, base, decl->getGetter());
       
       return gen.emitGetAccessor(loc, decl, substitutions,
-                                 std::move(args.base),
+                                 std::move(args.base), IsSuper,
                                  std::move(args.subscripts), c);
     }
     
@@ -523,7 +527,8 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
       substitutions = gen.buildForwardingSubstitutions(genericParams);
     }
 
-    lv.add<GetterSetterComponent>(var, substitutions, typeData);
+    lv.add<GetterSetterComponent>(var, /*isSuper=*/false, substitutions, 
+                                  typeData);
   }
   }
   return std::move(lv);
@@ -553,8 +558,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   // Use the property accessors if the variable has accessors and this isn't a
   // direct access to underlying storage.
   if (var->hasAccessorFunctions() && !e->isDirectPropertyAccess()) {
-    lv.add<GetterSetterComponent>(var, e->getMember().getSubstitutions(),
-                                  typeData);
+    lv.add<GetterSetterComponent>(var, e->isSuper(),
+                                  e->getMember().getSubstitutions(), typeData);
     return std::move(lv);
   }
 
@@ -597,7 +602,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
   
   LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(decl, e->getDecl().getSubstitutions(),
+  lv.add<GetterSetterComponent>(decl, e->isSuper(),
+                                e->getDecl().getSubstitutions(),
                                 typeData, e->getIndex());
   return std::move(lv);
 }
