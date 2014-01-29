@@ -129,7 +129,11 @@ public:
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
-  bool init(SILInstruction *I);
+  bool initWithInst(SILInstruction *I);
+
+  /// Initializes the state for a function parameter with the given
+  /// SILParameterInfo.
+  void initWithArg();
 
   /// Uninitialize the current state.
   void clear();
@@ -151,7 +155,7 @@ public:
 
 } // end anonymous namespace
 
-bool ReferenceCountState::init(SILInstruction *I) {
+bool ReferenceCountState::initWithInst(SILInstruction *I) {
   bool Nested = isTrackingInstruction();
 
   // This retain is known safe if the operand we are tracking was already
@@ -168,6 +172,13 @@ bool ReferenceCountState::init(SILInstruction *I) {
   InsertPt = nullptr;
 
   return Nested;
+}
+
+void ReferenceCountState::initWithArg() {
+  SeqState = SequenceState::Incremented;
+  Instruction = nullptr;
+  InsertPt = nullptr;
+  KnownSafe = false;
 }
 
 void ReferenceCountState::clear() {
@@ -290,6 +301,26 @@ processBBTopDown(SILBasicBlock &BB,
     return false;
 #endif
 
+  // If the current BB is the entry BB, initialize a state corresponding to each
+  // of its owned parameters.
+  //
+  // TODO: Handle gauranteed parameters.
+  if (&BB == &*BB.getParent()->begin()) {
+    auto Args = BB.getBBArgs();
+    auto SignatureParams =
+      BB.getParent()->getLoweredFunctionType()->getInterfaceParameters();
+    for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+      SILArgument *A = Args[i];
+      ParameterConvention P = SignatureParams[i].getConvention();
+
+      DEBUG(llvm::dbgs() << "VISITING ARGUMENT: " << *A);
+
+      if (P != ParameterConvention::Direct_Owned)
+        continue;
+      BBState[SILValue(Args[i])].initWithArg();
+    }
+  }
+
   // For each instruction I in BB...
   for (auto &I : BB) {
 
@@ -301,14 +332,14 @@ processBBTopDown(SILBasicBlock &BB,
       // state and continue...
       SILValue Operand = I.getOperand(0).stripCasts();
       ReferenceCountState &RefCountState = BBState[Operand];
-      NestingDetected |= RefCountState.init(&I);
+      NestingDetected |= RefCountState.initWithInst(&I);
 
       // If we have a copy value add in an additional state for its output
       // pointer.
       if (isa<CopyValueInst>(I)) {
         ReferenceCountState &OutputRefCountState = BBState[SILValue(&I, 0)];
-        OutputRefCountState.init(&I);
-        NestingDetected |= OutputRefCountState.init(&I);
+        OutputRefCountState.initWithInst(&I);
+        NestingDetected |= OutputRefCountState.initWithInst(&I);
       }
 
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "

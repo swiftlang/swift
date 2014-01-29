@@ -212,3 +212,35 @@ bb0(%0 : $Builtin.ObjectPointer):
   return %6 : $()
 }
 
+// CHECK-LABEL: sil @
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: br
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @owned_arguments_are_known_safe_in_the_first_bb : $@thin (@owned Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  %1 = function_ref @user : $@thin (Builtin.ObjectPointer) -> ()
+  strong_retain %0 : $Builtin.ObjectPointer
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  strong_release %0 : $Builtin.ObjectPointer
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.ObjectPointer
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  strong_release %0 : $Builtin.ObjectPointer
+  %2 = tuple()
+  return %2 : $()
+}
+
