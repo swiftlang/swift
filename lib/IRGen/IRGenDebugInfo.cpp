@@ -746,10 +746,9 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              IndirectionKind Indirection,
                                              ArtificialKind Artificial) {
   // There are variables without storage, such as "struct { func foo() {} }".
-  if (isa<llvm::UndefValue>(Storage)) {
-    llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
-    Storage = llvm::ConstantInt::get(Int64Ty, 0);
-  }
+  // Emit them as constant 0.
+  if (isa<llvm::UndefValue>(Storage))
+    Storage = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
   // FIXME: enable this assertion.
   //assert(Ty.getDebugScope());
