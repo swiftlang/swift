@@ -169,6 +169,14 @@ public:
 
     return *pred_begin();
   }
+
+  SILBasicBlock *getSingleSuccessor() {
+    if (succ_empty() || std::next(succ_begin()) != succ_end())
+      return 0;
+
+    return *succ_begin();
+  }
+
   const SILBasicBlock *getSinglePredecessor() const {
     return const_cast<SILBasicBlock*>(this)->getSinglePredecessor();
   }
