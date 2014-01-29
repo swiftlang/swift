@@ -358,6 +358,8 @@ function set_ios_options {
 if [[ ! "$SKIP_BUILD_IOS" ]]; then
     set_ios_options SWIFT_STDLIB_IOS_ARM64_CMAKE_OPTIONS iphoneos 7.0 .internal arm64
     set_ios_options SWIFT_STDLIB_IOS_SIMULATOR_X86_64_CMAKE_OPTIONS iphonesimulator 7.0 "" x86_64
+    set_ios_options SWIFT_STDLIB_IOS_ARMV7_CMAKE_OPTIONS iphoneos 7.0 .internal armv7
+    set_ios_options SWIFT_STDLIB_IOS_SIMULATOR_I386_CMAKE_OPTIONS iphonesimulator 7.0 "" i386
 fi
 
 SOURCEKIT_CMAKE_OPTIONS=(
