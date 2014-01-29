@@ -449,6 +449,14 @@ if [ \! "$SKIP_TEST_SWIFT" ]; then
     fi
 fi
 
+# Run the SourceKit tests.
+if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
+  echo "--- Running SourceKit Tests ---"
+
+  build_cmd=("$CMAKE" --build "${SOURCEKIT_BUILD_DIR}" -- ${BUILD_ARGS})
+  "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-sourcekit
+fi
+
 # Run the Swift performance tests.
 if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   # Currently we use the toolchain-specific Clang as our CC under test, because
@@ -575,14 +583,6 @@ EOM
     echo "No package file built!"
     exit 1
   fi
-fi
-
-# Run the SourceKit tests.
-if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
-  echo "--- Running SourceKit Tests ---"
-
-  build_cmd=("$CMAKE" --build "${SOURCEKIT_BUILD_DIR}" -- ${BUILD_ARGS})
-  "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-sourcekit
 fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
