@@ -38,6 +38,9 @@ STATISTIC(NumCSESunk,   "Number of instructions sunk");
 
 using namespace swift;
 
+
+static const int SinkSearchWindow = 6;
+
 //===----------------------------------------------------------------------===//
 //                                Simple Value
 //===----------------------------------------------------------------------===//
@@ -474,15 +477,61 @@ void promoteMemoryOperationsInBlock(SILBasicBlock*BB) {
   }
 }
 
-/// \brief Returns the instruction before the terminator or null if there isn't
-/// any.
-static SILInstruction *getLastNonTerminator(SILBasicBlock *BB) {
-  // Check if the first instruction is the terminator.
-  SILBasicBlock::iterator Term = BB->getTerminator();
-  if (BB->begin() == Term)
-    return nullptr;
 
-  return std::prev(Term);
+/// \brief Returns True if we can sink this instruction to another basic block.
+static bool canSinkInstruction(SILInstruction *Inst) {
+  return Inst->use_empty() && !isa<TermInst>(Inst);
+}
+
+/// \brief Returns true if this instruction is a skip barrier, which means that
+/// we can't sink other instructions past it.
+static bool isSinkBarrier(SILInstruction *Inst) {
+  // We know that some calls do not have side effects.
+  if (const ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
+    if (BuiltinFunctionRefInst *FR =
+        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+      return !isSideEffectFree(FR);
+    }
+  }
+
+  if (isa<TermInst>(Inst))
+    return false;
+
+  if (Inst->mayHaveSideEffects())
+    return true;
+
+  return false;
+}
+
+/// \brief Search for an instruction that is identical to \p Iden by scanning
+/// \p BB starting at the end of the block, stopping on sink barriers.
+SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
+  int SkipBudget = SinkSearchWindow;
+
+  SILBasicBlock::iterator InstToSink = BB->getTerminator();
+
+  while (SkipBudget) {
+    // If we found a sinkable instruction that is identical to our goal
+    // then return it.
+    if (canSinkInstruction(InstToSink) && Iden->isIdenticalTo(InstToSink)) {
+      DEBUG(llvm::dbgs() << "Found an identical instruction.");
+      return InstToSink;
+    }
+
+    // If this instruction is a skip-barrier end the scan.
+    if (isSinkBarrier(InstToSink))
+      return nullptr;
+
+    // If this is the first instruction in the block then we are done.
+    if (InstToSink == BB->begin())
+      return nullptr;
+
+    SkipBudget--;
+    InstToSink = std::prev(InstToSink);
+    DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
+  }
+
+  return nullptr;
 }
 
 static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
@@ -494,54 +543,74 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
     if (P->getSingleSuccessor() != BB)
       return;
 
-  // Try removing instructions from the first predecessor.
   SILBasicBlock *FirstPred = *BB->pred_begin();
-  if (!FirstPred)
+  // The first Pred must have at least one non-terminator.
+  if (FirstPred->getTerminator() == FirstPred->begin())
     return;
 
+  DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
 
-  // Keep trying to remove instructions as long as we are able to.
-  bool Changed = true;
-  while (Changed) {
-    Changed = false;
+  unsigned SkipBudget = SinkSearchWindow;
 
-    // Pick the last instruction from the first pred.
-    SILInstruction *FirstPredInst = getLastNonTerminator(FirstPred);
-    if (!FirstPredInst || !FirstPredInst->use_empty())
-      return;
+  // Start scanning backwards from the terminator.
+  SILBasicBlock::iterator InstToSink = FirstPred->getTerminator();
+
+  while (SkipBudget) {
+    DEBUG(llvm::dbgs() << "Processing: " << *InstToSink);
 
     // Save the duplicated instructions in case we need to remove them.
     SmallVector<SILInstruction*, 4> Dups;
 
-    // For all preds:
-    for (auto P : BB->getPreds()) {
-      if (P == FirstPred)
+    if (canSinkInstruction(InstToSink)) {
+      // For all preds:
+      for (auto P : BB->getPreds()) {
+        if (P == FirstPred)
+          continue;
+
+        // Search the duplicated instruction in the predecessor.
+        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink)) {
+          Dups.push_back(DupInst);
+        } else {
+          DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
+          Dups.clear();
+          break;
+        }
+      }
+
+      // If we found duplicated instructions, sink one of the copies and delete
+      // the rest.
+      if (Dups.size()) {
+        DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
+        InstToSink->moveBefore(BB->begin());
+        for (auto I : Dups) {
+          I->replaceAllUsesWith(InstToSink);
+          I->eraseFromParent();
+          NumCSESunk++;
+        }
+
+        // Restart the scan.
+        InstToSink = FirstPred->getTerminator();
+        DEBUG(llvm::dbgs() << "Restarting scan. Next inst: " << *InstToSink);
         continue;
-
-      // Check if the last instruction is identical to the last instruction
-      // of the first pred.
-      SILInstruction *Last = getLastNonTerminator(P);
-      if (!Last || !FirstPredInst->isIdenticalTo(Last) ||
-          !Last->use_empty()) {
-        Dups.clear();
-        break;
       }
-      Dups.push_back(Last);
     }
 
-    // If we found duplicated instructions, sink one of the copies and delete
-    // the rest.
-    if (Dups.size()) {
-      FirstPredInst->moveBefore(BB->begin());
-
-      for (auto I : Dups) {
-        I->replaceAllUsesWith(FirstPredInst);
-        I->eraseFromParent();
-        NumCSESunk++;
-      }
-      
-      Changed = true;
+    // If this instruction was a barrier then we can't sink anything else.
+    if (isSinkBarrier(InstToSink)) {
+      DEBUG(llvm::dbgs() << "Aborting on barrier: " << *InstToSink);
+      return;
     }
+
+    // This is the first instruction, we are done.
+    if (InstToSink == FirstPred->begin()) {
+      DEBUG(llvm::dbgs() << "Reached the first instruction.");
+      return;
+    }
+
+    SkipBudget--;
+    InstToSink = std::prev(InstToSink);
+    DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
+
   }
 }
 
