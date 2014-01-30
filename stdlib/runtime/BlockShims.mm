@@ -72,10 +72,10 @@ MAKE_BLOCK_SHIM(FUNC(NONE,
                      VOID),
                 void(void));
 
-/// (int64_t) -> Void
+/// (Int) -> Void
 MAKE_BLOCK_SHIM(FUNC(DIRECT(Si),
                      VOID),
-                void(int64_t));
+                void(NSInteger));
 
 /// NSDictionary enumerator
 /// (id, id, UnsafePointer<BOOL>) -> Void

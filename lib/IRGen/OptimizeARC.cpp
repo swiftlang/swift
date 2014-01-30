@@ -1316,6 +1316,7 @@ static bool performARCExpansion(Function &F) {
   // Scan through all the returns to see if there are any that can be optimized.
   // FIXME: swift_retainAndReturnThree runtime call 
   // is currently implemented only on x86_64.
+  // FIXME: optimizeReturn3() implementation assumes 64-bit
   if (llvm::Triple(F.getParent()->getTargetTriple()).getArchName() == "x86_64")
     for (ReturnInst *RI : Returns)
       Changed |= optimizeReturn3(RI);

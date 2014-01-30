@@ -35,9 +35,7 @@ struct HeapObject {
 
   uint32_t refCount;
   uint32_t weakRefCount;
-#ifndef __LP64__
-#error "FIXME -- allocate two words of metadata on 32-bit platforms"
-#endif
+  // FIXME: allocate two words of metadata on 32-bit platforms
 };
 
 /// Allocates a new heap object.  The returned memory is
@@ -112,7 +110,7 @@ extern "C" BoxPair swift_allocBox(Metadata const *type);
 // For example, a 12 byte allocation with 8 byte alignment becomes 16.
 #define SWIFT_TRYALLOC 0x0001
 #define SWIFT_RAWALLOC 0x0002
-extern "C" void *swift_slowAlloc(size_t bytes, uint64_t flags);
+extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
 
 // These exist as fast entry points for the above slow API.
 //

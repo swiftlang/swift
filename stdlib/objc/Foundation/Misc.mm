@@ -51,8 +51,7 @@ extern "C" bool swift_compareObjects(id x, id y) {
   return x == y;
 }
 
-// FIXME: Assumes Int is 64-bit.
-extern "C" int64_t swift_hashObject(id obj) {
+extern "C" intptr_t swift_hashObject(id obj) {
   [obj release];
-  return (int64_t)obj;
+  return (intptr_t)obj;
 }

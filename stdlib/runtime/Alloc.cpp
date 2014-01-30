@@ -56,12 +56,12 @@ swift::swift_allocObject(HeapMetadata const *metadata,
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
 extern "C" HeapObject* swift_bufferAllocate(
-  HeapMetadata const* bufferType, int64_t size)
+  HeapMetadata const* bufferType, intptr_t size)
 {
   return swift::swift_allocObject(bufferType, size, 0);
 }
 
-extern "C" int64_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
+extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 /// A do-nothing destructor for POD metadata.
 static void destroyPOD(HeapObject*) {}
@@ -307,7 +307,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
 
 __attribute__((noinline,used))
 static void *
-_swift_slowAlloc_fixup(AllocIndex idx, uint64_t flags)
+_swift_slowAlloc_fixup(AllocIndex idx, uintptr_t flags)
 {
   size_t sz;
 
@@ -338,7 +338,7 @@ _swift_slowAlloc_fixup(AllocIndex idx, uint64_t flags)
 }
 
 extern "C" LLVM_LIBRARY_VISIBILITY
-void _swift_refillThreadAllocCache(AllocIndex idx, uint64_t flags) {
+void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   void *tmp = _swift_slowAlloc_fixup(idx, flags);
   if (!tmp) {
     return;
@@ -350,7 +350,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uint64_t flags) {
   }
 }
 
-void *swift::swift_slowAlloc(size_t bytes, uint64_t flags) {
+void *swift::swift_slowAlloc(size_t bytes, uintptr_t flags) {
   void *r;
 
   do {

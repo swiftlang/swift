@@ -204,19 +204,19 @@ BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
           BUILTIN(Id, Name, Attrs)
 #endif
                        
-/// Sizeof has type (metatype<T>) -> Int64
+/// Sizeof has type (metatype<T>) -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
-/// Strideof has type (metatype<T>) -> Int64
+/// Strideof has type (metatype<T>) -> Int
 BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 
-/// Alignof has type (metatype<T>) -> Int64
+/// Alignof has type (metatype<T>) -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
-/// AllocRaw has type (Int64, Int64) -> Builtin.RawPointer
+/// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
-/// DeallocRaw has type (Builtin.RawPointer, Int64) -> ()
+/// DeallocRaw has type (Builtin.RawPointer, Int) -> ()
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().
