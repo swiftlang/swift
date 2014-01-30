@@ -89,13 +89,13 @@ int main(int argc_, const char **argv_) {
   llvm::InitializeAllTargets();
 
   std::unique_ptr<Compilation> C = TheDriver.buildCompilation(argv);
-  
-  // In the event of an unrecoverable error, BuildCompilation will exit early,
-  // so we can start with a 0 result code.
-  int ResultCode = 0;
+
+  if (Diags.hadAnyError())
+    return 1;
+
   if (C) {
-    ResultCode = C->performJobs();
+    return C->performJobs();
   }
 
-  return ResultCode;
+  return 0;
 }
