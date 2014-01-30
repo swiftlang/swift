@@ -2250,15 +2250,11 @@ public:
     if (!selfTy)
       return Type();
 
-    auto containerTy = func->getExtensionType();
     auto selfDecl = func->getImplicitSelfDecl();
 
-    // 'self' is let for reference types (i.e., classes) or when 'self' is
-    // neither @inout nor a metatype.
-    // FIXME: The metatype check here is odd.
-    selfDecl->setLet(containerTy->hasReferenceSemantics() ||
-                     (!selfTy->is<InOutType>() &&
-                      !selfTy->is<MetatypeType>()));
+    // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
+    // neither @inout.
+    selfDecl->setLet(!selfTy->is<InOutType>());
 
     auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
     if (!argPattern->getTypeLoc().getTypeRepr()) {
@@ -2743,14 +2739,14 @@ public:
     if (CD->getAttrs().getMutating())
       TC.diagnose(CD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
 
+
+    // FIXME: Shouldn't this use configureImplicitSelf?
     GenericParamList *outerGenericParams = nullptr;
     Type SelfTy = CD->computeSelfType(&outerGenericParams);
     Type ResultTy = SelfTy->getInOutObjectType();
     auto SelfDecl = CD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     (!SelfTy->is<InOutType>() &&
-                      !SelfTy->is<MetatypeType>()));
+    SelfDecl->setLet(!SelfTy->is<InOutType>());
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2875,11 +2871,11 @@ public:
       FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
 
     DD->setType(FnTy);
+
+    // FIXME: Shouldn't this use configureImplicitSelf?
     auto SelfDecl = DD->getImplicitSelfDecl();
     SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(SelfTy->hasReferenceSemantics() ||
-                     (!SelfTy->is<InOutType>() &&
-                      !SelfTy->is<MetatypeType>()));
+    SelfDecl->setLet(!SelfTy->is<InOutType>());
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
