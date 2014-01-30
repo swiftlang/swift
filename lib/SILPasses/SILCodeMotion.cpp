@@ -25,9 +25,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/RecyclingAllocator.h"
 
-STATISTIC(NumCSESunk,   "Number of instructions sunk");
-STATISTIC(NumCSEDeadStores, "Number of dead stores removed");
-STATISTIC(NumCSEDupLoads,   "Number of dup loads removed");
+STATISTIC(NumSunk,   "Number of instructions sunk");
+STATISTIC(NumDeadStores, "Number of dead stores removed");
+STATISTIC(NumDupLoads,   "Number of dup loads removed");
 
 using namespace swift;
 
@@ -53,7 +53,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
       if (PrevStore && PrevStore->getDest() == SI->getDest()) {
         recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
         PrevStore = SI;
-        NumCSEDeadStores++;
+        NumDeadStores++;
         continue;
       }
       PrevStore = SI;
@@ -65,7 +65,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
       if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
         recursivelyDeleteTriviallyDeadInstructions(LI, true);
-        NumCSEDupLoads++;
+        NumDupLoads++;
         continue;
       }
 
@@ -76,7 +76,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
           SILValue(LI, 0).replaceAllUsesWith(PrevLd);
           recursivelyDeleteTriviallyDeadInstructions(LI, true);
           LI = 0;
-          NumCSEDupLoads++;
+          NumDupLoads++;
           break;
         }
       }
@@ -207,7 +207,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
         for (auto I : Dups) {
           I->replaceAllUsesWith(InstToSink);
           I->eraseFromParent();
-          NumCSESunk++;
+          NumSunk++;
         }
 
         // Restart the scan.
