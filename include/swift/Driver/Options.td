@@ -26,9 +26,6 @@ def DriverOption : OptionFlag;
 // The option should be accepted by swift -frontend.
 def FrontendOption : OptionFlag;
 
-// The option should be accepted by swift -transform-ir.
-def TransformIROption : OptionFlag;
-
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -94,7 +91,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[DriverOption, FrontendOption]>;
 
 def o : JoinedOrSeparate<["-"], "o">,
-  Flags<[DriverOption, FrontendOption, TransformIROption]>,
+  Flags<[DriverOption, FrontendOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DriverOption]>,
@@ -255,4 +252,3 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 include "FrontendOptions.td"
-include "TransformIROptions.td"

@@ -29,8 +29,7 @@ namespace options {
   enum SwiftFlags {
     DriverOption = (1 << 4),
     FrontendOption = (1 << 5),
-    TransformIROption = (1 << 6),
-    NoDriverOption = (1 << 7),
+    NoDriverOption = (1 << 6),
   };
 
   enum ID {

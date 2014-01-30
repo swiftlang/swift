@@ -42,8 +42,6 @@ std::string getExecutablePath(const char *FirstArg) {
 
 extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
                          void *MainAddr);
-extern int transform_ir_main(ArrayRef<const char *> Args, const char *Argv0,
-                             void *MainAddr);
 
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
@@ -69,10 +67,6 @@ int main(int argc_, const char **argv_) {
       return frontend_main(llvm::makeArrayRef(argv.data()+2,
                                               argv.data()+argv.size()),
                            argv[0], (void *)(intptr_t)getExecutablePath);
-    } else if (FirstArg == "-transform-ir") {
-      return transform_ir_main(llvm::makeArrayRef(argv.data()+2,
-                                                  argv.data()+argv.size()),
-                               argv[0], (void *)(intptr_t)getExecutablePath);
     }
   }
 

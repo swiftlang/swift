@@ -1,11 +1,10 @@
 add_swift_executable(swift_driver
   driver.cpp
   frontend_main.cpp
-  transform_ir_main.cpp
   DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
           swiftSerialization swiftFrontend swiftClangImporter swiftIDE
   COMPONENT_DEPENDS bitreader bitwriter codegen ipo jit linker mcjit asmparser
-                    irreader selectiondag ${LLVM_TARGETS_TO_BUILD})
+                    selectiondag ${LLVM_TARGETS_TO_BUILD})
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
