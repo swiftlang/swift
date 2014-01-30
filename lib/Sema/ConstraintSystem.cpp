@@ -802,6 +802,18 @@ static void collectContextParamsAndRequirements(
                              nominal->getGenericRequirements().end());
 }
 
+/// Rebuilds the given 'self' type using the given object type as the
+/// replacement for the object type of self.
+static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
+  auto existingObjectTy = selfTy->getRValueInstanceType();
+  return selfTy.transform([=](Type type) -> Type {
+    if (type->isEqual(existingObjectTy))
+      return objectTy;
+    return type;
+  });
+}
+
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
@@ -920,8 +932,10 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If this is a method whose result type is DynamicSelf, replace
   // DynamicSelf with the actual object type.
+  bool hasDynamicSelf = false;
   if (auto func = dyn_cast<FuncDecl>(value)) {
     if (func->hasDynamicSelf()) {
+      hasDynamicSelf = true;
       openedType = openedType.transform([&](Type type) {
           if (type->is<DynamicSelfType>())
             return baseObjTy;
@@ -994,6 +1008,17 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
   } else {
     type = openedType;
+
+    // If we're referencing a method with DynamicSelf that has 'self'
+    // curried, replace the type of 'self' with the actual base object
+    // type.
+    if (hasDynamicSelf) {
+      auto fnType = type->castTo<FunctionType>();
+      auto selfTy = rebuildSelfTypeWithObjectType(fnType->getInput(), 
+                                                  baseObjTy);      
+      type = FunctionType::get(selfTy, fnType->getResult(),
+                               fnType->getExtInfo());
+    }
   }
 
   return { openedType, type };

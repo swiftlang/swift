@@ -1307,7 +1307,12 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   if (auto *FD = dyn_cast<FuncDecl>(theMethod)) {
     isStatic = FD->isStatic();
     isMutating = FD->isMutating();
-    selfTypeOverride = FD->getDynamicSelf();
+
+    // The non-interface type of a method that returns DynamicSelf
+    // uses DynamicSelf for the type of 'self', which is important
+    // when type checking the body of the function.
+    if (!wantInterfaceType)
+      selfTypeOverride = FD->getDynamicSelf();
   } else if (isa<ConstructorDecl>(theMethod)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
