@@ -18,9 +18,9 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -38,6 +38,7 @@ namespace opt {
 }
 
 namespace swift {
+  class DiagnosticEngine;
 namespace driver {
   class Compilation;
   class Job;
@@ -129,8 +130,7 @@ public:
   typedef std::pair<types::ID, const llvm::opt::Arg *> InputPair;
   typedef SmallVector<InputPair, 16> InputList;
 
-  Driver(StringRef DriverExecutable,
-         DiagnosticEngine &Diags);
+  Driver(StringRef DriverExecutable, DiagnosticEngine &Diags);
   ~Driver();
 
   const llvm::opt::OptTable &getOpts() const { return *Opts; }
