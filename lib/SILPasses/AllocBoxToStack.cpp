@@ -27,19 +27,15 @@ STATISTIC(NumEntryCycleBB, "Number of alloc_box's promotion disrupted due to "
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-/// We are currently checking for domination/post-domination but not control
-/// equivalence, a necessary condition for a single entry/single-exit
-/// region. This function ensures that we do not run into the issue by making
-/// sure that the allocbox is not reachable from itself.
-static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
+/// \brief Checks if the single entry single exit region starting at \p Entry
+/// and ending at \p Exit has cycles. This function returns True if there is
+/// a path between \p  Entry to itself without goint through \p Exit.
+static bool regionHasCycles(SILBasicBlock *Entry, SILBasicBlock *Exit) {
   llvm::SmallVector<SILBasicBlock *, 16> Worklist;
   llvm::SmallPtrSet<SILBasicBlock *, 16> VisitedBBSet;
 
-  auto *AllocBoxBB = ABI->getParent();
-  auto *ReleaseBB = SRI->getParent();
-
-  // Add the alloc box bb to the worklist.
-  Worklist.push_back(AllocBoxBB);
+  // Start the scan at the entry block.
+  Worklist.push_back(Entry);
 
   // For each BB in the worklist...
   while (!Worklist.empty()) {
@@ -49,16 +45,14 @@ static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
     for (auto &Succ : BB->getSuccs()) {
       auto *BB = Succ.getBB();
 
-      // If one of those successors is AllocBoxBB, we have an entry cycle
-      // implying that we can not promote this alloc box.
-      if (BB == AllocBoxBB) {
+      // If one of those successors is the entry block, we have a cycle.
+      if (BB == Entry) {
         ++NumEntryCycleBB;
         return true;
       }
 
-      // If the successor is the ReleaseBB, skip it since ReleaseBB
-      // post-dominates Prune the search at the SRI's BB.
-      if (BB == ReleaseBB)
+      // If the successor is the exit block, skip it.
+      if (BB == Exit)
         continue;
 
       // Otherwise, if we have not visited the BB yet, add it to the worklist
@@ -68,7 +62,7 @@ static bool checkForEntryCycles(SILInstruction *ABI, SILInstruction *SRI) {
     }
   }
 
-  // The allocbox's BB is not reachable from itself, we are safe.
+  // The entry block is not reachable from itself, we are safe.
   return false;
 }
 
@@ -125,10 +119,12 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
     }
   }
 
-  // Okay, we found the most-post-dominating release. Make sure that the entry
-  // basic block is not apart of any cycles originating inside the region. This
-  // is to prevent self-cycle issues.
-  if (checkForEntryCycles(ABI, LastRelease))
+  // Okay, we found the most-post-dominating release. We are currently checking
+  /// for domination/post-domination but not control equivalence, a necessary
+  /// condition for a single entry/single-exit region. This check ensures
+  /// that we do not run into the issue by making sure that the allocbox is not
+  /// reachable from itself.
+  if (regionHasCycles(ABI->getParent(), LastRelease->getParent()))
     return nullptr;
 
   // Make sure that the most-post-dominating release we have found postdom all
