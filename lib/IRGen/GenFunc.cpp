@@ -60,7 +60,9 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/DeclGroup.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "clang/CodeGen/ModuleBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Intrinsics.h"
@@ -2511,6 +2513,8 @@ void IRGenModule::emitLocalDecls(BraceStmt *body) {
 void IRGenModule::emitLocalDecls(FuncDecl *fd) {
   if (fd->getBody())
     emitLocalDecls(fd->getBody());
+  else if (auto *clangDecl = fd->getClangDecl())
+    emitLocalDecls(const_cast<clang::Decl *>(clangDecl));
 }
 
 void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {
@@ -2521,4 +2525,9 @@ void IRGenModule::emitLocalDecls(ConstructorDecl *cd) {
 void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
   if (dd->getBody())
     emitLocalDecls(dd->getBody());
+}
+
+// Emit IR for an imported inline Clang function body.
+void IRGenModule::emitLocalDecls(clang::Decl *decl) {
+  ClangCodeGen.HandleTopLevelDecl(clang::DeclGroupRef(decl));
 }

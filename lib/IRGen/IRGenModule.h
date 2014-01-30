@@ -45,6 +45,8 @@ namespace llvm {
   class AttributeSet;
 }
 namespace clang {
+  class CodeGenerator;
+  class Decl;
   namespace CodeGen {
     class CodeGenABITypes;
   }
@@ -242,6 +244,8 @@ public:
 private:
   TypeConverter &Types;
   friend class TypeConverter;
+  clang::CodeGenerator &ClangCodeGen;
+
   friend class GenericContextScope;
   
 //--- Globals ---------------------------------------------------------------
@@ -328,7 +332,7 @@ private:                            \
 public:
   IRGenModule(ASTContext &Context, IRGenOptions &Opts, llvm::Module &Module,
               const llvm::DataLayout &DataLayout,
-              SILModule *SILMod);
+              SILModule *SILMod, clang::CodeGenerator &ClangCodeGen);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
@@ -353,6 +357,7 @@ public:
   void emitLocalDecls(FuncDecl *fd);
   void emitLocalDecls(ConstructorDecl *cd);
   void emitLocalDecls(DestructorDecl *dd);
+  void emitLocalDecls(clang::Decl *decl);
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       ResilienceExpansion expansion,

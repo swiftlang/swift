@@ -63,13 +63,13 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 IRGenModule::IRGenModule(ASTContext &Context,
                          IRGenOptions &Opts, llvm::Module &Module,
                          const llvm::DataLayout &DataLayout,
-                         SILModule *SILMod)
+                         SILModule *SILMod, clang::CodeGenerator &ClangCodeGen)
   : Context(Context), Opts(Opts), Module(Module),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), Types(*new TypeConverter(*this))
+    DebugInfo(0), Types(*new TypeConverter(*this)),
+    ClangCodeGen(ClangCodeGen)
 {
-
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
   Int8Ty = llvm::Type::getInt8Ty(getLLVMContext());

@@ -1397,11 +1397,6 @@ namespace {
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
       decl = decl->getMostRecentDecl();
 
-      // FIXME: We can't IRgen inline functions, so don't import them.
-      if (decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>()) {
-        return nullptr;
-      }
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
@@ -1431,6 +1426,25 @@ namespace {
           Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
           /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
+
+      // Keep track of inline function bodies so that we can generate
+      // IR from them using Clang's IR generator.
+      if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>())
+          && decl->getBody()) {
+        // FIXME: Total hack to force instantiation of inline
+        //        functions into the module rather than going through
+        //        Clang's CodeGenModule::Release(), which will emit
+        //        deferred decls that have been referenced, since
+        //        Release() does many things including emitting stuff
+        //        that along with what Swift emits results in broken
+        //        modules.
+        auto *attr = clang::UsedAttr::CreateImplicit(decl->getASTContext());
+        const_cast<clang::FunctionDecl *>(decl)->addAttr(attr);
+
+        result->setClangNode(decl);
+        Impl.SwiftContext.addedExternalDecl(result);
+      }
+
       result->setBodyResultType(resultTy);
       setVarDeclContexts(argPatterns, result);
       setVarDeclContexts(bodyPatterns, result);

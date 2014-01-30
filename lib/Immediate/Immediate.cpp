@@ -269,8 +269,6 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     if (!ImportedModules.insert(import))
       continue;
 
-    // FIXME: Need to check whether this is actually safe in general.
-    llvm::Module SubModule(import->Name.str(), Module.getContext());
     std::unique_ptr<SILModule> SILMod = performSILGeneration(import);
     performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
@@ -278,7 +276,8 @@ static bool IRGenImportedModules(CompilerInstance &CI,
       break;
     }
 
-    performIRGeneration(Options, &SubModule, import, SILMod.get());
+    auto SubModule = performIRGeneration(Options, import, SILMod.get(),
+                                         import->Name.str());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -286,7 +285,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     }
 
     std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(&Module, &SubModule,
+    if (llvm::Linker::LinkModules(&Module, SubModule.get(),
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
@@ -312,16 +311,16 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
-  llvm::LLVMContext LLVMContext;
-  llvm::Module Module(CI.getMainModule()->Name.str(), LLVMContext);
-  performIRGeneration(Options, &Module, CI.getMainModule(), CI.getSILModule());
+  auto *swiftModule = CI.getMainModule();
+  auto Module = performIRGeneration(Options, swiftModule, CI.getSILModule(),
+                                    swiftModule->Name.str());
 
   if (Context.hadError())
     return;
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
-  if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules,
+  if (IRGenImportedModules(CI, *Module, CmdLine, ImportedModules,
                            InitFns, Options, /*IsREPL*/false))
     return;
 
@@ -329,9 +328,9 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   PMBuilder.OptLevel = 2;
   PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
   llvm::PassManager ModulePasses;
-  ModulePasses.add(new llvm::DataLayout(Module.getDataLayout()));
+  ModulePasses.add(new llvm::DataLayout(Module->getDataLayout()));
   PMBuilder.populateModulePassManager(ModulePasses);
-  ModulePasses.run(Module);
+  ModulePasses.run(*Module);
 
   if (!loadSwiftRuntime(CmdLine)) {
     CI.getDiags().diagnose(SourceLoc(),
@@ -340,7 +339,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   }
 
   // Build the ExecutionEngine.
-  llvm::EngineBuilder builder(&Module);
+  llvm::EngineBuilder builder(Module.get());
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
   TargetOpt.NoFramePointerElim = Options.DisableFPElim;
@@ -355,7 +354,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   }
 
   DEBUG(llvm::dbgs() << "Module to be executed:\n";
-        Module.dump());
+        Module->dump());
   
   // Run the generated program.
   for (auto InitFn : InitFns) {
@@ -367,7 +366,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   DEBUG(llvm::dbgs() << "Running static constructors\n");
   EE->runStaticConstructorsDestructors(false);
   DEBUG(llvm::dbgs() << "Running main\n");
-  llvm::Function *EntryFn = Module.getFunction("main");
+  llvm::Function *EntryFn = Module->getFunction("main");
   EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
 
@@ -982,24 +981,22 @@ private:
       return true;
 
      // IRGen the current line(s).
-    llvm::Module LineModule("REPLLine", LLVMContext);
-
-    performIRGeneration(Options, &LineModule, REPLInputFile, sil.get(),
-                        RC.CurIRGenElem);
+    auto LineModule = performIRGeneration(Options, REPLInputFile, sil.get(),
+                                          "REPLLine", RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
       return false;
     
     std::string ErrorMessage;
-    if (llvm::Linker::LinkModules(&Module, &LineModule,
+    if (llvm::Linker::LinkModules(&Module, LineModule.get(),
                                   llvm::Linker::PreserveSource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";
       llvm::errs() << ErrorMessage << "\n";
       return false;
     }
-    if (llvm::Linker::LinkModules(&DumpModule, &LineModule,
+    if (llvm::Linker::LinkModules(&DumpModule, LineModule.get(),
                                   llvm::Linker::DestroySource,
                                   &ErrorMessage)) {
       llvm::errs() << "Error linking swift modules\n";

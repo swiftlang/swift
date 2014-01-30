@@ -163,14 +163,20 @@ namespace swift {
                          ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
 
-  /// Turn the given module into either LLVM IR or native code.
-  void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
-                           swift::Module *M, SILModule *SILMod);
+  /// Turn the given Swift module into either LLVM IR or native code
+  /// and return the generated LLVM IR module.
+  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
+                                                    swift::Module *M,
+                                                    SILModule *SILMod,
+                                                    StringRef ModuleName);
 
-  /// Turn the given source file into either LLVM IR or native code.
-  void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
-                           SourceFile &SF, SILModule *SILMod,
-                           unsigned StartElem = 0);
+  /// Turn the given Swift module into either LLVM IR or native code
+  /// and return the generated LLVM IR module.
+  std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
+                                                    SourceFile &SF,
+                                                    SILModule *SILMod,
+                                                    StringRef ModuleName,
+                                                    unsigned StartElem = 0);
 
   // Optimization passes.
   llvm::FunctionPass *createSwiftARCOptPass();

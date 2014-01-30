@@ -69,6 +69,9 @@ typedef signed char BOOL;
 - (BOOL) negate:(BOOL) b;
 @end
 
+static inline int innerZero(void) { return 0; }
+static inline int zero(void) { return innerZero(); }
+
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end

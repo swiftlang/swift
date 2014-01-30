@@ -708,6 +708,11 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
     checkDefaultArguments(*this, pattern, nextArgIndex, FD);
   }
 
+  // Clang imported inline functions do not have a Swift body to
+  // typecheck.
+  if (FD->getClangDecl())
+    return false;
+
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
 
