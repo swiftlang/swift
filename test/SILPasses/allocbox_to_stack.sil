@@ -98,7 +98,10 @@ bb0:
   %7 = apply %6(%1#1) : $@thin (@inout Int) -> ()
   %8 = load %1#1 : $*Int
   %9 = strong_release %1#0 : $Builtin.ObjectPointer
-  %10 = return %8 : $Int
+  %10 = address_to_pointer %1#1 : $*Int to $Builtin.RawPointer
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to $*Int
+  %12 = load %11 : $*Int
+  %13 = return %8 : $Int
   // CHECK: return
 }
 

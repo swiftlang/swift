@@ -165,6 +165,26 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   return LastRelease;
 }
 
+static bool useCaptured(Operand *UI) {
+  auto *User = UI->getUser();
+
+  // These instructions do not cause the box's address to escape.
+  if (isa<CopyAddrInst>(User) ||
+      isa<LoadInst>(User) ||
+      isa<ProtocolMethodInst>(User) ||
+      (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
+      (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {
+    return false;
+  }
+
+  if ((isa<AddressToPointerInst>(User) || isa<PointerToAddressInst>(User)) &&
+      User->hasOneUse()) {
+    return useCaptured(*User->use_begin());
+  }
+
+  return true;
+}
+
 /// checkAllocBoxUses - Scan all of the uses (recursively) of the specified
 /// alloc_box, validating that they don't allow the ABI to escape.
 static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
@@ -173,11 +193,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     auto *User = UI->getUser();
 
     // These instructions do not cause the box's address to escape.
-    if (isa<CopyAddrInst>(User) ||
-        isa<LoadInst>(User) ||
-        isa<ProtocolMethodInst>(User) ||
-        (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
-        (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {
+    if (!useCaptured(UI))     {
       Users.push_back(User);
       continue;
     }
