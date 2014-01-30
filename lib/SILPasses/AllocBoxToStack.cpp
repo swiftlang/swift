@@ -161,6 +161,7 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   return LastRelease;
 }
 
+/// \brief Returns True if the operand or one of its users is captured.
 static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
 
