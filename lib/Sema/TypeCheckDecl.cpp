@@ -3802,4 +3802,5 @@ bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
   }
   
   DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern());
+  return false;
 }
