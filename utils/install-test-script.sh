@@ -62,7 +62,7 @@ elif [ "$(cat "$TMPDIR/test_repl_1_$$")" != "Hello world" ]; then
   RESULT=1
 fi
 
-if ! /usr/bin/swift -repl 2>"$TMPDIR/test_repl_2_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
+if ! /usr/bin/swift -repl -sdk="$SYSROOT" 2>"$TMPDIR/test_repl_2_err_$$" >"$TMPDIR/test_repl_2_$$" <<REPL
 import Foundation
 {(s : NSString) in println(s)}("Hello world")
 REPL
@@ -83,7 +83,7 @@ print("Hello ")
 println(s)
 TEST_COMPILE
 
-if ! /usr/bin/swift -c "$TMPDIR/test_compile_$$.swift" \
+if ! /usr/bin/swift -sdk="$SYSROOT" -c "$TMPDIR/test_compile_$$.swift" \
   -o "$TMPDIR/test_compile_$$.o"
 then
   echo "Failed to compile Swift program!"
