@@ -2649,7 +2649,7 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-    SILResultInfo interfaceResult(getType(resultID)->getCanonicalType(),
+    SILResultInfo interfaceResult(getType(interfaceResultID)->getCanonicalType(),
                                   interfaceResultConvention.getValue());
 
     // Process the parameters.
