@@ -40,9 +40,9 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 namespace {
-  /// SimpleValue - Instances of this struct represent available values in the
-  /// scoped hash table.
-  struct SimpleValue {
+/// SimpleValue - Instances of this struct represent available values in the
+/// scoped hash table.
+struct SimpleValue {
     SILInstruction *Inst;
 
     SimpleValue(SILInstruction *I) : Inst(I) {
@@ -50,12 +50,12 @@ namespace {
     }
 
     bool isSentinel() const {
-      return Inst == llvm::DenseMapInfo<SILInstruction*>::getEmptyKey() ||
-             Inst == llvm::DenseMapInfo<SILInstruction*>::getTombstoneKey();
+    return Inst == llvm::DenseMapInfo<SILInstruction *>::getEmptyKey() ||
+           Inst == llvm::DenseMapInfo<SILInstruction *>::getTombstoneKey();
     }
 
     static bool canHandle(SILInstruction *Inst) {
-      switch(Inst->getKind()) {
+    switch (Inst->getKind()) {
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
       case ValueKind::GlobalAddrInst:
@@ -92,10 +92,10 @@ template<> struct DenseMapInfo<SimpleValue> {
 } // end namespace llvm
 
 namespace {
-  class HashVisitor :
-    public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
+class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
     using hash_code = llvm::hash_code;
-  public:
+
+public:
     hash_code visitValueBase(ValueBase *) {
       llvm_unreachable("No hash implemented for the given type");
     }
@@ -117,80 +117,68 @@ namespace {
 
     hash_code visitIntegerLiteralInst(IntegerLiteralInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),
-                                X->getType(),
-                                X->getValue());
+                              X->getType(), X->getValue());
     }
 
     hash_code visitFloatLiteralInst(FloatLiteralInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
-                                X->getType(),
-                                X->getBits());
+                              X->getType(), X->getBits());
     }
 
     hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::RefElementAddrInst),
-                                X->getOperand(),
-                                X->getField());
+                              X->getOperand(), X->getField());
     }
 
     hash_code visitStringLiteralInst(StringLiteralInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
-                                unsigned(X->getEncoding()),
-                                X->getValue());
+                              unsigned(X->getEncoding()), X->getValue());
     }
 
     hash_code visitStructInst(StructInst *X) {
       // This is safe since we are hashing the operands using the actual pointer
       // values of the values being used by the operand.
       OperandValueArrayRef Operands(X->getAllOperands());
-      return llvm::hash_combine(unsigned(ValueKind::StructInst),
-                                X->getStructDecl(),
-                                llvm::hash_combine_range(Operands.begin(),
-                                                         Operands.end()));
+    return llvm::hash_combine(
+        unsigned(ValueKind::StructInst), X->getStructDecl(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
     }
 
     hash_code visitStructExtractInst(StructExtractInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
-                                X->getStructDecl(),
-                                X->getField(),
+                              X->getStructDecl(), X->getField(),
                                 X->getOperand());
     }
 
     hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
-                                X->getStructDecl(),
-                                X->getField(),
+                              X->getStructDecl(), X->getField(),
                                 X->getOperand());
     }
 
     hash_code visitTupleInst(TupleInst *X) {
       OperandValueArrayRef Operands(X->getAllOperands());
-      return llvm::hash_combine(unsigned(ValueKind::TupleInst),
-                                X->getTupleType(),
-                                llvm::hash_combine_range(Operands.begin(),
-                                                         Operands.end()));
+    return llvm::hash_combine(
+        unsigned(ValueKind::TupleInst), X->getTupleType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
     }
 
     hash_code visitTupleExtractInst(TupleExtractInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::TupleExtractInst),
-                                X->getTupleType(),
-                                X->getFieldNo(),
+                              X->getTupleType(), X->getFieldNo(),
                                 X->getOperand());
     }
 
     hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
       return llvm::hash_combine(unsigned(ValueKind::TupleElementAddrInst),
-                                X->getTupleType(),
-                                X->getFieldNo(),
+                              X->getTupleType(), X->getFieldNo(),
                                 X->getOperand());
     }
 
     hash_code visitMetatypeInst(MetatypeInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::MetatypeInst),
-                                X->getType());
+    return llvm::hash_combine(unsigned(ValueKind::MetatypeInst), X->getType());
     }
-
-  };
+};
 } // end anonymous namespace
 
 unsigned llvm::DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
@@ -220,10 +208,10 @@ class CSE {
 public:
   SILModule &Module;
 
-  typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase*> SimpleValueHTType;
-  typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator,
-                                   SimpleValueHTType> AllocatorTy;
-  typedef llvm::ScopedHashTable<SimpleValue, ValueBase*,
+  typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase *> SimpleValueHTType;
+  typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator, SimpleValueHTType>
+  AllocatorTy;
+  typedef llvm::ScopedHashTable<SimpleValue, ValueBase *,
                                 llvm::DenseMapInfo<SimpleValue>,
                                 AllocatorTy> ScopedHTType;
 
@@ -234,24 +222,21 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  explicit CSE(SILModule &M) : Module(M) { }
+  explicit CSE(SILModule &M) : Module(M) {}
 
   bool runOnFunction(SILFunction &F);
 
 private:
-
   // NodeScope - almost a POD, but needs to call the constructors for the
   // scoped hash tables so that a new scope gets pushed on. These are RAII so
   // that the scope gets popped when the NodeScope is destroyed.
   class NodeScope {
    public:
-    NodeScope(ScopedHTType *availableValues)
-      : Scope(*availableValues) {
-    }
+    NodeScope(ScopedHTType *availableValues) : Scope(*availableValues) {}
 
    private:
-    NodeScope(const NodeScope&) = delete;
-    void operator=(const NodeScope&) = delete;
+    NodeScope(const NodeScope &) = delete;
+    void operator=(const NodeScope &) = delete;
 
     ScopedHTType::ScopeTy Scope;
   };
@@ -262,12 +247,10 @@ private:
   // children do not need to be store spearately.
   class StackNode {
    public:
-    StackNode(ScopedHTType *availableValues,
-              DominanceInfoNode *n,
+    StackNode(ScopedHTType *availableValues, DominanceInfoNode *n,
               DominanceInfoNode::iterator child,
-              DominanceInfoNode::iterator end) :
-      Node(n), ChildIter(child), EndIter(end),
-      Scopes(availableValues),
+              DominanceInfoNode::iterator end)
+        : Node(n), ChildIter(child), EndIter(end), Scopes(availableValues),
       Processed(false) {}
 
     // Accessors.
@@ -283,8 +266,8 @@ private:
     void process() { Processed = true; }
 
    private:
-    StackNode(const StackNode&) = delete;
-    void operator=(const StackNode&) = delete;
+    StackNode(const StackNode &) = delete;
+    void operator=(const StackNode &) = delete;
 
     // Members.
     DominanceInfoNode *Node;
@@ -314,8 +297,7 @@ bool CSE::runOnFunction(SILFunction &F) {
   bool Changed = false;
 
   // Process the root node.
-  nodesToProcess.push_back(
-    new StackNode(AvailableValues, DT.getRootNode(),
+  nodesToProcess.push_back(new StackNode(AvailableValues, DT.getRootNode(),
                   DT.getRootNode()->begin(),
                   DT.getRootNode()->end()));
 
@@ -353,7 +335,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
   // not, add them to AvailableValues.
-  for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E; ) {
+  for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
     SILInstruction *Inst = I++;
 
     DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
@@ -386,8 +368,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
-      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V
-            << '\n');
+      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
       Inst->replaceAllUsesWith(V);
       Inst->eraseFromParent();
       Changed = true;
@@ -397,8 +378,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // Otherwise, just remember that this value is available.
     AvailableValues->insert(Inst, Inst);
-    DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
-          << " -> " << *Inst << "\n");
+    DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst << " -> "
+                       << *Inst << "\n");
   }
 
   return Changed;
