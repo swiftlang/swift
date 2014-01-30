@@ -452,7 +452,8 @@ namespace {
         // No substitutions required; the declaration reference is simple.
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
-        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc);
+        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc,
+                                              /*wantInterfaceType=*/true);
       }
 
       // If this is a method whose result type is DynamicSelf, replace

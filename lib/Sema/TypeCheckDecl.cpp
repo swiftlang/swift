@@ -2020,6 +2020,20 @@ public:
     }
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
+
+    // For a non-generic method that returns DynamicSelf, we need to
+    // provide an interface type where the 'self' argument is the
+    // nominal type.
+    if (FD->hasDynamicSelf() && !genericParams && !outerGenericParams) {
+      auto fnType = FD->getType()->castTo<FunctionType>();
+      auto inputType = fnType->getInput().transform([&](Type type) -> Type {
+        if (type->is<DynamicSelfType>())
+          return FD->getExtensionType();
+        return type;
+      });
+      FD->setInterfaceType(FunctionType::get(inputType, fnType->getResult(),
+                                             fnType->getExtInfo()));
+    }
   }
 
   /// Bind the given function declaration, which declares an operator, to
