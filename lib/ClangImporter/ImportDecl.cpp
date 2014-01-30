@@ -58,6 +58,41 @@ static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
   }
 }
 
+/// \brief Retrieve the type of 'self' for the given context.
+static Type getSelfTypeForContext(DeclContext *dc) {
+  // For a protocol, the type is 'Self'.
+  if (auto proto = dyn_cast<ProtocolDecl>(dc))
+    return proto->getSelf()->getArchetype();
+
+  return dc->getDeclaredTypeOfContext();
+}
+
+/// Create an implicit 'self' decl for a method in the specified type.  If
+/// 'static' is true, then this is self for a static method in the type.
+///
+/// Note that this decl is created, but it is returned with an incorrect
+/// DeclContext that needs to be reset once the method exists.
+///
+static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
+  auto selfType = getSelfTypeForContext(DC);
+
+  ASTContext &C = DC->getASTContext();
+
+  if (isStaticMethod)
+    selfType = MetatypeType::get(selfType, C);
+
+  bool isLet = true;
+  if (auto *ND = selfType->getAnyNominal())
+    isLet = !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
+
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/isLet,
+                                      SourceLoc(), C.Id_self, selfType, DC);
+  selfDecl->setImplicit();
+  return selfDecl;
+}
+
+
+
 /// Create a typedpattern(namedpattern(decl))
 static Pattern *createTypedNamedPattern(VarDecl *decl) {
   ASTContext &Ctx = decl->getASTContext();
@@ -309,15 +344,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      Type(),
-                                      optionSetDecl);
-  selfDecl->setImplicit();
-  auto metaTy = MetatypeType::get(optionSetType, C);
-  selfDecl->setType(metaTy);
-
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
   VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                      SourceLoc(), C.getIdentifier("raw"),
@@ -370,7 +397,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   rawDecl->setDeclContext(factoryDecl);
   
   Type factoryType = FunctionType::get(rawArgType, retType);
-  factoryType = FunctionType::get(metaTy, factoryType);
+  factoryType = FunctionType::get(selfDecl->getType(), factoryType);
   factoryDecl->setType(factoryType);
   factoryDecl->setBodyResultType(retType);
 
@@ -409,13 +436,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      Type(),
-                                      optionSetDecl);
-  selfDecl->setImplicit();
-  selfDecl->setType(optionSetType);
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, false);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
 
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
@@ -496,19 +517,10 @@ getOperatorRef(ASTContext &C, Identifier name) {
 static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
                                                   ValueDecl *valueDecl) {
   ASTContext &C = optionSetDecl->getASTContext();
-  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
-  auto boolType = C.getGetBoolDecl(nullptr)
-    ->getType()
-    ->castTo<AnyFunctionType>()
-    ->getResult();
+  auto boolType = C.getGetBoolDecl(nullptr)->getType()
+               ->castTo<AnyFunctionType>()->getResult();
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      Type(),
-                                      optionSetDecl);
-  selfDecl->setImplicit();
-  selfDecl->setType(optionSetType);
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, /*NotStaticMethod*/false);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
@@ -523,7 +535,8 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   
   auto toRawArgType = TupleType::getEmpty(C);
   Type toRawType = FunctionType::get(toRawArgType, boolType);
-  toRawType = FunctionType::get(optionSetType, toRawType);
+  toRawType = FunctionType::get(optionSetDecl->getDeclaredTypeInContext(),
+                                toRawType);
   getLVDecl->setType(toRawType);
   getLVDecl->setBodyResultType(boolType);
   
@@ -572,13 +585,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto metaTy = MetatypeType::get(optionSetType, C);
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/false,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      Type(),
-                                      optionSetDecl);
-  selfDecl->setImplicit();
-  selfDecl->setType(optionSetType);
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, false);
 
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
@@ -735,10 +742,7 @@ namespace {
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
       auto selfMetatype = MetatypeType::get(selfType, context);
-      auto selfName = context.Id_self;
-      auto selfDecl = new (context) VarDecl(/*static*/ false, /*IsLet*/ false,
-                                            SourceLoc(), selfName, selfType,
-                                            structDecl);
+      auto selfDecl = createSelfDecl(structDecl, false);
 
       // Construct the set of parameters from the list of members.
       SmallVector<Pattern *, 4> paramPatterns;
@@ -1562,14 +1566,8 @@ namespace {
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
-      auto selfTy = getSelfTypeForContext(dc);
-      if (decl->isClassMethod() || forceClassMethod)
-        selfTy = MetatypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.Id_self;
-      auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                     /*IsLet*/ true,
-                                                     SourceLoc(), selfName,
-                                                     selfTy, dc);
+      auto selfVar =
+        createSelfDecl(dc, decl->isClassMethod() || forceClassMethod);
       Pattern *selfPat = createTypedNamedPattern(selfVar);
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
@@ -1595,7 +1593,7 @@ namespace {
       auto resultTy = type->castTo<FunctionType>()->getResult();
 
       // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfTy, type);
+      type = FunctionType::get(selfVar->getType(), type);
 
       Type interfaceType;
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
@@ -1645,7 +1643,7 @@ namespace {
 
       // FIXME: We'll eventually have to deal with having multiple overrides
       // in Swift.
-      if (auto selfClassTy = getSelfTypeForContext(dc)->getAs<ClassType>()) {
+      if (auto selfClassTy = selfVar->getType()->getAs<ClassType>()) {
         if (auto superTy = selfClassTy->getDecl()->getSuperclass()) {
           auto superDecl = superTy->castTo<ClassType>()->getDecl();
           if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
@@ -1845,13 +1843,7 @@ namespace {
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
-      auto selfMetaTy = MetatypeType::get(selfTy, Impl.SwiftContext);
-      auto selfName = Impl.SwiftContext.Id_self;
-      auto selfMetaVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                         /*IsLet*/ true,
-                                                         SourceLoc(), selfName,
-                                                         selfMetaTy,
-                                                         Impl.firstClangModule);
+      auto selfMetaVar = createSelfDecl(dc, true);
       Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
@@ -1877,14 +1869,10 @@ namespace {
                                selfTy);
 
       // Add the 'self' parameter to the function types.
-      Type allocType = FunctionType::get(selfMetaTy, type);
+      Type allocType = FunctionType::get(selfMetaVar->getType(), type);
       Type initType = FunctionType::get(selfTy, type);
 
-      VarDecl *selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                         /*IsLet*/ true,
-                                                         SourceLoc(),
-                                                         selfName, selfTy, dc);
-      selfVar->isImplicit();
+      VarDecl *selfVar = createSelfDecl(dc, false);
 
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
@@ -1923,30 +1911,6 @@ namespace {
       }
 
       return cast<NamedPattern>(pattern)->getDecl();
-    }
-
-    /// \brief Add the implicit 'self' pattern to the given list of patterns.
-    ///
-    /// \param selfTy The type of the 'self' parameter.
-    ///
-    /// \param args The set of arguments 
-    VarDecl *addImplicitSelfParameter(Type selfTy,
-                                      SmallVectorImpl<Pattern *> &args) {
-      auto selfName = Impl.SwiftContext.Id_self;
-      auto selfVar = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                     /*IsLet*/ true,
-                                                     SourceLoc(), selfName,
-                                                     selfTy,
-                                                     Impl.firstClangModule);
-      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
-      selfPat->setType(selfVar->getType());
-      selfPat = new (Impl.SwiftContext) TypedPattern(
-                                          selfPat,
-                                          TypeLoc::withoutLoc(selfTy));
-      selfPat->setType(selfVar->getType());
-      args.push_back(selfPat);
-
-      return selfVar;
     }
 
     /// Retrieves the type and interface type for a protocol method given
@@ -2003,7 +1967,7 @@ namespace {
       SmallVector<Pattern *, 3> getterArgs;
 
       // 'self'
-      addImplicitSelfParameter(dc->getDeclaredTypeOfContext(), getterArgs);
+      getterArgs.push_back(createTypedNamedPattern(createSelfDecl(dc, false)));
 
       // index, for subscript operations.
       if (indices) {
@@ -2084,7 +2048,7 @@ namespace {
       SmallVector<Pattern *, 3> setterArgs;
 
       // 'self'
-      addImplicitSelfParameter(dc->getDeclaredTypeOfContext(), setterArgs);
+      setterArgs.push_back(createTypedNamedPattern(createSelfDecl(dc, false)));
 
       // index, for subscript operations.
       if (indices) {
@@ -2382,15 +2346,6 @@ namespace {
     }
 
   public:
-    /// \brief Retrieve the type of 'self' for the given context.
-    Type getSelfTypeForContext(DeclContext *dc) {
-      // For a protocol, the type is 'Self'.
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        return proto->getSelf()->getArchetype();
-      }
-
-      return dc->getDeclaredTypeOfContext();
-    }
 
     /// Recursively add the given protocol and its inherited protocols to the
     /// given vector, guarded by the known set of protocols.
