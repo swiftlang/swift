@@ -1,3 +1,28 @@
+2014-02-05
+----------
+
+* 'if' and 'while' statements can now conditionally bind variables. If the
+  condition of an 'if' or 'while' statement is a 'let' declaration, then the
+  right-hand expression is evaluated as an Optional value, and control flow
+  proceeds by considering the binding to be true if the Optional contains a
+  value, or false if it is empty, and the variables are available in the true
+  branch. This allows for elegant testing of dynamic types, methods, nullable
+  pointers, and other Optional things:
+
+    class B : NSObject {}
+    class D : B {
+      func foo() { println("we have a D") }
+    }
+    var b: B = D()
+    if let d = b as D {
+      d.foo()
+    }
+    var id: AnyObject = D()
+    if let foo = id.foo {
+      foo()
+    }
+
+
 2014-01-29
 ----------
 
