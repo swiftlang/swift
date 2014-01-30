@@ -184,7 +184,11 @@ if [ ! -e "$WORKSPACE" ]; then
 fi
 
 # Swift-project products, in the order they must be built
-SWIFT_BUILD_PRODUCTS=(swift SourceKit)
+SWIFT_BUILD_PRODUCTS=(swift)
+
+if [[ ! "$SKIP_BUILD_SOURCEKIT" ]]; then
+    SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" SourceKit)
+fi
 
 LLVM_TARGETS_TO_BUILD="X86;ARM"
 
