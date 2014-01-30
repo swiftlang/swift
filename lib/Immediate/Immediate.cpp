@@ -343,7 +343,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::EngineBuilder builder(&Module);
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
-  TargetOpt.NoFramePointerElim = true;
+  TargetOpt.NoFramePointerElim = Options.DisableFPElim;
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
@@ -1064,7 +1064,7 @@ public:
     llvm::EngineBuilder builder(&Module);
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
-    TargetOpt.NoFramePointerElim = true;
+    TargetOpt.NoFramePointerElim = Options.DisableFPElim;
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
     builder.setErrorStr(&ErrorMsg);

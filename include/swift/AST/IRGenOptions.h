@@ -85,11 +85,14 @@ public:
   /// \brief Whether we should omit dynamic safety checks from the emitted IR.
   unsigned DisableAllRuntimeChecks : 1;
 
+  // Disable frame pointer elimination?
+  unsigned DisableFPElim : 1;
+
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    OptLevel(0), DebugInfo(false), LegacyDebugInfo(false),
                    UseJIT(false), EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
-                   DisableAllRuntimeChecks(false) {}
+                   DisableAllRuntimeChecks(false), DisableFPElim(true) {}
 };
 
 } // end namespace swift

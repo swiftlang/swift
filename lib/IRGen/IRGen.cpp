@@ -115,7 +115,7 @@ static void performIRGeneration(IRGenOptions &Opts, llvm::Module *Module,
   //   - relocation model
   //   - code model
   TargetOptions TargetOpts;
-  TargetOpts.NoFramePointerElim = true;
+  TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
   
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
