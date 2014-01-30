@@ -86,7 +86,7 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   }
 
   // Search the runtime import path.
-  inputFilename = ctx.SearchPathOpts.RuntimeImportPath;
+  inputFilename = ctx.SearchPathOpts.RuntimeLibraryImportPath;
   llvm::sys::path::append(inputFilename, moduleFilename.str());
   err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
   if (!err) {

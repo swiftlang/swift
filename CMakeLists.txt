@@ -296,7 +296,11 @@ function(compile_swift_files)
   endif()
 
   # Allow import of other Swift modules we just built.
-  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}")
+  set(arch_subdir "")
+  if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
+    set(arch_subdir "/32")
+  endif()
+  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir}")
 
   # Turn on debug symbols in debug builds.
   if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -339,16 +343,20 @@ function(compile_swift_files)
     set(module_source_file)
     set(postprocessing)
   else()
+    # FIXME: We can control the module output path now.
     get_filename_component(module_source_name ${objfile} NAME_WE)
-    set(module_source_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR})
+
+    set(module_source_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
     set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
     set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
     list(APPEND swift_flags -emit-module)
-    set(postprocessing COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
+    set(postprocessing
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
+      COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
 
     install(FILES ${module_source_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR})
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR}${arch_subdir})
   endif()
 
   set(stdlib_dep)
@@ -741,7 +749,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
   # Add OS name to stdlib install directory
   set(SWIFTLIB_SUBDIR "swift/${SWIFT_DEPLOYMENT_OS}")
-
 endif()
 
 # We'll need this once we have generated headers

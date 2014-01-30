@@ -31,10 +31,13 @@ public:
   std::vector<std::string> FrameworkSearchPaths;
 
   /// Path to search for compiler-relative header files.
-  std::string RuntimeIncludePath;
+  std::string RuntimeResourcePath;
 
-  /// Path to search for compiler-relative stdlib modules and dylibs.
-  std::string RuntimeImportPath;
+  /// Path to search for compiler-relative stdlib dylibs.
+  std::string RuntimeLibraryPath;
+
+  /// Path to search for compiler-relative stdlib modules.
+  std::string RuntimeLibraryImportPath;
 };
 
 }

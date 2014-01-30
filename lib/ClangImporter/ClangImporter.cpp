@@ -144,7 +144,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   const std::string &overrideResourceDir = clangImporterOpts.OverrideResourceDir;
 
   if (overrideResourceDir.empty()) {
-    llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeIncludePath);
+    llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeResourcePath);
   
     // Adjust the path torefer to our copy of the Clang headers under
     // lib/swift/clang.

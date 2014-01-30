@@ -64,7 +64,7 @@ class CompilerInvocation {
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
 
-  void updateRuntimeImportPath();
+  void updateRuntimeLibraryPath();
 
 public:
   CompilerInvocation();
@@ -127,7 +127,7 @@ public:
 
   void setMainExecutablePath(StringRef Path);
 
-  void setRuntimeIncludePath(StringRef Path);
+  void setRuntimeResourcePath(StringRef Path);
 
   void setSDKPath(const std::string &Path) {
     SearchPathOpts.SDKPath = Path;

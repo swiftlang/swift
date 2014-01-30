@@ -344,7 +344,7 @@ function set_ios_options {
         -DMODULES_SDK="${sdkroot}"
         -DCMAKE_C_FLAGS="-isysroot${sdkroot}"
         -DCMAKE_CXX_FLAGS="-isysroot${sdkroot}"
-        -DSWIFT_DEPLOYMENT_OS=${platform}${internal_suffix}
+        -DSWIFT_DEPLOYMENT_OS=${platform}
         -DSWIFT_DEPLOYMENT_TARGET=${deployment_target}
         -DSWIFT_BUILD_TOOLS=OFF
         -DSWIFT_COMPILER="${SWIFT_BUILD_DIR}/bin/swift"

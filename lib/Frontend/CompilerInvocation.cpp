@@ -36,27 +36,29 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
   llvm::sys::path::remove_filename(LibPath); // Remove /swift
   llvm::sys::path::remove_filename(LibPath); // Remove /bin
   llvm::sys::path::append(LibPath, "lib", "swift");
-  setRuntimeIncludePath(LibPath.str());
+  setRuntimeResourcePath(LibPath.str());
 }
 
-void CompilerInvocation::setRuntimeIncludePath(StringRef Path) {
-  llvm::SmallString<128> LibPath(Path);
-  SearchPathOpts.RuntimeIncludePath = LibPath.str();
-  updateRuntimeImportPath();
+void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
+  SearchPathOpts.RuntimeResourcePath = Path;
+  updateRuntimeLibraryPath();
 }
 
-void CompilerInvocation::updateRuntimeImportPath() {
-  llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeIncludePath);
+void CompilerInvocation::updateRuntimeLibraryPath() {
+  llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   llvm::Triple Triple(IRGenOpts.Triple);
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+  SearchPathOpts.RuntimeLibraryPath = LibPath.str();
 
-  SearchPathOpts.RuntimeImportPath = LibPath.str();
+  if (Triple.isArch32Bit())
+    llvm::sys::path::append(LibPath, "32");
+  SearchPathOpts.RuntimeLibraryImportPath = LibPath.str();
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
   IRGenOpts.Triple = Triple.str();
-  updateRuntimeImportPath();
+  updateRuntimeLibraryPath();
 }
 
 static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
@@ -696,9 +698,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                      getSDKPath())) {
     return true;
   }
-
-  // Target options may have changed this path.
-  updateRuntimeImportPath();
 
   if (ParseDiagnosticArgs(DiagnosticOpts, *ParsedArgs, Diags)) {
     return true;
