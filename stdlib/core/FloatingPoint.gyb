@@ -420,13 +420,6 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 func ${op}= (lhs: @@inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 @ end
 
-@@asmname="sin${cFuncSuffix(bits)}"   func  sin(x: ${Self}) -> ${Self}
-@@asmname="cos${cFuncSuffix(bits)}"   func  cos(x: ${Self}) -> ${Self}
-@@asmname="tan${cFuncSuffix(bits)}"   func  tan(x: ${Self}) -> ${Self}
-@@asmname="atan${cFuncSuffix(bits)}"  func atan(x: ${Self}) -> ${Self}
-@@asmname="atan2${cFuncSuffix(bits)}" func atan(y: ${Self}, x: ${Self}) -> ${Self}
-@@asmname="sqrt${cFuncSuffix(bits)}"  func sqrt(x: ${Self}) -> ${Self}
-
 @ end # for bits in allFloatBits
 
 // Construction of integers from floating point numbers.
