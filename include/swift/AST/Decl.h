@@ -188,8 +188,11 @@ class alignas(8) Decl {
     /// \brief Whether this function was declared with a selector-style
     /// signature.
     unsigned HasSelectorStyleSignature : 1;
+
+    /// Number of curried parameter patterns (tuples).
+    unsigned NumParamPatterns : 7;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 3 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -202,10 +205,8 @@ class alignas(8) Decl {
     unsigned Mutating : 1;
     /// Whether this function has a \c DynamicSelf return type.
     unsigned HasDynamicSelf : 1;
-    /// Number of parameter patterns (tuples).
-    unsigned NumParamPatterns : 15;
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 3 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -2706,7 +2707,7 @@ protected:
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
                        SourceLoc NameLoc,
-                       VarDecl *ImplicitSelfDecl,
+                       VarDecl *ImplicitSelfDecl, unsigned NumParamPatterns,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
@@ -2717,6 +2718,10 @@ protected:
       ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, false);
     setBodyKind(BodyKind::None);
     AbstractFunctionDeclBits.HasSelectorStyleSignature = false;
+    AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
+
+    // Verify no bitfield truncation.
+    assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
   }
 
   VarDecl *getImplicitSelfDeclSlow() const;
@@ -2798,6 +2803,11 @@ public:
   /// \returns the default argument kind and, if there is a default argument,
   /// the type of the corresponding parameter.
   std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
+
+
+  unsigned getNumParamPatterns() const {
+    return AbstractFunctionDeclBits.NumParamPatterns;
+  }
 
   /// \brief Returns the argument pattern(s) for the function definition
   /// that determine the function type.
@@ -2943,25 +2953,18 @@ private:
   FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc, nullptr,
-                           GenericParams),
+    : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
+                           /*impself*/nullptr, NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
-    assert(NumParamPatterns > 0);
-    FuncDeclBits.NumParamPatterns = NumParamPatterns;
-    // Verify no bitfield truncation.
-    assert(FuncDeclBits.NumParamPatterns == NumParamPatterns);
+    assert(NumParamPatterns > 0 && "Must have at least an empty tuple arg");
     setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
   }
 
   VarDecl *getImplicitSelfDeclImpl() const;
-
-  unsigned getNumParamPatternsImpl() const {
-    return FuncDeclBits.NumParamPatterns;
-  }
 
 public:
   /// Factory function only for use by deserialization.
@@ -3018,7 +3021,7 @@ public:
   ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
   /// \endcode
   unsigned getNaturalArgumentCount() const {
-    return getNumParamPatternsImpl();
+    return getNumParamPatterns();
   }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -3280,9 +3283,8 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
-  Pattern *ArgParams;
-  Pattern *BodyParams;
-  
+  Pattern *ArgParams, *BodyParams;
+
   /// The type of the initializing constructor.
   Type InitializerType;
 
@@ -3299,7 +3301,7 @@ public:
                   VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ConstructorLoc, ImplicitSelfDecl, GenericParams),
+                           ConstructorLoc, ImplicitSelfDecl, 1, GenericParams),
       ArgParams(ArgParams), BodyParams(BodyParams) {
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
     ConstructorDeclBits.ComputedBodyInitKind = 0;
@@ -3400,12 +3402,11 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
-
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                  VarDecl *ImplicitSelfDecl, DeclContext *Parent)
+                 VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           DestructorLoc, ImplicitSelfDecl, nullptr) {
+                           DestructorLoc, ImplicitSelfDecl, 0, nullptr) {
     assert(ImplicitSelfDecl && "destructors should have a non-null self");
   }
 
@@ -3626,45 +3627,45 @@ inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
+  unsigned NumPatterns = AbstractFunctionDeclBits.NumParamPatterns;
+  Pattern **Ptr;
   switch (getKind()) {
+  default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->ArgParams,
-                                      1);
+    Ptr = &cast<ConstructorDecl>(this)->ArgParams;
+    break;
 
   case DeclKind::Destructor:
-    return {};
+    Ptr = nullptr;
+    break;
 
-  case DeclKind::Func: {
-    auto *FD = cast<FuncDecl>(this);
-    return MutableArrayRef<Pattern *>(reinterpret_cast<Pattern **>(FD + 1),
-                                      FD->getNumParamPatternsImpl());
+  case DeclKind::Func:
+    // Argument patterns are tail allocated.
+    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1);
+    break;
   }
-
-  default:
-    llvm_unreachable("unhandled derived decl kind");
-  }
+  return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
+  unsigned NumPatterns = AbstractFunctionDeclBits.NumParamPatterns;
+  Pattern **Ptr;
   switch (getKind()) {
+  default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    return MutableArrayRef<Pattern *>(&cast<ConstructorDecl>(this)->BodyParams,
-                                      1);
+    Ptr = &cast<ConstructorDecl>(this)->BodyParams;
+    break;
 
   case DeclKind::Destructor:
-    return {};
+    Ptr = nullptr;
+    break;
 
-  case DeclKind::Func: {
-    auto *FD = cast<FuncDecl>(this);
-    unsigned NumParamPatterns = FD->getNumParamPatternsImpl();
-    return MutableArrayRef<Pattern *>(
-        reinterpret_cast<Pattern **>(FD + 1) + NumParamPatterns,
-        NumParamPatterns);
+  case DeclKind::Func:
+    // Argument patterns are tail allocated.
+    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1) + NumPatterns;
+    break;
   }
-
-  default:
-    llvm_unreachable("unhandled derived decl kind");
-  }
+  return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
 }
 
 inline bool GenericParamList::hasSelfArchetype() const {
