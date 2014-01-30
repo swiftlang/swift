@@ -508,6 +508,11 @@ namespace {
       IGF.unimplemented(SourceLoc(), "metadata ref for module type");
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
+
+    llvm::Value *visitDynamicSelfType(CanDynamicSelfType type) {
+      IGF.unimplemented(SourceLoc(), "metadata ref for DynamicSelf type");
+      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+    }
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
       SmallVector<ProtocolDecl*, 2> protocols;

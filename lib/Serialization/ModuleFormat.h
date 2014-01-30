@@ -392,6 +392,11 @@ namespace decls_block {
     // Trailed by the nested types record.
   >;
 
+  using DynamicSelfTypeLayout = BCRecordLayout<
+    DYNAMIC_SELF_TYPE,
+    TypeIDField          // self type
+  >;
+
   using ArchetypeNestedTypeNamesLayout = BCRecordLayout<
     ARCHETYPE_NESTED_TYPE_NAMES,
     BCArray<IdentifierIDField>
@@ -621,6 +626,7 @@ namespace decls_block {
     BCFixed<1>,   // IBAction?
     BCFixed<1>,   // transparent?
     BCFixed<1>,   // mutating?
+    BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // optional?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)

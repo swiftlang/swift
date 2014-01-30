@@ -49,6 +49,7 @@ namespace swift {
   class ASTWalker;
   class DestructorDecl;
   class DiagnosticEngine;
+  class DynamicSelfType;
   class Type;
   class Expr;
   class LazyMemberLoader;
@@ -192,12 +193,13 @@ class alignas(8) Decl {
     friend class FuncDecl;
     unsigned : NumAbstractFunctionDeclBits;
 
-    /// \brief Whether this function is a 'static' method.
+    /// Whether this function is a 'static' method.
     unsigned Static : 1;
-    /// \brief Whether this function is a 'mutating' method.
+    /// Whether this function is a 'mutating' method.
     unsigned Mutating : 1;
-
-    /// \brief Number of parameter patterns (tuples).
+    /// Whether this function has a \c DynamicSelf return type.
+    unsigned HasDynamicSelf : 1;
+    /// Number of parameter patterns (tuples).
     unsigned NumParamPatterns : 15;
   };
   enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 17 };
@@ -2945,6 +2947,7 @@ private:
     assert(FuncDeclBits.NumParamPatterns == NumParamPatterns);
     setType(Ty);
     FuncDeclBits.Mutating = false;
+    FuncDeclBits.HasDynamicSelf = false;
   }
 
   VarDecl *getImplicitSelfDeclImpl() const;
@@ -3100,13 +3103,18 @@ public:
   }
   bool isAccessor() const { return getAccessorKind() != NotAccessor; }
 
-  /// Creates the implicit 'DynamicSelf' generic parameter.
-  ///
-  /// This utility function
-  GenericTypeParamType *makeDynamicSelf();
+  /// Determine whether this function has a \c DynamicSelf return
+  /// type.
+  bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
 
-  /// Retrieve the generic parameter DynamicSelf, if there is one.
-  GenericTypeParamType *getDynamicSelf() const;
+  /// Set whether this function has a dynamic self or not.
+  void setDynamicSelf(bool hasDynamicSelf) { 
+    FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
+  }
+  
+  /// Retrieve the \c DynamicSelf type for this method, or a null type if
+  /// this method does not have a \c DynamicSelf return type.
+  DynamicSelfType *getDynamicSelf() const;
 
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).

@@ -189,6 +189,7 @@ namespace {
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
     IMPL(Metatype, Trivial)
+    IMPL(DynamicSelf, Reference)
     IMPL(AnyFunction, Reference)
     IMPL(SILFunction, Reference)
     IMPL(Array, AddressOnly) // who knows?

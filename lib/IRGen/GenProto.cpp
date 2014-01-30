@@ -3371,6 +3371,7 @@ namespace {
     void visitBuiltinType(CanBuiltinType type) {}
     void visitMetatypeType(CanMetatypeType type) {}
     void visitModuleType(CanModuleType type) {}
+    void visitDynamicSelfType(CanDynamicSelfType type) {}
     void visitProtocolCompositionType(CanProtocolCompositionType type) {}
     void visitReferenceStorageType(CanReferenceStorageType type) {}
 

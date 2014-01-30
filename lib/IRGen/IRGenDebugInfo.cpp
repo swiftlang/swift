@@ -1405,6 +1405,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::GenericTypeParam:
   case TypeKind::LValue:
   case TypeKind::Module:
+  case TypeKind::DynamicSelf:
   case TypeKind::TypeVariable:
    DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
          llvm::errs() << "\n");

@@ -1557,67 +1557,11 @@ bool FuncDecl::isBinaryOperator() const {
     || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
 }
 
-GenericTypeParamType *FuncDecl::makeDynamicSelf() {
-  auto extType = getExtensionType();
-  if (extType->is<ErrorType>())
+DynamicSelfType *FuncDecl::getDynamicSelf() const {
+  if (!hasDynamicSelf())
     return nullptr;
 
-  GenericParamList *existingParams = getGenericParams();
-  unsigned index = existingParams? existingParams->size() : 0;
-
-  // Create the 'DynamicSelf' parameter.
-  SourceLoc loc;
-  auto &ctx = getASTContext();
-  auto dynamicSelfDecl = new (ctx) GenericTypeParamDecl(this,
-                                                        ctx.Id_DynamicSelf,
-                                                        loc,
-                                                        0, index);
-  dynamicSelfDecl->setImplicit();
-
-  // 'DynamicSelf' is bounded by the enclosing nominal type.
-  auto nominal = extType->getAnyNominal();
-  auto nominalRef = new (ctx) SimpleIdentTypeRepr(
-                                getBodyResultTypeLoc().getSourceRange().Start,
-                                                  nominal->getName());
-  TypeLoc nominalInherited[1] = { TypeLoc(nominalRef) };
-  dynamicSelfDecl->setInherited(ctx.AllocateCopy(nominalInherited));
-
-  if (existingParams) {
-    // Append to the existing parameter list.
-    SmallVector<GenericParam, 4> allGenericParams;
-    allGenericParams.append(existingParams->begin(), existingParams->end());
-    allGenericParams.push_back(dynamicSelfDecl);
-    GenericParams = GenericParamList::create(ctx,
-                                             existingParams->getLAngleLoc(),
-                                             allGenericParams,
-                                             existingParams->getWhereLoc(),
-                                             existingParams->getRequirements(),
-                                             existingParams->getRAngleLoc());
-  } else {
-    // Create the new generic parameter list.
-    GenericParams = GenericParamList::create(ctx, loc,
-                                             GenericParam(dynamicSelfDecl),
-                                             loc);
-  }
-
-  return dynamicSelfDecl->getDeclaredType()->castTo<GenericTypeParamType>();
-}
-
-GenericTypeParamType *FuncDecl::getDynamicSelf() const {
-  auto genericParams = getGenericParams();
-  if (!genericParams)
-    return nullptr;
-
-  auto lastParamDecl = genericParams->getParams().back().getAsTypeParam();
-  if (!lastParamDecl)
-    return nullptr;
-
-  auto &ctx = getASTContext();
-  if (!lastParamDecl->isImplicit() ||
-      lastParamDecl->getName() != ctx.Id_DynamicSelf)
-    return nullptr;
-
-  return lastParamDecl->getDeclaredType()->castTo<GenericTypeParamType>();
+  return DynamicSelfType::get(getExtensionType(), getASTContext());
 }
 
 StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {

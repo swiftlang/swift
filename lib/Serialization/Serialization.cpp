@@ -1329,6 +1329,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->getAttrs().isIBAction(),
                            fn->isTransparent(),
                            fn->isMutating(),
+                           fn->hasDynamicSelf(),
                            fn->getAttrs().isOptional(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),
@@ -1595,6 +1596,14 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Module:
     llvm_unreachable("modules are currently not first-class values");
+
+  case TypeKind::DynamicSelf: {
+    auto dynamicSelfTy = cast<DynamicSelfType>(ty.getPointer());
+    unsigned abbrCode = DeclTypeAbbrCodes[DynamicSelfTypeLayout::Code];
+    DynamicSelfTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addTypeRef(dynamicSelfTy->getSelfType()));
+    break;
+  }
 
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());

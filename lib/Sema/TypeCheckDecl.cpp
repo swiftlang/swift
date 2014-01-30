@@ -2176,9 +2176,10 @@ public:
       return true;
     }
 
-    // Create the generic parameter for DynamicSelf. The result type is this
-    // generic parameter type.
-    auto dynamicSelfType = func->makeDynamicSelf();
+    // Note that the function has a DynamicSelf return type, and set
+    // the return type component to the dynamic self type.
+    func->setDynamicSelf(true);
+    auto dynamicSelfType = func->getDynamicSelf();
     simpleRepr->setValue(dynamicSelfType);
     return false;
   }
@@ -2214,6 +2215,14 @@ public:
       auto name = archetype->getName();
       assert(!name.empty() && "Empty archetype name in 'self'");
       auto result = new (TC.Context) SimpleIdentTypeRepr(loc, name);
+      result->setValue(type);
+      return result;
+    }
+    
+    // DynamicSelf
+    if (type->is<DynamicSelfType>()) {
+      auto result 
+        = new (TC.Context) SimpleIdentTypeRepr(loc, TC.Context.Id_DynamicSelf);
       result->setValue(type);
       return result;
     }
@@ -2398,10 +2407,23 @@ public:
     ClassDecl *superclassDecl =
       decl->getDeclContext()->getDeclaredTypeInContext()
         ->getClassOrBoundGenericClass();
-    while (subclass->getClassOrBoundGenericClass() != superclassDecl)
-      subclass = TC.getSuperClassOf(subclass);
-    return TC.substMemberTypeWithBase(decl->getModuleContext(),
-                                      decl->getInterfaceType(), decl, subclass);
+    auto superclass = subclass;
+    while (superclass->getClassOrBoundGenericClass() != superclassDecl)
+      superclass = TC.getSuperClassOf(superclass);
+    auto type = TC.substMemberTypeWithBase(decl->getModuleContext(),
+                                           decl->getInterfaceType(), decl, 
+                                           superclass);
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      if (func->hasDynamicSelf()) {
+        type = type.transform([subclass](Type type) -> Type {
+            if (type->is<DynamicSelfType>())
+              return subclass;
+            return type;
+        });
+      }
+    }
+
+    return type;
   }
 
   /// Record that the \c overriding declarations overrides the \c

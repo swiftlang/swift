@@ -104,6 +104,9 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
     return cast<ProtocolType>(type)->requiresClass();
   case TypeKind::ProtocolComposition:
     return cast<ProtocolCompositionType>(type)->requiresClass();
+
+  case TypeKind::DynamicSelf:
+    return cast<DynamicSelfType>(type)->getSelfType()->hasReferenceSemantics();
       
   case TypeKind::BuiltinObjCPointer:
   case TypeKind::BuiltinObjectPointer:
@@ -295,6 +298,7 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Module:
+  case TypeKind::DynamicSelf:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
   case TypeKind::SILFunction:
@@ -782,6 +786,12 @@ CanType TypeBase::getCanonicalType() {
       Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
     break;
   }
+  case TypeKind::DynamicSelf: {
+    DynamicSelfType *DST = cast<DynamicSelfType>(this);
+    Type SelfTy = DST->getSelfType()->getCanonicalType();
+    Result = DynamicSelfType::get(SelfTy, SelfTy->getASTContext());
+    break;
+  }
   case TypeKind::UnboundGeneric: {
     auto unbound = cast<UnboundGenericType>(this);
     Type parentTy = unbound->getParent()->getCanonicalType();
@@ -838,6 +848,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::DependentMember:
   case TypeKind::UnownedStorage:
   case TypeKind::WeakStorage:
+  case TypeKind::DynamicSelf:
     // None of these types have sugar at the outer level.
     return this;
 #define SUGARED_TYPE(ID, PARENT) \
@@ -973,6 +984,7 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
+  case TypeKind::DynamicSelf:
     return false;
 
   case TypeKind::BoundGenericClass:
@@ -1112,6 +1124,8 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     }
   } else if (auto substitutableTy = getAs<SubstitutableType>()) {
     return substitutableTy->getSuperclass();
+  } else if (auto dynamicSelfTy = getAs<DynamicSelfType>()) {
+    return dynamicSelfTy->getSelfType();
   } else {
     // No other types have superclasses.
     return nullptr;
@@ -2014,6 +2028,18 @@ case TypeKind::Id:
     return MetatypeType::get(instanceTy, Ptr->getASTContext());
   }
 
+  case TypeKind::DynamicSelf: {
+    auto dynamicSelf = cast<DynamicSelfType>(base);
+    auto selfTy = dynamicSelf->getSelfType().transform(fn);
+    if (!selfTy)
+      return Type();
+
+    if (selfTy.getPointer() == dynamicSelf->getSelfType().getPointer())
+      return *this;
+
+    return DynamicSelfType::get(selfTy, selfTy->getASTContext());
+  }
+
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(base);
     auto underlyingTy = alias->getDecl()->getUnderlyingType().transform(fn);
@@ -2121,15 +2147,6 @@ case TypeKind::Id:
     if (inputTy.getPointer() == function->getInput().getPointer() &&
         resultTy.getPointer() == function->getResult().getPointer())
       return *this;
-
-    // Function types always parenthesized input types, but some clients
-    // (e.g., the type-checker) occasionally perform transformations that
-    // don't abide this. Fix up the input type appropriately.
-    if (!inputTy->hasTypeVariable() &&
-        !isa<ParenType>(inputTy.getPointer()) &&
-        !isa<TupleType>(inputTy.getPointer())) {
-      inputTy = ParenType::get(Ptr->getASTContext(), inputTy);
-    }
 
     if (auto polyFn = dyn_cast<PolymorphicFunctionType>(function)) {
       return PolymorphicFunctionType::get(inputTy, resultTy,

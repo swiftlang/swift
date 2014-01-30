@@ -1460,6 +1460,49 @@ private:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
   
+/// The type given to \c DynamicSelf.
+///
+/// Example:
+/// \code
+/// class X {
+///   type func factory() -> DynamicSelf { ... }
+/// };
+/// \endcode
+///
+/// In this example, \c DynamicSelf is represented by a 
+/// \c DynamicSelfType node whose self type is \c X.
+class DynamicSelfType : public TypeBase {
+  Type SelfType;
+
+public:
+  /// \brief Return the DynamicSelf for the specified self type.
+  static DynamicSelfType *get(Type selfType, const ASTContext &ctx);
+
+  /// Retrieve the (static) self type for this dynamic self type.
+  Type getSelfType() const { return SelfType; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::DynamicSelf;
+  }
+  
+private:
+  DynamicSelfType(Type selfType, const ASTContext &ctx,
+                  RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::DynamicSelf, selfType->isCanonical()? &ctx : 0, 
+               properties),
+      SelfType(selfType) { }
+
+  friend class TypeDecl;
+};
+BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getSelfType)
+
+  static CanDynamicSelfType get(CanType selfType, const ASTContext &ctx) {
+    return CanDynamicSelfType(DynamicSelfType::get(selfType, ctx));
+  }
+END_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
+
 /// A high-level calling convention.
 enum class AbstractCC : unsigned char {
   /// The calling convention used for calling a normal function.
@@ -3088,11 +3131,10 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
 
-  auto archetype = getAs<ArchetypeType>();
-  if (!archetype)
-    return nullptr;
+  if (auto archetype = getAs<ArchetypeType>())
+    return (bool)archetype->requiresClass();
 
-  return (bool)archetype->requiresClass();
+  return is<DynamicSelfType>();
 }
 
 inline TupleTypeElt::TupleTypeElt(Type ty,

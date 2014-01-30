@@ -1376,6 +1376,10 @@ public:
     Printer << ">";
   }
 
+  void visitDynamicSelfType(DynamicSelfType *T) {
+    Printer << "DynamicSelf";
+  }
+
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {
     if (info.isAutoClosure())
       Printer << "@auto_closure ";

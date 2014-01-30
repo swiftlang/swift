@@ -698,7 +698,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Tuple: {
       // Try the tuple-to-tuple conversion.
       potentialConversions.push_back(ConversionRestrictionKind::TupleToTuple);
-
       break;
     }
 
@@ -713,6 +712,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
     }
 
+    case TypeKind::DynamicSelf:
+      // FIXME: Deep equality? What is the rule between two DynamicSelfs?
+      break;
+       
     case TypeKind::Protocol:
       // Nothing to do here; try existential and user-defined conversions below.
       break;
@@ -1083,6 +1086,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::BoundGenericEnum:
   case TypeKind::BoundGenericStruct:
   case TypeKind::Archetype:
+  case TypeKind::DynamicSelf:
     // Break out to handle the actual construction below.
     break;
 

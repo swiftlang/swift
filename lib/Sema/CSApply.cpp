@@ -455,6 +455,20 @@ namespace {
         refTy = tc.getUnopenedTypeOfReference(member, Type(), dc);
       }
 
+      // If this is a method whose result type is DynamicSelf, replace
+      // DynamicSelf with the actual object type.
+      if (auto func = dyn_cast<FuncDecl>(member)) {
+        if (func->hasDynamicSelf()) {
+          refTy = refTy.transform([&](Type type) {
+              if (type->is<DynamicSelfType>())
+                return baseTy;
+              return type;
+            });
+
+          containerTy = baseTy;
+        }
+      }
+        
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {

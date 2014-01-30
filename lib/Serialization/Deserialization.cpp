@@ -1536,7 +1536,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool hasSelectorStyleSignature;
     bool isClassMethod;
     bool isAssignmentOrConversion;
-    bool isObjC, isIBAction, isTransparent, isMutating, isOptional;
+    bool isObjC, isIBAction, isTransparent, isMutating, hasDynamicSelf;
+    bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1547,7 +1548,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         hasSelectorStyleSignature,
                                         isClassMethod, isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
-                                        isMutating, isOptional,
+                                        isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID);
@@ -1618,6 +1619,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);
+    fn->setDynamicSelf(hasDynamicSelf);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
@@ -2278,6 +2280,13 @@ Type ModuleFile::getType(TypeID TID) {
       typeOrOffset = MetatypeType::get(getType(instanceID), isThin, ctx);
     else
       typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
+    break;
+  }
+
+  case decls_block::DYNAMIC_SELF_TYPE: {
+    TypeID selfID;
+    decls_block::DynamicSelfTypeLayout::readRecord(scratch, selfID);
+    typeOrOffset = DynamicSelfType::get(getType(selfID), ctx);
     break;
   }
 

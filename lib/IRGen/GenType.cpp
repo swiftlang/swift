@@ -958,6 +958,12 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertMetatypeType(cast<MetatypeType>(ty));
   case TypeKind::Module:
     return convertModuleType(cast<ModuleType>(ty));
+  case TypeKind::DynamicSelf: {
+    // DynamicSelf has the same representation as its superclass type.
+    auto dynamicSelf = cast<DynamicSelfType>(ty);
+    auto nominal = dynamicSelf->getSelfType()->getAnyNominal();
+    return convertAnyNominalType(ty, nominal);
+  }
   case TypeKind::BuiltinObjectPointer:
     return convertBuiltinObjectPointer();
   case TypeKind::BuiltinObjCPointer:

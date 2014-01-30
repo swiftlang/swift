@@ -918,6 +918,18 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     }
   }
 
+  // If this is a method whose result type is DynamicSelf, replace
+  // DynamicSelf with the actual object type.
+  if (auto func = dyn_cast<FuncDecl>(value)) {
+    if (func->hasDynamicSelf()) {
+      openedType = openedType.transform([&](Type type) {
+          if (type->is<DynamicSelfType>())
+            return baseObjTy;
+          return type;
+        });
+    }
+  }
+
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();
   Type selfObjTy = openedFnType->getInput()->getRValueInstanceType();

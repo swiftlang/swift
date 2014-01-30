@@ -170,6 +170,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
+  llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
   
   /// \brief The permanent arena.
   Arena Permanent;
@@ -1366,6 +1367,22 @@ ModuleType *ModuleType::get(Module *M) {
   if (Entry) return Entry;
   
   return Entry = new (C, AllocationArena::Permanent) ModuleType(M, C);
+}
+
+DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
+  assert(!selfType->hasTypeVariable() && "Type variable in DynamicSelfType");
+  
+  auto known = ctx.Impl.DynamicSelfTypes.find(selfType);
+  if (known != ctx.Impl.DynamicSelfTypes.end())
+    return known->second;
+
+  auto properties = selfType->getRecursiveProperties()
+                    - RecursiveTypeProperties::IsNotMaterializable;
+  auto arena = getArena(properties);  
+
+  auto result = new (ctx, arena) DynamicSelfType(selfType, ctx, properties);
+  ctx.Impl.DynamicSelfTypes.insert({selfType, result});
+  return result;
 }
 
 /// FunctionType::get - Return a uniqued function type with the specified

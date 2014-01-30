@@ -379,6 +379,7 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   bool visitBuiltinType(CanBuiltinType type) { return false; }
   bool visitMetatypeType(CanMetatypeType type) { return false; }
   bool visitModuleType(CanModuleType type) { return false; }
+  bool visitDynamicSelfType(CanDynamicSelfType type) { return false; }
   bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }
   bool visitSILFunctionType(CanSILFunctionType type) { return false; }
 

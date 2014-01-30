@@ -62,6 +62,7 @@ public:
     case TypeKind::BuiltinVector:
     case TypeKind::Class: // FIXME: not a leaf because of the parent type
     case TypeKind::Module:
+    case TypeKind::DynamicSelf:
     case TypeKind::Enum: // FIXME: not a leaf because of the parent type
     case TypeKind::Protocol:
     case TypeKind::ProtocolComposition:
