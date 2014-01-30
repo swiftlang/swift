@@ -259,7 +259,8 @@ void CompilerInstance::performParse() {
       parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                           TheSILModule ? &SILContext : nullptr,
                           &PersistentState, DelayedCB.get());
-      if (!Invocation.getParseOnly())
+      if (!Invocation.getParseOnly() && (PrimaryBufferID == NO_SUCH_BUFFER ||
+                                         MainBufferID == PrimaryBufferID))
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             CurTUElem);
       CurTUElem = MainFile.Decls.size();
@@ -271,7 +272,10 @@ void CompilerInstance::performParse() {
     auto InputSourceFiles = MainModule->getFiles().slice(0, BufferIDs.size());
     for (auto File : InputSourceFiles)
       if (auto SF = dyn_cast<SourceFile>(File))
-        performTypeChecking(*SF, PersistentState.getTopLevelContext());
+        if (PrimaryBufferID == NO_SUCH_BUFFER ||
+            (SF->getBufferID().hasValue() &&
+             SF->getBufferID().getValue() == PrimaryBufferID))
+            performTypeChecking(*SF, PersistentState.getTopLevelContext());
 
     // If there were no source files, we should still record known protocols.
     if (Context->getStdlibModule())
