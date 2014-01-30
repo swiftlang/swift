@@ -29,7 +29,7 @@ STATISTIC(NumEntryCycleBB, "Number of alloc_box's promotion disrupted due to "
 
 /// \brief Checks if the single entry single exit region starting at \p Entry
 /// and ending at \p Exit has cycles. This function returns True if there is
-/// a path between \p  Entry to itself without goint through \p Exit.
+/// a path between \p  Entry to itself without going through \p Exit.
 static bool regionHasCycles(SILBasicBlock *Entry, SILBasicBlock *Exit) {
   llvm::SmallVector<SILBasicBlock *, 16> Worklist;
   llvm::SmallPtrSet<SILBasicBlock *, 16> VisitedBBSet;
@@ -120,10 +120,10 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   }
 
   // Okay, we found the most-post-dominating release. We are currently checking
-  /// for domination/post-domination but not control equivalence, a necessary
-  /// condition for a single entry/single-exit region. This check ensures
-  /// that we do not run into the issue by making sure that the allocbox is not
-  /// reachable from itself.
+  // for domination/post-domination but not control equivalence, a necessary
+  // condition for a single entry/single-exit region. This check ensures
+  // that we do not run into the issue by making sure that the allocbox is not
+  // reachable from itself.
   if (regionHasCycles(ABI->getParent(), LastRelease->getParent()))
     return nullptr;
 
