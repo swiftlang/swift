@@ -58,6 +58,20 @@ static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
   }
 }
 
+/// Create a typedpattern(namedpattern(decl))
+static Pattern *createTypedNamedPattern(VarDecl *decl) {
+  ASTContext &Ctx = decl->getASTContext();
+  Type ty = decl->getType();
+  Pattern *P = new (Ctx) NamedPattern(decl);
+  P->setType(ty);
+  P->setImplicit();
+  P = new (Ctx) TypedPattern(P, TypeLoc::withoutLoc(ty));
+  P->setType(ty);
+  P->setImplicit();
+  return P;
+}
+
+
 /// \brief Map a well-known C type to a swift type from the standard library.
 ///
 /// \param IsError set to true when we know the corresponding swift type name,
@@ -304,24 +318,13 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   auto metaTy = MetatypeType::get(optionSetType, C);
   selfDecl->setType(metaTy);
 
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(metaTy);
-  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
-  selfParam->setImplicit();
-  selfParam->setType(metaTy);
-
-  VarDecl * rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      SourceLoc(),
-                                      C.getIdentifier("raw"),
-                                      Type(),
-                                      optionSetDecl);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
+                                     SourceLoc(), C.getIdentifier("raw"),
+                                     Type(), optionSetDecl);
   rawDecl->setImplicit();
   rawDecl->setType(rawType);
-  Pattern *rawParam = new (C) NamedPattern(rawDecl, /*implicit*/ true);
-  rawParam->setType(rawType);
-  rawParam = new (C) TypedPattern(rawParam, TypeLoc::withoutLoc(rawType));
-  rawParam->setImplicit();
-  rawParam->setType(rawType);
+  Pattern *rawParam = createTypedNamedPattern(rawDecl);
   auto rawArgType = TupleType::get(TupleTypeElt(rawType,
                                                 C.getIdentifier("raw")), C);
   rawParam = TuplePattern::create(C, SourceLoc(),
@@ -413,11 +416,8 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
                                       optionSetDecl);
   selfDecl->setImplicit();
   selfDecl->setType(optionSetType);
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(optionSetType);
-  selfParam = new (C) TypedPattern(selfParam,
-                                   TypeLoc::withoutLoc(optionSetType));
-  selfParam->setType(optionSetType);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
@@ -509,11 +509,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
                                       optionSetDecl);
   selfDecl->setImplicit();
   selfDecl->setType(optionSetType);
-  Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(optionSetType);
-  selfParam = new (C) TypedPattern(selfParam,
-                                   TypeLoc::withoutLoc(optionSetType));
-  selfParam->setType(optionSetType);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
@@ -618,6 +614,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   
   return ctorDecl;
 }
+
 
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
@@ -757,11 +754,7 @@ namespace {
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
           params.push_back(param);
-          Pattern *pattern = new (context) NamedPattern(param);
-          pattern->setType(var->getType());
-          auto tyLoc = TypeLoc::withoutLoc(var->getType());
-          pattern = new (context) TypedPattern(pattern, tyLoc);
-          pattern->setType(var->getType());
+          Pattern *pattern = createTypedNamedPattern(param);
           paramPatterns.push_back(pattern);
           patternElts.push_back(TuplePatternElt(pattern));
           tupleElts.push_back(TupleTypeElt(var->getType(), var->getName()));
@@ -976,14 +969,8 @@ namespace {
                                                    structDecl);
 
         // Create a pattern binding to describe the variable.
-        Pattern * varPattern = new (Impl.SwiftContext) NamedPattern(var);
-        varPattern->setType(var->getType());
-        varPattern
-          = new (Impl.SwiftContext) TypedPattern(
-                                      varPattern,
-                                      TypeLoc::withoutLoc(var->getType()));
-        varPattern->setType(var->getType());
-        
+        Pattern *varPattern = createTypedNamedPattern(var);
+
         auto patternBinding
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
                                                        SourceLoc(),
@@ -1057,14 +1044,8 @@ namespace {
                                                    structDecl);
 
         // Create a pattern binding to describe the variable.
-        Pattern * varPattern = new (Impl.SwiftContext) NamedPattern(var);
-        varPattern->setType(var->getType());
-        varPattern
-          = new (Impl.SwiftContext) TypedPattern(
-                                      varPattern,
-                                      TypeLoc::withoutLoc(var->getType()));
-        varPattern->setType(var->getType());
-        
+        Pattern *varPattern = createTypedNamedPattern(var);
+
         auto patternBinding
           = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
                                                        SourceLoc(),
@@ -1589,12 +1570,7 @@ namespace {
                                                      /*IsLet*/ true,
                                                      SourceLoc(), selfName,
                                                      selfTy, dc);
-      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfVar);
-      selfPat->setType(selfVar->getType());
-      selfPat
-        = new (Impl.SwiftContext) TypedPattern(selfPat,
-                                               TypeLoc::withoutLoc(selfTy));
-      selfPat->setType(selfVar->getType());
+      Pattern *selfPat = createTypedNamedPattern(selfVar);
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
       bool hasSelectorStyleSignature;
@@ -1876,13 +1852,7 @@ namespace {
                                                          SourceLoc(), selfName,
                                                          selfMetaTy,
                                                          Impl.firstClangModule);
-      Pattern *selfPat = new (Impl.SwiftContext) NamedPattern(selfMetaVar);
-      selfPat->setType(selfMetaTy);
-      selfPat
-        = new (Impl.SwiftContext) TypedPattern(selfPat,
-                                               TypeLoc::withoutLoc(selfMetaTy));
-      selfPat->setType(selfMetaTy);
-
+      Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
       argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
       bool hasSelectorStyleSignature;
