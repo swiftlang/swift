@@ -35,9 +35,9 @@ static const int SinkSearchWindow = 6;
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-void promoteMemoryOperationsInBlock(SILBasicBlock*BB) {
+void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
   StoreInst  *PrevStore = 0;
-  llvm::SmallVector<LoadInst*, 8> Loads;
+  llvm::SmallVector<LoadInst *, 8> Loads;
 
   auto II = BB->begin(), E = BB->end();
   while (II != E) {
@@ -156,7 +156,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
   return nullptr;
 }
 
-static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
+static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
   if (BB->pred_empty())
     return;
 
@@ -181,7 +181,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
     DEBUG(llvm::dbgs() << "Processing: " << *InstToSink);
 
     // Save the duplicated instructions in case we need to remove them.
-    SmallVector<SILInstruction*, 4> Dups;
+    SmallVector<SILInstruction *, 4> Dups;
 
     if (canSinkInstruction(InstToSink)) {
       // For all preds:
@@ -232,7 +232,6 @@ static void sinkCodeFromPredecessors(SILBasicBlock*BB) {
     SkipBudget--;
     InstToSink = std::prev(InstToSink);
     DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
-
   }
 }
 
