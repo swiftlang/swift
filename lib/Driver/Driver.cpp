@@ -563,7 +563,12 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   if (FinalOutput) {
     unsigned NumOutputs = 0;
     for (const Action *A : Actions) {
-      if (A->getType() != types::TY_Nothing) {
+      types::ID Type = A->getType();
+      if (Type != types::TY_Nothing && Type != types::TY_SwiftModuleFile) {
+        // Only increment NumOutputs if this is an output which must have its
+        // path specified using -o.
+        // (Module outputs can be specified using -module-output-path, or will
+        // be inferred if there are other top-level outputs.)
         ++NumOutputs;
       }
     }
