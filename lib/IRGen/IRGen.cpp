@@ -21,10 +21,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
-#include "clang/CodeGen/ModuleBuilder.h"
-#include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -84,26 +80,6 @@ enum ImageInfoFlags {
   eImageInfo_ImageIsSimulated    = (1 << 5)
 };
 
-static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
-                                                      IRGenOptions &Opts,
-                                                      StringRef ModuleName) {
-  auto Loader = Context.getClangModuleLoader();
-  auto *Importer = static_cast<ClangImporter*>(&*Loader);
-  assert(Importer && "No clang module loader!");
-  auto &ClangContext = Importer->getClangASTContext();
-
-  auto *CGO = new clang::CodeGenOptions;
-  CGO->OptimizationLevel = Opts.OptLevel;
-  CGO->DisableFPElim = Opts.DisableFPElim;
-  auto &TO = ClangContext.getTargetInfo().getTargetOpts();
-  auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, *CGO, TO,
-                                                llvm::getGlobalContext());
-  ClangCodeGen->Initialize(ClangContext);
-
-  return ClangCodeGen;
-}
-
 static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::Module *M,
                                                          SILModule *SILMod,
@@ -145,12 +121,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     return nullptr;
   }
 
-  // Create the Clang code generator we'll use to emit imported Clang
-  // inline functions.
-  std::unique_ptr<clang::CodeGenerator> ClangCodeGen(
-    createClangCodeGenerator(M->Ctx, Opts, ModuleName));
+  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
+  assert(DataLayout && "target machine didn't set DataLayout?");
 
-  auto *Module = ClangCodeGen->GetModule();
+  // Create the IR emitter.
+  IRGenModule IGM(M->Ctx, Opts, ModuleName, *DataLayout, SILMod);
+
+  auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
 
   Module->setTargetTriple(Opts.Triple);
@@ -163,12 +140,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                         llvm::DEBUG_METADATA_VERSION);
 
   // Set the module's string representation.
-  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
-  assert(DataLayout && "target machine didn't set DataLayout?");
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the module contents.
-  IRGenModule IGM(M->Ctx, Opts, *Module, *DataLayout, SILMod, *ClangCodeGen);
   IGM.emitGlobalTopLevel();
 
   if (SF) {
@@ -338,7 +312,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   }
 
   EmitPasses.run(*Module);
-  return std::unique_ptr<llvm::Module>(ClangCodeGen->ReleaseModule());
+  return std::unique_ptr<llvm::Module>(IGM.releaseModule());
 }
 
 std::unique_ptr<llvm::Module> swift::

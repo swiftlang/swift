@@ -108,6 +108,7 @@ class IRGenModule {
 public:
   ASTContext &Context;
   IRGenOptions &Opts;
+  std::unique_ptr<clang::CodeGenerator> ClangCodeGen;
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
   const llvm::DataLayout &DataLayout;
@@ -244,7 +245,6 @@ public:
 private:
   TypeConverter &Types;
   friend class TypeConverter;
-  clang::CodeGenerator &ClangCodeGen;
 
   friend class GenericContextScope;
   
@@ -312,6 +312,8 @@ public:
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
   ClassDecl *getSwiftRootClass();
+  llvm::Module *getModule() const;
+  llvm::Module *releaseModule();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -330,9 +332,8 @@ private:                            \
   
 //--- Generic ---------------------------------------------------------------
 public:
-  IRGenModule(ASTContext &Context, IRGenOptions &Opts, llvm::Module &Module,
-              const llvm::DataLayout &DataLayout,
-              SILModule *SILMod, clang::CodeGenerator &ClangCodeGen);
+  IRGenModule(ASTContext &Context, IRGenOptions &Opts, StringRef ModuleName,
+              const llvm::DataLayout &DataLayout, SILModule *SILMod);
   ~IRGenModule();
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }

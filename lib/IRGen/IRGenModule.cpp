@@ -19,7 +19,11 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/Frontend/CodeGenOptions.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -60,15 +64,36 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
   return createStructType(IGM, name, types)->getPointerTo(DefaultAS);
 };
 
+static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
+                                                      IRGenOptions &Opts,
+                                                      StringRef ModuleName) {
+  auto Loader = Context.getClangModuleLoader();
+  auto *Importer = static_cast<ClangImporter*>(&*Loader);
+  assert(Importer && "No clang module loader!");
+  auto &ClangContext = Importer->getClangASTContext();
+
+  auto *CGO = new clang::CodeGenOptions;
+  CGO->OptimizationLevel = Opts.OptLevel;
+  CGO->DisableFPElim = Opts.DisableFPElim;
+  auto &TO = ClangContext.getTargetInfo().getTargetOpts();
+  auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
+                                                ModuleName, *CGO, TO,
+                                                llvm::getGlobalContext());
+  ClangCodeGen->Initialize(ClangContext);
+
+  return ClangCodeGen;
+}
+
 IRGenModule::IRGenModule(ASTContext &Context,
-                         IRGenOptions &Opts, llvm::Module &Module,
+                         IRGenOptions &Opts, StringRef ModuleName,
                          const llvm::DataLayout &DataLayout,
-                         SILModule *SILMod, clang::CodeGenerator &ClangCodeGen)
-  : Context(Context), Opts(Opts), Module(Module),
+                         SILModule *SILMod)
+  : Context(Context), Opts(Opts),
+    ClangCodeGen(createClangCodeGenerator(Context, Opts, ModuleName)),
+    Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),
-    DebugInfo(0), Types(*new TypeConverter(*this)),
-    ClangCodeGen(ClangCodeGen)
+    DebugInfo(0), Types(*new TypeConverter(*this))
 {
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
@@ -333,6 +358,14 @@ llvm::Constant *IRGenModule::getObjCEmptyVTablePtr() {
                                                   OpaquePtrTy->getElementType());
   }
   return ObjCEmptyVTablePtr;
+}
+
+llvm::Module *IRGenModule::getModule() const {
+  return ClangCodeGen->GetModule();
+}
+
+llvm::Module *IRGenModule::releaseModule() {
+  return ClangCodeGen->ReleaseModule();
 }
 
 llvm::Constant *IRGenModule::getSize(Size size) {
