@@ -472,9 +472,67 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
 
+/// Parse the condition of an 'if' or 'while'.
+///
+///   condition:
+///     ('var' | 'let') pattern '=' expr-basic
+///     expr-basic
+ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
+                                        Diag<> ID) {
+  ParserStatus Status;
+  Condition = StmtCondition();
+  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let)) {
+    // We're parsing a conditional binding.
+    assert(CurDeclContext->isLocalContext()
+           && "conditional binding in non-local context?!");
+    
+    bool IsLet = Tok.is(tok::kw_let);
+    SourceLoc VarLoc = consumeToken();
+    
+    auto Pattern = parsePattern(IsLet);
+    Status |= Pattern;
+    if (Pattern.isNull() || Pattern.hasCodeCompletion())
+      return Status;
+
+    Expr *Init;
+    // Conditional bindings must have an initializer.
+    if (consumeIf(tok::equal)) {
+      ParserResult<Expr> InitExpr
+        = parseExprBasic(diag::expected_expr_conditional_var);
+      Status |= InitExpr;
+      if (InitExpr.isNull() || InitExpr.hasCodeCompletion())
+        return Status;
+      Init = InitExpr.get();
+    } else {
+      // Although we require an initializer, recover by parsing as if it were
+      // merely omitted.
+      diagnose(Tok, diag::conditional_var_initializer_required);
+      Init = new (Context) ErrorExpr(Tok.getLoc());
+    }
+    
+    Condition = new (Context) PatternBindingDecl(SourceLoc(),
+                                                 VarLoc, Pattern.get(),
+                                                 Init,
+                                                 /*hasStorage*/ true,
+                                                 /*isConditional*/ true,
+                                                 /*parent*/ CurDeclContext);
+    
+    // Introduce variables to the current scope.
+    SmallVector<Decl *, 2> Decls;
+    DeclAttributes Attributes;
+    addVarsToScope(Pattern.get(), Decls, /*static*/ false, Attributes);
+
+  } else {
+    ParserResult<Expr> Expr = parseExprBasic(ID);
+    Status |= Expr;
+    Condition = Expr.getPtrOrNull();
+  }
+  return Status;
+}
+
 /// 
 ///   stmt-if:
-///     'if' expr-basic stmt-brace stmt-if-else?
+///     'if' condition stmt-brace stmt-if-else?
 ///   stmt-if-else:
 ///    'else' stmt-brace
 ///    'else' stmt-if
@@ -482,31 +540,38 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   SourceLoc IfLoc = consumeToken(tok::kw_if);
 
   ParserStatus Status;
-
-  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_if);
-  Status |= Condition;
-  if (Condition.isNull() || Condition.hasCodeCompletion())
-    return makeParserResult<Stmt>(Condition, nullptr); // FIXME: better recovery
-
+  StmtCondition Condition;
   ParserResult<BraceStmt> NormalBody;
-  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
-    // If we parsed closure after 'if', then it was not the condition, but the
-    // 'if' statement body.  We can not have a bare closure in an 'if'
-    // condition because closures don't conform to LogicValue.
-    auto ClosureBody = CE->getBody();
-    SourceLoc LBraceLoc = ClosureBody->getStartLoc();
-    NormalBody = makeParserErrorResult(ClosureBody);
-    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
-    diagnose(IfLoc, diag::missing_condition_after_if)
-        .highlight(SourceRange(IfLoc, LBraceLoc));
+  
+  // A scope encloses the condition and true branch for any variables bound
+  // by a conditional binding. The else branch does *not* see these variables.
+  {
+    Scope S(this, ScopeKind::IfVars);
+  
+    Status |= parseStmtCondition(Condition, diag::expected_condition_if);
+    if (Status.isError() || Status.hasCodeCompletion())
+      return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
+
+    if (auto *CE = dyn_cast_or_null<ClosureExpr>(Condition.dyn_cast<Expr*>())) {
+      // If we parsed closure after 'if', then it was not the condition, but the
+      // 'if' statement body.  We can not have a bare closure in an 'if'
+      // condition because closures don't conform to LogicValue.
+      auto ClosureBody = CE->getBody();
+      SourceLoc LBraceLoc = ClosureBody->getStartLoc();
+      NormalBody = makeParserErrorResult(ClosureBody);
+      Condition = new (Context) ErrorExpr(LBraceLoc);
+      diagnose(IfLoc, diag::missing_condition_after_if)
+          .highlight(SourceRange(IfLoc, LBraceLoc));
+    }
+    if (NormalBody.isNull())
+      NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
+    if (NormalBody.isNull())
+      return nullptr; // FIXME: better recovery
+
+    Status |= NormalBody;
   }
-  if (NormalBody.isNull())
-    NormalBody = parseBraceItemList(diag::expected_lbrace_after_if);
-  if (NormalBody.isNull())
-    return nullptr; // FIXME: better recovery
 
-  Status |= NormalBody;
-
+  // The else branch, if any, is outside of the scope of the condition.
   SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::kw_else)) {
@@ -519,7 +584,7 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   }
 
   return makeParserResult(
-      Status, new (Context) IfStmt(IfLoc, Condition.get(), NormalBody.get(),
+      Status, new (Context) IfStmt(IfLoc, Condition, NormalBody.get(),
                                    ElseLoc, ElseBody.getPtrOrNull()));
 }
 
@@ -529,22 +594,23 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 ParserResult<Stmt> Parser::parseStmtWhile() {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
+  Scope S(this, ScopeKind::WhileVars);
+  
   ParserStatus Status;
-
-  ParserResult<Expr> Condition = parseExprBasic(diag::expected_expr_while);
-  Status |= Condition;
-  if (Condition.isNull() || Condition.hasCodeCompletion())
+  StmtCondition Condition;
+  Status |= parseStmtCondition(Condition, diag::expected_condition_while);
+  if (Status.isError() || Status.hasCodeCompletion())
     return makeParserResult<Stmt>(Status, nullptr); // FIXME: better recovery
 
   ParserResult<BraceStmt> Body;
-  if (auto *CE = dyn_cast<ClosureExpr>(Condition.get())) {
+  if (auto *CE = dyn_cast_or_null<ClosureExpr>(Condition.dyn_cast<Expr*>())) {
     // If we parsed a closure after 'while', then it was not the condition, but
     // the 'while' statement body.  We can not have a bare closure in a 'while'
     // condition because closures don't conform to LogicValue.
     auto ClosureBody = CE->getBody();
     SourceLoc LBraceLoc = ClosureBody->getStartLoc();
     Body = makeParserErrorResult(ClosureBody);
-    Condition = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
+    Condition = new (Context) ErrorExpr(LBraceLoc);
     diagnose(WhileLoc, diag::missing_condition_after_while)
         .highlight(SourceRange(WhileLoc, LBraceLoc));
   }
@@ -556,7 +622,7 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
   Status |= Body;
 
   return makeParserResult(
-      Status, new (Context) WhileStmt(WhileLoc, Condition.get(), Body.get()));
+      Status, new (Context) WhileStmt(WhileLoc, Condition, Body.get()));
 }
 
 /// 

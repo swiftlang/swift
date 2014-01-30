@@ -563,9 +563,15 @@ ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
 
+// If/While Conditions
+ERROR(expected_expr_conditional_var,stmt_parsing,PointsToFirstBadToken,
+      "expected expression after '=' in conditional binding", ())
+ERROR(conditional_var_initializer_required,stmt_parsing,none,
+      "variable binding in a condition requires an initializer", ())
+
 // If Statement
-ERROR(expected_expr_if,stmt_parsing,PointsToFirstBadToken,
-      "expected expression in 'if' condition", ())
+ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
+      "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,stmt_parsing,none,
       "missing condition in an 'if' statement", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
@@ -574,8 +580,8 @@ ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'else'", ())
 
 // While Statement
-ERROR(expected_expr_while,stmt_parsing,PointsToFirstBadToken,
-      "expected expression in 'while' condition", ())
+ERROR(expected_condition_while,stmt_parsing,PointsToFirstBadToken,
+      "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,stmt_parsing,none,
       "missing condition in a 'while' statement", ())
 ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,

@@ -57,7 +57,7 @@ public:
     popImpl();
     Depth = CleanupsDepth::invalid();
   }
-
+  
   ~Scope() {
     if (Depth.isValid()) popImpl();
   }

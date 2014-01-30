@@ -70,6 +70,87 @@ Condition SILGenFunction::emitCondition(Expr *E,
                        hasFalseCode, invertValue, contArgs);
 }
 
+/// Information about a conditional binding.
+struct ConditionalBinding {
+  PatternBindingDecl *PBD;
+  std::unique_ptr<TemporaryInitialization> OptAddr;
+};
+
+static std::unique_ptr<TemporaryInitialization>
+emitConditionalBindingBuffer(SILGenFunction &gen,
+                             StmtCondition cond) {
+  if (auto CB = cond.dyn_cast<PatternBindingDecl*>()) {
+    assert(CB->isConditional());
+    assert(CB->getInit());
+
+    auto &optTL = gen.getTypeLowering(CB->getInit()->getType());
+    return gen.emitTemporary(CB, optTL);
+  }
+  return nullptr;
+}
+
+static std::pair<Condition, Optional<ConditionalBinding>>
+emitConditionalBinding(SILGenFunction &gen,
+                       PatternBindingDecl *CB,
+                       std::unique_ptr<TemporaryInitialization> temp,
+                       bool hasFalseCode) {
+  // Emit the optional value, in its own inner scope.
+  {
+    FullExpr initScope(gen.Cleanups, CB);
+    gen.emitExprInto(CB->getInit(), temp.get());
+  }
+
+  // Test for a value in the optional.
+  SILValue hasValue = gen.emitDoesOptionalHaveValue(CB, temp->getAddress());
+  
+  // Emit the condition on the presence of the value.
+  Condition C = gen.emitCondition(hasValue, CB, hasFalseCode);
+  return {C, ConditionalBinding{CB, std::move(temp)}};
+}
+
+static void
+enterTrueConditionalBinding(SILGenFunction &gen,
+                            const ConditionalBinding &CB) {
+  // Bind variables.
+  InitializationPtr init
+    = gen.emitPatternBindingInitialization(CB.PBD->getPattern());
+  
+  FullExpr scope(gen.Cleanups, CB.PBD);
+  auto &optTL = gen.getTypeLowering(CB.PBD->getPattern()->getType());
+  // Take the value out of the temporary buffer into the variables.
+  ManagedValue mv = gen.emitGetOptionalValueFrom(CB.PBD,
+                         ManagedValue(CB.OptAddr->getAddress(),
+                                      CB.OptAddr->getInitializedCleanup()),
+                         optTL, SGFContext(init.get()));
+  if (!mv.isInContext()) {
+    RValue(gen, CB.PBD, CB.PBD->getPattern()->getType()->getCanonicalType(), mv)
+      .forwardInto(gen, init.get(), CB.PBD);
+  }
+  
+  // FIXME: Keep the cleanup dormant so we can reactivate it on the false
+  // branch?
+}
+
+static void
+enterFalseConditionalBinding(SILGenFunction &gen,
+                             const ConditionalBinding &CB) {
+  // Destroy the value in the optional buffer.
+  gen.B.emitDestroyAddr(CB.PBD, CB.OptAddr->getAddress());
+}
+
+static std::pair<Condition, Optional<ConditionalBinding>>
+emitStmtCondition(SILGenFunction &gen, StmtCondition C,
+                  std::unique_ptr<TemporaryInitialization> temp,
+                   bool hasFalseCode) {
+  if (auto E = C.dyn_cast<Expr*>()) {
+    return {gen.emitCondition(E, hasFalseCode), Nothing};
+  }
+  if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
+    return emitConditionalBinding(gen, CB, std::move(temp), hasFalseCode);
+  }
+  llvm_unreachable("unknown condition");
+}
+
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
                                         bool hasFalseCode, bool invertValue,
                                         ArrayRef<SILType> contArgs) {
@@ -191,18 +272,36 @@ void SILGenFunction::visitReturnStmt(ReturnStmt *S) {
 }
 
 void SILGenFunction::visitIfStmt(IfStmt *S) {
-  Condition Cond = emitCondition(S->getCond(), S->getElseStmt() != nullptr);
+  Scope condBufferScope(Cleanups, S);
+  auto condBuffer = emitConditionalBindingBuffer(*this, S->getCond());
+  
+  // We need a false branch if we have an 'else' block or if we have a
+  // pattern binding, to clean up the unconsumed optional value.
+  bool hasBindings = condBuffer.get();
+  auto CondPair = emitStmtCondition(*this, S->getCond(), std::move(condBuffer),
+                                    S->getElseStmt() != nullptr
+                                      || hasBindings);
+  auto &Cond = CondPair.first;
+  auto &CondBinding = CondPair.second;
   
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
-    visit(S->getThenStmt());
+    {
+      // Enter a scope for pattern variables.
+      Scope trueScope(Cleanups, S);
+      if (CondBinding)
+        enterTrueConditionalBinding(*this, *CondBinding);
+      visit(S->getThenStmt());
+    }
     Cond.exitTrue(B);
   }
   
   if (Cond.hasFalse()) {
-    assert(S->getElseStmt());
     Cond.enterFalse(B);
-    visit(S->getElseStmt());
+    if (CondBinding)
+      enterFalseConditionalBinding(*this, *CondBinding);
+    if (S->getElseStmt())
+      visit(S->getElseStmt());
     Cond.exitFalse(B);
   }
   
@@ -210,36 +309,52 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 }
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {
+  Scope condBufferScope(Cleanups, S);
+  // Allocate a buffer for pattern binding conditions outside the loop.
+  auto condBuffer = emitConditionalBindingBuffer(*this, S->getCond());
+  
   // Create a new basic block and jump into it.
   SILBasicBlock *LoopBB = createBasicBlock();
   B.emitBlock(LoopBB, S);
   
+  // Evaluate the condition with the false edge leading directly
+  // to the continuation block.
+  auto CondPair = emitStmtCondition(*this, S->getCond(), std::move(condBuffer),
+                                    /*hasFalseCode*/ false);
+  auto &Cond = CondPair.first;
+  auto &CondBinding = CondPair.second;
+
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
   BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
                               CleanupLocation(S->getBody()));
   ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
                                  CleanupLocation(S->getBody()));
-  
-  // Evaluate the condition with the false edge leading directly
-  // to the continuation block.
-  Condition Cond = emitCondition(S->getCond(), /*hasFalseCode*/ false);
-  
+
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
     Cond.enterTrue(B);
-    visit(S->getBody());
-    if (B.hasValidInsertionPoint()) {
-      // Accosiate the loop body's closing brace with this branch.
-      RegularLocation L(S->getBody());
-      L.pointToEnd();
-      B.createBranch(L, LoopBB);
+    {
+      // Enter a scope for pattern variables.
+      Scope trueScope(Cleanups, S);
+      if (CondBinding)
+        enterTrueConditionalBinding(*this, *CondBinding);
+      
+      visit(S->getBody());
+      if (B.hasValidInsertionPoint()) {
+        // Associate the loop body's closing brace with this branch.
+        RegularLocation L(S->getBody());
+        L.pointToEnd();
+        B.createBranch(L, LoopBB);
+      }
     }
     Cond.exitTrue(B);
   }
   
   // Complete the conditional execution.
   Cond.complete(B);
+  if (CondBinding)
+    enterFalseConditionalBinding(*this, *CondBinding);
   
   emitOrDeleteBlock(B, EndBB, S);
   BreakDestStack.pop_back();

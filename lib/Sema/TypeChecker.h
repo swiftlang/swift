@@ -573,6 +573,19 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
+  /// \brief Type check the given 'if' or 'while' statement condition, which
+  /// either converts an expression to a logic value or bind variables to the
+  /// contents of an Optional.
+  ///
+  /// \param cond The condition to type-check, which will be modified in place.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool typeCheckCondition(StmtCondition &cond, DeclContext *dc);
+
+  /// Type-check a pattern binding in an 'if' or 'while' statement condition.
+  bool typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
+                                          DeclContext *dc);
+  
   /// \brief Determine the semantics of a checked cast operation.
   ///
   /// \param fromType       The source type of the cast.

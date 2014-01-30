@@ -260,9 +260,9 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    Expr *E = IS->getCond();
-    if (TC.typeCheckCondition(E, DC)) return 0;
-    IS->setCond(E);
+    StmtCondition C = IS->getCond();
+    if (TC.typeCheckCondition(C, DC)) return 0;
+    IS->setCond(C);
 
     Stmt *S = IS->getThenStmt();
     if (typeCheckStmt(S)) return 0;
@@ -277,9 +277,9 @@ public:
   }
   
   Stmt *visitWhileStmt(WhileStmt *WS) {
-    Expr *E = WS->getCond();
-    if (TC.typeCheckCondition(E, DC)) return 0;
-    WS->setCond(E);
+    StmtCondition C = WS->getCond();
+    if (TC.typeCheckCondition(C, DC)) return 0;
+    WS->setCond(C);
 
     AddLoopNest loopNest(*this);
     Stmt *S = WS->getBody();
@@ -387,10 +387,11 @@ public:
       auto GenPat = new (TC.Context) NamedPattern(Stream);
       GenPat->setImplicit();
       auto GenBinding = new (TC.Context) PatternBindingDecl(SourceLoc(),
-                                                            S->getForLoc(),
+                                                          S->getForLoc(),
                                                           GenPat, GetStream,
-                                                            /*storage*/ true,
-                                                            DC);
+                                                          /*storage*/ true,
+                                                          /*conditional*/ false,
+                                                          DC);
       GenBinding->setImplicit();
       S->setStream(GenBinding);
     }

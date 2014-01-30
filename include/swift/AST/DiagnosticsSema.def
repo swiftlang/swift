@@ -661,6 +661,9 @@ ERROR(assignment_to_self,sema_tcs,none,
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
+ERROR(non_optional_in_conditional_binding,sema_tcs,none,
+      "bound value in a conditional binding must be of Optional type", ())
+
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "Sequence protocol definition is broken", ())

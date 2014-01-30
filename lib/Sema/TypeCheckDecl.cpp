@@ -3782,3 +3782,24 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 }
+
+bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
+                                                     DeclContext *dc) {
+  validatePatternBindingDecl(*this, PBD);
+  if (PBD->isInvalid())
+    return true;
+  
+  assert(PBD->getInit() && "conditional pattern binding should always have init");
+  if (!PBD->wasInitChecked()) {
+    if (typeCheckBinding(PBD)) {
+      PBD->setInvalid();
+      if (!PBD->getPattern()->hasType()) {
+        PBD->getPattern()->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(PBD->getPattern(), Context);
+        return true;
+      }
+    }
+  }
+  
+  DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern());
+}

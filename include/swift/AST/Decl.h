@@ -144,8 +144,11 @@ class alignas(8) Decl {
 
     /// \brief Whether this pattern binding declares a variable with storage.
     unsigned HasStorage : 1;
+    
+    /// \brief Whether this pattern binding appears in a conditional statement.
+    unsigned Conditional : 1;
   };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 2 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 3 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -1246,12 +1249,14 @@ public:
   PatternBindingDecl(SourceLoc StaticLoc,
                      SourceLoc VarLoc, Pattern *Pat, Expr *E,
                      bool hasStorage,
+                     bool isConditional,
                      DeclContext *Parent)
     : Decl(DeclKind::PatternBinding, Parent),
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
     PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
     PatternBindingDeclBits.HasStorage = hasStorage;
+    PatternBindingDeclBits.Conditional = isConditional;
   }
 
   SourceLoc getStartLoc() const {
@@ -1274,6 +1279,9 @@ public:
   /// Does this binding declare something that requires storage?
   bool hasStorage() const { return PatternBindingDeclBits.HasStorage; }
   
+  /// Does this binding appear in an 'if' or 'while' condition?
+  bool isConditional() const { return PatternBindingDeclBits.Conditional; }
+  
   bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
   void setStatic(bool s) { PatternBindingDeclBits.IsStatic = s; }
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -1281,9 +1289,8 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
   }
-
 };
-
+  
 /// TopLevelCodeDecl - This decl is used as a container for top-level
 /// expressions and statements in the main module.  It is always a direct
 /// child of a SourceFile.  The primary reason for building these is to give

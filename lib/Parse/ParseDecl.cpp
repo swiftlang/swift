@@ -1553,6 +1553,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
                                                 pattern.get(),
                                                 nullptr,
                                                 hasStorage,
+                                                /*conditional*/ false,
                                                 CurDeclContext);
 
     Bindings.All.push_back({PBD, topLevelDecl});

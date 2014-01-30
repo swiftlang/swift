@@ -814,6 +814,7 @@ public:
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtReturn();
+  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtWhile();
   ParserResult<Stmt> parseStmtDoWhile();

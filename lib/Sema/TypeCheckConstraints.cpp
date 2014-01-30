@@ -803,9 +803,9 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
     /// The locator we're using.
     ConstraintLocator *Locator;
 
-    /// The type of the pattern.
-    Type PatternType;
-
+    /// The type of the initializer.
+    Type InitType;
+    
   public:
     explicit BindingListener(PatternBindingDecl *binding) : Binding(binding) { }
 
@@ -815,23 +815,39 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
       // Collect constraints from the pattern.
       auto pattern = Binding->getPattern();
-      PatternType = cs.generateConstraints(pattern, Locator);
-      if (!PatternType)
+      InitType = cs.generateConstraints(pattern, Locator);
+      if (!InitType)
         return true;
+      
+      // If the pattern binding is conditional, the pattern is bound to the
+      // value inside an Optional on the right-hand side.
+      if (Binding->isConditional()) {
+        InitType = OptionalType::get(InitType);
+      }
 
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                       PatternType, Locator);
+                       InitType, Locator);
       return false;
     }
 
     virtual Expr *appliedSolution(Solution &solution, Expr *expr) {
       // Figure out what type the constraints decided on.
       auto &tc = solution.getConstraintSystem().getTypeChecker();
-      PatternType = solution.simplifyType(tc, PatternType);
+      InitType = solution.simplifyType(tc, InitType);
 
+      // For a conditional expression, the expression should be an optional
+      // prior to coercion.
+      if (Binding->isConditional()) {
+        auto exprType = solution.simplifyType(tc, expr->getType());
+        if (!exprType->getAnyOptionalObjectType()) {
+          tc.diagnose(expr->getLoc(),
+                      diag::non_optional_in_conditional_binding);
+        }
+      }
+      
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, PatternType, Locator);
+      expr = solution.coerceToType(expr, InitType, Locator);
       if (!expr) {
         return nullptr;
       }
@@ -842,8 +858,16 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
 
       // Apply the solution to the pattern as well.
       Pattern *pattern = Binding->getPattern();
+      Type patternType = expr->getType();
+      if (Binding->isConditional()) {
+        patternType = expr->getType()->getAnyOptionalObjectType();
+        assert(patternType
+               && "solution did not find optional type for "
+                  "conditional binding?!");
+      }
+      
       if (tc.coercePatternToType(pattern, Binding->getDeclContext(),
-                                 expr->getType(), TR_OverrideType)) {
+                                 patternType, TR_OverrideType)) {
         return nullptr;
       }
       Binding->setPattern(pattern);
@@ -1006,6 +1030,25 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   return typeCheckExpression(expr, dc, Type(), /*discardedExpr=*/false,
                              FreeTypeVariableBinding::Disallow,
                              &listener);
+}
+
+bool TypeChecker::typeCheckCondition(StmtCondition &cond, DeclContext *dc) {
+  if (auto E = cond.dyn_cast<Expr*>()) {
+    bool r = typeCheckCondition(E, dc);
+    cond = E;
+    return r;
+  }
+  if (auto CB = cond.dyn_cast<PatternBindingDecl*>()) {
+    assert(CB->isConditional()
+           && "non-conditional pattern binding in condition?!");
+    if (typeCheckConditionalPatternBinding(CB, dc)) {
+      cond = StmtCondition();
+      return true;
+    }
+    cond = CB;
+    return false;
+  }
+  llvm_unreachable("unknown condition");
 }
 
 bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,

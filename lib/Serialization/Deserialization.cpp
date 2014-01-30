@@ -1656,6 +1656,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                 SourceLoc(), pattern,
                                                 /*init=*/nullptr,
                                                 /*storage=*/hasStorage,
+                                                /*conditional=*/false,
                                                 getDeclContext(contextID));
     binding->setStatic(isStatic);
     declOrOffset = binding;

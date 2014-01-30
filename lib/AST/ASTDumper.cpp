@@ -781,7 +781,15 @@ public:
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->print(OS, Indent + 2); }
   void printRec(Pattern *P) {  PrintPattern(OS, Indent+2).visit(P); }
-
+  
+  void printRec(StmtCondition C) {
+    if (auto E = C.dyn_cast<Expr*>())
+      return printRec(E);
+    if (auto CB = C.dyn_cast<PatternBindingDecl*>())
+      return printRec(CB);
+    llvm_unreachable("unknown condition");
+  }
+  
   void visitBraceStmt(BraceStmt *S) {
     OS.indent(Indent) << "(brace_stmt";
     for (auto Elt : S->getElements()) {

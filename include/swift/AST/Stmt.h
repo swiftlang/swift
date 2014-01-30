@@ -167,18 +167,22 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Return;}
 };
 
+/// Either a conditional PatternBindingDecl or a boolean Expr can appear as the
+/// condition of an 'if' or 'while' statement.
+using StmtCondition = llvm::PointerUnion<PatternBindingDecl*, Expr*>;
+  
 /// IfStmt - if/then/else statement.  If no 'else' is specified, then the
 /// ElseLoc location is not specified and the Else statement is null. After
 /// type-checking, the condition is of type Builtin.Int1.
 class IfStmt : public Stmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
-  Expr *Cond;
+  StmtCondition Cond;
   Stmt *Then;
   Stmt *Else;
   
 public:
-  IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+  IfStmt(SourceLoc IfLoc, StmtCondition Cond, Stmt *Then, SourceLoc ElseLoc,
          Stmt *Else, Optional<bool> implicit = {})
   : Stmt(StmtKind::If, getDefaultImplicitFlag(implicit, IfLoc)),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
@@ -188,8 +192,8 @@ public:
 
   SourceRange getSourceRange() const;
 
-  Expr *getCond() const { return Cond; }
-  void setCond(Expr *e) { Cond = e; }
+  StmtCondition getCond() const { return Cond; }
+  void setCond(StmtCondition e) { Cond = e; }
 
   Stmt *getThenStmt() const { return Then; }
   void setThenStmt(Stmt *s) { Then = s; }
@@ -205,19 +209,19 @@ public:
 /// type Builtin.Int1.
 class WhileStmt : public Stmt {
   SourceLoc WhileLoc;
-  Expr *Cond;
+  StmtCondition Cond;
   Stmt *Body;
   
 public:
-  WhileStmt(SourceLoc WhileLoc, Expr *Cond, Stmt *Body,
+  WhileStmt(SourceLoc WhileLoc, StmtCondition Cond, Stmt *Body,
             Optional<bool> implicit = {})
   : Stmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc)),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
   SourceRange getSourceRange() const;
 
-  Expr *getCond() const { return Cond; }
-  void setCond(Expr *e) { Cond = e; }
+  StmtCondition getCond() const { return Cond; }
+  void setCond(StmtCondition e) { Cond = e; }
 
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }

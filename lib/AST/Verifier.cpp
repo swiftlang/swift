@@ -478,15 +478,42 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
+    void checkCondition(StmtCondition C) {
+      if (auto E = C.dyn_cast<Expr*>()) {
+        checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
+                      "condition type");
+        return;
+      }
+      if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
+        if (!CB->isConditional()) {
+          Out << "condition binding is not conditional\n";
+          CB->print(Out);
+          abort();
+        }
+        if (!CB->getInit()) {
+          Out << "conditional binding does not have initializer\n";
+          CB->print(Out);
+          abort();
+        }
+        auto initOptionalType = CB->getInit()->getType();
+        auto initType = initOptionalType->getAnyOptionalObjectType();
+        if (!initType) {
+          Out << "conditional binding is not of optional type\n";
+          CB->print(Out);
+          abort();
+        }
+        checkSameType(CB->getPattern()->getType(), initType,
+                      "conditional binding type");
+      }
+    }
+    
     void verifyChecked(IfStmt *S) {
-      checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
-                    "if condition type");
+      checkCondition(S->getCond());
       verifyCheckedBase(S);
     }
 
     void verifyChecked(WhileStmt *S) {
-      checkSameType(S->getCond()->getType(), BuiltinIntegerType::get(1, Ctx),
-                    "while condition type");
+      checkCondition(S->getCond());
       verifyCheckedBase(S);
     }
 

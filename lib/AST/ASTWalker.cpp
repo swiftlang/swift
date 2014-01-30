@@ -758,6 +758,35 @@ public:
 
     return P;
   }
+  
+  StmtCondition doIt(StmtCondition C) {
+    if (auto E = C.dyn_cast<Expr*>()) {
+      // Walk an expression condition normally.
+      E = doIt(E);
+      if (E)
+        return E;
+      return StmtCondition();
+    }
+    
+    if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
+      // Walk the binding pattern and initializer expression.
+      if (auto P = doIt(CB->getPattern()))
+        CB->setPattern(P);
+      else
+        return StmtCondition();
+      
+      if (CB->getInit()) {
+        if (auto E = doIt(CB->getInit()))
+          CB->setInit(E, CB->wasInitChecked());
+        else
+          return StmtCondition();
+      }
+      
+      return CB;
+    }
+    
+    llvm_unreachable("unhandled condition");
+  }
 
   /// Returns true on failure.
   bool doIt(TypeRepr *T) {
@@ -826,7 +855,7 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
 }
 
 Stmt *Traversal::visitIfStmt(IfStmt *IS) {
-  if (Expr *E2 = doIt(IS->getCond()))
+  if (StmtCondition E2 = doIt(IS->getCond()))
     IS->setCond(E2);
   else
     return nullptr;
@@ -846,7 +875,7 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
 }
 
 Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
-  if (Expr *E2 = doIt(WS->getCond()))
+  if (StmtCondition E2 = doIt(WS->getCond()))
     WS->setCond(E2);
   else
     return nullptr;
