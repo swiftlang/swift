@@ -168,7 +168,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
       return true;
     }
 
-  // ``If we didn't find any side effects, we win'' - Chris Lattner.
+  // We didn't find any side effects.
   return false;
 }
 
