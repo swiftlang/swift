@@ -41,6 +41,7 @@
 #include "DiagnosticsSIL.def"
 #include "DiagnosticsIRGen.def"
 #include "DiagnosticsFrontend.def"
+#include "DiagnosticsDriver.def"
 
 #undef DIAG_NO_UNDEF
 

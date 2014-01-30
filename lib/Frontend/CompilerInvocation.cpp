@@ -164,9 +164,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (Opts.RequestedAction == FrontendOptions::Immediate &&
       Opts.PrimaryInput.hasValue()) {
-    // TODO: emit diagnostic
-    llvm::errs() << "error: immediate mode is incompatible with -primary-file"
-    "\n";
+    Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
 
@@ -180,20 +178,17 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
   if (Opts.RequestedAction == FrontendOptions::REPL) {
     if (!Opts.InputFilenames.empty()) {
-      // TODO: emit diagnostic
-      llvm::errs() << "error: REPL mode requires no input files\n";
+      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return true;
     }
   } else if (TreatAsSIL) {
     if (Opts.InputFilenames.size() != 1) {
-      // TODO: emit diagnostic
-      llvm::errs() << "error: this mode requires a single input file\n";
+      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
       return true;
     }
   } else {
     if (Opts.InputFilenames.empty()) {
-      // TODO: emit diagnostic
-      llvm::errs() << "error: this mode requires at least one input file\n";
+      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
       return true;
     }
   }
@@ -353,16 +348,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     if (Opts.OutputFilename.empty()) {
       if (Opts.RequestedAction != FrontendOptions::REPL &&
           Opts.RequestedAction != FrontendOptions::Immediate) {
-        // TODO: emit diagnostic
-        llvm::errs() << "error: an output filename was not specified for a mode which requires an output filename\n";
+        Diags.diagnose(SourceLoc(), diag::error_no_output_filename_specified);
         return true;
       }
     } else if (Opts.OutputFilename != "-" &&
         llvm::sys::fs::is_directory(Opts.OutputFilename)) {
-      // TODO: emit diagnostic
-      llvm::errs() << "error: the implicit output file '" << Opts.OutputFilename
-                   << "' is a directory; explicitly specify a filename using -o"
-                   << '\n';
+      Diags.diagnose(SourceLoc(), diag::error_implicit_output_file_is_directory,
+                     Opts.OutputFilename);
       return true;
     }
   }
@@ -425,7 +417,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::PrintAST:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-      llvm::errs() << "swift: this mode is incompatible with -emit-module.\n";
+      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
       return true;
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSILGen:

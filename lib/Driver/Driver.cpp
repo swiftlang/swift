@@ -19,6 +19,9 @@
 #include "Tools.h"
 #include "ToolChains.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
@@ -80,10 +83,16 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
 
+  if (Diags.hadAnyError())
+    return nullptr;
+
   if (const Arg *A = ArgList->getLastArg(options::OPT_target))
     DefaultTargetTriple = A->getValue();
 
   const ToolChain &TC = getToolChain(*ArgList);
+
+  if (Diags.hadAnyError())
+    return nullptr;
 
   if (!handleImmediateArgs(*TranslatedArgList, TC)) {
     return nullptr;
@@ -93,9 +102,15 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   InputList Inputs;
   buildInputs(TC, *TranslatedArgList, Inputs);
 
+  if (Diags.hadAnyError())
+    return nullptr;
+
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
   buildOutputInfo(*TranslatedArgList, Inputs, OI);
+
+  if (Diags.hadAnyError())
+    return nullptr;
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
@@ -108,6 +123,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   ActionList Actions;
   buildActions(TC, *TranslatedArgList, Inputs, OI, Actions);
 
+  if (Diags.hadAnyError())
+    return nullptr;
+
   if (DriverPrintActions) {
     printActions(Actions);
     return nullptr;
@@ -116,33 +134,39 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   unsigned NumberOfParallelCommands = 1;
   if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
     if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      // TODO: emit diagnostic.
-      llvm::errs() << "warning: invalid value: " << A->getAsString(*ArgList)
-                   << '\n';
-      NumberOfParallelCommands = 1;
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(*ArgList), A->getValue());
+      return nullptr;
     }
   }
 
   std::unique_ptr<OutputFileMap> OFM;
   buildOutputFileMap(*TranslatedArgList, OFM);
+
+  if (Diags.hadAnyError())
+    return nullptr;
+
   if (DriverPrintOutputFileMap) {
     if (OFM)
       OFM->dump(llvm::errs(), true);
     else
-      // TODO: emit diagnostics
-      llvm::errs() << "error: no output file map specified\n";
+      Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
     return nullptr;
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(*this, TC, std::move(ArgList),
+  std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags,
+                                                 std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  NumberOfParallelCommands,
                                                  DriverSkipExecution));
 
   buildJobs(Actions, OI, OFM.get(), *C);
-  if (DriverPrintBindings) {
+
+  if (Diags.hadAnyError())
     return nullptr;
-  }
+
+  if (DriverPrintBindings)
+    return nullptr;
 
   if (DriverPrintJobs) {
     printJobs(C->getJobs());
@@ -171,17 +195,21 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
 
   // Check for missing argument error.
   if (MissingArgCount) {
-    // TODO: emit diagnostic.
-    llvm::errs() << "error: missing argument: " <<
-      ArgList->getArgString(MissingArgIndex) << MissingArgCount << '\n';
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ArgList->getArgString(MissingArgIndex), MissingArgCount);
+    return nullptr;
   }
 
+  // Check for unknown arguments.
+  bool hadUnknownArgument = false;
   for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
        ArgList->filtered_end())) {
-    // TODO: emit diagnostic.
-    llvm::errs() << "error: unknown argument: " << A->getAsString(*ArgList)
-                 << '\n';
+    hadUnknownArgument = true;
+    Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                   A->getAsString(*ArgList));
   }
+  if (hadUnknownArgument)
+    return nullptr;
 
   return ArgList;
 }
@@ -208,7 +236,7 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
 /// \brief Check that the file referenced by Value exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool diagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
-                                   StringRef Value) {
+                                   DiagnosticEngine &Diags, StringRef Value) {
   // FIXME: provide opt-out for checking input file existence
 
   // stdin always exists.
@@ -226,8 +254,7 @@ static bool diagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
   if (llvm::sys::fs::exists(Twine(Path)))
     return true;
 
-  // FIXME: issue a diagnostic
-  llvm::errs() << "error: input file '" << Value << "' does not exist\n";
+  Diags.diagnose(SourceLoc(), diag::error_no_such_file_or_directory, Value);
   return false;
 }
 
@@ -269,7 +296,7 @@ void Driver::buildInputs(const ToolChain &TC,
         Ty = InputType;
       }
 
-      if (diagnoseInputExistence(*this, Args, Value))
+      if (diagnoseInputExistence(*this, Args, Diags, Value))
         Inputs.push_back(std::make_pair(Ty, A));
     }
 
@@ -378,8 +405,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   if (OI.ShouldGenerateModule &&
       (OI.CompilerMode == OutputInfo::Mode::REPL ||
        OI.CompilerMode == OutputInfo::Mode::Immediate)) {
-    // FIXME: emit diagnostics
-    llvm::errs() << "error: this mode does not support emitting modules\n";
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+    return;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_module_name)) {
@@ -400,12 +427,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     else if (!Inputs.empty() || OI.CompilerMode == OutputInfo::Mode::REPL) {
       // Having an improper module name is only bad if we have inputs or if
       // we're in REPL mode.
-      // TODO: emit diagnostic
-      if (OI.ModuleName.empty())
-        llvm::errs() << "error: must specify a module name with -o or "
-                        "-module-name\n";
-      else
-        llvm::errs() << "error: bad module name '" << OI.ModuleName << "'\n";
+      Diags.diagnose(SourceLoc(), diag::bad_module_name,
+                     OI.ModuleName, !Args.hasArg(options::OPT_module_name));
       OI.ModuleName = "__bad__";
     }
   }
@@ -421,8 +444,7 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
     if (!OI.SDKPath.empty()) {
       if (!llvm::sys::fs::exists(OI.SDKPath)) {
-        // TODO: emit diagnostic
-        llvm::errs() << "warning: no such SDK: '" << OI.SDKPath << "'\n";
+        Diags.diagnose(SourceLoc(), diag::warning_no_such_sdk, OI.SDKPath);
       }
     }
   }
@@ -433,8 +455,7 @@ void Driver::buildActions(const ToolChain &TC,
                           const InputList &Inputs, const OutputInfo &OI,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
-    // FIXME: emit diagnostic
-    llvm::errs() << "error: no input files\n";
+    Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
   }
 
@@ -469,8 +490,7 @@ void Driver::buildActions(const ToolChain &TC,
   case OutputInfo::Mode::REPL: {
     if (!Inputs.empty()) {
       // REPL mode requires no inputs.
-      // FIXME: emit diagnostic
-      llvm::errs() << "error: REPL mode requires no input files\n";
+      Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return;
     }
     CompileActions.push_back(new CompileJobAction(OI.CompilerOutputType));
@@ -543,8 +563,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
     // TODO: perform some preflight checks to ensure the file exists.
     OFM = OutputFileMap::loadFromPath(A->getValue());
     if (!OFM)
-      // TODO: emit diagnostic
-      llvm::errs() << "error: unable to load output file map\n";
+      // TODO: emit diagnostic with error string
+      Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map);
   } else {
     // We don't have an OutputFileMap, so reset the unique_ptr.
     OFM.reset();
@@ -574,9 +594,8 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     }
 
     if (NumOutputs > 1) {
-      // FIXME: issue diagnostic
-      llvm::errs()
-        << "error: cannot specify -o when generating multiple output files\n";
+      Diags.diagnose(SourceLoc(),
+                     diag::error_cannot_specify__o_for_multiple_outputs);
       FinalOutput = nullptr;
     }
   }
@@ -745,8 +764,9 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                                                      Suffix,
                                                                      Path);
             if (EC) {
-              llvm::errs() << "error: unable to make temporary file"
-                           << EC.message();
+              Diags.diagnose(SourceLoc(),
+                             diag::error_unable_to_make_temporary_file,
+                             EC.message());
               Path = "";
             }
             Output.reset(new CommandOutput(JA->getType(), Path.str(),

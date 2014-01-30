@@ -12,8 +12,11 @@
 
 #include "swift/Driver/Compilation.h"
 
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
@@ -25,12 +28,14 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
+                         DiagnosticEngine &Diags,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          unsigned NumberOfParallelCommands,
                          bool SkipTaskExecution)
-  : TheDriver(D), DefaultToolChain(DefaultToolChain), Jobs(new JobList),
-    InputArgs(std::move(InputArgs)), TranslatedArgs(std::move(TranslatedArgs)),
+  : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
+    Jobs(new JobList), InputArgs(std::move(InputArgs)),
+    TranslatedArgs(std::move(TranslatedArgs)),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution) {
 };
@@ -228,10 +233,9 @@ int Compilation::performJobs() {
   }
 
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
-    // TODO: emit diagnostic
-    llvm::errs() << "warning: parallel execution not supported; "
-                 << "falling back to serial execution\n";
+    Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
+  
   // Set up a set for storing all Commands which have been scheduled for
   // execution (whether or not they've finished execution),
   // or which have been determined that they don't need to run.

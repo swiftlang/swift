@@ -29,6 +29,8 @@ namespace opt {
 }
 
 namespace swift {
+  class DiagnosticEngine;
+
 namespace driver {
   class Command;
   class Driver;
@@ -42,6 +44,9 @@ class Compilation {
 
   /// The default tool chain.
   const ToolChain &DefaultToolChain;
+
+  /// The DiagnosticEngine to which this Compilation should emit diagnostics.
+  DiagnosticEngine &Diags;
 
   /// The Jobs which will be performed by this compilation.
   std::unique_ptr<JobList> Jobs;
@@ -65,6 +70,7 @@ class Compilation {
 
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
+              DiagnosticEngine &Diags,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               unsigned NumberOfParallelCommands = 1,

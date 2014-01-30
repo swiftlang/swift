@@ -1,0 +1,67 @@
+//===- DiagnosticsDriver.def - Diagnostics Text -----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines driver-only diagnostics emitted in processing
+//  command-line arguments and setting up compilation.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Category,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Category,Options,Text,Signature) \
+  DIAG(WARNING,ID,Category,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Category,Options,Text,Signature) \
+  DIAG(NOTE,ID,Category,Options,Text,Signature)
+#endif
+
+
+WARNING(warning_parallel_execution_not_supported,driver,none,
+        "parallel execution not supported; falling back to serial execution",
+        ())
+
+ERROR(error_cannot_specify__o_for_multiple_outputs,driver,none,
+      "cannot specify -o when generating multiple output files", ())
+
+ERROR(error_unable_to_load_output_file_map,driver, none,
+      "unable to load output file map", ())
+
+ERROR(error_no_output_file_map_specified,driver,none,
+      "no output file map specified", ())
+
+ERROR(error_unable_to_make_temporary_file,driver,none,
+      "unable to make temporary file: %0", (StringRef))
+
+ERROR(error_no_input_files,driver,none,
+      "no input files", ())
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

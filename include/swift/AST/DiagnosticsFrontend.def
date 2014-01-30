@@ -37,6 +37,11 @@
   DIAG(NOTE,ID,Category,Options,Text,Signature)
 #endif
 
+WARNING(warning_no_such_sdk,frontend,none,
+  "no such SDK: '%0'", (StringRef))
+
+ERROR(error_no_such_file_or_directory,frontend,none,
+  "no such file or directory: '%0'", (StringRef))
 
 ERROR(cannot_open_serialized_file,frontend,none,
   "cannot open file '%0' for diagnostics emission (%1)", (StringRef, StringRef))
@@ -58,6 +63,26 @@ ERROR(error_immediate_mode_missing_stdlib,frontend,none,
 ERROR(error_immediate_mode_missing_library,frontend,none,
   "could not load %select{shared library|framework}0 '%1'",
   (unsigned, StringRef))
+ERROR(error_immediate_mode_primary_file,frontend,none,
+  "immediate mode is incompatible with -primary-file", ())
+
+ERROR(error_mode_cannot_emit_module,frontend,none,
+  "this mode does not support emitting modules", ()) 
+
+ERROR(error_repl_requires_no_input_files,frontend,none,
+  "REPL mode requires no input files", ())
+ERROR(error_mode_requires_one_input_file,frontend,none,
+  "this mode requires exactly one input file", ())
+ERROR(error_mode_requires_an_input_file,frontend,none,
+  "this mode requires at least one input file", ())
+
+ERROR(error_no_output_filename_specified,frontend,none,
+  "an output filename was not specified for a mode which requires an output "
+  "filename", ())
+
+ERROR(error_implicit_output_file_is_directory,frontend,none,
+  "the implicit output file '%0' is a directory; explicitly specify a filename "
+  "using -o", (StringRef))
 
 ERROR(repl_must_be_initialized,sema,none,
       "variables currently must have an initial value when entered at the "
