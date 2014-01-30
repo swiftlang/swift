@@ -43,18 +43,18 @@ namespace {
 /// SimpleValue - Instances of this struct represent available values in the
 /// scoped hash table.
 struct SimpleValue {
-    SILInstruction *Inst;
+  SILInstruction *Inst;
 
-    SimpleValue(SILInstruction *I) : Inst(I) {
-      assert((isSentinel() || canHandle(I)) && "Inst can't be handled!");
-    }
+  SimpleValue(SILInstruction *I) : Inst(I) {
+    assert((isSentinel() || canHandle(I)) && "Inst can't be handled!");
+  }
 
-    bool isSentinel() const {
+  bool isSentinel() const {
     return Inst == llvm::DenseMapInfo<SILInstruction *>::getEmptyKey() ||
            Inst == llvm::DenseMapInfo<SILInstruction *>::getTombstoneKey();
-    }
+  }
 
-    static bool canHandle(SILInstruction *Inst) {
+  static bool canHandle(SILInstruction *Inst) {
     switch (Inst->getKind()) {
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
@@ -73,18 +73,18 @@ struct SimpleValue {
         return true;
       default:
         return false;
-      }
     }
-  };
+  }
+};
 } // end anonymous namespace
 
 namespace llvm {
-template<> struct DenseMapInfo<SimpleValue> {
+template <> struct DenseMapInfo<SimpleValue> {
   static inline SimpleValue getEmptyKey() {
-    return DenseMapInfo<SILInstruction*>::getEmptyKey();
+    return DenseMapInfo<SILInstruction *>::getEmptyKey();
   }
   static inline SimpleValue getTombstoneKey() {
-    return DenseMapInfo<SILInstruction*>::getTombstoneKey();
+    return DenseMapInfo<SILInstruction *>::getTombstoneKey();
   }
   static unsigned getHashValue(SimpleValue Val);
   static bool isEqual(SimpleValue LHS, SimpleValue RHS);
@@ -93,91 +93,91 @@ template<> struct DenseMapInfo<SimpleValue> {
 
 namespace {
 class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
-    using hash_code = llvm::hash_code;
+  using hash_code = llvm::hash_code;
 
 public:
-    hash_code visitValueBase(ValueBase *) {
-      llvm_unreachable("No hash implemented for the given type");
-    }
+  hash_code visitValueBase(ValueBase *) {
+    llvm_unreachable("No hash implemented for the given type");
+  }
 
-    hash_code visitFunctionRefInst(FunctionRefInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::FunctionRefInst),
-                                X->getReferencedFunction());
-    }
+  hash_code visitFunctionRefInst(FunctionRefInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::FunctionRefInst),
+                              X->getReferencedFunction());
+  }
 
-    hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::BuiltinFunctionRefInst),
-                                X->getName().get());
-    }
+  hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::BuiltinFunctionRefInst),
+                              X->getName().get());
+  }
 
-    hash_code visitGlobalAddrInst(GlobalAddrInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::GlobalAddrInst),
-                                X->getGlobal());
-    }
+  hash_code visitGlobalAddrInst(GlobalAddrInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::GlobalAddrInst),
+                              X->getGlobal());
+  }
 
-    hash_code visitIntegerLiteralInst(IntegerLiteralInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),
+  hash_code visitIntegerLiteralInst(IntegerLiteralInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),
                               X->getType(), X->getValue());
-    }
+  }
 
-    hash_code visitFloatLiteralInst(FloatLiteralInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
+  hash_code visitFloatLiteralInst(FloatLiteralInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
                               X->getType(), X->getBits());
-    }
+  }
 
-    hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::RefElementAddrInst),
+  hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::RefElementAddrInst),
                               X->getOperand(), X->getField());
-    }
+  }
 
-    hash_code visitStringLiteralInst(StringLiteralInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
+  hash_code visitStringLiteralInst(StringLiteralInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
                               unsigned(X->getEncoding()), X->getValue());
-    }
+  }
 
-    hash_code visitStructInst(StructInst *X) {
-      // This is safe since we are hashing the operands using the actual pointer
-      // values of the values being used by the operand.
-      OperandValueArrayRef Operands(X->getAllOperands());
+  hash_code visitStructInst(StructInst *X) {
+    // This is safe since we are hashing the operands using the actual pointer
+    // values of the values being used by the operand.
+    OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
-        unsigned(ValueKind::StructInst), X->getStructDecl(),
-        llvm::hash_combine_range(Operands.begin(), Operands.end()));
-    }
+      unsigned(ValueKind::StructInst), X->getStructDecl(),
+      llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 
-    hash_code visitStructExtractInst(StructExtractInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
+  hash_code visitStructExtractInst(StructExtractInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
                               X->getStructDecl(), X->getField(),
-                                X->getOperand());
-    }
+                              X->getOperand());
+  }
 
-    hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
+  hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
                               X->getStructDecl(), X->getField(),
-                                X->getOperand());
-    }
+                              X->getOperand());
+  }
 
-    hash_code visitTupleInst(TupleInst *X) {
-      OperandValueArrayRef Operands(X->getAllOperands());
+  hash_code visitTupleInst(TupleInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         unsigned(ValueKind::TupleInst), X->getTupleType(),
-        llvm::hash_combine_range(Operands.begin(), Operands.end()));
-    }
+      llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 
-    hash_code visitTupleExtractInst(TupleExtractInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::TupleExtractInst),
+  hash_code visitTupleExtractInst(TupleExtractInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::TupleExtractInst),
                               X->getTupleType(), X->getFieldNo(),
-                                X->getOperand());
-    }
+                              X->getOperand());
+  }
 
-    hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
-      return llvm::hash_combine(unsigned(ValueKind::TupleElementAddrInst),
+  hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::TupleElementAddrInst),
                               X->getTupleType(), X->getFieldNo(),
-                                X->getOperand());
-    }
+                              X->getOperand());
+  }
 
-    hash_code visitMetatypeInst(MetatypeInst *X) {
+  hash_code visitMetatypeInst(MetatypeInst *X) {
     return llvm::hash_combine(unsigned(ValueKind::MetatypeInst), X->getType());
-    }
+  }
 };
 } // end anonymous namespace
 
