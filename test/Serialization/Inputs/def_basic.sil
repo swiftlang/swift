@@ -872,6 +872,30 @@ entry(%f : $@thin (@out Int, Int) -> (), %x : $Int):
   return %y : $Int
 }
 
+// Make sure we serialize the body of closure even without -sil-serialize-all.
+// CHECK_DECL-LABEL:  @partial_apply_with_closure
+sil [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> () {
+bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $CString, %3 : $Int64):
+  %17 = function_ref @closure_body : $@thin (CString, CString, Int64) -> ()
+// CHECK_DECL: function_ref @closure_body
+  %18 = partial_apply %17(%2, %3) : $@thin (CString, CString, Int64) -> ()
+// CHECK_DECL: partial_apply
+  %30 = tuple ()
+  return %30 : $()
+}
+
+// CHECK_DECL-LABEL: @closure_body : $@thin (CString, CString, Int64) -> () {
+sil private @closure_body : $@thin (CString, CString, Int64) -> () {
+bb0(%0 : $CString, %1 : $CString, %2 : $Int64):
+// CHECK_DECL: function_ref @assert_fail
+  %3 = function_ref @assert_fail : $@thin (CString, CString, Int64) -> ()
+  %4 = apply %3(%0, %1, %2) : $@thin (CString, CString, Int64) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @assert_fail : $@thin (CString, CString, Int64) -> ()
+
 @fragile
 class Foo {
   subscript (x: Int, y: Int) -> Int
@@ -964,7 +988,7 @@ sil_witness_table ConformingAssoc: AssocReqt module def_basic {
   method #AssocReqt.requiredMethod!1: @_TTWV14witness_tables15ConformingAssocS_9AssocReqtS_FS1_14requiredMethodU_fRQPS1_FT_T_
 }
 
-sil @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
+sil [transparent] @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
   %1 = function_ref @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@thin () -> ()
@@ -1022,6 +1046,7 @@ bb0:
 
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
+  %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> ()
 
   %119 = tuple ()
   return %119 : $()
