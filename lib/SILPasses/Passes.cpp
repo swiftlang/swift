@@ -80,11 +80,13 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     // Perform scalar optimizations.
     performSILCSE(&Module);
     performSILCombine(&Module);
+    performSILCodeMotion(&Module);
     performSimplifyCFG(&Module);
     Changed |= performSILDevirtualization(&Module);
     performSILARCOpts(&Module);
     performSILAllocBoxToStackPromotion(&Module);
     performSILAllocRefElimination(&Module);
+
 
     DEBUG(Module.verify());
     // Stats
