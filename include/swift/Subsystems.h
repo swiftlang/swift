@@ -26,7 +26,6 @@
 namespace llvm {
   class MemoryBuffer;
   class Module;
-  class FunctionPass;
 }
 
 namespace swift {
@@ -177,10 +176,6 @@ namespace swift {
                                                     SILModule *SILMod,
                                                     StringRef ModuleName,
                                                     unsigned StartElem = 0);
-
-  // Optimization passes.
-  llvm::FunctionPass *createSwiftARCOptPass();
-  llvm::FunctionPass *createSwiftARCExpandPass();
 
   /// The extension for serialized modules.
   static const char * const SERIALIZED_MODULE_EXTENSION = "swiftmodule";

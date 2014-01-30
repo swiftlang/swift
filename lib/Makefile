@@ -13,6 +13,6 @@ SWIFT_LEVEL := ..
 
 PARALLEL_DIRS = Basic AST Sema Parse SIL SILGen SILPasses IRGen ClangImporter \
                 NullClangImporter ASTSectionImporter Serialization IDE \
-                Driver Frontend Immediate
+                Driver Frontend Immediate OptimizeARC
 
 include $(SWIFT_LEVEL)/Makefile

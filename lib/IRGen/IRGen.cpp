@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/OptimizeARC/PassesFwd.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"

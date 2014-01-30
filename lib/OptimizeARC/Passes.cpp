@@ -1,4 +1,4 @@
-//===--- OptimizeARC.cpp - Reference Counting Optimizations ---------------===//
+//===--- Passes.cpp - Reference Counting Optimizations --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "swift-optimize"
-#include "swift/Subsystems.h"
+#include "swift/OptimizeARC/Passes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
@@ -36,7 +36,11 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
+
 using namespace llvm;
+using swift::SwiftAliasAnalysis;
+using swift::SwiftARCOpt;
+using swift::SwiftARCExpandPass;
 
 STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
@@ -171,42 +175,6 @@ static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
 namespace llvm {
 void initializeSwiftAliasAnalysisPass(PassRegistry&);
 }
-
-namespace {
-  /// SwiftAliasAnalysis - This is a simple alias analysis implementation that
-  /// uses knowledge of swift constructs to answer queries.
-  ///
-  class SwiftAliasAnalysis : public ImmutablePass, public AliasAnalysis {
-  public:
-    static char ID; // Class identification, replacement for typeinfo
-    SwiftAliasAnalysis() : ImmutablePass(ID) {
-      initializeSwiftAliasAnalysisPass(*PassRegistry::getPassRegistry());
-    }
-    
-  private:
-    virtual void initializePass() {
-      InitializeAliasAnalysis(this);
-    }
-    
-    /// getAdjustedAnalysisPointer - This method is used when a pass implements
-    /// an analysis interface through multiple inheritance.  If needed, it
-    /// should override this to adjust the this pointer as needed for the
-    /// specified pass info.
-    virtual void *getAdjustedAnalysisPointer(const void *PI) {
-      if (PI == &AliasAnalysis::ID)
-        return static_cast<AliasAnalysis *>(this);
-      return this;
-    }
-    
-    void getAnalysisUsage(AnalysisUsage &AU) const {
-      AU.setPreservesAll();
-      AliasAnalysis::getAnalysisUsage(AU);
-    }
-    
-    virtual ModRefResult getModRefInfo(ImmutableCallSite CS,
-                                       const Location &Loc);
-  };
-}  // End of anonymous namespace
 
 // Register this pass...
 char SwiftAliasAnalysis::ID = 0;
@@ -967,34 +935,30 @@ namespace llvm {
   void initializeSwiftARCOptPass(PassRegistry&);
 }
 
-
-namespace {
-  class SwiftARCOpt : public FunctionPass {
-    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-      AU.addRequired<SwiftAliasAnalysis>();
-      AU.setPreservesCFG();
-    }
-    virtual bool runOnFunction(Function &F);
-    
-  public:
-    static char ID;
-    SwiftARCOpt() : FunctionPass(ID) {
-      initializeSwiftARCOptPass(*PassRegistry::getPassRegistry());
-    }
-  };
-}
 char SwiftARCOpt::ID = 0;
+
 INITIALIZE_PASS_BEGIN(SwiftARCOpt,
-                  "swift-arc-optimize", "Swift ARC optimization", false, false)
+                      "swift-arc-optimize", "Swift ARC optimization",
+                      false, false)
 INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
 INITIALIZE_PASS_END(SwiftARCOpt,
-                    "swift-arc-optimize", "Swift ARC optimization", false,false)
+                    "swift-arc-optimize", "Swift ARC optimization",
+                    false, false)
 
 // Optimization passes.
 llvm::FunctionPass *swift::createSwiftARCOptPass() {
+  initializeSwiftARCOptPass(*llvm::PassRegistry::getPassRegistry());
   return new SwiftARCOpt();
 }
 
+SwiftARCOpt::SwiftARCOpt() : FunctionPass(ID) {
+}
+
+
+void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+  AU.addRequired<SwiftAliasAnalysis>();
+  AU.setPreservesCFG();
+}
 
 bool SwiftARCOpt::runOnFunction(Function &F) {
   bool Changed = false;
@@ -1175,7 +1139,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 ///
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
-static bool performARCExpansion(Function &F) {
+bool SwiftARCExpandPass::runOnFunction(Function &F) {
   Constant *RetainCache = nullptr;
   bool Changed = false;
   
@@ -1329,27 +1293,11 @@ namespace llvm {
   void initializeSwiftARCExpandPassPass(PassRegistry&);
 }
 
-namespace {
-  class SwiftARCExpandPass : public FunctionPass {
-    virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-      AU.setPreservesCFG();
-    }
-    virtual bool runOnFunction(Function &F) {
-      return performARCExpansion(F);
-    }
-    
-  public:
-    static char ID;
-    SwiftARCExpandPass() : FunctionPass(ID) {
-      initializeSwiftARCExpandPassPass(*PassRegistry::getPassRegistry());
-    }
-  };
-}
-
 char SwiftARCExpandPass::ID = 0;
 INITIALIZE_PASS(SwiftARCExpandPass,
                 "swift-arc-expand", "Swift ARC expansion", false, false)
 
 llvm::FunctionPass *swift::createSwiftARCExpandPass() {
+  initializeSwiftARCExpandPassPass(*llvm::PassRegistry::getPassRegistry());
   return new SwiftARCExpandPass();
 }

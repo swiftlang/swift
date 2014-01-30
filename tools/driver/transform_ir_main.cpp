@@ -19,7 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Driver/Options.h"
-#include "swift/Subsystems.h"
+#include "swift/OptimizeARC/PassesFwd.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Triple.h"

@@ -22,12 +22,11 @@ add_swift_library(swiftIRGen
   IRGenModule.cpp
   IRGenSIL.cpp
   Linking.cpp
-  OptimizeARC.cpp
   SwiftASTStreamerPass.cpp
   SwiftTargetInfo.cpp
   SwiftTargetMachine.cpp
   StructLayout.cpp
-  DEPENDS LLVMMC LLVMSupport LLVMCore swiftAST)
+  DEPENDS LLVMMC LLVMSupport LLVMCore swiftAST swiftOptimizeARC)
 
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.
