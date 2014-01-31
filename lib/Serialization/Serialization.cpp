@@ -2118,13 +2118,7 @@ static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members,
   }
 }
 
-void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
-  assert(!this->M && "already serializing a module");
-  this->M = getModule(DC);
-  this->SF = DC.dyn_cast<SourceFile *>();
-
-  writeSILFunctions(SILMod);
-
+void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, extensionDecls, operatorDecls, operatorMethodDecls;
   ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
   for (auto nextFile : files) {
@@ -2189,10 +2183,6 @@ void Serializer::writeModule(ModuleOrSourceFile DC, const SILModule *SILMod) {
       }
     }
   }
-
-#ifndef NDEBUG
-  this->M = nullptr;
-#endif
 }
 
 namespace {
@@ -2214,7 +2204,7 @@ namespace {
 }
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *SILMod,
+                               const SILModule *SILMod, bool serializeAllSIL,
                                FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
@@ -2224,14 +2214,22 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   // FIXME: This is only really needed for debugging. We don't actually use it.
   writeBlockInfoBlock();
 
-  const Module *mod = getModule(DC);
-
   {
+    assert(!this->M && "already serializing a module");
+    this->M = getModule(DC);
+    this->SF = DC.dyn_cast<SourceFile *>();
+
     BCBlockRAII moduleBlock(Out, MODULE_BLOCK_ID, 2);
-    writeHeader(mod);
-    writeInputFiles(mod, inputFiles, moduleLinkName);
-    writeModule(DC, SILMod);
+    writeHeader(M);
+    writeInputFiles(M, inputFiles, moduleLinkName);
+    writeSIL(SILMod, serializeAllSIL);
+    writeAST(DC);
     Out.FlushToWord();
+
+#ifndef NDEBUG
+    this->M = nullptr;
+    this->SF = nullptr;
+#endif
   }
 
   os.write(Buffer.data(), Buffer.size());
@@ -2239,9 +2237,9 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   Buffer.clear();
 }
 
-void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
-                      const char *outputPath, FilenamesTy inputFiles,
-                      StringRef moduleLinkName) {
+void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
+                      const SILModule *M, bool serializeAllSIL,
+                      FilenamesTy inputFiles, StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
                            llvm::sys::fs::F_Binary);
@@ -2253,12 +2251,13 @@ void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
     return;
   }
 
-  serializeToStream(DC, out, M, inputFiles, moduleLinkName);
+  serializeToStream(DC, out, M, serializeAllSIL, inputFiles, moduleLinkName);
 }
 
 void swift::serializeToStream(ModuleOrSourceFile DC, raw_ostream &out,
-                              const SILModule *M, FilenamesTy inputFiles,
+                              const SILModule *M, bool serializeAllSIL,
+                              FilenamesTy inputFiles,
                               StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, DC, M, inputFiles, moduleLinkName);
+  S.writeToStream(out, DC, M, serializeAllSIL, inputFiles, moduleLinkName);
 }

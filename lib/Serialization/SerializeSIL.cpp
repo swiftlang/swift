@@ -24,11 +24,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-// To help testing serialization, deserialization, we turn on sil-serialize-all.
-static llvm::cl::opt<bool>
-EnableSerializeAll("sil-serialize-all", llvm::cl::Hidden,
-                   llvm::cl::init(false));
-
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
@@ -116,25 +111,25 @@ namespace {
     Table FuncTable;
     std::vector<BitOffset> Funcs;
     /// The current function ID.
-    DeclID FuncID;
+    DeclID FuncID = 1;
 
     /// Maps class name to a VTable ID.
     Table VTableList;
     /// Holds the list of VTables.
     std::vector<BitOffset> VTableOffset;
-    DeclID VTableID;
+    DeclID VTableID = 1;
 
     /// Maps global variable name to an ID.
     Table GlobalVarList;
     /// Holds the list of SIL global variables.
     std::vector<BitOffset> GlobalVarOffset;
-    DeclID GlobalVarID;
+    DeclID GlobalVarID = 1;
 
     /// Maps witness table identifier to an ID.
     Table WitnessTableList;
     /// Holds the list of WitnessTables.
     std::vector<BitOffset> WitnessTableOffset;
-    DeclID WitnessTableID;
+    DeclID WitnessTableID = 1;
 
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock*, unsigned> BasicBlockMap;
@@ -153,6 +148,8 @@ namespace {
                          << "\n");
     }
 
+    bool ShouldSerializeAll;
+
     /// Helper function to update ListOfValues for MethodInst. Format:
     /// Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and an operand.
     void handleMethodInst(const MethodInst *MI, SILValue operand,
@@ -168,17 +165,12 @@ namespace {
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
-                  llvm::BitstreamWriter &Out);
+                  llvm::BitstreamWriter &Out, bool serializeAll)
+      : S(S), Ctx(Ctx), Out(Out), ShouldSerializeAll(serializeAll) {}
 
-    void writeAllSILFunctions(const SILModule *SILMod);
+    void writeModule(const SILModule *SILMod);
   };
 } // end anonymous namespace
-
-SILSerializer::SILSerializer(Serializer &S, ASTContext &Ctx,
-                             llvm::BitstreamWriter &Out) :
-                            S(S), Ctx(Ctx), Out(Out), FuncID(1),
-                            VTableID(1), GlobalVarID(1), WitnessTableID(1) {
-}
 
 /// We enumerate all values in a SILFunction beforehand to correctly
 /// handle forward references of values.
@@ -1278,7 +1270,7 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   }
 }
 
-void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
+void SILSerializer::writeModule(const SILModule *SILMod) {
   {
     BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 5);
     registerSILAbbr<SILFunctionLayout>();
@@ -1320,14 +1312,14 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
     // VTable.
     for (const SILVTable &vt : SILMod->getVTables()) {
       const ClassDecl *cd = vt.getClass();
-      if (EnableSerializeAll ||
+      if (ShouldSerializeAll ||
           cd->getAttrs().getResilienceKind() == Resilience::Fragile)
         writeVTable(vt);
     }
 
     // Write out WitnessTables. For now, write out only if EnableSerializeAll.
     for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-      if (EnableSerializeAll)
+      if (ShouldSerializeAll)
         writeWitnessTable(wt);
     }
 
@@ -1336,7 +1328,7 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
       // Emit function body if a private function is referenced in this module.
       // This is needed for body of closure.
       return (!F.empty() &&
-              (EnableSerializeAll || F.isTransparent()  ||
+              (ShouldSerializeAll || F.isTransparent()  ||
                (F.getLinkage() == SILLinkage::Private &&
                 FuncsToDeclare.count(&F))));
     };
@@ -1361,11 +1353,11 @@ void SILSerializer::writeAllSILFunctions(const SILModule *SILMod) {
   }
 }
 
-void Serializer::writeSILFunctions(const SILModule *SILMod) {
+void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
   if (!SILMod)
     return;
 
-  SILSerializer SILSer(*this, M->Ctx, Out);
-  SILSer.writeAllSILFunctions(SILMod);
+  SILSerializer SILSer(*this, M->Ctx, Out, serializeAllSIL);
+  SILSer.writeModule(SILMod);
 
 }

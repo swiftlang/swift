@@ -80,6 +80,9 @@ def print_stats : Flag<["-"], "print-stats">,
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 
+def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
+  HelpText<"Serialize all generated SIL">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

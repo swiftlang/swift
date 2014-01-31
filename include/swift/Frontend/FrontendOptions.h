@@ -119,6 +119,10 @@ public:
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
 
+  /// Indicates that all generated SIL should be serialized into a module,
+  /// not just code considered fragile.
+  bool SILSerializeAll = false;
+
   /// Indicates how the frontend should perform SIL linking.
   enum SILLinkMode {
     /// Indicates that the frontend should skip SIL linking.

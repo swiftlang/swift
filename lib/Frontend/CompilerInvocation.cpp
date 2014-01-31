@@ -444,6 +444,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown SIL linking option!");
   }
 
+  Opts.SILSerializeAll = Args.hasArg(OPT_sil_serialize_all);
+
   return false;
 }
 

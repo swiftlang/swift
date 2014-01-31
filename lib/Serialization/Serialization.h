@@ -255,18 +255,18 @@ private:
                     const std::vector<BitOffset> &values);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSILFunctions(const SILModule *M);
+  void writeSIL(const SILModule *M, bool serializeAllSIL);
 
   /// Top-level entry point for serializing a module.
-  void writeModule(ModuleOrSourceFile DC, const SILModule *M);
+  void writeAST(ModuleOrSourceFile DC);
 
 public:
   Serializer() = default;
 
   /// Serialize a module to the given stream.
   void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                     const SILModule *M, FilenamesTy inputFiles,
-                     StringRef moduleLinkName);
+                     const SILModule *M, bool serializeAllSIL,
+                     FilenamesTy inputFiles, StringRef moduleLinkName);
 
   /// Records the use of the given Type.
   ///

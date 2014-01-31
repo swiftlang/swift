@@ -143,8 +143,9 @@ namespace swift {
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 
   /// Serializes a module or single source file to the given output file.
-  void serialize(ModuleOrSourceFile DC, const SILModule *M,
-                 const char *outputPath,
+  void serialize(ModuleOrSourceFile DC, const char *outputPath,
+                 const SILModule *M = nullptr,
+                 bool serializeAllSIL = false,
                  ArrayRef<std::string> inputFilenames = {},
                  StringRef moduleLinkName = {});
 
@@ -152,6 +153,7 @@ namespace swift {
   void serializeToStream(ModuleOrSourceFile DC,
                          llvm::raw_ostream &out,
                          const SILModule *M = nullptr,
+                         bool serializeAllSIL = false,
                          ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
 

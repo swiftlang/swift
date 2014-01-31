@@ -150,8 +150,10 @@ static bool performCompile(CompilerInstance &Instance,
   if (!Invocation.getFrontendOptions().ModuleOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    serialize(DC, SM.get(),
+    serialize(DC,
               Invocation.getFrontendOptions().ModuleOutputPath.c_str(),
+              SM.get(),
+              Invocation.getFrontendOptions().SILSerializeAll,
               Invocation.getFrontendOptions().InputFilenames,
               Invocation.getFrontendOptions().ModuleLinkName);
 
