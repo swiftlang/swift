@@ -415,12 +415,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
       return true;
     case FrontendOptions::EmitModuleOnly:
-    case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitIR:
     case FrontendOptions::EmitBC:

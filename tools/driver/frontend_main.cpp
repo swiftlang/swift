@@ -125,27 +125,12 @@ static bool performCompile(CompilerInstance &Instance,
       performSILLinking(SM.get(), LinkMode == FrontendOptions::LinkAll);
   }
 
-  if (!Invocation.getFrontendOptions().ModuleOutputPath.empty()) {
-    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
-                                  Instance.getMainModule();
-    serialize(DC, SM.get(),
-              Invocation.getFrontendOptions().ModuleOutputPath.c_str(),
-              Invocation.getFrontendOptions().InputFilenames,
-              Invocation.getFrontendOptions().ModuleLinkName);
-
-    if (Action == FrontendOptions::EmitModuleOnly)
-      return false;
-  }
-
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::EmitSILGen) {
     return writeSIL(*SM, Instance.getMainModule(),
                     Invocation.getFrontendOptions().EmitVerboseSIL,
                     Invocation.getFrontendOptions().OutputFilename);
   }
-
-  assert(Action >= FrontendOptions::EmitSIL &&
-         "All actions not requiring SILPasses must have been handled!");
 
   // Perform "stable" optimizations that are invariant across compiler versions.
   if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
@@ -162,11 +147,20 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
-  // TODO: emit module, if requested.
-  if (Action == FrontendOptions::EmitModuleOnly) {
-    llvm::errs() << "error: frontend does not yet support emitting modules\n";
-    return true;
+  if (!Invocation.getFrontendOptions().ModuleOutputPath.empty()) {
+    auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
+                                  Instance.getMainModule();
+    serialize(DC, SM.get(),
+              Invocation.getFrontendOptions().ModuleOutputPath.c_str(),
+              Invocation.getFrontendOptions().InputFilenames,
+              Invocation.getFrontendOptions().ModuleLinkName);
+
+    if (Action == FrontendOptions::EmitModuleOnly)
+      return false;
   }
+
+  assert(Action >= FrontendOptions::EmitSIL &&
+         "All actions not requiring SILPasses must have been handled!");
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::EmitSIL) {
