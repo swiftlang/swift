@@ -27,15 +27,40 @@ using namespace swift;
 
 namespace {
 typedef std::pair<Identifier, SourceLoc> AccessPathElem;
+
+/// An adapter class that allows a std::unique_ptr to be used as an
+/// llvm::OwningPtr.
+template <typename T>
+class OwningPtrAdapter {
+  llvm::OwningPtr<T> Owner;
+  std::unique_ptr<T> &Result;
+public:
+  OwningPtrAdapter(std::unique_ptr<T> &result) : Result(result) {
+    Owner.reset(Result.release());
+  }
+
+  OwningPtrAdapter(const OwningPtrAdapter &other) = delete;
+  OwningPtrAdapter &operator=(const OwningPtrAdapter &other) = delete;
+  OwningPtrAdapter(OwningPtrAdapter &&other) = default;
+  OwningPtrAdapter &operator=(OwningPtrAdapter &&other) = default;
+
+  ~OwningPtrAdapter() {
+    Result.reset(Owner.take());
+  }
+  operator llvm::OwningPtr<T> &() { return Owner; }
+};
+
+template <typename T>
+OwningPtrAdapter<T> makeOwningPtrAdapter(std::unique_ptr<T> &result) {
+  return result;
+}
+
 }
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
-// FIXME: Copied from SourceLoader. Not bothering to fix until we decide that
-// the source loader search path should be the same as the module loader search
-// path.
 static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
                                    std::unique_ptr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
@@ -43,59 +68,21 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
   llvm::SmallString<128> inputFilename;
-  llvm::OwningPtr<llvm::MemoryBuffer> bufferRef;
 
-  // First, search in the directory corresponding to the import location.
-  // FIXME: This screams for a proper FileManager abstraction.
-  if (moduleID.second.isValid()) {
-    unsigned currentBufferID =
-        ctx.SourceMgr.findBufferContainingLoc(moduleID.second);
-    const llvm::MemoryBuffer *importingBuffer
-      = ctx.SourceMgr->getMemoryBuffer(currentBufferID);
-    StringRef currentDirectory
-      = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
-    if (!currentDirectory.empty()) {
-      inputFilename = currentDirectory;
-      llvm::sys::path::append(inputFilename, moduleFilename.str());
-      llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                                         bufferRef);
-      if (!err) {
-        buffer.reset(bufferRef.take());
-        return err;
-      }
-    }
-  }
-
-  // Second, search in the current directory.
-  llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename.str(),
-                                                     bufferRef);
-  if (!err) {
-    buffer.reset(bufferRef.take());
-    return err;
-  }
-
-  // If we fail, search each import search path.
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = Path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
-    err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
-    if (!err) {
-      buffer.reset(bufferRef.take());
+    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(),
+                                           makeOwningPtrAdapter(buffer));
+    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
-    }
   }
 
   // Search the runtime import path.
   inputFilename = ctx.SearchPathOpts.RuntimeLibraryImportPath;
   llvm::sys::path::append(inputFilename, moduleFilename.str());
-  err = llvm::MemoryBuffer::getFile(inputFilename.str(), bufferRef);
-  if (!err) {
-    buffer.reset(bufferRef.take());
-    return err;
-  }
-
-  // If we get here, we couldn't find the module, so return our most recent err.
-  return err;
+  return llvm::MemoryBuffer::getFile(inputFilename.str(),
+                                     makeOwningPtrAdapter(buffer));
 }
 
 FileUnit *

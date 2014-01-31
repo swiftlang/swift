@@ -24,6 +24,9 @@
 
 * 'import' will no longer import other source files, only built modules.
 
+* The current directory is no longer implicitly an import path. Use "-I ." if
+  you have modules in your current directory.
+
 
 2014-01-29
 ----------

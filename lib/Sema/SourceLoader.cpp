@@ -31,50 +31,22 @@
 
 using namespace swift;
 
+// FIXME: Basically the same as SerializedModuleLoader.
 static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
                                    SourceLoc importLoc,
                                    llvm::OwningPtr<llvm::MemoryBuffer> &buffer){
-  llvm::SmallString<64> moduleFilename(moduleID);
-  moduleFilename += ".swift";
-
   llvm::SmallString<128> inputFilename;
 
-  // First, search in the directory corresponding to the import location.
-  // FIXME: This screams for a proper FileManager abstraction.
-  if (importLoc.isValid()) {
-    unsigned currentBufferID =
-        ctx.SourceMgr.findBufferContainingLoc(importLoc);
-    const llvm::MemoryBuffer *importingBuffer
-      = ctx.SourceMgr->getMemoryBuffer(currentBufferID);
-    StringRef currentDirectory
-      = llvm::sys::path::parent_path(importingBuffer->getBufferIdentifier());
-    if (!currentDirectory.empty()) {
-      inputFilename = currentDirectory;
-      llvm::sys::path::append(inputFilename, moduleFilename.str());
-      llvm::error_code err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                                         buffer);
-      if (!err)
-        return err;
-    }
-  }
-
-  // Second, search in the current directory.
-  llvm::error_code err = llvm::MemoryBuffer::getFile(moduleFilename.str(),
-                                                     buffer);
-  if (!err)
-    return err;
-
-  // If we fail, search each import search path.
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = Path;
-    llvm::sys::path::append(inputFilename, moduleFilename.str());
-    err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err)
+    llvm::sys::path::append(inputFilename, moduleID);
+    inputFilename.append(".swift");
+    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
+    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
 
-  // If we get here, we couldn't find the module, so return our most recent err.
-  return err;
+  return make_error_code(llvm::errc::no_such_file_or_directory);
 }
 
 namespace {
