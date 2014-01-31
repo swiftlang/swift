@@ -72,7 +72,7 @@ ERROR(error_mode_cannot_emit_module,frontend,none,
 ERROR(error_repl_requires_no_input_files,frontend,none,
   "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,frontend,none,
-  "this mode requires exactly one input file", ())
+  "this mode requires a single input file", ())
 ERROR(error_mode_requires_an_input_file,frontend,none,
   "this mode requires at least one input file", ())
 
