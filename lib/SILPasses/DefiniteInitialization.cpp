@@ -826,11 +826,16 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   // If this is a copy_addr or store_weak, we just set the initialization bit
   // depending on what we find.
   if (auto *CA = dyn_cast<CopyAddrInst>(Inst)) {
+    assert(!CA->isInitializationOfDest()
+           && "should not modify copy_addr that already knows it is initialized");
     CA->setIsInitializationOfDest(InitKind);
     return;
   }
   
   if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
+    assert(!SW->isInitializationOfDest()
+           && "should not modify store_weak that already knows it is initialized");
+
     SW->setIsInitializationOfDest(InitKind);
     return;
   }
@@ -1503,6 +1508,9 @@ static void processMemoryObject(SILInstruction *I) {
 /// initialization before use are properly set and transform the code as
 /// required for flow-sensitive properties.
 static void checkDefiniteInitialization(SILFunction &Fn) {
+  DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
+                     <<  Fn.getName() << "\n");
+
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
       SILInstruction *Inst = I;
