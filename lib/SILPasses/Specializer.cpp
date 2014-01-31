@@ -192,6 +192,12 @@ static bool canSpecializeFunction(SILFunction *F) {
         if (PAI->hasSubstitutions())
           return false;
       }
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
+        SILValue CalleeVal = AI->getCallee();
+        FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
+        if (FRI && FRI->getReferencedFunction() == AI->getFunction())
+          return false;
+      }
     }
 
   return true;
