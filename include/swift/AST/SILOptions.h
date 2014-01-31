@@ -40,6 +40,9 @@ public:
 
   /// Controls how  perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
+
+  /// Controls whether the SIL ARC optimizations are run.
+  bool EnableARCOptimizations = true;
 };
 
 } // end namespace swift

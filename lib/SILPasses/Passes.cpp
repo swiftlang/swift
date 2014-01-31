@@ -83,8 +83,12 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     performSILCombine(&Module);
     performSILCodeMotion(&Module);
     performSimplifyCFG(&Module);
+
     Changed |= performSILDevirtualization(&Module);
-    performSILARCOpts(&Module);
+
+    if (Options.EnableARCOptimizations)
+      performSILARCOpts(&Module);
+
     performSILAllocBoxToStackPromotion(&Module);
     performSILAllocRefElimination(&Module);
 

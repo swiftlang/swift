@@ -27,9 +27,6 @@
 using namespace swift;
 using namespace swift::arc;
 
-static llvm::cl::opt<bool>
-EnableARCOpts("enable-arc-opts", llvm::cl::Hidden, llvm::cl::init(true));
-
 STATISTIC(NumIncrements, "Total number of increments seen");
 STATISTIC(NumMovedIncrements, "Total number of increments moved");
 STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
@@ -520,9 +517,6 @@ static void processFunction(SILFunction &F) {
 }
 
 void swift::performSILARCOpts(SILModule *M) {
-  if (!EnableARCOpts)
-    return;
-
   DEBUG(llvm::dbgs() << "*** SIL ARC OPTS ***\n");
   // For each function in the module...
   for (SILFunction &F : *M) {

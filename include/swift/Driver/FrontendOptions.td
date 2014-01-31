@@ -49,6 +49,9 @@ def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
 def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
   Alias<debug_constraints_attempt>;
 
+def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
+  HelpText<"Don't run SIL ARC optimization passes.">;
+
 def disable_all_runtime_checks : Flag<["-"], "disable-all-runtime-checks">,
   HelpText<"Disable all intrinsic runtime safety checks">;
 

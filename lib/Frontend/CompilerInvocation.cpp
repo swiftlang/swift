@@ -571,6 +571,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown SIL linking option!");
   }
 
+  Opts.EnableARCOptimizations = !Args.hasArg(OPT_disable_arc_opts);
+
   return false;
 }
 
