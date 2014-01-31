@@ -195,7 +195,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 # Swift stdlib build products
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_BUILD_IOS" ]]; then
-    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64)
+    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64 swift_stdlib_ios_armv7 swift_stdlib_ios_simulator_i386)
     SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
 fi
