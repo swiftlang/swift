@@ -22,11 +22,20 @@
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
 
-static llvm::cl::opt<unsigned>
-InlineCostThreshold("sil-inline-threshold", llvm::cl::Hidden,
-                    llvm::cl::init(50));
-
 STATISTIC(NumFunctionsInlined, "Number of functions inlined");
+
+namespace {
+  class SILPerformanceInliner {
+    const unsigned InlineCostThreshold;
+
+    unsigned getFunctionCost(SILFunction *F);
+  public:
+    explicit SILPerformanceInliner(unsigned threshold)
+      : InlineCostThreshold(threshold) {}
+
+    void inlineCallsIntoFunction(SILFunction *F);
+  };
+}
 
 //===----------------------------------------------------------------------===//
 //                            Call Graph Creation
@@ -231,7 +240,7 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
 }
 
 /// \brief Returns the inlining cost of the function.
-static unsigned getFunctionCost(SILFunction *F) {
+unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F) {
   DEBUG(llvm::dbgs() << "  Calculating cost for " << F->getName() << ".\n");
 
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
@@ -244,16 +253,13 @@ static unsigned getFunctionCost(SILFunction *F) {
 
       // If we're debugging, continue calculating the total cost even if we
       // passed the threshold.
-      DEBUG(goto next);
+      DEBUG(continue);
       
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
-      if (Cost > InlineCostThreshold) {
+      if (Cost > InlineCostThreshold)
         return Cost;
-      }
-      goto next;
-next:;
     }
   }
 
@@ -266,7 +272,7 @@ next:;
 //===----------------------------------------------------------------------===//
 
 /// Attempt to inline all calls smaller than our threshold into F until.
-static void inlineCallsIntoFunction(SILFunction *Caller) {
+void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
@@ -331,10 +337,11 @@ static void inlineCallsIntoFunction(SILFunction *Caller) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILPerformanceInlining(SILModule *M) {
+void swift::performSILPerformanceInlining(SILModule *M,
+                                          unsigned inlineCostThreshold) {
   DEBUG(llvm::dbgs() << "*** SIL Performance Inlining ***\n\n");
 
-  if (InlineCostThreshold == 0) {
+  if (inlineCostThreshold == 0) {
     DEBUG(llvm::dbgs() << "*** The SIL performance Inliner is disabled ***\n");
     return;
   }
@@ -342,6 +349,8 @@ void swift::performSILPerformanceInlining(SILModule *M) {
   // Collect a call-graph bottom-up list of functions.
   std::vector<SILFunction *> Worklist;
   TopDownCallGraphOrder(M, Worklist);
+
+  SILPerformanceInliner inliner(inlineCostThreshold);
 
   // For each function in the worklist, attempt to inline its list of apply
   // inst.
@@ -352,6 +361,6 @@ void swift::performSILPerformanceInlining(SILModule *M) {
     // Do not inline into transparent functions. This is exposing a diagnostics
     // bug. We will still inline after we perform mandatory inlining of the
     // transparent function.
-    inlineCallsIntoFunction(F);
+    inliner.inlineCallsIntoFunction(F);
   }
 }

@@ -24,6 +24,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -60,15 +61,15 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   return Ctx.hadError();
 }
 
-void swift::runSILOptimizationPasses(SILModule &Module) {
-
+void swift::runSILOptimizationPasses(SILModule &Module,
+                                     const SILOptions &Options) {
   // Continue to optimize the code until we can't specialize any more.
   bool Changed = true;
   while (Changed) {
     // Specialize generic functions.
     Changed = performSILSpecialization(&Module);
     // Inline the specialized functions.
-    performSILPerformanceInlining(&Module);
+    performSILPerformanceInlining(&Module, Options.InlineThreshold);
     // Cleanup after inlining.
     performSILCombine(&Module);
 

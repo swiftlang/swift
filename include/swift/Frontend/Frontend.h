@@ -27,6 +27,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -54,6 +55,7 @@ class CompilerInvocation {
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
+  SILOptions SILOpts;
   IRGenOptions IRGenOpts;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
@@ -168,6 +170,9 @@ public:
   const DiagnosticOptions &getDiagnosticOptions() const {
     return DiagnosticOpts;
   }
+
+  SILOptions &getSILOptions() { return SILOpts; }
+  const SILOptions &getSILOptions() const { return SILOpts; }
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }

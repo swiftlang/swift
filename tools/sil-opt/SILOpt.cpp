@@ -146,6 +146,9 @@ VerifyMode("verify",
            llvm::cl::desc("verify diagnostics against expected-"
                           "{error|warning|note} annotations"));
 
+static llvm::cl::opt<unsigned>
+SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
+                   llvm::cl::init(50));
 
 static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
@@ -253,7 +256,7 @@ int main(int argc, char **argv) {
       performSimplifyCFG(CI.getSILModule());
       break;
     case PassKind::PerformanceInlining:
-      performSILPerformanceInlining(CI.getSILModule());
+      performSILPerformanceInlining(CI.getSILModule(), SILInlineThreshold);
       break;
     case PassKind::CodeMotion:
       performSILCodeMotion(CI.getSILModule());

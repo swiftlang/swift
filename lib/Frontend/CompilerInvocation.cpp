@@ -559,6 +559,19 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
   OS << '"';
 }
 
+static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
+                         DiagnosticEngine &Diags) {
+  if (const Arg *A = Args.getLastArg(options::OPT_sil_inline_threshold)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.InlineThreshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
                                               const ArrayRef<const char*> &Args,
                                               StringRef SDKPath) {
@@ -698,7 +711,11 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags)) {
     return true;
   }
-  
+
+  if (ParseSILArgs(SILOpts, *ParsedArgs, Diags)) {
+    return true;
+  }
+
   if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts,
                      getSDKPath())) {
     return true;

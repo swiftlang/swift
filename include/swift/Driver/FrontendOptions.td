@@ -77,6 +77,10 @@ def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
+  MetaVarName<"<50>">,
+  HelpText<"Controls the aggressiveness of performance inlining">;
+
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 

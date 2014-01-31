@@ -18,8 +18,8 @@
 #define SWIFT_SILPASSES_PASSES_H
 
 namespace swift {
-
   class SILModule;
+  class SILOptions;
 
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
@@ -27,7 +27,7 @@ namespace swift {
   bool runSILDiagnosticPasses(SILModule &M);
 
   /// \brief Run all the SIL performance optimization passes on \p M.
-  void runSILOptimizationPasses(SILModule &M);
+  void runSILOptimizationPasses(SILModule &M, const SILOptions &Options);
 
   /// performSILDefiniteInitialization - Perform definitive initialization
   /// analysis, applying flow sensitive analysis to the SILGen generated code
@@ -99,7 +99,8 @@ namespace swift {
   void performSILCleanup(SILModule *M);
 
   /// \brief Perform SIL Inlining for Performance.
-  void performSILPerformanceInlining(SILModule *M);
+  void performSILPerformanceInlining(SILModule *M,
+                                     unsigned inlineCostThreshold);
 
   /// \brief Perform SIL code motion optimizations.
   void performSILCodeMotion(SILModule *M);
