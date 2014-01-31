@@ -1582,8 +1582,6 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
 }
 
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
-  SILValue v(i, 0);
-  
   const LoweredValue &calleeLV = getLoweredValue(i->getCallee());
   
   // Handle builtin calls separately.
