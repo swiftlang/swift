@@ -36,6 +36,7 @@ namespace {
 
   /// A CRTP class for defining entries in a metadata cache.
   template <class Impl> class alignas(void*) CacheEntry {
+    const Impl *Next;
     friend class MetadataCache<Impl>;
 
     CacheEntry(const CacheEntry &other) = delete;
@@ -174,6 +175,13 @@ namespace {
   /// The implementation of a metadata cache.  Note that all-zero must
   /// be a valid state for the cache.
   template <class Entry> class MetadataCache {
+    /// The head of a linked list connecting all the metadata cache entries.
+    /// TODO: Remove this when LLDB is able to understand the final data
+    /// structure for the metadata cache.
+    const Entry *Head;
+    
+    /// The lookup table for cached entries.
+    /// TODO: Consider a more tuned hashtable implementation.
     llvm::DenseMap<EntryRef<Entry>, bool> Entries;
 
   public:
@@ -194,6 +202,12 @@ namespace {
     ///
     /// FIXME: This doesn't actually handle races yet.
     const Entry *add(Entry *entry) {
+      // Maintain the linked list.
+      /// TODO: Remove this when LLDB is able to understand the final data
+      /// structure for the metadata cache.
+      entry->Next = Head;
+      Head = entry;
+      
       Entries[EntryRef<Entry>::forEntry(entry, entry->NumArguments)]
         = true;
       return entry;
