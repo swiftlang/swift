@@ -1005,7 +1005,7 @@ var staticProp: Int = 0
 sil private @globalinit_func0 : $@thin () -> () {
 bb0:
   %0 = global_addr #staticProp : $*Int
-  %1 = mark_uninitialized [globalvar] %0 : $*Int
+  %1 = mark_uninitialized [var] %0 : $*Int
   %7 = tuple ()
   return %7 : $()
 }

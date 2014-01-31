@@ -511,6 +511,60 @@ struct InitializationForPattern
 #include "swift/AST/PatternNodes.def"
 #undef INVALID_PATTERN
 };
+  
+/// A visitor that marks local variables uninitialized in a pattern binding
+/// without an initializer.
+struct MarkPatternUninitialized
+  : public PatternVisitor<MarkPatternUninitialized>
+{
+  SILGenFunction &Gen;
+  MarkPatternUninitialized(SILGenFunction &Gen) : Gen(Gen) {}
+  
+  // Paren, Typed, and Var patterns are noops, just look through them.
+  void visitParenPattern(ParenPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  void visitTypedPattern(TypedPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  void visitVarPattern(VarPattern *P) {
+    return visit(P->getSubPattern());
+  }
+  
+  void visitAnyPattern(AnyPattern *P) {}
+  
+  void visitTuplePattern(TuplePattern *P) {
+    for (auto elt : P->getFields())
+      visit(elt.getPattern());
+  }
+  
+  void visitNamedPattern(NamedPattern *P) {
+    VarDecl *var = P->getDecl();
+    if (!var->hasStorage())
+      return;
+    
+    // Emit a mark_uninitialized for the variable's storage, and fix up the
+    // loc to refer to the marker.
+    assert(Gen.VarLocs.count(var)
+           && "no varloc for uninitialized var?!");
+    auto &varLoc = Gen.VarLocs[var];
+    assert(varLoc.isAddress()
+           && "uninitialized var doesn't have an address?!");
+    auto mu
+      = Gen.B.createMarkUninitializedVar(P->getDecl(), varLoc.getAddress());
+    Gen.VarLocs[var] = SILGenFunction::VarLoc::getAddress(mu, varLoc.box);
+  }
+  
+  // TODO: Handle bindings from 'case' labels and match expressions.
+#define INVALID_PATTERN(Id, Parent) \
+  void visit##Id##Pattern(Id##Pattern *) { \
+    llvm_unreachable("pattern not valid in argument or var binding"); \
+  }
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) INVALID_PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+#undef INVALID_PATTERN
+};
 
 } // end anonymous namespace
 
@@ -528,9 +582,6 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
     SILValue addr = B.createGlobalAddr(vd, vd,
                                 getLoweredType(vd->getType()).getAddressType());
     
-    // In a top level context, all global variables must be initialized.
-    addr = B.createMarkUninitializedGlobalVar(vd, addr);
-    
     VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
     return InitializationPtr(new GlobalInitialization(addr));
   }
@@ -543,10 +594,9 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
 
   // If this is a 'let' initialization for a non-address-only type, set up a
   // let binding, which stores the initialization value into VarLocs directly.
-  if (vd->isLet()) {
+  if (vd->isLet())
     return InitializationPtr(new LetValueInitialization(vd, isArgument, *this));
-  }
-  
+
   // Otherwise, we have a normal local-variable initialization.
   auto varInit = emitLocalVariableWithCleanup(vd);
 
@@ -569,12 +619,13 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
       .visit(D->getPattern());
   
   // If an initial value expression was specified by the decl, emit it into
-  // the initialization. Otherwise, leave it uninitialized for DI to resolve.
+  // the initialization. Otherwise, mark it uninitialized for DI to resolve.
   if (D->getInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(D->getInit()));
     emitExprInto(D->getInit(), initialization.get());
   } else {
     initialization->finishInitialization(*this);
+    MarkPatternUninitialized(*this).visit(D->getPattern());
   }
 }
 

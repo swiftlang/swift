@@ -190,9 +190,14 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     auto *User = UI->getUser();
 
     // These instructions do not cause the box's address to escape.
-    if (!useCaptured(UI))     {
+    if (!useCaptured(UI)) {
       Users.push_back(User);
       continue;
+    }
+    
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
+      Users.push_back(MUI);
+      return checkAllocBoxUses(ABI, SILValue(MUI, 0), Users);
     }
 
     // These instructions only cause the alloc_box to escape if they are used in

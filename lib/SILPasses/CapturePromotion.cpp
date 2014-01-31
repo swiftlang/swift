@@ -592,19 +592,18 @@ static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     PartialApplyIndexMap &IM) {
   SmallVector<SILInstruction*, 32> Mutations;
-
-  for (auto *O : ABI->getUses()) {
+  
+  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+  // interesting uses.
+  SILValue Addr(ABI, 1);
+  if (Addr.hasOneUse())
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(Addr.use_begin()->getUser()))
+      Addr = SILValue(MUI, 0);
+  
+  for (auto *O : Addr.getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
-      if (O->get().getResultNumber() == 1) {
-        if (OpNo < 2 ||
-            PAI->getOperand(OpNo - 1) != SILValue(ABI, 0))
-          return false;
-        continue;
-      }
-      assert(O->get().getResultNumber() == 0 &&
-             "Unexpected result number of alloc box instruction used?");
 
       // If we've already seen this partial apply, then it means the same alloc
       // box is being captured twice by the same closure, which is odd and
@@ -612,10 +611,9 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       if (IM.count(PAI))
         return false;
 
-      // Verify that the next operand of the partial apply is the second result
-      // of the alloc_box.
-      if (OpNo + 1 >= PAI->getNumOperands() ||
-          PAI->getOperand(OpNo + 1) != SILValue(ABI, 1))
+      // Verify that the previous operand of the partial apply is the refcount
+      // result of the alloc_box.
+      if (PAI->getOperand(OpNo - 1) != SILValue(ABI, 0))
         return false;
 
       auto closureType = PAI->getType().castTo<SILFunctionType>();
@@ -627,7 +625,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // Calculate the index into the closure's argument list of the captured
       // box pointer (the captured address is always the immediately following
       // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureType->getInterfaceParameters().size();
+      unsigned Index = OpNo - 2 + closureType->getInterfaceParameters().size();
 
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
@@ -722,9 +720,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     if (PromotableIndices.count(Index)) {
       SILValue BoxValue = PAI->getOperand(OpNo);
       SILValue AddrValue = PAI->getOperand(OpNo + 1);
-      assert(BoxValue.getDef() == AddrValue.getDef() &&
+      SILValue UnderlyingAddrValue = AddrValue;
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(AddrValue))
+        UnderlyingAddrValue = MUI->getOperand();
+      assert(BoxValue.getDef() == UnderlyingAddrValue.getDef() &&
              BoxValue.getResultNumber() == 0 &&
-             AddrValue.getResultNumber() == 1);
+             UnderlyingAddrValue.getResultNumber() == 1);
 
       // Emit a strong release, zapping a retain if we can.
       B.emitStrongRelease(PAI->getLoc(), BoxValue);

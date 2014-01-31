@@ -65,10 +65,8 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
 
     // If this is a 'self' decl in an init method for a non-enum value, then we
     // want to process the stored members of the struct/class elementwise.
-    if (MUI->getKind() != MarkUninitializedInst::GlobalVar) {
-      if (!isEnumSelf() && !isDelegatingInit())
-        IsSelfOfNonDelegatingInitializer = true;
-    }
+    if (isAnyInitSelf() && !isEnumSelf() && !isDelegatingInit())
+      IsSelfOfNonDelegatingInitializer = true;
   }
   
   // Compute the number of elements to track in this memory object.
@@ -807,7 +805,8 @@ void ElementUseCollector::collectClassSelfUses() {
   assert(MUI->hasOneUse());
   auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
   SILValue SelfBox = TheStore->getOperand(1);
-  assert(isa<AllocBoxInst>(SelfBox) || isa<AllocStackInst>(SelfBox));
+  assert(isa<MarkUninitializedInst>(SelfBox) || isa<AllocBoxInst>(SelfBox) ||
+         isa<AllocStackInst>(SelfBox));
 
   // Okay, given that we have a proper setup, we walk the use chains of the self
   // box to find any accesses to it.  The possible uses are one of:
@@ -959,7 +958,8 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   assert(MUI->hasOneUse());
   auto *TheStore = cast<StoreInst>((*MUI->use_begin())->getUser());
   SILValue SelfBox = TheStore->getOperand(1);
-  assert(isa<AllocBoxInst>(SelfBox) || isa<AllocStackInst>(SelfBox));
+  assert(isa<MarkUninitializedInst>(SelfBox) || isa<AllocBoxInst>(SelfBox) ||
+         isa<AllocStackInst>(SelfBox));
   
   // Okay, given that we have a proper setup, we walk the use chains of the self
   // box to find any accesses to it.  The possible uses are one of:

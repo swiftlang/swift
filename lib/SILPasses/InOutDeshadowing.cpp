@@ -93,9 +93,14 @@ static AllocStackInst *isCopyToOrFromStack(Operand *UI) {
   
   // If this is an explicit copy_addr, return the other operand if it is a stack
   // allocation.
-  if (UI->getOperandNumber() == 0)
-    return dyn_cast<AllocStackInst>(CAI->getDest());
-  return dyn_cast<AllocStackInst>(CAI->getSrc());
+  SILValue OtherOp =
+    UI->getOperandNumber() == 0 ? CAI->getDest() : CAI->getSrc();
+  
+  // Look through mark_uninitialized.
+  if (auto *MUI = dyn_cast<MarkUninitializedInst>(OtherOp))
+    OtherOp = MUI->getOperand();
+  
+  return dyn_cast<AllocStackInst>(OtherOp);
 }
 
 

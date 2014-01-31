@@ -1484,13 +1484,6 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //===----------------------------------------------------------------------===//
 
 static void processMemoryObject(SILInstruction *I) {
-  // If the allocation's address has a mark_uninitialized use, then we'll
-  // analyze it when we look at the mark_uninitialized instruction itself.
-  if (!isa<MarkUninitializedInst>(I))
-    for (auto UI : SILValue(I, 1).getUses())
-      if (isa<MarkUninitializedInst>(UI->getUser()))
-        return;
-  
   DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -1514,8 +1507,7 @@ static void checkDefiniteInitialization(SILFunction &Fn) {
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
       SILInstruction *Inst = I;
-      if (isa<AllocBoxInst>(Inst) || isa<AllocStackInst>(Inst) ||
-          isa<MarkUninitializedInst>(Inst))
+      if (isa<MarkUninitializedInst>(Inst))
         processMemoryObject(Inst);
     }
   }

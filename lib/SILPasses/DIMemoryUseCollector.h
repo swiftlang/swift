@@ -91,7 +91,7 @@ public:
   /// isAnyInitSelf - Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-      return !MUI->isGlobalVar();
+      return !MUI->isVar();
     return false;
   }
   

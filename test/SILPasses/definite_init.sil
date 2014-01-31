@@ -12,9 +12,10 @@ sil @makesInt : $@thin () -> Int
 // CHECK-LABEL: sil @use_before_init
 sil @use_before_init : $@thin () -> Int {
 bb0:
-  %1 = alloc_box $Int                   // expected-note {{variable defined here}}
-  %4 = load %1#1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %1#0 : $Builtin.ObjectPointer
+  %0 = alloc_box $Int
+  %1 = mark_uninitialized [var] %0#1 : $*Int // expected-note {{variable defined here}}
+  %4 = load %1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
+  strong_release %0#0 : $Builtin.ObjectPointer
   %9 = return %4 : $Int
 }
 
@@ -22,14 +23,15 @@ bb0:
 // CHECK-LABEL: @inout_uninit
 sil @inout_uninit : $@thin () -> () {
 bb0:
-  %1 = alloc_box $Int                                   // expected-note {{variable defined here}}
+  %0 = alloc_box $Int
+  %1 = mark_uninitialized [var] %0#1 : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
+  %6 = apply %5(%1) : $@thin (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
-  %0 = tuple ()
-  strong_release %1#0 : $Builtin.ObjectPointer
-  return %0 : $()
+  %t = tuple ()
+  strong_release %0#0 : $Builtin.ObjectPointer
+  return %t : $()
 }
 
 
@@ -45,14 +47,16 @@ bb0:
 // CHECK-LABEL: sil @used_by_inout
 sil @used_by_inout : $@thin (Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
-  %2 = store %0 to %1#1 : $*Int
-  %3 = load %1#1 : $*Int
+  %91 = alloc_box $Int
+  %1 = mark_uninitialized [var] %91#1 : $*Int
+
+  %2 = store %0 to %1 : $*Int
+  %3 = load %1 : $*Int
   %5 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %6 = apply %5(%1#1) : $@thin (@inout Int) -> ()
-  %7 = load %1#1 : $*Int
+  %6 = apply %5(%1) : $@thin (@inout Int) -> ()
+  %7 = load %1 : $*Int
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %91#0 : $Builtin.ObjectPointer
   %11 = return %8 : $(Int, Int)
 }
 
@@ -69,12 +73,14 @@ sil @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
 // CHECK-LABEL: sil @call_struct_return_function
 sil @call_struct_return_function : $@thin () -> Int {
 bb0:
-  %1 = alloc_box $AddressOnlyStruct
+  %0 = alloc_box $AddressOnlyStruct
+  %1 = mark_uninitialized [var] %0#1 : $*AddressOnlyStruct
+
   %2 = function_ref @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
-  %3 = apply %2(%1#1) : $@thin (@out AddressOnlyStruct) -> ()
-  %4 = struct_element_addr %1#1 : $*AddressOnlyStruct, #b
+  %3 = apply %2(%1) : $@thin (@out AddressOnlyStruct) -> ()
+  %4 = struct_element_addr %1 : $*AddressOnlyStruct, #b
   %5 = load %4 : $*Int
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %0#0 : $Builtin.ObjectPointer
   return %5 : $Int
 }
 
@@ -82,14 +88,15 @@ bb0:
 // CHECK-LABEL: sil @tuple_elements1
 sil @tuple_elements1 : $@thin (Int) -> () {
 bb0(%0 : $Int):
-  %3 = alloc_box $(Int, Int)     // expected-note 1 {{variable defined here}}
-  %4 = tuple_element_addr %3#1 : $*(Int, Int), 0
-  %5 = tuple_element_addr %3#1 : $*(Int, Int), 1
+  %2 = alloc_box $(Int, Int)
+  %3 = mark_uninitialized [var] %2#1 : $*(Int, Int) // expected-note {{variable defined here}}
+  %4 = tuple_element_addr %3 : $*(Int, Int), 0
+  %5 = tuple_element_addr %3 : $*(Int, Int), 1
   %14 = function_ref @takes_Int_inout : $@thin (@inout Int) -> ()
-  %15 = tuple_element_addr %3#1 : $*(Int, Int), 1
+  %15 = tuple_element_addr %3 : $*(Int, Int), 1
   %16 = apply %14(%15) : $@thin (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
-  strong_release %3#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
   %99 = tuple ()
   return %99 : $()
 }
@@ -97,14 +104,15 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @tuple_elements2
 sil @tuple_elements2 : $@thin (Int) -> (Int, Int) {
 bb0(%0 : $Int):
-  %3 = alloc_box $(Int, Int)     // expected-note {{variable defined here}}
-  %18 = tuple_element_addr %3#1 : $*(Int, Int), 0
+  %2 = alloc_box $(Int, Int)
+  %3 = mark_uninitialized [var] %2#1 : $*(Int, Int) // expected-note {{variable defined here}}
+  %18 = tuple_element_addr %3 : $*(Int, Int), 0
   store %0 to %18 : $*Int
-  %20 = load %3#1 : $*(Int, Int) // expected-error {{variable '<unknown>.1' used before being initialized}}
+  %20 = load %3 : $*(Int, Int) // expected-error {{variable '<unknown>.1' used before being initialized}}
   %21 = tuple_extract %20 : $(Int, Int), 0
   %22 = tuple_extract %20 : $(Int, Int), 1
   %23 = tuple (%21 : $Int, %22 : $Int)
-  strong_release %3#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.ObjectPointer
   return %23 : $(Int, Int)
 }
 
@@ -113,10 +121,11 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil @copy_addr1
 sil @copy_addr1 : $@thin <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
-  %4 = alloc_box $T
-  copy_addr [take] %1 to [initialization] %4#1 : $*T
-  copy_addr %4#1 to [initialization] %0 : $*T
-  strong_release %4#0 : $Builtin.ObjectPointer
+  %3 = alloc_box $T
+  %4 = mark_uninitialized [var] %3#1 : $*T
+  copy_addr [take] %1 to [initialization] %4 : $*T
+  copy_addr %4 to [initialization] %0 : $*T
+  strong_release %3#0 : $Builtin.ObjectPointer
   %9 = tuple ()
   return %9 : $()
 }
@@ -124,9 +133,10 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK-LABEL: sil @copy_addr2
 sil @copy_addr2 : $@thin <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
-  %4 = alloc_box $T         // expected-note {{variable defined here}}
-  copy_addr %4#1 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %4#0 : $Builtin.ObjectPointer
+  %3 = alloc_box $T
+  %4 = mark_uninitialized [var] %3#1 : $*T // expected-note {{variable defined here}}
+  copy_addr %4 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
+  strong_release %3#0 : $Builtin.ObjectPointer
   %9 = tuple ()
   return %9 : $()
 }
@@ -138,14 +148,15 @@ sil @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
 // CHECK-LABEL: sil @closure_test
 sil @closure_test : $@thin () -> () {
 bb0:
-  %0 = alloc_box $Int    // expected-note {{variable defined here}}
+  %1 = alloc_box $Int
+  %0 = mark_uninitialized [var] %1#1 : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
   %6 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()
-  strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  strong_retain %1#0 : $Builtin.ObjectPointer
+  %8 = partial_apply %6(%1#0, %0) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
   %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
-  strong_release %0#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -160,16 +171,17 @@ sil @getSomeClass : $@thin () -> @owned SomeClass
 // CHECK-LABEL: sil @assign_test_trivial
 sil @assign_test_trivial : $@thin (Int) -> Int {
 bb0(%0 : $Int):
-  %1 = alloc_box $Int
+  %7 = alloc_box $Int
+  %1 = mark_uninitialized [var] %7#1 : $*Int
 
   // These assigns are a mix of init + store forms, but because Int is trivial,
   // they all turn into stores.
-  assign %0 to %1#1 : $*Int
-  assign %0 to %1#1 : $*Int
-  assign %0 to %1#1 : $*Int
+  assign %0 to %1 : $*Int
+  assign %0 to %1 : $*Int
+  assign %0 to %1 : $*Int
 
-  %2 = load %1#1 : $*Int
-  strong_release %1#0 : $Builtin.ObjectPointer
+  %2 = load %1 : $*Int
+  strong_release %7#0 : $Builtin.ObjectPointer
 
   return %2 : $Int
 }
@@ -180,26 +192,28 @@ bb0:
   // Assignments of nontrivial types.  The first becomes an initialize (i.e.,
   // lone store), the second becomes an assignment (retain/release dance).
 
-  %c = alloc_box $SomeClass
+  %b = alloc_box $SomeClass
+  %c = mark_uninitialized [var] %b#1 : $*SomeClass
+
   %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
   %4 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
-  assign %4 to %c#1 : $*SomeClass
+  assign %4 to %c : $*SomeClass
   // CHECK-NEXT: store
 
   %8 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  assign %8 to %c#1 : $*SomeClass
+  assign %8 to %c : $*SomeClass
   // CHECK-NEXT: load
   // CHECK-NEXT: store [[C2]]
   // CHECK-NEXT: strong_release
 
-  destroy_addr %c#1 : $*SomeClass
+  destroy_addr %c : $*SomeClass
   // CHECK-NEXT: destroy_addr
-  dealloc_box $SomeClass, %c#0 : $Builtin.ObjectPointer
+  dealloc_box $SomeClass, %b#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -209,22 +223,24 @@ bb0:
 // CHECK-LABEL: sil @assign_test_addressonly
 sil @assign_test_addressonly : $@thin <T> (@out T, @in T) -> () {
 bb0(%0 : $*T, %1 : $*T):
-  %2 = alloc_box $T
+  %b = alloc_box $T
+  %2 = mark_uninitialized [var] %b#1 : $*T
+
   // CHECK: alloc_box
 
   // This should become an initialization of %4
-  copy_addr %1 to %2#1 : $*T
+  copy_addr %1 to %2 : $*T
   // CHECK-NEXT: copy_addr %1 to [initialization] %2#1 : $*T
 
   // This should stay an assignment of %4
-  copy_addr [take] %1 to %2#1 : $*T
+  copy_addr [take] %1 to %2 : $*T
   // CHECK-NEXT: copy_addr [take] %1 to %2#1 : $*T
   
   // This is a load, and shouldn't be changed.
-  copy_addr %2#1 to [initialization] %0 : $*T
+  copy_addr %2 to [initialization] %0 : $*T
   // CHECK-NEXT: copy_addr %2#1 to [initialization] %0 : $*T
 
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %b#0 : $Builtin.ObjectPointer
   // CHECK-NEXT: strong_release %2#0
   %9 = tuple ()
   return %9 : $()
@@ -236,18 +252,19 @@ bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %c = alloc_box $@sil_weak SomeClass  // expected-note {{variable defined here}}
-  
+  %b = alloc_box $@sil_weak SomeClass
+  %c = mark_uninitialized [var] %b#1 : $*@sil_weak SomeClass // expected-note {{variable defined here}}
+
   // Invalid load to keep the alloc_box around so we can check init semantics.
-  load %c#1 : $*@sil_weak SomeClass    // expected-error {{used before being initialized}}
+  load %c : $*@sil_weak SomeClass    // expected-error {{used before being initialized}}
 
   %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
   %4 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK: [[C1:%[0-9]+]] = apply
 
-  // THis should become an initialization.
-  store_weak %4 to %c#1 : $*@sil_weak SomeClass
+  // This should become an initialization.
+  store_weak %4 to %c : $*@sil_weak SomeClass
   // CHECK-NEXT: store_weak [[C1]] to [initialization] %0#1
 
   strong_release %4 : $SomeClass
@@ -256,13 +273,13 @@ bb0:
   %8 = apply %f() : $@thin () -> @owned SomeClass
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  store_weak %8 to %c#1 : $*@sil_weak SomeClass
+  store_weak %8 to %c : $*@sil_weak SomeClass
   // CHECK-NEXT: store_weak [[C2]] to %0#1
 
   strong_release %8 : $SomeClass
   // CHECK-NEXT: release [[C2]]
 
-  strong_release %c#0 : $Builtin.ObjectPointer
+  strong_release %b#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -274,7 +291,8 @@ bb0:
   // Assignments of unowned pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %c = alloc_box $@sil_unowned SomeClass
+  %b = alloc_box $@sil_unowned SomeClass
+  %c = mark_uninitialized [var] %b#1 : $*@sil_unowned SomeClass
 
   %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
 
@@ -286,7 +304,7 @@ bb0:
   // CHECK-NEXT: [[C1u:%[0-9]+]] = ref_to_unowned [[C1]]
   unowned_retain %5 : $@sil_unowned SomeClass
   // CHECK-NEXT: unowned_retain [[C1u]]
-  assign %5 to %c#1 : $*@sil_unowned SomeClass
+  assign %5 to %c : $*@sil_unowned SomeClass
   // CHECK-NEXT: store [[C1u]]
   strong_release %4 : $SomeClass
   // CHECK-NEXT: strong_release [[C1]]
@@ -300,7 +318,7 @@ bb0:
   unowned_retain %9 : $@sil_unowned SomeClass
   // CHECK-NEXT: unowned_retain [[C2u]]
 
-  assign %9 to %c#1 : $*@sil_unowned SomeClass
+  assign %9 to %c : $*@sil_unowned SomeClass
   // CHECK-NEXT: load
   // CHECK-NEXT: store
   // CHECK-NEXT: unowned_release
@@ -308,8 +326,8 @@ bb0:
   strong_release %8 : $SomeClass
   // CHECK-NEXT: strong_release [[C2]]
 
-  destroy_addr %c#1 : $*@sil_unowned SomeClass
-  dealloc_box $SomeClass, %c#0 : $Builtin.ObjectPointer
+  destroy_addr %c : $*@sil_unowned SomeClass
+  dealloc_box $SomeClass, %b#0 : $Builtin.ObjectPointer
 
   %11 = tuple ()
   return %11 : $()
@@ -325,8 +343,9 @@ struct ContainsObjectPointer {
 sil @test_struct : $@thin (@inout ContainsObjectPointer) -> () {
 bb0(%0 : $*ContainsObjectPointer):
   %b = alloc_box $ContainsObjectPointer
+  %c = mark_uninitialized [var] %b#1 : $*ContainsObjectPointer
   %1 = load %0 : $*ContainsObjectPointer
-  assign %1 to %b#1 : $*ContainsObjectPointer
+  assign %1 to %c : $*ContainsObjectPointer
   
   strong_release %b#0 : $Builtin.ObjectPointer
   %x = tuple ()
@@ -363,7 +382,7 @@ var int_global : Int
 // CHECK: return
 sil @test_tlc : $() -> () {
   %0 = global_addr #int_global : $*Int
-  %1 = mark_uninitialized [globalvar] %0 : $*Int
+  %1 = mark_uninitialized [var] %0 : $*Int
 
   %9 = tuple ()
   return %9 : $()
@@ -386,9 +405,11 @@ sil @release_not_constructed : $@thin () -> () {
 bb0:  // CHECK: bb0:
   %3 = alloc_stack $SomeClass
   // CHECK-NEXT: alloc_stack
+  %c = mark_uninitialized [var] %3#1 : $*SomeClass
+
 
   // This should get removed.
-  destroy_addr %3#1 : $*SomeClass
+  destroy_addr %c : $*SomeClass
 
   dealloc_stack %3#0 : $*@local_storage SomeClass
   // CHECK-NEXT: dealloc_stack
@@ -402,10 +423,12 @@ bb0:  // CHECK: bb0:
 sil @release_some_constructed : $@thin () -> () {
 bb0:
   %0 = tuple ()
-  %1 = alloc_stack $(SomeClass, SomeClass)
+  %b = alloc_stack $(SomeClass, SomeClass)
+  %1 = mark_uninitialized [var] %b#1 : $*(SomeClass, SomeClass)
+
   %2 = function_ref @getSomeClass : $@thin () -> @owned SomeClass
   %3 = apply %2() : $@thin () -> @owned SomeClass
-  %4 = tuple_element_addr %1#1 : $*(SomeClass, SomeClass), 0
+  %4 = tuple_element_addr %1 : $*(SomeClass, SomeClass), 0
   store %3 to %4 : $*SomeClass
   // CHECK: store
 
@@ -413,10 +436,10 @@ bb0:
 
   // CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_element_addr {{.*}}, 0
   // CHECK-NEXT: destroy_addr [[ELT0]]
-  destroy_addr %1#1 : $*(SomeClass, SomeClass)
+  destroy_addr %1 : $*(SomeClass, SomeClass)
   
   // CHECK-NEXT: dealloc_stack
-  dealloc_stack %1#0 : $*@local_storage (SomeClass, SomeClass)
+  dealloc_stack %b#0 : $*@local_storage (SomeClass, SomeClass)
   %8 = tuple ()
   return %8 : $()
 }
@@ -428,12 +451,14 @@ bb0:
 sil @init_existential_with_class : $@thin (@inout C) -> () {
 entry(%a : $*C):
   %p = alloc_stack $P
-  %q = init_existential %p#1 : $*P, $*C
+  %b = mark_uninitialized [var] %p#1 : $*P
+
+  %q = init_existential %b : $*P, $*C
   
   // CHECK: copy_addr {{.*}} to [initialization] %2 : $*C
   copy_addr %a to [initialization] %q : $*C
   %u = function_ref @use : $@thin (@in P) -> ()
-  %v = apply %u(%p#1) : $@thin (@in P) -> ()
+  %v = apply %u(%b) : $@thin (@in P) -> ()
   dealloc_stack %p#0 : $*@local_storage P
   %z = tuple ()
   return %z : $()
@@ -446,7 +471,9 @@ entry(%a : $*C):
 //  actually initialized.
 sil @conditional_init : $@thin (Bool) -> () {
 bb0(%0 : $Bool):
-  %3 = alloc_stack $SomeClass
+  %2 = alloc_stack $SomeClass
+  %3 = mark_uninitialized [var] %2#1 : $*SomeClass
+
 // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK: [[ZERO:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 // CHECK: store [[ZERO]] to [[CONTROL]]#1 : $*Builtin.Int1
@@ -460,12 +487,12 @@ bb1:
 // CHECK: store [[ONE]] to [[CONTROL]]#1 : $*Builtin.Int1
   %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
   %6 = apply %f() : $@thin () -> @owned SomeClass
-  assign %6 to %3#1 : $*SomeClass
+  assign %6 to %3 : $*SomeClass
   br bb2
 
 bb2:
-  destroy_addr %3#1 : $*SomeClass
-  dealloc_stack %3#0 : $*@local_storage SomeClass
+  destroy_addr %3 : $*SomeClass
+  dealloc_stack %2#0 : $*@local_storage SomeClass
   %14 = tuple ()
   return %14 : $()
 }
@@ -477,7 +504,8 @@ bb0(%0 : $Builtin.Int1):
   // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack $SomeClass
   // CHECK: integer_literal $Builtin.Int1, 0
   // CHECK: store
-  %6 = alloc_stack $SomeClass
+  %5 = alloc_stack $SomeClass
+  %6 = mark_uninitialized [var] %5#1 : $*SomeClass
   cond_br %0, bb1, bb2
 
 bb1:
@@ -491,7 +519,7 @@ bb1:
   // CHECK: integer_literal $Builtin.Int1, -1
   // CHECK: store {{.*}} to [[CONTROL]]
   // CHECK: store [[V1]] to [[CLASSVAL]]
-  assign %12 to %6#1 : $*SomeClass                // id: %13
+  assign %12 to %6 : $*SomeClass                // id: %13
   br bb2                                          // id: %14
 
 bb2:
@@ -510,9 +538,9 @@ bb2:
   // CHECK: bb4:
   // CHECK: store [[V2]] to [[CLASSVAL]]
 
-  assign %17 to %6#1 : $*SomeClass                // id: %18
-  destroy_addr %6#1 : $*SomeClass                 // id: %19
-  dealloc_stack %6#0 : $*@local_storage SomeClass // id: %20
+  assign %17 to %6 : $*SomeClass                // id: %18
+  destroy_addr %6 : $*SomeClass                 // id: %19
+  dealloc_stack %5#0 : $*@local_storage SomeClass // id: %20
   %23 = tuple ()                                  // user: %24
   return %23 : $()                                // id: %24
 }

@@ -279,9 +279,9 @@ public:
                                                  MarkUninitializedInst::Kind k){
     return insert(new (F.getModule()) MarkUninitializedInst(loc, src, k));
   }
-  MarkUninitializedInst *createMarkUninitializedGlobalVar(SILLocation loc,
-                                                          SILValue src) {
-    return createMarkUninitialized(loc, src, MarkUninitializedInst::GlobalVar);
+  MarkUninitializedInst *createMarkUninitializedVar(SILLocation loc,
+                                                    SILValue src) {
+    return createMarkUninitialized(loc, src, MarkUninitializedInst::Var);
   }
   MarkUninitializedInst *createMarkUninitializedRootSelf(SILLocation loc,
                                                          SILValue src) {

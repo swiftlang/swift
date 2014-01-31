@@ -60,6 +60,10 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
       if (!ILI->getValue())
         return true;
 
+  // mark_uninitialized is never dead.
+  if (isa<MarkUninitializedInst>(I))
+    return false;
+  
   if (!I->mayHaveSideEffects())
     return true;
 

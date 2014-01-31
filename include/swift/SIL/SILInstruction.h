@@ -818,9 +818,8 @@ class MarkUninitializedInst
 public:
   // This enum captures what the mark_uninitialized instruction is designating.
   enum Kind {
-    /// GlobalVar designates the start of a global variable live range in a
-    /// top level code declaration.
-    GlobalVar,
+    /// Var designates the start of a normal variable live range.
+    Var,
 
     /// RootSelf designates "self" in a struct, enum, or root class.
     RootSelf,
@@ -846,7 +845,7 @@ public:
 
   Kind getKind() const { return ThisKind; }
 
-  bool isGlobalVar() const { return ThisKind == GlobalVar; }
+  bool isVar() const { return ThisKind == Var; }
   bool isRootSelf() const {
     return ThisKind == RootSelf;
   }

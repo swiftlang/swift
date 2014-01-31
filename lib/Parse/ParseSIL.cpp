@@ -1471,17 +1471,23 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
 
   case ValueKind::MarkUninitializedInst: {
+    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "["))
+      return true;
+    
     Identifier KindId;
-    SourceLoc KindLoc;
-    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "[") ||
-        P.parseIdentifier(KindId, KindLoc, diag::expected_tok_in_sil_instr,
-                          "globalvar or rootself") ||
-        P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+    SourceLoc KindLoc = P.Tok.getLoc();
+    if (P.consumeIf(tok::kw_var))
+      KindId = P.Context.getIdentifier("var");
+    else if (P.parseIdentifier(KindId, KindLoc,
+                               diag::expected_tok_in_sil_instr, "kind"))
+      return true;
+    
+    if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
       return true;
 
     MarkUninitializedInst::Kind Kind;
-    if (KindId.str() == "globalvar")
-      Kind = MarkUninitializedInst::GlobalVar;
+    if (KindId.str() == "var")
+      Kind = MarkUninitializedInst::Var;
     else if (KindId.str() == "rootself")
       Kind = MarkUninitializedInst::RootSelf;
     else if (KindId.str() == "derivedself")
@@ -1492,7 +1498,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       Kind = MarkUninitializedInst::DelegatingSelf;
     else {
       P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
-                 "globalvar, rootself, derivedself, derivedselfonly, "
+                 "var, rootself, derivedself, derivedselfonly, "
                  "or delegatingself");
       return true;
     }

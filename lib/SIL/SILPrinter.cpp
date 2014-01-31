@@ -619,7 +619,7 @@ public:
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
     OS << "mark_uninitialized ";
     switch (MU->getKind()) {
-    case MarkUninitializedInst::GlobalVar: OS << "[globalvar] "; break;
+    case MarkUninitializedInst::Var: OS << "[var] "; break;
     case MarkUninitializedInst::RootSelf:  OS << "[rootself] "; break;
     case MarkUninitializedInst::DerivedSelf:  OS << "[derivedself] "; break;
     case MarkUninitializedInst::DerivedSelfOnly:
