@@ -82,6 +82,13 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
+  /// Path to a file which should contain serialized diagnostics for this
+  /// frontend invocation.
+  std::string SerializedDiagnosticsPath;
+
+  /// Arguments which should be passed in immediate mode.
+  std::vector<std::string> ImmediateArgv;
+
   enum ActionType {
     Parse, ///< Parse and type-check only
     DumpParse, ///< Parse only and dump AST
@@ -115,6 +122,10 @@ public:
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;
 
+  /// Indicates whether or not an import statement can pick up a Swift source
+  /// file (as opposed to a module file).
+  bool EnableSourceImport = false;
+
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
@@ -122,13 +133,6 @@ public:
   /// Indicates that all generated SIL should be serialized into a module,
   /// not just code considered fragile.
   bool SILSerializeAll = false;
-
-  /// Path to a file which should contain serialized diagnostics for this
-  /// frontend invocation.
-  std::string SerializedDiagnosticsPath;
-
-  /// Arguments which should be passed in immediate mode.
-  std::vector<std::string> ImmediateArgv;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.

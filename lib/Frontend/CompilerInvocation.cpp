@@ -434,6 +434,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleLinkName = A->getValue();
   }
 
+  Opts.EnableSourceImport = Args.hasArg(OPT_enable_source_import);
   Opts.SILSerializeAll = Args.hasArg(OPT_sil_serialize_all);
 
   return false;

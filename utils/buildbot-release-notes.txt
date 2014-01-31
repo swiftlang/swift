@@ -22,6 +22,8 @@
       foo()
     }
 
+* 'import' will no longer import other source files, only built modules.
+
 
 2014-01-29
 ----------
