@@ -130,8 +130,10 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
   if (loadedModuleFile->getStatus() == ModuleStatus::MissingShadowedModule) {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
                        M.Name);
-    if (Ctx.SearchPathOpts.SDKPath.empty())
+    if (Ctx.SearchPathOpts.SDKPath.empty()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+      Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+    }
     return nullptr;
   }
 
@@ -171,8 +173,10 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
                        missingNames);
   }
 
-  if (Ctx.SearchPathOpts.SDKPath.empty())
+  if (Ctx.SearchPathOpts.SDKPath.empty()) {
     Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+    Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
+  }
 
   return nullptr;
 }

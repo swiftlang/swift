@@ -61,6 +61,9 @@ ERROR(sema_no_import_submodule,sema_nb,none,
       "no such module", ())
 NOTE(sema_no_import_no_sdk,sema_nb,none,
      "did you forget to set an SDK using -sdk or SDKROOT?", ())
+NOTE(sema_no_import_no_sdk_xcrun,sema_nb,none,
+     "use \"-sdk $(xcrun --show-sdk-path --sdk macosx)\" to select the default "
+     "OS X SDK installed with Xcode", ())
 ERROR(sema_opening_import,sema_nb,none,
       "opening import file '%0.swift': %1", (StringRef, StringRef))
 
