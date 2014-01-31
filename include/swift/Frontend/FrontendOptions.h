@@ -123,21 +123,6 @@ public:
   /// not just code considered fragile.
   bool SILSerializeAll = false;
 
-  /// Indicates how the frontend should perform SIL linking.
-  enum SILLinkMode {
-    /// Indicates that the frontend should skip SIL linking.
-    LinkNone,
-
-    /// Indicates that the frontend should perform normal SIL linking.
-    LinkNormal,
-
-    /// Indicates that the frontend should link all functions during SIL
-    /// linking.
-    LinkAll
-  };
-
-  SILLinkMode SILLinking = LinkNormal;
-
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;

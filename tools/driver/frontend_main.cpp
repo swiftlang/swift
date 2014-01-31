@@ -120,9 +120,9 @@ static bool performCompile(CompilerInstance &Instance,
     else
       SM = performSILGeneration(Instance.getMainModule());
 
-    auto LinkMode = Invocation.getFrontendOptions().SILLinking;
-    if (LinkMode > FrontendOptions::LinkNone)
-      performSILLinking(SM.get(), LinkMode == FrontendOptions::LinkAll);
+    auto LinkMode = Invocation.getSILOptions().LinkMode;
+    if (LinkMode > SILOptions::LinkNone)
+      performSILLinking(SM.get(), LinkMode == SILOptions::LinkAll);
   }
 
   // We've been told to emit SIL after SILGen, so write it now.

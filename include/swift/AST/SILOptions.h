@@ -24,7 +24,22 @@ namespace swift {
 
 class SILOptions {
 public:
+  /// Controls the aggressiveness of the performance inliner.
   unsigned InlineThreshold = 50;
+
+  enum LinkingMode {
+    /// Skip SIL linking.
+    LinkNone,
+
+    /// Perform normal SIL linking.
+    LinkNormal,
+
+    /// Link all functions during SIL linking.
+    LinkAll
+  };
+
+  /// Controls how  perform SIL linking.
+  LinkingMode LinkMode = LinkNormal;
 };
 
 } // end namespace swift

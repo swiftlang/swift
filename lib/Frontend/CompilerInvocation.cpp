@@ -434,16 +434,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleLinkName = A->getValue();
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
-                                     OPT_sil_link_all)) {
-    if (A->getOption().matches(OPT_disable_sil_linking))
-      Opts.SILLinking = FrontendOptions::LinkNone;
-    else if (A->getOption().matches(OPT_sil_link_all))
-      Opts.SILLinking = FrontendOptions::LinkAll;
-    else
-      llvm_unreachable("Unknown SIL linking option!");
-  }
-
   Opts.SILSerializeAll = Args.hasArg(OPT_sil_serialize_all);
 
   return false;
@@ -561,12 +551,24 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          DiagnosticEngine &Diags) {
-  if (const Arg *A = Args.getLastArg(options::OPT_sil_inline_threshold)) {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_sil_inline_threshold)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.InlineThreshold)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       return true;
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
+                                     OPT_sil_link_all)) {
+    if (A->getOption().matches(OPT_disable_sil_linking))
+      Opts.LinkMode = SILOptions::LinkNone;
+    else if (A->getOption().matches(OPT_sil_link_all))
+      Opts.LinkMode = SILOptions::LinkAll;
+    else
+      llvm_unreachable("Unknown SIL linking option!");
   }
 
   return false;
