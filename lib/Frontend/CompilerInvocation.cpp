@@ -434,6 +434,16 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleLinkName = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
+                                     OPT_sil_link_all)) {
+    if (A->getOption().matches(OPT_disable_sil_linking))
+      Opts.SILLinking = FrontendOptions::LinkNone;
+    else if (A->getOption().matches(OPT_sil_link_all))
+      Opts.SILLinking = FrontendOptions::LinkAll;
+    else
+      llvm_unreachable("Unknown SIL linking option!");
+  }
+
   return false;
 }
 

@@ -61,6 +61,9 @@ def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
 def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
   HelpText<"Don't run LLVM ARC optimization passes.">;
 
+def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
+  HelpText<"Don't link SIL functions">;
+
 def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
   HelpText<"Emit locations during SIL emission">;
 
@@ -73,6 +76,9 @@ def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
+
+def sil_link_all : Flag<["-"], "sil-link-all">,
+  HelpText<"Link all SIL functions">;
 
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "

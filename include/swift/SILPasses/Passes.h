@@ -72,7 +72,10 @@ namespace swift {
 
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
-  void performSILLinking(SILModule *M);
+  ///
+  /// \param M the SILModule on which to operate
+  /// \param LinkAll when true, always link. For testing purposes.
+  void performSILLinking(SILModule *M, bool LinkAll = false);
 
   /// \brief Optimize away shadow variables for any inout arguments that don't
   /// escape.

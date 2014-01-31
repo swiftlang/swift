@@ -22,12 +22,6 @@
 
 using namespace swift;
 
-// To help testing serialization, deserialization, we turn on sil-link-all.
-static llvm::cl::opt<bool>
-EnableLinkAll("sil-link-all", llvm::cl::Hidden, llvm::cl::init(false));
-static llvm::cl::opt<bool>
-EnableLinking("enable-sil-linking", llvm::cl::Hidden, llvm::cl::init(true));
-
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 
 namespace {
@@ -67,10 +61,7 @@ namespace {
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILLinking(SILModule *M) {
-  if (!EnableLinking && !EnableLinkAll)
-    return;
-
+void swift::performSILLinking(SILModule *M, bool LinkAll) {
   Callback callback;
   SerializedSILLoader *SILLoader = SerializedSILLoader::create(
                                      M->getASTContext(), M, &callback);
@@ -94,7 +85,7 @@ void swift::performSILLinking(SILModule *M) {
           if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
             CalleeFunction = FRI->getReferencedFunction();
             // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = EnableLinkAll || AI->isTransparent() ||
+            TryLinking = LinkAll || AI->isTransparent() ||
                          CalleeFunction->getLinkage() == SILLinkage::Private;
           }
         }
@@ -104,7 +95,7 @@ void swift::performSILLinking(SILModule *M) {
           if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
             CalleeFunction = FRI->getReferencedFunction();
             // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = EnableLinkAll || CalleeFunction->isTransparent() ||
+            TryLinking = LinkAll || CalleeFunction->isTransparent() ||
                          CalleeFunction->getLinkage() == SILLinkage::Private;
           } else {
             continue;
@@ -113,9 +104,9 @@ void swift::performSILLinking(SILModule *M) {
         else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
           // When EnableLinkAll is true, we link the function referenced by
           // FunctionRefInst.
-          CalleeFunction = EnableLinkAll ? FRI->getReferencedFunction() :
+          CalleeFunction = LinkAll ? FRI->getReferencedFunction() :
                                            nullptr;
-          TryLinking = EnableLinkAll;
+          TryLinking = LinkAll;
         }
 
         if (!CalleeFunction)
@@ -147,7 +138,7 @@ void swift::performSILLinking(SILModule *M) {
     }
   }
 
-  if (EnableLinkAll) {
+  if (LinkAll) {
     SILLoader->getAllVTables();
     SILLoader->getAllWitnessTables();
   }

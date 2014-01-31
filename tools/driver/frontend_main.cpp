@@ -119,7 +119,10 @@ static bool performCompile(CompilerInstance &Instance,
       SM = performSILGeneration(*PrimarySourceFile);
     else
       SM = performSILGeneration(Instance.getMainModule());
-    performSILLinking(SM.get());
+
+    auto LinkMode = Invocation.getFrontendOptions().SILLinking;
+    if (LinkMode > FrontendOptions::LinkNone)
+      performSILLinking(SM.get(), LinkMode == FrontendOptions::LinkAll);
   }
 
   if (!Invocation.getFrontendOptions().ModuleOutputPath.empty()) {
