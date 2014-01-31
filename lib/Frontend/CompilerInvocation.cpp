@@ -646,6 +646,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (!FrontendOpts.InputFilenames.empty())
     Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
   Opts.OutputFilename = FrontendOpts.OutputFilename;
+  Opts.ModuleName = FrontendOpts.ModuleName;
 
   return false;
 }
