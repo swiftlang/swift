@@ -315,9 +315,22 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
 }
 @ end
 
-@ for op, name in (
-@  ('<<','shl'), ('>>','ashr' if signed else 'lshr'),
-@  ('&','and'), ('^','xor'), ('|','or')):
+@ for op, name in (('<<','shl'), ('>>','ashr' if signed else 'lshr')):
+@@transparent
+func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+@ if signed:
+  assert(rhs >= 0)
+@ end
+@ if Self == "Int":
+  assert(rhs < (sizeof(rhs) * 8))
+@ else:
+  assert(rhs < ${Self}(sizeof(rhs) * 8))
+@ end
+  return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
+}
+@ end
+
+@ for op, name in (('&','and'), ('^','xor'), ('|','or')):
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
