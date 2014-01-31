@@ -1416,19 +1416,22 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto genericParams = maybeReadGenericParams(parent);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
-                                          /*argParams=*/nullptr,
-                                          /*bodyParams=*/nullptr, selfDecl,
-                                          genericParams, parent);
+                                          /*argParams=*/nullptr, nullptr,
+                                          /*bodyParams=*/nullptr, nullptr,
+                                          selfDecl, genericParams, parent);
     declOrOffset = ctor;
     selfDecl->setDeclContext(ctor);
 
-    Pattern *argParams = maybeReadPattern();
-    assert(argParams && "missing argument patterns for constructor");
-    ctor->setArgParams(argParams);
+    Pattern *argParams0 = maybeReadPattern();
+    Pattern *argParams1 = maybeReadPattern();
+    assert(argParams0 && argParams1 &&
+           "missing argument patterns for constructor");
+    ctor->setArgParams(argParams0, argParams1);
 
-    Pattern *bodyParams = maybeReadPattern();
-    assert(bodyParams && "missing body patterns for constructor");
-    ctor->setBodyParams(bodyParams);
+    Pattern *bodyParams0 = maybeReadPattern();
+    Pattern *bodyParams1 = maybeReadPattern();
+    assert(bodyParams0&&bodyParams1 && "missing body patterns for constructor");
+    ctor->setBodyParams(bodyParams0, bodyParams1);
 
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get
@@ -2040,9 +2043,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
-                                         selfDecl, parent);
+                                         /*selfpat*/nullptr, selfDecl, parent);
     declOrOffset = dtor;
     selfDecl->setDeclContext(dtor);
+
+
+    Pattern *selfParams = maybeReadPattern();
+    assert(selfParams && "Didn't get self pattern?");
+    dtor->setSelfPattern(selfParams);
 
     dtor->setType(getType(signatureID));
     if (isImplicit)

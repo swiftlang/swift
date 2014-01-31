@@ -301,7 +301,7 @@ static Pattern *getParameterPattern(ValueDecl *decl) {
   if (auto func = dyn_cast<FuncDecl>(decl))
     return func->getArgParamPatterns()[0];
   if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return constructor->getArgParams();
+    return constructor->getArgParamPatterns()[1];
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
     return subscript->getIndices();
 

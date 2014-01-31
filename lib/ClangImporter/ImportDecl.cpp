@@ -586,14 +586,16 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto metaTy = MetatypeType::get(optionSetType, C);
 
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, false);
+  Pattern *selfPattern = createTypedNamedPattern(selfDecl);
 
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
 
-  ConstructorDecl *ctorDecl = new (C) ConstructorDecl(C.Id_init, SourceLoc(),
-                                                      methodParam, methodParam,
-                                                      selfDecl, nullptr,
-                                                      optionSetDecl);
+  auto *ctorDecl = new (C) ConstructorDecl(C.Id_init, optionSetDecl->getLoc(),
+                                           selfPattern, methodParam,
+                                           selfPattern, methodParam,
+                                           selfDecl, nullptr,
+                                           optionSetDecl);
   ctorDecl->setImplicit();
   
   auto fnTy = FunctionType::get(TupleType::getEmpty(C), optionSetType);
@@ -744,6 +746,8 @@ namespace {
       auto selfMetatype = MetatypeType::get(selfType, context);
       auto selfDecl = createSelfDecl(structDecl, false);
 
+      Pattern *selfPattern = createTypedNamedPattern(selfDecl);
+
       // Construct the set of parameters from the list of members.
       SmallVector<Pattern *, 4> paramPatterns;
       SmallVector<TuplePatternElt, 8> patternElts;
@@ -770,11 +774,11 @@ namespace {
       paramPattern->setType(paramTy);
 
       // Create the constructor
-      auto constructor = new (context) ConstructorDecl(name, SourceLoc(),
-                                                       paramPattern,
-                                                       paramPattern,
-                                                       selfDecl,
-                                                       nullptr, structDecl);
+      auto constructor =
+        new (context) ConstructorDecl(name, structDecl->getLoc(),
+                                      selfPattern, paramPattern,
+                                      selfPattern, paramPattern,
+                                      selfDecl, nullptr, structDecl);
 
       // Set the constructor's type.
       auto fnTy = FunctionType::get(paramTy, selfType);
@@ -954,8 +958,9 @@ namespace {
       }
 
       case EnumKind::Unknown: {
+        auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = new (Impl.SwiftContext)
-          StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
+          StructDecl(Loc, name, Loc, { }, nullptr, dc);
         structDecl->computeType();
 
         // Compute the underlying type of the enumeration.
@@ -1033,10 +1038,12 @@ namespace {
                                               ImportTypeKind::Normal);
         if (!underlyingType)
           return nullptr;
-        
+
+        auto Loc = Impl.importSourceLoc(decl->getLocation());
+
         // Create a struct with the underlying type as a field.
         auto structDecl = new (Impl.SwiftContext)
-          StructDecl(SourceLoc(), name, SourceLoc(), { }, nullptr, dc);
+          StructDecl(Loc, name, Loc, { }, nullptr, dc);
         structDecl->computeType();
         
         // Create a field to store the underlying value.
@@ -1873,14 +1880,13 @@ namespace {
       Type initType = FunctionType::get(selfTy, type);
 
       VarDecl *selfVar = createSelfDecl(dc, false);
+      selfPat = createTypedNamedPattern(selfVar);
 
       // Create the actual constructor.
-      auto result = new (Impl.SwiftContext) ConstructorDecl(name, loc,
-                                                            argPatterns.back(),
-                                                            bodyPatterns.back(),
-                                                            selfVar,
-                                                            /*GenericParams=*/0,
-                                                            dc);
+      auto result = new (Impl.SwiftContext)
+         ConstructorDecl(name, loc, selfPat, argPatterns.back(),
+                         selfPat, bodyPatterns.back(), selfVar,
+                         /*GenericParams=*/0, dc);
       result->setType(allocType);
       result->setInitializerType(initType);
       result->setIsObjC(true);

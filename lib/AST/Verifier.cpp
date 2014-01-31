@@ -1144,7 +1144,7 @@ struct ASTNodeBase {};
 
       if (AFD->hasSelectorStyleSignature()) {
         unsigned NumExpectedParamPatterns = 1;
-        if (AFD->getImplicitSelfDecl() && isa<FuncDecl>(AFD))
+        if (AFD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
         if (AFD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
           Out << "functions with selector-style signature should "
@@ -1157,9 +1157,9 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(ConstructorDecl *CD) {
-      if (CD->getArgParamPatterns().size() != 1 ||
-          CD->getBodyParamPatterns().size() != 1) {
-        Out << "ConstructorDecl should have exactly one parameter pattern";
+      if (CD->getArgParamPatterns().size() != 2 ||
+          CD->getBodyParamPatterns().size() != 2) {
+        Out << "ConstructorDecl should have exactly two parameter patterns";
         abort();
       }
 
@@ -1198,9 +1198,9 @@ struct ASTNodeBase {};
         Out << "DestructorDecl can not be generic";
         abort();
       }
-      if (!DD->getArgParamPatterns().empty() ||
-          !DD->getBodyParamPatterns().empty()) {
-        Out << "DestructorDecl should not have parameter patterns";
+      if (!DD->getArgParamPatterns().size() == 1 ||
+          !DD->getBodyParamPatterns().size() == 1) {
+        Out << "DestructorDecl should have 'self' parameter pattern only";
         abort();
       }
 

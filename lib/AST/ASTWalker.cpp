@@ -612,18 +612,18 @@ public:
         else
           return true;
       }
-    } else if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
 #ifndef NDEBUG
-      PrettyStackTraceDecl debugStack("walking into body of", FD);
+      PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-      if (FD->hasSelectorStyleSignature()) {
-        for (auto &P : FD->getBodyParamPatterns()) {
+      if (AFD->hasSelectorStyleSignature()) {
+        for (auto &P : AFD->getBodyParamPatterns()) {
           if (Pattern *NewPattern = doIt(P))
             P = NewPattern;
           else
             return true;
         }
-        for (auto &P : FD->getArgParamPatterns()) {
+        for (auto &P : AFD->getArgParamPatterns()) {
           if (Pattern *NewPattern = doIt(P))
             P = NewPattern;
           else
@@ -631,8 +631,8 @@ public:
         }
       } else {
         // Body params are same as argument params.
-        auto BodyPatterns = FD->getBodyParamPatterns();
-        auto ArgPatterns = FD->getArgParamPatterns();
+        auto BodyPatterns = AFD->getBodyParamPatterns();
+        auto ArgPatterns = AFD->getArgParamPatterns();
         for (unsigned i = 0, e = BodyPatterns.size(); i != e; ++i) {
           if (Pattern *NewPattern = doIt(BodyPatterns[i]))
             BodyPatterns[i] = ArgPatterns[i] = NewPattern;
@@ -641,13 +641,14 @@ public:
         }
       }
 
-      if (!FD->isGetterOrSetter() && FD->getBodyResultTypeLoc().getTypeRepr())
-        if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
-          return true;
+      if (auto *FD = dyn_cast<FuncDecl>(AFD))
+        if (!FD->isAccessor() && FD->getBodyResultTypeLoc().getTypeRepr())
+          if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
+            return true;
 
-      if (FD->getBody()) {
-        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(FD->getBody())))
-          FD->setBody(S);
+      if (AFD->getBody()) {
+        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
+          AFD->setBody(S);
         else
           return true;
       }
@@ -707,36 +708,6 @@ public:
     } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
         TLCD->setBody(S);
-    } else if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(D)) {
-      // Visit arguments.
-      auto *bodyParams = doIt(CD->getBodyParams());
-      if (!bodyParams)
-        return true;
-
-      Pattern *argParams;
-      if (CD->hasSelectorStyleSignature()) {
-        argParams = doIt(CD->getArgParams());
-        if (!argParams)
-          return true;
-      } else {
-        argParams = bodyParams;
-      }
-      CD->setBodyParams(bodyParams);
-      CD->setArgParams(argParams);
-
-      if (CD->getBody()) {
-        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(CD->getBody())))
-          CD->setBody(S);
-        else
-          return true;
-      }
-    } else if (DestructorDecl *DD = dyn_cast<DestructorDecl>(D)) {
-      if (DD->getBody()) {
-        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(DD->getBody())))
-          DD->setBody(S);
-        else
-          return true;
-      }
     }
 
     Walker.Parent = PrevParent;

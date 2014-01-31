@@ -594,7 +594,7 @@ namespace decls_block {
     TypeIDField, // type (interface)
     DeclIDField  // implicit this decl
     // Trailed by its generic parameters, if any, followed by the parameter
-    // pattern.
+    // patterns.
   >;
 
   using VarLayout = BCRecordLayout<
@@ -705,6 +705,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     TypeIDField, // type (signature)
     DeclIDField  // implicit this decl
+    // Trailed by a pattern for self.
   >;
 
   

@@ -665,20 +665,15 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   auto patterns = func->getArgParamPatterns();
   SmallVector<Pattern *, 4> storedPatterns;
 
-  // FIXME: Constructors and destructors don't have the curried 'self' parameter
-  // in their signature, so paste it there.
   // FIXME: Destructors don't have the '()' pattern in their signature, so
-  // paste it here as well.
-  if (isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) {
-    storedPatterns.push_back(nullptr);
+  // paste it here.
+  if (isa<DestructorDecl>(func)) {
     storedPatterns.append(patterns.begin(), patterns.end());
 
-    if (isa<DestructorDecl>(func)) {
-      Pattern *pattern = TuplePattern::create(Context, SourceLoc(), { },
-                                              SourceLoc(), /*Implicit=*/true);
-      pattern->setType(TupleType::getEmpty(Context));
-      storedPatterns.push_back(pattern);
-    }
+    Pattern *pattern = TuplePattern::create(Context, SourceLoc(), { },
+                                            SourceLoc(), /*Implicit=*/true);
+    pattern->setType(TupleType::getEmpty(Context));
+    storedPatterns.push_back(pattern);
     patterns = storedPatterns;
   }
 

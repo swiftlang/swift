@@ -1073,16 +1073,19 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   }
 }
 
-static Pattern *buildGetterSetterSelf(SourceLoc Loc, DeclContext *DC,
-                                      VarDecl **SelfDecl) {
-  auto &Context = DC->getASTContext();
+/// \brief Build an implicit 'self' parameter for the specified DeclContext.
+static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC,
+                                           VarDecl **SelfDeclRet = nullptr) {
+  ASTContext &Ctx = DC->getASTContext();
+  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                     Loc, Ctx.Id_self, Type(), DC);
+  // FIXME: Remove SelfDeclRet when we don't need it anymore.
+  if (SelfDeclRet)
+    *SelfDeclRet = SelfDecl;
 
-  VarDecl *D = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                     Loc, Context.Id_self, Type(), DC);
-  *SelfDecl = D;
-  D->setImplicit();
-  Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
-  return new (Context) TypedPattern(P, TypeLoc());
+  SelfDecl->setImplicit();
+  Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
+  return new (Ctx) TypedPattern(P, TypeLoc());
 }
 
 static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
@@ -1113,7 +1116,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
   // Create the parameter list for the getter.
   Pattern *GetterParams[] = {
     // The implicit 'self' argument.
-    buildGetterSetterSelf(Loc, VD->getDeclContext(), &SelfDecl),
+    buildImplicitSelfParameter(Loc, VD->getDeclContext(), &SelfDecl),
     
     // Add a no-parameters clause.
     TuplePattern::create(VD->getASTContext(), Loc, ArrayRef<TuplePatternElt>(),
@@ -1144,7 +1147,7 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
   // Create the parameter list for the setter.
   Pattern *SetterParams[] = {
     // The implicit 'self' argument.
-    buildGetterSetterSelf(Loc, VD->getDeclContext(), &SelfDecl),
+    buildImplicitSelfParameter(Loc, VD->getDeclContext(), &SelfDecl),
     
     // Add a "(value : T)" pattern.
     buildSetterValueArgumentPattern(VD, &ValueDecl)
@@ -1921,7 +1924,7 @@ public:
 
   bool semaFuncParamPatterns(DeclContext *dc,
                              ArrayRef<Pattern*> paramPatterns,
-                             GenericTypeResolver *resolver) {
+                             GenericTypeResolver *resolver = nullptr) {
     bool badType = false;
     for (Pattern *P : paramPatterns) {
       if (P->hasType())
@@ -1965,12 +1968,9 @@ public:
       }
     }
 
-    badType =
-        badType || semaFuncParamPatterns(FD, FD->getArgParamPatterns(),
-                                         resolver);
-    badType =
-        badType || semaFuncParamPatterns(FD, FD->getBodyParamPatterns(),
-                                         resolver);
+    if (!badType)
+      badType = semaFuncParamPatterns(FD, FD->getArgParamPatterns(), resolver)||
+                semaFuncParamPatterns(FD, FD->getBodyParamPatterns(), resolver);
 
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
@@ -2210,6 +2210,10 @@ public:
     // @inout
     if (auto inout = type->getAs<InOutType>()) {
       auto baseRepr = createTrivialSelfTypeRepr(inout->getObjectType(), loc);
+      // FIXME: Decls imported from clang have no sourceloc, which causes
+      // setAttr() to explode, since it needs valid source locs.
+      if (loc.isInvalid()) return baseRepr;
+
       TypeAttributes typeAttrs;
       typeAttrs.setAttr(TAK_inout, loc);
       return new (TC.Context) AttributedTypeRepr(typeAttrs, baseRepr);
@@ -2259,16 +2263,16 @@ public:
                              GenericParamList *&outerGenericParams) {
     outerGenericParams = nullptr;
 
+    auto selfDecl = func->getImplicitSelfDecl();
+
     // Compute the type of self.
     Type selfTy = func->computeSelfType(&outerGenericParams);
-    if (!selfTy)
-      return Type();
-
-    auto selfDecl = func->getImplicitSelfDecl();
+    assert(selfDecl && selfTy && "Not a method");
 
     // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
     // neither @inout.
     selfDecl->setLet(!selfTy->is<InOutType>());
+    selfDecl->setType(selfTy);
 
     auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
     if (!argPattern->getTypeLoc().getTypeRepr()) {
@@ -2754,13 +2758,8 @@ public:
       TC.diagnose(CD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
 
 
-    // FIXME: Shouldn't this use configureImplicitSelf?
-    GenericParamList *outerGenericParams = nullptr;
-    Type SelfTy = CD->computeSelfType(&outerGenericParams);
-    Type ResultTy = SelfTy->getInOutObjectType();
-    auto SelfDecl = CD->getImplicitSelfDecl();
-    SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(!SelfTy->is<InOutType>());
+    GenericParamList *outerGenericParams;
+    Type SelfTy = configureImplicitSelf(CD, outerGenericParams);
 
     Optional<ArchetypeBuilder> builder;
     if (auto gp = CD->getGenericParams()) {
@@ -2776,13 +2775,14 @@ public:
         checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.
-        if (TC.typeCheckPattern(CD->getArgParams(), CD, None)) {
+        if (semaFuncParamPatterns(CD, CD->getArgParamPatterns()) ||
+            semaFuncParamPatterns(CD, CD->getBodyParamPatterns())) {
           CD->overwriteType(ErrorType::get(TC.Context));
           CD->setInvalid();
         }
 
         // Infer requirements from the parameters of the constructor.
-        builder.inferRequirements(CD->getArgParams());
+        builder.inferRequirements(CD->getArgParamPatterns()[1]);
 
         // Revert the constructor signature so it can be type-checked with
         // archetypes below.
@@ -2802,19 +2802,24 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (TC.typeCheckPattern(CD->getArgParams(), CD, TR_FunctionInput)) {
+    if (CD->isInvalid() ||
+        semaFuncParamPatterns(CD, CD->getArgParamPatterns()) ||
+        semaFuncParamPatterns(CD, CD->getBodyParamPatterns())) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
       Type FnTy;
       Type AllocFnTy;
       Type InitFnTy;
+      Type ArgType = CD->getArgParamPatterns()[1]->getType();
+      Type ResultTy = SelfTy->getInOutObjectType();
+
       if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
         innerGenericParams->setOuterParameters(outerGenericParams);
-        FnTy = PolymorphicFunctionType::get(CD->getArgParams()->getType(),
-                                            ResultTy, innerGenericParams);
+        FnTy = PolymorphicFunctionType::get(ArgType, ResultTy,
+                                            innerGenericParams);
       } else
-        FnTy = FunctionType::get(CD->getArgParams()->getType(), ResultTy);
+        FnTy = FunctionType::get(ArgType, ResultTy);
       Type SelfMetaTy = MetatypeType::get(ResultTy, TC.Context);
       if (outerGenericParams) {
         AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
@@ -2827,12 +2832,6 @@ public:
       }
       CD->setType(AllocFnTy);
       CD->setInitializerType(InitFnTy);
-
-      // Type check the constructor body parameters.
-      if (TC.typeCheckPattern(CD->getBodyParams(), CD, None)) {
-        CD->overwriteType(ErrorType::get(TC.Context));
-        CD->setInvalid();
-      }
     }
 
     // A method is ObjC-compatible if it's explicitly @objc, a member of an
@@ -2869,11 +2868,16 @@ public:
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");
 
-    GenericParamList *outerGenericParams = nullptr;
-    Type SelfTy = DD->computeSelfType(&outerGenericParams);
+    GenericParamList *outerGenericParams;
+    Type SelfTy = configureImplicitSelf(DD, outerGenericParams);
 
-    if (outerGenericParams) {
+    if (outerGenericParams)
       TC.validateGenericFuncSignature(DD);
+
+    if (semaFuncParamPatterns(DD, DD->getArgParamPatterns()) ||
+        semaFuncParamPatterns(DD, DD->getBodyParamPatterns())) {
+      DD->overwriteType(ErrorType::get(TC.Context));
+      DD->setInvalid();
     }
 
     Type FnTy;
@@ -2885,11 +2889,6 @@ public:
       FnTy = FunctionType::get(SelfTy, TupleType::getEmpty(TC.Context));
 
     DD->setType(FnTy);
-
-    // FIXME: Shouldn't this use configureImplicitSelf?
-    auto SelfDecl = DD->getImplicitSelfDecl();
-    SelfDecl->setType(SelfTy);
-    SelfDecl->setLet(!SelfTy->is<InOutType>());
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
@@ -3158,26 +3157,20 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
     }
   }
 
+  auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
+
   // Create the constructor.
   auto constructorID = context.Id_init;
-  VarDecl *selfDecl
-    = new (context) VarDecl(/*static*/ false,
-                            /*IsLet*/isa<ClassDecl>(decl),
-                            Loc, context.Id_self, Type(), decl);
-  selfDecl->setImplicit();
+  VarDecl *selfDecl;
+  Pattern *selfPat = buildImplicitSelfParameter(Loc, decl, &selfDecl);
   ConstructorDecl *ctor
     = new (context) ConstructorDecl(constructorID, Loc,
-                                    nullptr, nullptr, selfDecl, nullptr,
-                                    decl);
+                                    selfPat, pattern, selfPat, pattern,
+                                    selfDecl, nullptr, decl);
   selfDecl->setDeclContext(ctor);
   for (auto var : allArgs) {
     var->setDeclContext(ctor);
   }
-
-  // Set its arguments.
-  auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
-  ctor->setArgParams(pattern);
-  ctor->setBodyParams(pattern);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -3261,15 +3254,13 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (FoundDestructor)
     return;
 
-  VarDecl *SelfDecl =
-    new (Context) VarDecl(/*static*/ false, /*IsLet*/true, SourceLoc(),
-                          Context.Id_self, Type(), CD);
-  SelfDecl->setImplicit();
+  VarDecl *selfDecl;
+  Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD, &selfDecl);
 
   DestructorDecl *DD =
-    new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(), SelfDecl,
-                                 CD);
-  SelfDecl->setDeclContext(DD);
+    new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(), selfPat,
+                                 selfDecl, CD);
+  selfDecl->setDeclContext(DD);
 
   DD->setImplicit();
 

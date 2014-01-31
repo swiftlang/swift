@@ -1410,8 +1410,12 @@ void Serializer::writeDecl(const Decl *D) {
                                   addDeclRef(implicitSelf));
 
     writeGenericParams(ctor->getGenericParams());
-    writePattern(ctor->getArgParams());
-    writePattern(ctor->getBodyParams());
+    assert(ctor->getArgParamPatterns().size() == 2);
+    assert(ctor->getBodyParamPatterns().size() == 2);
+    for (auto pattern : ctor->getArgParamPatterns())
+      writePattern(pattern);
+    for (auto pattern : ctor->getBodyParamPatterns())
+      writePattern(pattern);
     break;
   }
 
@@ -1429,7 +1433,9 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()),
                                  addDeclRef(implicitSelf));
-    
+    assert(dtor->getArgParamPatterns().size() == 1);
+    for (auto pattern : dtor->getArgParamPatterns())
+      writePattern(pattern);
     break;
   }
   }

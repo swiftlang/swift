@@ -625,7 +625,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
   // Skip over the implicit 'self'.
-  if (AFD->getImplicitSelfDecl() && isa<FuncDecl>(AFD)) {
+  if (AFD->getImplicitSelfDecl()) {
     ArgPatterns = ArgPatterns.slice(1);
     BodyPatterns = BodyPatterns.slice(1);
   }

@@ -1404,7 +1404,7 @@ std::pair<DefaultArgumentKind, Type>
 AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   ArrayRef<const Pattern *> Patterns = getArgParamPatterns();
 
-  if (isa<FuncDecl>(this) && getImplicitSelfDecl()) {
+  if (getImplicitSelfDecl()) {
     // Skip the 'self' parameter; it is not counted.
     Patterns = Patterns.slice(1);
   }
@@ -1508,7 +1508,7 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
                                         TypeLoc FnRetType) {
   MutableArrayRef<Pattern *> ArgParamsRef = getArgParamPatterns();
   MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();
-  const unsigned NumParamPatterns = ArgParamsRef.size();
+  unsigned NumParamPatterns = ArgParamsRef.size();
 
   assert(ArgParams.size() == BodyParams.size());
   assert(NumParamPatterns == ArgParams.size());
@@ -1712,11 +1712,10 @@ ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   // In the beginning, there was 'init'.
   out << "init";
 
-  // If there are no parameters, this is just 'init'.
-  auto tuple = cast<TuplePattern>(getArgParams());
-  if (tuple->getNumFields() == 0) {
+  // If there are no parameters, this is just 'init()'.
+  auto tuple = cast<TuplePattern>(getArgParamPatterns()[1]);
+  if (tuple->getNumFields() == 0)
     return out.str();
-  }
 
   // The first field is special: we uppercase the name.
   const auto &firstElt = tuple->getFields()[0];

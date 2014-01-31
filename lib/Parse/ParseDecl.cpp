@@ -31,6 +31,24 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+/// \brief Build an implicit 'self' parameter for the specified DeclContext.
+static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
+                                           DeclContext *CurDeclContext,
+                                           VarDecl **SelfDeclRet = nullptr) {
+  ASTContext &Ctx = CurDeclContext->getASTContext();
+  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                   Loc, Ctx.Id_self,
+                                   Type(), CurDeclContext);
+  // FIXME: Remove SelfDeclRet when we don't need it anymore.
+  if (SelfDeclRet)
+    *SelfDeclRet = SelfDecl;
+
+  SelfDecl->setImplicit();
+  Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
+  return new (Ctx) TypedPattern(P, TypeLoc());
+}
+
+
 /// \brief Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -1107,7 +1125,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
   
   // Add the implicit 'self' to Params, if needed.
   if (Flags & Parser::PD_HasContainerType)
-    Params.push_back(P->buildImplicitSelfParameter(DeclLoc));
+    Params.push_back(buildImplicitSelfParameter(DeclLoc, P->CurDeclContext));
   
   // Add the index clause if necessary.
   if (Indices)
@@ -1678,17 +1696,6 @@ static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
   }
 }
 
-/// \brief Build an implicit 'self' parameter for the current DeclContext.
-Pattern *Parser::buildImplicitSelfParameter(SourceLoc Loc) {
-  VarDecl *D
-    = new (Context) VarDecl(/*static*/ false,
-                            /*IsLet*/ true,
-                            Loc, Context.Id_self,
-                            Type(), CurDeclContext);
-  D->setImplicit();
-  Pattern *P = new (Context) NamedPattern(D, /*Implicit=*/true);
-  return new (Context) TypedPattern(P, TypeLoc());
-}
 
 void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                          const DeclAttributes &Attrs) {
@@ -1810,7 +1817,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
   // "(int)->int" on FooTy into "(this: @inout FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
-    Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc);
+    Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc, CurDeclContext);
     ArgParams.push_back(SelfPattern);
     BodyParams.push_back(SelfPattern);
   }
@@ -2619,16 +2626,16 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes)
     return SignatureStatus;
   }
 
-  VarDecl *SelfDecl
-    = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                            SourceLoc(), Context.Id_self,
-                            Type(), CurDeclContext);
-  SelfDecl->setImplicit();
+  VarDecl *SelfDecl;
+  auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,
+                                                 CurDeclContext, &SelfDecl);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   ConstructorDecl *CD =
-      new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc, ArgPattern,
-                                    BodyPattern, SelfDecl, GenericParams,
+      new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc,
+                                    SelfPattern, ArgPattern,
+                                    SelfPattern, BodyPattern,
+                                    SelfDecl, GenericParams,
                                     CurDeclContext);
   // No need to setLocalDiscriminator.
 
@@ -2739,16 +2746,14 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  VarDecl *SelfDecl
-    = new (Context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                            SourceLoc(), Context.Id_self,
-                            Type(), CurDeclContext);
-  SelfDecl->setImplicit();
+  VarDecl *SelfDecl;
+  auto *SelfPattern = buildImplicitSelfParameter(DestructorLoc,
+                                                 CurDeclContext, &SelfDecl);
 
   Scope S(this, ScopeKind::DestructorBody);
   DestructorDecl *DD
     = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
-                                   SelfDecl, CurDeclContext);
+                                   SelfPattern, SelfDecl, CurDeclContext);
   // No need to setLocalDiscriminator.
 
   SelfDecl->setDeclContext(DD);

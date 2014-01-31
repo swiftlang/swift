@@ -3283,7 +3283,7 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
-  Pattern *ArgParams, *BodyParams;
+  Pattern *ArgParams[2], *BodyParams[2];
 
   /// The type of the initializing constructor.
   Type InitializerType;
@@ -3297,12 +3297,15 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
-                  Pattern *ArgParams, Pattern *BodyParams,
+                  Pattern *SelfArgParam, Pattern *ArgParams,
+                  Pattern *SelfBodyParam, Pattern *BodyParams,
                   VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ConstructorLoc, ImplicitSelfDecl, 1, GenericParams),
-      ArgParams(ArgParams), BodyParams(BodyParams) {
+                           ConstructorLoc, ImplicitSelfDecl, 2, GenericParams) {
+    setArgParams(SelfArgParam, ArgParams);
+    setBodyParams(SelfBodyParam, BodyParams);
+
     assert(ImplicitSelfDecl && "constructors should have a non-null self");
     ConstructorDeclBits.ComputedBodyInitKind = 0;
   }
@@ -3311,18 +3314,14 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  Pattern *getArgParams() { return ArgParams; }
-  const Pattern *getArgParams() const { return ArgParams; }
-
-  void setArgParams(Pattern *argParams) {
-    ArgParams = argParams;
+  void setArgParams(Pattern *selfPattern, Pattern *argParams) {
+    ArgParams[0] = selfPattern;
+    ArgParams[1] = argParams;
   }
 
-  Pattern *getBodyParams() { return BodyParams; }
-  const Pattern *getBodyParams() const { return BodyParams; }
-
-  void setBodyParams(Pattern *bodyParams) {
-    BodyParams = bodyParams;
+  void setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
+    BodyParams[0] = selfPattern;
+    BodyParams[1] = bodyParams;
   }
 
   /// getArgumentType - get the type of the argument tuple
@@ -3402,12 +3401,20 @@ public:
 /// }
 /// \endcode
 class DestructorDecl : public AbstractFunctionDecl {
+  friend class AbstractFunctionDecl;
+  Pattern *SelfPattern;
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
+                 Pattern *SelfPattern,
                  VarDecl *ImplicitSelfDecl, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           DestructorLoc, ImplicitSelfDecl, 0, nullptr) {
+                           DestructorLoc, ImplicitSelfDecl, 1, nullptr),
+      SelfPattern(SelfPattern) {
     assert(ImplicitSelfDecl && "destructors should have a non-null self");
+  }
+
+  void setSelfPattern(Pattern *selfPattern) {
+    SelfPattern = selfPattern;
   }
 
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
@@ -3632,11 +3639,11 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    Ptr = &cast<ConstructorDecl>(this)->ArgParams;
+    Ptr = cast<ConstructorDecl>(this)->ArgParams;
     break;
 
   case DeclKind::Destructor:
-    Ptr = nullptr;
+    Ptr = &cast<DestructorDecl>(this)->SelfPattern;
     break;
 
   case DeclKind::Func:
@@ -3653,11 +3660,11 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   switch (getKind()) {
   default: llvm_unreachable("Unknown AbstractFunctionDecl!");
   case DeclKind::Constructor:
-    Ptr = &cast<ConstructorDecl>(this)->BodyParams;
+    Ptr = cast<ConstructorDecl>(this)->BodyParams;
     break;
 
   case DeclKind::Destructor:
-    Ptr = nullptr;
+    Ptr = &cast<DestructorDecl>(this)->SelfPattern;
     break;
 
   case DeclKind::Func:

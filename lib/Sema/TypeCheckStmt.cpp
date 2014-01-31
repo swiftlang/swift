@@ -757,7 +757,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
   unsigned nextArgIndex = 0;
-  checkDefaultArguments(*this, ctor->getArgParams(), nextArgIndex, ctor);
+  for (auto pattern : ctor->getBodyParamPatterns())
+    checkDefaultArguments(*this, pattern, nextArgIndex, ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

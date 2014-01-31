@@ -567,10 +567,10 @@ public:
                           SourceLoc StaticLoc,
                           VarDecl *&boundVar);
   
-  Pattern *buildImplicitSelfParameter(SourceLoc Loc);
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
-  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
+  ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
+                                       ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,

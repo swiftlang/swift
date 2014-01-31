@@ -347,6 +347,14 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
+  // Emit any default argument generators.
+  {
+    auto patterns = AFD->getArgParamPatterns();
+    if (AFD->getDeclContext()->isTypeContext())
+      patterns = patterns.slice(1);
+    emitDefaultArgGenerators(AFD, patterns);
+  }
+
   // If this is a function at global scope, it may close over a global variable.
   // If we're emitting top-level code, then emit a "mark_function_escape" that
   // lists the captured global variables so that definite initialization can
@@ -371,14 +379,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
   SILDeclRef::Loc decl = fd;
-
-  // Emit any default argument generators.
-  {
-    auto patterns = fd->getArgParamPatterns();
-    if (fd->getDeclContext()->isTypeContext())
-      patterns = patterns.slice(1);
-    emitDefaultArgGenerators(decl, patterns);
-  }
 
   emitAbstractFuncDecl(fd);
   
@@ -418,9 +418,8 @@ void SILGenModule::addGlobalVariable(VarDecl *global) {
 }
 
 void SILGenModule::emitConstructor(ConstructorDecl *decl) {
+  // FIXME: Handle 'self' like any other argument here.
   // Emit any default argument getter functions.
-  emitDefaultArgGenerators(decl, decl->getBodyParams());
-
   emitAbstractFuncDecl(decl);
 
   SILDeclRef constant(decl);
