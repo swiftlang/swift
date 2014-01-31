@@ -142,15 +142,9 @@ namespace swift {
 
   using ModuleOrSourceFile = PointerUnion<Module *, SourceFile *>;
 
-  enum class SerializationMode {
-    AST,
-    MachOSection
-  };
-
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const SILModule *M,
                  const char *outputPath,
-                 SerializationMode mode = SerializationMode::AST,
                  ArrayRef<std::string> inputFilenames = {},
                  StringRef moduleLinkName = {});
 
@@ -158,7 +152,6 @@ namespace swift {
   void serializeToStream(ModuleOrSourceFile DC,
                          llvm::raw_ostream &out,
                          const SILModule *M = nullptr,
-                         SerializationMode mode = SerializationMode::AST,
                          ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
 

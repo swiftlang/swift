@@ -2214,7 +2214,7 @@ namespace {
 }
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               const SILModule *SILMod, SerializationMode mode,
+                               const SILModule *SILMod,
                                FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
@@ -2234,48 +2234,14 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     Out.FlushToWord();
   }
 
-  if (mode == SerializationMode::MachOSection) {
-    // FIXME: Duplicated here and in SwiftASTStreamerPass.h.
-    // FIXME: Is this wrapper really necessary?
-
-    // Write the section header.
-    uint32_t magic = 0x41535473;
-    uint32_t version = 1;
-    uint32_t language = dwarf::DW_LANG_Swift;
-    uint32_t flags = 0;
-
-    os << AsBytes<4>(magic) << AsBytes<4>(version) << AsBytes<4>(language)
-       << AsBytes<4>(flags);
-
-    StringRef moduleName = getModule(DC)->Name.str();
-
-    // Write the offset to the serialized data and its length.
-    uint32_t offsetLength = 32 + moduleName.size();
-    uint32_t alignedOffset = llvm::RoundUpToAlignment(offsetLength, 32);
-    os << AsBytes<8>(alignedOffset) << AsBytes<8>(Buffer.size());
-
-    // Write the module name.
-    os << AsBytes<4>(moduleName.size()) << moduleName;
-
-    // Align to 32 bytes before and after the actual data.
-    static const char nulls[31] = {};
-    assert(alignedOffset - offsetLength < sizeof(nulls));
-    os.write(nulls, alignedOffset - offsetLength);
-    os.write(Buffer.data(), Buffer.size());
-    os.write(nulls,
-             llvm::RoundUpToAlignment(Buffer.size(), 32) - Buffer.size());
-
-  } else {
-    os.write(Buffer.data(), Buffer.size());
-  }
-
+  os.write(Buffer.data(), Buffer.size());
   os.flush();
   Buffer.clear();
 }
 
 void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
-                      const char *outputPath, SerializationMode mode,
-                      FilenamesTy inputFiles, StringRef moduleLinkName) {
+                      const char *outputPath, FilenamesTy inputFiles,
+                      StringRef moduleLinkName) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo,
                            llvm::sys::fs::F_Binary);
@@ -2287,12 +2253,12 @@ void swift::serialize(ModuleOrSourceFile DC, const SILModule *M,
     return;
   }
 
-  serializeToStream(DC, out, M, mode, inputFiles, moduleLinkName);
+  serializeToStream(DC, out, M, inputFiles, moduleLinkName);
 }
 
 void swift::serializeToStream(ModuleOrSourceFile DC, raw_ostream &out,
-                              const SILModule *M, SerializationMode mode,
-                              FilenamesTy inputFiles, StringRef moduleLinkName) {
+                              const SILModule *M, FilenamesTy inputFiles,
+                              StringRef moduleLinkName) {
   Serializer S;
-  S.writeToStream(out, DC, M, mode, inputFiles, moduleLinkName);
+  S.writeToStream(out, DC, M, inputFiles, moduleLinkName);
 }
