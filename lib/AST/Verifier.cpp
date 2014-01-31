@@ -1198,8 +1198,8 @@ struct ASTNodeBase {};
         Out << "DestructorDecl can not be generic";
         abort();
       }
-      if (!DD->getArgParamPatterns().size() == 1 ||
-          !DD->getBodyParamPatterns().size() == 1) {
+      if (DD->getArgParamPatterns().size() != 1 ||
+          DD->getBodyParamPatterns().size() != 1) {
         Out << "DestructorDecl should have 'self' parameter pattern only";
         abort();
       }
