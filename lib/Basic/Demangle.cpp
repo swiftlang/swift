@@ -1238,6 +1238,15 @@ private:
       block->addChild(postProcessReturnTypeNode(out_args));
       return block;
     }
+    if (c == 'D') {
+      NodePointer type = demangleType();
+      if (!type)
+        return nullptr;
+
+      NodePointer dynamicSelf = Node::create(Node::Kind::DynamicSelf);
+      dynamicSelf->addChild(type);
+      return dynamicSelf;
+    }
     if (c == 'E') {
       if (!Mangled.nextIf('R'))
         return nullptr;
@@ -2067,6 +2076,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
     printBoundGeneric(pointer);
+    return;
+  case Node::Kind::DynamicSelf:
+    Printer << "DynamicSelf";
     return;
   case Node::Kind::ObjCBlock: {
     Printer << "@objc_block ";
