@@ -2133,9 +2133,6 @@ public:
   /// \brief returns jump target for the branch.
   SILBasicBlock *getDestBB() const { return DestBB; }
 
-  /// \brief Sets the jump target for the branch.
-  void setDestBB(SILBasicBlock *BB) { DestBB = BB; }
-
   /// The arguments for the destination BB.
   OperandValueArrayRef getArgs() const { return Operands.asValueArray(); }
 
@@ -2203,11 +2200,6 @@ public:
   SILBasicBlock *getFalseBB() { return DestBBs[1]; }
   const SILBasicBlock *getFalseBB() const { return DestBBs[1]; }
 
-  /// \brief Sets the True jump target.
-  void setTrueBB(SILBasicBlock *BB) { DestBBs[0] = BB; }
-
-  /// \brief Sets the False jump target.
-  void setFalseBB(SILBasicBlock *BB) { DestBBs[1] = BB; }
 
   /// Get the arguments to the true BB.
   OperandValueArrayRef getTrueArgs() const;
