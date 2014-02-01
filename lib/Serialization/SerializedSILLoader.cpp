@@ -27,6 +27,9 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
         auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx,
                                        callback);
+#ifndef NDEBUG
+        SILMod->verify();
+#endif
         LoadedSILSections.emplace_back(Des);
       }
     }
