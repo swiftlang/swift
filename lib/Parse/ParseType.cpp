@@ -325,8 +325,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
 
   IdentTypeRepr *ITR = nullptr;
   if (!ComponentsR.empty()) {
-    // Lookup element #0 through our current scope chains in case it is some thing
-    // local (this returns null if nothing is found).
+    // Lookup element #0 through our current scope chains in case it is some
+    // thing local (this returns null if nothing is found).
     if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
       ComponentsR[0]->setValue(Entry);
 
@@ -372,7 +372,8 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     return makeParserResult(new (Context) ProtocolCompositionTypeRepr(
                                              ArrayRef<IdentTypeRepr *>(),
                                              ProtocolLoc,
-                                             SourceRange(LAngleLoc, RAngleLoc)));
+                                             SourceRange(LAngleLoc,
+                                                         RAngleLoc)));
   }
   
   // Parse the type-composition-list.
@@ -502,12 +503,14 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
   SourceLoc lsquareLoc = consumeToken();
-
+  ParserResult<TypeRepr> NestedType = makeParserResult(Base);
+  ArrayTypeRepr *ATR = nullptr;
+  
   // Handle the [] production, meaning an array slice.
   if (Tok.is(tok::r_square)) {
     SourceLoc rsquareLoc = consumeToken(tok::r_square);
-    ParserResult<TypeRepr> NestedType = makeParserResult(Base);
-
+    
+      
     // If we're starting another square-bracket clause, recur.
     if (Tok.isFollowingLSquare()) {
       NestedType = parseTypeArray(Base);
@@ -519,38 +522,70 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
         NestedType = makeParserErrorResult(Base);
       }
     }
-
+    
     // Just build a normal array slice type.
-    auto ATR = new (Context) ArrayTypeRepr(
-        NestedType.get(), nullptr, SourceRange(lsquareLoc, rsquareLoc));
+    ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
+                                           SourceRange(lsquareLoc, rsquareLoc));
     if (NestedType.isParseError())
       return makeParserErrorResult(ATR);
     else
       return makeParserResult(ATR);
   }
 
-  ParserResult<Expr> sizeEx = parseExpr(diag::expected_expr_array_type);
-  if (sizeEx.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
-  if (sizeEx.isNull()) {
-    consumeIf(tok::r_square);
-    // FIXME: better recovery.
-    return nullptr;
-  }
-
   SourceLoc rsquareLoc;
+
+  // We currently only accept an integer literal as the inner expression.
+  // FIXME: Should we decide to support integer constant expressions in the
+  // future, we will need to remove this check to accept any compositional
+  // expressions
+  ParserResult<Expr> sizeEx = parseExpr(diag::expected_expr_array_type, true);
+  
   if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type, lsquareLoc))
     return nullptr;
+  
+  if (!sizeEx.isNull() && isa<IntegerLiteralExpr>(sizeEx.get())) {
+    if (sizeEx.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+
+    NestedType = makeParserErrorResult(Base);
+    
+    // FIXME: We don't supported fixed-length arrays yet.
+    diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
+    .highlight(sizeEx.get()->getSourceRange());
+    
+    ATR = new (Context) ArrayTypeRepr(NestedType.get(),
+                                      nullptr,
+                                      SourceRange(lsquareLoc,
+                                                  getEndOfPreviousLoc()));
+    return makeParserErrorResult(ATR);
+  } else {
+
+    // If the size expression is null, we would have raised the
+    // expected_expr_array_type error above when the token stream failed to
+    // parse as an expression
+    if (!sizeEx.isNull()) {
+      diagnose(lsquareLoc, diag::expected_expr_array_type)
+      .highlight(sizeEx.get()->getSourceRange());
+    }
+    else {
+      // Skip until the next decl, statement or block
+      skipUntilDeclStmtRBrace(tok::l_brace);
+    }
+    
+    // Create an array slice type for the malformed array type specification
+    NestedType = makeParserErrorResult(Base);
+    ATR = new (Context) ArrayTypeRepr(NestedType.get(),
+                                           nullptr,
+                                           SourceRange(lsquareLoc,
+                                                       getEndOfPreviousLoc()));
+    return makeParserErrorResult(ATR);
+  }
 
   // If we're starting another square-bracket clause, recur.
   if (Tok.isFollowingLSquare() && parseTypeArray(Base).isParseError())
     return nullptr;
-  
-  // FIXME: We don't supported fixed-length arrays yet.
-  diagnose(lsquareLoc, diag::unsupported_fixed_length_array)
-    .highlight(sizeEx.get()->getSourceRange());
-  
+
   return nullptr;
 }
 

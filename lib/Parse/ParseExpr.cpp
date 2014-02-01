@@ -1299,7 +1299,13 @@ Expr *Parser::parseExprClosure() {
   SourceLoc inLoc;
   parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
 
-  assert(CurLocalContext && "parsing expression in non-local context?");
+  // If the closure was created in the context of an array type signature's
+  // size expression, there will not be a local context. A parse error will
+  // be reported at the signature's declaration site.
+  if (!CurLocalContext) {
+    return new (Context) ErrorExpr(inLoc);
+  }
+  
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
