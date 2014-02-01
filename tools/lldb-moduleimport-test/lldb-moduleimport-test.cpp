@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     }
     llvm::outs() << "ok!\n";
     if (DumpModule) {
-      llvm::SmallVectorImpl<swift::Decl*> Decls;
+      llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);
       for (auto Decl : Decls) {
         Decl->dump(llvm::outs());
