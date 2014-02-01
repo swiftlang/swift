@@ -38,21 +38,6 @@ swift::isSideEffectFree(BuiltinFunctionRefInst *FR) {
   llvm_unreachable("All cases are covered.");
 }
 
-bool swift::isReadNone(BuiltinFunctionRefInst *FR) {
-  // First, check if we are dealing with a swift builtin.
-  const BuiltinInfo &BInfo = FR->getBuiltinInfo();
-  if (BInfo.ID != BuiltinValueKind::None)
-    return BInfo.isReadNone();
-
-  // Second, specialcase llvm intrinsic.
-  const IntrinsicInfo & IInfo = FR->getIntrinsicInfo();
-  if (IInfo.ID != llvm::Intrinsic::not_intrinsic)
-    return IInfo.hasAttribute(llvm::Attribute::ReadNone) &&
-      IInfo.hasAttribute(llvm::Attribute::NoUnwind);
-
-  llvm_unreachable("All cases are covered.");
-}
-
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.

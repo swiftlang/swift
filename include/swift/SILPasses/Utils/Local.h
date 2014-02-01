@@ -61,9 +61,6 @@ namespace swift {
   /// Does the passed in BuiltinFunctionRefInst have any side effects?
   bool isSideEffectFree(BuiltinFunctionRefInst *FR);
 
-  /// Does the passed in BuiltinFunctionRefInst touch memory at all?
-  bool isReadNone(BuiltinFunctionRefInst *FR);
-
 } // end namespace swift
 
 #endif
