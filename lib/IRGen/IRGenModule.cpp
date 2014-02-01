@@ -65,6 +65,7 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 };
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
+                                                 llvm::LLVMContext &LLVMContext,
                                                       IRGenOptions &Opts,
                                                       StringRef ModuleName) {
   auto Loader = Context.getClangModuleLoader();
@@ -78,18 +79,19 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &TO = ClangContext.getTargetInfo().getTargetOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, *CGO, TO,
-                                                llvm::getGlobalContext());
+                                                LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
 
   return ClangCodeGen;
 }
 
 IRGenModule::IRGenModule(ASTContext &Context,
+                         llvm::LLVMContext &LLVMContext,
                          IRGenOptions &Opts, StringRef ModuleName,
                          const llvm::DataLayout &DataLayout,
                          SILModule *SILMod)
   : Context(Context), Opts(Opts),
-    ClangCodeGen(createClangCodeGenerator(Context, Opts, ModuleName)),
+    ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, Opts, ModuleName)),
     Module(*ClangCodeGen->GetModule()),
     LLVMContext(Module.getContext()), DataLayout(DataLayout),
     SILMod(SILMod), TargetInfo(SwiftTargetInfo::get(*this)),

@@ -332,7 +332,8 @@ private:                            \
   
 //--- Generic ---------------------------------------------------------------
 public:
-  IRGenModule(ASTContext &Context, IRGenOptions &Opts, StringRef ModuleName,
+  IRGenModule(ASTContext &Context, llvm::LLVMContext &LLVMContext,
+              IRGenOptions &Opts, StringRef ModuleName,
               const llvm::DataLayout &DataLayout, SILModule *SILMod);
   ~IRGenModule();
 

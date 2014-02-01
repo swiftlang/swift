@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/LLVMContext.h"
 
 #include <memory>
 
@@ -162,7 +163,8 @@ namespace swift {
   std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                     swift::Module *M,
                                                     SILModule *SILMod,
-                                                    StringRef ModuleName);
+                                                    StringRef ModuleName,
+                                                llvm::LLVMContext &LLVMContext);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
@@ -170,6 +172,7 @@ namespace swift {
                                                     SourceFile &SF,
                                                     SILModule *SILMod,
                                                     StringRef ModuleName,
+                                                 llvm::LLVMContext &LLVMContext,
                                                     unsigned StartElem = 0);
 
   /// The extension for serialized modules.

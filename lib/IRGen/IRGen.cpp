@@ -85,6 +85,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                                                          swift::Module *M,
                                                          SILModule *SILMod,
                                                          StringRef ModuleName,
+                                                 llvm::LLVMContext &LLVMContext,
                                                        SourceFile *SF = nullptr,
                                                        unsigned StartElem = 0) {
   assert(!M->Ctx.hadError());
@@ -126,7 +127,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   assert(DataLayout && "target machine didn't set DataLayout?");
 
   // Create the IR emitter.
-  IRGenModule IGM(M->Ctx, Opts, ModuleName, *DataLayout, SILMod);
+  IRGenModule IGM(M->Ctx, LLVMContext, Opts, ModuleName, *DataLayout, SILMod);
 
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
@@ -318,13 +319,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
 std::unique_ptr<llvm::Module> swift::
 performIRGeneration(IRGenOptions &Opts, swift::Module *M, SILModule *SILMod,
-                    StringRef ModuleName) {
-  return ::performIRGeneration(Opts, M, SILMod, ModuleName);
+                    StringRef ModuleName, llvm::LLVMContext &LLVMContext) {
+  return ::performIRGeneration(Opts, M, SILMod, ModuleName, LLVMContext);
 }
 
 std::unique_ptr<llvm::Module> swift::
 performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
-                    StringRef ModuleName, unsigned StartElem) {
+                    StringRef ModuleName, llvm::LLVMContext &LLVMContext,
+                    unsigned StartElem) {
   return ::performIRGeneration(Opts, SF.getParentModule(), SILMod, ModuleName,
-                               &SF, StartElem);
+                               LLVMContext, &SF, StartElem);
 }

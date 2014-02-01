@@ -221,12 +221,17 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
+  // FIXME: We shouldn't need to use the global context here, but
+  // something is persisting across calls to performIRGeneration.
+  auto &LLVMContext = llvm::getGlobalContext();
   if (PrimarySourceFile) {
     performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
-                        Invocation.getFrontendOptions().OutputFilename);
+                        Invocation.getFrontendOptions().OutputFilename,
+                        LLVMContext);
   } else {
     performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
-                        Invocation.getFrontendOptions().OutputFilename);
+                        Invocation.getFrontendOptions().OutputFilename,
+                        LLVMContext);
   }
 
   return false;

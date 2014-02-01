@@ -277,8 +277,11 @@ static bool IRGenImportedModules(CompilerInstance &CI,
       break;
     }
 
+    // FIXME: We shouldn't need to use the global context here, but
+    // something is persisting across calls to performIRGeneration.
     auto SubModule = performIRGeneration(IRGenOpts, import, SILMod.get(),
-                                         import->Name.str());
+                                         import->Name.str(),
+                                         llvm::getGlobalContext());
 
     if (CI.getASTContext().hadError()) {
       hadError = true;
@@ -313,8 +316,11 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
+  // FIXME: We shouldn't need to use the global context here, but
+  // something is persisting across calls to performIRGeneration.
   auto Module = performIRGeneration(IRGenOpts, swiftModule, CI.getSILModule(),
-                                    swiftModule->Name.str());
+                                    swiftModule->Name.str(),
+                                    llvm::getGlobalContext());
 
   if (Context.hadError())
     return;
@@ -982,9 +988,12 @@ private:
     if (!ShouldRun)
       return true;
 
-     // IRGen the current line(s).
+    // IRGen the current line(s).
+    // FIXME: We shouldn't need to use the global context here, but
+    // something is persisting across calls to performIRGeneration.
     auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile, sil.get(),
-                                          "REPLLine", RC.CurIRGenElem);
+                                          "REPLLine", llvm::getGlobalContext(),
+                                          RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
     if (CI.getASTContext().hadError())
