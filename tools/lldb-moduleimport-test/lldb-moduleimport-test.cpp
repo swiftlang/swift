@@ -43,6 +43,11 @@ static llvm::cl::opt<std::string>
 SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::init(SWIFT_MODULES_SDK));
 
+static llvm::cl::opt<bool>
+DumpModule("dump-module",
+           llvm::cl::desc("Dump the imported module after checking it imports just fine"));
+
+
 void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
@@ -149,6 +154,13 @@ int main(int argc, char **argv) {
       return 1;
     }
     llvm::outs() << "ok!\n";
+    if (DumpModule) {
+      llvm::SmallVectorImpl<swift::Decl*> Decls;
+      Module->getTopLevelDecls(Decls);
+      for (auto Decl : Decls) {
+        Decl->dump(llvm::outs());
+      }
+    }
   }
   return 0;
 }
