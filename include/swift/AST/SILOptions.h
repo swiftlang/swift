@@ -43,6 +43,9 @@ public:
 
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
+
+  /// Controls whether or not paranoid verification checks are run.
+  bool EnableParanoidVerification = false;
 };
 
 } // end namespace swift
