@@ -670,6 +670,10 @@ Globals
   global ::= 'Tb' type                   // swift-to-ObjC block converter
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
+
+  global ::= 'TS' specialization* '_' .* // specialization
+  specialization ::= type protocol-conformance* '_'
+
   global ::= 'TW' protocol-conformance entity
                                          // protocol witness thunk
   entity ::= nominal-type                // named type declaration
@@ -712,6 +716,10 @@ A global mangling starts with an ``entity`` or ``[MTWw]``.
 If a partial application forwarder is for a static symbol, its name will
 start with the sequence ``_TPA_`` followed by the mangled symbol name of the
 forwarder's destination.
+
+A generic specialization mangling consists of a header, specifying the types
+and conformances used to specialize the generic function, followed by the
+full mangled name of the original unspecialized generic symbol.
 
 The types in a ``<reabstract-signature>`` are always non-polymorphic
 ``<impl-function-type>`` types.

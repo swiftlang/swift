@@ -18,6 +18,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Mangle.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
@@ -106,6 +107,23 @@ private:
                                         Inst->isVolatile()));
   }
 
+  static SILLinkage getSpecializedLinkage(SILLinkage orig) {
+    switch (orig) {
+    case SILLinkage::Public:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::Shared:
+    case SILLinkage::Hidden:
+    case SILLinkage::HiddenExternal:
+      // Specializations of public or hidden symbols can be shared by all TUs
+      // that specialize the definition.
+      return SILLinkage::Shared;
+        
+    case SILLinkage::Private:
+      // Specializations of private symbols should remain so.
+      return SILLinkage::Private;
+    }
+  }
+  
   /// Create a new empty function with the correct arguments and a unique name.
   static SILFunction *initCloned(SILFunction *Orig,
                                  TypeSubstitutionMap &Subst,
@@ -119,7 +137,8 @@ private:
 
     // Create a new empty function.
     SILFunction *NewF =
-        SILFunction::create(M, SILLinkage::Private, NewName, FTy,
+        SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
+                            NewName, FTy,
                             Orig->getLocation(), Orig->isBare(),
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());
@@ -223,21 +242,13 @@ struct SILSpecializer {
   /// The SIL Module.
   SILModule *M;
 
-  /// A list of declared function names.
-  llvm::StringSet<> FunctionNameCache;
-
   /// Maps a function to all of the ApplyInst that call it.
   llvm::MapVector<SILFunction *, AIList> ApplyInstMap;
 
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
 
-  SILSpecializer(SILModule *Mod) : M(Mod) {
-
-    // Save the list of function names at the beginning of the specialization.
-    for (SILFunction &F : *Mod)
-      FunctionNameCache.insert(F.getName());
-  }
+  SILSpecializer(SILModule *Mod) : M(Mod) {}
 
   bool specializeApplyInstGroup(SILFunction *F, AIList &List);
 
@@ -369,22 +380,39 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     if (!canSpecializeFunctionWithSubList(F, Subs))
       continue;
 
-    // TODO: Mangle the subst types into the new function name and
-    // use shared linkage. For now, we use a running counter. rdar://15658321
-    unsigned Counter = 0;
-    std::string ClonedName;
-    do {
-      ClonedName.clear();
-      llvm::raw_string_ostream buffer(ClonedName);
-      buffer << F->getName() << "_spec" << Counter++;
-    } while (FunctionNameCache.count(ClonedName));
+    llvm::SmallString<64> ClonedName;
+    {
+      llvm::raw_svector_ostream buffer(ClonedName);
+      buffer << "_TTS";
 
-    // Add the new name to the list of module function names.
-    FunctionNameCache.insert(ClonedName);
-
-    // Create a new function.
-    SILFunction *NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName,
-                                                     Bucket[0]);
+      Mangle::Mangler mangle(buffer);
+      
+      for (auto &Sub : Bucket[0]->getSubstitutions()) {
+        mangle.mangleType(Sub.Replacement->getCanonicalType(),
+                          ResilienceExpansion::Minimal, 0);
+        for (auto C : Sub.Conformance) {
+          if (!C)
+            goto null_conformances;
+          mangle.mangleProtocolConformance(C);
+        }
+      null_conformances:;
+        buffer << '_';
+      }
+      
+      buffer << '_' << F->getName();
+    }
+    
+    SILFunction *NewF;
+    bool createdFunction;
+    // If we already have this specialization, reuse it.
+    if (auto PrevF = M->lookUpFunction(ClonedName)) {
+      NewF = PrevF;
+      createdFunction = false;
+    } else {
+      // Create a new function.
+      NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName, Bucket[0]);
+      createdFunction = false;
+    }
 
     // Replace all of the AI functions with the new function.
     for (auto &AI : Bucket)
@@ -392,8 +420,10 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     Changed = true;
 
     // Analyze the ApplyInsts in the new function.
-    collectApplyInst(*NewF);
-    Worklist.push_back(NewF);
+    if (createdFunction) {
+      collectApplyInst(*NewF);
+      Worklist.push_back(NewF);
+    }
   }
 
 
