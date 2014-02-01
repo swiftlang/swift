@@ -538,7 +538,6 @@ bb0(%0 : $Builtin.ObjectPointer):
 //////////
 
 // Make sure SILCloner does not get into an infinite loop here.
-// swift.^ [infix] (lhs : swift.UWord, rhs : swift.UWord) -> swift.UWord
 sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord {
 bb0(%0 : $UWord, %1 : $UWord):
   %2 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %5
@@ -549,7 +548,6 @@ bb0(%0 : $UWord, %1 : $UWord):
   return %6 : $UWord                              // id: %7
 }
 
-// function_ref swift.~ [prefix] (a : swift.UWord) -> swift.UWord
 sil @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord {
 bb0(%0 : $UWord):
   // function_ref swift.^ [infix] (lhs : swift.UWord, rhs : swift.UWord) -> swift.UWord
@@ -561,4 +559,28 @@ bb0(%0 : $UWord):
   %5 = apply %2(%4) : $@thin (UWord) -> UWord     // user: %6
   %6 = apply %1(%0, %5) : $@thin (UWord, UWord) -> UWord // user: %7
   return %6 : $UWord                              // id: %7
+}
+
+// Make sure that private symbol references do not get inlined into
+// transparent functions.
+sil private @private : $@thin () -> () {
+entry:
+  return undef : $()
+}
+
+sil @uses_private : $@thin () -> () {
+entry:
+  %f = function_ref @private : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: sil [transparent] @transparent_uses_uses_private : $@thin () -> () {
+// CHECK: [[USES_PRIVATE:%.*]] = function_ref @uses_private
+// CHECK: apply [[USES_PRIVATE]]()
+sil [transparent] @transparent_uses_uses_private : $@thin () -> () {
+entry:
+  %f = function_ref @uses_private : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
 }

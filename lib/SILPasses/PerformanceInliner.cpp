@@ -28,7 +28,8 @@ namespace {
   class SILPerformanceInliner {
     const unsigned InlineCostThreshold;
 
-    unsigned getFunctionCost(SILFunction *F);
+    unsigned getFunctionCost(SILFunction *Callee,
+                             SILFunction *Caller);
   public:
     explicit SILPerformanceInliner(unsigned threshold)
       : InlineCostThreshold(threshold) {}
@@ -94,28 +95,59 @@ namespace {
 
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
-enum class InlineCost {
+enum class InlineCost : unsigned {
   Free = 0,
   Expensive = 1,
+  CannotBeInlined = UINT_MAX,
 };
 
 } // end anonymous namespace
 
+static bool isValidLinkageForTransparentRef(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::Shared:
+    return true;
+      
+  case SILLinkage::Private:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+    return false;
+  }
+}
+  
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 ///
 /// TODO: Fill this out.
-static InlineCost instructionInlineCost(SILInstruction &I) {
+static InlineCost instructionInlineCost(SILInstruction &I,
+                                        SILFunction *Caller) {
   switch (I.getKind()) {
-    case ValueKind::FunctionRefInst:
     case ValueKind::BuiltinFunctionRefInst:
     case ValueKind::GlobalAddrInst:
-    case ValueKind::SILGlobalAddrInst:
     case ValueKind::IntegerLiteralInst:
     case ValueKind::FloatLiteralInst:
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
+      return InlineCost::Free;
+
+    // Private symbol references cannot be inlined into transparent functions.
+    case ValueKind::FunctionRefInst:
+      if (Caller->isTransparent()
+          && !isValidLinkageForTransparentRef(
+              cast<FunctionRefInst>(I).getReferencedFunction()->getLinkage())) {
+        return InlineCost::CannotBeInlined;
+      }
+      return InlineCost::Free;
+      
+    case ValueKind::SILGlobalAddrInst:
+      if (Caller->isTransparent()
+          && !isValidLinkageForTransparentRef(
+              cast<SILGlobalAddrInst>(I).getReferencedGlobal()->getLinkage())) {
+        return InlineCost::CannotBeInlined;
+      }
       return InlineCost::Free;
       
     case ValueKind::TupleElementAddrInst:
@@ -240,7 +272,8 @@ static InlineCost instructionInlineCost(SILInstruction &I) {
 }
 
 /// \brief Returns the inlining cost of the function.
-unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F) {
+unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F,
+                                                SILFunction *Caller) {
   DEBUG(llvm::dbgs() << "  Calculating cost for " << F->getName() << ".\n");
 
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
@@ -249,7 +282,11 @@ unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F) {
   unsigned Cost = 0;
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      Cost += unsigned(instructionInlineCost(I));
+      auto ICost = instructionInlineCost(I, Caller);
+      if (ICost == InlineCost::CannotBeInlined)
+        return UINT_MAX;
+      
+      Cost += unsigned(ICost);
 
       // If we're debugging, continue calculating the total cost even if we
       // passed the threshold.
@@ -308,7 +345,7 @@ void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     }
 
     // Calculate the inlining cost of the callee.
-    unsigned CalleeCost = getFunctionCost(Callee);
+    unsigned CalleeCost = getFunctionCost(Callee, Caller);
 
     if (CalleeCost > InlineCostThreshold) {
       DEBUG(llvm::dbgs() << "  Function too big to inline. Skipping.\n");
@@ -354,13 +391,10 @@ void swift::performSILPerformanceInlining(SILModule *M,
 
   // For each function in the worklist, attempt to inline its list of apply
   // inst.
-  while (Worklist.size()) {
+  while (!Worklist.empty()) {
     SILFunction *F = Worklist.back();
     Worklist.pop_back();
 
-    // Do not inline into transparent functions. This is exposing a diagnostics
-    // bug. We will still inline after we perform mandatory inlining of the
-    // transparent function.
     inliner.inlineCallsIntoFunction(F);
   }
 }
