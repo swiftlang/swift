@@ -130,11 +130,7 @@ int Compilation::performJobsInList(const JobList &JL,
 
     // TODO: add support for controlling whether command lines are printed
     // when execution begins.
-    llvm::errs() << BeganCmd->getExecutable();
-    for (const char *Arg : BeganCmd->getArguments()) {
-      llvm::errs() << ' ' << Arg;
-    }
-    llvm::errs() << '\n';
+    BeganCmd->printCommandLine(llvm::errs());
   };
 
   // Set up a callback which will be called immediately after a task has

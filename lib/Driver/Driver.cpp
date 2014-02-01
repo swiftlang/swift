@@ -967,11 +967,7 @@ static void printJob(const Job *J, llvm::DenseSet<const Job *> &VisitedJobs) {
   } else if (const Command *Cmd = dyn_cast<Command>(J)) {
     const JobList &Inputs = Cmd->getInputs();
     printJob(&Inputs, VisitedJobs);
-    llvm::outs() << Cmd->getExecutable();
-    for (const char *Arg : Cmd->getArguments()) {
-      llvm::outs() << ' ' << Arg;
-    }
-    llvm::outs() << '\n';
+    Cmd->printCommandLine(llvm::outs());
   } else {
     llvm_unreachable("Unknown JobClass");
   }

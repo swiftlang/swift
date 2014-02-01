@@ -55,3 +55,11 @@ CommandOutput::getAnyOutputForType(types::ID type) const {
     return PrimaryOutputFilename;
   return getAdditionalOutputForType(type);
 }
+
+void Command::printCommandLine(llvm::raw_ostream &os) const {
+  os << Executable;
+  for (const char *Arg : Arguments) {
+    llvm::outs() << ' ' << Arg;
+  }
+  os << '\n';
+}
