@@ -33,7 +33,7 @@ STATISTIC(NumOptzIter, "Number of optimizer iterations");
 
 using namespace swift;
 
-bool swift::runSILDiagnosticPasses(SILModule &Module) {
+bool swift::runSILDiagnosticPasses(SILModule &Module, const SILOptions &Opts) {
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
   if (Module.getStage() == SILStage::Canonical)

@@ -25,6 +25,7 @@ namespace swift {
   class CompilerInstance;
   class SILModule;
   class IRGenOptions;
+  class SILOptions;
 
   // Using LLVM containers to store command-line arguments turns out
   // to be a lose, because LLVM's execution engine demands this vector
@@ -51,7 +52,7 @@ namespace swift {
   };
 
   void RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                      IRGenOptions &Options);
+                      IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
   void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
   void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);

@@ -134,7 +134,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   // Perform "stable" optimizations that are invariant across compiler versions.
   if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
-      runSILDiagnosticPasses(*SM))
+      runSILDiagnosticPasses(*SM, Invocation.getSILOptions()))
     return true;
 
   SM->verify();
@@ -213,7 +213,7 @@ static bool performCompile(CompilerInstance &Instance,
                                       ProcessCmdLine(ImmediateArgv.begin(),
                                                      ImmediateArgv.end());
     Instance.setSILModule(std::move(SM));
-    RunImmediately(Instance, CmdLine, IRGenOpts);
+    RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
     return false;
   }
   default:

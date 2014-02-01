@@ -233,7 +233,8 @@ static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::SmallPtrSet<swift::Module *, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
-                                 IRGenOptions &Options,
+                                 IRGenOptions &IRGenOpts,
+                                 const SILOptions &SILOpts,
                                  bool IsREPL = true) {
   swift::Module *M = CI.getMainModule();
   bool hadError = false;
@@ -243,7 +244,7 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     if (!tryLoadLibrary(linkLib, CmdLine, CI.getDiags()))
       hadError = true;
   };
-  std::for_each(Options.LinkLibraries.begin(), Options.LinkLibraries.end(),
+  std::for_each(IRGenOpts.LinkLibraries.begin(), IRGenOpts.LinkLibraries.end(),
                 addLinkLibrary);
   M->forAllVisibleModules({}, /*includePrivateTopLevel=*/true,
                           [&](Module::ImportedModule import) {
@@ -271,12 +272,12 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 
     std::unique_ptr<SILModule> SILMod = performSILGeneration(import);
     performSILLinking(SILMod.get());
-    if (runSILDiagnosticPasses(*SILMod)) {
+    if (runSILDiagnosticPasses(*SILMod, SILOpts)) {
       hadError = true;
       break;
     }
 
-    auto SubModule = performIRGeneration(Options, import, SILMod.get(),
+    auto SubModule = performIRGeneration(IRGenOpts, import, SILMod.get(),
                                          import->Name.str());
 
     if (CI.getASTContext().hadError()) {
@@ -307,12 +308,12 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 }
 
 void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                           IRGenOptions &Options) {
+                           IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
   auto *swiftModule = CI.getMainModule();
-  auto Module = performIRGeneration(Options, swiftModule, CI.getSILModule(),
+  auto Module = performIRGeneration(IRGenOpts, swiftModule, CI.getSILModule(),
                                     swiftModule->Name.str());
 
   if (Context.hadError())
@@ -321,7 +322,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   if (IRGenImportedModules(CI, *Module, CmdLine, ImportedModules,
-                           InitFns, Options, /*IsREPL*/false))
+                           InitFns, IRGenOpts, SILOpts, /*IsREPL*/false))
     return;
 
   llvm::PassManagerBuilder PMBuilder;
@@ -342,7 +343,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::EngineBuilder builder(Module.get());
   std::string ErrorMsg;
   llvm::TargetOptions TargetOpt;
-  TargetOpt.NoFramePointerElim = Options.DisableFPElim;
+  TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setErrorStr(&ErrorMsg);
@@ -938,7 +939,8 @@ private:
   llvm::SmallString<128> DumpSource;
 
   llvm::ExecutionEngine *EE;
-  IRGenOptions Options;
+  IRGenOptions IRGenOpts;
+  const SILOptions SILOpts;
 
   REPLInput Input;
   REPLContext RC;
@@ -957,7 +959,7 @@ private:
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, RC.CurIRGenElem);
       performSILLinking(sil.get());
-      runSILDiagnosticPasses(*sil);
+      runSILDiagnosticPasses(*sil, SILOpts);
     }
 
     if (CI.getASTContext().hadError()) {
@@ -981,7 +983,7 @@ private:
       return true;
 
      // IRGen the current line(s).
-    auto LineModule = performIRGeneration(Options, REPLInputFile, sil.get(),
+    auto LineModule = performIRGeneration(IRGenOpts, REPLInputFile, sil.get(),
                                           "REPLLine", RC.CurIRGenElem);
     RC.CurIRGenElem = RC.CurElem;
     
@@ -1007,7 +1009,7 @@ private:
     DumpModuleMain->setName("repl.line");
     
     if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules, InitFns,
-                             Options, sil.get()))
+                             IRGenOpts, SILOpts, sil.get()))
       return false;
     
     for (auto InitFn : InitFns)
@@ -1040,6 +1042,8 @@ public:
       RanGlobalInitializers(false),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
+      IRGenOpts(),
+      SILOpts(),
       Input(*this),
       RC{
         /*BufferID*/ ~0U,
@@ -1061,19 +1065,19 @@ public:
     llvm::EngineBuilder builder(&Module);
     std::string ErrorMsg;
     llvm::TargetOptions TargetOpt;
-    TargetOpt.NoFramePointerElim = Options.DisableFPElim;
+    TargetOpt.NoFramePointerElim = IRGenOpts.DisableFPElim;
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
     builder.setErrorStr(&ErrorMsg);
     builder.setEngineKind(llvm::EngineKind::JIT);
     EE = builder.create();
 
-    Options.OutputFilename = "";
-    Options.Triple = llvm::sys::getDefaultTargetTriple();
-    Options.OptLevel = 0;
-    Options.OutputKind = IRGenOutputKind::Module;
-    Options.UseJIT = true;
-    Options.DebugInfo = false;
+    IRGenOpts.OutputFilename = "";
+    IRGenOpts.Triple = llvm::sys::getDefaultTargetTriple();
+    IRGenOpts.OptLevel = 0;
+    IRGenOpts.OutputKind = IRGenOutputKind::Module;
+    IRGenOpts.UseJIT = true;
+    IRGenOpts.DebugInfo = false;
 
     // Force standard library to be loaded immediately.  This forces any errors
     // to appear upfront, and helps eliminate some nasty lag after the first
