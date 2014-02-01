@@ -232,6 +232,9 @@ namespace {
 
       if (ShowColors)
         OS << llvm::sys::Process::ResetColor();
+
+      if (D->isImplicit())
+        OS << " implicit";
     }
 
     void printInherited(ArrayRef<TypeLoc> Inherited) {
