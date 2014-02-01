@@ -203,10 +203,19 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
-    if (FD && FD->isGetterOrSetter()) {
-      // Pass get / set context sensitive keyword token.
+    if (FD && FD->isAccessor()) {
+      // Pass context sensitive keyword token.
       SourceLoc SL = FD->getFuncLoc();
-      if (!passNonTokenNode({ SyntaxNodeKind::Keyword, CharSourceRange(SL, 3)}))
+      unsigned TokLen;
+      switch (FD->getAccessorKind()) {
+      case FuncDecl::NotAccessor: llvm_unreachable("expected accessor");
+      case FuncDecl::IsGetter: TokLen = 3; break;
+      case FuncDecl::IsSetter: TokLen = 3; break;
+      case FuncDecl::IsWillSet: TokLen = 7; break;
+      case FuncDecl::IsDidSet: TokLen = 6; break;
+      }
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+                              CharSourceRange(SL, TokLen)}))
         return false;
     }
     else {
@@ -273,7 +282,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
   if (isa<AbstractFunctionDecl>(D)) {
     FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!(FD && FD->isGetterOrSetter())) {
+    if (!(FD && FD->isAccessor())) {
       popStructureNode();
     }
   }

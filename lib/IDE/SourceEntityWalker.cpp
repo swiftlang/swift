@@ -77,7 +77,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     if (auto FD = dyn_cast<FuncDecl>(D)) {
-      if (FD->isGetterOrSetter()) {
+      if (FD->isAccessor()) {
         NameLen = 0;
       } else {
         NameLen = VD->getName().getLength();
