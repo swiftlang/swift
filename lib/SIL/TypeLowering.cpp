@@ -1741,6 +1741,20 @@ TypeConverter::getConstantFormalTypeWithoutCaptures(SILDeclRef c) {
   return makeConstantType(c, /*withCaptures*/ false);
 }
 
+/// Replace any DynamicSelf types with their underlying Self type.
+static Type replaceDynamicSelfWithSelf(Type t) {
+  return t.transform([](Type type) -> Type {
+    if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+      return dynamicSelf->getSelfType();
+    return type;
+  });
+}
+
+/// Replace any DynamicSelf types with their underlying Self type.
+static CanType replaceDynamicSelfWithSelf(CanType t) {
+  return replaceDynamicSelfWithSelf(Type(t))->getCanonicalType();
+}
+
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                                                             bool withCaptures) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
@@ -1766,6 +1780,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     if (func->getParent() && func->getParent()->isLocalContext())
       funcTy = cast<AnyFunctionType>(
                          getInterfaceTypeInContext(funcTy, func->getParent()));
+    funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
     func->getCaptureInfo().getLocalCaptures(captures);
     return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
@@ -1842,6 +1857,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
+    funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
     func->getCaptureInfo().getLocalCaptures(captures);
     return getFunctionTypeWithCaptures(funcTy, captures,
