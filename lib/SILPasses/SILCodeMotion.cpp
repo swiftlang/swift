@@ -23,6 +23,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/RecyclingAllocator.h"
 
 STATISTIC(NumSunk,   "Number of instructions sunk");
@@ -33,9 +34,15 @@ using namespace swift;
 
 static const int SinkSearchWindow = 6;
 
+static unsigned NumNoRead = 0;
+static llvm::cl::opt<unsigned>
+MaxNoRead("max-no-read", llvm::cl::init(-1));
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
+  if (NumNoRead >= MaxNoRead)
+    return;
   StoreInst  *PrevStore = 0;
   llvm::SmallVector<LoadInst *, 8> Loads;
 
@@ -51,6 +58,9 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
       // If we are storing to the previously stored address then delete the old
       // store.
       if (PrevStore && PrevStore->getDest() == SI->getDest()) {
+        if (NumNoRead >= MaxNoRead)
+          return;
+        ++NumNoRead;
         recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
         PrevStore = SI;
         NumDeadStores++;
@@ -63,6 +73,9 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
       // If we are loading a value that we just saved then use the saved value.
       if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
+        if (NumNoRead >= MaxNoRead)
+          return;
+        ++NumNoRead;
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
         recursivelyDeleteTriviallyDeadInstructions(LI, true);
         NumDupLoads++;
@@ -73,6 +86,9 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
       // previous loads.
       for (auto PrevLd : Loads) {
         if (PrevLd->getOperand() == LI->getOperand()) {
+          if (NumNoRead >= MaxNoRead)
+            return;
+          ++NumNoRead;
           SILValue(LI, 0).replaceAllUsesWith(PrevLd);
           recursivelyDeleteTriviallyDeadInstructions(LI, true);
           LI = 0;
@@ -89,6 +105,11 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
     // Retains write to memory but they don't affect loads and stores.
     if (isa<StrongRetainInst>(Inst))
       continue;
+
+    if (auto *AI = dyn_cast<ApplyInst>(Inst))
+      if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
+        if (isReadNone(BI))
+          continue;
 
     // All other instructions that read from memory invalidate the store.
     if (Inst->mayReadFromMemory())
