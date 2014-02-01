@@ -225,18 +225,34 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
+static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
+  while (!dc->isModuleScopeContext()) {
+    // Local definitions in transparent contexts are forced public because
+    // external references to them can be exposed by mandatory inlining.
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      if (fn->isTransparent())
+        return SILLinkage::Public;
+    }
+    // Check that this local context is not itself in a local transparent
+    // context.
+    dc = dc->getParent();
+  }
+  
+  return SILLinkage::Private;
+}
+
 SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
                                             ForDefinition_t forDefinition) {
-  // Anonymous functions always have internal linkage.
-  if (!constant.hasDecl())
-    return SILLinkage::Private;
+  // Anonymous functions have local linkage.
+  if (auto closure = constant.getAbstractClosureExpr())
+    return getLinkageForLocalContext(closure->getParent());
   
   // Function-local declarations always have internal linkage.
   ValueDecl *d = constant.getDecl();
   DeclContext *dc = d->getDeclContext();
   while (!dc->isModuleScopeContext()) {
     if (dc->isLocalContext())
-      return SILLinkage::Private;
+      return getLinkageForLocalContext(dc);
     dc = dc->getParent();
   }
   
