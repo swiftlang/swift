@@ -56,10 +56,47 @@ CommandOutput::getAnyOutputForType(types::ID type) const {
   return getAdditionalOutputForType(type);
 }
 
+static void escapeAndPrintString(llvm::raw_ostream &os, const char *str) {
+  StringRef String(str);
+  if (String.empty()) {
+    // Special-case the empty string.
+    os << "\"\"";
+    return;
+  }
+
+  bool NeedsEscape = String.find_first_of(" \"\\$") != StringRef::npos;
+
+  if (!NeedsEscape) {
+    // This string doesn't have anything we need to escape, so print it directly
+    os << str;
+    return;
+  }
+
+  // Quote and escape. This isn't really complete, but is good enough, and
+  // matches how Clang's Command handles escaping arguments.
+  os << '"';
+  for (const char c : String) {
+    switch (c) {
+      case '"':
+      case '\\':
+      case '$':
+        // These characters need to be escaped.
+        os << '\\';
+        // Fall-through to the default case, since we still need to print the
+        // character.
+      default:
+        os << c;
+    }
+  }
+  os << '"';
+
+}
+
 void Command::printCommandLine(llvm::raw_ostream &os) const {
-  os << Executable;
+  escapeAndPrintString(os, Executable);
   for (const char *Arg : Arguments) {
-    llvm::outs() << ' ' << Arg;
+    os << ' ';
+    escapeAndPrintString(os, Arg);
   }
   os << '\n';
 }
