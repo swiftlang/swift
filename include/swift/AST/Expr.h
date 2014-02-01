@@ -1701,26 +1701,6 @@ public:
   }
 };
 
-/// Perform a function conversion from one function that to one that has a
-/// covariant result type.
-///
-/// This conversion is technically unsafe; however, semantic analysis will
-/// only introduce such a conversion in cases where other language features
-/// (i.e., DynamicSelf) enforce static safety. Additionally, this conversion
-/// avoid changing the
-///
-/// FIXME: This should be a CapturingExpr.
-class CovariantFunctionConversionExpr : public ImplicitConversionExpr {
-public:
-  CovariantFunctionConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::CovariantFunctionConversion, subExpr,
-                             type) { }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CovariantFunctionConversion;
-    }
-  };
-
 /// MetatypeConversionExpr - Convert a metatype to another metatype
 /// using essentially a derived-to-base conversion.
 class MetatypeConversionExpr : public ImplicitConversionExpr {

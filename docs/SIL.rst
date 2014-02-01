@@ -3064,16 +3064,16 @@ in the following ways:
 - Corresponding tuple elements may add, remove, or change keyword names.
   ``(a:Int, b:Float, UnicodeScalar) -> ()`` and ``(x:Int, Float, z:UnicodeScalar) -> ()`` are
   ABI compatible.
-
-- A class tuple element of the destination type may be a superclass or
-  subclass of the source type's corresponding tuple element.
+- A class tuple element of the destination type may be a superclass of the
+  source type's corresponding tuple element.
 
 The function types may also differ in attributes, with the following
 exceptions:
 
 - The ``cc``, ``thin``, and ``objc_block`` attributes cannot be changed.
 - A ``@noreturn`` function may be converted to a non-``@noreturn``
-  type and vice-versa.
+  type, but a non-``@noreturn`` function may not be converted to a
+  ``@noreturn`` function.
 
 bridge_to_block
 ```````````````

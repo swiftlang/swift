@@ -189,6 +189,7 @@ namespace {
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
     IMPL(Metatype, Trivial)
+    IMPL(DynamicSelf, Reference)
     IMPL(AnyFunction, Reference)
     IMPL(SILFunction, Reference)
     IMPL(Array, AddressOnly) // who knows?
@@ -295,10 +296,6 @@ namespace {
       if (hasReference)
         return asImpl().handleAggWithReference(type);
       return asImpl().handleTrivial(type);
-    }
-
-    RetTy visitDynamicSelfType(CanDynamicSelfType type) {
-      return this->visit(type.getSelfType());
     }
   };
 
@@ -974,12 +971,6 @@ namespace {
       return LoadableEnumTypeLowering::create(TC, Dependent,
                                               OrigType, nonTrivialElts);
     }
-
-    const TypeLowering *visitDynamicSelfType(CanDynamicSelfType type) {
-      return LowerType(TC, type.getSelfType(), Dependent)
-               .visit(type.getSelfType());
-    }
-
   };
 }
 

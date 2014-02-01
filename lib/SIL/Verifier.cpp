@@ -1329,8 +1329,11 @@ public:
             "convert_function cannot change function cc");
     require(opTI->isThin() == resTI->isThin(),
             "convert_function cannot change function thinness");
-  }
 
+    requireSameFunctionComponents(opTI, resTI,
+                                  "convert_function operand and result");
+  }
+  
   void checkCondFailInst(CondFailInst *CFI) {
     require(CFI->getOperand().getType()
               == SILType::getBuiltinIntegerType(1, F.getASTContext()),

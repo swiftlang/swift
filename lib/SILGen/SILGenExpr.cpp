@@ -174,9 +174,6 @@ namespace {
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
-    RValue visitCovariantFunctionConversionExpr(
-             CovariantFunctionConversionExpr *E,
-             SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
@@ -855,19 +852,6 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     result = ManagedValue(converted, original.getCleanup());
   }
   
-  return RValue(SGF, e, result);
-}
-
-RValue RValueEmitter::visitCovariantFunctionConversionExpr(
-                        CovariantFunctionConversionExpr *e,
-                        SGFContext C) {
-  ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
-  CanAnyFunctionType destTy
-    = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-  SILType resultType = SGF.getLoweredType(destTy);
-  SILValue converted = SGF.B.createConvertFunction(e, original.getValue(),
-                                                   resultType);
-  ManagedValue result(converted, original.getCleanup());
   return RValue(SGF, e, result);
 }
 

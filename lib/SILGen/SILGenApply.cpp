@@ -123,68 +123,22 @@ private:
       Loc(L)
   {}
 
-  /// Determine whether the method referenced by the declaration has a
-  /// DynamicSelf result type.
-  static bool isDynamicSelfMethod(SILDeclRef fn) {
-    if (fn.kind != SILDeclRef::Kind::Func || !fn.hasDecl())
-      return nullptr;
-    
-    if (auto func = cast<FuncDecl>(fn.getDecl()))
-      if (func->hasDynamicSelf())
-        return func;
-    
-    return nullptr;
-  }
-  
-  /// Replace the DynamicSelf type with the appropriate self/result types.
-  static CanAnyFunctionType replaceDynamicSelfWithSelf(
-                              SILValue selfValue,
-                              CanAnyFunctionType fnType) {
-    auto containerTy = selfValue.getType().getSwiftType()
-                         ->getRValueInstanceType();
-    return cast<AnyFunctionType>(fnType.transform([&](Type type) -> Type {
-             if (type->is<DynamicSelfType>())
-               return containerTy;
-             return type;
-           })->getCanonicalType());
-  }
-  
-
   static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
-                                                  SILValue selfValue,
                                                   SILDeclRef fn) {
-    auto type = gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
-    
-    // If this routine involves DynamicSelf, replace the DynamicSelf
-    // result type with the original 'self' type.
-    if (isDynamicSelfMethod(fn))
-      return replaceDynamicSelfWithSelf(selfValue, type);
-
-    return type;
+    return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
   }
 
   static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &gen,
-                                                  SILValue selfValue,
                                                   SILDeclRef fn) {
-    auto type
-      = gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalInterfaceType;
-
-    // If this routine involves DynamicSelf, replace the DynamicSelf
-    // result type with the original 'self' type.
-    if (isDynamicSelfMethod(fn))
-      return replaceDynamicSelfWithSelf(selfValue, type);
-
-    return type;
+    return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalInterfaceType;
   }
 
   Callee(SILGenFunction &gen, SILDeclRef standaloneFunction,
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(Kind::StandaloneFunction), standaloneFunction(standaloneFunction),
-      OrigFormalOldType(getConstantFormalType(gen, SILValue(), 
-                                              standaloneFunction)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, SILValue(),
-                                                           standaloneFunction)),
+      OrigFormalOldType(getConstantFormalType(gen, standaloneFunction)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, standaloneFunction)),
       SubstFormalType(substFormalType),
       isTransparent(standaloneFunction.isTransparent()),
       Loc(l)
@@ -198,9 +152,8 @@ private:
          CanAnyFunctionType substFormalType,
          SILLocation l)
     : kind(methodKind), method{selfValue, methodName},
-      OrigFormalOldType(getConstantFormalType(gen, selfValue, methodName)),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, selfValue, 
-                                                             methodName)),
+      OrigFormalOldType(getConstantFormalType(gen, methodName)),
+      OrigFormalInterfaceType(getConstantFormalInterfaceType(gen, methodName)),
       SubstFormalType(substFormalType),
       isTransparent(false),
       Loc(l)
@@ -1063,18 +1016,9 @@ public:
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
-    // FIXME: Check whether this function conversion requires us to build a
-    // thunk.
     visit(e->getSubExpr());
   }
-
-  void visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *e){
-    // FIXME: These expressions merely adjust the result type for DynamicSelf
-    // in an unchecked, ABI-compatible manner. They shouldn't prevent us form
-    // forming a complete call.
-    visitExpr(e);
-  }
-
+  
   void visitParenExpr(ParenExpr *e) {
     visit(e->getSubExpr());
   }
