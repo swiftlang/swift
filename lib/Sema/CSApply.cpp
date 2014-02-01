@@ -393,6 +393,44 @@ namespace {
       return new (ctx) DeclRefExpr(decl, loc, implicit, type);
     }
 
+    /// Replace the result type for the given function with the given, new
+    /// result type.
+    ///
+    /// \param func The function whose type should be transformed.
+    /// \param type The function type to transform.
+    /// \param newResultType The replacement result type.
+    /// \param uncurried The number of levels that have already been uncurried.
+    static Type replaceFunctionResultType(FuncDecl *func,
+                                          Type type,
+                                          Type newResultType,
+                                          unsigned uncurried = 0) {
+      // If we've unwrapped the last pattern, return the new result type.
+      if (uncurried == func->getNumParamPatterns())
+        return newResultType;
+
+      // Determine the input and result types of this function.
+      auto fnType = type->castTo<AnyFunctionType>();
+      Type inputType = fnType->getInput();
+      Type resultType = replaceFunctionResultType(func, fnType->getResult(),
+                                                  newResultType, uncurried + 1);
+
+      // Produce the resulting function type.
+      if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+        return GenericFunctionType::get(genericFn->getGenericParams(),
+                                        genericFn->getRequirements(),
+                                        inputType, resultType,
+                                        fnType->getExtInfo());
+      }
+
+      if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
+        return PolymorphicFunctionType::get(inputType, resultType,
+                                            &polyFn->getGenericParams(),
+                                            fnType->getExtInfo());
+      }
+
+      return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+    }
+
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
@@ -428,6 +466,7 @@ namespace {
       Type containerTy;
       ConcreteDeclRef memberRef;
       Type refTy;
+      Type dynamicSelfFnType;
       if (openedFullType->hasTypeVariable()) {
         // We require substitutions. Figure out what they are.
 
@@ -460,21 +499,17 @@ namespace {
       // DynamicSelf with the actual object type.
       if (auto func = dyn_cast<FuncDecl>(member)) {
         if (func->hasDynamicSelf()) {
-          refTy = refTy.transform([&](Type type) {
-              if (type->is<DynamicSelfType>())
-                return baseTy;
-              return type;
-            });
-
-          containerTy = baseTy;
+          refTy = replaceFunctionResultType(func, refTy, containerTy);
+          dynamicSelfFnType = replaceFunctionResultType(func, refTy, baseTy);
         }
       }
-        
+
       // If we're referring to the member of a module, it's just a simple
       // reference.
       if (baseTy->is<ModuleType>()) {
         assert(!IsDirectPropertyAccess &&
                "Direct property access doesn't make sense for this");
+        assert(!dynamicSelfFnType && "No reference type to convert to");
         Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         ref->setType(refTy);
         return new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref);
@@ -539,6 +574,14 @@ namespace {
         assert(!IsDirectPropertyAccess &&
                "Direct property access doesn't make sense for this");
 
+        // FIXME: DynamicSelf on archetypes and existentials.
+        if (dynamicSelfFnType) {
+          tc.diagnose(dotLoc, diag::dynamic_self_protocol);
+          return nullptr;
+        }
+
+        assert(!dynamicSelfFnType && "DynamicSelf not yet supported in protocols");
+
         Expr *ref;
 
         if (member->getAttrs().isOptional()) {
@@ -560,6 +603,7 @@ namespace {
 
       // For types and properties, build member references.
       if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
+        assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         auto result
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit,
@@ -577,6 +621,11 @@ namespace {
       // Handle all other references.
       Expr *ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
       ref->setType(refTy);
+
+      // If the reference needs to be converted, do so now.
+      if (dynamicSelfFnType) {
+        ref = new (context) FunctionConversionExpr(ref, dynamicSelfFnType);
+      }
 
       ApplyExpr *apply;
       if (isa<ConstructorDecl>(member)) {
