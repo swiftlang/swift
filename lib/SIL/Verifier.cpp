@@ -380,11 +380,32 @@ public:
             "builtin_function_ref should have a thin function result");
   }
   
+  bool isValidLinkageForTransparentRef(SILLinkage linkage) {
+    switch (linkage) {
+    case SILLinkage::Private:
+    case SILLinkage::Hidden:
+    case SILLinkage::HiddenExternal:
+      return false;
+
+    case SILLinkage::Public:
+    case SILLinkage::PublicExternal:
+    case SILLinkage::Shared:
+      return true;
+        
+    }
+  }
+  
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
     require(fnType->isThin(),
             "function_ref should have a thin function result");
+    if (F.isTransparent()) {
+      require(isValidLinkageForTransparentRef(
+                                    FRI->getReferencedFunction()->getLinkage()),
+              "function_ref inside transparent function cannot "
+              "reference a private or hidden symbol");
+    }
   }
   
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
@@ -403,6 +424,12 @@ public:
               GAI->getReferencedGlobal()->getLoweredType(),
             "SILGlobalAddr must be the address type of the variable it "
             "references");
+    if (F.isTransparent()) {
+      require(isValidLinkageForTransparentRef(
+                                      GAI->getReferencedGlobal()->getLinkage()),
+              "function_ref inside transparent function cannot "
+              "reference a private or hidden symbol");
+    }
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {

@@ -457,7 +457,7 @@ var x : Int = 0
 sil @global_callee : $@thin (Builtin.Int128, @thin Int.metatype) -> Int
 
 // CHECK-LABEL: @global_code : $@thin () -> ()
-sil private @global_code : $@thin () -> () {
+sil @global_code : $@thin () -> () {
 bb0:
   // CHECK: global_addr #x : $*Int
   %0 = global_addr #x : $*Int
@@ -872,6 +872,17 @@ entry(%f : $@thin (@out Int, Int) -> (), %x : $Int):
   return %y : $Int
 }
 
+// FIXME: Not serialized because not private.
+// C/HECK_DECL-LABEL: @closure_body : $@thin (CString, CString, Int64) -> () {
+sil @closure_body : $@thin (CString, CString, Int64) -> () {
+bb0(%0 : $CString, %1 : $CString, %2 : $Int64):
+// C/HECK_DECL: function_ref @assert_fail
+  %3 = function_ref @assert_fail : $@thin (CString, CString, Int64) -> ()
+  %4 = apply %3(%0, %1, %2) : $@thin (CString, CString, Int64) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
 // Make sure we serialize the body of closure even without -sil-serialize-all.
 // CHECK_DECL-LABEL:  @partial_apply_with_closure
 sil [transparent] @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> () {
@@ -882,16 +893,6 @@ bb0(%0 : $@callee_owned () -> Bool, %1 : $String, %2 : $CString, %3 : $Int64):
 // CHECK_DECL: partial_apply
   %30 = tuple ()
   return %30 : $()
-}
-
-// CHECK_DECL-LABEL: @closure_body : $@thin (CString, CString, Int64) -> () {
-sil private @closure_body : $@thin (CString, CString, Int64) -> () {
-bb0(%0 : $CString, %1 : $CString, %2 : $Int64):
-// CHECK_DECL: function_ref @assert_fail
-  %3 = function_ref @assert_fail : $@thin (CString, CString, Int64) -> ()
-  %4 = apply %3(%0, %1, %2) : $@thin (CString, CString, Int64) -> ()
-  %5 = tuple ()
-  return %5 : $()
 }
 
 sil @assert_fail : $@thin (CString, CString, Int64) -> ()
