@@ -1581,6 +1581,62 @@ static void emitBuiltinApplyInst(IRGenSILFunction &IGF,
   }
 }
 
+static void emitApplyArguments(IRGenSILFunction &IGF,
+                               ApplyInst *i,
+                               OperandValueArrayRef args,
+                               ArrayRef<SILParameterInfo> params,
+                               Explosion &out) {
+  auto origCalleeType = i->getOrigCalleeType();
+  auto substCalleeType = i->getSubstCalleeType();
+
+  // Turn the formal SIL parameters into IR-gen things.
+  for (auto index : indices(args)) {
+    emitApplyArgument(IGF, args[index], params[index],
+                      i->getSubstitutions(), out);
+  }
+
+  // Pass the generic arguments.
+  if (hasPolymorphicParameters(origCalleeType)) {
+    emitPolymorphicArguments(IGF, origCalleeType, substCalleeType,
+                             i->getSubstitutions(), out);
+  }
+}
+
+static void emitExternalApplyArguments(IRGenSILFunction &IGF,
+                                       ApplyInst *i,
+                                       const LoweredValue &calleeLV,
+                                       OperandValueArrayRef args,
+                                       ArrayRef<SILParameterInfo> params,
+                                       Explosion &out) {
+    // ObjC message sends need special handling for the 'self'
+    // argument, which in SIL gets curried to the end of the argument
+    // list but in IR is passed as the first argument. It additionally
+    // may need to be wrapped in an objc_super struct, and the '_cmd'
+    // argument needs to be passed alongside it.
+    if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
+      SILValue selfValue = args.back();
+      args = args.slice(0, args.size() - 1);
+      params = params.slice(0, params.size() - 1);
+
+      llvm::Value *selfArg;
+      // Convert a metatype 'self' argument to the ObjC Class pointer.
+      if (selfValue.getType().is<MetatypeType>()) {
+        selfArg = getObjCClassForValue(IGF, selfValue);
+      } else {
+        Explosion selfExplosion = IGF.getLoweredExplosion(selfValue);
+        selfArg = selfExplosion.claimNext();
+      }
+
+      addObjCMethodCallImplicitArguments(IGF, out,
+                                         calleeLV.getObjCMethod().getMethod(),
+                                         selfArg,
+                                      calleeLV.getObjCMethod().getSearchType());
+    }
+
+    // FIXME: Replace this with code that uses the correct ABI types.
+    emitApplyArguments(IGF, i, args, params, out);
+}
+
 void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   const LoweredValue &calleeLV = getLoweredValue(i->getCallee());
   
@@ -1611,43 +1667,19 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
   // Lower the SIL arguments to IR arguments.
   Explosion llArgs(emission.getCurExplosionLevel());
   
-  // ObjC message sends need special handling for the 'self' argument, which in
-  // SIL gets curried to the end of the argument list but in IR is passed as the
-  // first argument. It additionally may need to be wrapped in an objc_super
-  // struct, and the '_cmd' argument needs to be passed alongside it.
-  if (calleeLV.kind == LoweredValue::Kind::ObjCMethod) {
-    SILValue selfValue = args.back();
-    args = args.slice(0, args.size() - 1);
-    params = params.slice(0, params.size() - 1);
-
-    llvm::Value *selfArg;
-    // Convert a metatype 'self' argument to the ObjC Class pointer.
-    if (selfValue.getType().is<MetatypeType>()) {
-      selfArg = getObjCClassForValue(*this, selfValue);
-    } else {
-      Explosion selfExplosion = getLoweredExplosion(selfValue);
-      selfArg = selfExplosion.claimNext();
-    }
-
-    addObjCMethodCallImplicitArguments(*this, llArgs,
-                                 calleeLV.getObjCMethod().getMethod(),
-                                 selfArg,
-                                 calleeLV.getObjCMethod().getSearchType());
-  }
-
   // Lower the arguments and return value in the callee's generic context.
   GenericContextScope scope(IGM, origCalleeType->getGenericSignature());
   
-  // Turn the formal SIL parameters into IR-gen things.
-  for (auto index : indices(args)) {
-    emitApplyArgument(*this, args[index], params[index],
-                      i->getSubstitutions(), llArgs);
-  }
-
-  // Pass the generic arguments.
-  if (hasPolymorphicParameters(origCalleeType)) {
-    emitPolymorphicArguments(*this, origCalleeType, substCalleeType,
-                             i->getSubstitutions(), llArgs);
+  switch (origCalleeType->getAbstractCC()) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    emitExternalApplyArguments(*this, i, calleeLV, args, params, llArgs);
+    break;
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
+    emitApplyArguments(*this, i, args, params, llArgs);
+    break;
   }
 
   // Add all those arguments.
