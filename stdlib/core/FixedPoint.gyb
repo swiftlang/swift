@@ -331,10 +331,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 @ if signed:
-  assert(rhs >= 0)
-@ end
-@ if Self == "Int":
-  assert(rhs < (sizeof(rhs) * 8))
+  assert(U${Self}(rhs) < U${Self}(sizeof(rhs) * 8))
 @ else:
   assert(rhs < ${Self}(sizeof(rhs) * 8))
 @ end
