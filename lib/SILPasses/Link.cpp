@@ -48,6 +48,7 @@ namespace {
         decl->setLinkage(SILLinkage::HiddenExternal);
         return;
       case SILLinkage::Shared:
+        decl->setLinkage(SILLinkage::Shared);
       case SILLinkage::Private: // ?
       case SILLinkage::PublicExternal:
       case SILLinkage::HiddenExternal:
@@ -86,7 +87,7 @@ void swift::performSILLinking(SILModule *M, bool LinkAll) {
             CalleeFunction = FRI->getReferencedFunction();
             // When EnableLinkAll is true, we always link the Callee.
             TryLinking = LinkAll || AI->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Private;
+                         CalleeFunction->getLinkage() == SILLinkage::Shared;
           }
         }
         else if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(I)) {
@@ -96,7 +97,7 @@ void swift::performSILLinking(SILModule *M, bool LinkAll) {
             CalleeFunction = FRI->getReferencedFunction();
             // When EnableLinkAll is true, we always link the Callee.
             TryLinking = LinkAll || CalleeFunction->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Private;
+                         CalleeFunction->getLinkage() == SILLinkage::Shared;
           } else {
             continue;
           }

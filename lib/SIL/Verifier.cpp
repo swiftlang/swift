@@ -402,7 +402,8 @@ public:
             "function_ref should have a thin function result");
     if (F.isTransparent()) {
       require(isValidLinkageForTransparentRef(
-                                    FRI->getReferencedFunction()->getLinkage()),
+                                    FRI->getReferencedFunction()->getLinkage())
+                || FRI->getReferencedFunction()->isExternalDeclaration(),
               "function_ref inside transparent function cannot "
               "reference a private or hidden symbol");
     }

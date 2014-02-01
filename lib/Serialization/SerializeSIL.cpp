@@ -1327,9 +1327,10 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
     auto shouldEmitFunctionBody = [&](const SILFunction &F) {
       // Emit function body if a private function is referenced in this module.
       // This is needed for body of closure.
+      // FIXME: This is order-dependent.
       return (!F.empty() &&
               (ShouldSerializeAll || F.isTransparent()  ||
-               (F.getLinkage() == SILLinkage::Private &&
+               (F.getLinkage() == SILLinkage::Shared &&
                 FuncsToDeclare.count(&F))));
     };
 
