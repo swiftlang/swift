@@ -680,15 +680,15 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printImplicitObjCNote(decl);
     recordDeclLoc(decl);
     switch (decl->getAccessorKind()) {
-    case FuncDecl::NotAccessor: break;
-    case FuncDecl::IsGetter:
+    case AccessorKind::NotAccessor: break;
+    case AccessorKind::IsGetter:
       Printer << "get:";
       break;
-    case FuncDecl::IsDidSet:
+    case AccessorKind::IsDidSet:
       Printer << "didSet:";
       break;
-    case FuncDecl::IsSetter:
-    case FuncDecl::IsWillSet:
+    case AccessorKind::IsSetter:
+    case AccessorKind::IsWillSet:
       Printer << (decl->isSetter() ? "set" : "willSet");
 
       auto BodyParams = decl->getBodyParamPatterns();

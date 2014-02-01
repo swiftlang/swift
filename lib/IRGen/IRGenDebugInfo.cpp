@@ -370,11 +370,11 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
     if (ValueDecl *VD = FD.getAccessorStorageDecl()) {
       const char *Kind;
       switch (FD.getAccessorKind()) {
-      case FuncDecl::NotAccessor: assert(0 && "we know this is an accessor");
-      case FuncDecl::IsGetter: Kind = ".get"; break;
-      case FuncDecl::IsSetter: Kind = ".set"; break;
-      case FuncDecl::IsWillSet: Kind = ".willset"; break;
-      case FuncDecl::IsDidSet: Kind = ".didset"; break;
+      case AccessorKind::NotAccessor: assert(0 && "we know this is an accessor");
+      case AccessorKind::IsGetter: Kind = ".get"; break;
+      case AccessorKind::IsSetter: Kind = ".set"; break;
+      case AccessorKind::IsWillSet: Kind = ".willset"; break;
+      case AccessorKind::IsDidSet: Kind = ".didset"; break;
       }
       
       SmallVector<char, 64> Buf;

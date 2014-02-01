@@ -364,15 +364,15 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
       switch (FD->getAccessorKind()) {
       default: assert(0 && "Unhandled accessor");
-      case FuncDecl::NotAccessor: break;
-      case FuncDecl::IsWillSet:
+      case AccessorKind::NotAccessor: break;
+      case AccessorKind::IsWillSet:
         //   entity ::= declaration 'w'                 // willSet
         buffer << introducer;
         mangler.mangleAccessorEntity('w', FD->getAccessorStorageDecl(),
                                      expansion);
         return;
 
-      case FuncDecl::IsDidSet:
+      case AccessorKind::IsDidSet:
         //   entity ::= declaration 'W'                 // didSet
         buffer << introducer;
         mangler.mangleAccessorEntity('W', FD->getAccessorStorageDecl(),

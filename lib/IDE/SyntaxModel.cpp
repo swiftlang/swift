@@ -208,11 +208,11 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SourceLoc SL = FD->getFuncLoc();
       unsigned TokLen;
       switch (FD->getAccessorKind()) {
-      case FuncDecl::NotAccessor: llvm_unreachable("expected accessor");
-      case FuncDecl::IsGetter: TokLen = 3; break;
-      case FuncDecl::IsSetter: TokLen = 3; break;
-      case FuncDecl::IsWillSet: TokLen = 7; break;
-      case FuncDecl::IsDidSet: TokLen = 6; break;
+      case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
+      case AccessorKind::IsGetter: TokLen = 3; break;
+      case AccessorKind::IsSetter: TokLen = 3; break;
+      case AccessorKind::IsWillSet: TokLen = 7; break;
+      case AccessorKind::IsDidSet: TokLen = 6; break;
       }
       if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
                               CharSourceRange(SL, TokLen)}))

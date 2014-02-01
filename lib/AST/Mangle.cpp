@@ -283,11 +283,11 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
     if (auto func = dyn_cast<FuncDecl>(fn)) {
       char Code = '\0';
       switch (func->getAccessorKind()) {
-      case FuncDecl::IsGetter: Code = 'g'; break;
-      case FuncDecl::IsSetter: Code = 's'; break;
-      case FuncDecl::IsWillSet: Code = 'w'; break;
-      case FuncDecl::IsDidSet: Code = 'W'; break;
-      case FuncDecl::NotAccessor: break;
+      case AccessorKind::IsGetter: Code = 'g'; break;
+      case AccessorKind::IsSetter: Code = 's'; break;
+      case AccessorKind::IsWillSet: Code = 'w'; break;
+      case AccessorKind::IsDidSet: Code = 'W'; break;
+      case AccessorKind::NotAccessor: break;
       }
       if (Code)
         return mangleAccessorEntity(Code, func->getAccessorStorageDecl(),

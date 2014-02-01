@@ -2914,24 +2914,21 @@ public:
 
 class OperatorDecl;
 
+enum class AccessorKind {
+  /// \brief This is not a property accessor.
+  NotAccessor = -1,
+  /// \brief This is a getter for a property or subscript.
+  IsGetter,
+  /// \brief This is a setter for a property or subscript.
+  IsSetter,
+  /// \brief This is a willSet specifier for a property.
+  IsWillSet,
+  /// \brief This is a didSet specifier for a property.
+  IsDidSet
+};
+
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
-public:
-  // This enum indicates what kind of property/subscript accessor this FuncDecl
-  // is.
-  enum AccessorKind {
-    /// \brief This is not a property accessor.
-    NotAccessor = -1,
-    /// \brief This is a getter for a property or subscript.
-    IsGetter,
-    /// \brief This is a setter for a property or subscript.
-    IsSetter,
-    /// \brief This is a willSet specifier for a property.
-    IsWillSet,
-    /// \brief This is a didSet specifier for a property.
-    IsDidSet
-  };
-private:
   friend class AbstractFunctionDecl;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
@@ -3088,7 +3085,7 @@ public:
   /// makeAccessor - Note that this function is an accessor for the given
   /// VarDecl or SubscriptDecl.
   void makeAccessor(AbstractStorageDecl *D, AccessorKind Kind) {
-    assert(Kind != NotAccessor && "Must specify an accessor kind");
+    assert(Kind != AccessorKind::NotAccessor && "Must specify an accessor kind");
     AccessorDecl.setPointerAndInt(D, Kind);
   }
 
@@ -3098,20 +3095,23 @@ public:
 
   AccessorKind getAccessorKind() const {
     if (AccessorDecl.getPointer() == nullptr)
-      return NotAccessor;
+      return AccessorKind::NotAccessor;
     return AccessorDecl.getInt();
   }
 
-  bool isGetter() const { return getAccessorKind() == IsGetter; }
-  bool isSetter() const { return getAccessorKind() == IsSetter; }
+  bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
+  bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
 
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
   /// a normal function.
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
   bool isDidSetWillSet() const {
-    return getAccessorKind() == IsDidSet || getAccessorKind() == IsWillSet;
+    return getAccessorKind() == AccessorKind::IsDidSet ||
+           getAccessorKind() == AccessorKind::IsWillSet;
   }
-  bool isAccessor() const { return getAccessorKind() != NotAccessor; }
+  bool isAccessor() const {
+    return getAccessorKind() != AccessorKind::NotAccessor;
+  }
 
   /// Determine whether this function has a \c DynamicSelf return
   /// type.

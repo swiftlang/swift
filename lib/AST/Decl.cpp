@@ -1036,9 +1036,9 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   GetSetInfo->Set = Set;
   
   if (Get)
-    Get->makeAccessor(this, FuncDecl::IsGetter);
+    Get->makeAccessor(this, AccessorKind::IsGetter);
   if (Set)
-    Set->makeAccessor(this, FuncDecl::IsSetter);
+    Set->makeAccessor(this, AccessorKind::IsSetter);
   
   // Mark that this is a computed property.
   setStorageKind(Computed);
@@ -1055,8 +1055,8 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   GetSetInfo->Get = Get;
   GetSetInfo->Set = Set;
   
-  Get->makeAccessor(this, FuncDecl::IsGetter);
-  if (Set) Set->makeAccessor(this, FuncDecl::IsSetter);
+  Get->makeAccessor(this, AccessorKind::IsGetter);
+  if (Set) Set->makeAccessor(this, AccessorKind::IsSetter);
   
   // Mark that this is a StoredObjC property.
   setStorageKind(StoredObjC);
@@ -1080,8 +1080,8 @@ void AbstractStorageDecl::makeWillSetDidSet(SourceLoc LBraceLoc,
   getDidSetInfo().WillSet = WillSet;
   getDidSetInfo().DidSet = DidSet;
   
-  if (WillSet) WillSet->makeAccessor(this, FuncDecl::IsWillSet);
-  if (DidSet) DidSet->makeAccessor(this, FuncDecl::IsDidSet);
+  if (WillSet) WillSet->makeAccessor(this, AccessorKind::IsWillSet);
+  if (DidSet) DidSet->makeAccessor(this, AccessorKind::IsDidSet);
 }
 
 /// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
@@ -1095,8 +1095,8 @@ void AbstractStorageDecl::setDidSetWillSetAccessors(FuncDecl *Get,
   GetSetInfo->Get = Get;
   GetSetInfo->Set = Set;
 
-  Get->makeAccessor(this, FuncDecl::IsGetter);
-  Set->makeAccessor(this, FuncDecl::IsSetter);
+  Get->makeAccessor(this, AccessorKind::IsGetter);
+  Set->makeAccessor(this, AccessorKind::IsSetter);
 }
 
 
