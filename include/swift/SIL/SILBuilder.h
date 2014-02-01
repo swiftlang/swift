@@ -726,7 +726,29 @@ public:
                                                    Target2, Args2,
                                                    F));
   }
-  
+
+  CondBranchInst *createCondBranch(SILLocation Loc, SILValue Cond,
+                                   SILBasicBlock *Target1,
+                                   OperandValueArrayRef Args1,
+                                   SILBasicBlock *Target2,
+                                   OperandValueArrayRef Args2) {
+    SmallVector<SILValue, 6> ArgsCopy1;
+    SmallVector<SILValue, 6> ArgsCopy2;
+    
+    ArgsCopy1.reserve(Args1.size());
+    ArgsCopy2.reserve(Args2.size());
+
+    for (auto I = Args1.begin(), E = Args1.end(); I != E; ++I)
+      ArgsCopy1.push_back(*I);
+    for (auto I = Args2.begin(), E = Args2.end(); I != E; ++I)
+      ArgsCopy2.push_back(*I);
+
+    return insertTerminator(CondBranchInst::create(Loc, Cond,
+                                                   Target1, ArgsCopy1,
+                                                   Target2, ArgsCopy2,
+                                                   F));
+  }
+
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock) {
     return insertTerminator(BranchInst::create(Loc, TargetBlock, F));
   }
