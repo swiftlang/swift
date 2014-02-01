@@ -780,7 +780,7 @@ llvm::Type *SignatureExpansion::expandResult() {
     SmallVector<clang::CanQualType,1> args;
 
     auto extInfo = clang::FunctionType::ExtInfo();
-    auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangType, args, extInfo,
+    auto &FI = ABITypes.arrangeFreeFunctionCall(clangType, args, extInfo,
                                              clang::CodeGen::RequiredArgs::All);
 
     auto &returnInfo = FI.getReturnInfo();
@@ -1818,8 +1818,8 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   SmallVector<clang::CanQualType,1> args;
 
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
+  auto &FI = ABITypes.arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                              clang::CodeGen::RequiredArgs::All);
 
   auto &returnInfo = FI.getReturnInfo();
   if (!returnInfo.isIndirect())
@@ -1849,8 +1849,8 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 
   auto extInfo = clang::FunctionType::ExtInfo();
   // Use clangTy as a dummy result type; we don't use the resulting ABI type.
-  auto &FI = ABITypes.arrangeLLVMFunctionInfo(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
+  auto &FI = ABITypes.arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                              clang::CodeGen::RequiredArgs::All);
 
   assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
   auto const &AI = FI.arg_begin()->info;
