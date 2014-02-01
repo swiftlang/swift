@@ -501,6 +501,11 @@ namespace {
         if (func->hasDynamicSelf()) {
           refTy = replaceFunctionResultType(func, refTy, containerTy);
           dynamicSelfFnType = replaceFunctionResultType(func, refTy, baseTy);
+
+          // If the type after replacing DynamicSelf with the provided base
+          // type is no different, we don't need to perform a conversion here.
+          if (refTy->isEqual(dynamicSelfFnType))
+            dynamicSelfFnType = nullptr;
         }
       }
 
@@ -624,7 +629,8 @@ namespace {
 
       // If the reference needs to be converted, do so now.
       if (dynamicSelfFnType) {
-        ref = new (context) FunctionConversionExpr(ref, dynamicSelfFnType);
+        ref = new (context) CovariantFunctionConversionExpr(ref,
+                                                            dynamicSelfFnType);
       }
 
       ApplyExpr *apply;
