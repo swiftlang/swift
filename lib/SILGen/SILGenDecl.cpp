@@ -2102,8 +2102,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               witnessSubstIfaceTy,
                                               requirement.uncurryLevel);
 
-  // TODO: emit with shared linkage if the type and protocol are non-local.
-  SILLinkage linkage = SILLinkage::Private;
+  // TODO: emit with private or hidden linkage if the conformance is local.
+  SILLinkage linkage = SILLinkage::Public;
 
   // Mangle the name of the witness thunk.
   llvm::SmallString<128> nameBuffer;
