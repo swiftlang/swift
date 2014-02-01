@@ -405,6 +405,15 @@ extension ${Self} {
 @@transparent @@prefix
 func + (rhs: ${Self}) -> ${Self} { return rhs }
 
+@@transparent @@prefix @@assignment
+func ++ (rhs: @@inout ${Self}) -> ${Self} { rhs += 1.0; return rhs }
+@@transparent @@prefix @@assignment
+func -- (rhs: @@inout ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
+@@transparent @@postfix @@assignment
+func ++ (lhs: @@inout ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
+@@transparent @@postfix @@assignment
+func -- (lhs: @@inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
+
 @ for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
@@ -450,5 +459,3 @@ extension ${Self} {
 }
 
 @ end
-
-
