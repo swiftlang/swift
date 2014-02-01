@@ -963,6 +963,6 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
 void swift::performSILPredictableMemoryOptimizations(SILModule *M) {
   for (auto &Fn : *M) {
     optimizeMemoryAllocations(Fn);
-    Fn.verify();
+    DEBUG(Fn.verify());
   }
 }
