@@ -1131,6 +1131,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
                           Type(), GetterParams, GetterParams,
                           TypeLoc::withoutLoc(VD->getType()),
                           VD->getDeclContext());
+  Get->setImplicit();
   
   
   // Reparent the self argument.
@@ -1158,6 +1159,7 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
                                SetterParams, SetterParams,
                                TypeLoc::withoutLoc(SetterRetTy),
                                VD->getDeclContext());
+  Set->setImplicit();
   
   // Reparent the self and value arguments.
   SelfDecl->setDeclContext(Set);
