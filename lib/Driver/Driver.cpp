@@ -72,6 +72,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
+  if (Diags.hadAnyError())
+    return nullptr;
 
   bool DriverPrintActions = ArgList->hasArg(options::OPT_driver_print_actions);
   bool DriverPrintOutputFileMap =
@@ -83,9 +85,6 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   std::unique_ptr<DerivedArgList> TranslatedArgList(
     translateInputArgs(*ArgList));
-
-  if (Diags.hadAnyError())
-    return nullptr;
 
   if (const Arg *A = ArgList->getLastArg(options::OPT_target))
     DefaultTargetTriple = A->getValue();
@@ -206,15 +205,11 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
   }
 
   // Check for unknown arguments.
-  bool hadUnknownArgument = false;
   for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
        ArgList->filtered_end())) {
-    hadUnknownArgument = true;
     Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                    A->getAsString(*ArgList));
   }
-  if (hadUnknownArgument)
-    return nullptr;
 
   return ArgList;
 }
