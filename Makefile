@@ -100,7 +100,7 @@ else
 endif
 
 # All options for .swift files
-SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -target $(TARGET_TRIPLE) -I=$(SWIFT_HEADER_DIR) -sdk=$(MODULES_SDK)
+SWIFT_FLAGS := $(SWIFT_DEBUGFLAG) $(SWIFT_OPTFLAG) -target $(TARGET_TRIPLE) -I $(SWIFT_HEADER_DIR) -sdk $(MODULES_SDK)
 
 
 ###

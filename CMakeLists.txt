@@ -300,7 +300,7 @@ function(compile_swift_files)
   if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
     set(arch_subdir "/32")
   endif()
-  list(APPEND swift_flags "-I=${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir}")
+  list(APPEND swift_flags "-I" "${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir}")
 
   # Turn on debug symbols in debug builds.
   if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -309,17 +309,17 @@ function(compile_swift_files)
   
   # If we have a modules SDK, use it for building.
   if (MODULES_SDK)
-    list(APPEND swift_flags "-sdk=${MODULES_SDK}")
+    list(APPEND swift_flags "-sdk" "${MODULES_SDK}")
   endif()
 
   # If we have a host triple, use it.
   if (SWIFT_HOST_TRIPLE)
-    list(APPEND swift_flags "-triple=${SWIFT_HOST_TRIPLE}")
+    list(APPEND swift_flags "-target" "${SWIFT_HOST_TRIPLE}")
   endif()
 
   # If we have a custom module cache path, use it.
   if (SWIFT_MODULE_CACHE_PATH)
-    list(APPEND swift_flags "-module-cache-path=${SWIFT_MODULE_CACHE_PATH}")
+    list(APPEND swift_flags "-module-cache-path" "${SWIFT_MODULE_CACHE_PATH}")
   endif()
 
   list(APPEND swift_flags "${SWIFT_EXTRA_FLAGS}")
