@@ -184,6 +184,7 @@ option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 option(SWIFT_RUNTIME_CHECKS "Enable overflow checks for the Swift standard library" YES)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
+option(SWIFT_NEW_DRIVER "Enable the new Swift driver" OFF)
 
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
@@ -289,6 +290,14 @@ function(compile_swift_files)
     list(APPEND swift_flags "-O2")
   else()
     list(APPEND swift_flags "-O0")
+  endif()
+
+  if(SWIFT_NEW_DRIVER)
+    if(SWIFT_OPTIMIZED OR SWIFTFILE_IS_STDLIB_CORE)
+      # FIXME: We shouldn't /have/ to build the standard library in a single
+      # process. <rdar://problem/15693042>
+      list(APPEND swift_flags "-force-single-frontend-invocation")
+    endif()
   endif()
 
   if(NOT SWIFT_RUNTIME_CHECKS)

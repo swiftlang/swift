@@ -22,9 +22,6 @@ except KeyError:
     key, = e.args
     lit_config.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
-# Let the main config do the real work.
-lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
-
 # Enable Darwin SDK-dependent tests if we have an SDK.
 # On Linux, assume that SDK path does not point to the Darwin SDK.
 if "@MODULES_SDK@" != "" and platform.system() != 'Linux':
@@ -36,6 +33,14 @@ if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
 
 if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
   config.available_features.add("asan")
+
+if "@SWIFT_NEW_DRIVER@" != "ON" and "@SWIFT_NEW_DRIVER@" != "YES":
+  config.swift_new_driver = False
+else:
+  config.swift_new_driver = True
+
+# Let the main config do the real work.
+lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
 
 # Enable interpreter-based tests on platforms where the interpterer is known to
 # work.
