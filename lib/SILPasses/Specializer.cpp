@@ -396,9 +396,6 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     Worklist.push_back(NewF);
   }
 
-  if (!F->getRefCount() && !isPossiblyUsedExternally(F->getLinkage())) {
-    F->getBlocks().clear();
-  }
 
   return Changed;
 }
