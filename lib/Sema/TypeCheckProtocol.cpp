@@ -449,7 +449,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
       return RequirementMatch(witness, MatchKind::MutatingConflict);
     
     // If the requirement is for a method returning DynamicSelf, but
-    // the witness does not. check more closely.
+    // the witness does not, check more closely.
     if (funcReq->hasDynamicSelf() && !funcWitness->hasDynamicSelf()) {
       if (auto nominal = funcWitness->getExtensionType()->getAnyNominal()) {
         // For structs and enums, DynamicSelf is not permitted on the
