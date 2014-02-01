@@ -90,6 +90,11 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
     if (isa<StrongRetainInst>(Inst))
       continue;
 
+    if (auto *AI = dyn_cast<ApplyInst>(Inst))
+      if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
+        if (isReadNone(BI))
+          continue;
+
     // All other instructions that read from memory invalidate the store.
     if (Inst->mayReadFromMemory())
       PrevStore = 0;

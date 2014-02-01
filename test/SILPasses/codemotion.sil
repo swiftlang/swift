@@ -108,3 +108,82 @@ bb3(%6 : $Builtin.Int32):
   return %6 : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: [[LOAD_RESULT:%[0-9]+]] = load
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[LOAD_RESULT]]
+// CHECK-NEXT: [[APPLY_RESULT:%[0-9]+]] = tuple_extract
+// CHECK-NEXT: apply {{%[0-9]+}}([[LOAD_RESULT]], [[APPLY_RESULT]]
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @eliminate_duplicate_loads_over_noread_builtins : $@thin (@inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64):
+  %1 = load %0 : $*Builtin.Int64
+  %2 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = apply %2(%1, %1, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %5 = load %0 : $*Builtin.Int64
+  %6 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 0
+  %7 = apply %2(%5, %6, %3) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
+  return %8 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dead_store_elimination_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_store_elimination_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load %0 : $*Builtin.Int64
+  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to %1 : $*Builtin.Int64
+  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  store %9 to %1 : $*Builtin.Int64
+  %10 = tuple()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @load_store_forwarding_over_noread_builtins : $@thin (@inout Builtin.Int64, @inout Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load %0 : $*Builtin.Int64
+  %3 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = apply %3(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to %1 : $*Builtin.Int64
+  %7 = builtin_function_ref "smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  %10 = load %1 : $*Builtin.Int64
+  %11 = apply %3(%10, %9, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) 
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  return %12 : $Builtin.Int64
+}
