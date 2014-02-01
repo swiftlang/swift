@@ -412,6 +412,10 @@ private:
     visitPart(SST->getSinglyDesugaredType());
   }
 
+  void visitDynamicSelfType(DynamicSelfType *DST) {
+    os << "instancetype";
+  }
+
   /// Print a full type.
   ///
   /// This will properly handle nested function types (see

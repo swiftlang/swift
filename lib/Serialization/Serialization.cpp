@@ -1967,6 +1967,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
     registerDeclTypeAbbr<UncheckedOptionalTypeLayout>();
+    registerDeclTypeAbbr<DynamicSelfTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();
