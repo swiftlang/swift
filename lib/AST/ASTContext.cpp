@@ -134,6 +134,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<Type, Type>, SubstitutedType *> SubstitutedTypes;
     llvm::DenseMap<std::pair<Type, void*>, DependentMemberType *>
       DependentMemberTypes;
+    llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::FoldingSet<EnumType> EnumTypes;
     llvm::FoldingSet<StructType> StructTypes;
     llvm::FoldingSet<ClassType> ClassTypes;
@@ -170,7 +171,6 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
-  llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
   
   /// \brief The permanent arena.
   Arena Permanent;
@@ -1370,18 +1370,17 @@ ModuleType *ModuleType::get(Module *M) {
 }
 
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
-  assert(!selfType->hasTypeVariable() && "Type variable in DynamicSelfType");
-  
-  auto known = ctx.Impl.DynamicSelfTypes.find(selfType);
-  if (known != ctx.Impl.DynamicSelfTypes.end())
-    return known->second;
-
   auto properties = selfType->getRecursiveProperties()
                     - RecursiveTypeProperties::IsNotMaterializable;
-  auto arena = getArena(properties);  
+  auto arena = getArena(properties);
+
+  auto &dynamicSelfTypes = ctx.Impl.getArena(arena).DynamicSelfTypes;
+  auto known = dynamicSelfTypes.find(selfType);
+  if (known != dynamicSelfTypes.end())
+    return known->second;
 
   auto result = new (ctx, arena) DynamicSelfType(selfType, ctx, properties);
-  ctx.Impl.DynamicSelfTypes.insert({selfType, result});
+  dynamicSelfTypes.insert({selfType, result});
   return result;
 }
 

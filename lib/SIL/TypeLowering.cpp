@@ -976,7 +976,8 @@ namespace {
     }
 
     const TypeLowering *visitDynamicSelfType(CanDynamicSelfType type) {
-      return LowerType(TC, type.getSelfType(), Dependent)
+      return LowerType(TC, cast<DynamicSelfType>(OrigType).getSelfType(), 
+                       Dependent)
                .visit(type.getSelfType());
     }
 

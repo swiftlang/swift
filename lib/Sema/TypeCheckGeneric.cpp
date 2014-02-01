@@ -652,6 +652,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     funcTy = fn->getBodyResultTypeLoc().getType();
     if (!funcTy) {
       funcTy = TupleType::getEmpty(Context);
+    } else if (funcTy->is<DynamicSelfType>()) {
+      funcTy = fn->getDynamicSelfInterface();
     }
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     funcTy = ctor->getExtensionType()->getAnyNominal()

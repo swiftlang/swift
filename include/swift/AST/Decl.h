@@ -3126,6 +3126,11 @@ public:
   /// this method does not have a \c DynamicSelf return type.
   DynamicSelfType *getDynamicSelf() const;
 
+  /// Retrieve the \c DynamicSelf interface type for this method, or a
+  /// null type if this method does not have a \c DynamicSelf return
+  /// type.
+  DynamicSelfType *getDynamicSelfInterface() const;
+
   /// Given that this is an Objective-C method declaration, produce
   /// its selector in the given buffer (as UTF-8).
   StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;

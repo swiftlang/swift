@@ -1569,6 +1569,14 @@ DynamicSelfType *FuncDecl::getDynamicSelf() const {
   return DynamicSelfType::get(getExtensionType(), getASTContext());
 }
 
+DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
+  if (!hasDynamicSelf())
+    return nullptr;
+
+  return DynamicSelfType::get(getDeclContext()->getDeclaredInterfaceType(), 
+                              getASTContext());
+}
+
 StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream out(buffer);
 
