@@ -155,7 +155,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     return nullptr;
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags,
+  OutputLevel Level = OutputLevel::Normal;
+  if (TranslatedArgList->hasArg(options::OPT_v))
+    Level = OutputLevel::Verbose;
+
+  std::unique_ptr<Compilation> C(new Compilation(*this, TC, Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  NumberOfParallelCommands,

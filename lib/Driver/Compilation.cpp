@@ -28,13 +28,13 @@ using namespace swift::driver;
 using namespace llvm::opt;
 
 Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-                         DiagnosticEngine &Diags,
+                         DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          unsigned NumberOfParallelCommands,
                          bool SkipTaskExecution)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
-    Jobs(new JobList), InputArgs(std::move(InputArgs)),
+    Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution) {
@@ -124,13 +124,13 @@ int Compilation::performJobsInList(const JobList &JL,
   // Set up a callback which will be called immediately after a task has
   // started. This callback may be used to provide output indicating that the
   // task began.
-  auto taskBegan = [] (ProcessId Pid, void *Context) {
+  auto taskBegan = [this] (ProcessId Pid, void *Context) {
     // TODO: properly handle task began.
     const Command *BeganCmd = (const Command *)Context;
 
-    // TODO: add support for controlling whether command lines are printed
-    // when execution begins.
-    BeganCmd->printCommandLine(llvm::errs());
+    // For verbose output, print out each command as it begins execution.
+    if (Level == OutputLevel::Verbose)
+      BeganCmd->printCommandLine(llvm::errs());
   };
 
   // Set up a callback which will be called immediately after a task has

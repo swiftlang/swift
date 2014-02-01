@@ -38,6 +38,16 @@ namespace driver {
   class JobList;
   class ToolChain;
 
+/// An enum providing different levels of output which should be produced
+/// by a Compilation.
+enum class OutputLevel {
+  /// Indicates that normal output should be produced.
+  Normal,
+
+  /// Indicates that verbose output should be produced. (-v)
+  Verbose,
+};
+
 class Compilation {
   /// The driver we were created by.
   const Driver &TheDriver;
@@ -47,6 +57,9 @@ class Compilation {
 
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
+
+  /// The OutputLevel at which this Compilation should generate output.
+  OutputLevel Level;
 
   /// The Jobs which will be performed by this compilation.
   std::unique_ptr<JobList> Jobs;
@@ -70,7 +83,7 @@ class Compilation {
 
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
-              DiagnosticEngine &Diags,
+              DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               unsigned NumberOfParallelCommands = 1,
