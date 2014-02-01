@@ -1570,6 +1570,9 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   if (isClassOrObjCProtocol(*this, T))
     return true;
 
+  if (T->is<DynamicSelfType>())
+    return true;
+
   if (auto MTT = T->getAs<MetatypeType>()) {
     if (isClassOrObjCProtocol(*this, MTT->getInstanceType()))
       return true;
