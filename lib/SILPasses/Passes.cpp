@@ -35,9 +35,11 @@ using namespace swift;
 
 static void performParanoidVerification(SILModule &Module,
                                         const SILOptions &Options) {
+#ifndef NDEBUG
   if (!Options.EnableParanoidVerification)
     return;
   Module.verify();
+#endif
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module,
@@ -49,35 +51,35 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
   auto &Ctx = Module.getASTContext();
 
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILMandatoryInlining(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILCapturePromotion(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILAllocBoxToStackPromotion(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performInOutDeshadowing(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILDefiniteInitialization(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILPredictableMemoryOptimizations(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILConstantPropagation(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   performSILDeadCodeElimination(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   // Generate diagnostics.
   emitSILDataflowDiagnostics(&Module);
-  DEBUG(performParanoidVerification(Module, Options));
+  performParanoidVerification(Module, Options);
 
   Module.setStage(SILStage::Canonical);
 
@@ -92,49 +94,49 @@ void swift::runSILOptimizationPasses(SILModule &Module,
   while (Changed) {
     // Specialize generic functions.
     Changed = performSILSpecialization(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     // Inline the specialized functions.
     performSILPerformanceInlining(&Module, Options.InlineThreshold);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     // Cleanup after inlining.
     performSILCombine(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     // Transition to SSA form.
     performSILLowerAggregateInstrs(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSILSROA(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSILMem2Reg(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     // Perform scalar optimizations.
     performSILCSE(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSILCombine(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSILCodeMotion(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSimplifyCFG(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     Changed |= performSILDevirtualization(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     if (Options.EnableARCOptimizations) {
       performSILARCOpts(&Module);
-      DEBUG(performParanoidVerification(Module, Options));
+      performParanoidVerification(Module, Options);
     }
 
     performSILAllocBoxToStackPromotion(&Module);
-    DEBUG(performParanoidVerification(Module, Options));
+    performParanoidVerification(Module, Options);
 
     performSILAllocRefElimination(&Module);
 
