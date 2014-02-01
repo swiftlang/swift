@@ -86,7 +86,10 @@ namespace {
       WorklistMap.erase(It);
     }
 
-    void removeDeadBlock(SILBasicBlock *BB);
+    /// \brief Remove the basic block if it has no predecessors. Returns true
+    /// If the block was removed.
+    bool removeIfDead(SILBasicBlock *BB);
+    
     bool tryJumpThreading(BranchInst *BI);
     void simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
@@ -98,7 +101,10 @@ namespace {
   };
 } // end anonymous namespace
 
-void SimplifyCFG::removeDeadBlock(SILBasicBlock *BB) {
+bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
+  if (!BB->pred_empty() || BB == &*Fn.begin())
+    return false;
+
   // Add successor blocks to the worklist since their predecessor list is about
   // to change.
   for (auto &S : BB->getSuccs())
@@ -119,6 +125,7 @@ void SimplifyCFG::removeDeadBlock(SILBasicBlock *BB) {
 
   BB->eraseFromParent();
   ++NumBlocksDeleted;
+  return true;
 }
 
 /// This is called when a predecessor of a block is dropped, to simplify the
@@ -302,6 +309,26 @@ void SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       }
 }
 
+bool isTrampolineBlock(SILBasicBlock *SBB) {
+  // Ignore blocks with more than one instruction.
+  if (SBB->getTerminator() != SBB->begin())
+    return false;
+
+  BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
+  if (!BI)
+    return false;
+
+  auto BrArgs = BI->getArgs();
+  if (BrArgs.size() != SBB->getNumBBArg())
+    return false;
+
+  // Check that the arguments are the same and in the right order.
+  for (int i = 0, e = SBB->getNumBBArg(); i < e; ++i)
+    if (BrArgs[i] != SBB->getBBArg(i))
+      return false;
+
+  return true;
+}
 
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
@@ -309,6 +336,7 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
   simplifyBranchOperands(BI->getArgs());
+  auto *ThisBB = BI->getParent();
 
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
 
@@ -333,6 +361,17 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     return;
   }
 
+  // If the destination block is a simple trampoline (jump to another block)
+  // then jump directly.
+  if (isTrampolineBlock(DestBB)) {
+    BranchInst* Br = dyn_cast<BranchInst>(DestBB->getTerminator());
+    SILBuilder(BI).createBranch(BI->getLoc(), Br->getDestBB(), BI->getArgs());
+    BI->eraseFromParent();
+    removeIfDead(DestBB);
+    addToWorklist(ThisBB);
+    return;
+  }
+
   // If this unconditional branch has BBArgs, check to see if duplicating the
   // destination would allow it to be simplified.  This is a simple form of jump
   // threading.
@@ -348,6 +387,7 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // can expose CFG simplifications.
   simplifyBranchOperands(BI->getTrueArgs());
   simplifyBranchOperands(BI->getFalseArgs());
+  auto *ThisBB = BI->getParent();
 
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
@@ -368,8 +408,56 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     return;
   }
 
+  // If the destination block is a simple trampoline (jump to another block)
+  // then jump directly.
+  SILBasicBlock *TrueSide = BI->getTrueBB();
+  SILBasicBlock *FalseSide = BI->getFalseBB();
 
+  if (isTrampolineBlock(TrueSide)) {
+    BranchInst* Br = cast<BranchInst>(TrueSide->getTerminator());
+    SILBuilder(BI).createCondBranch(BI->getLoc(), BI->getCondition(),
+                                    Br->getDestBB(), BI->getTrueArgs(),
+                                    BI->getFalseBB(), BI->getFalseArgs());
+    BI->eraseFromParent();
+    removeIfDead(TrueSide);
+    addToWorklist(ThisBB);
+    return;
+  }
+  if (isTrampolineBlock(FalseSide)) {
+    BranchInst* Br = cast<BranchInst>(FalseSide->getTerminator());
+    SILBuilder(BI).createCondBranch(BI->getLoc(), BI->getCondition(),
+                                    BI->getTrueBB(), BI->getTrueArgs(),
+                                    Br->getDestBB(), BI->getFalseArgs());
+    BI->eraseFromParent();
+    removeIfDead(FalseSide);
+    addToWorklist(ThisBB);
+    return;
+  }
 
+  // Simplify cond_br where both sides jump to the same blocks with the same
+  // args.
+  TrueSide = BI->getTrueBB();
+  FalseSide = BI->getFalseBB();
+  if (TrueSide == FalseSide) {
+    auto TrueArgs = BI->getTrueArgs();
+    auto FalseArgs = BI->getFalseArgs();
+    assert(TrueArgs.size() == FalseArgs.size() && "Invalid args!");
+    bool SameArgs = true;
+    for (int i = 0, e = TrueArgs.size(); i < e; i++)
+      if (TrueArgs[i] != FalseArgs[i]){
+        SameArgs = false;
+        break;
+      }
+
+    if (SameArgs) {
+      SILBuilder(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
+      BI->eraseFromParent();
+      addToWorklist(ThisBB);
+      addToWorklist(TrueSide);
+      ++NumConstantFolded;
+      return;
+    }
+  }
 }
 
 
@@ -412,10 +500,8 @@ void SimplifyCFG::run() {
   // Iteratively simplify while there is still work to do.
   while (SILBasicBlock *BB = popWorklist()) {
     // If the block is dead, remove it.
-    if (BB->pred_empty() && BB != &*Fn.begin()) {
-      removeDeadBlock(BB);
+    if (removeIfDead(BB))
       continue;
-    }
 
     // Otherwise, try to simplify the terminator.
     TermInst *TI = BB->getTerminator();

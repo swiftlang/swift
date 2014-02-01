@@ -112,3 +112,38 @@ bb2:
   return %0 : $Int64
 }
 
+// CHECK-LABEL: @elim_trampoline
+// CHECK: cond_br %0, bb1(%1 : $Int64), bb1(%2 : $Int64)
+// CHECK: bb1
+// CHECK-NEXT: return
+sil @elim_trampoline : $@thin (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1(%1 : $Int64), bb2(%2 : $Int64)
+
+bb1(%3 : $Int64):
+  br bb3(%3 : $Int64)
+
+bb2(%4 : $Int64):
+  br bb3(%4 : $Int64)
+
+bb3(%5 : $Int64):
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: @elim_trampoline2
+// CHECK-NOT: cond_br %0, bb1(%1 : $Int64), bb1(%1 : $Int64)
+// CHECK: return
+sil @elim_trampoline2 : $@thin (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  cond_br %0, bb1(%1 : $Int64), bb2(%1 : $Int64)
+
+bb1(%2 : $Int64):
+  br bb3(%2 : $Int64)
+
+bb2(%3 : $Int64):
+  br bb3(%3 : $Int64)
+
+bb3(%4 : $Int64):
+  return %4 : $Int64
+}
+
