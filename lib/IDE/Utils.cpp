@@ -19,6 +19,7 @@
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/PersistentParserState.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 using namespace ide;
@@ -45,4 +46,10 @@ bool ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   } while (!Done);
 
   return !P.isInputIncomplete();
+}
+
+bool ide::isSourceInputComplete(StringRef Text) {
+  std::unique_ptr<llvm::MemoryBuffer> InputBuf;
+  InputBuf.reset(llvm::MemoryBuffer::getMemBufferCopy(Text));
+  return ide::isSourceInputComplete(std::move(InputBuf));
 }

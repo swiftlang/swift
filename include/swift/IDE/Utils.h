@@ -13,6 +13,7 @@
 #ifndef SWIFT_IDE_UTILS_H
 #define SWIFT_IDE_UTILS_H
 
+#include "swift/Basic/LLVM.h"
 #include <memory>
 
 namespace llvm {
@@ -25,6 +26,7 @@ namespace ide {
 /// Returns true if the input source is fully formed, or false if, for example,
 /// a closing brace is missing.
 bool isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
+bool isSourceInputComplete(StringRef Text);
 
 } // namespace ide
 } // namespace swift

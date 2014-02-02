@@ -602,9 +602,7 @@ public:
       }
 
       // Keep reading if input is unfinished.
-      std::unique_ptr<llvm::MemoryBuffer> InputBuf;
-      InputBuf.reset(llvm::MemoryBuffer::getMemBufferCopy(CurrentLines.str()));
-      UnfinishedInput = !ide::isSourceInputComplete(std::move(InputBuf));
+      UnfinishedInput = !ide::isSourceInputComplete(CurrentLines.str());
 
     } while (UnfinishedInput);
 
