@@ -1228,8 +1228,13 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
 
   SourceLoc startOfBody = Tok.getLoc();
   Status |= parseBraceItems(bodyItems, BraceItemListKind::Case);
-  BraceStmt *body = BraceStmt::create(Context,
-                                      startOfBody, bodyItems, Tok.getLoc());
+  BraceStmt *body;
+  if (bodyItems.empty()) {
+    body = BraceStmt::create(Context, startOfBody, ArrayRef<ASTNode>(),
+                             startOfBody, /*implicit=*/true);
+  } else {
+    body = BraceStmt::create(Context, startOfBody, bodyItems, PreviousLoc);
+  }
 
   return makeParserResult(
       Status, CaseStmt::create(Context, labels, !boundDecls.empty(), body));
