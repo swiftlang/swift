@@ -1,3 +1,14 @@
+;===--- .dir-locals.el ---------------------------------------------------===;
+;
+; This source file is part of the Swift.org open source project
+;
+; Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+; Licensed under Apache License v2.0 with Runtime Library Exception
+;
+; See http://swift.org/LICENSE.txt for license information
+; See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+;
+;===----------------------------------------------------------------------===;
 ;;; Directory Local Variables
 ;;; See Info node `(emacs) Directory Variables' for more information.
 
@@ -5,12 +16,22 @@
   (tab-width . 2)
   (c-file-style . "swift")
   (eval .
-        (unless (featurep 'swift-mode)
-          (load-library
+        ;; Load the Swift project's settings.  To suppress this action
+        ;; you can put "(provide 'swift-project-settings)" in your
+        ;; .emacs
+        (unless (featurep 'swift-project-settings)
+          ;; Make sure the project's own utils directory is in the
+          ;; load path, but don't override any one the user might have
+          ;; set up.
+          (add-to-list
+           'load-path
            (concat
             (let ((dlff (dir-locals-find-file default-directory)))
               (if (listp dlff) (car dlff) (file-name-directory dlff)))
-            "utils/swift-mode")))))
+            "utils")
+           :append)
+            ;; Load our project's settings -- indirectly brings in swift-mode
+          (require 'swift-project-settings))))
  (c++mode
   (whitespace-style face lines indentation:space)
   (eval whitespace-mode))
