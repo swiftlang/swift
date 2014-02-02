@@ -60,6 +60,7 @@ public:
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);
+  clang::CanQualType visitDynamicSelfType(CanDynamicSelfType type);
 
   clang::CanQualType visitType(CanType type);
 };

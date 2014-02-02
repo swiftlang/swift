@@ -174,6 +174,12 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   return clang::CanQualType();
 }
 
+clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
+  // DynamicSelf is equivalent to 'instancetype', which is treated as
+  // 'id' within the Objective-C type system.
+  return getClangIdType(getClangASTContext());
+}
+
 // FIXME: We should not be seeing these by the time we generate Clang types.
 clang::CanQualType GenClangType::visitGenericTypeParamType(
   CanGenericTypeParamType type) {
