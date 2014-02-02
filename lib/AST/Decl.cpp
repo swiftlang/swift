@@ -1566,15 +1566,24 @@ DynamicSelfType *FuncDecl::getDynamicSelf() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  return DynamicSelfType::get(getExtensionType(), getASTContext());
+  auto extType = getExtensionType();
+  if (auto protoTy = extType->getAs<ProtocolType>())
+    return DynamicSelfType::get(protoTy->getDecl()->getSelf()->getArchetype(),
+                                getASTContext());
+
+  return DynamicSelfType::get(extType, getASTContext());
 }
 
 DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   if (!hasDynamicSelf())
     return nullptr;
 
-  return DynamicSelfType::get(getDeclContext()->getDeclaredInterfaceType(), 
-                              getASTContext());
+  auto extType = getDeclContext()->getDeclaredInterfaceType();
+  if (auto protoTy = extType->getAs<ProtocolType>())
+    return DynamicSelfType::get(protoTy->getDecl()->getSelf()->getDeclaredType(),
+                                getASTContext());
+
+  return DynamicSelfType::get(extType, getASTContext());
 }
 
 StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
