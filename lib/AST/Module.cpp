@@ -1120,6 +1120,7 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 
+SourceFile::~SourceFile() {}
 
 bool FileUnit::walk(ASTWalker &walker) {
   SmallVector<Decl *, 64> Decls;

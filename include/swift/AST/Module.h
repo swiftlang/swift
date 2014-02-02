@@ -592,6 +592,7 @@ public:
 
   SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
              bool hasBuiltinModuleAccess = false);
+  ~SourceFile();
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
