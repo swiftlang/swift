@@ -33,6 +33,7 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
+#include "swift/IDE/Utils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -525,7 +526,7 @@ public:
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
     int BraceCount = 0;
-    bool UnfinishedInfixExpr = false;
+    bool UnfinishedInput = false;
     unsigned CurChunkLines = 0;
     wchar_t TotalLine[4096] = L"";
 
@@ -538,7 +539,7 @@ public:
     do {
       // Read one line.
       PromptContinuationLevel = BraceCount;
-      NeedPromptContinuation = BraceCount != 0 || UnfinishedInfixExpr;
+      NeedPromptContinuation = UnfinishedInput;
       PromptedForLine = false;
       Outdented = false;
       int LineCount;
@@ -571,11 +572,9 @@ public:
         ++p;
       }
       if (p == CurrentLines.end()) {
-        if (BraceCount != 0 || UnfinishedInfixExpr) continue;
+        if (UnfinishedInput) continue;
         return REPLInputKind::Empty;
       }
-
-      UnfinishedInfixExpr = false;
 
       if (CurChunkLines == 1 && BraceCount == 0 && *p == ':') {
         // Colorize the response output.
@@ -591,9 +590,9 @@ public:
 
         return REPLInputKind::REPLDirective;
       }
-      
-      // If we detect unbalanced braces, keep reading before
-      // we start parsing.
+
+      // Figure out indentation using braces.
+      // FIXME: Add indentation support in libIDE and use it here.
       while (p < CurrentLines.end()) {
         if (*p == '{' || *p == '(' || *p == '[')
           ++BraceCount;
@@ -601,15 +600,13 @@ public:
           --BraceCount;
         ++p;
       }
-      while (isspace(*--p) && p >= s);
-      // FIXME: Unicode operators
-      // scan backwards to the start of the operator if it is there
-      while (Identifier::isOperatorContinuationCodePoint(*p) && --p >= s);
-      if (*p == '.') --p;
-      if (isspace(*p) && Identifier::isOperatorStartCodePoint(p[1])) {
-        UnfinishedInfixExpr = true;
-      }
-    } while (BraceCount > 0 || UnfinishedInfixExpr);
+
+      // Keep reading if input is unfinished.
+      std::unique_ptr<llvm::MemoryBuffer> InputBuf;
+      InputBuf.reset(llvm::MemoryBuffer::getMemBufferCopy(CurrentLines.str()));
+      UnfinishedInput = !ide::isSourceInputComplete(std::move(InputBuf));
+
+    } while (UnfinishedInput);
 
     // Enter the line into the line history.
     HistEventW ev;
