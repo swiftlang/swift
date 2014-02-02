@@ -1083,7 +1083,7 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
-    rBraceLoc = Tok.getLoc();
+    rBraceLoc = PreviousLoc;
   }
 
   return makeParserResult(
