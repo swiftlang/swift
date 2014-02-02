@@ -411,6 +411,7 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
     consumeToken(tok::identifier);
     return false;
   default:
+    checkForInputIncomplete();
     diagnose(Tok, D);
     return true;
   }
@@ -436,6 +437,7 @@ bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
     return false;
   }
 
+  checkForInputIncomplete();
   diagnose(Tok, D);
   return true;
 }
@@ -449,7 +451,8 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
     TokLoc = consumeToken(K);
     return false;
   }
-  
+
+  checkForInputIncomplete();
   diagnose(Tok, D);
   return true;
 }
@@ -524,6 +527,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         break;
       if (Tok.is(tok::eof)) {
         RightLoc = PreviousLoc;
+        IsInputIncomplete = true;
         Status.setIsParseError();
         return Status;
       }

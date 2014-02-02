@@ -3,5 +3,6 @@ add_swift_library(swiftIDE
   REPLCodeCompletion.cpp
   SourceEntityWalker.cpp
   SyntaxModel.cpp
+  Utils.cpp
   DEPENDS swiftAST swiftParse swiftSema swiftClangImporter)
 

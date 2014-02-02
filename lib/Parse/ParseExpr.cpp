@@ -789,6 +789,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     return nullptr;
 
   default:
+    checkForInputIncomplete();
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);
     return nullptr;
@@ -881,6 +882,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           Result.setHasCodeCompletion();
           return Result;
         }
+        checkForInputIncomplete();
         diagnose(Tok, diag::expected_member_name);
         return nullptr;
       }

@@ -100,6 +100,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return ty;
   }
   default:
+    checkForInputIncomplete();
     diagnose(Tok, MessageID);
     return nullptr;
   }
@@ -228,6 +229,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
   } while (consumeIf(tok::comma));
 
   if (!startsWithGreater(Tok)) {
+    checkForInputIncomplete();
     diagnose(Tok, diag::expected_rangle_generic_arg_list);
     diagnose(LAngleLoc, diag::opening_angle);
 

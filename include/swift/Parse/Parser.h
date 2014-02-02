@@ -67,6 +67,8 @@ class Parser {
   Parser(const Parser&) = delete;
   void operator=(const Parser&) = delete;
 
+  bool IsInputIncomplete = false;
+
 public:
   SourceManager &SourceMgr;
   const unsigned BufferID;
@@ -109,6 +111,14 @@ public:
 
   bool allowTopLevelCode() const {
     return SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL;
+  }
+
+  /// Returns true if the parser reached EOF with incomplete source input, due
+  /// for example, a missing right brace.
+  bool isInputIncomplete() const { return IsInputIncomplete; }
+
+  void checkForInputIncomplete() {
+    IsInputIncomplete = IsInputIncomplete || Tok.is(tok::eof);
   }
 
   /// \brief This is the current token being considered by the parser.
