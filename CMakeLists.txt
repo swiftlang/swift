@@ -298,11 +298,9 @@ function(compile_swift_files)
   endif()
 
   if(SWIFT_NEW_DRIVER)
-    if(SWIFT_OPTIMIZED OR SWIFTFILE_IS_STDLIB_CORE)
-      # FIXME: We shouldn't /have/ to build the standard library in a single
-      # process. <rdar://problem/15693042>
-      list(APPEND swift_flags "-force-single-frontend-invocation")
-    endif()
+    # FIXME: We shouldn't /have/ to build things in a single process.
+    # <rdar://problem/15972329>
+    list(APPEND swift_flags "-force-single-frontend-invocation")
   endif()
 
   if(NOT SWIFT_RUNTIME_CHECKS)
