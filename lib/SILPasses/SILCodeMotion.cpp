@@ -34,23 +34,11 @@ using namespace swift;
 
 static const int SinkSearchWindow = 6;
 
-/// Visit all loads we are tracking so far and return true if any of
-/// them can potentially alias one of Inst's arguments. If they can
-/// not, then Inst even though it writes memory can not affect the
-/// values we are loading.
-static bool mayAliasLoadSet(AliasAnalysis &AA, SILInstruction *Inst,
-                            llvm::SmallVectorImpl<LoadInst *> &Loads) {
-  for (auto *LI : Loads)
-    if (AA.alias(Inst, SILValue(LI)) != AliasAnalysis::Result::NoAlias)
-      return true;
-  return false;
-}
-
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
   StoreInst  *PrevStore = 0;
-  llvm::SmallVector<LoadInst *, 8> Loads;
+  llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
   auto II = BB->begin(), E = BB->end();
   while (II != E) {
@@ -95,7 +83,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
       }
 
       if (LI)
-        Loads.push_back(LI);
+        Loads.insert(LI);
       continue;
     }
 
@@ -116,11 +104,17 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
     if (Inst->mayReadFromMemory())
       PrevStore = 0;
 
-    // If we have an instruction that may write to memory and we can
-    // not prove that it and its operands can not alias any of the
-    // loads we have visited so far, clear the loads.
-    if (Inst->mayWriteToMemory() && mayAliasLoadSet(AA, Inst, Loads))
-      Loads.clear();
+    // If we have an instruction that may write to memory and we can not prove
+    // that it and its operands can not alias a load we have visited, invalidate
+    // that load.
+    if (Inst->mayWriteToMemory()) {
+      llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
+      for (auto *LI : Loads)
+        if (AA.alias(Inst, SILValue(LI)) != AliasAnalysis::Result::NoAlias)
+          InvalidatedLoadList.push_back(LI);
+      for (auto *LI : InvalidatedLoadList)
+        Loads.erase(LI);
+    }
   }
 }
 
