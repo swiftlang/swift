@@ -109,14 +109,14 @@ static bool isValidLinkageForTransparentRef(SILLinkage linkage) {
   case SILLinkage::PublicExternal:
   case SILLinkage::Shared:
     return true;
-      
+
   case SILLinkage::Private:
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
     return false;
   }
 }
-  
+
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 ///
@@ -141,7 +141,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
         return InlineCost::CannotBeInlined;
       }
       return InlineCost::Free;
-      
+
     case ValueKind::SILGlobalAddrInst:
       if (Caller->isTransparent()
           && !isValidLinkageForTransparentRef(
@@ -149,7 +149,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
         return InlineCost::CannotBeInlined;
       }
       return InlineCost::Free;
-      
+
     case ValueKind::TupleElementAddrInst:
     case ValueKind::StructElementAddrInst: {
       // A gep whose operand is a gep with no other users will get folded by
@@ -166,24 +166,24 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
       return InlineCost::Free;
-      
+
     // Unchecked casts are free.
     case ValueKind::AddressToPointerInst:
     case ValueKind::PointerToAddressInst:
 
     case ValueKind::ObjectPointerToRefInst:
     case ValueKind::RefToObjectPointerInst:
-    
+
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:
-    
+
     case ValueKind::UpcastExistentialRefInst:
     case ValueKind::UpcastInst:
-      
+
     case ValueKind::ThinToThickFunctionInst:
     case ValueKind::ConvertFunctionInst:
       return InlineCost::Free;
-    
+
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
       if (I.getType(0).castTo<MetatypeType>()->isThin())
@@ -196,7 +196,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:
       return InlineCost::Free;
-      
+
     // TODO
     case ValueKind::AllocArrayInst:
     case ValueKind::AllocBoxInst:
@@ -264,7 +264,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::SILArgument:
     case ValueKind::SILUndef:
       llvm_unreachable("Only instructions should be passed into this "
-                       "function.");    
+                       "function.");
     case ValueKind::MarkFunctionEscapeInst:
     case ValueKind::MarkUninitializedInst:
       llvm_unreachable("not valid in canonical sil");
@@ -285,13 +285,13 @@ unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F,
       auto ICost = instructionInlineCost(I, Caller);
       if (ICost == InlineCost::CannotBeInlined)
         return UINT_MAX;
-      
+
       Cost += unsigned(ICost);
 
       // If we're debugging, continue calculating the total cost even if we
       // passed the threshold.
       DEBUG(continue);
-      
+
       // If i is greater than the InlineCostThreshold, we already know we are
       // not going to inline this given function, so there is no point in
       // continuing to visit instructions.
