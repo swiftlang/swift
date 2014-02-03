@@ -411,7 +411,21 @@ namespace {
         OS << " type";
       if (VD->isLet())
         OS << " let";
-      
+      OS << " storage_kind=";
+      switch (VD->getStorageKind()) {
+      case VarDecl::Computed:
+        OS << "'computed'";
+        break;
+      case VarDecl::Stored:
+        OS << "'stored'";
+        break;
+      case VarDecl::StoredObjC:
+        OS << "'stored_objc'";
+        break;
+      case VarDecl::WillSetDidSet:
+        OS << "'willset_didset'";
+        break;
+      }
       if (FuncDecl *Get = VD->getGetter()) {
         OS << "\n";
         OS.indent(Indent + 2);
