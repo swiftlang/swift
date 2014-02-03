@@ -2063,7 +2063,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
 
   if (result.size() == 1) {
     auto *returned = result.claimNext();
-    if (ABIType != bodyType)
+    if (ABIType != returned->getType())
       returned = coerceValue(returned, ABIType, IGM.DataLayout);
 
     Builder.CreateRet(returned);
