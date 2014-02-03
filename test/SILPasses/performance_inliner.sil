@@ -584,3 +584,16 @@ entry:
   %z = apply %f() : $@thin () -> ()
   return %z : $()
 }
+
+// CHECK-LABEL: sil @calls_self
+// CHECK-NEXT: bb0:
+// CHECK: function_ref @calls_self
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil @calls_self : $@thin () -> () {
+entry:
+  %f = function_ref @calls_self : $@thin () -> ()
+  %z = apply %f() : $@thin () -> ()
+  return %z : $()
+}
+

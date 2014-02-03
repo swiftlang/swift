@@ -345,6 +345,10 @@ void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     if (!Callee)
       continue;
 
+    // Don't inline recursive calls.
+    if (Callee == Caller)
+      continue;
+
     DEBUG(llvm::dbgs() << "  Found callee:" <<  Callee->getName() << ".\n");
 
     // Prevent circular inlining.
