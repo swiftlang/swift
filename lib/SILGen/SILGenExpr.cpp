@@ -684,6 +684,13 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
                                         SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
   uint64_t Length;
+  bool isASCII = true;
+  for (unsigned char c : Str) {
+    if (c > 127) {
+      isASCII = false;
+      break;
+    }
+  }
 
   StringLiteralInst::Encoding instEncoding;
   switch (encoding) {
@@ -716,10 +723,14 @@ RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
   auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
   auto *lengthInst = SGF.B.createIntegerLiteral(E, WordTy, Length);
 
+  // The 'isascii' bit is lowered as an integer_literal.
+  auto Int1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+  auto *isASCIIInst = SGF.B.createIntegerLiteral(E, Int1Ty, isASCII);
+
   ManagedValue EltsArray[] = {
-    ManagedValue::forUnmanaged(SILValue(string, 0)),
+    ManagedValue::forUnmanaged(string),
     ManagedValue::forUnmanaged(lengthInst),
-    ManagedValue::forUnmanaged(SILValue(string, 2))
+    ManagedValue::forUnmanaged(isASCIIInst)
   };
 
   ArrayRef<ManagedValue> Elts;

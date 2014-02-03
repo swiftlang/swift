@@ -419,7 +419,8 @@ struct StringData {
 // issues.
 sil @sil_extract_of_string : $@thin () -> Builtin.Word {
   %0 = string_literal utf8 ""
-  %1 = struct $StringData (%0#1 : $Builtin.Word)
+  %l1 = integer_literal $Builtin.Word, 0
+  %1 = struct $StringData (%l1 : $Builtin.Word)
   %2 = struct_extract %1 : $StringData, #size  
   return %2 : $Builtin.Word
 }

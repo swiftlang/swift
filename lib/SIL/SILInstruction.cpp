@@ -727,7 +727,7 @@ APFloat FloatLiteralInst::getValue() const {
 }
 
 StringLiteralInst::StringLiteralInst(SILLocation Loc, StringRef Text,
-                                     Encoding encoding, SILTypeList *Ty)
+                                     Encoding encoding, SILType Ty)
   : LiteralInst(ValueKind::StringLiteralInst, Loc, Ty),
     Length(Text.size()), TheEncoding(encoding)
 {
@@ -740,15 +740,7 @@ StringLiteralInst::create(SILLocation loc, StringRef text, Encoding encoding,
   void *buf
     = allocateLiteralInstWithTextSize<StringLiteralInst>(F, text.size());
 
-  const ASTContext &Ctx = F.getModule().getASTContext();
-  SILType ResTys[] = {
-    SILType::getRawPointerType(Ctx),
-    SILType::getBuiltinWordType(Ctx),
-    SILType::getBuiltinIntegerType(1, Ctx)
-  };
-
-  SILTypeList *Ty = F.getModule().getSILTypeList(ResTys);
-
+  auto Ty = SILType::getRawPointerType(F.getModule().getASTContext());
   return ::new (buf) StringLiteralInst(loc, text, encoding, Ty);
 }
 

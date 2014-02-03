@@ -529,13 +529,11 @@ public:
 
 /// Abstract base class for literal instructions.
 class LiteralInst : public SILInstruction {
-public:
+protected:
   LiteralInst(ValueKind Kind, SILLocation Loc, SILType Ty)
     : SILInstruction(Kind, Loc, Ty) {}
-  LiteralInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList=nullptr,
-              SILDebugScope *DS = nullptr)
-    : SILInstruction(Kind, Loc, TypeList, DS) {}
-  
+public:
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_LiteralInst &&
       V->getKind() <= ValueKind::Last_LiteralInst;
@@ -704,7 +702,8 @@ public:
 };
 
 /// StringLiteralInst - Encapsulates a string constant, as defined originally by
-/// a StringLiteralExpr.
+/// a StringLiteralExpr.  This produces the address of the string data as a
+/// Builtin.RawPointer.
 class StringLiteralInst : public LiteralInst {
 public:
   enum class Encoding {
@@ -717,7 +716,7 @@ private:
   Encoding TheEncoding;
   
   StringLiteralInst(SILLocation loc, StringRef text, Encoding encoding,
-                    SILTypeList *type);
+                    SILType ty);
   
 public:
   static StringLiteralInst *create(SILLocation Loc, StringRef Text,

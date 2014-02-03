@@ -17,14 +17,6 @@ bb0:
 // CHECK: define i8* @utf8_literal() {
 // CHECK:   ret i8* getelementptr inbounds ([8 x i8]* [[U8_0]], i64 0, i64 0)
 
-sil @utf8_literal_size : $@thin () -> Builtin.Word {
-bb0:
-  %0 = string_literal utf8 "help\tme"
-  return %0#1 : $Builtin.Word
-}
-// CHECK: define i64 @utf8_literal_size() {
-// CHECK:   ret i64 7
-
 sil @utf8_literal_with_nul : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = string_literal utf8 "\x00x\u01ab"
@@ -32,14 +24,6 @@ bb0:
 }
 // CHECK: define i8* @utf8_literal_with_nul() {
 // CHECK:   ret i8* getelementptr inbounds ([5 x i8]* [[U8_1]], i64 0, i64 0)
-
-sil @utf8_literal_with_nul_size : $@thin () -> Builtin.Word {
-bb0:
-  %0 = string_literal utf8 "\x00x\u01ab"
-  return %0#1 : $Builtin.Word
-}
-// CHECK: define i64 @utf8_literal_with_nul_size() {
-// CHECK:   ret i64 4
 
 sil @utf16_literal : $@thin () -> Builtin.RawPointer {
 bb0:
@@ -49,14 +33,6 @@ bb0:
 // CHECK: define i8* @utf16_literal() {
 // CHECK:   ret i8* bitcast ([8 x i16]* [[U16_0]] to i8*)
 
-sil @utf16_literal_size : $@thin () -> Builtin.Word {
-bb0:
-  %0 = string_literal utf16 "help\tme"
-  return %0#1 : $Builtin.Word
-}
-// CHECK: define i64 @utf16_literal_size() {
-// CHECK:   ret i64 7
-
 sil @utf16_literal_with_nul : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = string_literal utf16 "\x00x\u01ab"
@@ -64,12 +40,4 @@ bb0:
 }
 // CHECK: define i8* @utf16_literal_with_nul() {
 // CHECK:   ret i8* bitcast ([4 x i16]* [[U16_1]] to i8*)
-
-sil @utf16_literal_with_nul_size : $@thin () -> Builtin.Word {
-bb0:
-  %0 = string_literal utf16 "\x00x\u01ab"
-  return %0#1 : $Builtin.Word
-}
-// CHECK: define i64 @utf16_literal_with_nul_size() {
-// CHECK:   ret i64 3
 

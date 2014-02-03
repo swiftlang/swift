@@ -1847,57 +1847,28 @@ void IRGenSILFunction::visitFloatLiteralInst(swift::FloatLiteralInst *i) {
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
-static std::pair<llvm::Constant*, size_t>
-getAddrOfString(IRGenModule &IGM, StringRef string,
-                StringLiteralInst::Encoding encoding) {
+static llvm::Constant *getAddrOfString(IRGenModule &IGM, StringRef string,
+                                       StringLiteralInst::Encoding encoding) {
   switch (encoding) {
   case swift::StringLiteralInst::Encoding::UTF8:
-    return { IGM.getAddrOfGlobalString(string), string.size() };
+    return IGM.getAddrOfGlobalString(string);
 
-  case swift::StringLiteralInst::Encoding::UTF16: {
+  case swift::StringLiteralInst::Encoding::UTF16:
     // This is always a GEP of a GlobalVariable with a nul terminator.
     auto addr = IGM.getAddrOfGlobalUTF16String(string);
-    auto gep = cast<llvm::ConstantExpr>(addr);
-    assert(gep->getOpcode() == llvm::Instruction::GetElementPtr);
-    auto var = cast<llvm::GlobalVariable>(gep->getOperand(0));
-    size_t length = cast<llvm::ArrayType>(var->getInitializer()->getType())
-                     ->getNumElements() - 1;
 
     // Cast to Builtin.RawPointer.
-    addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
-    return { addr, length };
-  }
-
+    return llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
   }
   llvm_unreachable("bad string encoding");
 }
 
 void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
-  auto addrAndSize = getAddrOfString(IGM, i->getValue(), i->getEncoding());
-  {
-    Explosion e(ResilienceExpansion::Maximal);
-    e.add(addrAndSize.first);
-    setLoweredExplosion(SILValue(i, 0), e);
-  }
-  {
-    Explosion e(ResilienceExpansion::Maximal);
-    e.add(Builder.getInt(APInt(IGM.getPointerSize().getValueInBits(),
-                               addrAndSize.second)));
-    setLoweredExplosion(SILValue(i, 1), e);
-  }
-  
-  // Determine whether this is an ASCII string.
-  bool isASCII = true;
-  for (unsigned char c : i->getValue()) {
-    if (c > 127) {
-      isASCII = false;
-      break;
-    }
-  }
+  auto addr = getAddrOfString(IGM, i->getValue(), i->getEncoding());
 
   Explosion e(ResilienceExpansion::Maximal);
-  e.add(Builder.getInt1(isASCII));
-  setLoweredExplosion(SILValue(i, 2), e);
+  e.add(addr);
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitUnreachableInst(swift::UnreachableInst *i) {
