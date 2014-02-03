@@ -73,6 +73,12 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
+  // First attempt to look up if we already have a computed result for V1, V2.
+  auto Key = V1 < V2? std::make_pair(V1, V2) : std::make_pair(V2, V1);
+  auto Pair = Cache.find(Key);
+  if (Pair != Cache.end())
+    return Pair->second;
+
   // Get the underlying objects for V1, V2.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
@@ -80,11 +86,11 @@ AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
   // If O1 and O2 do not equal, see if we can prove that they can not be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
-    return Result::NoAlias;
+    return Cache[Key] = Result::NoAlias;
 
   // We could not prove anything. Be conservative and return that V1, V2 may
   // alias.
-  return Result::MayAlias;
+  return Cache[Key] = Result::MayAlias;
 }
 
 AliasAnalysis::Result AliasAnalysis::alias(SILInstruction *Inst, SILValue V2) {
