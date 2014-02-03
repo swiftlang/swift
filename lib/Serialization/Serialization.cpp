@@ -1290,9 +1290,22 @@ void Serializer::writeDecl(const Decl *D) {
 
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
 
-    if (var->getStorageKind() == VarDecl::WillSetDidSet) {
+    VarDeclStorageKind StorageKind;
+    switch (var->getStorageKind()) {
+    case VarDecl::Stored:
+      StorageKind = VarDeclStorageKind::Stored;
+      break;
+    case VarDecl::StoredObjC:
+      StorageKind = VarDeclStorageKind::StoredObjC;
+      break;
+    case VarDecl::Computed:
+      StorageKind = VarDeclStorageKind::Computed;
+      break;
+    case VarDecl::WillSetDidSet:
+      StorageKind = VarDeclStorageKind::WillSetDidSet;
       WillSet = var->getWillSetFunc();
       DidSet = var->getDidSetFunc();
+      break;
     }
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
@@ -1305,7 +1318,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->getAttrs().isOptional(),
                           var->isStatic(),
                           var->isLet(),
-                          var->getStorageKind(),
+                          uint8_t(StorageKind),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),

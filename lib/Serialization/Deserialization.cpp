@@ -1492,7 +1492,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet;
-    unsigned StorageKind;
+    uint8_t StorageKind;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
@@ -1515,19 +1515,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (auto interfaceType = getType(interfaceTypeID))
       var->setInterfaceType(interfaceType);
 
-    switch ((VarDecl::StorageKindTy)StorageKind) {
-    case VarDecl::Stored: break;
-    case VarDecl::StoredObjC:
+    switch ((VarDeclStorageKind)StorageKind) {
+    case VarDeclStorageKind::Stored: break;
+    case VarDeclStorageKind::StoredObjC:
       var->makeStoredObjC(cast_or_null<FuncDecl>(getDecl(getterID)),
                           cast_or_null<FuncDecl>(getDecl(setterID)));
       break;
-    case VarDecl::Computed:
+    case VarDeclStorageKind::Computed:
       var->makeComputed(SourceLoc(),
                         cast_or_null<FuncDecl>(getDecl(getterID)),
                         cast_or_null<FuncDecl>(getDecl(setterID)),
                         SourceLoc());
       break;
-    case VarDecl::WillSetDidSet:
+    case VarDeclStorageKind::WillSetDidSet:
       var->makeWillSetDidSet(SourceLoc(),
                              cast_or_null<FuncDecl>(getDecl(willSetID)),
                              cast_or_null<FuncDecl>(getDecl(didSetID)),

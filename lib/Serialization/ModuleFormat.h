@@ -63,6 +63,11 @@ using BitOffsetField = BCFixed<31>;
 using CharOffset = BitOffset;
 using CharOffsetField = BitOffsetField;
 
+enum class VarDeclStorageKind : uint8_t {
+  Stored, StoredObjC, Computed, WillSetDidSet
+};
+using VarDeclStorageKindField = BCFixed<2>;
+
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -607,7 +612,7 @@ namespace decls_block {
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
-    BCFixed<2>,   // StorageKind
+    VarDeclStorageKindField,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
