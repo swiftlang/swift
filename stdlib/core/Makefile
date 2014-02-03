@@ -50,6 +50,11 @@ ifneq ($(ARCH),x86_64)
   endif
 endif
 
+# Only enable benchmarks if we are asked to.
+ifneq ($(SWIFT_ENABLE_BENCHMARKS),1)
+    SWIFT_SOURCES := $(subst Benchmark.swift,,$(SWIFT_SOURCES))
+endif
+
 #
 # Done with SWIFT_SOURCES
 #

@@ -26,6 +26,10 @@ if(SWIFT_ASSERTS)
   string(REPLACE ";Assert.swift" ";AssertDebug.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 endif()
 
+if(NOT SWIFT_ENABLE_BENCHMARKS)
+  string(REPLACE ";Benchmark.swift" "" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
+endif()
+
 # Compile only 32-bit and 64-bit floating point on non-x86 architectures
 if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL i386 AND
     NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
