@@ -87,6 +87,9 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
+  V1 = V1.stripCasts();
+  V2 = V2.stripCasts();
+
   // First attempt to look up if we already have a computed result for V1, V2.
   auto Key = V1 < V2? std::make_pair(V1, V2) : std::make_pair(V2, V1);
   auto Pair = Cache.find(Key);
