@@ -33,6 +33,8 @@ static SILValue getUnderlyingObject(SILValue V) {
   }
 }
 
+/// Returns true if Kind is one of AllocStackInst, AllocBoxInst, AllocRefInst,
+/// or AllocArrayInst.
 static bool isAllocationInst(ValueKind Kind) {
   switch (Kind) {
   case ValueKind::AllocStackInst:
@@ -66,6 +68,8 @@ static bool isIdentifiableObject(SILValue V) {
   return false;
 }
 
+/// Returns true if we can prove that the two input SILValues which do not equal
+/// can not alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   assert(O1 != O2 && "This function should only be called on unequal values.");
 
