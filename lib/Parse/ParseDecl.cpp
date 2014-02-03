@@ -517,7 +517,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
 
 void Parser::setLocalDiscriminator(ValueDecl *D) {
   // If we're not in a local context, this is unnecessary.
-  if (!CurLocalContext) return;
+  if (!CurLocalContext || !D->getDeclContext()->isLocalContext())
+    return;
 
   Identifier name = D->getName();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
@@ -1375,6 +1376,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
   return false;
 }
 
+
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 ///
 /// \verbatim
@@ -1399,6 +1401,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 
   if (!PrimaryVar)
     diagnose(pattern.getLoc(), diag::getset_nontrivial_pattern);
+  else
+    setLocalDiscriminator(PrimaryVar);
 
   boundVar = PrimaryVar;
 
@@ -1413,8 +1417,6 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
 
-  setLocalDiscriminator(PrimaryVar);
-  
   SourceLoc LBLoc = consumeToken(tok::l_brace);
     
   // Parse getter and setter.
@@ -1527,30 +1529,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
     if (pattern.isNull())
       return makeParserError();
 
-    // If we syntactically match the second decl-var production, with a
-    // var-get-set clause, parse the var-get-set clause.
-    if (Tok.is(tok::l_brace)) {
-      // Reject getters and setters for lets, but parse them for better
-      // recovery.
-      if (isLet)
-        diagnose(Tok, diag::let_cannot_be_computed_property);
-
-      VarDecl *boundVar = nullptr;
-      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar);
-
-      if (isLet)
-        return makeParserError();
-
-      HasGetSet = true;
-      if (boundVar) hasStorage = boundVar->hasStorage();
-    }
-    
-    if (isLet && Tok.isNot(tok::equal) &&
-        !(Flags & PD_HasContainerType)) {
-      diagnose(VarLoc, diag::let_requires_initializer);
-      return makeParserError();
-    }
-
     // If this is a var in the top-level of script/repl source file,
     // wrap everything in a TopLevelCodeDecl, since it represents
     // executable code.
@@ -1585,7 +1563,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
       pattern.get()->collectVariables(Vars);
       using RestoreVarsRAII = llvm::SaveAndRestore<decltype(CurVars)>;
       RestoreVarsRAII RestoreCurVars(CurVars, {CurDeclContext, Vars});
-
+      
       // Enter an initializer context if we're not in a local context.
       PatternBindingInitializer *initContext = nullptr;
       Optional<ParseFunctionBody> initParser;
@@ -1593,10 +1571,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
         initContext = Context.createPatternBindingContext(PBD);
         initParser.emplace(*this, initContext);
       }
-
+      
       SourceLoc EqualLoc = consumeToken(tok::equal);
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
-
+      
       // Leave the initializer context.
       if (initContext) {
         if (!initParser->hasClosures())
@@ -1604,26 +1582,55 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attrib
         initParser.reset();
       }
       assert(!initParser.hasValue());
-
-      if (init.hasCodeCompletion()) {
+      
+      if (init.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
-      } if (init.isNull()) {
+      if (init.isNull())
         return makeParserError();
-      }
-    
-      if (HasGetSet) {
-        diagnose(pattern.get()->getLoc(), diag::getset_init)
-          .highlight(init.get()->getSourceRange());
-        init = nullptr;
-      }
+      
       if (Flags & PD_DisallowInit) {
         diagnose(EqualLoc, diag::disallowed_init);
         Status.setIsParseError();
         init = nullptr;
       }
-
+      
       PBD->setInit(init.getPtrOrNull(), false);
     }
+
+
+    // If we syntactically match the second decl-var production, with a
+    // var-get-set clause, parse the var-get-set clause.
+    if (Tok.is(tok::l_brace)) {
+      // Reject getters and setters for lets, but parse them for better
+      // recovery.
+      if (isLet)
+        diagnose(Tok, diag::let_cannot_be_computed_property);
+
+      if (PBD->getInit()) {
+        diagnose(pattern.get()->getLoc(), diag::getset_init)
+          .highlight(PBD->getInit()->getSourceRange());
+        PBD->setInit(nullptr, false);
+      }
+
+      VarDecl *boundVar = nullptr;
+      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar);
+
+      if (isLet)
+        return makeParserError();
+
+      HasGetSet = true;
+      if (boundVar) hasStorage = boundVar->hasStorage();
+    }
+
+    // Reject a let missing an initial value, when they are required.
+    if (isLet && !PBD->getInit() &&
+        !(Flags & PD_HasContainerType)) {
+      diagnose(VarLoc, diag::let_requires_initializer);
+      return makeParserError();
+    }
+    
+
+    PBD->setHasStorage(hasStorage);
 
     if (topLevelDecl) {
       Decls.push_back(topLevelDecl);

@@ -1279,6 +1279,7 @@ public:
 
   /// Does this binding declare something that requires storage?
   bool hasStorage() const { return PatternBindingDeclBits.HasStorage; }
+  void setHasStorage(bool S = true) { PatternBindingDeclBits.HasStorage = S; }
   
   /// Does this binding appear in an 'if' or 'while' condition?
   bool isConditional() const { return PatternBindingDeclBits.Conditional; }
