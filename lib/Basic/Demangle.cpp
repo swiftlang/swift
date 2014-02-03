@@ -223,12 +223,27 @@ public:
       return failure();
     if (Mangled.slice(2) != "_T")
       return failure();
-    if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
+    if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTS") {
+      Mangled.advanceOffset(4);
+      auto attr = demangleSpecializedAttribute();
+      if (!attr)
+        return failure();
+      if (!Mangled.hasAtLeast(2) || Mangled.slice(2) != "_T")
+        return failure();
+      Mangled.advanceOffset(2);
+      appendNode(attr);
+      // The Substitution header does not share state with the rest of the
+      // mangling.
+      Substitutions.clear();
+      ArchetypeCounts.clear();
+      ArchetypeCount = 0;
+    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
       Mangled.advanceOffset(4);
       appendNode(Node::Kind::ObjCAttribute);
     } else {
       Mangled.advanceOffset(2);
     }
+    
     if (!demangleGlobal())
       return false;
 
@@ -580,6 +595,25 @@ private:
     return true;
   }
 
+  NodePointer demangleSpecializedAttribute() {
+    NodePointer specialization = Node::create(Node::Kind::SpecializedAttribute);
+    while (!Mangled.nextIf('_')) {
+      NodePointer param = Node::create(Node::Kind::SpecializationParam);
+      NodePointer type = demangleType();
+      if (!type)
+        return nullptr;
+      param->addChild(type);
+      while (!Mangled.nextIf('_')) {
+        NodePointer conformance = demangleProtocolConformance();
+        if (!conformance)
+          return nullptr;
+        param->addChild(conformance);
+      }
+      specialization->addChild(param);
+    }
+    return specialization;
+  }
+  
   std::string demangleOperator() {
     static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
     Node::IndexType length;
@@ -1964,6 +1998,25 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
+    return;
+  case Node::Kind::SpecializedAttribute:
+    Printer << "specialization <";
+    for (unsigned i = 0, e = pointer->getNumChildren(); i < e; ++i) {
+      if (i >= 1)
+        Printer << ", ";
+      print(pointer->getChild(i));
+    }
+    Printer << "> of ";
+    return;
+  case Node::Kind::SpecializationParam:
+    print(pointer->getChild(0));
+    for (unsigned i = 1, e = pointer->getNumChildren(); i < e; ++i) {
+      if (i == 1)
+        Printer << " with ";
+      else
+        Printer << " and ";
+      print(pointer->getChild(i));
+    }
     return;
   case Node::Kind::BuiltinTypeName:
     Printer << pointer->getText();
