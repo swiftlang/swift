@@ -17,6 +17,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILPasses/Utils/AliasAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -33,9 +34,21 @@ using namespace swift;
 
 static const int SinkSearchWindow = 6;
 
+/// Visit all loads we are tracking so far and return true if any of
+/// them can potentially alias one of Inst's arguments. If they can
+/// not, then Inst even though it writes memory can not affect the
+/// values we are loading.
+static bool mayAliasLoadSet(AliasAnalysis &AA, SILInstruction *Inst,
+                            llvm::SmallVectorImpl<LoadInst *> &Loads) {
+  for (auto *LI : Loads)
+    if (AA.alias(Inst, SILValue(LI)) != AliasAnalysis::Result::NoAlias)
+      return true;
+  return false;
+}
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
+void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
   StoreInst  *PrevStore = 0;
   llvm::SmallVector<LoadInst *, 8> Loads;
 
@@ -103,8 +116,10 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
     if (Inst->mayReadFromMemory())
       PrevStore = 0;
 
-    // All other instructions that write to memory invalidate the loads.
-    if (Inst->mayWriteToMemory())
+    // If we have an instruction that may write to memory and we can
+    // not prove that it and its operands can not alias any of the
+    // loads we have visited so far, clear the loads.
+    if (Inst->mayWriteToMemory() && mayAliasLoadSet(AA, Inst, Loads))
       Loads.clear();
   }
 }
@@ -250,9 +265,11 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
 
 void swift::performSILCodeMotion(SILModule *M) {
   for (SILFunction &F : *M) {
+    AliasAnalysis AA;
+
     // Remove dead stores and merge duplicate loads.
     for (auto &BB : F)
-      promoteMemoryOperationsInBlock(&BB);
+      promoteMemoryOperationsInBlock(&BB, AA);
 
     // Sink duplicated code from predecessors.
     for (auto &BB : F)
