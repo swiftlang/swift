@@ -559,3 +559,139 @@ bb0(%0 : $Builtin.RawPointer):
   return %2 : $Builtin.RawPointer
 }
 
+////////////////////////////////////////////
+// Load Proj To GEP Load Canonicalization //
+////////////////////////////////////////////
+
+struct Y {
+  var int : Builtin.Int64
+  var ptr : Builtin.ObjectPointer
+  var tup : (Builtin.Int32, Builtin.Int1)
+}
+
+struct X {
+  var y : Y
+  var t : (Builtin.ObjectPointer, Y)
+}
+
+sil @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> () 
+sil @mix2 : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> () 
+
+// CHECK-LABEL: sil @load_proj_to_gep_load_canonicalization_no_rep_no_other_use_test : $@thin (@inout X) -> ()
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
+sil @load_proj_to_gep_load_canonicalization_no_rep_no_other_use_test : $@thin (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = struct_extract %1 : $X, #y
+  %3 = struct_extract %2 : $Y, #int
+  %4 = struct_extract %2 : $Y, #ptr
+  %5 = struct_extract %2 : $Y, #tup
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
+  %8 = struct_extract %1 : $X, #t
+  %9 = tuple_extract %8 : $(Builtin.ObjectPointer, Y), 0
+  %10 = tuple_extract %8 : $(Builtin.ObjectPointer, Y), 1
+  %11 = struct_extract %10 : $Y, #int
+  %12 = struct_extract %10 : $Y, #ptr
+  %13 = struct_extract %10 : $Y, #tup
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
+  %16 = function_ref @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  apply %16(%3, %4, %6, %7) : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %17 = function_ref @mix2 : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  apply %17(%9, %11, %12, %14, %15) : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %18 = tuple()
+  return %18 : $()
+}
+
+// CHECK-LABEL: sil @load_proj_to_gep_load_canonicalization_with_rep_no_other_use_test : $@thin (@inout X) -> ()
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
+// CHECK: apply {{%[0-9]+}}([[ARG1:%[0-9]+]], [[ARG2:%[0-9]+]], [[ARG3:%[0-9]+]], [[ARG4:%[0-9]+]]
+// CHECK-NEXT: apply {{%[0-9]+}}([[ARG1]], [[ARG2]], [[ARG3]], [[ARG4]]
+// CHECK-NOT: struct_extract
+// CHECK-NOT: tuple_extract
+sil @load_proj_to_gep_load_canonicalization_with_rep_no_other_use_test : $@thin (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = struct_extract %1 : $X, #y
+  %3 = struct_extract %2 : $Y, #int
+  %4 = struct_extract %2 : $Y, #ptr
+  %5 = struct_extract %2 : $Y, #tup
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
+  %16 = function_ref @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  apply %16(%3, %4, %6, %7) : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %19 = struct_extract %2 : $Y, #int
+  %20 = struct_extract %2 : $Y, #ptr
+  %21 = struct_extract %2 : $Y, #tup
+  %22 = tuple_extract %21 : $(Builtin.Int32, Builtin.Int1), 0
+  %23 = tuple_extract %21 : $(Builtin.Int32, Builtin.Int1), 1
+  apply %16(%19, %20, %22, %23) : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %18 = tuple()
+  return %18 : $()
+}
+
+sil @disrupting_use : $@thin (Y) -> ()
+
+// CHECK-LABEL: sil @load_proj_to_gep_load_canonicalization_no_rep_with_disrupting_use_test : $@thin (@inout X) -> ()
+// CHECK: bb0
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_element_addr
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple_element_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @load_proj_to_gep_load_canonicalization_no_rep_with_disrupting_use_test : $@thin (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = struct_extract %1 : $X, #y
+  %3 = struct_extract %2 : $Y, #int
+  %4 = struct_extract %2 : $Y, #ptr
+  %5 = struct_extract %2 : $Y, #tup
+  %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0
+  %7 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 1
+  %8 = struct_extract %1 : $X, #t
+  %9 = tuple_extract %8 : $(Builtin.ObjectPointer, Y), 0
+  %10 = tuple_extract %8 : $(Builtin.ObjectPointer, Y), 1
+  %11 = struct_extract %10 : $Y, #int
+  %12 = struct_extract %10 : $Y, #ptr
+  %13 = struct_extract %10 : $Y, #tup
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
+  %16 = function_ref @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  apply %16(%3, %4, %6, %7) : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %17 = function_ref @mix2 : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  apply %17(%9, %11, %12, %14, %15) : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+  %18 = function_ref @disrupting_use : $@thin (Y) -> ()
+  apply %18(%10) : $@thin (Y) -> ()
+  %19 = tuple()
+  return %19 : $()
+}
+
