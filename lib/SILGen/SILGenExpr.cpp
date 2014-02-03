@@ -29,6 +29,7 @@
 #include "RValue.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -682,23 +683,42 @@ RValue RValueEmitter::visitCharacterLiteralExpr(CharacterLiteralExpr *E,
 RValue RValueEmitter::emitStringLiteral(Expr *E, StringRef Str,
                                         SGFContext C,
                                         StringLiteralExpr::Encoding encoding) {
+  uint64_t Length;
+
   StringLiteralInst::Encoding instEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
     instEncoding = StringLiteralInst::Encoding::UTF8;
+    Length = Str.size();
     break;
 
-  case StringLiteralExpr::UTF16:
+  case StringLiteralExpr::UTF16: {
     instEncoding = StringLiteralInst::Encoding::UTF16;
+
+    // Transcode the string to UTF16 to get its length.
+    SmallVector<UTF16, 128> buffer(Str.size() + 1); // +1 for ending nulls.
+    const UTF8 *fromPtr = (const UTF8 *) Str.data();
+    UTF16 *toPtr = &buffer[0];
+    (void)ConvertUTF8toUTF16(&fromPtr, fromPtr + Str.size(),
+                             &toPtr, toPtr + Str.size(), strictConversion);
+
+    // The length of the transcoded string in UTF-16 code points.
+    Length = toPtr - &buffer[0];
     break;
   }
+  }
 
+  // The string literal provides the data.
   StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
   CanType ty = E->getType()->getCanonicalType();
-  
+
+  // The length is lowered as an integer_literal.
+  auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
+  auto *lengthInst = SGF.B.createIntegerLiteral(E, WordTy, Length);
+
   ManagedValue EltsArray[] = {
     ManagedValue::forUnmanaged(SILValue(string, 0)),
-    ManagedValue::forUnmanaged(SILValue(string, 1)),
+    ManagedValue::forUnmanaged(lengthInst),
     ManagedValue::forUnmanaged(SILValue(string, 2))
   };
 

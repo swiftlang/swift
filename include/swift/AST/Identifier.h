@@ -20,7 +20,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ConvertUTF.h"
 #include <cstring>
 
 namespace llvm {
@@ -76,16 +75,9 @@ public:
       return false;
     if ((unsigned char)Pointer[0] < 0x80)
       return isOperatorStartCodePoint((unsigned char)Pointer[0]);
-    
-    StringRef data = str();
-    auto *s = reinterpret_cast<UTF8 const *>(data.begin()),
-       *end = reinterpret_cast<UTF8 const *>(data.end());
-    UTF32 codePoint;
-    ConversionResult res = llvm::convertUTF8Sequence(&s, end, &codePoint,
-                                                     strictConversion);
-    assert(res == conversionOK && "invalid UTF-8 in identifier?!");
-    (void)res;
-    return !empty() && isOperatorStartCodePoint(codePoint);
+
+    // Handle the high unicode case out of line.
+    return isOperatorSlow();
   }
   
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -144,6 +136,9 @@ public:
     return Identifier((const char*)
                       llvm::DenseMapInfo<const void*>::getTombstoneKey());
   }
+
+private:
+  bool isOperatorSlow() const;
 };
 
 } // end namespace swift

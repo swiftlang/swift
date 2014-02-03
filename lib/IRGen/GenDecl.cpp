@@ -33,6 +33,7 @@
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ConvertUTF.h"
 
 #include "CallingConvention.h"
 #include "Explosion.h"
