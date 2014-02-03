@@ -1083,7 +1083,12 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
   if (parseMatchingToken(tok::r_brace, rBraceLoc,
                          diag::expected_rbrace_switch, lBraceLoc)) {
     Status.setIsParseError();
-    rBraceLoc = PreviousLoc;
+    // Make sure the source range still properly contains all the cases we've
+    // parsed so far. <rdar://problem/15971438>
+    if (cases.empty())
+      rBraceLoc = PreviousLoc;
+    else
+      rBraceLoc = cases.back()->getEndLoc();
   }
 
   return makeParserResult(
