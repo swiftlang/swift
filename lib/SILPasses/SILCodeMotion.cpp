@@ -95,6 +95,10 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB) {
         if (isReadNone(BI))
           continue;
 
+    // cond_fail does not read/write memory in a manner that we care about.
+    if (isa<CondFailInst>(Inst))
+      continue;
+
     // All other instructions that read from memory invalidate the store.
     if (Inst->mayReadFromMemory())
       PrevStore = 0;
