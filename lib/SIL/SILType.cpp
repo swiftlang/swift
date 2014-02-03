@@ -89,3 +89,10 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     M.Types.getLoweredType(AbstractionPattern(origEltTy), substEltTy);
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
+
+/// True if the type, or the referenced type of an address type, is
+/// address-only. For example, it could be a resilient struct or something of
+/// unknown size.
+bool SILType::isAddressOnly(SILModule &M) const {
+  return M.getTypeLowering(*this).isAddressOnly();
+}
