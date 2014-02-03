@@ -74,7 +74,6 @@ SILValue SILValue::stripAddressProjections() {
   SILValue V = *this;
 
   while (true) {
-    V = V.stripCasts();
     switch (V->getKind()) {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
