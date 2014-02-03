@@ -34,5 +34,6 @@ static void init() {
                                               MACH_PORT_NULL,
                                               EXCEPTION_STATE_IDENTITY
                                               | MACH_EXCEPTION_CODES, flavor);
+  (void)KR;
   assert(KR == 0);
 }
