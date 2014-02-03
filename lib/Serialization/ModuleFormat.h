@@ -607,10 +607,13 @@ namespace decls_block {
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
+    BCFixed<2>,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type
     DeclIDField,  // getter
     DeclIDField,  // setter
+    DeclIDField,  // willset
+    DeclIDField,  // didset
     DeclIDField   // overridden decl
   >;
 

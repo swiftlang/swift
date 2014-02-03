@@ -1288,6 +1288,13 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
 
+    FuncDecl *WillSet = nullptr, *DidSet = nullptr;
+
+    if (var->getStorageKind() == VarDecl::WillSetDidSet) {
+      WillSet = var->getWillSetFunc();
+      DidSet = var->getDidSetFunc();
+    }
+
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
                           addIdentifierRef(var->getName()),
@@ -1298,10 +1305,13 @@ void Serializer::writeDecl(const Decl *D) {
                           var->getAttrs().isOptional(),
                           var->isStatic(),
                           var->isLet(),
+                          var->getStorageKind(),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
                           addDeclRef(var->getGetter()),
                           addDeclRef(var->getSetter()),
+                          addDeclRef(WillSet),
+                          addDeclRef(DidSet),
                           addDeclRef(var->getOverriddenDecl()));
     break;
   }

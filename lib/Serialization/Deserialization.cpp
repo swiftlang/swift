@@ -1492,14 +1492,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet;
+    unsigned StorageKind;
     TypeID typeID, interfaceTypeID;
-    DeclID getterID, setterID;
+    DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isIBOutlet, isOptional, isStatic,
-                                       isLet, typeID, interfaceTypeID,
-                                       getterID, setterID, overriddenID);
+                                       isLet, StorageKind, typeID,
+                                       interfaceTypeID, getterID, setterID,
+                                       willSetID, didSetID, overriddenID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1513,11 +1515,26 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (auto interfaceType = getType(interfaceTypeID))
       var->setInterfaceType(interfaceType);
 
-    if (getterID || setterID) {
+    switch ((VarDecl::StorageKindTy)StorageKind) {
+    case VarDecl::Stored: break;
+    case VarDecl::StoredObjC:
+      var->makeStoredObjC(cast_or_null<FuncDecl>(getDecl(getterID)),
+                          cast_or_null<FuncDecl>(getDecl(setterID)));
+      break;
+    case VarDecl::Computed:
       var->makeComputed(SourceLoc(),
                         cast_or_null<FuncDecl>(getDecl(getterID)),
                         cast_or_null<FuncDecl>(getDecl(setterID)),
                         SourceLoc());
+      break;
+    case VarDecl::WillSetDidSet:
+      var->makeWillSetDidSet(SourceLoc(),
+                             cast_or_null<FuncDecl>(getDecl(willSetID)),
+                             cast_or_null<FuncDecl>(getDecl(didSetID)),
+                             SourceLoc());
+      var->setDidSetWillSetAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
+                                     cast_or_null<FuncDecl>(getDecl(setterID)));
+      break;
     }
 
     if (isImplicit)
