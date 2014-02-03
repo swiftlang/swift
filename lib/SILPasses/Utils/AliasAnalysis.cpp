@@ -13,6 +13,7 @@
 #include "swift/SILPasses/Utils/AliasAnalysis.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 
@@ -44,12 +45,23 @@ static bool isAllocationInst(ValueKind Kind) {
   }
 }
 
+/// A no alias argument is an address only argument.
+static bool isNoAliasArgument(SILValue V) {
+  auto *Arg = dyn_cast<SILArgument>(V.getDef());
+  if (!Arg)
+    return false;
+
+  SILModule &M = Arg->getModule();
+  return Arg->getType().isAddressOnly(M);
+}
+
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
   ValueKind Kind = V->getKind();
 
-  if (isAllocationInst(Kind) || Kind == ValueKind::SILArgument ||
+  if (isAllocationInst(Kind) ||
+      isNoAliasArgument(V) ||
       isa<LiteralInst>(*V))
     return true;
 
