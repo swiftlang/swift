@@ -1300,25 +1300,46 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 }
 
-/// \brief Determine whether the given protocol member's signature involves
-/// any associated types or Self.
-static bool involvesAssociatedTypes(TypeChecker &tc, ValueDecl *decl) {
-  Type type = decl->getType();
+/// Determine whether the given type contains a reference to the 'Self' type
+/// of a protocol.
+static bool containsProtocolSelf(Type type) {
+  // If the type is not dependent, it doesn't refer to 'Self'.
+  if (!type->isDependentType())
+    return false;
 
-  // For a function or constructor,
-  // Note that there are no destructor requirements, so we don't need to check
-  // for destructors.
-  if (isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl))
-    type = type->castTo<AnyFunctionType>()->getResult();
-
-  // FIXME: Use interface type and look for dependent types.
-  return type.findIf([](Type type) {
-    if (auto archetype = type->getAs<ArchetypeType>()) {
-      return archetype->getParent() || archetype->getSelfProtocol();
-    }
+  return type.findIf([](Type type) -> bool {
+    if (auto genericParam = type->getAs<GenericTypeParamType>())
+      return genericParam->getDepth() == 0;
 
     return false;
   });
+}
+
+/// Determine whether the given protocol member's signature prevents
+/// it from being used in an existential reference.
+static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
+  Type type = decl->getInterfaceType();
+
+  // For a function or constructor, skip the implicit 'this'.
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+    // Allow method requirements to return DynamicSelf.
+    if (auto func = dyn_cast<FuncDecl>(afd)) {
+      if (func->hasDynamicSelf()) {
+        while (auto funcTy = type->getAs<AnyFunctionType>()) {
+          if (containsProtocolSelf(funcTy->getInput()))
+            return true;
+
+          type = funcTy->getResult();
+        }
+        assert(type->is<DynamicSelfType>() && "Should only have DynamicSelf");
+        return false;
+      }
+    }
+  }
+
+  return containsProtocolSelf(type);
 }
 
 ConstraintSystem::SolutionKind
@@ -1401,7 +1422,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // constructor whose signature involves associated types.
       // FIXME: Mark this as 'unavailable'.
       if (isExistential &&
-          involvesAssociatedTypes(getTypeChecker(), constructor))
+          isUnavailableInExistential(getTypeChecker(), constructor))
         continue;
 
       choices.push_back(OverloadChoice(baseTy, constructor,
@@ -1498,7 +1519,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     // FIXME: Mark this as 'unavailable'.
-    if (isExistential && involvesAssociatedTypes(getTypeChecker(), result))
+    if (isExistential && isUnavailableInExistential(getTypeChecker(), result))
       continue;
 
     // If we are looking for a metatype member, don't include members that can
