@@ -51,6 +51,10 @@ static const clang::CanQualType getClangBuiltinTypeFromKind(
   }
 }
 
+static clang::CanQualType getUnhandledType() {
+  return clang::CanQualType();
+}
+
 static clang::CanQualType getClangSelectorType(
   const clang::ASTContext &clangCtx) {
   return clangCtx.getPointerType(clangCtx.ObjCBuiltinSelTy);
@@ -107,8 +111,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_CLANG_TYPE_MATCH(type, "CString", clangCtx.VoidPtrTy);
   CHECK_CLANG_TYPE_MATCH(type, "Selector", getClangSelectorType(clangCtx));
 #undef CHECK_CLANG_TYPE_MATCH
+
   // FIXME: Handle other structs resulting from imported non-struct Clang types.
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
@@ -116,7 +121,7 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
     return getClangASTContext().VoidTy;
 
   llvm_unreachable("Unexpected tuple type in Clang type generation!");
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
@@ -167,7 +172,7 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
   // FIXME: We hit this building Foundation, with a call on the type
   // encoding path.
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
@@ -185,15 +190,15 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
 
 clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
   CanBuiltinObjCPointerType type) {
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
@@ -205,13 +210,13 @@ clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
 // FIXME: We should not be seeing these by the time we generate Clang types.
 clang::CanQualType GenClangType::visitGenericTypeParamType(
   CanGenericTypeParamType type) {
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
   llvm_unreachable("Unexpected type in Clang type generation.");
 
-  return clang::CanQualType();
+  return getUnhandledType();
 }
 
 const clang::ASTContext &GenClangType::getClangASTContext() const {
