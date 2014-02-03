@@ -45,14 +45,12 @@ static bool isAllocationInst(ValueKind Kind) {
   }
 }
 
-/// A no alias argument is an address only argument.
+/// A no alias argument is an argument that is an address type.
 static bool isNoAliasArgument(SILValue V) {
   auto *Arg = dyn_cast<SILArgument>(V.getDef());
   if (!Arg)
     return false;
-
-  SILModule &M = Arg->getModule();
-  return Arg->getType().isAddressOnly(M);
+  return Arg->getType().isAddress();
 }
 
 /// Return true if V is an object that at compile time can be uniquely
