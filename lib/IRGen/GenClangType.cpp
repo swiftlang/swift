@@ -135,11 +135,33 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
 
 clang::CanQualType GenClangType::visitBoundGenericStructType(
   CanBoundGenericStructType type) {
-  return clang::CanQualType();
+  // We only expect UnsafePointer<T>.
+  auto swiftStructDecl = type->getDecl();
+  assert(swiftStructDecl->getName().str() == "UnsafePointer" &&
+         "Unexpected bound generic struct in imported Clang module!");
+  (void) swiftStructDecl;
+  auto args = type->getGenericArgs();
+  assert(args.size() == 1 &&
+         "UnsafePointer<> should have a single generic argument!");
+
+  // Convert the bound type to the appropriate clang type and return a
+  // pointer to that type.
+  auto clangCanTy = visit(args.front()->getCanonicalType());
+  return getClangASTContext().getPointerType(clangCanTy);
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
-  return clang::CanQualType();
+  // Typedef enums have a Clang Decl available.
+  auto *decl = type->getDecl();
+  if (auto *clangDecl = decl->getClangDecl()) {
+    auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
+    return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
+  }
+
+  // Plain enums just have the raw type set.
+  assert(!decl->getRawType() &&
+         "Expected raw type for Clang-imported enum!");
+  return visit(decl->getRawType()->getCanonicalType());
 }
 
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
