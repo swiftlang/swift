@@ -15,6 +15,18 @@
 
 using namespace swift;
 
+/// Strip off casts/address projections from V until there is nothing
+/// left to strip.
+static SILValue getUnderlyingObject(SILValue V) {
+  while (true) {
+    SILValue NewV = V.stripCasts();
+    NewV = NewV.stripAddressProjections();
+    if (NewV == V)
+      return NewV;
+    V = NewV;
+  }
+}
+
 AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
   /// FIXME: Fill this out.
   return Result::MayAlias;
