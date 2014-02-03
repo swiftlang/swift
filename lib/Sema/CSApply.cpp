@@ -191,7 +191,8 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
 /// Adjust the given type to become the self type when referring to
 /// the given member.
 static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
-                                    bool IsDirectPropertyAccess) {
+                                    bool IsDirectPropertyAccess,
+                                    DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
     // If 'self' is an @inout type, turn the base type into an lvalue
@@ -221,8 +222,9 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
         !IsDirectPropertyAccess)
       return InOutType::get(baseObjectTy);
    
-    // If the member is a let, the base is always an unqualified baseObjectTy.
-    if (VD->isLet())
+    // If the member is immutable in this context, the base is always an
+    // unqualified baseObjectTy.
+    if (!VD->isSettable(UseDC))
       return baseObjectTy;
   }
   
@@ -3172,7 +3174,8 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
                                          Type baseTy, ValueDecl *member,
                                          bool IsDirectPropertyAccess,
                                          ConstraintLocatorBuilder locator) {
-  Type toType = adjustSelfTypeForMember(baseTy, member, IsDirectPropertyAccess);
+  Type toType = adjustSelfTypeForMember(baseTy, member, IsDirectPropertyAccess,
+                                        dc);
 
   // If our expression already has the right type, we're done.
   Type fromType = expr->getType();
