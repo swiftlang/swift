@@ -12,6 +12,7 @@
 
 #include "swift/SILPasses/Utils/AliasAnalysis.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
 
@@ -25,6 +26,30 @@ static SILValue getUnderlyingObject(SILValue V) {
       return NewV;
     V = NewV;
   }
+}
+
+static bool isAllocationInst(ValueKind Kind) {
+  switch (Kind) {
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocArrayInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Return true if V is an object that at compile time can be uniquely
+/// identified.
+static bool isIdentifiableObject(SILValue V) {
+  ValueKind Kind = V->getKind();
+
+  if (isAllocationInst(Kind) || Kind == ValueKind::SILArgument ||
+      isa<LiteralInst>(*V))
+    return true;
+
+  return false;
 }
 
 AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
