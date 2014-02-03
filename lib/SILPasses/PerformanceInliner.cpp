@@ -198,11 +198,20 @@ static InlineCost instructionInlineCost(SILInstruction &I,
       return InlineCost::Free;
 
     // TODO
+    case ValueKind::ApplyInst: {
+      // Don't inline functions that contain recursions.
+      ApplyInst *AI = cast<ApplyInst>(&I);
+      auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+      if (FRI && FRI->getReferencedFunction() == AI->getFunction())
+        return InlineCost::CannotBeInlined;
+ 
+      return InlineCost::Expensive;
+    }
+
     case ValueKind::AllocArrayInst:
     case ValueKind::AllocBoxInst:
     case ValueKind::AllocRefInst:
     case ValueKind::AllocStackInst:
-    case ValueKind::ApplyInst:
     case ValueKind::ArchetypeMetatypeInst:
     case ValueKind::ArchetypeMethodInst:
     case ValueKind::ArchetypeRefToSuperInst:
