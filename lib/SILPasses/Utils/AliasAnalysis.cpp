@@ -57,8 +57,7 @@ AliasAnalysis::Result AliasAnalysis::alias(SILValue V1, SILValue V2) {
   return Result::MayAlias;
 }
 
-AliasAnalysis::Result AliasAnalysis::alias(SILInstruction *Inst,
-                                           SILValue V2) {
+AliasAnalysis::Result AliasAnalysis::alias(SILInstruction *Inst, SILValue V2) {
   /// FIXME: Fill this out.
   return Result::MayAlias;
 }
