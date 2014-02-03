@@ -594,8 +594,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto *ctorDecl = new (C) ConstructorDecl(C.Id_init, optionSetDecl->getLoc(),
                                            selfPattern, methodParam,
                                            selfPattern, methodParam,
-                                           selfDecl, nullptr,
-                                           optionSetDecl);
+                                           nullptr, optionSetDecl);
   ctorDecl->setImplicit();
   
   auto fnTy = FunctionType::get(TupleType::getEmpty(C), optionSetType);
@@ -778,7 +777,7 @@ namespace {
         new (context) ConstructorDecl(name, structDecl->getLoc(),
                                       selfPattern, paramPattern,
                                       selfPattern, paramPattern,
-                                      selfDecl, nullptr, structDecl);
+                                      nullptr, structDecl);
 
       // Set the constructor's type.
       auto fnTy = FunctionType::get(paramTy, selfType);
@@ -1885,8 +1884,7 @@ namespace {
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext)
          ConstructorDecl(name, loc, selfPat, argPatterns.back(),
-                         selfPat, bodyPatterns.back(), selfVar,
-                         /*GenericParams=*/0, dc);
+                         selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
       result->setType(allocType);
       result->setInitializerType(initType);
       result->setIsObjC(true);

@@ -2634,12 +2634,10 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes)
                                                  CurDeclContext, &SelfDecl);
 
   Scope S2(this, ScopeKind::ConstructorBody);
-  ConstructorDecl *CD =
-      new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc,
-                                    SelfPattern, ArgPattern,
-                                    SelfPattern, BodyPattern,
-                                    SelfDecl, GenericParams,
-                                    CurDeclContext);
+  auto *CD = new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc,
+                                           SelfPattern, ArgPattern,
+                                           SelfPattern, BodyPattern,
+                                           GenericParams, CurDeclContext);
   // No need to setLocalDiscriminator.
 
   if (HasSelectorStyleSignature)
@@ -2754,9 +2752,8 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                                  CurDeclContext, &SelfDecl);
 
   Scope S(this, ScopeKind::DestructorBody);
-  DestructorDecl *DD
-    = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
-                                   SelfPattern, SelfDecl, CurDeclContext);
+  auto *DD = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
+                                          SelfPattern, CurDeclContext);
   // No need to setLocalDiscriminator.
 
   SelfDecl->setDeclContext(DD);

@@ -1385,14 +1385,22 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
   return getSelfTypeForContainer(this, isInitializingCtor, true, nullptr);
 }
 
+/// \brief This method returns the implicit 'self' decl.
+///
+/// Note that some functions don't have an implicit 'self' decl, for example,
+/// free functions.  In this case nullptr is returned.
+VarDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
+  ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
+  if (ArgParamPatterns.empty())
+    return nullptr;
 
-VarDecl *AbstractFunctionDecl::getImplicitSelfDeclSlow() const {
-  if (auto FD = dyn_cast<FuncDecl>(this)) {
-    VarDecl *SelfDecl = FD->getImplicitSelfDeclImpl();
-    ImplicitSelfDeclAndIsCached.setPointerAndInt(SelfDecl, true);
-    return SelfDecl;
-  }
-  ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, true);
+  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
+  const Pattern *P = ArgParamPatterns[0]->getSemanticsProvidingPattern();
+
+  // The decl should be named 'self' and be implicit.
+  auto NP = dyn_cast<NamedPattern>(P);
+  if (NP && NP->isImplicit() && NP->getBoundName() == getASTContext().Id_self)
+    return NP->getDecl();
   return nullptr;
 }
 
@@ -1456,21 +1464,6 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   case BodyKind::Unparsed:
     return BodyRange;
   }
-}
-
-VarDecl *FuncDecl::getImplicitSelfDeclImpl() const {
-  ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
-  if (ArgParamPatterns.empty())
-    return nullptr;
-
-  // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  const Pattern *P = ArgParamPatterns[0]->getSemanticsProvidingPattern();
-
-  // The decl should be named 'self' and be implicit.
-  auto NP = dyn_cast<NamedPattern>(P);
-  if (NP && NP->isImplicit() && NP->getBoundName() == getASTContext().Id_self)
-    return NP->getDecl();
-  return nullptr;
 }
 
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,

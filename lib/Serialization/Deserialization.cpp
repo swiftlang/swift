@@ -1418,7 +1418,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
                                           /*argParams=*/nullptr, nullptr,
                                           /*bodyParams=*/nullptr, nullptr,
-                                          selfDecl, genericParams, parent);
+                                          genericParams, parent);
     declOrOffset = ctor;
     selfDecl->setDeclContext(ctor);
 
@@ -2043,7 +2043,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
-                                         /*selfpat*/nullptr, selfDecl, parent);
+                                         /*selfpat*/nullptr, parent);
     declOrOffset = dtor;
     selfDecl->setDeclContext(dtor);
 

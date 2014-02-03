@@ -2697,25 +2697,16 @@ protected:
     SourceRange BodyRange;
   };
 
-  /// Pointer to the implicit 'self' decl and a bit that is set to true when
-  /// this pointer is computed already.
-  mutable llvm::PointerIntPair<VarDecl *, 1, bool> ImplicitSelfDeclAndIsCached;
-
   GenericParamList *GenericParams;
 
   CaptureInfo Captures;
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
-                       SourceLoc NameLoc,
-                       VarDecl *ImplicitSelfDecl, unsigned NumParamPatterns,
+                       SourceLoc NameLoc, unsigned NumParamPatterns,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
         Body(nullptr), GenericParams(GenericParams) {
-    if (ImplicitSelfDecl)
-      ImplicitSelfDeclAndIsCached.setPointerAndInt(ImplicitSelfDecl, true);
-    else
-      ImplicitSelfDeclAndIsCached.setPointerAndInt(nullptr, false);
     setBodyKind(BodyKind::None);
     AbstractFunctionDeclBits.HasSelectorStyleSignature = false;
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
@@ -2723,8 +2714,6 @@ protected:
     // Verify no bitfield truncation.
     assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
   }
-
-  VarDecl *getImplicitSelfDeclSlow() const;
 
   MutableArrayRef<Pattern *> getArgParamBuffer();
   MutableArrayRef<Pattern *> getBodyParamBuffer();
@@ -2885,11 +2874,7 @@ public:
   ///
   /// Note that some functions don't have an implicit 'self' decl, for example,
   /// free functions.  In this case nullptr is returned.
-  VarDecl *getImplicitSelfDecl() const {
-    if (ImplicitSelfDeclAndIsCached.getInt())
-      return ImplicitSelfDeclAndIsCached.getPointer();
-    return getImplicitSelfDeclSlow();
-  }
+  VarDecl *getImplicitSelfDecl() const;
 
   /// \brief Retrieve the set of parameters to a generic function, or null if
   /// this function is not generic.
@@ -2951,7 +2936,7 @@ class FuncDecl : public AbstractFunctionDecl {
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
-                           /*impself*/nullptr, NumParamPatterns, GenericParams),
+                           NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenDecl(nullptr), Operator(nullptr) {
     FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
@@ -2960,8 +2945,6 @@ class FuncDecl : public AbstractFunctionDecl {
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
   }
-
-  VarDecl *getImplicitSelfDeclImpl() const;
 
 public:
   /// Factory function only for use by deserialization.
@@ -3304,14 +3287,12 @@ public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *SelfArgParam, Pattern *ArgParams,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
-                  VarDecl *ImplicitSelfDecl,
                   GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ConstructorLoc, ImplicitSelfDecl, 2, GenericParams) {
+                           ConstructorLoc, 2, GenericParams) {
     setArgParams(SelfArgParam, ArgParams);
     setBodyParams(SelfBodyParam, BodyParams);
 
-    assert(ImplicitSelfDecl && "constructors should have a non-null self");
     ConstructorDeclBits.ComputedBodyInitKind = 0;
   }
 
@@ -3410,12 +3391,10 @@ class DestructorDecl : public AbstractFunctionDecl {
   Pattern *SelfPattern;
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                 Pattern *SelfPattern,
-                 VarDecl *ImplicitSelfDecl, DeclContext *Parent)
+                 Pattern *SelfPattern, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           DestructorLoc, ImplicitSelfDecl, 1, nullptr),
+                           DestructorLoc, 1, nullptr),
       SelfPattern(SelfPattern) {
-    assert(ImplicitSelfDecl && "destructors should have a non-null self");
   }
 
   void setSelfPattern(Pattern *selfPattern) {
