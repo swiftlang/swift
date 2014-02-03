@@ -133,12 +133,10 @@ static bool canSinkInstruction(SILInstruction *Inst) {
 /// we can't sink other instructions past it.
 static bool isSinkBarrier(SILInstruction *Inst) {
   // We know that some calls do not have side effects.
-  if (const ApplyInst *AI = dyn_cast<ApplyInst>(Inst)) {
+  if (const ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
     if (BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef()))
       return !isSideEffectFree(FR);
-    }
-  }
 
   if (isa<TermInst>(Inst))
     return false;
