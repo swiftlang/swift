@@ -133,4 +133,13 @@ typedef __INT8_TYPE__ int8_t;
 typedef __INT16_TYPE__ int16_t;
 typedef __INT32_TYPE__ int32_t;
 typedef __INT64_TYPE__ int64_t;
+typedef __INTPTR_TYPE__ intptr_t;
+typedef unsigned __INTPTR_TYPE__ uintptr_t;
+
+// Types from stddef.h.
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+typedef __SIZE_TYPE__ size_t;
+
+// Types from sys/types.h (POSIX).
+typedef long ssize_t;
 

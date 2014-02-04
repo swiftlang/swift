@@ -64,12 +64,17 @@ MAP_STDLIB_TYPE("int16_t", SignedInt, 16, "Int16", All, false)
 MAP_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false)
 MAP_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false)
 
-// C types.
-MAP_STDLIB_TYPE("ptrdiff_t", SignedWord, 0, "Int", All, false)
-MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false)
-MAP_STDLIB_TYPE("size_t", UnsignedWord, 0, "UInt", All, false)
-MAP_STDLIB_TYPE("intptr_t", SignedWord, 0, "Int", All, false)
+MAP_STDLIB_TYPE("intptr_t",  SignedWord,   0, "Int",  All, false)
 MAP_STDLIB_TYPE("uintptr_t", UnsignedWord, 0, "UInt", All, false)
+
+// stddef.h types.
+MAP_STDLIB_TYPE("ptrdiff_t", SignedWord,   0, "Int",  All, false)
+MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "UInt", All, false)
+
+// POSIX sys/types.h.
+MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false)
+
+// stdarg.h types.
 // FIXME: why does this not catch va_list on x86_64?
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false)
 
