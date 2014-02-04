@@ -626,15 +626,20 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     if (!ClosureTy)
       return nullptr;
 
-    int ArgNum = 0;
-    // For each parameter of the closure function:
-    for (auto Param : ClosureTy->getInterfaceParameters()) {
-      SILValue Arg = PAI->getArguments()[ArgNum++];
+    // Emit a destroy value for each captured closure argument.
+    auto Params = ClosureTy->getInterfaceParameters();
+    auto Args = PAI->getArguments();
+    unsigned Delta = Params.size() - Args.size();
+    assert(Delta <= Params.size() && "Error, more Args to partial apply than "
+           "params in its interface.");
+
+    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
+      SILValue Arg = Args[AI];
+      auto Param = Params[AI + Delta];
 
       if (!Param.isIndirect() && Param.isConsumed())
         if (!Arg.getType().isAddress())
           Builder->createDestroyValue(Loc, Arg);
-
     }
 
     // Delete the strong_release.
