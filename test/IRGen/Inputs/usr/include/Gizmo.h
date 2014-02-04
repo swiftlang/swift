@@ -23,35 +23,7 @@ struct NSRect {
   } size;
 };
 
-struct Trio {
-  double i;
-  double j;
-  double k;
-};
-
-struct IntPair {
-  int a;
-  int b;
-};
-
-struct NestedInts {
-  struct A {
-    int value;
-  } a;
-  struct B {
-    int value;
-  } b;
-};
-
 typedef long NSInteger;
-
-#if !defined(OBJC_HIDE_64) && TARGET_OS_IPHONE && __LP64__
-typedef bool BOOL;
-#else
-typedef signed char BOOL;
-// BOOL is explicitly signed so @encode(BOOL) == "c" rather than "C"
-// even if -funsigned-char is used.
-#endif
 
 @interface Gizmo : NSObject
 - (Gizmo*) clone NS_RETURNS_RETAINED;
@@ -66,7 +38,6 @@ typedef signed char BOOL;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 + (void) runce;
-- (BOOL) negate:(BOOL) b;
 @end
 
 static inline int innerZero(void) { return 0; }
@@ -94,13 +65,6 @@ NSString *NSStringFromRect(struct NSRect r);
 - (void)runce;
 - (void)funge;
 - (void)foo;
-@end
-
-@interface NSStructReturns
-- (struct Rect)newRect;
-- (struct Trio)newTrio;
-- (struct IntPair)newPair;
-- (struct NestedInts)newNestedInts;
 @end
 
 typedef NS_ENUM(unsigned short, NSRuncingOptions) {
