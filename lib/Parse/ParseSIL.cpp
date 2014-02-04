@@ -2670,6 +2670,88 @@ bool Parser::parseSILVTable() {
   return false;
 }
 
+static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
+  Identifier DeclName;
+  SourceLoc DeclLoc;
+  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
+    return nullptr;
+
+  // Find the protocol decl.
+  SmallVector<ValueDecl*, 4> CurModuleResults;
+  P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), DeclName,
+                                    NLKind::UnqualifiedLookup,
+                                    CurModuleResults);
+  if (CurModuleResults.size() != 1) {
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+    return nullptr;
+  }
+  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(CurModuleResults[0]);
+  if (!proto)
+    P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
+  return proto;
+}
+
+static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
+           ProtocolDecl *proto) {
+  Identifier DeclName;
+  SourceLoc DeclLoc;
+  if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
+    return nullptr;
+  auto VD = lookupMember(P, proto->getType(), DeclName);
+  if (!VD) {
+    P.diagnose(DeclLoc, diag::sil_witness_assoc_not_found, DeclName);
+    return nullptr;
+  }
+  return dyn_cast<AssociatedTypeDecl>(VD);
+}
+
+static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
+           SILParser &SP, SILType ConformingTy, ProtocolDecl *&proto) {
+  Identifier ModuleKeyword, ModuleName;
+  SourceLoc Loc, KeywordLoc;
+  proto = parseProtocolDecl(P, SP);
+  if (!proto)
+    return nullptr;
+      
+  if (P.parseIdentifier(ModuleKeyword, KeywordLoc,
+                        diag::expected_tok_in_sil_instr, "module") ||
+      SP.parseSILIdentifier(ModuleName, Loc,
+                            diag::expected_sil_value_name))
+    return nullptr;
+
+  if (ModuleKeyword.str() != "module") {
+    P.diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
+    return nullptr;
+  }
+
+  // Find the NormalProtocolConformance.
+  auto lookup = P.SF.getParentModule()->lookupConformance(
+                         ConformingTy.getSwiftRValueType(), proto, nullptr);
+  NormalProtocolConformance *theConformance =
+      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
+  if (!theConformance)
+    P.diagnose(KeywordLoc, diag::sil_witness_protocol_conformance_not_found);
+  return theConformance;
+}
+
+static ProtocolConformance *parseProtocolConformance(Parser &P, SILParser &SP,
+           ProtocolDecl *&proto) {
+  // FIXME: parse generic params.
+  SILType ConformingTy;
+  TypeAttributes emptyAttrs;
+  if (SP.parseSILTypeWithoutQualifiers(ConformingTy,
+                                       SILValueCategory::Object,
+                                       emptyAttrs) ||
+      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+    return nullptr;
+
+  auto peek = P.peekToken();
+  if (peek.getText() == "specialize" || peek.getText() == "inherit")
+    // FIXME: handle specialize and inherit.
+    return nullptr;
+  return parseNormalProtocolConformance(P, SP, ConformingTy, proto);
+}
+
 /// decl-sil-witness: [[only in SIL mode]]
 ///   'sil_witness_table' normal-conformance decl-sil-witness-body
 /// normal-conformance:
@@ -2687,48 +2769,10 @@ bool Parser::parseSILWitnessTable() {
   SILParser WitnessState(*this);
 
   // Parse the protocol conformance.
-  // FIXME: parse generic params.
-  SILType ConformingTy;
-  TypeAttributes emptyAttrs;
-  Identifier ProtocolName, ModuleKeyword, ModuleName;
-  SourceLoc Loc, ProtoLoc, KeywordLoc;
-  if (WitnessState.parseSILTypeWithoutQualifiers(ConformingTy,
-                                                 SILValueCategory::Object,
-                                                 emptyAttrs) ||
-      parseToken(tok::colon, diag::expected_sil_witness_colon) ||
-      WitnessState.parseSILIdentifier(ProtocolName, ProtoLoc,
-                                      diag::expected_sil_value_name) ||
-      parseIdentifier(ModuleKeyword, KeywordLoc,
-                      diag::expected_tok_in_sil_instr, "module") ||
-      WitnessState.parseSILIdentifier(ModuleName, Loc,
-                                      diag::expected_sil_value_name))
-    return true;
-
-  if (ModuleKeyword.str() != "module") {
-    diagnose(KeywordLoc, diag::expected_tok_in_sil_instr, "module");
-    return true;
-  }
-
-  // Find the protocol decl.
-  SmallVector<ValueDecl*, 4> CurModuleResults;
-  SF.getParentModule()->lookupValue(Module::AccessPathTy(), ProtocolName,
-                                    NLKind::UnqualifiedLookup,
-                                    CurModuleResults);
-  if (CurModuleResults.size() != 1) {
-    diagnose(ProtoLoc, diag::sil_witness_protocol_not_found, ProtocolName);
-    return true;
-  }
-  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(CurModuleResults[0]);
-  if (!proto) {
-    diagnose(ProtoLoc, diag::sil_witness_protocol_not_found, ProtocolName);
-    return true;
-  }
-
-  // Find the NormalProtocolConformance.
-  auto lookup = SF.getParentModule()->lookupConformance(
-                            ConformingTy.getSwiftRValueType(), proto, nullptr);
+  ProtocolDecl *proto;
   NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(lookup.getPointer());
+      dyn_cast<NormalProtocolConformance>(
+          parseProtocolConformance(*this, WitnessState, proto));
 
   SourceLoc LBraceLoc = Tok.getLoc();
   consumeToken(tok::l_brace);
@@ -2746,11 +2790,74 @@ bool Parser::parseSILWitnessTable() {
             "method, associated_type, associated_type_protocol, base_protocol"))
         return true;
 
-      if (EntryKeyword.str() == "associated_type" ||
-          EntryKeyword.str() == "associated_type_protocol" ||
-          EntryKeyword.str() == "base_protocol") {
-        // FIXME: associated_type, associated_type_protocol, base_protocol.
-        return true;
+      if (EntryKeyword.str() == "base_protocol") {
+        ProtocolDecl *proto = parseProtocolDecl(*this, WitnessState);
+        if (!proto)
+          return true;
+        if (parseToken(tok::colon, diag::expected_sil_witness_colon))
+          return true;
+        ProtocolDecl *dummy;
+        ProtocolConformance *conform = parseProtocolConformance(*this,
+                                           WitnessState, dummy);
+        if (!conform) // Ignore this witness entry for now.
+          continue;
+
+        witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
+          proto, conform
+        });
+        continue;
+      }
+
+      if (EntryKeyword.str() == "associated_type_protocol") {
+        if (parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
+          return true;
+        AssociatedTypeDecl *assoc = parseAssociatedTypeDecl(*this,
+                                        WitnessState, proto);
+        if (!assoc)
+          return true;
+        if (parseToken(tok::colon, diag::expected_sil_witness_colon))
+          return true;
+        ProtocolDecl *proto = parseProtocolDecl(*this, WitnessState);
+        if (!proto)
+          return true;
+        if (parseToken(tok::r_paren, diag::expected_sil_witness_rparen) ||
+            parseToken(tok::colon, diag::expected_sil_witness_colon))
+          return true;
+
+        auto peek = peekToken();
+        ProtocolConformance *conform = nullptr;
+        if (peek.getText() != "dependent") {
+          ProtocolDecl *dummy;
+          conform = parseProtocolConformance(*this,
+                                             WitnessState, dummy);
+          if (!conform) // Ignore this witness entry for now.
+            continue;
+        }
+
+        witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+          assoc, proto, conform
+        });
+        continue;
+      }
+
+      if (EntryKeyword.str() == "associated_type") {
+        AssociatedTypeDecl *assoc = parseAssociatedTypeDecl(*this,
+                                        WitnessState, proto);
+        if (!assoc)
+          return true;
+        if (parseToken(tok::colon, diag::expected_sil_witness_colon))
+          return true;
+        SILType Ty;
+        TypeAttributes emptyAttrs;
+        if (WitnessState.parseSILTypeWithoutQualifiers(Ty,
+                                                       SILValueCategory::Object,
+                                                       emptyAttrs))
+          return true;
+
+        witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
+          assoc, Ty.getSwiftRValueType()
+        });
+        continue;
       }
 
       if (EntryKeyword.str() != "method") {

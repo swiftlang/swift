@@ -1324,8 +1324,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       break;
     }
     case AssociatedType: {
-      // FIXME: implement parsing associated_type.
-      OS << "// ";
       // associated_type AssociatedTypeName: ConformingType
       auto &assocWitness = witness.getAssociatedTypeWitness();
       OS << "associated_type ";
@@ -1334,8 +1332,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       break;
     }
     case AssociatedTypeProtocol: {
-      // FIXME: implement parsing associated_type_protocol.
-      OS << "// ";
       // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
       auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
       OS << "associated_type_protocol ("
@@ -1348,8 +1344,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       break;
     }
     case BaseProtocol: {
-      // FIXME: implement parsing base_protocol.
-      OS << "// ";
       // base_protocol Protocol: <conformance>
       auto &baseProtoWitness = witness.getBaseProtocolWitness();
       OS << "base_protocol "

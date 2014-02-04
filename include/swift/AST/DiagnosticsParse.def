@@ -458,10 +458,18 @@ ERROR(sil_global_variable_not_found, decl_parsing,none,
 // SIL Witness Table
 ERROR(expected_sil_witness_colon, decl_parsing,none,
       "expected ':' in a witness table", ())
+ERROR(expected_sil_witness_lparen, decl_parsing,none,
+      "expected '(' in a witness table", ())
+ERROR(expected_sil_witness_rparen, decl_parsing,none,
+      "expected ')' in a witness table", ())
 ERROR(sil_witness_func_not_found, decl_parsing,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_witness_protocol_not_found, decl_parsing,none,
       "sil protocol not found %0", (Identifier))
+ERROR(sil_witness_assoc_not_found, decl_parsing,none,
+      "sil associated type decl not found %0", (Identifier))
+ERROR(sil_witness_protocol_conformance_not_found, decl_parsing,none,
+      "sil protocol conformance not found", ())
 
 //------------------------------------------------------------------------------
 // Type parsing diagnostics
