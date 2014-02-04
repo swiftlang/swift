@@ -148,6 +148,20 @@ public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
 
+  /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
+  class OrderImportedModules {
+  public:
+    bool operator()(const ImportedModule &lhs,
+                    const ImportedModule &rhs) const {
+      if (lhs.second != rhs.second)
+        return std::less<const Module *>()(lhs.second, rhs.second);
+      if (lhs.first.data() != rhs.first.data())
+        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
+                                                   rhs.first.begin());
+      return lhs.first.size() < rhs.first.size();
+    }
+  };
+
 public:
   ASTContext &Ctx;
   Identifier Name;
