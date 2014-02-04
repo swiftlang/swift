@@ -285,6 +285,14 @@ ERROR(inout_attribute_non_parameter,sema_tcd,none,
 ERROR(unimplemented_type_var,decl_parsing,none,
      "type variables not yet supported in "
      "%select{this context|generic types|classes|protocols}0", (unsigned))
+ERROR(let_requires_initializer,decl_parsing,none,
+     "'let' declarations require an initializer expression", ())
+ERROR(global_requires_initializer,decl_parsing,none,
+      "global 'var' declaration require an initializer expression or "
+      "getter/setter specifier", ())
+ERROR(static_requires_initializer,decl_parsing,none,
+      "'type var' declaration require an initializer expression or "
+      "getter/setter specifier", ())
 
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,

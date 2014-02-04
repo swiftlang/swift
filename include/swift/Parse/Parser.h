@@ -110,7 +110,7 @@ public:
   }
 
   bool allowTopLevelCode() const {
-    return SF.Kind == SourceFileKind::Main || SF.Kind == SourceFileKind::REPL;
+    return SF.isScriptMode();
   }
 
   /// Returns true if the parser reached EOF with incomplete source input, due

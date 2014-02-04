@@ -1416,7 +1416,7 @@ public:
                         (protocolContext && protocolContext->isObjC()));
         }
       }
-      
+
       // In a protocol context, variables written as "var x : Int" are really
       // computed properties with just a getter.  Create the getter decl now.
       if (isa<ProtocolDecl>(VD->getDeclContext()) &&
@@ -1476,6 +1476,56 @@ public:
             setBoundVarsTypeError(PBD->getPattern(), TC.Context);
             return;
           }
+        }
+      }
+    }
+
+    bool isInSILMode = false;
+    if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
+      isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
+
+    // If this is an declaration with an initializer, reject code if
+    // uninitialized vars are not allowed.
+    if (!PBD->hasInit() && !isInSILMode) {
+      SmallVector<VarDecl*, 4> vars;
+      PBD->getPattern()->collectVariables(vars);
+
+      for (auto *var : vars) {
+        // If the variable is computed, it never needs an initializer.
+        if (var->hasAccessorFunctions())
+          continue;
+
+        auto *varDC = var->getDeclContext();
+
+        // Let declarations require an initializer, unless they are a property
+        // (in which case they get set during the init method of the enclosing
+        // type).
+        if (var->isLet() && !varDC->isTypeContext()) {
+          TC.diagnose(var->getLoc(), diag::let_requires_initializer);
+          PBD->setInvalid();
+          var->setInvalid();
+          var->overwriteType(ErrorType::get(TC.Context));
+          continue;
+        }
+
+        // Static/type declarations require an initializer unless in a
+        // protocol.
+        if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
+          TC.diagnose(var->getLoc(), diag::static_requires_initializer);
+          PBD->setInvalid();
+          var->setInvalid();
+          var->overwriteType(ErrorType::get(TC.Context));
+          continue;
+        }
+
+        // Global variables require an initializer (except in top level code).
+        if (varDC->isModuleScopeContext() &&
+            !varDC->getParentSourceFile()->isScriptMode()) {
+          TC.diagnose(var->getLoc(), diag::global_requires_initializer);
+          PBD->setInvalid();
+          var->setInvalid();
+          var->overwriteType(ErrorType::get(TC.Context));
+          continue;
         }
       }
     }

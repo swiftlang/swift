@@ -1623,28 +1623,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       if (boundVar) hasStorage = boundVar->hasStorage();
     }
 
-    // If we have neither a get/set nor an initializer, reject the code if one
-    // is required.
-    if (!PBD->hasInit() && !HasGetSet && !isInSILMode()) {
-      // Let declarations require an initializer, unless they are a property (in
-      // which case they get set during the init method of the enclosing type).
-      if (isLet &&
-          !(Flags & PD_HasContainerType)) {
-        diagnose(VarLoc, diag::let_requires_initializer);
-        Status.setIsParseError();
-      } else if (StaticLoc.isValid() &&
-                 !(Flags & PD_InProtocol)) {
-        // Static/type declarations require an initializer unless in a protocol.
-        diagnose(VarLoc, diag::static_requires_initializer);
-        Status.setIsParseError();
-      } else if (CurDeclContext->isModuleScopeContext() &&
-                 !allowTopLevelCode()) {
-        // Global variables require an initializer (except in top level code).
-        diagnose(VarLoc, diag::global_requires_initializer);
-        Status.setIsParseError();
-      }
-    }
-
     PBD->setHasStorage(hasStorage);
 
     if (topLevelDecl) {
