@@ -208,6 +208,12 @@ public:
   // An aggregate projection instruction is either a struct_extract or a
   // tuple_extract instruction.
   SILValue stripAggregateProjections();
+
+  // Return the underlying SILValue after stripping off all indexing
+  // instructions.
+  //
+  // An indexing inst is either index_addr or index_raw_pointer.
+  SILValue stripIndexingInsts();
   
   void replaceAllUsesWith(SILValue V);
 

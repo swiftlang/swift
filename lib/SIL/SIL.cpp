@@ -101,6 +101,14 @@ SILValue SILValue::stripAggregateProjections() {
   }
 }
 
+SILValue SILValue::stripIndexingInsts() {
+  SILValue V = *this;
+  while (true) {
+    if (!isa<IndexingInst>(V.getDef()))
+      return V;
+    V = cast<IndexingInst>(V)->getBase();
+  }
+}
 
 SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
   // Unique these.
