@@ -17,6 +17,7 @@ add_swift_library(swiftSIL
   TypeLowering.cpp
   Verifier.cpp
   SILType.cpp
+  SILValue.cpp
   DEPENDS swiftAST)
 
 # Clang dependencies.
