@@ -317,11 +317,16 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
   echo "--- Building LLVM and Clang ---"
   if [[ ! -f  "${LLVM_BUILD_DIR}/CMakeCache.txt" ]] ; then
       mkdir -p "${LLVM_BUILD_DIR}"
+      # Note: we set LLVM_IMPLICIT_PROJECT_IGNORE below because this
+      # script builds swift separately, and people often have reasons
+      # to symlink the swift directory into llvm/tools, e.g. to build
+      # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
+              -DLLVM_IMPLICIT_PROJECT_IGNORE="${LLVM_SOURCE_DIR}/tools/swift" \
               -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
               "${LLVM_SOURCE_DIR}" || exit 1)
