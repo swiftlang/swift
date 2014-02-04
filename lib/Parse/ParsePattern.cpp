@@ -201,7 +201,9 @@ parseSelectorArgument(Parser &P,
   }
 
   ParserResult<Pattern> PatternRes =
-    P.parsePatternTuple(/*DefArgs=*/&defaultArgs, /*IsLet*/true);
+      P.parsePatternTuple(/*DefArgs=*/&defaultArgs, /*IsLet*/true);
+  if (PatternRes.hasCodeCompletion())
+    return PatternRes;
   if (PatternRes.isNull()) {
     if (PatternRes.isParseError())
       recoverFromBadSelectorArgument(P);
