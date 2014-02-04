@@ -1658,16 +1658,17 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
+  SourceLoc startLoc = getStartLoc();
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
-    return { FuncLoc, BodyRange.End };
+    return { startLoc, BodyRange.End };
 
   if (auto *B = getBody())
-    return { FuncLoc, B->getEndLoc() };
+    return { startLoc, B->getEndLoc() };
   if (getBodyResultTypeLoc().hasLocation())
-    return { FuncLoc, getBodyResultTypeLoc().getSourceRange().End };
+    return { startLoc, getBodyResultTypeLoc().getSourceRange().End };
   const Pattern *LastPat = getArgParamPatterns().back();
-  return { FuncLoc, LastPat->getEndLoc() };
+  return { startLoc, LastPat->getEndLoc() };
 }
 
 SourceRange EnumElementDecl::getSourceRange() const {
