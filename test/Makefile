@@ -53,7 +53,6 @@ lit.site.cfg: FORCE
 	@$(ECHOPATH) s=@TARGET_TRIPLE@=$(TARGET_TRIPLE)=g >> lit.tmp
 	@$(ECHOPATH) s=@MODULES_SDK@=$(MODULES_SDK)=g >> lit.tmp
 	@$(ECHOPATH) s=@SWIFT_RUN_LONG_TESTS@=NO=g >> lit.tmp
-	@$(ECHOPATH) s=@SWIFT_NEW_DRIVER@=YES=g >> lit.tmp
 	@sed -f lit.tmp $(PROJ_SRC_DIR)/lit.site.cfg.in > $@
 	@-rm -f lit.tmp
 

@@ -31,7 +31,7 @@ PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 $(SWIFT_HEADER_DIR)/UIKit.swiftmodule: $(ObjDir)/UIKit.o $(SWIFT_HEADER_DIR)
 $(ObjDir)/UIKit.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -force-single-frontend-invocation -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(PATH_TO_SWIFT_SOURCES)
 	@mv $(ObjDir)/UIKit.swiftmodule $(SWIFT_HEADER_DIR)
 
 all-local:: $(SWIFT_HEADER_DIR)/UIKit.swiftmodule

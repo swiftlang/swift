@@ -41,7 +41,7 @@ $(SWIFT_HEADER_DIR)/ObjectiveC.swift: $(PATH_TO_SWIFT_SOURCES) $(SWIFT_HEADER_DI
 $(SWIFT_HEADER_DIR)/ObjectiveC.swiftmodule: $(ObjDir)/ObjectiveC.o $(SWIFT_HEADER_DIR)
 $(ObjDir)/ObjectiveC.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -force-single-frontend-invocation -parse-as-library $(PATH_TO_SWIFT_SOURCES)
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -o $@ -c -emit-module -module-link-name $(LIBRARYNAME) -parse-as-library $(PATH_TO_SWIFT_SOURCES)
 	@mv $(ObjDir)/ObjectiveC.swiftmodule $(SWIFT_HEADER_DIR)
 
 all-local:: $(SWIFT_HEADER_DIR)/ObjectiveC.swiftmodule
