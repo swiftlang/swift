@@ -1301,6 +1301,15 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
   // Otherwise, we have a normal var or subscript declaration, parse the full
   // complement of specifiers, along with their bodies.
+
+  // If the body is completely empty, reject it.  This is at best a getter with
+  // an implicit fallthrough off the end.
+  if (Tok.is(tok::r_brace)) {
+    diagnose(Tok, diag::computed_property_no_accessors);
+    return true;
+  }
+
+
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof))
       return true;

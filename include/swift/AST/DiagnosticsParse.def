@@ -170,6 +170,8 @@ ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
 
 // Variable getters/setters
+ERROR(computed_property_no_accessors, decl_parsing, none,
+      "computed property must have accessors specified", ())
 ERROR(willsetdidset_requires_type,decl_parsing,none,
       "willSet/didSet properties must be defined in a type right now", ())
 ERROR(expected_getset_in_protocol,decl_parsing,none,
