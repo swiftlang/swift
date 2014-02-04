@@ -1,5 +1,5 @@
 // RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck -check-prefix=INTEL %s
-// REQUIRES: ARM
+// REQUIRES: rainbows
 // RUN: %swift -target armv7-apple-ios7 %s -emit-ir | FileCheck -check-prefix=ARM32 %s
 
 import Builtin
