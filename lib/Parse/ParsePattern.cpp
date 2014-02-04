@@ -544,6 +544,8 @@ ParserResult<Pattern> Parser::parsePatternVarOrLet() {
     T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
   ParserResult<Pattern> subPattern = parsePattern(isLet);
+  if (subPattern.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Pattern>();
   if (subPattern.isNull())
     return nullptr;
   return makeParserResult(new (Context) VarPattern(varLoc, subPattern.get()));
