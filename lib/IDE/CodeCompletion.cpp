@@ -808,21 +808,10 @@ public:
         TypeResolver(createLazyResolver(Ctx)),
         CurrDeclContext(CurrDeclContext) {
     // Determine if we are doing code completion inside a static method.
-    if (CurrDeclContext && CurrDeclContext->isLocalContext()) {
-      const DeclContext *FunctionDC = CurrDeclContext;
-      while (FunctionDC->isLocalContext()) {
-        const DeclContext *Parent = FunctionDC->getParent();
-        if (!Parent->isLocalContext())
-          break;
-        FunctionDC = Parent;
-      }
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
-        if (AFD->getExtensionType()) {
-          CurrentMethod = AFD;
-          if (auto *FD = dyn_cast<FuncDecl>(AFD))
-            InsideStaticMethod = FD->isStatic();
-        }
-      }
+    if (CurrDeclContext) {
+      CurrentMethod = CurrDeclContext->getInnermostMethodContext();
+      if (auto *FD = dyn_cast_or_null<FuncDecl>(CurrentMethod))
+        InsideStaticMethod = FD->isStatic();
     }
   }
 
