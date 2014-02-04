@@ -1540,6 +1540,12 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
   
   VarDecl *getField() const { return Field; }
+
+  ClassDecl *getClassDecl() const {
+    auto s = getOperand().getType().getClassOrBoundGenericClass();
+    assert(s);
+    return s;
+  }
 };
   
 /// MethodInst - Abstract base for instructions that implement dynamic
