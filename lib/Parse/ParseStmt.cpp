@@ -1235,8 +1235,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   Status |= parseBraceItems(bodyItems, BraceItemListKind::Case);
   BraceStmt *body;
   if (bodyItems.empty()) {
-    body = BraceStmt::create(Context, startOfBody, ArrayRef<ASTNode>(),
-                             startOfBody, /*implicit=*/true);
+    body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
+                             PreviousLoc, /*implicit=*/true);
   } else {
     body = BraceStmt::create(Context, startOfBody, bodyItems, PreviousLoc);
   }
