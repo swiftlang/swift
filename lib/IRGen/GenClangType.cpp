@@ -160,7 +160,8 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   auto *decl = type->getDecl();
   if (auto *clangDecl = decl->getClangDecl()) {
     auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-    return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
+    auto clangType = getClangASTContext().getTypeDeclType(typeDecl);
+    return clangType->getCanonicalTypeUnqualified();
   }
 
   // Plain enums just have the raw type set.

@@ -37,3 +37,8 @@ struct NestedInts {
 @interface Gadget : NSObject
 - (BOOL) negate:(BOOL) b;
 @end
+
+typedef NS_ENUM(unsigned short, ChooseTo) {
+  ChooseToTakeIt = 709,
+  ChooseToLeaveIt = 1709
+};
