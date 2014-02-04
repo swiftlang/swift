@@ -908,15 +908,33 @@ SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
       modules.push_back(importPair.first);
 }
 
+namespace {
+  /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
+  class OrderImportedModules {
+    using ImportedModule = Module::ImportedModule;
+    using AccessPathTy = Module::AccessPathTy;
+  public:
+    bool operator()(const ImportedModule &lhs, const ImportedModule &rhs) {
+      if (lhs.second != rhs.second)
+        return std::less<const Module *>()(lhs.second, rhs.second);
+      if (lhs.first.data() != rhs.first.data())
+        return std::less<AccessPathTy::iterator>()(lhs.first.begin(),
+                                                   rhs.first.begin());
+      return lhs.first.size() < rhs.first.size();
+    }
+  };
+}
+
 bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   if (lhs.size() != rhs.size())
     return false;
-  return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
-                    [](const AccessPathElem &lElem,
-                       const AccessPathElem &rElem) {
+  auto iters = std::mismatch(lhs.begin(), lhs.end(), rhs.begin(),
+                             [](const AccessPathElem &lElem,
+                                const AccessPathElem &rElem) {
     return lElem.first == rElem.first;
   });
+  return iters.first == lhs.end();
 }
 
 StringRef Module::getModuleFilename() const {
@@ -953,7 +971,7 @@ static bool forAllImportedModules(Module *topLevel,
   using ImportedModule = Module::ImportedModule;
   using AccessPathTy = Module::AccessPathTy;
   
-  llvm::SmallSet<ImportedModule, 32, Module::OrderImportedModules> visited;
+  llvm::SmallSet<ImportedModule, 32, OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> queue;
 
   AccessPathTy overridingPath;
