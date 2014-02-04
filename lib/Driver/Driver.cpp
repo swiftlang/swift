@@ -709,19 +709,24 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       // Process Action-specific output-specifying options next,
       // since we didn't find anything applicable in the OutputMap.
       if (isa<MergeModuleJobAction>(JA)) {
-        if (Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path))
+        if (Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
           Output.reset(new CommandOutput(JA->getType(), A->getValue(),
                                          BaseInput));
-        else if (OI.ShouldTreatModuleAsTopLevelOutput) {
+        } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
           if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
-            // Put the module next to the top-level output.
-            llvm::SmallString<128> Path(A->getValue());
-            llvm::sys::path::remove_filename(Path);
-            llvm::sys::path::append(Path, OI.ModuleName);
-            llvm::sys::path::replace_extension(Path,
-                                               SERIALIZED_MODULE_EXTENSION);
-            Output.reset(new CommandOutput(JA->getType(), Path.str(),
-                                           BaseInput));
+            if (OI.CompilerOutputType == types::TY_SwiftModuleFile) {
+              Output.reset(new CommandOutput(JA->getType(), A->getValue(),
+                                             BaseInput));
+            } else {
+              // Put the module next to the top-level output.
+              llvm::SmallString<128> Path(A->getValue());
+              llvm::sys::path::remove_filename(Path);
+              llvm::sys::path::append(Path, OI.ModuleName);
+              llvm::sys::path::replace_extension(Path,
+                                                 SERIALIZED_MODULE_EXTENSION);
+              Output.reset(new CommandOutput(JA->getType(), Path.str(),
+                                             BaseInput));
+            }
           } else {
             // A top-level output wasn't specified, so just output to
             // <ModuleName>.swiftmodule.
