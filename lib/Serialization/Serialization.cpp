@@ -332,9 +332,22 @@ void Serializer::writeHeader(const Module *M) {
   }
 }
 
+static void
+removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
+  std::sort(imports.begin(), imports.end(), Module::OrderImportedModules());
+  auto last = std::unique(imports.begin(), imports.end(),
+                          [](const Module::ImportedModule &lhs,
+                             const Module::ImportedModule &rhs) -> bool {
+    if (lhs.second != rhs.second)
+      return false;
+    return Module::isSameAccessPath(lhs.first, rhs.first);
+  });
+  imports.erase(last, imports.end());
+}
+
 using ImportPathBlob = llvm::SmallString<64>;
-void flattenImportPath(const Module::ImportedModule &import,
-                       ImportPathBlob &out) {
+static void flattenImportPath(const Module::ImportedModule &import,
+                              ImportPathBlob &out) {
   // FIXME: Submodules?
   out.append(import.second->Name.str());
 
@@ -366,21 +379,28 @@ void Serializer::writeInputFiles(const Module *M,
     SourceFile.emit(ScratchRecord, path);
   }
 
+  // FIXME: Having to deal with private imports as a superset of public imports
+  // is inefficient.
+  SmallVector<Module::ImportedModule, 8> publicImports;
+  SmallVector<Module::ImportedModule, 8> allImports;
   for (auto file : M->getFiles()) {
-    // FIXME: Do some uniquing.
-    // FIXME: Clean this up to handle mixed source/AST modules.
-    auto SF = dyn_cast<swift::SourceFile>(file);
-    if (!SF)
+    file->getImportedModules(publicImports, false);
+    file->getImportedModules(allImports, true);
+  }
+
+  llvm::SmallSet<Module::ImportedModule, 8, Module::OrderImportedModules>
+    publicImportSet;
+  publicImportSet.insert(publicImports.begin(), publicImports.end());
+
+  removeDuplicateImports(allImports);
+  for (auto import : allImports) {
+    if (import.second == M->Ctx.TheBuiltinModule)
       continue;
 
-    for (auto import : SF->getImports()) {
-      if (import.first.second == M->Ctx.TheBuiltinModule)
-        continue;
-
-      ImportPathBlob importPath;
-      flattenImportPath(import.first, importPath);
-      ImportedModule.emit(ScratchRecord, import.second, importPath);
-    }
+    ImportPathBlob importPath;
+    flattenImportPath(import, importPath);
+    ImportedModule.emit(ScratchRecord, publicImportSet.count(import),
+                        importPath);
   }
 
   if (!moduleLinkName.empty()) {
