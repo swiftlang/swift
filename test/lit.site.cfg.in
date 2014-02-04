@@ -42,7 +42,7 @@ else:
 # Let the main config do the real work.
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
 
-# Enable interpreter-based tests on platforms where the interpterer is known to
+# Enable interpreter-based tests on platforms where the interpreter is known to
 # work.
 if platform.system() != 'Linux':
   config.available_features.add('swift_interpreter')
@@ -54,3 +54,73 @@ if platform.system() != 'Linux':
 #for target in config.targets_to_build.split():
 #  config.available_features.add(target)
 config.available_features.add("X86")
+
+
+# Substitutions for running on a target machine that is not the build machine.
+# %target-run          (run a command on the target machine)
+# %target-build-swift  (compile and link swift files for the target platform)
+# %target-run-simple-swift (build and run one test file on the target platform)
+
+config.test_triple = lit_config.params.get('test_triple', None)
+
+# These substitutions must use the new swift driver, 
+# but cannot depend on %swift to get it.
+if (config.swift_new_driver):
+    driver = config.swift
+else:
+    driver = config.swift_driver
+
+if '-apple-' in config.test_triple:
+    test_stdlib = lit_config.params.get('test_stdlib')
+    if not test_stdlib:
+        lit_config.fatal("No --param test_stdlib specified")
+    lit_config.note('testing stdlib ' + test_stdlib)
+    if 'arm' in config.test_triple:
+        # iOS device
+        lit_config.note('testing iOS device ' + config.test_triple)
+        if not config.swift_ios_test:
+        config.target_build_swift = (
+            'xcrun -sdk iphoneos %s -target %s '
+            '-Xlinker -rpath -Xlinker %s -I %s -L %s '
+            % (driver, config.test_triple, 
+               '/tmp/swifttest-device/lib', test_stdlib, test_stdlib))
+        config.target_run = (
+            '/usr/bin/env %r --source-dir=%%S --test-dir=%%T --' 
+            % (config.swift_ios_test))
+
+    elif '-ios' in config.test_triple:
+        # iOS simulator
+        lit_config.note("testing iOS simulator " + config.test_triple)
+        config.target_build_swift = (
+            'xcrun -sdk iphonesimulator %s -target %s '
+            '-Xlinker -rpath -Xlinker %s -I %s -L %s'
+            % (driver, config.test_triple, 
+               test_stdlib, test_stdlib, test_stdlib))
+        # FIXME: simulator libc writes directly to tty?
+        # `script` captures tty output so it can be piped to FileCheck
+        config.target_run = '/usr/bin/script -q /dev/null /usr/bin/env DYLD_ROOT_PATH=`xcrun -sdk iphonesimulator --show-sdk-path`'
+        
+    else:
+        # OS X
+        lit_config.note("testing OS X " + config.test_triple)
+        config.target_build_swift = (
+            'xcrun -sdk macosx %s -target %s '
+            '-Xlinker -rpath -Xlinker %s -I %s -L %s'
+            % (driver, config.test_triple, 
+               test_stdlib, test_stdlib, test_stdlib))
+        config.target_run = ''
+        
+else:
+    # not OS X or iOS
+    lit_config.fatal("Don't know how to define target_run and "
+                     "target_build_swift for platform " + config.test_triple)
+
+config.target_run_simple_swift = (
+    'rm -rf %%t && mkdir -p %%t && '
+    '%s -module-cache-path %%t/clang-module-cache %%s -o %%t/a.out && '
+    '%s %%t/a.out'
+    % (config.target_build_swift, config.target_run))
+
+config.substitutions.append(('%target-run-simple-swift', config.target_run_simple_swift))
+config.substitutions.append(('%target-run', config.target_run))
+config.substitutions.append(('%target-build-swift', config.target_build_swift))

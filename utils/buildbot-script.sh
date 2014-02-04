@@ -25,14 +25,16 @@ KNOWN_SETTINGS=(
     incremental                 ""               "when build directories already exist, skip configuration"
     package                     ""               "set to build packages"
     prefix                      "/usr"           "installation prefix"
+    skip-ios                    ""               "set to skip everything iOS-related"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-ios              ""               "set to skip building Swift stdlibs for iOS"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-test-swift             ""               "set to skip testing Swift"
+    skip-test-ios               1                "set to skip testing Swift stdlibs for iOS"
+    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
     skip-package-swift          ""               "set to skip packaging Swift"
-    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-package-sourcekit      ""               "set to skip packaging SourceKit"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
@@ -185,6 +187,7 @@ fi
 
 # Swift-project products, in the order they must be built
 SWIFT_BUILD_PRODUCTS=(swift)
+SWIFT_TEST_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}")
 
 if [[ ! "$SKIP_BUILD_SOURCEKIT" ]]; then
     SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" SourceKit)
@@ -194,10 +197,15 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 
 # Swift stdlib build products
 # macosx-x86_64 stdlib is part of the swift product itself
-if [[ ! "$SKIP_BUILD_IOS" ]]; then
+if [[ ! "$SKIP_IOS" ]]; then
     IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64 swift_stdlib_ios_armv7 swift_stdlib_ios_simulator_i386)
-    SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
+    if [[ ! "$SKIP_BUILD_IOS" ]]; then
+        SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+    fi
+    if [[ ! "$SKIP_TEST_IOS" ]]; then
+        SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+    fi
 fi
 
 # All build products, in the order they must be built
@@ -351,7 +359,7 @@ function set_ios_options {
         -DSWIFT_DEPLOYMENT_OS=${platform}
         -DSWIFT_DEPLOYMENT_TARGET=${deployment_target}
         -DSWIFT_BUILD_TOOLS=OFF
-        -DSWIFT_COMPILER="${SWIFT_BUILD_DIR}/bin/swift"
+        -DPATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
         -DSWIFT_INCLUDE_DOCS=OFF
     )
 
@@ -432,34 +440,38 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
     fi
 done
 
-# Run the Swift tests.
-if [ \! "$SKIP_TEST_SWIFT" ]; then
-    echo "--- Running Swift Tests ---"
+# Run the tests for each product
+for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
+    PRODUCT=$(toupper "${product}")
     
-    build_cmd=("$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS})
+    _SKIP_TEST_PRODUCT=SKIP_TEST_${PRODUCT}
+    if [[ ! "${!_SKIP_TEST_PRODUCT}" ]]; then
+        
+        echo "--- Running tests for ${product} ---"
+        trap "echo '*** Failed while running tests for ${product}'" ERR
+        _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
+        _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
+    
+        build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
-    "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
-    
-    if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
-        # Ninja buffers command output to avoid scrambling the output
-        # of parallel jobs, which is awesome... except that it
-        # interferes with the progress meter when testing.  Instead of
-        # executing ninja directly, have it dump the commands it would
-        # run, strip Ninja's progress prefix with sed, and tell the
-        # shell to execute that.
-        sh -c "$("${build_cmd[@]}" -n -v check-swift | sed -e 's/[^]]*] //')"
-    else
-        "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-swift
+        "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
+
+        if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
+            # Ninja buffers command output to avoid scrambling the output
+            # of parallel jobs, which is awesome... except that it
+            # interferes with the progress meter when testing.  Instead of
+            # executing ninja directly, have it dump the commands it would
+            # run, strip Ninja's progress prefix with sed, and tell the
+            # shell to execute that.
+            sh -c "$("${build_cmd[@]}" -n -v check-${product} | sed -e 's/[^]]*] //')"
+        else
+            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-${product}
+        fi
+
+        trap - ERR
+        echo "--- Finished tests for ${product} ---"
     fi
-fi
-
-# Run the SourceKit tests.
-if [ \! "$SKIP_TEST_SOURCEKIT" ]; then
-  echo "--- Running SourceKit Tests ---"
-
-  build_cmd=("$CMAKE" --build "${SOURCEKIT_BUILD_DIR}" -- ${BUILD_ARGS})
-  "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-sourcekit
-fi
+done
 
 # Run the Swift performance tests.
 if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then

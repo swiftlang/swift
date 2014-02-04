@@ -199,7 +199,12 @@ option(SWIFT_ENABLE_BENCHMARKS "Include benchmarks in the stdlib" NO)
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
 
-set(SWIFT_COMPILER "swift" CACHE FILEPATH "Path to Swift compiler")
+set(PATH_TO_SWIFT_BUILD "" CACHE FILEPATH "Path to existing Swift build")
+if ( PATH_TO_SWIFT_BUILD STREQUAL "" )
+   set(SWIFT_COMPILER "swift")
+else()
+   set(SWIFT_COMPILER "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
+endif()
 
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
