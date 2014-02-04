@@ -60,6 +60,8 @@ if platform.system() == 'Darwin' and (run_os == 'macosx' or run_os == 'darwin'):
   config.available_features.add('swift_interpreter')
   config.available_features.add('swift_repl')
 
+if '@SWIFT_ASSERTS@' == 'ON':
+  config.available_features.add('swift_stdlib_asserts')
 
 # Substitutions for running on a target machine that is not the build machine.
 # %target-run          (run a command on the target machine)
