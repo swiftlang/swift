@@ -10,20 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_ALIASANALYSIS_H
-#define SWIFT_SILPASSES_ALIASANALYSIS_H
+#ifndef SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
+#define SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
 class SILValue;
 class SILInstruction;
 
-/// This class is a simple wrapper around an alias analysis
-/// cache. This is needed since we do not have an "analysis"
-/// infrastructure.
+/// This class is a simple wrapper around an alias analysis cache. This is
+/// needed since we do not have an "analysis" infrastructure.
 class AliasAnalysis {
 public:
   /// The result of an alias query. This is based off of LLVM's alias
@@ -42,7 +40,6 @@ private:
   using CacheKey = std::pair<SILValue, SILValue>;
 
   llvm::DenseMap<CacheKey, Result> Cache;
-  llvm::DenseMap<SILValue, llvm::SmallVector<SILValue, 4>> ValueToPairedValue;
 
 public:
 
