@@ -81,7 +81,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   auto *decl = type->getDecl();
   if (auto *clangDecl = decl->getClangDecl()) {
     auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-    return typeDecl->getTypeForDecl()->getCanonicalTypeUnqualified();
+    auto &clangCtx = getClangASTContext();
+    auto clangType = clangCtx.getTypeDeclType(typeDecl);
+    return clangCtx.getCanonicalType(clangType);
   }
 
   auto const &clangCtx = getClangASTContext();
@@ -160,8 +162,9 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   auto *decl = type->getDecl();
   if (auto *clangDecl = decl->getClangDecl()) {
     auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-    auto clangType = getClangASTContext().getTypeDeclType(typeDecl);
-    return clangType->getCanonicalTypeUnqualified();
+    auto &clangCtx = getClangASTContext();
+    auto clangType = clangCtx.getTypeDeclType(typeDecl);
+    return clangCtx.getCanonicalType(clangType);
   }
 
   // Plain enums just have the raw type set.
