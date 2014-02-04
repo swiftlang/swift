@@ -334,7 +334,21 @@ void Serializer::writeHeader(const Module *M) {
 
 static void
 removeDuplicateImports(SmallVectorImpl<Module::ImportedModule> &imports) {
-  std::sort(imports.begin(), imports.end(), Module::OrderImportedModules());
+  std::sort(imports.begin(), imports.end(),
+            [](const Module::ImportedModule &lhs,
+               const Module::ImportedModule &rhs) -> bool {
+    // Arbitrarily sort by name to get a deterministic order.
+    // FIXME: Submodules don't get sorted properly here.
+    if (lhs.second != rhs.second)
+      return lhs.second->Name.str() < rhs.second->Name.str();
+    using AccessPathElem = std::pair<Identifier, SourceLoc>;
+    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
+                                        rhs.first.begin(), rhs.first.end(),
+                                        [](const AccessPathElem &lElem,
+                                           const AccessPathElem &rElem) {
+      return lElem.first.str() < rElem.first.str();
+    });
+  });
   auto last = std::unique(imports.begin(), imports.end(),
                           [](const Module::ImportedModule &lhs,
                              const Module::ImportedModule &rhs) -> bool {
