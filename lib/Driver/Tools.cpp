@@ -283,11 +283,6 @@ Job *MergeModule::constructJob(const JobAction &JA,
 
   addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
 
-  // Pass through the values passed to -Xfrontend.
-  // FIXME: This is kind of nasty, but necessary if we need these options to
-  // load the partial ASTs.
-  Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
-
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
 
