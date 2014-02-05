@@ -642,6 +642,100 @@ static void printJobOutputs(const Job *J) {
   }
 }
 
+static StringRef getOutputFilename(const JobAction *JA,
+                                   const OutputInfo &OI,
+                                   const TypeToPathMap *OutputMap,
+                                   const llvm::opt::DerivedArgList &Args,
+                                   bool AtTopLevel,
+                                   StringRef BaseInput,
+                                   DiagnosticEngine &Diags,
+                                   llvm::SmallString<128> &Buffer) {
+  if (JA->getType() == types::TY_Nothing)
+    return {};
+
+  // If available, check the OutputMap first.
+  if (OutputMap) {
+    auto iter = OutputMap->find(JA->getType());
+    if (iter != OutputMap->end())
+      return iter->second;
+  }
+
+  // Process Action-specific output-specifying options next,
+  // since we didn't find anything applicable in the OutputMap.
+  if (isa<MergeModuleJobAction>(JA)) {
+    if (const Arg *A = Args.getLastArg(options::OPT_emit_module_path))
+      return A->getValue();
+
+    if (OI.ShouldTreatModuleAsTopLevelOutput) {
+      if (const Arg *A = Args.getLastArg(options::OPT_o)) {
+        if (OI.CompilerOutputType == types::TY_SwiftModuleFile)
+          return A->getValue();
+
+        // Otherwise, put the module next to the top-level output.
+        Buffer = A->getValue();
+        llvm::sys::path::remove_filename(Buffer);
+        llvm::sys::path::append(Buffer, OI.ModuleName);
+        llvm::sys::path::replace_extension(Buffer, SERIALIZED_MODULE_EXTENSION);
+        return Buffer.str();
+      }
+
+      // A top-level output wasn't specified, so just output to
+      // <ModuleName>.swiftmodule.
+      Buffer = OI.ModuleName;
+      llvm::sys::path::replace_extension(Buffer, SERIALIZED_MODULE_EXTENSION);
+      return Buffer.str();
+    }
+  }
+
+  // We don't have an output from an Action-specific command line option,
+  // so figure one out using the defaults.
+  if (AtTopLevel)
+    if (Arg *FinalOutput = Args.getLastArg(options::OPT_o))
+      return FinalOutput->getValue();
+
+  assert(!BaseInput.empty() &&
+         "A Command which produces output must have a BaseInput!");
+  StringRef BaseName(BaseInput);
+  if (isa<MergeModuleJobAction>(JA) ||
+      OI.CompilerMode == OutputInfo::Mode::SingleCompile ||
+      JA->getType() == types::TY_Image)
+    BaseName = OI.ModuleName;
+
+  // We don't yet have a name, assign one.
+  if (!AtTopLevel) {
+    // We should output to a temporary file, since we're not at
+    // the top level.
+    StringRef Stem = llvm::sys::path::stem(BaseName);
+    StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+    llvm::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix,
+                                                             Buffer);
+    if (EC) {
+      Diags.diagnose(SourceLoc(),
+                     diag::error_unable_to_make_temporary_file,
+                     EC.message());
+      return {};
+    }
+
+    return Buffer.str();
+  }
+
+
+  if (JA->getType() == types::TY_Image) {
+    if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
+      BaseName = llvm::sys::path::stem(BaseInput);
+    return BaseName;
+  }
+
+
+  StringRef Suffix = types::getTypeTempSuffix(JA->getType());
+  assert(Suffix.data() &&
+         "All types used for output should have a suffix.");
+
+  Buffer = llvm::sys::path::filename(BaseName);
+  llvm::sys::path::replace_extension(Buffer, Suffix);
+  return Buffer.str();
+}
+
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
@@ -693,113 +787,12 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
       OI.CompilerMode != OutputInfo::Mode::SingleCompile)
     OutputMap = OFM->getOutputMapForInput(BaseInput);
 
-  std::unique_ptr<CommandOutput> Output;
-  if (JA->getType() == types::TY_Nothing) {
-    Output.reset(new CommandOutput(BaseInput));
-  } else {
-    // If available, check the OutputMap first.
-    if (OutputMap) {
-      auto iter = OutputMap->find(JA->getType());
-      if (iter != OutputMap->end()) {
-        Output.reset(new CommandOutput(JA->getType(), iter->second, BaseInput));
-      }
-    }
-
-    if (!Output) {
-      // Process Action-specific output-specifying options next,
-      // since we didn't find anything applicable in the OutputMap.
-      if (isa<MergeModuleJobAction>(JA)) {
-        if (Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
-          Output.reset(new CommandOutput(JA->getType(), A->getValue(),
-                                         BaseInput));
-        } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
-          if (const Arg *A = C.getArgs().getLastArg(options::OPT_o)) {
-            if (OI.CompilerOutputType == types::TY_SwiftModuleFile) {
-              Output.reset(new CommandOutput(JA->getType(), A->getValue(),
-                                             BaseInput));
-            } else {
-              // Put the module next to the top-level output.
-              llvm::SmallString<128> Path(A->getValue());
-              llvm::sys::path::remove_filename(Path);
-              llvm::sys::path::append(Path, OI.ModuleName);
-              llvm::sys::path::replace_extension(Path,
-                                                 SERIALIZED_MODULE_EXTENSION);
-              Output.reset(new CommandOutput(JA->getType(), Path.str(),
-                                             BaseInput));
-            }
-          } else {
-            // A top-level output wasn't specified, so just output to
-            // <ModuleName>.swiftmodule.
-            llvm::SmallString<128> Path(OI.ModuleName);
-            llvm::sys::path::replace_extension(Path,
-                                               SERIALIZED_MODULE_EXTENSION);
-            Output.reset(new CommandOutput(JA->getType(), Path.str(),
-                                           BaseInput));
-          }
-        }
-      }
-
-      if (!Output) {
-        // We don't have an output from an Action-specific command line option,
-        // so figure one out using the defaults.
-        if (AtTopLevel) {
-          if (Arg *FinalOutput = C.getArgs().getLastArg(options::OPT_o)) {
-            Output.reset(new CommandOutput(JA->getType(),
-                                           FinalOutput->getValue(), BaseInput));
-          }
-        }
-
-        if (!Output) {
-          assert(!BaseInput.empty() &&
-                 "A Command which produces output must have a BaseInput!");
-          StringRef BaseName(BaseInput);
-          if (isa<MergeModuleJobAction>(JA) ||
-              OI.CompilerMode == OutputInfo::Mode::SingleCompile ||
-              JA->getType() == types::TY_Image)
-            BaseName = OI.ModuleName;
-
-          // We don't yet have a name, assign one.
-          if (!AtTopLevel) {
-            // We should output to a temporary file, since we're not at
-            // the top level.
-            StringRef Stem = llvm::sys::path::stem(BaseName);
-            StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-            llvm::SmallString<128> Path;
-            llvm::error_code EC = llvm::sys::fs::createTemporaryFile(Stem,
-                                                                     Suffix,
-                                                                     Path);
-            if (EC) {
-              Diags.diagnose(SourceLoc(),
-                             diag::error_unable_to_make_temporary_file,
-                             EC.message());
-              Path = "";
-            }
-            Output.reset(new CommandOutput(JA->getType(), Path.str(),
-                                           BaseInput));
-          } else {
-            if (JA->getType() == types::TY_Image) {
-              if (A->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
-                BaseName = llvm::sys::path::stem(BaseInput);
-              Output.reset(new CommandOutput(JA->getType(), BaseName,
-                                             BaseInput));
-            } else {
-              StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-              assert(Suffix.data() &&
-                     "All types used for output should have a suffix.");
-
-              llvm::SmallString<128> Suffixed(
-                llvm::sys::path::filename(BaseName));
-              llvm::sys::path::replace_extension(Suffixed, Suffix);
-              Output.reset(
-                new CommandOutput(JA->getType(), Suffixed, BaseInput));
-            }
-          }
-        }
-      }
-    }
-  }
-
-  assert(Output && "No CommandOutput was created!");
+  llvm::SmallString<128> Buf;
+  StringRef OutputFile = getOutputFilename(JA, OI, OutputMap, C.getArgs(),
+                                           AtTopLevel, BaseInput, Diags, Buf);
+  std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType(),
+                                                          OutputFile,
+                                                          BaseInput));
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
       Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
