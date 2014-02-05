@@ -1,3 +1,13 @@
+2014-02-12
+----------
+
+* The "@mutating" attribute (which can be used on functions in structs,
+  enums, and protocols) has been promoted to a context-sensitive keyword.
+  Mutating struct methods are now written as:
+    struct SomeStruct {
+      mutating func f() {}
+    }
+
 2014-02-05
 ----------
 
