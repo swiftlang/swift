@@ -62,16 +62,19 @@ VALUE(SILUndef, ValueBase)
 // descriptions in the SIL reference in docs/SIL.rst.
 
 ABSTRACT_VALUE(SILInstruction, ValueBase)
-  // Allocation and Deallocation
-  INST(AllocStackInst, SILInstruction, None)
-  INST(AllocRefInst, SILInstruction, None)
-  INST(AllocBoxInst, SILInstruction, None)
-  INST(AllocArrayInst, SILInstruction, None)
+  // Allocation instructions.
+  ABSTRACT_VALUE(AllocationInst, SILInstruction)
+  INST(AllocStackInst, AllocationInst, None)
+  INST(AllocRefInst, AllocationInst, None)
+  INST(AllocBoxInst, AllocationInst, None)
+  INST(AllocArrayInst, AllocationInst, None)
   VALUE_RANGE(AllocationInst, AllocStackInst, AllocArrayInst)
 
-  INST(DeallocStackInst, SILInstruction, MayHaveSideEffects)
-  INST(DeallocRefInst, SILInstruction, MayHaveSideEffects)
-  INST(DeallocBoxInst, SILInstruction, MayHaveSideEffects)
+  // Deallocation instructions.
+  ABSTRACT_VALUE(DeallocationInst, SILInstruction)
+  INST(DeallocStackInst, DeallocationInst, MayHaveSideEffects)
+  INST(DeallocRefInst, DeallocationInst, MayHaveSideEffects)
+  INST(DeallocBoxInst, DeallocationInst, MayHaveSideEffects)
   VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocBoxInst)
 
   // Accessing memory
@@ -102,13 +105,14 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     VALUE_RANGE(RefCountingInst, StrongRetainInst, UnownedReleaseInst)
 
   // Literals
-  INST(FunctionRefInst, SILInstruction, None)
-  INST(BuiltinFunctionRefInst, SILInstruction, None)
-  INST(GlobalAddrInst, SILInstruction, None)
-  INST(SILGlobalAddrInst, SILInstruction, None)
-  INST(IntegerLiteralInst, SILInstruction, None)
-  INST(FloatLiteralInst, SILInstruction, None)
-  INST(StringLiteralInst, SILInstruction, None)
+  ABSTRACT_VALUE(LiteralInst, SILInstruction)
+  INST(FunctionRefInst, LiteralInst, None)
+  INST(BuiltinFunctionRefInst, LiteralInst, None)
+  INST(GlobalAddrInst, LiteralInst, None)
+  INST(SILGlobalAddrInst, LiteralInst, None)
+  INST(IntegerLiteralInst, LiteralInst, None)
+  INST(FloatLiteralInst, LiteralInst, None)
+  INST(StringLiteralInst, LiteralInst, None)
   VALUE_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
 
   // Dynamic Dispatch
