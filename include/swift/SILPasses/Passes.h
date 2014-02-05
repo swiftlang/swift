@@ -122,6 +122,10 @@ namespace swift {
   /// with side effects.
   void performSILAllocRefElimination(SILModule *M);
 
+  /// \brief Count the number of instructions in the module for all
+  /// instructions.
+  void performSILInstCount(SILModule *M);
+
   // Diagnostics transformations.
   SILTransform *createCapturePromotion();
   SILTransform *createInOutDeshadowing();
@@ -131,7 +135,6 @@ namespace swift {
   SILTransform *createDCE();
   SILTransform *createMandatoryInlining();
   SILTransform *createSILCleanup();
-  SILTransform *createStripDebug();
   SILTransform *createEmitDFDiagnostics();
 
   // Performance transformations.
@@ -150,6 +153,9 @@ namespace swift {
   SILTransform *createStackPromotion();
   SILTransform *createSILAllocRefElimination();
 
+  // Utilities
+  SILTransform *createStripDebug();
+  SILTransform *createSILInstCount();
 } // end namespace swift
 
 #endif

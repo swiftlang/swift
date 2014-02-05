@@ -52,6 +52,7 @@ enum class PassKind {
   ARCOpts,
   StripDebugInfo,
   AllocRefElimination,
+  InstCount,
 };
 
 static llvm::cl::opt<std::string>
@@ -141,6 +142,10 @@ Passes(llvm::cl::desc("Passes:"),
                                    "allocref-elim",
                                    "Eliminate alloc refs with no side effect "
                                    "destructors that are only stored into."),
+                        clEnumValN(PassKind::InstCount,
+                                   "inst-count",
+                                   "Count all instructions in the given "
+                                   "module."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -286,6 +291,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::AllocRefElimination:
       PM.add(createSILAllocRefElimination());
+      break;
+    case PassKind::InstCount:
+      PM.add(createSILInstCount());
       break;
     }
 
