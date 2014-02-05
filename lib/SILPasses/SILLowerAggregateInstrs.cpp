@@ -273,7 +273,7 @@ class SILLowerAggregate : public SILFunctionTrans {
     DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F.getName() << " *****\n");
     processFunction(F);
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

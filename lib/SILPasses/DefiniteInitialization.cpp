@@ -1584,7 +1584,7 @@ class DefiniteInitialization : public SILFunctionTrans {
     lowerRawSILOperations(F);
     DEBUG(F.verify());
 
-    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

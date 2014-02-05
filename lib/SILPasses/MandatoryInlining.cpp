@@ -464,7 +464,7 @@ class MandatoryInlining : public SILModuleTrans {
 
     performSILMandatoryInlining(&M);
 
-    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

@@ -680,7 +680,7 @@ class DCE : public SILModuleTrans {
 
     performSILDeadCodeElimination(&M);
 
-    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

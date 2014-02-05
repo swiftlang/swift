@@ -363,7 +363,7 @@ class SILAllocRefElimination : public SILFunctionTrans {
 
     processFunction(F, DestructorAnalysisCache);
 
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

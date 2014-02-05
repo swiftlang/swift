@@ -410,7 +410,7 @@ class SILCSE : public SILFunctionTrans {
           " *****\n");
     CSE C;
     C.processFunction(F);
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

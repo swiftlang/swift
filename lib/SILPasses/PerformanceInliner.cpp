@@ -415,7 +415,7 @@ public:
     }
 
     // Invalidate the call graph.
-    CGA->invalidate(SILAnalysis::IK_CallGraph);
+    CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 

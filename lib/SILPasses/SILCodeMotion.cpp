@@ -337,7 +337,7 @@ class SILCodeMotion : public SILFunctionTrans {
     for (auto &BB : F)
       sinkCodeFromPredecessors(&BB);
 
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

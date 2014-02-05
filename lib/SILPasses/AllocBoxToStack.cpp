@@ -392,7 +392,7 @@ class SILStackPromotion : public SILFunctionTrans {
       }
     }
 
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

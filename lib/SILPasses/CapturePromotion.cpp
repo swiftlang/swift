@@ -809,7 +809,7 @@ class CapturePromotionPass : public SILModuleTrans {
     while (!Worklist.empty())
       runOnFunction(Worklist.pop_back_val(), Worklist);
 
-    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

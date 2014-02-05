@@ -537,7 +537,7 @@ class SimplifyCFGPass : public SILFunctionTrans {
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     SimplifyCFG(F).run();
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_CFG);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::CFG);
   }
 };
 

@@ -317,7 +317,7 @@ class SILSROA : public SILFunctionTrans {
           " *****\n");
 
     runSROAOnFunction(F);
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

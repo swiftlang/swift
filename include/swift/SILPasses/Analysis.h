@@ -28,16 +28,18 @@ namespace swift {
     /// The invalidation Lattice.
     /// This is a heiarchy of invalidation messages that are sent to analysis
     /// objects. Every invalidation kind invalidates the levels below it.
-    enum InvalidationKind {
-      IK_Instructions,  // Invalidate instruction-related analysis.
-      IK_CFG,           // The control flow changes.
-      IK_CallGraph,     // The call graph changed.
-      IK_All,           // Invalidate everything.
+    enum class InvalidationKind {
+      Instructions,  // Invalidate instruction-related analysis.
+      CFG,           // The control flow changes.
+      CallGraph,     // The call graph changed.
+      Alias,         // Invalidate alias analysis.
+      All,           // Invalidate everything.
     };
 
     /// The class heiarchy
-    enum AnalysisKind {
-      AK_CallGraph,
+    enum class AnalysisKind {
+      CallGraph,
+      Alias,
     };
 
     /// Stores the kind of derived class.
@@ -65,10 +67,11 @@ namespace swift {
 
   public:
     virtual ~CallGraphAnalysis() {}
-    CallGraphAnalysis(SILModule *MM) : SILAnalysis(AK_CallGraph), M(MM) {}
+    CallGraphAnalysis(SILModule *MM) : SILAnalysis(AnalysisKind::CallGraph),
+                                       M(MM) {}
 
     static bool classof(const SILAnalysis *S) {
-      return S->getKind() == AK_CallGraph;
+      return S->getKind() == AnalysisKind::CallGraph;
     }
 
     void bottomUpCallGraphOrder(std::vector<SILFunction*> &order);
@@ -76,7 +79,7 @@ namespace swift {
 
     virtual void invalidate(InvalidationKind K) {
     // TODO: invalidate the cache once we implement one.
-      if (K == IK_CallGraph) { /* ... */ }
+      if (K == InvalidationKind::CallGraph) { /* ... */ }
     }
 
     virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }

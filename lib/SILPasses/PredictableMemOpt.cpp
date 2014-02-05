@@ -978,7 +978,7 @@ class PredictableMemoryOptimizations : public SILFunctionTrans {
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     optimizeMemoryAllocations(F);
-    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

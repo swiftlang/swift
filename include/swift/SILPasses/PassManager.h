@@ -75,7 +75,7 @@ namespace swift {
     }
 
     /// Broadcast the invalidation of the function to all analysis.
-    void invalidateAllAnalisys(SILFunction *F,
+    void invalidateAllAnalysis(SILFunction *F,
                                SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
         AP->invalidate(F, K);

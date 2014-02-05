@@ -489,7 +489,7 @@ class SILDevirtualizationPass : public SILFunctionTrans {
     bool Changed = SILDevirtualizer(&F).run();
     if (Changed)
       PM->scheduleAnotherIteration();
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

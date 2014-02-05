@@ -771,7 +771,7 @@ class SILCombine : public SILFunctionTrans {
       return;
 
     Combiner.runOnFunction(F);
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
@@ -798,7 +798,7 @@ class SILDeadFuncElimination : public SILModuleTrans {
       Changed |= tryToRemoveFunction(Order[i]);
 
     // Invalidate the call graph.
-    CGA->invalidate(SILAnalysis::IK_CallGraph);
+    CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 

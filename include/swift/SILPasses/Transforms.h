@@ -22,27 +22,27 @@ namespace swift {
   class SILTransform {
   public:
     /// The kind of transformation passes we use.
-    enum TransKind {
-      TK_Function,
-      TK_Module
+    enum class TransformKind {
+      Function,
+      Module,
     };
 
     /// Stores the kind of derived class.
-    const TransKind Kind;
+    const TransformKind Kind;
 
   public:
     /// C'tor. \p K indicates the kind of derived class.
-    SILTransform(SILTransform::TransKind K) : Kind(K) {}
+    SILTransform(SILTransform::TransformKind K) : Kind(K) {}
     /// D'tor.
     virtual ~SILTransform() {}
     /// Returns the kind of derived class.
-    TransKind getKind() const { return Kind; }
+    TransformKind getKind() const { return Kind; }
   };
 
   /// A transformation that operates on functions.
   struct SILFunctionTrans : public SILTransform {
     /// C'tor.
-    SILFunctionTrans() : SILTransform(TK_Function) {}
+    SILFunctionTrans() : SILTransform(TransformKind::Function) {}
 
     /// D'tor.
     virtual ~SILFunctionTrans() {}
@@ -51,14 +51,14 @@ namespace swift {
     virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {}
 
     static bool classof(const SILTransform *S) {
-      return S->getKind() == TK_Function;
+      return S->getKind() == TransformKind::Function;
     }
   };
 
   /// A transformation that operates on modules.
   struct SILModuleTrans : public SILTransform {
     /// C'tor.
-    SILModuleTrans() : SILTransform(TK_Module) {}
+    SILModuleTrans() : SILTransform(TransformKind::Module) {}
 
     /// D'tor.
     virtual ~SILModuleTrans() {}
@@ -67,7 +67,7 @@ namespace swift {
     virtual void runOnModule(SILModule &M, SILPassManager *PM) {}
 
     static bool classof(const SILTransform *S) {
-      return S->getKind() == TK_Module;
+      return S->getKind() == TransformKind::Module;
     }
   };
 

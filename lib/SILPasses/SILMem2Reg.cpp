@@ -736,7 +736,7 @@ class SILMem2Reg : public SILFunctionTrans {
     DEBUG(llvm::dbgs() << "***** Mem2Reg on function: " << F.getName() <<
           " *****\n");
     promoteAllocasInFunction(F);
-    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
