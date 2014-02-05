@@ -751,6 +751,22 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   return IGM.VoidTy;
 }
 
+static llvm::Type *getABIReturnType(SILType type,
+                                    IRGenModule &IGM) {
+  GenClangType GCT(IGM.Context);
+  auto clangTy = GCT.visit(type.getSwiftRValueType());
+  assert(clangTy && "Unexpected failure in Clang type generation!");
+
+  SmallVector<clang::CanQualType,1> args;
+
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  auto &returnInfo = FI.getReturnInfo();
+  return returnInfo.getCoerceToType();
+}
+
 llvm::Type *SignatureExpansion::expandResult() {
   // Handle the direct result type, checking for supposedly scalar
   // result types that we actually want to return indirectly.
@@ -768,23 +784,15 @@ llvm::Type *SignatureExpansion::expandResult() {
     if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
       return addIndirectResult();
 
+    // FIXME: Until we can generate Clang types for every parameter
+    //        that can appear in an @objc signature, we'll fall back on
+    //        the Swift IR type selection in some cases.
     GenClangType GCT(IGM.Context);
-    auto clangType = GCT.visit(resultType.getSwiftRValueType());
-
-    // Fall back on native Swift type lowering for things that we
-    // cannot generate a Clang type from.
-    if (!clangType)
+    auto clangTy = GCT.visit(resultType.getSwiftRValueType());
+    if (!clangTy)
       return schema.getScalarResultType(IGM);
 
-    auto &ABITypes = *IGM.ABITypes;
-    SmallVector<clang::CanQualType,1> args;
-
-    auto extInfo = clang::FunctionType::ExtInfo();
-    auto &FI = ABITypes.arrangeFreeFunctionCall(clangType, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-
-    auto &returnInfo = FI.getReturnInfo();
-    return returnInfo.getCoerceToType();
+    return getABIReturnType(resultType, IGM);
   }
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -1808,18 +1816,17 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
 
-  // We are unable to produce an appropriate Clang type in some cases,
-  // so fall back on the test used for native Swift types.
+  // FIXME: We are unable to produce an appropriate Clang type in some
+  //        cases, so fall back on the test used for native Swift
+  //        types.
   if (!clangTy)
     return IGM.requiresIndirectResult(fnType->getInterfaceResult().getSILType(),
                                       level);
 
-  auto &ABITypes = *IGM.ABITypes;
   SmallVector<clang::CanQualType,1> args;
-
   auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = ABITypes.arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                              clang::CodeGen::RequiredArgs::All);
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
 
   auto &returnInfo = FI.getReturnInfo();
   if (!returnInfo.isIndirect())
@@ -1843,14 +1850,12 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
   if (!clangTy)
     return IGM.requiresIndirectResult(type, ResilienceExpansion::Minimal);
 
-  auto &ABITypes = *IGM.ABITypes;
   SmallVector<clang::CanQualType,1> args;
   args.push_back(clangTy);
 
   auto extInfo = clang::FunctionType::ExtInfo();
-  // Use clangTy as a dummy result type; we don't use the resulting ABI type.
-  auto &FI = ABITypes.arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                              clang::CodeGen::RequiredArgs::All);
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
 
   assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
   auto const &AI = FI.arg_begin()->info;
@@ -2057,10 +2062,6 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
 
   auto *ABIType = CurFn->getReturnType();
 
-  auto &resultTI = IGM.getTypeInfo(resultType);
-  auto schema = resultTI.getSchema(result.getKind());
-  auto *bodyType = schema.getScalarResultType(IGM);
-
   if (result.size() == 1) {
     auto *returned = result.claimNext();
     if (ABIType != returned->getType())
@@ -2069,6 +2070,10 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result) {
     Builder.CreateRet(returned);
     return;
   }
+
+  auto &resultTI = IGM.getTypeInfo(resultType);
+  auto schema = resultTI.getSchema(result.getKind());
+  auto *bodyType = schema.getScalarResultType(IGM);
 
   // Multiple return values are returned as a struct.
   assert(cast<llvm::StructType>(bodyType)->getNumElements() == result.size());
