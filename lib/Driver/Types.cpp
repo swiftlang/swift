@@ -50,6 +50,7 @@ StringRef types::getTypeTempSuffix(ID Id) {
 ID types::lookupTypeForExtension(StringRef Ext) {
   return llvm::StringSwitch<types::ID>(Ext)
            .Case("swift", TY_Swift)
+           .Case("sil", TY_SIL)
            .Case("swiftmodule", TY_SwiftModuleFile)
            .Case("pcm", TY_ClangModuleFile)
            .Case("o", TY_Object)
