@@ -297,11 +297,11 @@ int main(int argc, char **argv) {
       break;
     }
 
-    PM.run();
-
     // Verify the module after every pass.
     CI.getSILModule()->verify();
   }
+
+  PM.run();
 
   std::string ErrorInfo;
   llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo);
