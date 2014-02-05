@@ -72,6 +72,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(DeallocStackInst, SILInstruction, MayHaveSideEffects)
   INST(DeallocRefInst, SILInstruction, MayHaveSideEffects)
   INST(DeallocBoxInst, SILInstruction, MayHaveSideEffects)
+  VALUE_RANGE(DeallocationInst, DeallocStackInst, DeallocBoxInst)
 
   // Accessing memory
   INST(LoadInst, SILInstruction, MayRead)

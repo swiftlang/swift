@@ -1904,16 +1904,32 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
+//===----------------------------------------------------------------------===//
+// DeallocationInsts
+//===----------------------------------------------------------------------===//
+
+/// DeallocationInst - An abstract parent class for Dealloc{Stack, Box, Ref}.
+class DeallocationInst : public SILInstruction {
+protected:
+  DeallocationInst(ValueKind Kind, SILLocation Loc,
+                   SILTypeList *TypeList=nullptr, SILDebugScope *DS=nullptr)
+    : SILInstruction(Kind, Loc, TypeList, DS) { }
+public:
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_DeallocationInst &&
+      V->getKind() <= ValueKind::Last_DeallocationInst;
+  }
+};
+
 /// DeallocStackInst - Deallocate stack memory allocated by alloc_stack.
-class DeallocStackInst
-  : public UnaryInstructionBase<ValueKind::DeallocStackInst, SILInstruction,
-                                /*HAS_RESULT*/ false>
-{
+class DeallocStackInst :
+    public UnaryInstructionBase<ValueKind::DeallocStackInst, DeallocationInst,
+                                /*HAS_RESULT*/ false> {
 public:
   DeallocStackInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand) {}
 };
-  
+
 /// DeallocRefInst - Deallocate memory allocated for a reference type
 /// instance, as might have been created by an AllocRefInst. It is
 /// undefined behavior if the type of the operand does not match the
@@ -1921,10 +1937,9 @@ public:
 ///
 /// This does not destroy the referenced instance; it must either be
 /// uninitialized or have been manually destroyed.
-class DeallocRefInst : public UnaryInstructionBase<ValueKind::DeallocRefInst,
-                                                   SILInstruction,
-                                                   /*HAS_RESULT*/ false>
-{
+class DeallocRefInst : 
+  public UnaryInstructionBase<ValueKind::DeallocRefInst, DeallocationInst,
+                              /*HAS_RESULT*/ false> {
 public:
   DeallocRefInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
@@ -1937,10 +1952,9 @@ public:
 ///
 /// This does not destroy the boxed value instance; it must either be
 /// uninitialized or have been manually destroyed.
-class DeallocBoxInst : public UnaryInstructionBase<ValueKind::DeallocBoxInst,
-                                                   SILInstruction,
-                                                   /*HAS_RESULT*/ false>
-{
+class DeallocBoxInst :
+  public UnaryInstructionBase<ValueKind::DeallocBoxInst, DeallocationInst,
+                              /*HAS_RESULT*/ false> {
   SILType ElementType;
 public:
   DeallocBoxInst(SILLocation loc, SILType elementType, SILValue operand)
