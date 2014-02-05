@@ -29,7 +29,9 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-STATISTIC(NumOptzIter, "Number of optimizer iterations");
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Analysis.h"
 
 using namespace swift;
 
@@ -90,58 +92,25 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
   // Continue to optimize the code until we can't specialize any more.
-  bool Changed = true;
-  while (Changed) {
-    // Specialize generic functions.
-    Changed = performSILSpecialization(&Module);
-    performParanoidVerification(Module, Options);
 
-    // Inline the specialized functions.
-    performSILPerformanceInlining(&Module, Options.InlineThreshold);
-    performParanoidVerification(Module, Options);
-
-    // Cleanup after inlining.
-    performSILCombine(&Module);
-    performParanoidVerification(Module, Options);
-
-    // Transition to SSA form.
-    performSILLowerAggregateInstrs(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSILSROA(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSILMem2Reg(&Module);
-    performParanoidVerification(Module, Options);
-
-    // Perform scalar optimizations.
-    performSILCSE(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSILCombine(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSILCodeMotion(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSimplifyCFG(&Module);
-    performParanoidVerification(Module, Options);
-
-    Changed |= performSILDevirtualization(&Module);
-    performParanoidVerification(Module, Options);
-
-    if (Options.EnableARCOptimizations) {
-      performSILARCOpts(&Module);
-      performParanoidVerification(Module, Options);
-    }
-
-    performSILAllocBoxToStackPromotion(&Module);
-    performParanoidVerification(Module, Options);
-
-    performSILAllocRefElimination(&Module);
+    SILPassManager PM;
+    PM.registerAnalysis(createCallGraphAnalysis(&Module));
+    PM.add(createGenericSpecializer());
+    PM.add(createPerfInliner(Options.InlineThreshold));
+    PM.add(createSILCombine());
+    PM.add(createDeadFunctionEmim());
+    PM.add(createLowerAggregate());
+    PM.add(createSROA());
+    PM.add(createMem2Reg());
+    PM.add(createCSE());
+    PM.add(createSILCombine());
+    PM.add(createCodeMotion());
+    PM.add(createSimplifyCFG());
+    PM.add(createDevirtualization());
+    PM.add(createSILARCOpts());
+    PM.add(createStackPromotion());
+    PM.add(createSILAllocRefElimination());
+    PM.run(Module);
 
     DEBUG(Module.verify());
-    // Stats
-    NumOptzIter++;
-  }
 }
