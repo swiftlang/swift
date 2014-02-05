@@ -35,15 +35,6 @@
 
 using namespace swift;
 
-static void performParanoidVerification(SILModule &Module,
-                                        const SILOptions &Options) {
-#ifndef NDEBUG
-  if (!Options.EnableParanoidVerification)
-    return;
-  Module.verify();
-#endif
-}
-
 bool swift::runSILDiagnosticPasses(SILModule &Module,
                                    const SILOptions &Options) {
   // If we parsed a .sil file that is already in canonical form, don't rerun
@@ -53,36 +44,19 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
   auto &Ctx = Module.getASTContext();
 
-  performParanoidVerification(Module, Options);
-
-  performSILMandatoryInlining(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILCapturePromotion(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILAllocBoxToStackPromotion(&Module);
-  performParanoidVerification(Module, Options);
-
-  performInOutDeshadowing(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILDefiniteInitialization(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILPredictableMemoryOptimizations(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILConstantPropagation(&Module);
-  performParanoidVerification(Module, Options);
-
-  performSILDeadCodeElimination(&Module);
-  performParanoidVerification(Module, Options);
+  SILPassManager PM(&Module);
+  PM.add(createMandatoryInlining());
+  PM.add(createCapturePromotion());
+  PM.add(createStackPromotion());
+  PM.add(createInOutDeshadowing());
+  PM.add(createDefiniteInitialization());
+  PM.add(createPredictableMemoryOptimizations());
+  PM.add(createConstantPropagation());
+  PM.add(createDCE());
+  PM.run();
 
   // Generate diagnostics.
   emitSILDataflowDiagnostics(&Module);
-  performParanoidVerification(Module, Options);
-
   Module.setStage(SILStage::Canonical);
 
   // If errors were produced during SIL analysis, return true.
