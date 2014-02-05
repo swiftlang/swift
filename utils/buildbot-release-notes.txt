@@ -22,6 +22,14 @@
       foo()
     }
 
+* The "@mutating" attribute (which can be used on functions in structs,
+  enums, and protocols) has been promoted to a context-sensitive keyword.
+  Mutating struct methods are now written as:
+
+    struct SomeStruct {
+      mutating func f() {}
+    }
+
 * The "swift" command line tool can now create executables and libraries
   directly, just like Clang. Use "swift main.swift" to create an executable and
   "swift -emit-library -o foo.dylib foo.swift" to create a library.
