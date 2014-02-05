@@ -467,10 +467,9 @@ void Driver::buildActions(const ToolChain &TC,
       const Arg *InputArg = Input.second;
 
       std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
-      Current.reset(new CompileJobAction(Current.release(),
-                                         OI.CompilerOutputType));
-      // We've been told to link, so this action will be a linker input,
-      // not a top-level action.
+      if (InputType == types::TY_Swift || InputType == types::TY_SIL)
+        Current.reset(new CompileJobAction(Current.release(),
+                                           OI.CompilerOutputType));
       CompileActions.push_back(Current.release());
     }
     break;

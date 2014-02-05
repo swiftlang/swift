@@ -47,6 +47,15 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
 
 /// Swift Tool
 
+static void addInputsOfType(ArgStringList &Arguments, const ActionList &Inputs,
+                            types::ID InputType) {
+  for (auto &Input : Inputs) {
+    if (Input->getType() != InputType)
+      continue;
+    Arguments.push_back(cast<InputAction>(Input)->getInputArg().getValue());
+  }
+}
+
 static void addInputsOfType(ArgStringList &Arguments, const Job *J,
                             types::ID InputType) {
   if (const Command *Cmd = dyn_cast<Command>(J)) {
@@ -285,7 +294,10 @@ Job *MergeModule::constructJob(const JobAction &JA,
   size_t origLen = Arguments.size();
   (void)origLen;
   addInputsOfType(Arguments, Inputs.get(), types::TY_SwiftModuleFile);
-  assert(Arguments.size() - origLen == Inputs->size() &&
+  addInputsOfType(Arguments, InputActions, types::TY_SwiftModuleFile);
+  assert(Arguments.size() - origLen >= Inputs->size() + InputActions.size());
+  assert((Arguments.size() - origLen == Inputs->size() ||
+          !InputActions.empty()) &&
          "every input to MergeModule must generate a swiftmodule");
 
   // Tell all files to parse as library, which is necessary to load them as
@@ -347,6 +359,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
   ArgStringList Arguments;
   addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
+  addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   if (Args.hasArg(options::OPT_g)) {
     Arguments.push_back("-sectalign");
