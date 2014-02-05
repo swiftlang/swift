@@ -34,6 +34,18 @@ using namespace swift;
 
 static const int SinkSearchWindow = 6;
 
+static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
+  switch (B) {
+  case SILInstruction::MemoryBehavior::MayWrite:
+  case SILInstruction::MemoryBehavior::MayReadWrite:
+  case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+    return true;
+  case SILInstruction::MemoryBehavior::None:
+  case SILInstruction::MemoryBehavior::MayRead:
+    return false;
+  }
+}
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
@@ -110,7 +122,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
     if (Inst->mayWriteToMemory()) {
       llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
       for (auto *LI : Loads)
-        if (AA.alias(Inst, SILValue(LI)) != AliasAnalysis::Result::NoAlias)
+        if (isWriteMemBehavior(AA.getMemoryBehavior(Inst, SILValue(LI))))
           InvalidatedLoadList.push_back(LI);
       for (auto *LI : InvalidatedLoadList)
         Loads.erase(LI);

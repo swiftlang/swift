@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
 #define SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
 
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -28,7 +29,7 @@ public:
   /// analysis so see LLVM's documentation for more information.
   ///
   /// FIXME: PartialAlias?
-  enum class Result : unsigned {
+  enum class AliasResult : unsigned {
     NoAlias=0,      ///< The two values have no dependencies on each
                     ///  other.
     MayAlias,       ///< The two values can not be proven to alias or
@@ -37,25 +38,26 @@ public:
   };
 
 private:
-  using CacheKey = std::pair<SILValue, SILValue>;
+  using AliasCacheKey = std::pair<SILValue, SILValue>;
+  llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
 
-  llvm::DenseMap<CacheKey, Result> Cache;
+  using MemoryBehavior = SILInstruction::MemoryBehavior;
 
 public:
 
   /// Perform an alias query to see if V1, V2 refer to the same values.
-  Result alias(SILValue V1, SILValue V2);
+  AliasResult alias(SILValue V1, SILValue V2);
 
-  /// Perform an alias query on Inst to see if any of its operands
-  /// alias V.
-  Result alias(SILInstruction *Inst, SILValue V);
+  /// Use the alias analysis to determine the memory behavior of Inst with
+  /// respect to V.
+  MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V);
 
-  /// Clear the cache.
+  /// Clear the caches.
   ///
   /// FIXME: Add in an API to call to invalidate all of the cache
   /// entries for one SILValue. It is not needed right now, but it
   /// could be useful in the future.
-  void invalidateCache() { Cache.clear(); }
+  void invalidateCaches() { AliasCache.clear(); }
 };
 
 } // end namespace swift
