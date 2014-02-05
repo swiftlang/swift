@@ -24,8 +24,8 @@ using namespace swift;
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
-/// Strip off casts/address projections from V until there is nothing
-/// left to strip.
+/// Strip off casts/indexing insts/address projections from V until there is
+/// nothing left to strip.
 static SILValue getUnderlyingObject(SILValue V) {
   while (true) {
     SILValue V2 = V.stripCasts().stripAddressProjections().stripIndexingInsts();
@@ -115,6 +115,9 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
+  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
+  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
+
 
   // If O1 and O2 do not equal, see if we can prove that they can not be the
   // same object. If we can, return No Alias.
