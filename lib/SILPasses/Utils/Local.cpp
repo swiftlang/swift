@@ -187,3 +187,20 @@ void swift::bottomUpCallGraphOrder(SILModule *M,
 
   sorter.sort(order);
 }
+
+void swift::topDownCallGraphOrder(SILModule *M,
+                                   std::vector<SILFunction*> &order) {
+  CallGraphSorter<SILFunction *> sorter;
+
+  // NOTE: we are inserting edges in reverse to get the top-down call graph.
+  for (auto &Caller : *M)
+    for (auto &BB : Caller)
+      for (auto &I : BB)
+        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
+          SILFunction *Callee = FRI->getReferencedFunction();
+          sorter.addEdge(Callee, &Caller);
+        }
+
+  // Perform the topological sorting.
+  sorter.sort(order);
+}

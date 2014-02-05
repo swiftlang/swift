@@ -58,6 +58,10 @@ namespace swift {
   /// include functions that don't participate in any call (caller or callee).
   void bottomUpCallGraphOrder(SILModule *M, std::vector<SILFunction*> &order);
 
+  /// Return the top-down call-graph order for module M. Notice that we don't
+  /// include functions that don't participate in any call (caller or callee).
+  void topDownCallGraphOrder(SILModule *M, std::vector<SILFunction*> &order);
+
   /// Does the passed in BuiltinFunctionRefInst have any side effects?
   bool isSideEffectFree(BuiltinFunctionRefInst *FR);
 
