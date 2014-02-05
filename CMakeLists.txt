@@ -309,7 +309,11 @@ function(compile_swift_files)
   endif()
 
   if(NOT SWIFT_RUNTIME_CHECKS)
-    list(APPEND swift_flags "-disable-all-runtime-checks")
+    if(SWIFT_NEW_DRIVER)
+      list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")
+    else()
+      list(APPEND swift_flags "-disable-all-runtime-checks")
+    endif()
   endif()
 
   # Allow import of other Swift modules we just built.
