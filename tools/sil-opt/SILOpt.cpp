@@ -19,6 +19,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -40,6 +41,7 @@ enum class PassKind {
   SILCleanup,
   SILMem2Reg,
   SILCombine,
+  SILDeadFunctionElimination,
   SILSpecialization,
   SILDevirt,
   SimplifyCFG,
@@ -105,8 +107,11 @@ Passes(llvm::cl::desc("Passes:"),
                                    "Predictable early memory optimization"),
                         clEnumValN(PassKind::SILCombine,
                                    "sil-combine",
-                                   "Perform small peepholes/combine operations/"
-                                   "dead code elimination"),
+                                   "Perform small peepholes and combine"
+                                   " operations."),
+                        clEnumValN(PassKind::SILDeadFunctionElimination,
+                                   "sil-deadfuncelim",
+                                   "Remove private unused functions"),
                         clEnumValN(PassKind::SimplifyCFG,
                                    "simplify-cfg",
                                    "Clean up the CFG of SIL functions"),
@@ -205,78 +210,86 @@ int main(int argc, char **argv) {
   if (VerifyMode)
     enableDiagnosticVerifier(CI.getSourceMgr());
 
+  SILPassManager PM(CI.getSILModule());
+  PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
+
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
-      performSILAllocBoxToStackPromotion(CI.getSILModule());
+      PM.add(createStackPromotion());
       break;
     case PassKind::CapturePromotion:
-      performSILCapturePromotion(CI.getSILModule());
+      PM.add(createCapturePromotion());
       break;
     case PassKind::CCP:
-      performSILConstantPropagation(CI.getSILModule());
+      PM.add(createConstantPropagation());
       break;
     case PassKind::CSE:
-      performSILCSE(CI.getSILModule());
+      PM.add(createCSE());
       break;
     case PassKind::DCE:
-      performSILDeadCodeElimination(CI.getSILModule());
+      PM.add(createDCE());
       break;
     case PassKind::DefiniteInit:
-      performSILDefiniteInitialization(CI.getSILModule());
+      PM.add(createDefiniteInitialization());
       break;
     case PassKind::DataflowDiagnostics:
-      emitSILDataflowDiagnostics(CI.getSILModule());
+      PM.add(createEmitDFDiagnostics());
       break;
     case PassKind::InOutDeshadowing:
-      performInOutDeshadowing(CI.getSILModule());
+      PM.add(createInOutDeshadowing());
       break;
     case PassKind::MandatoryInlining:
-      performSILMandatoryInlining(CI.getSILModule());
+      PM.add(createMandatoryInlining());
       break;
     case PassKind::PredictableMemoryOpt:
-      performSILPredictableMemoryOptimizations(CI.getSILModule());
+      PM.add(createPredictableMemoryOptimizations());
       break;
     case PassKind::SILCleanup:
-      performSILCleanup(CI.getSILModule());
+      PM.add(createSILCleanup());
       break;
     case PassKind::SILMem2Reg:
-      performSILMem2Reg(CI.getSILModule());
+      PM.add(createMem2Reg());
       break;
     case PassKind::SILCombine:
-      performSILCombine(CI.getSILModule());
+      PM.add(createSILCombine());
+      break;
+    case PassKind::SILDeadFunctionElimination:
+      PM.add(createDeadFunctionElimination());
       break;
     case PassKind::SILSpecialization:
-      performSILSpecialization(CI.getSILModule());
+      PM.add(createGenericSpecializer());
       break;
     case PassKind::SILDevirt:
-      performSILDevirtualization(CI.getSILModule());
+      PM.add(createDevirtualization());
       break;
     case PassKind::SimplifyCFG:
-      performSimplifyCFG(CI.getSILModule());
+      PM.add(createSimplifyCFG());
       break;
     case PassKind::PerformanceInlining:
-      performSILPerformanceInlining(CI.getSILModule(), SILInlineThreshold);
+      PM.add(createPerfInliner(SILInlineThreshold));
       break;
     case PassKind::CodeMotion:
-      performSILCodeMotion(CI.getSILModule());
+      PM.add(createCodeMotion());
       break;
     case PassKind::LowerAggregateInstrs:
-      performSILLowerAggregateInstrs(CI.getSILModule());
+      PM.add(createLowerAggregate());
       break;
     case PassKind::SROA:
-      performSILSROA(CI.getSILModule());
+      PM.add(createSROA());
       break;
     case PassKind::ARCOpts:
-      performSILARCOpts(CI.getSILModule());
+      PM.add(createSILARCOpts());
       break;
     case PassKind::StripDebugInfo:
-      performSILStripDebugInfo(CI.getSILModule());
+      PM.add(createStripDebug());
       break;
     case PassKind::AllocRefElimination:
-      performSILAllocRefElimination(CI.getSILModule());
+      PM.add(createSILAllocRefElimination());
       break;
     }
+
+    PM.run();
 
     // Verify the module after every pass.
     CI.getSILModule()->verify();

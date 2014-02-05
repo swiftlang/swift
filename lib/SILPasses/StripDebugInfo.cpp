@@ -11,27 +11,48 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 
+
 using namespace swift;
+
+static void stripFunction(SILFunction *F) {
+  for (auto &BB : *F)
+    for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+      SILInstruction *Inst = II;
+      ++II;
+
+      if (!isa<DebugValueInst>(Inst) &&
+          !isa<DebugValueAddrInst>(Inst))
+        continue;
+
+      Inst->eraseFromParent();
+    }
+}
 
 void swift::performSILStripDebugInfo(SILModule *M) {
   for (auto &F : *M) {
     if (F.empty())
       continue;
 
-    for (auto &BB : F)
-      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-        SILInstruction *Inst = II;
-        ++II;
-
-        if (!isa<DebugValueInst>(Inst) &&
-            !isa<DebugValueAddrInst>(Inst))
-          continue;
-
-        Inst->eraseFromParent();
-      }
+    stripFunction(&F);
   }
+}
+
+class StripDebugInfo : public swift::SILFunctionTrans {
+  virtual ~StripDebugInfo() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(swift::SILFunction &F, SILPassManager *PM) {
+    stripFunction(&F);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+  }
+};
+
+SILTransform *swift::createStripDebug() {
+  return new StripDebugInfo();
 }

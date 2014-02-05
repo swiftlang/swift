@@ -130,6 +130,9 @@ namespace swift {
   SILTransform *createConstantPropagation();
   SILTransform *createDCE();
   SILTransform *createMandatoryInlining();
+  SILTransform *createSILCleanup();
+  SILTransform *createStripDebug();
+  SILTransform *createEmitDFDiagnostics();
 
   // Performance transformations.
   SILTransform *createSILCombine();

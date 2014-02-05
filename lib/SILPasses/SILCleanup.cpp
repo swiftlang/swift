@@ -20,27 +20,49 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
+
+using namespace swift;
+
+static void cleanFunction(SILFunction &Fn) {
+  for (auto &BB : Fn) {
+    auto I = BB.begin(), E = BB.end();
+    while (I != E) {
+      // Make sure there is no iterator invalidation if the inspected
+      // instruction gets removed from the block.
+      SILInstruction *Inst = I++;
+
+      // Remove calls to Builtin.staticReport().
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
+        if (BuiltinFunctionRefInst *FR =
+            dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+          const BuiltinInfo &B = FR->getBuiltinInfo();
+          if (B.ID == BuiltinValueKind::StaticReport) {
+            // The call to the builtin should get removed before we reach
+            // IRGen.
+            recursivelyDeleteTriviallyDeadInstructions(AI, /* Force */true);
+          }
+        }
+    }
+  }
+}
 
 void swift::performSILCleanup(SILModule *M) {
   for (auto &Fn : *M)
-    for (auto &BB : Fn) {
-      auto I = BB.begin(), E = BB.end();
-      while (I != E) {
-        // Make sure there is no iterator invalidation if the inspected
-        // instruction gets removed from the block.
-        SILInstruction *Inst = I++;
+    cleanFunction(Fn);
+}
 
-        // Remove calls to Builtin.staticReport().
-        if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
-          if (BuiltinFunctionRefInst *FR =
-              dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
-            const BuiltinInfo &B = FR->getBuiltinInfo();
-            if (B.ID == BuiltinValueKind::StaticReport) {
-              // The call to the builtin should get removed before we reach
-              // IRGen.
-              recursivelyDeleteTriviallyDeadInstructions(AI, /* Force */true);
-            }
-          }
-      }
-    }
+class SILCleanup : public swift::SILFunctionTrans {
+  virtual ~SILCleanup() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(swift::SILFunction &F, SILPassManager *PM) {
+    cleanFunction(F);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+  }
+};
+
+SILTransform *swift::createSILCleanup() {
+  return new SILCleanup();
 }
