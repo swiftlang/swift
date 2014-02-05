@@ -22,6 +22,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
@@ -266,7 +268,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   AI->eraseFromParent();
 }
 
-static void processFunction(SILFunction &Fn) {
+static void runSROAOnFunction(SILFunction &Fn) {
   std::vector<AllocStackInst *> Worklist;
 
   // For each basic block BB in Fn...
@@ -300,9 +302,28 @@ void swift::performSILSROA(SILModule *M) {
     if (Fn.empty())
       continue;
 
-    DEBUG(llvm::dbgs() << "***** Visiting " << Fn.getName() << " *****\n");
 
     // Otherwise perform SROA on Fn.
-    processFunction(Fn);
+    runSROAOnFunction(Fn);
   }
 }
+
+class SILSROA : public SILFunctionTrans {
+  virtual ~SILSROA() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    DEBUG(llvm::dbgs() << "***** SROA on function: " << F.getName() <<
+          " *****\n");
+
+    runSROAOnFunction(F);
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createSROA() {
+  return new SILSROA();
+}
+
+
+

@@ -17,6 +17,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Mangle.h"
 #include "llvm/ADT/MapVector.h"
@@ -432,4 +434,30 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 
 bool swift::performSILSpecialization(SILModule *M) {
   return SILSpecializer(M).specialize();
+}
+
+class SILGenericSpecializer : public SILModuleTrans {
+
+public:
+  SILGenericSpecializer() {}
+
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
+
+    // Collect a call-graph bottom-up list of functions.
+    std::vector<SILFunction *> Worklist;
+    CGA->bottomUpCallGraphOrder(Worklist);
+
+     bool Changed = SILSpecializer(&M).specialize();
+    
+    if (Changed)
+      PM->scheduleAnotherIteration();
+
+    // Invalidate the call graph.
+    CGA->invalidate(SILAnalysis::IK_CallGraph);
+  }
+};
+
+SILTransform *swift::createGenericSpecializer() {
+  return new SILGenericSpecializer();
 }

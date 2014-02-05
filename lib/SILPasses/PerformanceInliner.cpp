@@ -15,6 +15,9 @@
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -62,29 +65,6 @@ static SILFunction *getInlinableFunction(ApplyInst *AI) {
 
   DEBUG(llvm::dbgs() << "  Can inline " << F->getName() << ".\n");
   return F;
-}
-
-/// Return the bottom up call-graph order for module M. Notice that we don't
-/// include functions that don't participate in any call (caller or callee).
-static void TopDownCallGraphOrder(SILModule *M,
-                                  std::vector<SILFunction *> &order) {
-  CallGraphSorter<SILFunction *> sorter;
-
-  // Construct the call graph, mapping callee to callers to that the resulting
-  // topological ordering has callees before callers.
-  //
-  // *NOTE* From the typical callgraph perspective, we are inserting edges in
-  // reverse.
-  for (auto &Caller : *M)
-    for (auto &BB : Caller)
-      for (auto &I : BB)
-        if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          SILFunction *Callee = FRI->getReferencedFunction();
-          sorter.addEdge(Callee, &Caller);
-        }
-
-  // Perform the topological sorting.
-  sorter.sort(order);
 }
 
 //===----------------------------------------------------------------------===//
@@ -394,7 +374,7 @@ void swift::performSILPerformanceInlining(SILModule *M,
 
   // Collect a call-graph bottom-up list of functions.
   std::vector<SILFunction *> Worklist;
-  TopDownCallGraphOrder(M, Worklist);
+  topDownCallGraphOrder(M, Worklist);
 
   SILPerformanceInliner inliner(inlineCostThreshold);
 
@@ -407,3 +387,39 @@ void swift::performSILPerformanceInlining(SILModule *M,
     inliner.inlineCallsIntoFunction(F);
   }
 }
+
+class SILPerformanceInlinerPass : public SILModuleTrans {
+  int Threshold;
+
+public:
+  SILPerformanceInlinerPass(int th) : Threshold(th) {}
+
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
+
+    if (Threshold == 0) {
+      DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
+      return;
+    }
+
+    // Collect a call-graph bottom-up list of functions.
+    std::vector<SILFunction *> Worklist;
+    CGA->topDownCallGraphOrder(Worklist);
+
+    SILPerformanceInliner inliner(Threshold);
+
+    while (!Worklist.empty()) {
+      SILFunction *F = Worklist.back();
+      Worklist.pop_back();
+      inliner.inlineCallsIntoFunction(F);
+    }
+
+    // Invalidate the call graph.
+    CGA->invalidate(SILAnalysis::IK_CallGraph);
+  }
+};
+
+SILTransform *swift::createPerfInliner(int threshold) {
+  return new SILPerformanceInlinerPass(threshold);
+}
+

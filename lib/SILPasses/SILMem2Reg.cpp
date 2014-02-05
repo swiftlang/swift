@@ -26,6 +26,8 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -726,3 +728,19 @@ void swift::performSILMem2Reg(SILModule *M) {
     if (!F.isExternalDeclaration())
       promoteAllocasInFunction(F);
 }
+
+class SILMem2Reg : public SILFunctionTrans {
+  virtual ~SILMem2Reg() {}
+
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    DEBUG(llvm::dbgs() << "***** Mem2Reg on function: " << F.getName() <<
+          " *****\n");
+    promoteAllocasInFunction(F);
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createMem2Reg() {
+  return new SILMem2Reg();
+}
+

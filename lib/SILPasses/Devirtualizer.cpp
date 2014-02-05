@@ -22,6 +22,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -39,17 +41,16 @@ namespace {
 
 struct SILDevirtualizer {
   /// The SIL Module.
-  SILModule *M;
+  SILFunction *F;
   bool Changed;
 
-  SILDevirtualizer(SILModule *Mod) : M(Mod), Changed(false) {}
+  SILDevirtualizer(SILFunction *Func) : F(Func), Changed(false) {}
 
   void optimizeClassMethodInst(ClassMethodInst *CMI);
   void optimizeApplyInst(ApplyInst *Inst);
 
   bool run() {
-    for (auto &F : *M)
-      for (auto &BB : F) {
+      for (auto &BB : *F) {
         auto I = BB.begin(), E = BB.end();
         while (I != E) {
           SILInstruction *Inst = I++;
@@ -210,7 +211,8 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
       // If found the requested method.
       if (SILFunction *F = Vtbl.getImplementation(CMI->getModule(), Member)) {
         // Create a direct reference to the method.
-        SILInstruction *FRI = new (*M) FunctionRefInst(CMI->getLoc(), F);
+        SILInstruction *FRI =
+        new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
         DEBUG(llvm::dbgs() << " *** Devirtualized : " << *CMI);
         CMI->getParent()->getInstList().insert(CMI, FRI);
         CMI->replaceAllUsesWith(FRI);
@@ -473,5 +475,24 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
 }
 
 bool swift::performSILDevirtualization(SILModule *M) {
-  return SILDevirtualizer(M).run();
+  bool Changed = false;
+  for (auto &F : *M)
+    Changed |= SILDevirtualizer(&F).run();
+  return Changed;
+}
+
+class SILDevirtualizationPass : public SILFunctionTrans {
+  virtual ~SILDevirtualizationPass() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    bool Changed = SILDevirtualizer(&F).run();
+    if (Changed)
+      PM->scheduleAnotherIteration();
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createDevirtualization() {
+  return new SILDevirtualizationPass();
 }

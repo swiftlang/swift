@@ -16,6 +16,8 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -527,4 +529,19 @@ void SimplifyCFG::run() {
 void swift::performSimplifyCFG(SILModule *M) {
   for (auto &Fn : *M)
     SimplifyCFG(Fn).run();
+}
+
+class SimplifyCFGPass : public SILFunctionTrans {
+  virtual ~SimplifyCFGPass() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    SimplifyCFG(F).run();
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_CFG);
+  }
+};
+
+
+SILTransform *swift::createSimplifyCFG() {
+  return new SimplifyCFGPass();
 }

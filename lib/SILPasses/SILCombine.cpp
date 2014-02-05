@@ -20,6 +20,8 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -149,8 +151,7 @@ namespace swift {
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
 public:
-  SILCombiner(SILModule &M) : Module(M), Worklist(), MadeChange(false),
-                              Iteration(0), Builder(0) { }
+  SILCombiner() : Worklist(), MadeChange(false), Iteration(0), Builder(0) { }
 
   void runOnFunction(SILFunction &F) {
     clear();
@@ -262,8 +263,6 @@ private:
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
 
-  /// Module currently being processed.
-  SILModule &Module;
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
   /// Variable to track if the SILCombiner made any changes.
@@ -557,15 +556,16 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
   if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
-    if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module))
+    if (!EI->hasOperand() ||
+        EI->getOperand().getType().isTrivial(EI->getModule()))
       return eraseInstFromFunction(*DI);
 
   // DestroyValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics())
-    return new (Module) StrongReleaseInst(DI->getLoc(), Operand);
+    return new (DI->getModule()) StrongReleaseInst(DI->getLoc(), Operand);
 
   // DestroyValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(Module))
+  if (OperandTy.isTrivial(DI->getModule()))
     return eraseInstFromFunction(*DI);
 
   // Do nothing for non-trivial non-reference types.
@@ -579,7 +579,8 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   // copy_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
-    if (!EI->hasOperand() || EI->getOperand().getType().isTrivial(Module)) {
+    if (!EI->hasOperand() ||
+        EI->getOperand().getType().isTrivial(CI->getModule())) {
       // We need to use eraseInstFromFunction + RAUW here since a copy value can
       // never be trivially dead since it touches reference counts.
       replaceInstUsesWith(*CI, EI, 0);
@@ -596,7 +597,7 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
   }
 
   // CopyValueInst of a trivial type is a no-op + use propogation.
-  if (OperandTy.isTrivial(Module)) {
+  if (OperandTy.isTrivial(CI->getModule())) {
     // We need to use eraseInstFromFunction + RAUW here since a copy value can
     // never be trivially dead since it touches reference counts.
     replaceInstUsesWith(*CI, Operand.getDef(), 0);
@@ -744,7 +745,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
 //===----------------------------------------------------------------------===//
 
 void swift::performSILCombine(SILModule *M) {
-  SILCombiner Combiner(*M);
+  SILCombiner Combiner;
 
   // Process each function in M.
   for (SILFunction &F : *M) {
@@ -757,4 +758,54 @@ void swift::performSILCombine(SILModule *M) {
   }
 
   deleteDeadFunctions(M);
+}
+
+class SILCombine : public SILFunctionTrans {
+  virtual ~SILCombine() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    SILCombiner Combiner;
+    // If F is just a declaration without any basic blocks, skip it.
+    if (F.empty())
+      return;
+
+    Combiner.runOnFunction(F);
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+class SILDeadFuncElimination : public SILModuleTrans {
+
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
+
+    bool Changed = false;
+
+    // Erase trivially dead functions that may not be a part of the call graph.
+    for (auto FI = M.begin(), EI = M.end(); FI != EI;) {
+      SILFunction *F = FI++;
+      Changed |= tryToRemoveFunction(F);
+    }
+
+    std::vector<SILFunction*> Order;
+    // returns a bottom-up list of functions, leafs first.
+    CGA->bottomUpCallGraphOrder(Order);
+
+    // Scan the call graph top-down (caller first) because eliminating functions
+    // can generate more opportunities.
+    for (int i = Order.size() - 1; i >= 0; i--)
+      Changed |= tryToRemoveFunction(Order[i]);
+
+    // Invalidate the call graph.
+    CGA->invalidate(SILAnalysis::IK_CallGraph);
+  }
+};
+
+SILTransform *swift::createSILCombine() {
+  return new SILCombine();
+}
+
+SILTransform *swift::createDeadFunctionEmim() {
+  return new SILDeadFuncElimination();
 }

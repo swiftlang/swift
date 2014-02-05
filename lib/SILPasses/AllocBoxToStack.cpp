@@ -15,6 +15,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -365,4 +367,35 @@ void swift::performSILAllocBoxToStackPromotion(SILModule *M) {
       }
     }
   }
+}
+
+class SILStackPromotion : public SILFunctionTrans {
+  virtual ~SILStackPromotion() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    llvm::OwningPtr<PostDominanceInfo> PostDomInfo;
+
+    for (auto &BB : F) {
+      auto I = BB.begin(), E = BB.end();
+      while (I != E) {
+        if (auto *ABI = dyn_cast<AllocBoxInst>(I))
+          if (optimizeAllocBox(ABI, PostDomInfo)) {
+            ++NumStackPromoted;
+            // Carefully move iterator to avoid invalidation problems.
+            ++I;
+            ABI->eraseFromParent();
+            continue;
+          }
+
+        ++I;
+      }
+    }
+
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createStackPromotion() {
+  return new SILStackPromotion();
 }

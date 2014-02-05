@@ -19,6 +19,8 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/AliasAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
@@ -316,3 +318,30 @@ void swift::performSILCodeMotion(SILModule *M) {
       sinkCodeFromPredecessors(&BB);
   }
 }
+
+class SILCodeMotion : public SILFunctionTrans {
+  virtual ~SILCodeMotion() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F.getName() <<
+          " *****\n");
+
+    AliasAnalysis AA;
+
+    // Remove dead stores and merge duplicate loads.
+    for (auto &BB : F)
+      promoteMemoryOperationsInBlock(&BB, AA);
+
+    // Sink duplicated code from predecessors.
+    for (auto &BB : F)
+      sinkCodeFromPredecessors(&BB);
+
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createCodeMotion() {
+  return new SILCodeMotion();
+}
+

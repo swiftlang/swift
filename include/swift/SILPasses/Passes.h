@@ -20,6 +20,7 @@
 namespace swift {
   class SILModule;
   class SILOptions;
+  class SILTransform;
 
   /// \brief Run all the SIL diagnostic passes on \p M.
   ///
@@ -120,7 +121,22 @@ namespace swift {
   /// \brief Eliminate alloc_ref with well behaved destructors that have no uses
   /// with side effects.
   void performSILAllocRefElimination(SILModule *M);
-  
+
+  SILTransform *createSILCombine();
+  SILTransform *createDeadFunctionEmim();
+  SILTransform *createLowerAggregate();
+  SILTransform *createSROA();
+  SILTransform *createMem2Reg();
+  SILTransform *createCSE();
+  SILTransform *createCodeMotion();
+  SILTransform *createPerfInliner(int threshold);
+  SILTransform *createGenericSpecializer();
+  SILTransform *createSILARCOpts();
+  SILTransform *createSimplifyCFG();
+  SILTransform *createDevirtualization();
+  SILTransform *createStackPromotion();
+  SILTransform *createSILAllocRefElimination();
+
 } // end namespace swift
 
 #endif

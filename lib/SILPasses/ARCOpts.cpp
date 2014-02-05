@@ -17,6 +17,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -528,3 +530,18 @@ void swift::performSILARCOpts(SILModule *M) {
     processFunction(F);
   }
 }
+
+class SILARCOpts : public SILFunctionTrans {
+  virtual ~SILARCOpts() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    processFunction(F);
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createSILARCOpts() {
+  return new SILARCOpts();
+}
+

@@ -23,6 +23,8 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
@@ -206,8 +208,6 @@ namespace {
 /// obvious cases so that SILCombine and other passes are more effective.
 class CSE {
 public:
-  SILModule &Module;
-
   typedef llvm::ScopedHashTableVal<SimpleValue, ValueBase *> SimpleValueHTType;
   typedef llvm::RecyclingAllocator<llvm::BumpPtrAllocator, SimpleValueHTType>
   AllocatorTy;
@@ -222,9 +222,9 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  explicit CSE(SILModule &M) : Module(M) {}
+  CSE() {}
 
-  bool runOnFunction(SILFunction &F);
+  bool processFunction(SILFunction &F);
 
 private:
   // NodeScope - almost a POD, but needs to call the constructors for the
@@ -285,7 +285,7 @@ private:
 //                             CSE Implementation
 //===----------------------------------------------------------------------===//
 
-bool CSE::runOnFunction(SILFunction &F) {
+bool CSE::processFunction(SILFunction &F) {
   std::vector<StackNode *> nodesToProcess;
 
   DominanceInfo DT(&F);
@@ -390,7 +390,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 //===----------------------------------------------------------------------===//
 
 void swift::performSILCSE(SILModule *M) {
-  CSE C(*M);
+  CSE C;
   for (SILFunction &F : *M) {
     // If F is just a declaration and not a definition, skip it since it has no
     // BB's to process.
@@ -398,6 +398,23 @@ void swift::performSILCSE(SILModule *M) {
       continue;
 
     // Perform CSE.
-    C.runOnFunction(F);
+    C.processFunction(F);
   }
 }
+
+class SILCSE : public SILFunctionTrans {
+  virtual ~SILCSE() {}
+
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    DEBUG(llvm::dbgs() << "***** CSE on function: " << F.getName() <<
+          " *****\n");
+    CSE C;
+    C.processFunction(F);
+    PM->invalidateAllAnalisys(&F, SILAnalysis::IK_Instructions);
+  }
+};
+
+SILTransform *swift::createCSE() {
+  return new SILCSE();
+}
+
