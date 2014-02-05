@@ -237,7 +237,7 @@ static bool canSpecializeFunctionWithSubList(SILFunction *F,
 
 namespace {
 
-struct SILSpecializer {
+struct GenericSpecializer {
   /// A list of ApplyInst instructions.
   typedef SmallVector<ApplyInst *, 16> AIList;
 
@@ -250,7 +250,7 @@ struct SILSpecializer {
   /// A worklist of functions to specialize.
   std::vector<SILFunction*> Worklist;
 
-  SILSpecializer(SILModule *Mod) : M(Mod) {}
+  GenericSpecializer(SILModule *Mod) : M(Mod) {}
 
   bool specializeApplyInstGroup(SILFunction *F, AIList &List);
 
@@ -280,7 +280,7 @@ struct SILSpecializer {
 
 } // end anonymous namespace.
 
-void SILSpecializer::collectApplyInst(SILFunction &F) {
+void GenericSpecializer::collectApplyInst(SILFunction &F) {
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
     for (auto &I : BB) {
@@ -338,7 +338,7 @@ static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
   return true;
 }
 
-bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
+bool GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   bool Changed = false;
   // Make sure we can specialize this function.
   if (!canSpecializeFunction(F))
@@ -428,18 +428,17 @@ bool SILSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     }
   }
 
-
   return Changed;
 }
 
 bool swift::performSILSpecialization(SILModule *M) {
-  return SILSpecializer(M).specialize();
+  return GenericSpecializer(M).specialize();
 }
 
-class SILGenericSpecializer : public SILModuleTrans {
+class SILGenericSpecializerTransform : public SILModuleTrans {
 
 public:
-  SILGenericSpecializer() {}
+  SILGenericSpecializerTransform() {}
 
   virtual void runOnModule(SILModule &M, SILPassManager *PM) {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -448,7 +447,7 @@ public:
     std::vector<SILFunction *> Worklist;
     CGA->bottomUpCallGraphOrder(Worklist);
 
-     bool Changed = SILSpecializer(&M).specialize();
+     bool Changed = GenericSpecializer(&M).specialize();
     
     if (Changed)
       PM->scheduleAnotherIteration();
@@ -459,5 +458,5 @@ public:
 };
 
 SILTransform *swift::createGenericSpecializer() {
-  return new SILGenericSpecializer();
+  return new SILGenericSpecializerTransform();
 }
