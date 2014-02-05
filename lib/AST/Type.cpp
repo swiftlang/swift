@@ -1905,7 +1905,7 @@ case TypeKind::Id:
     CanType canTransResult = transResult->getCanonicalType();
     changed = changed || (canTransResult != origResult.getType());
     
-    SILResultInfo origInterfaceResult = fnTy->getResult();
+    SILResultInfo origInterfaceResult = fnTy->getInterfaceResult();
     Type transInterfaceResult = origResult.getType().transform(fn);
     if (!transInterfaceResult)
       return Type();
