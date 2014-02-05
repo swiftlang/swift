@@ -15,8 +15,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
 
-#ifndef SWIFT_SILPASSES_ANALYSIS_H
-#define SWIFT_SILPASSES_ANALYSIS_H
+#ifndef SWIFT_SILANALYSIS_ANALYSIS_H
+#define SWIFT_SILANALYSIS_ANALYSIS_H
 
 namespace swift {
   class SILModule;
