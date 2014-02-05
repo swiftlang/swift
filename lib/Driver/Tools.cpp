@@ -131,6 +131,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_LLVM_BC:
       FrontendModeOption = "-emit-bc";
       break;
+    case types::TY_Assembly:
+      FrontendModeOption = "-S";
+      break;
     case types::TY_SwiftModuleFile:
       // Since this is our primary output, we need to specify the option here.
       FrontendModeOption = "-emit-module";
@@ -143,8 +146,16 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
         llvm_unreachable("We were told to perform a standard compile, "
                          "but no mode option was passed to the driver.");
       break;
-    default:
-      llvm_unreachable("Invalid output type");
+    case types::TY_Swift:
+    case types::TY_dSYM:
+    case types::TY_Dependencies:
+    case types::TY_ClangModuleFile:
+    case types::TY_SerializedDiagnostics:
+    case types::TY_Image:
+      llvm_unreachable("Output type can never be primary output.");
+    case types::TY_INVALID:
+    case types::TY_LAST:
+      llvm_unreachable("Invalid type ID");
     }
     break;
   }
