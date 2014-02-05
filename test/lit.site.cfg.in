@@ -53,6 +53,9 @@ config.test_triple = lit_config.params.get('test_triple', None)
 config.available_features.add("CPU=" + run_cpu)
 config.available_features.add("OS=" + run_os)
 
+# Add substitutions for the run target triple, CPU, and OS.
+config.substitutions.append(('%target-cpu', run_cpu))
+config.substitutions.append(('%target-os', run_os))
 
 # Enable interpreter-based tests on platforms where the interpreter is known to
 # work.
