@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -62,4 +63,28 @@ ID types::lookupTypeForName(StringRef Name) {
       return (ID)(i + 1);
   }
   return TY_INVALID;
+}
+
+bool types::isTextual(ID Id) {
+  switch (Id) {
+  case types::TY_Swift:
+  case types::TY_SIL:
+  case types::TY_Dependencies:
+  case types::TY_Assembly:
+  case types::TY_RawSIL:
+  case types::TY_LLVM_IR:
+    return true;
+  case types::TY_Image:
+  case types::TY_Object:
+  case types::TY_dSYM:
+  case types::TY_SwiftModuleFile:
+  case types::TY_LLVM_BC:
+  case types::TY_SerializedDiagnostics:
+  case types::TY_ClangModuleFile:
+  case types::TY_Nothing:
+    return false;
+  case types::TY_INVALID:
+  case types::TY_LAST:
+    llvm_unreachable("Invalid type ID.");
+  }
 }

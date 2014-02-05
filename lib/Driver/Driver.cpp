@@ -689,9 +689,12 @@ static StringRef getOutputFilename(const JobAction *JA,
 
   // We don't have an output from an Action-specific command line option,
   // so figure one out using the defaults.
-  if (AtTopLevel)
+  if (AtTopLevel) {
     if (Arg *FinalOutput = Args.getLastArg(options::OPT_o))
       return FinalOutput->getValue();
+    if (types::isTextual(JA->getType()))
+      return "-";
+  }
 
   assert(!BaseInput.empty() &&
          "A Command which produces output must have a BaseInput!");

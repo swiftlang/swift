@@ -41,6 +41,9 @@ namespace types {
   /// Lookup the type to use for the name \p Name.
   ID lookupTypeForName(StringRef Name);
 
+  /// Returns true if the type represents textual data.
+  bool isTextual(ID Id);
+
 } // end namespace types
 } // end namespace driver
 } // end namespace swift
