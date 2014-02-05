@@ -574,7 +574,7 @@ Compile Swift programs just like C programs:
 If you want to use Cocoa frameworks, run the Swift installed in Xcode using
 "xcrun swift", or pass an SDK explicitly:
 
-        swift -sdk $(xcrun --show-sdk-path --sdk macosx)
+        swift -sdk \$(xcrun --show-sdk-path --sdk macosx)
 
 Language documentation and examples are installed under /usr/share/swift.
 
