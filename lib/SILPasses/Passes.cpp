@@ -91,8 +91,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
-  // Continue to optimize the code until we can't specialize any more.
-
     SILPassManager PM;
     PM.registerAnalysis(createCallGraphAnalysis(&Module));
     PM.add(createGenericSpecializer());

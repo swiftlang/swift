@@ -23,17 +23,23 @@ using namespace swift;
 STATISTIC(NumOptzIterations, "Number of optimization iterations");
 
 void SILPassManager::run(SILModule &Mod) {
+  // Keep optimizing the module untill no one requested another iteration
+  // of the pass.
   do {
     DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
-
     NumOptzIterations++;
     anotherIteration = false;
+
+    // For each transformation:
     for (SILTransform *ST : Transformations) {
+
+      // Run module transformations on the module.
       if (SILModuleTrans *SMT = llvm::dyn_cast<SILModuleTrans>(ST)) {
         SMT->runOnModule(Mod, this);
         continue;
       }
 
+      // Run function transformation on all functions.
       if (SILFunctionTrans *SFT = llvm::dyn_cast<SILFunctionTrans>(ST)) {
         for (auto &F : Mod)
           if (!F.empty())
@@ -41,7 +47,7 @@ void SILPassManager::run(SILModule &Mod) {
         continue;
       }
 
-      llvm_unreachable("Unknown pass!");
+      llvm_unreachable("Unknown pass kind.");
     }
   } while (anotherIteration);
 }
