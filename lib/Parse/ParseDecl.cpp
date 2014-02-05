@@ -483,9 +483,17 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
         || Tok2.isContextualKeyword("infix"));
 }
 
-static bool isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
-  return Tok.isContextualKeyword("type")
-    && (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
+static bool isStartOfModifiedDecl(const Token &Tok, const Token &Tok2,
+                                  bool &IsMutating) {
+  if (Tok.isContextualKeyword("type"))
+    IsMutating = false;
+  else if (Tok.isContextualKeyword("mutating"))
+    IsMutating = true;
+  else
+    return false;
+  
+  return
+       (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
         Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
         Tok2.is(tok::kw_subscript) || Tok2.is(tok::kw_struct) ||
         Tok2.is(tok::kw_enum) || Tok2.is(tok::kw_class) ||
@@ -514,7 +522,10 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_protocol:
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
   default:
-    return isStartOfMetaDecl(Tok, Tok2) || isStartOfOperatorDecl(Tok, Tok2);
+    if (isStartOfOperatorDecl(Tok, Tok2)) return true;
+      
+    bool isMutating = false;
+    return isStartOfModifiedDecl(Tok, Tok2, isMutating);
   }
 }
 
@@ -579,11 +590,17 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
   // If we see the contextual 'type' keyword followed by a declaration
   // keyword, parse it now.
-  SourceLoc StaticLoc;
-  bool UnhandledStatic = false;
-  if (isStartOfMetaDecl(Tok, peekToken())) {
-    StaticLoc = consumeToken();
-    UnhandledStatic = true;
+  SourceLoc StaticLoc, MutatingLoc;
+  bool UnhandledStatic = false, UnhandledMutating = false;
+  bool IsMutating = false;
+  if (isStartOfModifiedDecl(Tok, peekToken(), IsMutating)) {
+    if (IsMutating) {
+      MutatingLoc = consumeToken(tok::identifier);
+      UnhandledMutating = true;
+    } else {
+      StaticLoc = consumeToken(tok::identifier);
+      UnhandledStatic = true;
+    }
   } else if (Tok.is(tok::kw_static)) {
     // If we see 'static', provide a Fix-It to 'type'.
     StaticLoc = consumeToken();
@@ -643,9 +660,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
 
   case tok::kw_func:
-    DeclResult = parseDeclFunc(StaticLoc, Flags, Attributes);
+    DeclResult = parseDeclFunc(StaticLoc, MutatingLoc, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
+    UnhandledMutating = false;
     break;
 
   case tok::kw_subscript:
@@ -687,10 +705,15 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   if (Status.isSuccess() && Tok.is(tok::semi))
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
 
-  // If we parsed 'type' but didn't handle it above, complain about it.
-  if (Status.isSuccess() && UnhandledStatic) {
-    diagnose(Entries.back()->getLoc(), diag::decl_not_type)
-      .fixItRemove(SourceRange(StaticLoc));
+  if (Status.isSuccess()) {
+    // If we parsed 'type' but didn't handle it above, complain about it.
+    if (UnhandledStatic)
+      diagnose(Entries.back()->getLoc(), diag::decl_not_type)
+        .fixItRemove(SourceRange(StaticLoc));
+    // If we parsed 'mutating' but didn't handle it above, complain about it.
+    if (UnhandledMutating)
+      diagnose(Entries.back()->getLoc(), diag::mutating_invalid)
+        .fixItRemove(SourceRange(MutatingLoc));
   }
 
   return Status;
@@ -1784,15 +1807,17 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \verbatim
 ///   decl-func:
-///     'type'? 'func' attribute-list any-identifier generic-params?
+///     'type'? 'mutating'? 'func' attribute-list any-identifier generic-params?
 ///               func-signature stmt-brace?
 /// \endverbatim
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
-Parser::parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
-                      DeclAttributes &Attributes) {
+Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
+                      ParseDeclOptions Flags, DeclAttributes &Attributes) {
   bool HasContainerType = Flags.contains(PD_HasContainerType);
+  assert((StaticLoc.isInvalid() || MutatingLoc.isInvalid()) &&
+         "Parser should only parse one of mutating or type");
 
   // Reject 'type' functions at global scope.
   if (StaticLoc.isValid() && !HasContainerType) {
@@ -1800,13 +1825,20 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, ParseDeclOptions Flags,
       .fixItRemoveChars(StaticLoc, Tok.getLoc());
     StaticLoc = SourceLoc();
   }
-  
-  SourceLoc FuncLoc = consumeToken(tok::kw_func);
+
+  // If the 'mutating' modifier was applied to the func, model it as if the
+  // @mutating attribute were specified.
+  if (MutatingLoc.isValid()) {
+    if (!Attributes.isValid()) Attributes.AtLoc = MutatingLoc;
+    Attributes.setAttr(AK_mutating, MutatingLoc);
+  }
 
   if (StaticLoc.isValid() && Attributes.hasMutating()) {
     diagnose(Tok, diag::static_functions_not_mutating);
     Attributes.clearAttribute(AK_mutating);
   }
+
+  SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();

@@ -168,6 +168,8 @@ ERROR(decl_not_type,decl_parsing,none,
       "declaration cannot be marked 'type'", ())
 ERROR(static_is_type,decl_parsing,none,
       "the 'static' keyword has been renamed to 'type'", ())
+ERROR(mutating_invalid,sema_tcd,none,
+      "'mutating' is not valid on this declaration", ())
 
 // Variable getters/setters
 ERROR(computed_property_no_accessors, decl_parsing, none,

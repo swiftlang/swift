@@ -2363,10 +2363,13 @@ public:
     // on funcdecl (instead of just being in DeclAttrs).
     Optional<bool> MutatingAttr = FD->getAttrs().getMutating();
     if (MutatingAttr) {
-      if (!FD->getDeclContext()->isTypeContext() ||
-          FD->getDeclContext()->getDeclaredTypeInContext()
-            ->hasReferenceSemantics())
-        TC.diagnose(FD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
+      if (!FD->getDeclContext()->isTypeContext())
+        TC.diagnose(FD->getAttrs().getLoc(AK_mutating),
+                    diag::mutating_invalid_global_scope);
+      else if (FD->getDeclContext()->getDeclaredTypeInContext()
+                 ->hasReferenceSemantics())
+        TC.diagnose(FD->getAttrs().getLoc(AK_mutating),
+                    diag::mutating_invalid_classes);
       else
         FD->setMutating(MutatingAttr.getValue());
     }
@@ -2807,7 +2810,8 @@ public:
 
     // Reject @mutating and @!mutating attributes.
     if (CD->getAttrs().getMutating())
-      TC.diagnose(CD->getAttrs().getLoc(AK_mutating), diag::mutating_invalid);
+      TC.diagnose(CD->getAttrs().getLoc(AK_mutating),
+                  diag::mutating_invalid_init);
 
 
     GenericParamList *outerGenericParams;

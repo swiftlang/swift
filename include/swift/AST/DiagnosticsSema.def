@@ -225,8 +225,13 @@ ERROR(invalid_prefix_input,sema_tcd,none,
       "only unary operators can be declared 'prefix'", ())
 ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial @inout argument", ())
-ERROR(mutating_invalid,sema_tcd,none,
-      "@mutating is not valid on this declaration", ())
+ERROR(mutating_invalid_global_scope,sema_tcd,none,
+      "'mutating' is only valid on methods", ())
+ERROR(mutating_invalid_classes,sema_tcd,none,
+      "'mutating' isn't valid on methods in classes or class-bound protocols",
+      ())
+ERROR(mutating_invalid_init,sema_tcd,none,
+      "'mutating' isn't allowed on init methods", ())
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,
@@ -340,7 +345,7 @@ NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
 NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
-     "candidate is marked @mutating but protocol does not allow it", ())
+     "candidate is marked 'mutating' but protocol does not allow it", ())
 
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
