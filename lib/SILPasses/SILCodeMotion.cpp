@@ -56,6 +56,8 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
   while (II != E) {
     SILInstruction *Inst = II++;
 
+    DEBUG(llvm::dbgs() << "Visiting: " << *Inst);
+
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
       // Invalidate all loads that this store writes to.
@@ -72,6 +74,8 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
       // If we are storing to the previously stored address then delete the old
       // store.
       if (PrevStore && PrevStore->getDest() == SI->getDest()) {
+        DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
+              << *PrevStore);
         recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
         PrevStore = SI;
         NumDeadStores++;
@@ -84,6 +88,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
       // If we are loading a value that we just saved then use the saved value.
       if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
+        DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
         recursivelyDeleteTriviallyDeadInstructions(LI, true);
         NumDupLoads++;
@@ -94,6 +99,8 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
       // previous loads.
       for (auto PrevLd : Loads) {
         if (PrevLd->getOperand() == LI->getOperand()) {
+          DEBUG(llvm::dbgs() << "    Replacing with previous load: "
+                << *PrevLd);
           SILValue(LI, 0).replaceAllUsesWith(PrevLd);
           recursivelyDeleteTriviallyDeadInstructions(LI, true);
           LI = 0;
@@ -108,21 +115,33 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
     }
 
     // Retains write to memory but they don't affect loads and stores.
-    if (isa<StrongRetainInst>(Inst))
+    if (isa<StrongRetainInst>(Inst)) {
+      DEBUG(llvm::dbgs() << "    Found strong retain, does not affect loads and"
+            " stores.\n");
       continue;
+    }
 
     if (auto *AI = dyn_cast<ApplyInst>(Inst))
       if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
-        if (isReadNone(BI))
+        if (isReadNone(BI)) {
+          DEBUG(llvm::dbgs() << "    Found readnone builtin, does not affect "
+                "loads and stores.\n");
           continue;
+        }
 
     // cond_fail does not read/write memory in a manner that we care about.
-    if (isa<CondFailInst>(Inst))
+    if (isa<CondFailInst>(Inst)) {
+      DEBUG(llvm::dbgs() << "    Found a cond fail, does not affect "
+            "loads and stores.\n");
       continue;
+    }
 
     // All other instructions that read from memory invalidate the store.
-    if (Inst->mayReadFromMemory())
+    if (Inst->mayReadFromMemory()) {
+      DEBUG(llvm::dbgs() << "    Found an instruction that reads from memory."
+            " Invalidating store.\n");
       PrevStore = 0;
+    }
 
     // If we have an instruction that may write to memory and we can not prove
     // that it and its operands can not alias a load we have visited, invalidate
@@ -132,8 +151,11 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
       for (auto *LI : Loads)
         if (isWriteMemBehavior(AA.getMemoryBehavior(Inst, SILValue(LI))))
           InvalidatedLoadList.push_back(LI);
-      for (auto *LI : InvalidatedLoadList)
+      for (auto *LI : InvalidatedLoadList) {
+        DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
+              "such that a load is invalidated:" << *LI);
         Loads.erase(LI);
+      }
     }
   }
 }
@@ -276,14 +298,20 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
 //===----------------------------------------------------------------------===//
 
 void swift::performSILCodeMotion(SILModule *M) {
+  DEBUG(llvm::dbgs() << "***** SIL CODE MOTION *****\n");
+
   for (SILFunction &F : *M) {
     AliasAnalysis AA;
 
+    DEBUG(llvm::dbgs() << "*** Visiting: " << F.getName() << " ***\n");
+
     // Remove dead stores and merge duplicate loads.
+    DEBUG(llvm::dbgs() << "PROMOTING MEMORY OPERATIONS:\n");
     for (auto &BB : F)
       promoteMemoryOperationsInBlock(&BB, AA);
 
     // Sink duplicated code from predecessors.
+    DEBUG(llvm::dbgs() << "SINKING DUPLICATE CODE:\n");
     for (auto &BB : F)
       sinkCodeFromPredecessors(&BB);
   }
