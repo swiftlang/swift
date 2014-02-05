@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SILANALYSIS_ARCANALYSIS_H
+#define SWIFT_SILANALYSIS_ARCANALYSIS_H
+
 namespace swift {
 
 class SILValue;
@@ -29,3 +32,5 @@ bool cannotUseValue(SILInstruction *Inst, SILValue Target);
 
 } // end namespace arc
 } // end namespace swift
+
+#endif

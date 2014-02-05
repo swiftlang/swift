@@ -1,4 +1,4 @@
-##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
+##===- swift/lib/SILAnalysis/Makefile ----------------------*- Makefile -*-===##
 # 
 # This source file is part of the Swift.org open source project
 #
@@ -9,11 +9,10 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 ##===----------------------------------------------------------------------===##
-SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL SILAnalysis SILGen SILPasses \
-                IRGen ClangImporter NullClangImporter                 \
-                ASTSectionImporter Serialization IDE Driver Frontend  \
-                Immediate OptimizeARC
+SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
+
+LIBRARYNAME := swiftSILAnalysis
 
 include $(SWIFT_LEVEL)/Makefile

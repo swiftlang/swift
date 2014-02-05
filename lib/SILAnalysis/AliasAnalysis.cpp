@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-aa"
-#include "swift/SILPasses/Utils/AliasAnalysis.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-arc-analysis"
-#include "ARCAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"

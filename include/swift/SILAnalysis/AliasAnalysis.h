@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
-#define SWIFT_SILPASSES_UTILS_ALIASANALYSIS_H
+#ifndef SWIFT_SILANALYSIS_ALIASANALYSIS_H
+#define SWIFT_SILANALYSIS_ALIASANALYSIS_H
 
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
