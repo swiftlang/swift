@@ -10,7 +10,6 @@ add_swift_library(swiftSILPasses
   InOutDeshadowing.cpp
   Link.cpp
   MandatoryInlining.cpp
-  Analysis.cpp
   Passes.cpp
   PassManager.cpp
   PredictableMemOpt.cpp

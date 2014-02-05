@@ -11,13 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-analysis"
-
-
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILPasses/Analysis.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "swift/SILPasses/Utils/Local.h"

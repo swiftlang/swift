@@ -13,7 +13,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "swift/SILPasses/Analysis.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Transforms.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H

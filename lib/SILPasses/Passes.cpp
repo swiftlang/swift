@@ -31,7 +31,7 @@
 
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/Analysis.h"
+#include "swift/SILAnalysis/Analysis.h"
 
 using namespace swift;
 
