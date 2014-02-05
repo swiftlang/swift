@@ -389,10 +389,10 @@ void swift::performSILPerformanceInlining(SILModule *M,
 }
 
 class SILPerformanceInlinerPass : public SILModuleTrans {
-  int Threshold;
+  unsigned Threshold;
 
 public:
-  SILPerformanceInlinerPass(int th) : Threshold(th) {}
+  SILPerformanceInlinerPass(unsigned th) : Threshold(th) {}
 
   virtual void runOnModule(SILModule &M, SILPassManager *PM) {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
@@ -419,7 +419,7 @@ public:
   }
 };
 
-SILTransform *swift::createPerfInliner(int threshold) {
+SILTransform *swift::createPerfInliner(unsigned threshold) {
   return new SILPerformanceInlinerPass(threshold);
 }
 
