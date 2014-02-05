@@ -229,10 +229,30 @@ public:
     return V->getKind() == KIND;
   }
 };
-  
+
+//===----------------------------------------------------------------------===//
+// Allocation Instructions
+//===----------------------------------------------------------------------===//
+
+/// Abstract base class for literal instructions.
+class AllocationInst : public SILInstruction {
+protected:
+  AllocationInst(ValueKind Kind, SILLocation Loc, SILType Ty)
+    : SILInstruction(Kind, Loc, Ty) {}
+  AllocationInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList=nullptr,
+                 SILDebugScope *DS = nullptr)
+    : SILInstruction(Kind, Loc, TypeList, DS) {}
+public:
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_AllocationInst &&
+      V->getKind() <= ValueKind::Last_AllocationInst;
+  }
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
-class AllocStackInst : public SILInstruction {
+class AllocStackInst : public AllocationInst {
 public:
   AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F);
 
@@ -260,7 +280,7 @@ public:
 /// AllocRefInst - This represents the primitive allocation of an instance
 /// of a reference type. Aside from the reference count, the instance is
 /// returned uninitialized.
-class AllocRefInst : public SILInstruction {
+class AllocRefInst : public AllocationInst {
   bool ObjC;
 
 public:
@@ -284,7 +304,7 @@ public:
 /// pointer with Builtin.ObjectPointer type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
-class AllocBoxInst : public SILInstruction {
+class AllocBoxInst : public AllocationInst {
 public:
   AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F);
 
@@ -311,7 +331,7 @@ public:
 /// header) with Builtin.ObjectPointer type.  The second element returned is an
 /// lvalue to the first array element.
 ///
-class AllocArrayInst : public SILInstruction {
+class AllocArrayInst : public AllocationInst {
   enum {
     NumElements
   };

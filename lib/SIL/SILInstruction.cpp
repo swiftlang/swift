@@ -470,7 +470,7 @@ static SILTypeList *getAllocStackType(SILType eltTy, SILFunction &F) {
 }
 
 AllocStackInst::AllocStackInst(SILLocation loc, SILType elementType, SILFunction &F)
-  : SILInstruction(ValueKind::AllocStackInst, loc,
+  : AllocationInst(ValueKind::AllocStackInst, loc,
                    getAllocStackType(elementType, F)) {
 }
 
@@ -482,7 +482,7 @@ VarDecl *AllocStackInst::getDecl() const {
 
 AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
                            bool objc)
-  : SILInstruction(ValueKind::AllocRefInst, loc, elementType), ObjC(objc) {
+  : AllocationInst(ValueKind::AllocRefInst, loc, elementType), ObjC(objc) {
 }
 
 
@@ -499,7 +499,7 @@ static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
 }
 
 AllocBoxInst::AllocBoxInst(SILLocation Loc, SILType ElementType, SILFunction &F)
-  : SILInstruction(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
+  : AllocationInst(ValueKind::AllocBoxInst, Loc, getAllocType(ElementType, F)) {
 }
 
 /// getDecl - Return the underlying variable declaration associated with this
@@ -512,7 +512,8 @@ VarDecl *AllocBoxInst::getDecl() const {
 
 AllocArrayInst::AllocArrayInst(SILLocation Loc, SILType ElementType,
                                SILValue NumElements, SILFunction &F)
-  : SILInstruction(ValueKind::AllocArrayInst, Loc, getAllocType(ElementType, F)),
+  : AllocationInst(ValueKind::AllocArrayInst,
+                   Loc, getAllocType(ElementType, F)),
     Operands(this, NumElements) {
 }
 

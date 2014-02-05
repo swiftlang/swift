@@ -67,6 +67,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(AllocRefInst, SILInstruction, None)
   INST(AllocBoxInst, SILInstruction, None)
   INST(AllocArrayInst, SILInstruction, None)
+  VALUE_RANGE(AllocationInst, AllocStackInst, AllocArrayInst)
+
   INST(DeallocStackInst, SILInstruction, MayHaveSideEffects)
   INST(DeallocRefInst, SILInstruction, MayHaveSideEffects)
   INST(DeallocBoxInst, SILInstruction, MayHaveSideEffects)
