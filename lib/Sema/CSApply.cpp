@@ -3293,8 +3293,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
 
+  // Handle applications that implicitly look through UncheckedOptional<T>.
+  auto fn = apply->getFn();
+  if (auto fnTy = cs.lookThroughUncheckedOptionalType(fn->getType())) {
+    fn = coerceUncheckedOptionalToValue(fn, fnTy, locator);
+    if (!fn) return nullptr;
+  }
+
   // The function is always an rvalue.
-  auto fn = tc.coerceToRValue(apply->getFn());
+  fn = tc.coerceToRValue(fn);
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;

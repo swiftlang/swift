@@ -1678,6 +1678,12 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
                                      /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
+  // Try to look through UncheckedOptional<T>; the result is always an r-value.
+  if (auto objTy = lookThroughUncheckedOptionalType(desugar2)) {
+    type2 = objTy;
+    desugar2 = type2->getDesugaredType();
+  }
+
   // Force the right-hand side to be an rvalue.
   unsigned flags = TMF_GenerateConstraints;
 
