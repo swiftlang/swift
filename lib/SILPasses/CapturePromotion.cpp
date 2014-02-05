@@ -17,6 +17,9 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
+
 using namespace swift;
 
 typedef llvm::SmallSet<unsigned, 4> IndicesSet;
@@ -794,3 +797,23 @@ swift::performSILCapturePromotion(SILModule *M) {
   while (!Worklist.empty())
     runOnFunction(Worklist.pop_back_val(), Worklist);
 }
+
+class CapturePromotionPass : public SILModuleTrans {
+  virtual ~CapturePromotionPass() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+    SmallVector<SILFunction*, 128> Worklist;
+    for (auto &F : M)
+      runOnFunction(&F, Worklist);
+    while (!Worklist.empty())
+      runOnFunction(Worklist.pop_back_val(), Worklist);
+
+    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+  }
+};
+
+SILTransform *swift::createCapturePromotion() {
+  return new CapturePromotionPass();
+}
+

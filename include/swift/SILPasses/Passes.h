@@ -122,6 +122,16 @@ namespace swift {
   /// with side effects.
   void performSILAllocRefElimination(SILModule *M);
 
+  // Diagnostics transformations.
+  SILTransform *createCapturePromotion();
+  SILTransform *createInOutDeshadowing();
+  SILTransform *createDefiniteInitialization();
+  SILTransform *createPredictableMemoryOptimizations();
+  SILTransform *createConstantPropagation();
+  SILTransform *createDCE();
+  SILTransform *createMandatoryInlining();
+
+  // Performance transformations.
   SILTransform *createSILCombine();
   SILTransform *createDeadFunctionEmim();
   SILTransform *createLowerAggregate();

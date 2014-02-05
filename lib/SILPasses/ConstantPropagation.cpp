@@ -15,6 +15,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -814,3 +816,18 @@ void swift::performSILConstantPropagation(SILModule *M) {
   for (auto &Fn : *M)
     CCPFunctionBody(Fn);
 }
+
+class ConstantPropagation : public SILFunctionTrans {
+  virtual ~ConstantPropagation() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    CCPFunctionBody(F);
+    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+  }
+};
+
+SILTransform *swift::createConstantPropagation() {
+  return new ConstantPropagation();
+}
+

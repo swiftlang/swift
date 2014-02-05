@@ -26,8 +26,11 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
 using namespace swift;
 
 STATISTIC(NumShadowsRemoved, "Number of inout shadow variables removed");
@@ -162,4 +165,33 @@ void swift::performInOutDeshadowing(SILModule *M) {
   }
 }
 
+class InOutDeshadowing : public SILFunctionTrans {
+  virtual ~InOutDeshadowing() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    SILBasicBlock &EntryBlock = F.front();
+
+    // For each function, find any inout arguments and try to optimize each of
+    // them.
+    SILFunctionType *FTI = F.getLoweredFunctionType();
+
+    for (unsigned arg = 0, e = FTI->getInterfaceParameters().size();
+         arg != e; ++arg) {
+      if (!FTI->getInterfaceParameters()[arg].isIndirectInOut()) continue;
+
+      DEBUG(llvm::dbgs()<< "  " << F.getName() << ": argument #"<< arg << "\n");
+
+      if (processInOutValue(EntryBlock.getBBArgs()[arg]))
+        ++NumShadowsRemoved;
+      else {
+        ++NumShadowsKept;
+      }
+    }
+  }
+};
+
+SILTransform *swift::createInOutDeshadowing() {
+  return new InOutDeshadowing();
+}
 

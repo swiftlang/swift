@@ -16,6 +16,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/ImmutableSet.h"
@@ -452,4 +454,20 @@ void swift::performSILMandatoryInlining(SILModule *M) {
     // Okay, just erase the function from the module.
     M->getFunctionList().erase(&F);
   }
+}
+
+class MandatoryInlining : public SILModuleTrans {
+  virtual ~MandatoryInlining() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+
+    performSILMandatoryInlining(&M);
+
+    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+  }
+};
+
+SILTransform *swift::createMandatoryInlining() {
+  return new MandatoryInlining();
 }

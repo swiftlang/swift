@@ -15,6 +15,8 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -969,3 +971,22 @@ void swift::performSILPredictableMemoryOptimizations(SILModule *M) {
 #endif
   }
 }
+
+class PredictableMemoryOptimizations : public SILFunctionTrans {
+  virtual ~PredictableMemoryOptimizations() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+    optimizeMemoryAllocations(F);
+    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+  }
+};
+
+SILTransform *swift::createPredictableMemoryOptimizations() {
+  return new PredictableMemoryOptimizations();
+}
+
+
+
+
+

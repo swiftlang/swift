@@ -16,6 +16,8 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -669,3 +671,20 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
     removeUnreachableBlocks(Fn, *M, &State);
   }
 }
+
+class DCE : public SILModuleTrans {
+  virtual ~DCE() {}
+
+  /// The entry point to the transformation.
+  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+
+    performSILDeadCodeElimination(&M);
+
+    PM->invalidateAllAnalysis(SILAnalysis::IK_All);
+  }
+};
+
+SILTransform *swift::createDCE() {
+  return new DCE();
+}
+
