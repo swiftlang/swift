@@ -1621,7 +1621,8 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
       return t->is<ArchetypeType>();
     }) && "interface type of generic type should not contain context archetypes");
   }
-      
+
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   assert(getParameters().size() == getInterfaceParameters().size());
   for (unsigned i : indices(getParameters())) {
     (void)i;
@@ -1644,6 +1645,7 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
                                               getInterfaceResult().getType())
               ->getCanonicalType()
          && "interface result type differs");
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 }
 
 CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,

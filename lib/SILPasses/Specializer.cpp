@@ -138,7 +138,7 @@ private:
     // Create a new empty function.
     SILFunction *NewF =
         SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
-                            NewName, FTy,
+                            NewName, FTy, nullptr,
                             Orig->getLocation(), Orig->isBare(),
                             Orig->isTransparent(), 0,
                             Orig->getDebugScope(), Orig->getDeclContext());

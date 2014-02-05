@@ -202,6 +202,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (DeclOnly)
     return;
   
+  if (auto gp = F.getContextGenericParams()) {
+    S.writeGenericParams(gp, SILAbbrCodes);
+  }
+  
   // Assign a unique ID to each basic block of the SILFunction.
   unsigned BasicID = 0;
   BasicBlockMap.clear();
@@ -1302,6 +1306,10 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
     registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
     registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
     registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
+    registerSILAbbr<decls_block::GenericParamListLayout>();
+    registerSILAbbr<decls_block::GenericParamLayout>();
+    registerSILAbbr<decls_block::GenericRequirementLayout>();
+    registerSILAbbr<decls_block::LastGenericRequirementLayout>();
 
     for (const SILGlobalVariable &g : SILMod->getSILGlobals())
       writeGlobalVar(g);

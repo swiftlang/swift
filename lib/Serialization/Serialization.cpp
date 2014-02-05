@@ -293,6 +293,14 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::GENERIC_PARAM_LIST);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::GENERIC_PARAM);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::GENERIC_REQUIREMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::LAST_GENERIC_REQUIREMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -583,7 +591,8 @@ void Serializer::writeRequirements(ArrayRef<Requirement> requirements) {
   }
 }
 
-bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
+bool Serializer::writeGenericParams(const GenericParamList *genericParams,
+                                  const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
 
   // Don't write anything if there are no generic params.
@@ -594,17 +603,17 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
   for (auto archetype : genericParams->getAllArchetypes())
     archetypeIDs.push_back(addTypeRef(archetype));
 
-  unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
+  unsigned abbrCode = abbrCodes[GenericParamListLayout::Code];
   GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      archetypeIDs);
 
-  abbrCode = DeclTypeAbbrCodes[GenericParamLayout::Code];
+  abbrCode = abbrCodes[GenericParamLayout::Code];
   for (auto next : genericParams->getParams()) {
     GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addDeclRef(next.getDecl()));
   }
 
-  abbrCode = DeclTypeAbbrCodes[GenericRequirementLayout::Code];
+  abbrCode = abbrCodes[GenericRequirementLayout::Code];
   for (auto next : genericParams->getRequirements()) {
     switch (next.getKind()) {
     case RequirementKind::Conformance:
@@ -627,7 +636,7 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
     }
   }
 
-  abbrCode = DeclTypeAbbrCodes[LastGenericRequirementLayout::Code];
+  abbrCode = abbrCodes[LastGenericRequirementLayout::Code];
   uint8_t dummy = 0;
   LastGenericRequirementLayout::emitRecord(Out, ScratchRecord, abbrCode, dummy);
   return true;
@@ -1230,7 +1239,7 @@ void Serializer::writeDecl(const Decl *D) {
                              addDeclRef(DC),
                              theStruct->isImplicit());
 
-    writeGenericParams(theStruct->getGenericParams());
+    writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theStruct->getGenericRequirements());
     writeConformances(theStruct->getProtocols(), theStruct->getConformances(),
                       theStruct, DeclTypeAbbrCodes);
@@ -1251,7 +1260,7 @@ void Serializer::writeDecl(const Decl *D) {
                             theEnum->isImplicit(),
                             addTypeRef(theEnum->getRawType()));
 
-    writeGenericParams(theEnum->getGenericParams());
+    writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theEnum->getGenericRequirements());
     writeConformances(theEnum->getProtocols(), theEnum->getConformances(),
                       theEnum, DeclTypeAbbrCodes);
@@ -1279,7 +1288,7 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->requiresStoredPropertyInits(),
                             addTypeRef(theClass->getSuperclass()));
 
-    writeGenericParams(theClass->getGenericParams());
+    writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theClass->getGenericRequirements());
     writeConformances(theClass->getProtocols(), theClass->getConformances(),
                       theClass, DeclTypeAbbrCodes);
@@ -1307,7 +1316,7 @@ void Serializer::writeDecl(const Decl *D) {
                                proto->isObjC(),
                                protocols);
 
-    writeGenericParams(proto->getGenericParams());
+    writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(proto->getGenericRequirements());
     writeMembers(proto->getMembers(), true);
     break;
@@ -1395,7 +1404,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOverriddenDecl()),
                            fn->getAttrs().AsmName);
 
-    writeGenericParams(fn->getGenericParams());
+    writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write both argument and body parameters. This is important for proper
     // error messages with selector-style declarations.
@@ -1466,7 +1475,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(implicitSelf));
 
-    writeGenericParams(ctor->getGenericParams());
+    writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
     assert(ctor->getArgParamPatterns().size() == 2);
     assert(ctor->getBodyParamPatterns().size() == 2);
     for (auto pattern : ctor->getArgParamPatterns())
@@ -1791,7 +1800,7 @@ void Serializer::writeType(Type ty) {
                                               fnTy->isThin(),
                                               fnTy->isNoReturn());
     if (!genericContext)
-      writeGenericParams(&fnTy->getGenericParams());
+      writeGenericParams(&fnTy->getGenericParams(), DeclTypeAbbrCodes);
     break;
   }
 
@@ -1816,8 +1825,8 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::SILFunction: {
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
-
     auto genericParams = fnTy->getGenericParams();
 
     auto callingConvention = fnTy->getAbstractCC();
@@ -1870,8 +1879,9 @@ void Serializer::writeType(Type ty) {
     else
       writeRequirements({});
     if (genericParams)
-      writeGenericParams(genericParams);
+      writeGenericParams(genericParams, DeclTypeAbbrCodes);
     break;
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   }
 
   case TypeKind::Array: {

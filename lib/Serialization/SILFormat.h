@@ -97,7 +97,21 @@ namespace sil_block {
     SIL_INST_CAST, // It has a cast kind instead of an attribute.
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESSTABLE,
-    SIL_WITNESS_METHOD_ENTRY
+    SIL_WITNESS_METHOD_ENTRY,
+    
+    // We also share these layouts from the decls block. Their enumerators must
+    // not overlap with ours.
+    BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
+    NO_CONFORMANCE = decls_block::NO_CONFORMANCE,
+    NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
+    SPECIALIZED_PROTOCOL_CONFORMANCE
+      = decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE,
+    INHERITED_PROTOCOL_CONFORMANCE
+      = decls_block::INHERITED_PROTOCOL_CONFORMANCE,
+    GENERIC_PARAM_LIST = decls_block::GENERIC_PARAM_LIST,
+    GENERIC_PARAM = decls_block::GENERIC_PARAM,
+    GENERIC_REQUIREMENT = decls_block::GENERIC_REQUIREMENT,
+    LAST_GENERIC_REQUIREMENT = decls_block::LAST_GENERIC_REQUIREMENT,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -139,6 +153,7 @@ namespace sil_block {
     SILLinkageField,
     BCFixed<1>,        // transparent
     TypeIDField
+                       // followed by generic param list, if any
   >;
 
   // Has an optional argument list where each argument is a typed valueref.

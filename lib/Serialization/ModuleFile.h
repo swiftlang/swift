@@ -274,12 +274,6 @@ private:
                             serialization::IdentifierID moduleID,
                             llvm::BitstreamCursor &Cursor);
 
-  /// Reads a generic param list from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a generic param list, returns null
-  /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
-
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
                                                 DeclContext *DC);
 
@@ -459,6 +453,12 @@ public:
   Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 
+  /// Reads a generic param list from \c DeclTypeCursor.
+  ///
+  /// If the record at the cursor is not a generic param list, returns null
+  /// without moving the cursor.
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;
 };

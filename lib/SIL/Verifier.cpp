@@ -1666,6 +1666,11 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
+    if (F->getLoweredFunctionType()->isPolymorphic()) {
+      require(F->getContextGenericParams(),
+              "generic function definition must have context archetypes");
+    }
+    
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
     

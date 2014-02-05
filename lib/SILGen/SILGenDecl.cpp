@@ -2119,10 +2119,14 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   }
   
   auto *f = SILFunction::create(M, linkage, nameBuffer,
-                                witnessSILType.castTo<SILFunctionType>(),
-                                SILLocation(witness.getDecl()),
-                                IsNotBare,
-                                IsNotTransparent);
+                witnessSILType.castTo<SILFunctionType>(),
+                // FIXME: Tease out the logic above for forming the generic
+                // param list for the PolymorphicFunctionType and use it to
+                // directly get the context generic params here.
+                witnessSILType.castTo<SILFunctionType>()->getGenericParams(),
+                SILLocation(witness.getDecl()),
+                IsNotBare,
+                IsNotTransparent);
   
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(witness.getDecl())));
   
@@ -2156,6 +2160,8 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
     mangler.mangleType(toType, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
-  return M.getOrCreateSharedFunction(loc, buffer.str(), thunkType,
+  // FIXME: Fake up context generic params for the thunk.
+  return M.getOrCreateSharedFunction(loc, buffer.str(),
+                                     thunkType, thunkType->getGenericParams(),
                                      IsBare, IsTransparent);
 }
