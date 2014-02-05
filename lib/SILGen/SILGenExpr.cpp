@@ -505,7 +505,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   if (declRef.isSpecialized()) {
     // Substitute the function type.
     auto origFnType = result.getType().castTo<SILFunctionType>();
-    auto substFnType = origFnType->substGenericArgs(SGM.M, SGM.SwiftModule,
+    auto substFnType = origFnType->substInterfaceGenericArgs(
+                                                    SGM.M, SGM.SwiftModule,
                                                     declRef.getSubstitutions());
     auto closureType = getThickFunctionType(substFnType);
 
@@ -1295,7 +1296,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
     // Specialize the generic method.
     methodTy = getLoweredLoadableType(
                     methodTy.castTo<SILFunctionType>()
-                      ->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
+                      ->substInterfaceGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
   
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
@@ -1716,19 +1717,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   bool wasSpecialized = false;
   if (pft->isPolymorphic() && !forwardSubs.empty()) {
-    auto info = FunctionType::ExtInfo()
-                  .withCallingConv(pft->getAbstractCC())
-                  .withIsThin(true);
-
-    auto specialized = SILFunctionType::get(nullptr, nullptr,
-                                            info,
-                                            pft->getCalleeConvention(),
-                                            pft->getParameters(),
-                                            pft->getResult(),
-                                            pft->getParameters(),
-                                            pft->getResult(),
-                                            F.getASTContext());
-    functionTy = getLoweredLoadableType(specialized);
+    auto specialized = pft->substInterfaceGenericArgs(F.getModule(),
+                                                F.getModule().getSwiftModule(),
+                                                forwardSubs);
+    functionTy = SILType::getPrimitiveObjectType(specialized);
     wasSpecialized = true;
   }
 
@@ -2556,7 +2548,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     for (auto &arg : args) {
       auto nativeTy = arg.getType().getSwiftType();// FIXME: wrong for functions
       auto bridgedTy =
-        objcFnType->getParameters()[idx++].getSILType().getSwiftType();
+        objcFnType->getInterfaceParameters()[idx++].getSILType().getSwiftType();
       arg = emitNativeToBridgedValue(Loc,
                                      ManagedValue::forUnmanaged(arg),
                                      AbstractCC::ObjCMethod,
@@ -2935,17 +2927,18 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   SILValue toFn = getNextUncurryLevelRef(*this, fd, to, curriedArgs);
   SILType resultTy
-    = SGM.getConstantType(from).castTo<SILFunctionType>()->getResult().getSILType();
+    = SGM.getConstantType(from).castTo<SILFunctionType>()
+         ->getInterfaceResult().getSILType();
+  resultTy = F.mapTypeIntoContext(resultTy);
   auto toTy = toFn.getType();
   
   // Forward archetypes and specialize if the function is generic.
   ArrayRef<Substitution> subs;
-  {
+  if (auto gp = getConstantInfo(to).ContextGenericParams) {
     auto toFnTy = toFn.getType().castTo<SILFunctionType>();
-    if (toFnTy->isPolymorphic()) {
-      subs = buildForwardingSubstitutions(toFnTy->getGenericParams());
-      toTy = getLoweredLoadableType(toFnTy->substGenericArgs(SGM.M, SGM.SwiftModule, subs));
-    }
+    subs = buildForwardingSubstitutions(gp);
+    toTy = getLoweredLoadableType(
+              toFnTy->substInterfaceGenericArgs(SGM.M, SGM.SwiftModule, subs));
   }
   
   // Partially apply the next uncurry level and return the result closure.
@@ -3053,7 +3046,7 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};
   auto resultTy = builtinOnceSILTy.castTo<SILFunctionType>()
-                                                  ->getResult().getSILType();
+                                            ->getInterfaceResult().getSILType();
 
   B.createApply(global, builtinOnce, builtinOnceSILTy, resultTy,
                 {}, onceArgs);
