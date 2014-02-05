@@ -2296,6 +2296,13 @@ public:
       result->setValue(type);
       return result;
     }
+    
+    // Error
+    if (type->is<ErrorType>()) {
+      auto result
+        = new (TC.Context) ErrorTypeRepr(loc);
+      return result;
+    }
 
     auto nominal = type->getAnyNominal();
     assert(nominal && "'self' is not a nominal type");
@@ -2325,7 +2332,7 @@ public:
     // neither @inout.
     selfDecl->setLet(!selfTy->is<InOutType>());
     selfDecl->setType(selfTy);
-
+    
     auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
     if (!argPattern->getTypeLoc().getTypeRepr()) {
       argPattern->getTypeLoc()

@@ -808,7 +808,8 @@ static bool tryTypeVariableBindings(
       // Handle simple subtype bindings.
       if (binding.Kind == AllowedBindingKind::Subtypes &&
           typeVar->getImpl().canBindToLValue() &&
-          !type->is<LValueType>()) {
+          !type->is<LValueType>() &&
+          !type->is<InOutType>()) {
         // Try lvalue qualification in addition to rvalue qualification.
         auto subtype = LValueType::get(type);
         if (exploredTypes.insert(subtype->getCanonicalType()))
