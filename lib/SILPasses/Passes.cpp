@@ -70,7 +70,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createGenericSpecializer());
     PM.add(createPerfInliner(Options.InlineThreshold));
     PM.add(createSILCombine());
-    PM.add(createDeadFunctionEmim());
+    PM.add(createDeadFunctionElimination());
     PM.add(createLowerAggregate());
     PM.add(createSROA());
     PM.add(createMem2Reg());

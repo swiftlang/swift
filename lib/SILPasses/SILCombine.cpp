@@ -806,6 +806,6 @@ SILTransform *swift::createSILCombine() {
   return new SILCombine();
 }
 
-SILTransform *swift::createDeadFunctionEmim() {
+SILTransform *swift::createDeadFunctionElimination() {
   return new SILDeadFuncElimination();
 }
