@@ -359,6 +359,7 @@ protected:
 };
 
 /// Type and lowering information about a constant function.
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
 struct SILConstantInfo {
   /// The formal type of the constant, still curried.  For a normal
   /// function, this is just its declared type; for a getter or
@@ -391,6 +392,7 @@ struct SILConstantInfo {
     return !(lhs == rhs);
   }
 };
+SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
@@ -573,13 +575,15 @@ public:
 
   /// Returns the formal AST type of a constant reference.
   /// Parameters remain uncurried and unbridged.
-  CanAnyFunctionType getConstantFormalType(SILDeclRef constant) {
+  CanAnyFunctionType getConstantFormalType(SILDeclRef constant)
+  SIL_FUNCTION_TYPE_DEPRECATED {
     return getConstantInfo(constant).FormalType;
   }
 
   /// Returns the lowered AST type of a constant reference.
   /// Parameters have been uncurried and bridged.
-  CanAnyFunctionType getConstantLoweredType(SILDeclRef constant) {
+  CanAnyFunctionType getConstantLoweredType(SILDeclRef constant)
+  SIL_FUNCTION_TYPE_DEPRECATED {
     return getConstantInfo(constant).LoweredType;
   }
 

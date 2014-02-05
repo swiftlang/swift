@@ -125,7 +125,8 @@ private:
 
   static CanAnyFunctionType getConstantFormalType(SILGenFunction &gen,
                                                   SILValue selfValue,
-                                                  SILDeclRef fn) {
+                                                  SILDeclRef fn)
+  SIL_FUNCTION_TYPE_DEPRECATED {
     return gen.SGM.Types.getConstantInfo(fn.atUncurryLevel(0)).FormalType;
   }
 
@@ -282,6 +283,8 @@ private:
     if (!isThin) {
       constantInfo.LoweredType =
         getThickFunctionType(constantInfo.LoweredType);
+      constantInfo.LoweredInterfaceType =
+        getThickFunctionType(constantInfo.LoweredInterfaceType);
     }
 
     // The expected result of archetype_method is a partial application
