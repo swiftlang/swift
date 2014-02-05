@@ -959,13 +959,16 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // Compute the type of the reference.
   Type type;
   if (auto subscript = dyn_cast<SubscriptDecl>(value)) {
-    // For a subscript, turn the element type into an optional or lvalue,
-    // depending on whether the result type is optional/dynamic, is settable,
-    // or is not.
+    // For a subscript, turn the element type into an (@unchecked)
+    // optional or lvalue, depending on whether the result type is
+    // optional/dynamic, is settable, or is not.
     auto fnType = openedFnType->getResult()->castTo<FunctionType>();
     auto elementTy = fnType->getResult();
-    if (isDynamicResult || subscript->getAttrs().isOptional())
+    if (subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy->getRValueType());
+    else if (isDynamicResult)
+      elementTy = UncheckedOptionalType::get(elementTy->getRValueType());
+
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
              isa<AssociatedTypeDecl>(value)) {
@@ -1063,17 +1066,28 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                              isTypeReference,
                              choice.isSpecialized());
 
-    if (isDynamicResult || choice.getDecl()->getAttrs().isOptional()) {
-      // For a non-subscript declaration found via dynamic lookup or as an
-      // optional requirement in a protocol, strip off the lvalue-ness (one
-      // cannot assign to such declarations) and make a reference to that
-      // declaration be optional.
+    if (choice.getDecl()->getAttrs().isOptional() &&
+        !isa<SubscriptDecl>(choice.getDecl())) {
+      // For a non-subscript declaration that is an optional
+      // requirement in a protocol, strip off the lvalue-ness (FIXME:
+      // one cannot assign to such declarations for now) and make a
+      // reference to that declaration be optional.
       //
       // Subscript declarations are handled within
       // getTypeOfMemberReference(); their result types are optional.
-      if (!isa<SubscriptDecl>(choice.getDecl()))
-        refType = OptionalType::get(refType->getRValueType());
-    }
+      refType = OptionalType::get(refType->getRValueType());
+    } 
+    // For a non-subscript declaration found via dynamic lookup, strip
+    // off the lvalue-ness (FIXME: as a temporary hack. We eventually
+    // want this to work) and make a reference to that declaration be
+    // an unchecked optional.
+    //
+    // Subscript declarations are handled within
+    // getTypeOfMemberReference(); their result types are unchecked
+    // optional.
+    else if (isDynamicResult && !isa<SubscriptDecl>(choice.getDecl())) {    
+      refType = UncheckedOptionalType::get(refType->getRValueType());
+    } 
 
     break;
   }

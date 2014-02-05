@@ -2222,7 +2222,6 @@ namespace {
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
-      Type optType = OptionalType::get(valueType);
 
       // If the subexpression is of DynamicLookup type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
@@ -2240,11 +2239,19 @@ namespace {
                                        SourceLoc(),
                                        TypeLoc::withoutLoc(valueType));
         cast->setImplicit(true);
-        cast->setType(optType);
+        cast->setType(OptionalType::get(valueType));
         cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
                                      : CheckedCastKind::ExistentialToConcrete);
         subExpr = cast;
       } else {
+        bool isDynamicLookup = isa<DynamicLookupExpr>(subExpr);
+        
+        Type optType;
+        if (isDynamicLookup)
+          optType = UncheckedOptionalType::get(valueType);
+        else
+          optType = OptionalType::get(valueType);
+        
         // Coerce the subexpression to the appropriate optional type.
         subExpr = coerceToType(subExpr, optType,
                                cs.getConstraintLocator(expr));
@@ -2858,6 +2865,9 @@ Expr *ExprRewriter::coerceUncheckedOptionalToValue(Expr *expr, Type objTy,
   // Coerce to an r-value.
   auto rvalueTy = expr->getType()->getRValueType();
   assert(rvalueTy->getUncheckedOptionalObjectType()->isEqual(objTy));
+
+  if (cs.getTypeChecker().requireOptionalIntrinsics(expr->getLoc()))
+    return nullptr;
 
   expr = coerceToType(expr, rvalueTy, /*bogus?*/ locator);
   if (!expr) return nullptr;

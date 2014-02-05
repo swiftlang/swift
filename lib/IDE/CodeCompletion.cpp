@@ -1490,7 +1490,7 @@ public:
       return;
 
     ExprType = ExprType->getRValueType();
-    Type Unwrapped = ExprType->getOptionalObjectType();
+    Type Unwrapped = ExprType->getAnyOptionalObjectType();
     if (!Unwrapped)
       return;
     // FIXME: consider types convertible to T?.

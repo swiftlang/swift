@@ -22,13 +22,20 @@
       foo()
     }
 
-* The "@mutating" attribute (which can be used on functions in structs,
-  enums, and protocols) has been promoted to a context-sensitive keyword.
-  Mutating struct methods are now written as:
+* When referring to a member of an 'AnyObject' (or 'AnyClass') object
+  and using it directly (such as calling it, subscripting, or
+  accessing a property on it), one no longer has to write the '?' or
+  '!'. The run-time check will be performed implicitly. For example:
 
-    struct SomeStruct {
-      mutating func f() {}
+    func doSomethingOnViews(views: NSArray) {
+      for view in views {
+          view.setNeedsDisplay() // no '!' needed
+      }
     }
+
+  Note that one can still test whether the member is available at
+  runtime using '?', testing the optional result, or conditionally
+  binding a variable to the resulting member.
 
 * The "swift" command line tool can now create executables and libraries
   directly, just like Clang. Use "swift main.swift" to create an executable and

@@ -2633,7 +2633,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
-    auto valueTy = e->getType()->getOptionalObjectType()->getCanonicalType();
+    auto valueTy = e->getType()->getAnyOptionalObjectType()->getCanonicalType();
     auto methodTy = valueTy;
 
     // For a computed variable, we want the getter.
@@ -2725,7 +2725,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
     // The argument to the has-member block is the uncurried method.
-    auto valueTy = e->getType()->getOptionalObjectType()->getCanonicalType();
+    auto valueTy = e->getType()->getAnyOptionalObjectType()->getCanonicalType();
     auto subscript = cast<SubscriptDecl>(e->getMember().getDecl());
     auto methodTy = subscript->getGetter()->getType()->castTo<AnyFunctionType>()
                       ->getResult();
