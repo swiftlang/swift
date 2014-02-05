@@ -10,10 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-aa"
 #include "swift/SILPasses/Utils/AliasAnalysis.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -118,6 +121,77 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 
 SILInstruction::MemoryBehavior
 AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
-  // FIXME: Fill this in.
-  return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
+        << *V.getDef());
+
+  // If we already know that we do not read or write memory, just return None.
+  if (!Inst->mayReadOrWriteMemory()) {
+    DEBUG(llvm::dbgs() << "  Inst does not write memory. Returning None.\n");
+    return MemoryBehavior::None;
+  }
+
+  switch (Inst->getKind()) {
+  case ValueKind::LoadInst:
+    // If the load address doesn't alias the given address, it doesn't read or
+    // write the specified memory.
+    if (alias(Inst->getOperand(0), V) == AliasResult::NoAlias) {
+      DEBUG(llvm::dbgs() << "  Load does not alias inst. Returning None.\n");
+      return MemoryBehavior::None;
+    }
+
+    // Otherwise be conservative and just return reads since loads can only
+    // read.
+    DEBUG(llvm::dbgs() << "  Could not prove load does not alias inst. "
+          "Returning MayRead.\n");
+    return MemoryBehavior::MayRead;
+  case ValueKind::StoreInst:
+    // If the store dest cannot alias the pointer in question, then the
+    // specified value can not be modified by the store.
+    if (alias(cast<StoreInst>(Inst)->getDest(), V) == AliasResult::NoAlias) {
+      DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
+            "None.\n");
+      return MemoryBehavior::None;
+    }
+
+    // Otherwise, a store just writes.
+    DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
+          "Returning MayWrite.\n");
+    return MemoryBehavior::MayWrite;
+  case ValueKind::ApplyInst: {
+    // If the ApplyInst is from a no-read builtin it can not read or write and
+    // if it comes from a no-side effect builtin, it can only read.
+    auto *AI = cast<ApplyInst>(Inst);
+    auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef());
+
+    // If our callee is not a builtin, be conservative and return may have side
+    // effects.
+    if (!BFR) {
+      DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
+            "MHSF.\n");
+      return MemoryBehavior::MayHaveSideEffects;
+    }
+
+    // If the builtin is read none, it does not read or write memory.
+    if (isReadNone(BFR)) {
+      DEBUG(llvm::dbgs() << "  Found apply of read none builtin. Returning"
+            " None.\n");
+      return MemoryBehavior::None;
+    }
+    // If the builtin is side effect free, then it can only read memory.
+    if (isSideEffectFree(BFR)) {
+      DEBUG(llvm::dbgs() << "  Found apply of side effect free builtin. "
+            "Returning MayRead.\n");
+      return MemoryBehavior::MayRead;
+    }
+
+    // Otherwise be conservative and return that we may have side effects.
+    DEBUG(llvm::dbgs() << "  Found apply of side effect builtin. "
+          "Returning MayHaveSideEffects.\n");
+    return MemoryBehavior::MayHaveSideEffects;
+  }
+  default:
+    // If we do not have a special case, just return the generic memory
+    // behavior of Inst.
+    return Inst->getMemoryBehavior();
+  }
 }
