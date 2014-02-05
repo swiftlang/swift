@@ -985,8 +985,3 @@ class PredictableMemoryOptimizations : public SILFunctionTrans {
 SILTransform *swift::createPredictableMemoryOptimizations() {
   return new PredictableMemoryOptimizations();
 }
-
-
-
-
-
