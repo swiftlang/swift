@@ -326,7 +326,7 @@ private:
 
   /// Add the 'self' type to the substituted function type of this
   /// dynamic callee.
-  void addDynamicSelfToFormalType(SILGenModule &SGM) {
+  void addDynamicCalleeSelfToFormalType(SILGenModule &SGM) {
     assert(kind == Kind::DynamicMethod);
 
     // Drop the original self clause.
@@ -405,7 +405,7 @@ public:
                            SILLocation l) {
     Callee callee(Kind::DynamicMethod, gen, proto, name,
                   substFormalType, l);
-    callee.addDynamicSelfToFormalType(gen.SGM);
+    callee.addDynamicCalleeSelfToFormalType(gen.SGM);
     return callee;
   }
   Callee(Callee &&) = default;
