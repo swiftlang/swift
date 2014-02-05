@@ -22,6 +22,17 @@
       foo()
     }
 
+* When referring to a member of an 'AnyObject' (or 'AnyClass') object
+  and using it directly (such as calling it, subscripting, or
+  accessing a property on it), one no longer has to write the '?' or
+  '!'. The run-time check will be performed implicitly. For example:
+
+    func doSomethingOnViews(views: NSArray) {
+      for view in views {
+          view.setNeedsDisplay() // no '!' needed
+      }
+    }
+
 * The "swift" command line tool can now create executables and libraries
   directly, just like Clang. Use "swift main.swift" to create an executable and
   "swift -emit-library -o foo.dylib foo.swift" to create a library.
