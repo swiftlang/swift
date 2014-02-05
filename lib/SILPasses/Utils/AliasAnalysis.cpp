@@ -88,9 +88,13 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
+  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
+        << "    V2: " << *V2.getDef());
   // Strip off any casts on V1, V2.
   V1 = V1.stripCasts();
   V2 = V2.stripCasts();
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1.getDef());
+  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2.getDef());
 
   // Create a key to lookup if we have already computed an alias result for V1,
   // V2. Canonicalize our cache keys so that the pointer with the lower address
@@ -101,8 +105,12 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 
   // If we find our key in the cache, just return the alias result.
   auto Pair = AliasCache.find(Key);
-  if (Pair != AliasCache.end())
+  if (Pair != AliasCache.end()) {
+    DEBUG(llvm::dbgs() << "      Found value in the cache: "
+          << unsigned(Pair->second));
+
     return Pair->second;
+  }
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
