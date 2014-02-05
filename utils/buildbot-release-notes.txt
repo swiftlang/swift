@@ -22,6 +22,17 @@
       foo()
     }
 
+* The "swift" command line tool can now create executables and libraries
+  directly, just like Clang. Use "swift main.swift" to create an executable and
+  "swift -emit-library -o foo.dylib foo.swift" to create a library.
+
+* Object files emitted by Swift are not debuggable on their own, even if you
+  compiled them with the "-g" option. This was already true if you had multiple
+  files in your project. To produce a debuggable Swift binary from the command
+  line, you must compile and link in a single step with "swift", or pass object
+  files AND swiftmodule files back into "swift" after compilation.
+  (Or use Xcode.)
+
 * 'import' will no longer import other source files, only built modules.
 
 * The current directory is no longer implicitly an import path. Use "-I ." if
