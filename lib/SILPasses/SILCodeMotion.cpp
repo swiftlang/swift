@@ -58,8 +58,16 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      // Invalidate all previous loads.
-      Loads.clear();
+      // Invalidate all loads that this store writes to.
+      llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
+      for (auto *LI : Loads)
+        if (isWriteMemBehavior(AA.getMemoryBehavior(Inst, SILValue(LI))))
+          InvalidatedLoadList.push_back(LI);
+      for (auto *LI : InvalidatedLoadList) {
+        DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
+              "such that a load is invalidated:" << *LI);
+        Loads.erase(LI);
+      }
 
       // If we are storing to the previously stored address then delete the old
       // store.
