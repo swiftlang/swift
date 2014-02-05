@@ -566,13 +566,15 @@ Run Swift programs using the '-i' flag:
 
         swift -i /usr/share/swift/examples/hello.swift
 
-Compile Swift programs to .o files using the '-c' flag. Currently they must
-then be linked manually to the swift_stdlib_core library in
-/usr/lib/swift/macosx using Clang:
+Compile Swift programs just like C programs:
 
-        swift -c /usr/share/swift/examples/hello.swift -o hello.o
-        clang -o hello hello.o -L/usr/lib/swift/macosx -lswift_stdlib_core
+        swift /usr/share/swift/examples/hello.swift -o hello
         ./hello
+
+If you want to use Cocoa frameworks, run the Swift installed in Xcode using
+"xcrun swift", or pass an SDK explicitly:
+
+        swift -sdk $(xcrun --show-sdk-path --sdk macosx)
 
 Language documentation and examples are installed under /usr/share/swift.
 
