@@ -46,32 +46,6 @@ bool Parser::isStartOfStmt(const Token &Tok) {
   }
 }
 
-/// isStartOfDecl - Return true if this is the start of a decl or decl-import.
-bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
-  switch (Tok.getKind()) {
-  case tok::at_sign:
-  case tok::kw_static:
-  case tok::kw_extension:
-  case tok::kw_let:
-  case tok::kw_var:
-  case tok::kw_typealias:
-  case tok::kw_enum:
-  case tok::kw_case:
-  case tok::kw_struct:
-  case tok::kw_class:
-  case tok::kw_import:
-  case tok::kw_subscript:
-  case tok::kw_init:
-  case tok::kw_destructor:
-  case tok::kw_func:
-    return true;
-  case tok::kw_protocol:
-    return !(Tok2.isAnyOperator() && Tok2.getText().equals("<"));
-  default:
-    return isStartOfMetaDecl(Tok, Tok2) || isStartOfOperatorDecl(Tok, Tok2);
-  }
-}
-
 ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (Tok.is(tok::semi)) {
     diagnose(Tok, diag::illegal_semi_stmt)

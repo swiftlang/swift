@@ -476,14 +476,14 @@ bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
   return false;
 }
 
-bool Parser::isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
+static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
   return Tok.isContextualKeyword("operator")
     && (Tok2.isContextualKeyword("prefix")
         || Tok2.isContextualKeyword("postfix")
         || Tok2.isContextualKeyword("infix"));
 }
 
-bool Parser::isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
+static bool isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
   return Tok.isContextualKeyword("type")
     && (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
         Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
@@ -492,15 +492,42 @@ bool Parser::isStartOfMetaDecl(const Token &Tok, const Token &Tok2) {
         Tok2.is(tok::kw_protocol) || Tok2.is(tok::kw_typealias));
 }
 
+/// isStartOfDecl - Return true if this is the start of a decl or decl-import.
+bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
+  switch (Tok.getKind()) {
+  case tok::at_sign:
+  case tok::kw_static:
+  case tok::kw_extension:
+  case tok::kw_let:
+  case tok::kw_var:
+  case tok::kw_typealias:
+  case tok::kw_enum:
+  case tok::kw_case:
+  case tok::kw_struct:
+  case tok::kw_class:
+  case tok::kw_import:
+  case tok::kw_subscript:
+  case tok::kw_init:
+  case tok::kw_destructor:
+  case tok::kw_func:
+    return true;
+  case tok::kw_protocol:
+    return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
+  default:
+    return isStartOfMetaDecl(Tok, Tok2) || isStartOfOperatorDecl(Tok, Tok2);
+  }
+}
+
+
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   // Consume tokens up to code completion token.
-  while (Tok.isNot(tok::code_complete)) {
+  while (Tok.isNot(tok::code_complete))
     consumeToken();
-  }
+
   // Consume the code completion token, if there is one.
   consumeIf(tok::code_complete);
   SourceLoc EndLoc = Tok.getLoc();
