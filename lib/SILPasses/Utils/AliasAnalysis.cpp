@@ -28,11 +28,10 @@ using namespace swift;
 /// left to strip.
 static SILValue getUnderlyingObject(SILValue V) {
   while (true) {
-    SILValue NewV = V.stripCasts();
-    NewV = NewV.stripAddressProjections();
-    if (NewV == V)
-      return NewV;
-    V = NewV;
+    SILValue V2 = V.stripCasts().stripAddressProjections().stripIndexingInsts();
+    if (V2 == V)
+      return V2;
+    V = V2;
   }
 }
 
