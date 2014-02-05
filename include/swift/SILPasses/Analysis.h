@@ -25,12 +25,14 @@ namespace swift {
   /// The base class for all SIL-level analysis.
   class SILAnalysis {
   public:
-    //// Invalidation Kind
+    /// The invalidation Lattice.
+    /// This is a heiarchy of invalidation messages that are sent to analysis
+    /// objects. Every invalidation kind invalidates the levels below it.
     enum InvalidationKind {
-      IK_All,           // Invalidate everything.
       IK_Instructions,  // Invalidate instruction-related analysis.
       IK_CFG,           // The control flow changes.
       IK_CallGraph,     // The call graph changed.
+      IK_All,           // Invalidate everything.
     };
 
     /// The class heiarchy
@@ -57,6 +59,7 @@ namespace swift {
     virtual void invalidate(SILFunction *F, InvalidationKind K) {}
   };
 
+  /// The Call Graph Analysis provides information about the call graph.
   class CallGraphAnalysis : public SILAnalysis {
     SILModule *M;
 
