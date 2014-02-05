@@ -31,6 +31,7 @@ namespace swift {
   private:
     /// When set to True the pass manager will re-run the transformation pipe.
     bool anotherIteration;
+    SILModule *Mod;
 
     /// The list of transformations to run.
     llvm::SmallVector<SILTransform*, 8> Transformations;
@@ -40,7 +41,7 @@ namespace swift {
 
   public:
     /// C'tor
-    SILPassManager() : anotherIteration(false) {}
+    SILPassManager(SILModule *M) : anotherIteration(false), Mod(M) {}
 
     template<typename T>
     T* getAnalysis() {
@@ -62,7 +63,7 @@ namespace swift {
     }
 
     /// Run the transformations on the module \p Mod.
-    void run(SILModule &Mod);
+    void run();
 
     /// Request another invocation of the transformation pipeline.
     void scheduleAnotherIteration() { anotherIteration = true; }

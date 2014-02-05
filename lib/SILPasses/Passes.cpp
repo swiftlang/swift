@@ -91,7 +91,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
-    SILPassManager PM;
+    SILPassManager PM(&Module);
     PM.registerAnalysis(createCallGraphAnalysis(&Module));
     PM.add(createGenericSpecializer());
     PM.add(createPerfInliner(Options.InlineThreshold));
@@ -108,7 +108,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createSILARCOpts());
     PM.add(createStackPromotion());
     PM.add(createSILAllocRefElimination());
-    PM.run(Module);
+    PM.run();
 
     DEBUG(Module.verify());
 }
