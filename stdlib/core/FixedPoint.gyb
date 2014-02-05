@@ -361,17 +361,5 @@ func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
 @ end
 @ end  # for bits in allInts
 
-// Word size lookup
-
-@ for Self in 'Int', 'UInt':
-@@transparent
-extension ${Self} {
-  type func bitSize() -> ${Self} {
-    return ${wordBits}
-  }
-}
-
-@end
-
 typealias Word = Int
 typealias UWord = UInt
