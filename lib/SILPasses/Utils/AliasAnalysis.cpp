@@ -116,7 +116,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 
   // We could not prove anything. Be conservative and return that V1, V2 may
   // alias.
-  return AliasCache[Key] = AliasResult::MayAlias;
+  return AliasResult::MayAlias;
 }
 
 SILInstruction::MemoryBehavior
