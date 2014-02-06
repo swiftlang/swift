@@ -290,13 +290,13 @@ int main(int argc, char **argv) {
       PM.add(createSROA());
       break;
     case PassKind::ARCOpts:
-      PM.add(createSILARCOpts());
+      PM.add(createARCOpts());
       break;
     case PassKind::StripDebugInfo:
       PM.add(createStripDebug());
       break;
     case PassKind::AllocRefElimination:
-      PM.add(createSILAllocRefElimination());
+      PM.add(createAllocRefElimination());
       break;
     case PassKind::InstCount:
       PM.add(createSILInstCount());

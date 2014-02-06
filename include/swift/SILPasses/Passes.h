@@ -65,11 +65,11 @@ namespace swift {
   SILTransform *createCodeMotion();
   SILTransform *createPerfInliner(unsigned threshold);
   SILTransform *createGenericSpecializer();
-  SILTransform *createSILARCOpts();
+  SILTransform *createARCOpts();
   SILTransform *createSimplifyCFG();
   SILTransform *createDevirtualization();
   SILTransform *createAllocBoxToStack();
-  SILTransform *createSILAllocRefElimination();
+  SILTransform *createAllocRefElimination();
 
   // Utilities
   SILTransform *createStripDebug();

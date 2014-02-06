@@ -518,8 +518,8 @@ static void processFunction(SILFunction &F) {
   }
 }
 
-class SILARCOpts : public SILFunctionTransform {
-  virtual ~SILARCOpts() {}
+class ARCOpts : public SILFunctionTransform {
+  virtual ~ARCOpts() {}
 
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
@@ -528,6 +528,6 @@ class SILARCOpts : public SILFunctionTransform {
   }
 };
 
-SILTransform *swift::createSILARCOpts() {
-  return new SILARCOpts();
+SILTransform *swift::createARCOpts() {
+  return new ARCOpts();
 }

@@ -84,9 +84,9 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createCodeMotion());
     PM.add(createSimplifyCFG());
     PM.add(createDevirtualization());
-    PM.add(createSILARCOpts());
+    PM.add(createARCOpts());
     PM.add(createAllocBoxToStack());
-    PM.add(createSILAllocRefElimination());
+    PM.add(createAllocRefElimination());
     PM.run();
 
     DEBUG(Module.verify());

@@ -337,8 +337,8 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-class SILAllocRefElimination : public SILFunctionTransform {
-  virtual ~SILAllocRefElimination() {}
+class AllocRefElimination : public SILFunctionTransform {
+  virtual ~AllocRefElimination() {}
 
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
@@ -350,6 +350,6 @@ class SILAllocRefElimination : public SILFunctionTransform {
   }
 };
 
-SILTransform *swift::createSILAllocRefElimination() {
-  return new SILAllocRefElimination();
+SILTransform *swift::createAllocRefElimination() {
+  return new AllocRefElimination();
 }

@@ -35,7 +35,7 @@ void SILPassManager::runOneIteration() {
     }
 
     // Run function transformation on all functions.
-    if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)){
+    if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
       for (auto &F : *Mod)
         if (!F.empty())
           SFT->runOnFunction(F, this);
