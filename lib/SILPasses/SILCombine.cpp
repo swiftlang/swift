@@ -153,7 +153,7 @@ class SILCombiner :
 public:
   SILCombiner() : Worklist(), MadeChange(false), Iteration(0), Builder(0) { }
 
-  void runOnFunction(SILFunction &F) {
+  bool runOnFunction(SILFunction &F) {
     clear();
 
     // Create a SILBuilder for F and initialize the tracking list.
@@ -161,12 +161,16 @@ public:
     B.setTrackingList(&TrackingList);
     Builder = &B;
 
+    bool Changed = false;
     // Perform iterations until we do not make any changes.
-    while (doOneIteration(F, Iteration))
+    while (doOneIteration(F, Iteration)) {
+      Changed = true;
       Iteration++;
+    }
 
     // Cleanup the builder and return whether or not we made any changes.
     Builder = 0;
+    return Changed;
   }
 
   void clear() {
@@ -749,8 +753,9 @@ class SILCombine : public SILFunctionTransform {
     if (F.empty())
       return;
 
-    Combiner.runOnFunction(F);
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    bool Changed = Combiner.runOnFunction(F);
+    if (Changed)
+      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
@@ -776,7 +781,8 @@ class SILDeadFuncElimination : public SILModuleTransform {
       Changed |= tryToRemoveFunction(Order[i]);
 
     // Invalidate the call graph.
-    CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+    if (Changed)
+      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 
