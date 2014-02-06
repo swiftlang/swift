@@ -444,16 +444,18 @@ public:
   virtual void runOnModule(SILModule &M, SILPassManager *PM) {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
-    // Collect a call-graph bottom-up list of functions.
-
+    // Collect a call-graph bottom-up list of functions and specialize the
+    // functions in reverse order.
      bool Changed =
       GenericSpecializer(&M).specialize(CGA->bottomUpCallGraphOrder());
 
-    if (Changed)
+    if (Changed) {
+      // Schedule another iteration of the transformation pipe.
       PM->scheduleAnotherIteration();
 
-    // Invalidate the call graph.
-    CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+      // Invalidate the call graph.
+      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+    }
   }
 };
 
