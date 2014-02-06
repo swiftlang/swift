@@ -94,10 +94,12 @@ private:
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
     // Specialize the Self substitution of the archetype_method.
-    auto sub = Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
-                                                 CallerInst->getSubstitutions());
+    auto sub =
+    Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
+                                      CallerInst->getSubstitutions());
     
-    assert(sub.Conformance.size() == 1 && "didn't get conformance from substitution?!");
+    assert(sub.Conformance.size() == 1 &&
+           "didn't get conformance from substitution?!");
     
     doPostProcess(Inst,Builder.
                   createArchetypeMethod(getOpLocation(Inst->getLoc()),
@@ -340,7 +342,8 @@ static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
   return true;
 }
 
-bool GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
+bool
+GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   bool Changed = false;
   // Make sure we can specialize this function.
   if (!canSpecializeFunction(F))
