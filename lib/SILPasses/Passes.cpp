@@ -50,7 +50,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.registerAnalysis(createDominanceAnalysis(&Module));
   PM.add(createMandatoryInlining());
   PM.add(createCapturePromotion());
-  PM.add(createStackPromotion());
+  PM.add(createAllocBoxToStack());
   PM.add(createInOutDeshadowing());
   PM.add(createDefiniteInitialization());
   PM.add(createPredictableMemoryOptimizations());
@@ -85,7 +85,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createSimplifyCFG());
     PM.add(createDevirtualization());
     PM.add(createSILARCOpts());
-    PM.add(createStackPromotion());
+    PM.add(createAllocBoxToStack());
     PM.add(createSILAllocRefElimination());
     PM.run();
 

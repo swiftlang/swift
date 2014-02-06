@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
-      PM.add(createStackPromotion());
+      PM.add(createAllocBoxToStack());
       break;
     case PassKind::CapturePromotion:
       PM.add(createCapturePromotion());

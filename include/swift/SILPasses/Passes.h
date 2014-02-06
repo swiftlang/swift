@@ -68,7 +68,7 @@ namespace swift {
   SILTransform *createSILARCOpts();
   SILTransform *createSimplifyCFG();
   SILTransform *createDevirtualization();
-  SILTransform *createStackPromotion();
+  SILTransform *createAllocBoxToStack();
   SILTransform *createSILAllocRefElimination();
 
   // Utilities

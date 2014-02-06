@@ -332,8 +332,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
   return true;
 }
 
-class SILStackPromotion : public SILFunctionTransform {
-  virtual ~SILStackPromotion() {}
+class AllocBoxToStack : public SILFunctionTransform {
+  virtual ~AllocBoxToStack() {}
 
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
@@ -360,6 +360,6 @@ class SILStackPromotion : public SILFunctionTransform {
   }
 };
 
-SILTransform *swift::createStackPromotion() {
-  return new SILStackPromotion();
+SILTransform *swift::createAllocBoxToStack() {
+  return new AllocBoxToStack();
 }
