@@ -406,13 +406,13 @@ extension ${Self} {
 func + (rhs: ${Self}) -> ${Self} { return rhs }
 
 @@transparent @@prefix @@assignment
-func ++ (rhs: @@inout ${Self}) -> ${Self} { rhs += 1.0; return rhs }
+func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @@transparent @@prefix @@assignment
-func -- (rhs: @@inout ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
+func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @@transparent @@postfix @@assignment
-func ++ (lhs: @@inout ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
+func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
 @@transparent @@postfix @@assignment
-func -- (lhs: @@inout ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
+func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
 @ for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @@transparent
@@ -438,7 +438,7 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 @ for op in '+', '-', '*', '/', '%':
 @@transparent @@assignment
-func ${op}= (lhs: @@inout ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
+func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
 @ end
 
 @ end # for bits in allFloatBits

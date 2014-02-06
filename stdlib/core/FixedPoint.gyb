@@ -355,7 +355,7 @@ extension ${Self} : BitwiseOperations {
 // Compound assignments
 @ for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
 @@transparent @@assignment
-func ${op}=(lhs: @@inout ${Self}, rhs: ${Self}) {
+func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
 @ end
