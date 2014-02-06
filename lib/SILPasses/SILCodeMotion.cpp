@@ -50,7 +50,8 @@ static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
+bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
+  bool Changed = false;
   StoreInst  *PrevStore = 0;
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
@@ -78,6 +79,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
       if (PrevStore && PrevStore->getDest() == SI->getDest()) {
         DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
               << *PrevStore);
+        Changed = true;
         recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
         PrevStore = SI;
         NumDeadStores++;
@@ -93,6 +95,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
         DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
         recursivelyDeleteTriviallyDeadInstructions(LI, true);
+        Changed = true;
         NumDupLoads++;
         continue;
       }
@@ -105,6 +108,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
                 << *PrevLd);
           SILValue(LI, 0).replaceAllUsesWith(PrevLd);
           recursivelyDeleteTriviallyDeadInstructions(LI, true);
+          Changed = true;
           LI = 0;
           NumDupLoads++;
           break;
@@ -160,6 +164,8 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
       }
     }
   }
+
+  return Changed;
 }
 
 /// \brief Returns True if we can sink this instruction to another basic block.
@@ -216,19 +222,20 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
   return nullptr;
 }
 
-static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
+static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
+  bool Changed = false;
   if (BB->pred_empty())
-    return;
+    return Changed;
 
   // This block must be the only successor of all the predecessors.
   for (auto P : BB->getPreds())
     if (P->getSingleSuccessor() != BB)
-      return;
+      return Changed;
 
   SILBasicBlock *FirstPred = *BB->pred_begin();
   // The first Pred must have at least one non-terminator.
   if (FirstPred->getTerminator() == FirstPred->begin())
-    return;
+    return Changed;
 
   DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
 
@@ -264,6 +271,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
       if (Dups.size()) {
         DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
         InstToSink->moveBefore(BB->begin());
+        Changed = true;
         for (auto I : Dups) {
           I->replaceAllUsesWith(InstToSink);
           I->eraseFromParent();
@@ -280,19 +288,21 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
     // If this instruction was a barrier then we can't sink anything else.
     if (isSinkBarrier(InstToSink)) {
       DEBUG(llvm::dbgs() << "Aborting on barrier: " << *InstToSink);
-      return;
+      return Changed;
     }
 
     // This is the first instruction, we are done.
     if (InstToSink == FirstPred->begin()) {
       DEBUG(llvm::dbgs() << "Reached the first instruction.");
-      return;
+      return Changed;
     }
 
     SkipBudget--;
     InstToSink = std::prev(InstToSink);
     DEBUG(llvm::dbgs() << "Continuing scan. Next inst: " << *InstToSink);
   }
+
+  return Changed;
 }
 
 class SILCodeMotion : public SILFunctionTransform {
@@ -305,15 +315,18 @@ class SILCodeMotion : public SILFunctionTransform {
 
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
 
+    bool Changed = false;
+
     // Remove dead stores and merge duplicate loads.
     for (auto &BB : F)
-      promoteMemoryOperationsInBlock(&BB, AA);
+      Changed |= promoteMemoryOperationsInBlock(&BB, AA);
 
     // Sink duplicated code from predecessors.
     for (auto &BB : F)
-      sinkCodeFromPredecessors(&BB);
+      Changed |= sinkCodeFromPredecessors(&BB);
 
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    if (Changed)
+      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
