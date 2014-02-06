@@ -148,9 +148,9 @@ Passes(llvm::cl::desc("Passes:"),
                                    "Count all instructions in the given "
                                    "module."),
                         clEnumValN(PassKind::AADumper,
-                                   "aa-evaluator",
-                                   "Evaluate AA on all pairs of ValueKinds in "
-                                   "all function."),
+                                   "aa-dump",
+                                   "Dump AA result for all pairs of ValueKinds"
+                                   " in all functions."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
