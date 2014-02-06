@@ -35,20 +35,6 @@ static SILValue getUnderlyingObject(SILValue V) {
   }
 }
 
-/// Returns true if Kind is one of AllocStackInst, AllocBoxInst, AllocRefInst,
-/// or AllocArrayInst.
-static bool isAllocationInst(ValueKind Kind) {
-  switch (Kind) {
-  case ValueKind::AllocStackInst:
-  case ValueKind::AllocBoxInst:
-  case ValueKind::AllocRefInst:
-  case ValueKind::AllocArrayInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 /// A no alias argument is an argument that is an address type.
 static bool isNoAliasArgument(SILValue V) {
   auto *Arg = dyn_cast<SILArgument>(V.getDef());
@@ -60,12 +46,8 @@ static bool isNoAliasArgument(SILValue V) {
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
-  ValueKind Kind = V->getKind();
-
-  if (isAllocationInst(Kind) || isNoAliasArgument(V) || isa<LiteralInst>(*V))
-    return true;
-
-  return false;
+  return isa<AllocationInst>(*V) || isNoAliasArgument(V) ||
+    isa<LiteralInst>(*V));
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
@@ -209,4 +191,3 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysis(M);
 }
-
