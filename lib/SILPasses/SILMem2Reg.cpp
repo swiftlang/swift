@@ -27,7 +27,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/DenseSet.h"
@@ -730,15 +729,16 @@ bool MemoryToRegisters::run() {
 class SILMem2Reg : public SILFunctionTransform {
   virtual ~SILMem2Reg() {}
 
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F.getName() << " **\n");
+  void run() {
+    SILFunction *F = getFunction();
+    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() << " **\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 
-    bool Changed = MemoryToRegisters(F, DA->getDomInfo(&F)).run();
+    bool Changed = MemoryToRegisters(*F, DA->getDomInfo(F)).run();
 
     if (Changed)
-      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

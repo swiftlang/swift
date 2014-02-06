@@ -12,7 +12,6 @@
 
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
@@ -38,9 +37,9 @@ class StripDebugInfo : public swift::SILFunctionTransform {
   virtual ~StripDebugInfo() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(swift::SILFunction &F, SILPassManager *PM) {
-    stripFunction(&F);
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  void run() {
+    stripFunction(getFunction());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

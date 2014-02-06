@@ -12,7 +12,6 @@
 
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -151,9 +150,9 @@ class EmitDFDiagnostics : public SILFunctionTransform {
   virtual ~EmitDFDiagnostics() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    SILModule &M = F.getModule();
-    for (auto &BB : F)
+  void run() {
+    SILModule &M = getFunction()->getModule();
+    for (auto &BB : *getFunction())
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
         diagnoseReturn(&I, M.getASTContext());

@@ -23,7 +23,6 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/Support/Debug.h"
 
@@ -55,7 +54,8 @@ namespace {
 class SILAAEvaluator : public SILFunctionTransform {
   virtual ~SILAAEvaluator() {}
 
-  virtual void runOnFunction(SILFunction &Fn, SILPassManager *PM) {
+  void run() {
+    SILFunction &Fn = *getFunction();
     llvm::outs() << "*** " << Fn.getName() << " ***\n";
     // Gather up all Values in Fn.
     std::vector<SILValue> Values;

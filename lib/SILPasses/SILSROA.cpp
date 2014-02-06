@@ -23,7 +23,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
@@ -296,12 +295,13 @@ class SILSROA : public SILFunctionTransform {
   virtual ~SILSROA() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    DEBUG(llvm::dbgs() << "***** SROA on function: " << F.getName() <<
+  void run() {
+    SILFunction *F = getFunction();
+    DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName() <<
           " *****\n");
 
-    runSROAOnFunction(F);
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    runSROAOnFunction(*F);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

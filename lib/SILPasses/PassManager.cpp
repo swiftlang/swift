@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-passmanager"
 
 #include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/Statistic.h"
@@ -30,15 +31,20 @@ void SILPassManager::runOneIteration() {
   for (SILTransform *ST : Transformations) {
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
-      SMT->runOnModule(*Mod, this);
+      SMT->injectPassManager(this);
+      SMT->injectModule(Mod);
+      SMT->run();
       continue;
     }
 
     // Run function transformation on all functions.
     if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
       for (auto &F : *Mod)
-        if (!F.empty())
-          SFT->runOnFunction(F, this);
+        if (!F.empty()) {
+          SFT->injectPassManager(this);
+          SFT->injectFunction(&F);
+          SFT->run();
+        }
       continue;
     }
 
@@ -56,4 +62,16 @@ void SILPassManager::run() {
 
   } while (anotherIteration);
 }
+
+/// D'tor.
+SILPassManager::~SILPassManager() {
+  // Free all transformations.
+  for (auto T : Transformations)
+    delete T;
+
+  // delete the analyis.
+  for (auto A : Analysis)
+    delete A;
+}
+
 

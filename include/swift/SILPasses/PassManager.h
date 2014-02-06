@@ -15,7 +15,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/SILAnalysis/Analysis.h"
-#include "swift/SILPasses/Transforms.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H
 #define SWIFT_SILPASSES_PASSMANAGER_H
@@ -46,20 +45,11 @@ namespace swift {
     /// analysis. If the analysis is not found, the program terminates.
     template<typename T>
     T* getAnalysis() {
-      if (T *A = getAnalysisOrNull<T>())
-        return A;
-      llvm_unreachable("Unable to find analysis for requested type.");
-    }
-
-    /// \brief Searches for an analysis of type T in the list of registered
-    /// analysis.
-    template<typename T>
-    T* getAnalysisOrNull() {
       for (SILAnalysis *A : Analysis)
         if (T* R = llvm::dyn_cast<T>(A))
           return R;
 
-      return nullptr;
+      llvm_unreachable("Unable to find analysis for requested type.");
     }
 
     /// \brief Add another transformation to the pipe. This transfers the
@@ -69,9 +59,7 @@ namespace swift {
 
     /// \brief  Register another analysis. This transfers the ownership of the
     /// analysis to the pass manager that will delete it when done.
-    void registerAnalysis(SILAnalysis *A) {
-      Analysis.push_back(A);
-    }
+    void registerAnalysis(SILAnalysis *A) { Analysis.push_back(A); }
 
     /// \brief Run the transformations on the module.
     void run();
@@ -83,28 +71,20 @@ namespace swift {
     void scheduleAnotherIteration() { anotherIteration = true; }
 
     ///  \brief Broadcast the invalidation of the module to all analysis.
-    void invalidateAllAnalysis(SILAnalysis::InvalidationKind K) {
+    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
         AP->invalidate(K);
     }
 
     /// \brief Broadcast the invalidation of the function to all analysis.
-    void invalidateAllAnalysis(SILFunction *F,
-                               SILAnalysis::InvalidationKind K) {
+    void invalidateAnalysis(SILFunction *F,
+                            SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
         AP->invalidate(F, K);
     }
 
     /// D'tor.
-    ~SILPassManager() {
-      // Free all transformations.
-      for (auto T : Transformations)
-        delete T;
-
-      // delete the analyis.
-      for (auto A : Analysis)
-        delete A;
-    }
+    ~SILPassManager();
   };
 
 } // end namespace swift

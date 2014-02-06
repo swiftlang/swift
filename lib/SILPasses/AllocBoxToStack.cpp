@@ -15,7 +15,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/Statistic.h"
@@ -336,11 +335,11 @@ class AllocBoxToStack : public SILFunctionTransform {
   virtual ~AllocBoxToStack() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-    PostDominanceInfo *PDI = DA->getPostDomInfo(&F);
+  void run() {
+    DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
+    PostDominanceInfo *PDI = DA->getPostDomInfo(getFunction());
 
-    for (auto &BB : F) {
+    for (auto &BB : *getFunction()) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
         if (auto *ABI = dyn_cast<AllocBoxInst>(I))
@@ -356,7 +355,7 @@ class AllocBoxToStack : public SILFunctionTransform {
       }
     }
 
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

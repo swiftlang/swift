@@ -33,7 +33,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -341,12 +340,12 @@ class AllocRefElimination : public SILFunctionTransform {
   virtual ~AllocRefElimination() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+  void run() {
     llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
 
-    processFunction(F, DestructorAnalysisCache);
+    processFunction(*getFunction(), DestructorAnalysisCache);
 
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

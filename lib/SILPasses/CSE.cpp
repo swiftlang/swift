@@ -24,7 +24,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -387,15 +386,15 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 class SILCSE : public SILFunctionTransform {
   virtual ~SILCSE() {}
 
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    DEBUG(llvm::dbgs() << "***** CSE on function: " << F.getName() <<
-          " *****\n");
+  void run() {
+    DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
+          << " *****\n");
 
-    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
     CSE C;
-    C.processFunction(F, DA->getDomInfo(&F));
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    C.processFunction(*getFunction(), DA->getDomInfo(getFunction()));
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

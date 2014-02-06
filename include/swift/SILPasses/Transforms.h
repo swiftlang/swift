@@ -9,14 +9,14 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
 #ifndef SWIFT_SILPASSES_TRANSFORMS_H
 #define SWIFT_SILPASSES_TRANSFORMS_H
+
+#include "swift/SILPasses/PassManager.h"
 
 namespace swift {
   class SILModule;
   class SILFunction;
-  class SILPassManager;
 
   /// The base class for all SIL-level transformations.
   class SILTransform {
@@ -30,44 +30,83 @@ namespace swift {
     /// Stores the kind of derived class.
     const TransformKind Kind;
 
+  protected:
+    // The pass manager that runs this pass.
+    SILPassManager* PM;
+
   public:
     /// C'tor. \p K indicates the kind of derived class.
-    SILTransform(SILTransform::TransformKind K) : Kind(K) {}
+    SILTransform(SILTransform::TransformKind K) : Kind(K), PM(0) {}
+
     /// D'tor.
     virtual ~SILTransform() {}
+
     /// Returns the kind of derived class.
     TransformKind getKind() const { return Kind; }
+
+    /// Inject the pass manager running this pass.
+    void injectPassManager(SILPassManager *PMM) { PM = PMM; }
+
+  protected:
+    /// \brief Searches for an analysis of type T in the list of registered
+    /// analysis. If the analysis is not found, the program terminates.
+    template<typename T>
+    T* getAnalysis() { return PM->getAnalysis<T>(); }
   };
 
   /// A transformation that operates on functions.
-  struct SILFunctionTransform : public SILTransform {
+  class SILFunctionTransform : public SILTransform {
+    SILFunction *F;
+
+  public:
     /// C'tor.
-    SILFunctionTransform() : SILTransform(TransformKind::Function) {}
+    SILFunctionTransform() : SILTransform(TransformKind::Function), F(0) {}
 
     /// D'tor.
     virtual ~SILFunctionTransform() {}
 
     /// The entry point to the transformation.
-    virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {}
+    virtual void run() = 0;
 
     static bool classof(const SILTransform *S) {
       return S->getKind() == TransformKind::Function;
     }
+
+    void injectFunction(SILFunction *Func) { F = Func; }
+
+  protected:
+    SILFunction *getFunction() { return F; };
+
+    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+      PM->invalidateAnalysis(F, K);
+    }
   };
 
   /// A transformation that operates on modules.
-  struct SILModuleTransform : public SILTransform {
+  class SILModuleTransform : public SILTransform {
+    SILModule *M;
+
+  public:
     /// C'tor.
-    SILModuleTransform() : SILTransform(TransformKind::Module) {}
+    SILModuleTransform() : SILTransform(TransformKind::Module), M(0) {}
 
     /// D'tor.
     virtual ~SILModuleTransform() {}
 
     /// The entry point to the transformation.
-    virtual void runOnModule(SILModule &M, SILPassManager *PM) {}
+    virtual void run() = 0;
 
     static bool classof(const SILTransform *S) {
       return S->getKind() == TransformKind::Module;
+    }
+
+    void injectModule(SILModule *Mod) { M = Mod; }
+
+  protected:
+    SILModule *getModule() { return M; };
+
+    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
+      PM->invalidateAnalysis(K);
     }
   };
 

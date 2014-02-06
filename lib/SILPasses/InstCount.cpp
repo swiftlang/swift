@@ -67,16 +67,14 @@ public:
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-class SILInstCount : public SILModuleTransform {
+class SILInstCount : public SILFunctionTransform {
   virtual ~SILInstCount() {}
 
   InstCountVisitor V;
 
   /// The entry point to the transformation.
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
-    for (auto &F : M)
-      if (!F.empty())
-        V.visitSILFunction(&F);
+  void run() {
+    V.visitSILFunction(getFunction());
   }
 };
 

@@ -17,7 +17,6 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/ImmutableSet.h"
@@ -460,11 +459,9 @@ class MandatoryInlining : public SILModuleTransform {
   virtual ~MandatoryInlining() {}
 
   /// The entry point to the transformation.
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
-
-    performSILMandatoryInlining(&M);
-
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+  void run() {
+    performSILMandatoryInlining(getModule());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

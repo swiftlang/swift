@@ -15,7 +15,6 @@
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/SILInliner.h"
@@ -369,7 +368,7 @@ class SILPerformanceInlinerPass : public SILModuleTransform {
 public:
   SILPerformanceInlinerPass(unsigned th) : Threshold(th) {}
 
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+  void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
     if (Threshold == 0) {
@@ -394,7 +393,7 @@ public:
 
     // Invalidate the call graph.
     if (Changed)
-      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 

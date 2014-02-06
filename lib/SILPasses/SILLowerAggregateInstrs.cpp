@@ -17,7 +17,6 @@
 #define DEBUG_TYPE "sil-lower-aggregate-instrs"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -257,12 +256,13 @@ class SILLowerAggregate : public SILFunctionTransform {
   virtual ~SILLowerAggregate() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+  void run() {
+    SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
-          F.getName() << " *****\n");
-    bool Changed = processFunction(F);
+          F->getName() << " *****\n");
+    bool Changed = processFunction(*F);
     if (Changed)
-      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

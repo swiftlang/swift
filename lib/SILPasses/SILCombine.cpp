@@ -20,7 +20,6 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -747,27 +746,23 @@ class SILCombine : public SILFunctionTransform {
   virtual ~SILCombine() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+  void run() {
     SILCombiner Combiner;
-    // If F is just a declaration without any basic blocks, skip it.
-    if (F.empty())
-      return;
-
-    bool Changed = Combiner.runOnFunction(F);
+    bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
-      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
 class SILDeadFuncElimination : public SILModuleTransform {
 
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+  void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
-
+    SILModule *M = getModule();
     bool Changed = false;
 
     // Erase trivially dead functions that may not be a part of the call graph.
-    for (auto FI = M.begin(), EI = M.end(); FI != EI;) {
+    for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
       SILFunction *F = FI++;
       Changed |= tryToRemoveFunction(F);
     }
@@ -782,7 +777,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
     // Invalidate the call graph.
     if (Changed)
-      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 

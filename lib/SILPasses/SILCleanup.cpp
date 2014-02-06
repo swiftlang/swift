@@ -21,7 +21,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 
 using namespace swift;
 
@@ -57,9 +56,9 @@ class SILCleanup : public swift::SILFunctionTransform {
   virtual ~SILCleanup() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(swift::SILFunction &F, SILPassManager *PM) {
-    cleanFunction(F);
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+  void run() {
+    cleanFunction(*getFunction());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

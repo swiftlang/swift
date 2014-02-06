@@ -27,7 +27,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -140,7 +139,8 @@ class InOutDeshadowing : public SILFunctionTransform {
   virtual ~InOutDeshadowing() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
+  void run() {
+    SILFunction &F = *getFunction();
     SILBasicBlock &EntryBlock = F.front();
 
     // For each function, find any inout arguments and try to optimize each of

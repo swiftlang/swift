@@ -18,7 +18,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -1561,17 +1560,15 @@ class DefiniteInitialization : public SILFunctionTransform {
   virtual ~DefiniteInitialization() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-
+  void run() {
     // Walk through and promote all of the alloc_box's that we can.
-    checkDefiniteInitialization(F);
-    DEBUG(F.verify());
+    checkDefiniteInitialization(*getFunction());
+    DEBUG(getFunction()->verify());
 
     // Lower raw-sil only instructions used by this pass, like "assign".
-    lowerRawSILOperations(F);
-    DEBUG(F.verify());
+    lowerRawSILOperations(*getFunction());
 
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
 };
 

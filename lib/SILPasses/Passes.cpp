@@ -22,6 +22,9 @@
 #define DEBUG_TYPE "sil-optimizer"
 
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/PassManager.h"
+#include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
@@ -29,9 +32,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-#include "swift/SILPasses/PassManager.h"
-#include "swift/SILPasses/Transforms.h"
-#include "swift/SILAnalysis/Analysis.h"
+
 
 using namespace swift;
 

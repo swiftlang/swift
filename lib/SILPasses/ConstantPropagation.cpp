@@ -16,7 +16,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -813,9 +812,9 @@ class ConstantPropagation : public SILFunctionTransform {
   virtual ~ConstantPropagation() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    CCPFunctionBody(F);
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  void run() {
+    CCPFunctionBody(*getFunction());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

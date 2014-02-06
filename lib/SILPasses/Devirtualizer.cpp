@@ -22,7 +22,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "llvm/ADT/MapVector.h"
@@ -478,11 +477,11 @@ class SILDevirtualizationPass : public SILFunctionTransform {
   virtual ~SILDevirtualizationPass() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    bool Changed = SILDevirtualizer(&F).run();
+  void run() {
+    bool Changed = SILDevirtualizer(getFunction()).run();
     if (Changed)
       PM->scheduleAnotherIteration();
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

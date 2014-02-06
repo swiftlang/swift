@@ -18,7 +18,6 @@
 #include "llvm/Support/Debug.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILPasses/PassManager.h"
 
 using namespace swift;
 
@@ -760,7 +759,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 }
 
 static void
-runOnFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
+processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
   ReachabilityInfo RS(F);
 
   // This is a map from each partial apply to a set of indices of promotable
@@ -793,14 +792,15 @@ class CapturePromotionPass : public SILModuleTransform {
   virtual ~CapturePromotionPass() {}
 
   /// The entry point to the transformation.
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+  virtual void run() {
     SmallVector<SILFunction*, 128> Worklist;
-    for (auto &F : M)
-      runOnFunction(&F, Worklist);
+    for (auto &F : *getModule())
+      processFunction(&F, Worklist);
+    
     while (!Worklist.empty())
-      runOnFunction(Worklist.pop_back_val(), Worklist);
+      processFunction(Worklist.pop_back_val(), Worklist);
 
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

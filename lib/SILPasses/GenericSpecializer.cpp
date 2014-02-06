@@ -17,7 +17,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Mangle.h"
@@ -441,20 +440,20 @@ class SILGenericSpecializerTransform : public SILModuleTransform {
 public:
   SILGenericSpecializerTransform() {}
 
-  virtual void runOnModule(SILModule &M, SILPassManager *PM) {
+  void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
     // Collect a call-graph bottom-up list of functions and specialize the
     // functions in reverse order.
-     bool Changed =
-      GenericSpecializer(&M).specialize(CGA->bottomUpCallGraphOrder());
+    bool Changed = GenericSpecializer(getModule()).
+      specialize(CGA->bottomUpCallGraphOrder());
 
     if (Changed) {
       // Schedule another iteration of the transformation pipe.
       PM->scheduleAnotherIteration();
 
       // Invalidate the call graph.
-      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
     }
   }
 };

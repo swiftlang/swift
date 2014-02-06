@@ -16,7 +16,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -522,9 +521,9 @@ class ARCOpts : public SILFunctionTransform {
   virtual ~ARCOpts() {}
 
   /// The entry point to the transformation.
-  virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    processFunction(F);
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+  void run() {
+    processFunction(*getFunction());
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
