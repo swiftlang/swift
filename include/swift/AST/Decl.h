@@ -2900,17 +2900,20 @@ public:
 
 class OperatorDecl;
 
+
+// Note that the values of these enums line up with %select values in
+// diagnostics.
 enum class AccessorKind {
   /// \brief This is not a property accessor.
   NotAccessor = -1,
   /// \brief This is a getter for a property or subscript.
-  IsGetter,
+  IsGetter = 0,
   /// \brief This is a setter for a property or subscript.
-  IsSetter,
+  IsSetter = 1,
   /// \brief This is a willSet specifier for a property.
-  IsWillSet,
+  IsWillSet = 2,
   /// \brief This is a didSet specifier for a property.
-  IsDidSet
+  IsDidSet = 3
 };
 
 /// FuncDecl - 'func' declaration.
