@@ -40,7 +40,7 @@ class StripDebugInfo : public swift::SILFunctionTransform {
   /// The entry point to the transformation.
   virtual void runOnFunction(swift::SILFunction &F, SILPassManager *PM) {
     stripFunction(&F);
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

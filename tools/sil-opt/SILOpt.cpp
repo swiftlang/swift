@@ -218,7 +218,7 @@ int main(int argc, char **argv) {
   SILPassManager PM(CI.getSILModule());
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
   PM.registerAnalysis(createAliasAnalysis(CI.getSILModule()));
-
+  PM.registerAnalysis(createDominanceAnalysis(CI.getSILModule()));
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:

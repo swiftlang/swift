@@ -29,6 +29,7 @@
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
@@ -133,7 +134,7 @@ class MemoryToRegisters {
   SILFunction &F;
 
   /// Dominators.
-  DominanceInfo DT;
+  DominanceInfo *DT;
 
   /// \brief Check if the AllocStackInst \p ASI is captured by any of its users.
   bool isCaptured(AllocStackInst *ASI);
@@ -153,7 +154,7 @@ class MemoryToRegisters {
 
 public:
   /// C'tor
-  MemoryToRegisters(SILFunction &Func) : F(Func), DT(&F) {}
+  MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt) {}
 
   /// Promote memory to registers.
   void run();
@@ -707,7 +708,7 @@ void MemoryToRegisters::run() {
       DEBUG(llvm::dbgs() << "*** Need to insert Phis for " << *ASI);
 
       // Promote this allocation.
-      StackAllocationPromoter(ASI, &DT).run();
+      StackAllocationPromoter(ASI, DT).run();
 
       // Make sure that all of the allocations were promoted into registers.
       assert(isWriteOnlyAllocation(ASI) && "Loads left behind");
@@ -725,9 +726,13 @@ class SILMem2Reg : public SILFunctionTransform {
   virtual ~SILMem2Reg() {}
 
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    DEBUG(llvm::dbgs() << "***** Mem2Reg on function: " << F.getName() <<
-          " *****\n");
-    MemoryToRegisters(F).run();
+    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F.getName() << " **\n");
+
+    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    assert(DA && "Unable to find dominance analysis.");
+
+    MemoryToRegisters(F, DA->getDomInfo(&F)).run();
+
     PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };

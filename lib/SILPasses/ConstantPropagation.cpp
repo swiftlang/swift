@@ -815,7 +815,7 @@ class ConstantPropagation : public SILFunctionTransform {
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     CCPFunctionBody(F);
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

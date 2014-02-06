@@ -800,7 +800,7 @@ class CapturePromotionPass : public SILModuleTransform {
     while (!Worklist.empty())
       runOnFunction(Worklist.pop_back_val(), Worklist);
 
-    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::All);
+    PM->invalidateAllAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };
 

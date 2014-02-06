@@ -17,6 +17,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -74,7 +75,7 @@ static bool regionHasCycles(SILBasicBlock *Entry, SILBasicBlock *Exit) {
 static SILInstruction *getLastRelease(AllocBoxInst *ABI,
                                       SmallVectorImpl<SILInstruction*> &Users,
                                     SmallVectorImpl<SILInstruction*> &Releases,
-                                      llvm::OwningPtr<PostDominanceInfo> &PDI) {
+                                      PostDominanceInfo *PDI) {
   // If there are no releases, then the box is leaked.  Don't transform it. This
   // can only happen in hand-written SIL code, not compiler generated code.
   if (Releases.empty())
@@ -110,10 +111,6 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
       continue;
     }
 
-    // Otherwise, we need to order them.  Make sure we've computed PDI.
-    if (!PDI.isValid())
-      PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
-
     if (PDI->properlyDominates(RI->getParent(), LastRelease->getParent())) {
       // RI post-dom's LastRelease, so it is our new LastRelease.
       LastRelease = RI;
@@ -135,10 +132,6 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   for (auto *User : Users) {
     if (User->getParent() == LastRelease->getParent())
       continue;
-
-    // Make sure we've computed PDI.
-    if (!PDI.isValid())
-      PDI.reset(new PostDominanceInfo(ABI->getParent()->getParent()));
 
     if (!PDI->properlyDominates(LastRelease->getParent(), User->getParent()))
       return nullptr;
@@ -242,8 +235,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
 /// alloc_stack.  On success, this updates the IR and returns true, but does not
 /// remove the alloc_box itself.
-static bool optimizeAllocBox(AllocBoxInst *ABI,
-                             llvm::OwningPtr<PostDominanceInfo> &PDI) {
+static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
 
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
@@ -345,13 +337,16 @@ class SILStackPromotion : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
-    llvm::OwningPtr<PostDominanceInfo> PostDomInfo;
+    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    assert(DA && "Unable to find dominance analysis.");
+
+    PostDominanceInfo *PDI = DA->getPostDomInfo(&F);
 
     for (auto &BB : F) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
         if (auto *ABI = dyn_cast<AllocBoxInst>(I))
-          if (optimizeAllocBox(ABI, PostDomInfo)) {
+          if (optimizeAllocBox(ABI, PDI)) {
             ++NumStackPromoted;
             // Carefully move iterator to avoid invalidation problems.
             ++I;

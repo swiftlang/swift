@@ -38,6 +38,7 @@ namespace swift {
     /// The class hierarchy
     enum class AnalysisKind {
       CallGraph,
+      Dominance,
       Alias,
     };
 
@@ -88,6 +89,7 @@ namespace swift {
 
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
   SILAnalysis *createAliasAnalysis(SILModule *M);
+  SILAnalysis *createDominanceAnalysis(SILModule *M);
 
 } // end namespace swift
 

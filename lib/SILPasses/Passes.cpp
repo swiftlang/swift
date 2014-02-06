@@ -45,6 +45,9 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   auto &Ctx = Module.getASTContext();
 
   SILPassManager PM(&Module);
+  PM.registerAnalysis(createCallGraphAnalysis(&Module));
+  PM.registerAnalysis(createAliasAnalysis(&Module));
+  PM.registerAnalysis(createDominanceAnalysis(&Module));
   PM.add(createMandatoryInlining());
   PM.add(createCapturePromotion());
   PM.add(createStackPromotion());
@@ -68,6 +71,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     SILPassManager PM(&Module);
     PM.registerAnalysis(createCallGraphAnalysis(&Module));
     PM.registerAnalysis(createAliasAnalysis(&Module));
+    PM.registerAnalysis(createDominanceAnalysis(&Module));
     PM.add(createGenericSpecializer());
     PM.add(createPerfInliner(Options.InlineThreshold));
     PM.add(createSILCombine());

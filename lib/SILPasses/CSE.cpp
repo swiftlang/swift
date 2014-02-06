@@ -25,6 +25,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/PassManager.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
@@ -224,7 +225,7 @@ public:
 
   CSE() {}
 
-  bool processFunction(SILFunction &F);
+  bool processFunction(SILFunction &F, DominanceInfo *DT);
 
 private:
   // NodeScope - almost a POD, but needs to call the constructors for the
@@ -285,10 +286,8 @@ private:
 //                             CSE Implementation
 //===----------------------------------------------------------------------===//
 
-bool CSE::processFunction(SILFunction &F) {
+bool CSE::processFunction(SILFunction &Fm, DominanceInfo *DT) {
   std::vector<StackNode *> nodesToProcess;
-
-  DominanceInfo DT(&F);
 
   // Tables that the pass uses when walking the domtree.
   ScopedHTType AVTable;
@@ -297,9 +296,9 @@ bool CSE::processFunction(SILFunction &F) {
   bool Changed = false;
 
   // Process the root node.
-  nodesToProcess.push_back(new StackNode(AvailableValues, DT.getRootNode(),
-                  DT.getRootNode()->begin(),
-                  DT.getRootNode()->end()));
+  nodesToProcess.push_back(new StackNode(AvailableValues, DT->getRootNode(),
+                  DT->getRootNode()->begin(),
+                  DT->getRootNode()->end()));
 
   // Process the stack.
   while (!nodesToProcess.empty()) {
@@ -391,8 +390,12 @@ class SILCSE : public SILFunctionTransform {
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << F.getName() <<
           " *****\n");
+
+    DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+    assert(DA && "Unable to find dominance analysis.");
+
     CSE C;
-    C.processFunction(F);
+    C.processFunction(F, DA->getDomInfo(&F));
     PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
