@@ -47,6 +47,7 @@ TYPEREPR(Tuple, TypeRepr)
 TYPEREPR(Named, TypeRepr)
 TYPEREPR(ProtocolComposition, TypeRepr)
 TYPEREPR(Metatype, TypeRepr)
+TYPEREPR(InOut, TypeRepr)
 
 #undef ABSTRACT_TYPEREPR
 #undef TYPEREPR

@@ -2544,8 +2544,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     return makeParserError();
   }
 
-  ParserResult<Pattern> Indices = parsePatternTuple(/*DefaultArgs=*/nullptr,
-                                                    /*IsLet*/ true);
+  ParserResult<Pattern> Indices =
+    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   Indices.get()->walk(SetVarContext(CurDeclContext));
@@ -2771,8 +2771,8 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // Parse the parameter tuple.
     SourceLoc LParenLoc = Tok.getLoc();
     DefaultArgumentInfo DefaultArgs; // ignored in valid code
-    ParserResult<Pattern> Params = parsePatternTuple(&DefaultArgs,
-                                                     /*IsLet*/true);
+    ParserResult<Pattern> Params =
+      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
     if (!Params.isParseError()) {
       // Check that the destructor has zero parameters.
       SourceRange ElementsRange;

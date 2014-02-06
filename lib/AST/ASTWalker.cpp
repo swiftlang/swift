@@ -1154,6 +1154,12 @@ bool Traversal::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

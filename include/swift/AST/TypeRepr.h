@@ -114,7 +114,7 @@ private:
 
 /// \brief A type with attributes.
 /// \code
-///   @inout Foo
+///   @thin Foo
 /// \endcode
 class AttributedTypeRepr : public TypeRepr {
   // FIXME: TypeAttributes isn't a great use of space.
@@ -567,6 +567,36 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+  
+/// \brief An 'inout' type.
+/// \code
+///   inout x : Int
+/// \endcode
+class InOutTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc InOutLoc;
+  
+public:
+  InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+  : TypeRepr(TypeReprKind::InOut), Base(Base), InOutLoc(InOutLoc) {
+  }
+  
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getInOutLoc() const { return InOutLoc; }
+  
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InOut;
+  }
+  static bool classof(const InOutTypeRepr *T) { return true; }
+  
+private:
+  SourceLoc getStartLocImpl() const { return InOutLoc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+  
 
 inline bool TypeRepr::isSimple() const {
   switch (getKind()) {
@@ -574,6 +604,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Array:
+  case TypeReprKind::InOut:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

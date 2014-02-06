@@ -1636,6 +1636,12 @@ public:
     printRec(T->getBase());
     OS << ')';
   }
+  
+  void visitInOutTypeRepr(InOutTypeRepr *T) {
+    printCommon(T, "type_inout") << '\n';
+    printRec(T->getBase());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

@@ -164,6 +164,11 @@ TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
   return new (Ctx) MetatypeTypeRepr(visit(T->getBase()), T->getMetaLoc());
 }
 
+TypeRepr *CloneVisitor::visitInOutTypeRepr(InOutTypeRepr *T) {
+  return new (Ctx) InOutTypeRepr(visit(T->getBase()), T->getInOutLoc());
+}
+
+
 TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
@@ -334,3 +339,11 @@ void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,
   Base->print(Printer, Opts);
   Printer << ".metatype";
 }
+
+
+void InOutTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  Printer << "inout ";
+  Base->print(Printer, Opts);
+}
+

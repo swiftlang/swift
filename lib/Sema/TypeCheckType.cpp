@@ -839,6 +839,12 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
+  case TypeReprKind::InOut: {
+    Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
+    if (ty->is<ErrorType>())
+      return ty;
+    return InOutType::get(ty);
+  }
 
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
