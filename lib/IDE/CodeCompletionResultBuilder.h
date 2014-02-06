@@ -128,10 +128,20 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
+  void Func(Type T) {
+    if (T->getAs<InOutType>()) {}
+  }
 
-  void addCallParameter(Identifier Name, StringRef Type) {
+  void addCallParameter(Identifier Name, Type ty) {
     CurrentNestingLevel++;
+    
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
+    // inout arguments are printed specially.
+    if (auto *IOT = ty->getAs<InOutType>()) {
+      addTextChunk("inout ");
+      ty = IOT->getObjectType();
+    }
+
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
 
@@ -149,8 +159,8 @@ public:
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
     }
-    addChunkWithText(
-        CodeCompletionString::Chunk::ChunkKind::CallParameterType, Type);
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+                     ty->getString());
     CurrentNestingLevel--;
   }
 

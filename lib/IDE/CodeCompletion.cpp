@@ -993,18 +993,15 @@ public:
       for (auto TupleElt : TP->getFields()) {
         if (NeedComma)
           Builder.addComma();
-        Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
-                                 TupleElt.getPattern()->getType().getString());
         NeedComma = true;
+        
+        Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
+                                 TupleElt.getPattern()->getType());
       }
       return;
     }
-    if (auto *PP = dyn_cast<ParenPattern>(P)) {
-      Builder.addCallParameter(PP->getBoundName(), PP->getType().getString());
-      return;
-    }
-    auto *TP = cast<TypedPattern>(P);
-    Builder.addCallParameter(TP->getBoundName(), TP->getType().getString());
+
+    Builder.addCallParameter(P->getBoundName(), P->getType());
   }
 
   void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
@@ -1029,8 +1026,7 @@ public:
     if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
       if (IsTopLevel)
         Builder.addLeftParen();
-      Builder.addCallParameter(Identifier(),
-                               PT->getUnderlyingType().getString());
+      Builder.addCallParameter(Identifier(), PT->getUnderlyingType());
       if (IsTopLevel)
         Builder.addRightParen();
       return;
@@ -1038,7 +1034,8 @@ public:
 
     if (IsTopLevel)
       Builder.addLeftParen();
-    Builder.addCallParameter(Label, T.getString());
+    
+    Builder.addCallParameter(Label, T);
     if (IsTopLevel)
       Builder.addRightParen();
   }
@@ -1058,17 +1055,16 @@ public:
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
           Builder.addComma();
-        Builder.addCallParameter(TupleElt.getName(),
-                                 TupleElt.getType().getString());
+        Builder.addCallParameter(TupleElt.getName(), TupleElt.getType());
         NeedComma = true;
       }
     } else {
       Type T = AFT->getInput();
       if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-        // Only unwrap the paren shugar, if it exists.
+        // Only unwrap the paren sugar, if it exists.
         T = PT->getUnderlyingType();
       }
-      Builder.addCallParameter(Identifier(), T->getString());
+      Builder.addCallParameter(Identifier(), T);
     }
     Builder.addRightParen();
     addTypeAnnotation(Builder, AFT->getResult());
@@ -1136,8 +1132,7 @@ public:
         FirstInputType = PT->getUnderlyingType();
 
       Builder.addLeftParen();
-      Builder.addCallParameter(Ctx.Id_self,
-                               FirstInputType.getString());
+      Builder.addCallParameter(Ctx.Id_self, FirstInputType);
       Builder.addRightParen();
     } else {
       addPatternFromType(Builder, FirstInputType);

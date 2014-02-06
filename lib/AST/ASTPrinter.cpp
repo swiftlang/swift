@@ -185,6 +185,15 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,
                                  bool StripOuterSliceType) {
+  auto TheTypeLoc = TP->getTypeLoc();
+  
+  // If the outer typeloc is an InOutTypeRepr, print the inout before the
+  // subpattern.
+  if (auto *IOT = dyn_cast_or_null<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
+    TheTypeLoc = TypeLoc(IOT->getBase());
+    Printer << "inout ";
+  }
+  
   printPattern(TP->getSubPattern());
   Printer << ": ";
   if (StripOuterSliceType) {
@@ -194,7 +203,7 @@ void PrintAST::printTypedPattern(const TypedPattern *TP,
       return;
     }
   }
-  printTypeLoc(TP->getTypeLoc());
+  printTypeLoc(TheTypeLoc);
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
