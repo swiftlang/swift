@@ -1,6 +1,23 @@
 2014-02-12
 ----------
 
+* The @inout attribute in argument lists has been promoted to a 
+  context-sensitive keyword.  Where before you might have written:
+
+    func swap<T>(a : @inout T, b : @inout T) {
+      (a,b) = (b,a)
+    }
+
+  You are now required to write:
+    func swap<T>(inout a : T, inout b : T) {
+      (a,b) = (b,a)
+    }
+
+  We made this change because "inout" is a fundamental part of the type
+  system, which attributes are a poor match for.  The inout keyword is
+  also orthogonal to the var and let keywords (which may be specified in
+  the same place), so it fits naturally there.
+
 * The "@mutating" attribute (which can be used on functions in structs,
   enums, and protocols) has been promoted to a context-sensitive keyword.
   Mutating struct methods are now written as:
