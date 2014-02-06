@@ -32,7 +32,6 @@ namespace swift {
       Instructions,  // Invalidate instruction-related analysis.
       CFG,           // The control flow changes.
       CallGraph,     // The call graph changed.
-      Alias,         // Invalidate alias analysis.
       All,           // Invalidate everything.
     };
 
