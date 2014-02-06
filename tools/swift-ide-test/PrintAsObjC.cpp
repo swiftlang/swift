@@ -55,6 +55,8 @@ class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
 
+  bool protocolMembersOptional = false;
+
   friend ASTVisitor<ObjCPrinter>;
   friend TypeVisitor<ObjCPrinter>;
 
@@ -102,6 +104,10 @@ private:
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->isObjC())
         continue;
+      if (VD->getAttrs().isOptional() != protocolMembersOptional) {
+        protocolMembersOptional = VD->getAttrs().isOptional();
+        os << (protocolMembersOptional ? "@optional\n" : "@required\n");
+      }
       visit(VD);
     }
   }
@@ -129,7 +135,9 @@ private:
     os << "@protocol " << PD->getName();
     printProtocols(PD->getProtocols());
     os << "\n";
+    assert(!protocolMembersOptional && "protocols start @required");
     printMembers(PD->getMembers());
+    protocolMembersOptional = false;
     os << "@end\n";
   }
 
