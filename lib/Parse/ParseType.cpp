@@ -826,6 +826,10 @@ bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
       Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
     do {
+      // The contextual inout marker is part of argument lists.
+      if (Tok.isContextualKeyword("inout"))
+        consumeToken(tok::identifier);
+      
       // If the tuple element starts with "ident :", then it is followed
       // by a type annotation.
       if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
