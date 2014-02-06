@@ -14,6 +14,7 @@
 #define SWIFT_SILANALYSIS_ALIASANALYSIS_H
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -23,7 +24,7 @@ class SILInstruction;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
-class AliasAnalysis {
+class AliasAnalysis : public SILAnalysis {
 public:
   /// The result of an alias query. This is based off of LLVM's alias
   /// analysis so see LLVM's documentation for more information.
@@ -44,6 +45,13 @@ private:
   using MemoryBehavior = SILInstruction::MemoryBehavior;
 
 public:
+  AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias) {}
+
+  virtual ~AliasAnalysis() {}
+
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == AnalysisKind::Alias;
+  }
 
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2);
@@ -52,12 +60,9 @@ public:
   /// respect to V.
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V);
 
-  /// Clear the caches.
-  ///
-  /// FIXME: Add in an API to call to invalidate all of the cache
-  /// entries for one SILValue. It is not needed right now, but it
-  /// could be useful in the future.
-  void invalidateCaches() { AliasCache.clear(); }
+  virtual void invalidate(InvalidationKind K) { AliasCache.clear(); }
+
+  virtual void invalidate(SILFunction *, InvalidationKind K) { invalidate(K); }
 };
 
 } // end namespace swift

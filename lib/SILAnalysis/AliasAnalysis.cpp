@@ -205,3 +205,8 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
     return Inst->getMemoryBehavior();
   }
 }
+
+SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
+  return new AliasAnalysis(M);
+}
+

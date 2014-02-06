@@ -86,6 +86,8 @@ namespace swift {
 
 
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
+  SILAnalysis *createAliasAnalysis(SILModule *M);
+
 } // end namespace swift
 
 #endif

@@ -50,7 +50,7 @@ static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
+void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
   StoreInst  *PrevStore = 0;
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
@@ -65,7 +65,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
       // Invalidate all loads that this store writes to.
       llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
       for (auto *LI : Loads)
-        if (isWriteMemBehavior(AA.getMemoryBehavior(Inst, SILValue(LI))))
+        if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, SILValue(LI))))
           InvalidatedLoadList.push_back(LI);
       for (auto *LI : InvalidatedLoadList) {
         DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
@@ -151,7 +151,7 @@ void promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis &AA) {
     if (Inst->mayWriteToMemory()) {
       llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
       for (auto *LI : Loads)
-        if (isWriteMemBehavior(AA.getMemoryBehavior(Inst, SILValue(LI))))
+        if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, SILValue(LI))))
           InvalidatedLoadList.push_back(LI);
       for (auto *LI : InvalidatedLoadList) {
         DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
@@ -303,7 +303,7 @@ class SILCodeMotion : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F.getName() <<
           " *****\n");
 
-    AliasAnalysis AA;
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
 
     // Remove dead stores and merge duplicate loads.
     for (auto &BB : F)

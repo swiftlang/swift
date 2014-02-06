@@ -67,6 +67,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
     SILPassManager PM(&Module);
     PM.registerAnalysis(createCallGraphAnalysis(&Module));
+    PM.registerAnalysis(createAliasAnalysis(&Module));
     PM.add(createGenericSpecializer());
     PM.add(createPerfInliner(Options.InlineThreshold));
     PM.add(createSILCombine());
