@@ -47,7 +47,22 @@ static bool isNoAliasArgument(SILValue V) {
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
   return isa<AllocationInst>(*V) || isNoAliasArgument(V) ||
-    isa<LiteralInst>(*V));
+    isa<LiteralInst>(*V);
+}
+
+static bool isLocalLiteral(SILValue V) {
+  switch (V->getKind()) {
+  case ValueKind::IntegerLiteralInst:
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::StringLiteralInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+static bool isIdentifiedFunctionLocal(SILValue V) {
+  return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
@@ -58,6 +73,12 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they can not alias.
   if (isIdentifiableObject(O1) && isIdentifiableObject(O2))
+    return true;
+
+  // Function arguments can't alias with things that are known to be
+  // unambigously identified at the function level.
+  if ((isa<SILArgument>(O1.getDef()) && isIdentifiedFunctionLocal(O2)) ||
+      (isa<SILArgument>(O2.getDef()) && isIdentifiedFunctionLocal(O1)))
     return true;
 
   // We failed to prove that the two objects are different.
