@@ -304,6 +304,7 @@ class SILCodeMotion : public SILFunctionTransform {
           " *****\n");
 
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    assert(AA && "We should never get a null alias analysis.");
 
     // Remove dead stores and merge duplicate loads.
     for (auto &BB : F)
