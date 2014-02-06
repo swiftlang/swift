@@ -126,6 +126,9 @@ private:
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(NominalTypeDecl *type);
   bool tryMangleSubstitution(void *ptr);
+  
+  void mangleGenericSignature(GenericSignature *sig,
+                              ResilienceExpansion expansion);
 };
   
 } // end namespace Mangle

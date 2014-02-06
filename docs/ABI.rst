@@ -790,7 +790,7 @@ Types
   type ::= 'R' type                          // inout
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
-  type ::= 'U' generics '_' type             // generic type
+  type ::= 'U' generics '_' type             // generic type (old)
   type ::= 'Xo' type                         // [unowned] type
   type ::= 'Xw' type                         // [weak] type
   type ::= 'XF' impl-function-type           // function implementation type
@@ -811,8 +811,16 @@ Types
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
+  type ::= 'u' generic-signature '_' type   // generic type (new)
+  type ::= 'q' index                         // dependent generic parameter
+                                             //   with depth = 0, idx = N
+  type ::= 'qd' index index                  // dependent generic parameter
+                                             //   with depth = M, idx = N
+  type ::= 'q' type identifier               // member of dependent type
+
 ``<type>`` never begins or ends with a number.
 ``<type>`` never begins with an underscore.
+``<type>`` never begins with ``d``.
 
 Note that protocols mangle differently as types and as contexts. A protocol
 context always consists of a single protocol name and so mangles without a
@@ -820,7 +828,10 @@ trailing underscore. A protocol type can have zero, one, or many protocol bounds
 which are juxtaposed and terminated with a trailing underscore.
 
 ::
-  impl-function-type ::= impl-callee-convention impl-function-attribute* generics? '_' impl-parameter* '_' impl-result* '_'
+
+  impl-function-type ::=
+    impl-callee-convention impl-function-attribute* generic-signature? '_'
+    impl-parameter* '_' impl-result* '_'
   impl-callee-convention ::= 't'              // thin
   impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
   impl-convention ::= 'a'                     // direct, autoreleased
@@ -871,6 +882,15 @@ so the structure is quite simple.
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
 module is the one containing the extension or type declaration that declared
 the conformance.
+
+::
+
+  generic-signature ::= index* 'R' requirement* '_'
+  requirement ::= 'P' type type     // protocol or superclass requirement
+  requirement ::= 'E' type type     // same-type requirement
+
+A generic signature begins by describing the number of generic parameters at
+each depth of the signature, followed by the requirements The requirements a
 
 Value Witnesses
 ~~~~~~~~~~~~~~~

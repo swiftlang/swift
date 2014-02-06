@@ -536,9 +536,49 @@ void Mangler::mangleDeclType(ValueDecl *decl, ResilienceExpansion explosion,
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 }
 
+void Mangler::mangleGenericSignature(GenericSignature *sig,
+                                     ResilienceExpansion expansion) {
+  // Mangle the number of parameters.
+  unsigned depth = 0;
+  unsigned count = 0;
+  for (auto param : sig->getGenericParams()) {
+    if (param->getDepth() != depth) {
+      assert(param->getDepth() > depth && "generic params not ordered");
+      while (depth++ < param->getDepth()) {
+        Buffer << Index(count);
+        count = 0;
+      }
+    }
+    assert(param->getIndex() == count && "generic params not ordered");
+    ++count;
+  }
+  Buffer << 'R';
+  // Mangle the requirements.
+  for (auto &reqt : sig->getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementKind::WitnessMarker:
+      // TODO: Do we need to mangle this?
+      break;
+        
+    case RequirementKind::Conformance:
+      Buffer << 'P';
+      mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
+      mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
+      break;
+
+    case RequirementKind::SameType:
+      Buffer << 'E';
+      mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
+      mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
+      break;
+    }
+  }
+  Buffer << '_';
+}
+
 /// Mangle a type into the buffer.
 ///
-/// Type manglings should never start with [0-9_] or end with [0-9].
+/// Type manglings should never start with [0-9d_] or end with [0-9].
 ///
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
 /// <type> ::= Bf <natural> _        # Builtin.Float
@@ -791,7 +831,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     if (fn->isNoReturn()) Buffer << 'N';
     if (fn->isPolymorphic()) {
       Buffer << 'G';
-      bindGenericParameters(fn->getGenericParams(), /*mangle*/ true);
+      mangleGenericSignature(fn->getGenericSignature(), explosion);
     }
     Buffer << '_';
 
@@ -800,15 +840,15 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       mangleType(param.getType(), ResilienceExpansion::Minimal, 0);
     };
 
-    for (auto param : fn->getParametersWithoutIndirectResult()) {
+    for (auto param : fn->getInterfaceParametersWithoutIndirectResult()) {
       mangleParameter(param);
     }
     Buffer << '_';
 
     if (fn->hasIndirectResult()) {
-      mangleParameter(fn->getIndirectResult());
+      mangleParameter(fn->getIndirectInterfaceResult());
     } else {
-      auto result = fn->getResult();
+      auto result = fn->getInterfaceResult();
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), ResilienceExpansion::Minimal, 0);
     }
@@ -912,11 +952,22 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   }
 
   case TypeKind::GenericTypeParam: {
-    llvm_unreachable("cannot mangle generic type parameters yet");
+    Buffer << 'q';
+    // FIXME: Notion of depth is reversed from that for archetypes.
+    auto paramTy = cast<GenericTypeParamType>(type);
+    if (paramTy->getDepth() > 0) {
+      Buffer << 'd';
+      Buffer << Index(paramTy->getDepth() - 1);
+    }
+    Buffer << Index(paramTy->getIndex());
   }
 
   case TypeKind::DependentMember: {
-    llvm_unreachable("cannot mangle dependent member types yet");
+    Buffer << 'q';
+
+    auto memTy = cast<DependentMemberType>(type);
+    mangleType(type, explosion, 0);
+    mangleIdentifier(memTy->getName());
   }
 
   case TypeKind::Function:
