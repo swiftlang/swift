@@ -259,7 +259,7 @@ struct GenericSpecializer {
   void collectApplyInst(SILFunction &F);
 
   /// The driver for the generic specialization pass.
-  bool specialize(std::vector<SILFunction *> &BotUpFuncList) {
+  bool specialize(const std::vector<SILFunction *> &BotUpFuncList) {
     bool Changed = false;
     for (auto &F : *M)
       collectApplyInst(F);
@@ -442,10 +442,9 @@ public:
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
     // Collect a call-graph bottom-up list of functions.
-    std::vector<SILFunction *> BotUpFuncList;
-    CGA->bottomUpCallGraphOrder(BotUpFuncList);
 
-     bool Changed = GenericSpecializer(&M).specialize(BotUpFuncList);
+     bool Changed =
+      GenericSpecializer(&M).specialize(CGA->bottomUpCallGraphOrder());
 
     if (Changed)
       PM->scheduleAnotherIteration();

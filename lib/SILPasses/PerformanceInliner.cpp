@@ -373,9 +373,10 @@ public:
       return;
     }
 
-    // Collect a call-graph bottom-up list of functions.
-    std::vector<SILFunction *> Worklist;
-    CGA->bottomUpCallGraphOrder(Worklist);
+    // Initialize the worklist with a bottom-up call-graph order list of
+    // functions.
+    const std::vector<SILFunction *> &Order = CGA->bottomUpCallGraphOrder();
+    std::vector<SILFunction *> Worklist(Order);
     std::reverse(Worklist.begin(), Worklist.end());
 
     SILPerformanceInliner inliner(Threshold);

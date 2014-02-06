@@ -64,6 +64,7 @@ namespace swift {
   /// The Call Graph Analysis provides information about the call graph.
   class CallGraphAnalysis : public SILAnalysis {
     SILModule *M;
+    std::vector<SILFunction *> BottomUpFunctionOrder;
 
   public:
     virtual ~CallGraphAnalysis() {}
@@ -74,11 +75,12 @@ namespace swift {
       return S->getKind() == AnalysisKind::CallGraph;
     }
 
-    void bottomUpCallGraphOrder(std::vector<SILFunction*> &order);
+    /// \brief return a bottom-up function order.
+    const std::vector<SILFunction*> &bottomUpCallGraphOrder();
 
     virtual void invalidate(InvalidationKind K) {
-    // TODO: invalidate the cache once we implement one.
-      if (K == InvalidationKind::CallGraph) { /* ... */ }
+      if (K >= InvalidationKind::CallGraph)
+        BottomUpFunctionOrder.clear();
     }
 
     virtual void invalidate(SILFunction*, InvalidationKind K) { invalidate(K); }

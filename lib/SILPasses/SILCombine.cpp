@@ -767,9 +767,8 @@ class SILDeadFuncElimination : public SILModuleTransform {
       Changed |= tryToRemoveFunction(F);
     }
 
-    std::vector<SILFunction*> Order;
-    // returns a bottom-up list of functions, leafs first.
-    CGA->bottomUpCallGraphOrder(Order);
+    // A bottom-up list of functions, leafs first.
+    const std::vector<SILFunction*> &Order = CGA->bottomUpCallGraphOrder();
 
     // Scan the call graph top-down (caller first) because eliminating functions
     // can generate more opportunities.
