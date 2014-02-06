@@ -48,7 +48,9 @@ for target in config.targets_to_build.split():
   config.available_features.add(target)
 
 # Add the run target CPU and OS as features.
-config.test_triple = lit_config.params.get('test_triple', None)
+# Assume macosx if not set.
+config.test_triple = lit_config.params.get('test_triple', 
+                                           'x86_64-apple-macosx10.9')
 (run_cpu, run_vendor, run_os, run_vers) = re.match('([^-]+)-([^-]+)-([^0-9]+)(.*)', config.test_triple).groups()
 config.available_features.add("CPU=" + run_cpu)
 config.available_features.add("OS=" + run_os)
@@ -79,13 +81,15 @@ else:
     driver = config.swift_driver
 
 if run_vendor == 'apple':
+    # Find stdlib to test. Assume it's near the swift compiler if not set.
     test_stdlib = lit_config.params.get('test_stdlib')
     if not test_stdlib:
-        lit_config.fatal("No --param test_stdlib specified")
-    lit_config.note('testing stdlib ' + test_stdlib)
+        test_stdlib = os.path.join(config.swift_lib_dir, 'swift', run_os, '.')
+    lit_config.note('Testing stdlib ' + test_stdlib)
+
     if 'arm' in run_cpu:
         # iOS device
-        lit_config.note('testing iOS device ' + config.test_triple)
+        lit_config.note('Testing iOS device ' + config.test_triple)
         if not config.swift_ios_test:
         config.target_build_swift = (
             'xcrun -sdk iphoneos %s -target %s '
@@ -98,7 +102,7 @@ if run_vendor == 'apple':
 
     elif run_os == 'ios':
         # iOS simulator
-        lit_config.note("testing iOS simulator " + config.test_triple)
+        lit_config.note("Testing iOS simulator " + config.test_triple)
         config.target_build_swift = (
             'xcrun -sdk iphonesimulator %s -target %s '
             '-Xlinker -rpath -Xlinker %s -I %s -L %s'
@@ -110,7 +114,7 @@ if run_vendor == 'apple':
 
     elif run_os == 'macosx':
         # OS X
-        lit_config.note("testing OS X " + config.test_triple)
+        lit_config.note("Testing OS X " + config.test_triple)
         config.target_build_swift = (
             'xcrun -sdk macosx %s -target %s '
             '-Xlinker -rpath -Xlinker %s -I %s -L %s'

@@ -18,7 +18,7 @@ ifndef SWIFT_LEVEL
 IS_TOP_LEVEL := 1
 SWIFT_LEVEL := .
 
-DIRS := include lib tools # docs
+DIRS := include lib tools utils # docs
 PARALLEL_DIRS :=
 
 # See compiler-rt/Makefile for a description of the problems with building 
@@ -36,7 +36,7 @@ else
 endif
 
 ifeq ($(MAKECMDGOALS),libs-only)
-  DIRS := $(filter-out tools docs, $(DIRS))
+  DIRS := $(filter-out tools utils docs, $(DIRS))
   OPTIONAL_DIRS :=
 endif
 
