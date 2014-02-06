@@ -22,33 +22,38 @@ using namespace swift;
 
 STATISTIC(NumOptzIterations, "Number of optimization iterations");
 
+void SILPassManager::runOneIteration() {
+  DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
+  NumOptzIterations++;
+
+  // For each transformation:
+  for (SILTransform *ST : Transformations) {
+    // Run module transformations on the module.
+    if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
+      SMT->runOnModule(*Mod, this);
+      continue;
+    }
+
+    // Run function transformation on all functions.
+    if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)){
+      for (auto &F : *Mod)
+        if (!F.empty())
+          SFT->runOnFunction(F, this);
+      continue;
+    }
+
+    llvm_unreachable("Unknown pass kind.");
+  }
+}
+
 void SILPassManager::run() {
-  // Keep optimizing the module untill no one requested another iteration
+  // Keep optimizing the module untill no pass requested another iteration
   // of the pass.
   do {
-    DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
-    NumOptzIterations++;
     anotherIteration = false;
 
-    // For each transformation:
-    for (SILTransform *ST : Transformations) {
+    runOneIteration();
 
-      // Run module transformations on the module.
-      if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
-        SMT->runOnModule(*Mod, this);
-        continue;
-      }
-
-      // Run function transformation on all functions.
-      if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
-        for (auto &F : *Mod)
-          if (!F.empty())
-            SFT->runOnFunction(F, this);
-        continue;
-      }
-
-      llvm_unreachable("Unknown pass kind.");
-    }
   } while (anotherIteration);
 }
 

@@ -73,8 +73,11 @@ namespace swift {
       Analysis.push_back(A);
     }
 
-    /// \brief Run the transformations on the module \p Mod.
+    /// \brief Run the transformations on the module.
     void run();
+
+    /// \brief Run one iteration of the optimization pipeline.
+    void runOneIteration();
 
     /// \brief Request another invocation of the transformation pipeline.
     void scheduleAnotherIteration() { anotherIteration = true; }
