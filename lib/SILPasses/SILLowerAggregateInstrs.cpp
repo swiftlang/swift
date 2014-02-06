@@ -247,7 +247,7 @@ static void processFunction(SILFunction &Fn) {
   }
 }
 
-class SILLowerAggregate : public SILFunctionTrans {
+class SILLowerAggregate : public SILFunctionTransform {
   virtual ~SILLowerAggregate() {}
 
   /// The entry point to the transformation.

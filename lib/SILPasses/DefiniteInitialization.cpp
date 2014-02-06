@@ -1557,7 +1557,7 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 /// performSILDefiniteInitialization - Perform definitive initialization
 /// analysis and promote alloc_box uses into SSA registers for later SSA-based
 /// dataflow passes.
-class DefiniteInitialization : public SILFunctionTrans {
+class DefiniteInitialization : public SILFunctionTransform {
   virtual ~DefiniteInitialization() {}
 
   /// The entry point to the transformation.

@@ -147,7 +147,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
-class EmitDFDiagnostics : public SILFunctionTrans {
+class EmitDFDiagnostics : public SILFunctionTransform {
   virtual ~EmitDFDiagnostics() {}
 
   /// The entry point to the transformation.

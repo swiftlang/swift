@@ -34,7 +34,7 @@ static void stripFunction(SILFunction *F) {
     }
 }
 
-class StripDebugInfo : public swift::SILFunctionTrans {
+class StripDebugInfo : public swift::SILFunctionTransform {
   virtual ~StripDebugInfo() {}
 
   /// The entry point to the transformation.

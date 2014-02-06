@@ -34,13 +34,13 @@ void SILPassManager::run() {
     for (SILTransform *ST : Transformations) {
 
       // Run module transformations on the module.
-      if (SILModuleTrans *SMT = llvm::dyn_cast<SILModuleTrans>(ST)) {
+      if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
         SMT->runOnModule(*Mod, this);
         continue;
       }
 
       // Run function transformation on all functions.
-      if (SILFunctionTrans *SFT = llvm::dyn_cast<SILFunctionTrans>(ST)) {
+      if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
         for (auto &F : *Mod)
           if (!F.empty())
             SFT->runOnFunction(F, this);

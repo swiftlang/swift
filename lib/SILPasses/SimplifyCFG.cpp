@@ -525,7 +525,7 @@ void SimplifyCFG::run() {
   }
 }
 
-class SimplifyCFGPass : public SILFunctionTrans {
+class SimplifyCFGPass : public SILFunctionTransform {
   virtual ~SimplifyCFGPass() {}
 
   /// The entry point to the transformation.

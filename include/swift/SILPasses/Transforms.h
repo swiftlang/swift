@@ -40,12 +40,12 @@ namespace swift {
   };
 
   /// A transformation that operates on functions.
-  struct SILFunctionTrans : public SILTransform {
+  struct SILFunctionTransform : public SILTransform {
     /// C'tor.
-    SILFunctionTrans() : SILTransform(TransformKind::Function) {}
+    SILFunctionTransform() : SILTransform(TransformKind::Function) {}
 
     /// D'tor.
-    virtual ~SILFunctionTrans() {}
+    virtual ~SILFunctionTransform() {}
 
     /// The entry point to the transformation.
     virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {}
@@ -56,12 +56,12 @@ namespace swift {
   };
 
   /// A transformation that operates on modules.
-  struct SILModuleTrans : public SILTransform {
+  struct SILModuleTransform : public SILTransform {
     /// C'tor.
-    SILModuleTrans() : SILTransform(TransformKind::Module) {}
+    SILModuleTransform() : SILTransform(TransformKind::Module) {}
 
     /// D'tor.
-    virtual ~SILModuleTrans() {}
+    virtual ~SILModuleTransform() {}
 
     /// The entry point to the transformation.
     virtual void runOnModule(SILModule &M, SILPassManager *PM) {}

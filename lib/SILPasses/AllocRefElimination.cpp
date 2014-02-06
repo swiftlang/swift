@@ -337,7 +337,7 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-class SILAllocRefElimination : public SILFunctionTrans {
+class SILAllocRefElimination : public SILFunctionTransform {
   virtual ~SILAllocRefElimination() {}
 
   /// The entry point to the transformation.

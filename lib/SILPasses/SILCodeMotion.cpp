@@ -295,7 +295,7 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
   }
 }
 
-class SILCodeMotion : public SILFunctionTrans {
+class SILCodeMotion : public SILFunctionTransform {
   virtual ~SILCodeMotion() {}
 
   /// The entry point to the transformation.

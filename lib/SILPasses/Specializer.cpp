@@ -431,7 +431,7 @@ bool GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) 
   return Changed;
 }
 
-class SILGenericSpecializerTransform : public SILModuleTrans {
+class SILGenericSpecializerTransform : public SILModuleTransform {
 
 public:
   SILGenericSpecializerTransform() {}

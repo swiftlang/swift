@@ -67,7 +67,7 @@ public:
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-class SILInstCount : public SILModuleTrans {
+class SILInstCount : public SILModuleTransform {
   virtual ~SILInstCount() {}
 
   InstCountVisitor V;

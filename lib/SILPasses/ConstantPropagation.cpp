@@ -809,7 +809,7 @@ static bool CCPFunctionBody(SILFunction &F) {
   return false;
 }
 
-class ConstantPropagation : public SILFunctionTrans {
+class ConstantPropagation : public SILFunctionTransform {
   virtual ~ConstantPropagation() {}
 
   /// The entry point to the transformation.

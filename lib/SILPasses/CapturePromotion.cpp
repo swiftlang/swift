@@ -789,7 +789,7 @@ runOnFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
     processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
 }
 
-class CapturePromotionPass : public SILModuleTrans {
+class CapturePromotionPass : public SILModuleTransform {
   virtual ~CapturePromotionPass() {}
 
   /// The entry point to the transformation.

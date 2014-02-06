@@ -359,7 +359,7 @@ void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   }
 }
 
-class SILPerformanceInlinerPass : public SILModuleTrans {
+class SILPerformanceInlinerPass : public SILModuleTransform {
   unsigned Threshold;
 
 public:

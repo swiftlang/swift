@@ -385,7 +385,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   return Changed;
 }
 
-class SILCSE : public SILFunctionTrans {
+class SILCSE : public SILFunctionTransform {
   virtual ~SILCSE() {}
 
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {

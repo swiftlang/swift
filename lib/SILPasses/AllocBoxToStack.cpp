@@ -340,7 +340,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   return true;
 }
 
-class SILStackPromotion : public SILFunctionTrans {
+class SILStackPromotion : public SILFunctionTransform {
   virtual ~SILStackPromotion() {}
 
   /// The entry point to the transformation.

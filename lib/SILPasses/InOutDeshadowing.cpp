@@ -136,7 +136,7 @@ static bool processInOutValue(SILArgument *InOutArg) {
 }
 
 
-class InOutDeshadowing : public SILFunctionTrans {
+class InOutDeshadowing : public SILFunctionTransform {
   virtual ~InOutDeshadowing() {}
 
   /// The entry point to the transformation.

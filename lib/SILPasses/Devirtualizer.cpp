@@ -474,7 +474,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *PMI);
 }
 
-class SILDevirtualizationPass : public SILFunctionTrans {
+class SILDevirtualizationPass : public SILFunctionTransform {
   virtual ~SILDevirtualizationPass() {}
 
   /// The entry point to the transformation.

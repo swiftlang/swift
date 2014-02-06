@@ -721,7 +721,7 @@ void MemoryToRegisters::run() {
   }
 }
 
-class SILMem2Reg : public SILFunctionTrans {
+class SILMem2Reg : public SILFunctionTransform {
   virtual ~SILMem2Reg() {}
 
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {

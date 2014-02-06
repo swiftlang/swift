@@ -668,7 +668,7 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
   }
 }
 
-class DCE : public SILModuleTrans {
+class DCE : public SILModuleTransform {
   virtual ~DCE() {}
 
   /// The entry point to the transformation.

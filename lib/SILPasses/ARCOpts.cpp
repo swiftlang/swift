@@ -518,7 +518,7 @@ static void processFunction(SILFunction &F) {
   }
 }
 
-class SILARCOpts : public SILFunctionTrans {
+class SILARCOpts : public SILFunctionTransform {
   virtual ~SILARCOpts() {}
 
   /// The entry point to the transformation.

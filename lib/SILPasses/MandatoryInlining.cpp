@@ -456,7 +456,7 @@ static void performSILMandatoryInlining(SILModule *M) {
   }
 }
 
-class MandatoryInlining : public SILModuleTrans {
+class MandatoryInlining : public SILModuleTransform {
   virtual ~MandatoryInlining() {}
 
   /// The entry point to the transformation.

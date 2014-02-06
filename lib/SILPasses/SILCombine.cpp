@@ -739,7 +739,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   return nullptr;
 }
 
-class SILCombine : public SILFunctionTrans {
+class SILCombine : public SILFunctionTransform {
   virtual ~SILCombine() {}
 
   /// The entry point to the transformation.
@@ -754,7 +754,7 @@ class SILCombine : public SILFunctionTrans {
   }
 };
 
-class SILDeadFuncElimination : public SILModuleTrans {
+class SILDeadFuncElimination : public SILModuleTransform {
 
   virtual void runOnModule(SILModule &M, SILPassManager *PM) {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
