@@ -1121,11 +1121,13 @@ namespace {
         
         if (VD->hasAccessorFunctions()) {
           // Add getter & setter in source order.
-          FuncDecl *Accessors[2];
+          FuncDecl *Accessors[4] = { nullptr };
           
           if (VD->getStorageKind() == VarDecl::Observing) {
             Accessors[0] = VD->getWillSetFunc();
             Accessors[1] = VD->getDidSetFunc();
+            Accessors[2] = VD->getGetter();
+            Accessors[3] = VD->getSetter();
           } else {
             Accessors[0] = VD->getGetter();
             Accessors[1] = VD->getSetter();
@@ -1197,6 +1199,12 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
   // non-static set:/willSet:/didSet: default to @mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
     D->setMutating();
+
+  // Reparent the argument decls.
+  for (Pattern *Pat : D->getBodyParamPatterns())
+    Pat->forEachVariable([&](VarDecl *VD) {
+      VD->setDeclContext(D);
+    });
 
   return D;
 }
@@ -1523,6 +1531,22 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     }
 
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
+
+    // Observing properties will have getters and setters synthesized by sema.
+    // Create their prototypes now.
+    auto *ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
+                                                     AccessorKind::IsGetter);
+    Get = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
+                             StaticLoc, Flags, AccessorKind::IsGetter, this);
+    Get->setImplicit();
+
+    ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
+                                               AccessorKind::IsSetter);
+    Set = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
+                             StaticLoc, Flags, AccessorKind::IsSetter, this);
+    Set->setImplicit();
+
+    PrimaryVar->setObservingAccessors(Get, Set);
     return;
   }
 

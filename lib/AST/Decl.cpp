@@ -1663,6 +1663,8 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
+  if (StartLoc.isInvalid()) return SourceRange();
+
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
     return { StartLoc, BodyRange.End };

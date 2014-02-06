@@ -1202,17 +1202,17 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
 /// (trivial) getter and the setter, which calls these.
 static void synthesizeObservingAccessors(VarDecl *VD) {
   assert(VD->getStorageKind() == VarDecl::Observing);
-  assert(!VD->getGetter() && !VD->getSetter() &&
+  assert(VD->getGetter() && VD->getSetter() &&
+         !VD->getGetter()->getBody() && !VD->getSetter()->getBody() &&
          "willSet/didSet var already has a getter or setter");
   
   auto &Ctx = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
-  VarDecl *SelfDecl = nullptr;
-  
   /// The getter is always trivial: just perform a (direct!) load of storage.
-  auto *Get = createGetterPrototype(VD, SelfDecl);
-  
+  auto *Get = VD->getGetter();
+  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
+
   // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
   auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
   auto *MRE = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
@@ -1221,10 +1221,17 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
   
 
-  // Okay, the getter is done, create the setter now.
+  // Okay, the getter is done, create the setter now.  Start by finding the
+  // decls for 'self' and 'value'.
+  auto *Set = VD->getSetter();
+  SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = nullptr;
-  auto *Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
-  
+  Set->getArgParamPatterns()[1]->forEachVariable([&](VarDecl *VD) {
+    assert(!ValueDecl && "Already found 'value'?");
+    ValueDecl = VD;
+  });
+
+
   // The setter invokes willSet with the incoming value, then does a direct
   // store, then invokes didSet.
   SmallVector<ASTNode, 3> SetterBody;
@@ -1264,18 +1271,6 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   }
   
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
-  
-  
-  VD->setObservingAccessors(Get, Set);
-  
-  // We've added some members to our containing class, add them to the members
-  // list.
-  auto *NTD = cast<NominalTypeDecl>(VD->getDeclContext());
-  SmallVector<Decl*, 4> members(NTD->getMembers().begin(),
-                                NTD->getMembers().end());
-  members.push_back(Get);
-  members.push_back(Set);
-  NTD->setMembers(Ctx.AllocateCopy(members), NTD->getBraces());
 }
 
 
@@ -1379,7 +1374,8 @@ public:
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
-    if (VD->getStorageKind() == VarDecl::Observing && !VD->getGetter()) {
+    if (VD->getStorageKind() == VarDecl::Observing &&
+        !VD->getGetter()->getBody()) {
       synthesizeObservingAccessors(VD);
 
       // Type check the body of the getter and setter.
