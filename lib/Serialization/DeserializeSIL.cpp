@@ -1576,17 +1576,52 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
   std::vector<SILWitnessTable::Entry> witnessEntries;
   // Another SIL_WITNESSTABLE record means the end of this WitnessTable.
   while (kind != SIL_WITNESSTABLE && kind != SIL_FUNCTION) {
-    // FIXME: handle other witness entries.
-    assert(kind == SIL_WITNESS_METHOD_ENTRY &&
-           "Content of WitnessTable should be in SIL_WITNESS_METHOD_ENTRY.");
-    ArrayRef<uint64_t> ListOfValues;
-    DeclID NameID;
-    WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
-    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
-    if (Func)
-      witnessEntries.push_back(SILWitnessTable::MethodWitness{
-        getSILDeclRef(MF, ListOfValues, 0), Func
+    if (kind == SIL_WITNESS_BASE_ENTRY) {
+      DeclID protoId;
+      TypeID tyId;
+      WitnessBaseEntryLayout::readRecord(scratch, protoId, tyId);
+      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      auto conformancePair = MF->maybeReadConformance(MF->getType(tyId),
+                                                      SILCursor);
+      ProtocolConformance *conformance
+        = conformancePair ? conformancePair->second : nullptr;
+      witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
+        proto, conformance
       });
+    } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
+      DeclID assocId, protoId;
+      TypeID tyId;
+      WitnessAssocProtocolLayout::readRecord(scratch, assocId, protoId, tyId);
+      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      ProtocolConformance *conformance = nullptr;
+      if (tyId) {
+        auto conformancePair = MF->maybeReadConformance(MF->getType(tyId),
+                                                        SILCursor);
+        conformance = conformancePair ? conformancePair->second : nullptr;
+      }
+      witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
+        cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto, conformance
+      });
+    } else if (kind == SIL_WITNESS_ASSOC_ENTRY) {
+      DeclID assocId;
+      TypeID tyId;
+      WitnessAssocEntryLayout::readRecord(scratch, assocId, tyId);
+      AssociatedTypeDecl *assoc = cast<AssociatedTypeDecl>(MF->getDecl(assocId));
+      witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
+        assoc, MF->getType(tyId)->getCanonicalType()
+      });
+    } else {
+      assert(kind == SIL_WITNESS_METHOD_ENTRY &&
+             "Content of WitnessTable should be in SIL_WITNESS_METHOD_ENTRY.");
+      ArrayRef<uint64_t> ListOfValues;
+      DeclID NameID;
+      WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
+      SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
+      if (Func)
+        witnessEntries.push_back(SILWitnessTable::MethodWitness{
+          getSILDeclRef(MF, ListOfValues, 0), Func
+        });
+    }
 
     // Fetch the next record.
     scratch.clear();

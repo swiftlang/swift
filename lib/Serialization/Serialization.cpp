@@ -281,6 +281,10 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
   BLOCK_RECORD(sil_block, SIL_WITNESSTABLE);
   BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_BASE_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_PROTOCOL);
+  BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_ENTRY);
+
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,

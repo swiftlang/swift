@@ -98,6 +98,11 @@ namespace sil_block {
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESSTABLE,
     SIL_WITNESS_METHOD_ENTRY,
+    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
+    // FIXME: another option is to start SIL_FUNCTION at a large number.
+    SIL_WITNESS_BASE_ENTRY = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
+    SIL_WITNESS_ASSOC_PROTOCOL,
+    SIL_WITNESS_ASSOC_ENTRY,
     
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -140,6 +145,27 @@ namespace sil_block {
     SIL_WITNESS_METHOD_ENTRY,
     DeclIDField,  // SILFunction name
     BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using WitnessBaseEntryLayout = BCRecordLayout<
+    SIL_WITNESS_BASE_ENTRY,
+    DeclIDField,  // ID of protocol decl
+    TypeIDField   // ID of conforming type
+    // Protocol Conformance will be serialized immediately after.
+  >;
+
+  using WitnessAssocProtocolLayout = BCRecordLayout<
+    SIL_WITNESS_ASSOC_PROTOCOL,
+    DeclIDField,  // ID of AssocaitedTypeDecl
+    DeclIDField,  // ID of ProtocolDecl
+    TypeIDField   // ID of conforming type
+    // Protocol Conformance will be serialized immediately after.
+  >;
+
+  using WitnessAssocEntryLayout = BCRecordLayout<
+    SIL_WITNESS_ASSOC_ENTRY,
+    DeclIDField,  // ID of AssociatedTypeDecl
+    TypeIDField
   >;
 
   using GlobalVarLayout = BCRecordLayout<
