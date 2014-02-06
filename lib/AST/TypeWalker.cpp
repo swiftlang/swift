@@ -106,10 +106,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILFunctionType(SILFunctionType *ty) {
-    for (auto param : ty->getParameters())
+    for (auto param : ty->getInterfaceParameters())
       if (doIt(param.getType()))
         return true;
-    return doIt(ty->getResult().getType());
+    return doIt(ty->getInterfaceResult().getType());
   }
 
   bool visitArrayType(ArrayType *ty) {
