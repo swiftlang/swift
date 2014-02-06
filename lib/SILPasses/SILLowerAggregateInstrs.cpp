@@ -206,7 +206,8 @@ static bool expandCopyValue(CopyValueInst *CV) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processFunction(SILFunction &Fn) {
+static bool processFunction(SILFunction &Fn) {
+  bool Changed = false;
   for (auto BI = Fn.begin(), BE = Fn.end(); BI != BE; ++BI) {
     auto II = BI->begin(), IE = BI->end();
     while (II != IE) {
@@ -218,6 +219,7 @@ static void processFunction(SILFunction &Fn) {
         if (expandCopyAddr(CA)) {
           ++II;
           CA->eraseFromParent();
+          Changed = true;
           continue;
         }
 
@@ -225,6 +227,7 @@ static void processFunction(SILFunction &Fn) {
         if (expandDestroyAddr(DA)) {
           ++II;
           DA->eraseFromParent();
+          Changed = true;
           continue;
         }
 
@@ -232,6 +235,7 @@ static void processFunction(SILFunction &Fn) {
         if (expandCopyValue(CV)) {
           ++II;
           CV->eraseFromParent();
+          Changed = true;
           continue;
         }
 
@@ -239,12 +243,14 @@ static void processFunction(SILFunction &Fn) {
         if (expandDestroyValue(DV)) {
           ++II;
           DV->eraseFromParent();
+          Changed = true;
           continue;
         }
 
       ++II;
     }
   }
+  return Changed;
 }
 
 class SILLowerAggregate : public SILFunctionTransform {
@@ -254,8 +260,9 @@ class SILLowerAggregate : public SILFunctionTransform {
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     DEBUG(llvm::dbgs() << "***** LowerAggregate on function: " <<
           F.getName() << " *****\n");
-    processFunction(F);
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    bool Changed = processFunction(F);
+    if (Changed)
+      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
