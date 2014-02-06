@@ -156,8 +156,8 @@ public:
   /// C'tor
   MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt) {}
 
-  /// Promote memory to registers.
-  void run();
+  /// \brief Promote memory to registers. Return True on change.
+  bool run();
 };
 
 } // end anonymous namespace.
@@ -660,7 +660,8 @@ void StackAllocationPromoter::run() {
   promoteAllocationToPhi();
 }
 
-void MemoryToRegisters::run() {
+bool MemoryToRegisters::run() {
+  bool Changed = false;
   for (auto &BB : F) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
@@ -691,6 +692,7 @@ void MemoryToRegisters::run() {
         I++;
         ASI->eraseFromParent();
         NumInstRemoved++;
+        Changed = true;
         continue;
       }
 
@@ -701,6 +703,7 @@ void MemoryToRegisters::run() {
         DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *ASI);
         I++;
         ASI->eraseFromParent();
+        Changed = true;
         NumInstRemoved++;
         continue;
       }
@@ -718,8 +721,10 @@ void MemoryToRegisters::run() {
       I++;
       ASI->eraseFromParent();
       NumInstRemoved++;
+      Changed = true;
     }
   }
+  return Changed;
 }
 
 class SILMem2Reg : public SILFunctionTransform {
@@ -730,9 +735,10 @@ class SILMem2Reg : public SILFunctionTransform {
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 
-    MemoryToRegisters(F, DA->getDomInfo(&F)).run();
+    bool Changed = MemoryToRegisters(F, DA->getDomInfo(&F)).run();
 
-    PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
+    if (Changed)
+      PM->invalidateAllAnalysis(&F,SILAnalysis::InvalidationKind::Instructions);
   }
 };
 
