@@ -34,15 +34,6 @@ static void stripFunction(SILFunction *F) {
     }
 }
 
-void swift::performSILStripDebugInfo(SILModule *M) {
-  for (auto &F : *M) {
-    if (F.empty())
-      continue;
-
-    stripFunction(&F);
-  }
-}
-
 class StripDebugInfo : public swift::SILFunctionTrans {
   virtual ~StripDebugInfo() {}
 

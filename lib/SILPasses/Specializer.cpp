@@ -431,10 +431,6 @@ bool GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) 
   return Changed;
 }
 
-bool swift::performSILSpecialization(SILModule *M) {
-  return GenericSpecializer(M).specialize();
-}
-
 class SILGenericSpecializerTransform : public SILModuleTrans {
 
 public:
@@ -448,7 +444,7 @@ public:
     CGA->bottomUpCallGraphOrder(Worklist);
 
      bool Changed = GenericSpecializer(&M).specialize();
-    
+
     if (Changed)
       PM->scheduleAnotherIteration();
 

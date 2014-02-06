@@ -959,19 +959,6 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
   }
 }
 
-/// performSILPredictableMemoryOptimizations - Perform predictable memory
-/// optimizations, including promoting operations to SSA form so that later
-/// analysis can depend on SSA use-def chains.
-void swift::performSILPredictableMemoryOptimizations(SILModule *M) {
-  for (auto &Fn : *M) {
-    optimizeMemoryAllocations(Fn);
-
-#ifndef NDEBUG
-    Fn.verify();
-#endif
-  }
-}
-
 class PredictableMemoryOptimizations : public SILFunctionTrans {
   virtual ~PredictableMemoryOptimizations() {}
 

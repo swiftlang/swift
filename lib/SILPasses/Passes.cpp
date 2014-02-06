@@ -53,10 +53,10 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.add(createPredictableMemoryOptimizations());
   PM.add(createConstantPropagation());
   PM.add(createDCE());
+  PM.add(createEmitDFDiagnostics());
   PM.run();
 
   // Generate diagnostics.
-  emitSILDataflowDiagnostics(&Module);
   Module.setStage(SILStage::Canonical);
 
   // If errors were produced during SIL analysis, return true.

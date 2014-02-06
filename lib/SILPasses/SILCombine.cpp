@@ -739,27 +739,6 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   return nullptr;
 }
 
-
-//===----------------------------------------------------------------------===//
-//                              Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performSILCombine(SILModule *M) {
-  SILCombiner Combiner;
-
-  // Process each function in M.
-  for (SILFunction &F : *M) {
-    // If F is just a declaration without any basic blocks, skip it.
-    if (F.empty())
-      continue;
-
-    // Combine instructions in F.
-    Combiner.runOnFunction(F);
-  }
-
-  deleteDeadFunctions(M);
-}
-
 class SILCombine : public SILFunctionTrans {
   virtual ~SILCombine() {}
 

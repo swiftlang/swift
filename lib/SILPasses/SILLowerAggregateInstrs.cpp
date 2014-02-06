@@ -247,24 +247,6 @@ static void processFunction(SILFunction &Fn) {
   }
 }
 
-void swift::performSILLowerAggregateInstrs(SILModule *M) {
-
-  DEBUG(llvm::dbgs() << "*** SIL LowerAggregateInstrs ***\n");
-
-  // For each function Fn in M...
-  for (auto &Fn : *M) {
-
-    // If Fn has no basic blocks skip it.
-    if (Fn.empty())
-      continue;
-
-    DEBUG(llvm::dbgs() << "***** Visiting " << Fn.getName() << " *****\n");
-
-    // Otherwise perform LowerAggregateInstrs.
-    processFunction(Fn);
-  }
-}
-
 class SILLowerAggregate : public SILFunctionTrans {
   virtual ~SILLowerAggregate() {}
 

@@ -421,13 +421,13 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILMandatoryInlining(SILModule *M) {
+static void performSILMandatoryInlining(SILModule *M) {
   DenseFunctionSet FullyInlinedSet;
   ImmutableFunctionSet::Factory SetFactory;
   for (auto &F : *M)
     runOnFunctionRecursively(&F, nullptr, FullyInlinedSet, SetFactory,
                               SetFactory.getEmptySet());
-  
+
   // Now that we've inlined some functions, clean up.  If there are any
   // transparent functions that are deserialized from another module that are
   // now unused, just remove them from the module.
@@ -438,19 +438,19 @@ void swift::performSILMandatoryInlining(SILModule *M) {
     SILFunction &F = *FI++;
 
     if (F.getRefCount() != 0) continue;
-    
+
     // We can always remove transparent functions.  We can also remove functions
     // that came from closures.
     if (!F.isTransparent() &&
         (!F.hasLocation() || !F.getLocation().isASTNode<Expr>() ||
          !F.getLocation().isASTNode<AbstractClosureExpr>()))
       continue;
-   
+
     // We discard functions that don't have external linkage, e.g. deserialized
     // functions, internal functions, and thunks.  Being marked transparent
     // controls this.
     if (isPossiblyUsedExternally(F.getLinkage())) continue;
-    
+
     // Okay, just erase the function from the module.
     M->getFunctionList().erase(&F);
   }

@@ -292,22 +292,6 @@ static void runSROAOnFunction(SILFunction &Fn) {
   }
 }
 
-void swift::performSILSROA(SILModule *M) {
-  DEBUG(llvm::dbgs() << "*** SIL SROA ***\n");
-
-  // For each function Fn in M...
-  for (auto &Fn : *M) {
-
-    // If Fn has no basic blocks skip it...
-    if (Fn.empty())
-      continue;
-
-
-    // Otherwise perform SROA on Fn.
-    runSROAOnFunction(Fn);
-  }
-}
-
 class SILSROA : public SILFunctionTrans {
   virtual ~SILSROA() {}
 
@@ -324,6 +308,3 @@ class SILSROA : public SILFunctionTrans {
 SILTransform *swift::createSROA() {
   return new SILSROA();
 }
-
-
-

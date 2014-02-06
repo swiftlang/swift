@@ -1557,19 +1557,6 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 /// performSILDefiniteInitialization - Perform definitive initialization
 /// analysis and promote alloc_box uses into SSA registers for later SSA-based
 /// dataflow passes.
-void swift::performSILDefiniteInitialization(SILModule *M) {
-  for (auto &Fn : *M) {
-    // Walk through and promote all of the alloc_box's that we can.
-    checkDefiniteInitialization(Fn);
-    DEBUG(Fn.verify());
-
-    // Lower raw-sil only instructions used by this pass, like "assign".
-    lowerRawSILOperations(Fn);
-    DEBUG(Fn.verify());
-  }
-}
-
-
 class DefiniteInitialization : public SILFunctionTrans {
   virtual ~DefiniteInitialization() {}
 
@@ -1591,4 +1578,3 @@ class DefiniteInitialization : public SILFunctionTrans {
 SILTransform *swift::createDefiniteInitialization() {
   return new DefiniteInitialization();
 }
-

@@ -385,23 +385,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   return Changed;
 }
 
-//===----------------------------------------------------------------------===//
-//                              Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performSILCSE(SILModule *M) {
-  CSE C;
-  for (SILFunction &F : *M) {
-    // If F is just a declaration and not a definition, skip it since it has no
-    // BB's to process.
-    if (F.empty())
-      continue;
-
-    // Perform CSE.
-    C.processFunction(F);
-  }
-}
-
 class SILCSE : public SILFunctionTrans {
   virtual ~SILCSE() {}
 
@@ -417,4 +400,3 @@ class SILCSE : public SILFunctionTrans {
 SILTransform *swift::createCSE() {
   return new SILCSE();
 }
-

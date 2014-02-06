@@ -359,35 +359,6 @@ void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   }
 }
 
-//===----------------------------------------------------------------------===//
-//                              Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performSILPerformanceInlining(SILModule *M,
-                                          unsigned inlineCostThreshold) {
-  DEBUG(llvm::dbgs() << "*** SIL Performance Inlining ***\n\n");
-
-  if (inlineCostThreshold == 0) {
-    DEBUG(llvm::dbgs() << "*** The SIL performance Inliner is disabled ***\n");
-    return;
-  }
-
-  // Collect a call-graph bottom-up list of functions.
-  std::vector<SILFunction *> Worklist;
-  topDownCallGraphOrder(M, Worklist);
-
-  SILPerformanceInliner inliner(inlineCostThreshold);
-
-  // For each function in the worklist, attempt to inline its list of apply
-  // inst.
-  while (!Worklist.empty()) {
-    SILFunction *F = Worklist.back();
-    Worklist.pop_back();
-
-    inliner.inlineCallsIntoFunction(F);
-  }
-}
-
 class SILPerformanceInlinerPass : public SILModuleTrans {
   unsigned Threshold;
 
@@ -422,4 +393,3 @@ public:
 SILTransform *swift::createPerfInliner(unsigned threshold) {
   return new SILPerformanceInlinerPass(threshold);
 }
-

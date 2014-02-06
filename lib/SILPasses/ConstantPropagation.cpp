@@ -809,14 +809,6 @@ static bool CCPFunctionBody(SILFunction &F) {
   return false;
 }
 
-//===----------------------------------------------------------------------===//
-//                          Top Level Driver
-//===----------------------------------------------------------------------===//
-void swift::performSILConstantPropagation(SILModule *M) {
-  for (auto &Fn : *M)
-    CCPFunctionBody(Fn);
-}
-
 class ConstantPropagation : public SILFunctionTrans {
   virtual ~ConstantPropagation() {}
 
@@ -830,4 +822,3 @@ class ConstantPropagation : public SILFunctionTrans {
 SILTransform *swift::createConstantPropagation() {
   return new ConstantPropagation();
 }
-

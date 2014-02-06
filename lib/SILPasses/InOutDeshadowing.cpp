@@ -131,39 +131,10 @@ static bool processInOutValue(SILArgument *InOutArg) {
     for (auto UI : InOutArg->getUses())
       llvm::dbgs() << "    " << *UI->getUser();
   });
-  
+
   return false;
 }
 
-//===----------------------------------------------------------------------===//
-//                          Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performInOutDeshadowing(SILModule *M) {
-  DEBUG(llvm::dbgs() << "*** inout Deshadowing\n");
-
-  for (auto &Fn : *M) {
-    if (Fn.empty()) continue;
-    SILBasicBlock &EntryBlock = Fn.front();
-
-    // For each function, find any inout arguments and try to optimize each of
-    // them.
-    SILFunctionType *FTI = Fn.getLoweredFunctionType();
-    
-    for (unsigned arg = 0, e = FTI->getInterfaceParameters().size(); arg != e; ++arg) {
-      if (!FTI->getInterfaceParameters()[arg].isIndirectInOut()) continue;
-
-      DEBUG(llvm::dbgs() << "  " << Fn.getName() << ": argument #"
-                         << arg << "\n");
-
-      if (processInOutValue(EntryBlock.getBBArgs()[arg]))
-        ++NumShadowsRemoved;
-      else {
-        ++NumShadowsKept;
-      }
-    }
-  }
-}
 
 class InOutDeshadowing : public SILFunctionTrans {
   virtual ~InOutDeshadowing() {}
@@ -194,4 +165,3 @@ class InOutDeshadowing : public SILFunctionTrans {
 SILTransform *swift::createInOutDeshadowing() {
   return new InOutDeshadowing();
 }
-

@@ -295,30 +295,6 @@ static void sinkCodeFromPredecessors(SILBasicBlock *BB) {
   }
 }
 
-//===----------------------------------------------------------------------===//
-//                              Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performSILCodeMotion(SILModule *M) {
-  DEBUG(llvm::dbgs() << "***** SIL CODE MOTION *****\n");
-
-  for (SILFunction &F : *M) {
-    AliasAnalysis AA;
-
-    DEBUG(llvm::dbgs() << "*** Visiting: " << F.getName() << " ***\n");
-
-    // Remove dead stores and merge duplicate loads.
-    DEBUG(llvm::dbgs() << "PROMOTING MEMORY OPERATIONS:\n");
-    for (auto &BB : F)
-      promoteMemoryOperationsInBlock(&BB, AA);
-
-    // Sink duplicated code from predecessors.
-    DEBUG(llvm::dbgs() << "SINKING DUPLICATE CODE:\n");
-    for (auto &BB : F)
-      sinkCodeFromPredecessors(&BB);
-  }
-}
-
 class SILCodeMotion : public SILFunctionTrans {
   virtual ~SILCodeMotion() {}
 
@@ -344,4 +320,3 @@ class SILCodeMotion : public SILFunctionTrans {
 SILTransform *swift::createCodeMotion() {
   return new SILCodeMotion();
 }
-

@@ -627,10 +627,6 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-//                          Top Level Driver
-//===----------------------------------------------------------------------===//
-
 void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** Dead Code Elimination processing: "
@@ -687,4 +683,3 @@ class DCE : public SILModuleTrans {
 SILTransform *swift::createDCE() {
   return new DCE();
 }
-

@@ -147,16 +147,6 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
-void swift::emitSILDataflowDiagnostics(SILModule *M) {
-  for (auto &Fn : *M)
-    for (auto &BB : Fn)
-      for (auto &I : BB) {
-        diagnoseUnreachable(&I, M->getASTContext());
-        diagnoseReturn(&I, M->getASTContext());
-        diagnoseStaticReports(&I, *M);
-      }
-}
-
 class EmitDFDiagnostics : public SILFunctionTrans {
   virtual ~EmitDFDiagnostics() {}
 
@@ -175,5 +165,3 @@ class EmitDFDiagnostics : public SILFunctionTrans {
 SILTransform *swift::createEmitDFDiagnostics() {
   return new EmitDFDiagnostics();
 }
-
-

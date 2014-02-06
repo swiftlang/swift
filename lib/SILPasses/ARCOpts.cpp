@@ -518,19 +518,6 @@ static void processFunction(SILFunction &F) {
   }
 }
 
-void swift::performSILARCOpts(SILModule *M) {
-  DEBUG(llvm::dbgs() << "*** SIL ARC OPTS ***\n");
-  // For each function in the module...
-  for (SILFunction &F : *M) {
-    // If the function has no basic blocks, skip it...
-    if (F.empty())
-      continue;
-
-    // Otherwise perform ARC optimizations.
-    processFunction(F);
-  }
-}
-
 class SILARCOpts : public SILFunctionTrans {
   virtual ~SILARCOpts() {}
 
@@ -544,4 +531,3 @@ class SILARCOpts : public SILFunctionTrans {
 SILTransform *swift::createSILARCOpts() {
   return new SILARCOpts();
 }
-

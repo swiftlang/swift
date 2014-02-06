@@ -340,35 +340,6 @@ static bool optimizeAllocBox(AllocBoxInst *ABI,
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-//                             Top Level Driver
-//===----------------------------------------------------------------------===//
-
-void swift::performSILAllocBoxToStackPromotion(SILModule *M) {
-
-  for (auto &Fn : *M) {
-    // PostDomInfo - This is the post dominance information for the specified
-    // function.  It is lazily generated only if needed.
-    llvm::OwningPtr<PostDominanceInfo> PostDomInfo;
-
-    for (auto &BB : Fn) {
-      auto I = BB.begin(), E = BB.end();
-      while (I != E) {
-        if (auto *ABI = dyn_cast<AllocBoxInst>(I))
-          if (optimizeAllocBox(ABI, PostDomInfo)) {
-            ++NumStackPromoted;
-            // Carefully move iterator to avoid invalidation problems.
-            ++I;
-            ABI->eraseFromParent();
-            continue;
-          }
-
-        ++I;
-      }
-    }
-  }
-}
-
 class SILStackPromotion : public SILFunctionTrans {
   virtual ~SILStackPromotion() {}
 

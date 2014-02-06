@@ -789,15 +789,6 @@ runOnFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
     processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
 }
 
-void
-swift::performSILCapturePromotion(SILModule *M) {
-  SmallVector<SILFunction*, 128> Worklist;
-  for (auto &F : *M)
-    runOnFunction(&F, Worklist);
-  while (!Worklist.empty())
-    runOnFunction(Worklist.pop_back_val(), Worklist);
-}
-
 class CapturePromotionPass : public SILModuleTrans {
   virtual ~CapturePromotionPass() {}
 
@@ -816,4 +807,3 @@ class CapturePromotionPass : public SILModuleTrans {
 SILTransform *swift::createCapturePromotion() {
   return new CapturePromotionPass();
 }
-

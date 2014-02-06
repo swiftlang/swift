@@ -474,13 +474,6 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *PMI);
 }
 
-bool swift::performSILDevirtualization(SILModule *M) {
-  bool Changed = false;
-  for (auto &F : *M)
-    Changed |= SILDevirtualizer(&F).run();
-  return Changed;
-}
-
 class SILDevirtualizationPass : public SILFunctionTrans {
   virtual ~SILDevirtualizationPass() {}
 

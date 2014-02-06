@@ -721,21 +721,13 @@ void MemoryToRegisters::run() {
   }
 }
 
-void promoteAllocasInFunction(SILFunction &F) { MemoryToRegisters(F).run(); }
-
-void swift::performSILMem2Reg(SILModule *M) {
-  for (auto &F : *M)
-    if (!F.isExternalDeclaration())
-      promoteAllocasInFunction(F);
-}
-
 class SILMem2Reg : public SILFunctionTrans {
   virtual ~SILMem2Reg() {}
 
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     DEBUG(llvm::dbgs() << "***** Mem2Reg on function: " << F.getName() <<
           " *****\n");
-    promoteAllocasInFunction(F);
+    MemoryToRegisters(F).run();
     PM->invalidateAllAnalysis(&F, SILAnalysis::InvalidationKind::Instructions);
   }
 };
@@ -743,4 +735,3 @@ class SILMem2Reg : public SILFunctionTrans {
 SILTransform *swift::createMem2Reg() {
   return new SILMem2Reg();
 }
-

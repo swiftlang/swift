@@ -337,23 +337,6 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILAllocRefElimination(SILModule *M) {
-  DEBUG(llvm::dbgs() << "*** SIL Alloc Ref Elimination ***\n");
-
-  llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
-
-  for (auto &F : *M) {
-    // If F has no basic blocks, skip it.
-    if (F.empty())
-      continue;
-
-    // Otherwise process it.
-    processFunction(F, DestructorAnalysisCache);
-  }
-}
-
-
-
 class SILAllocRefElimination : public SILFunctionTrans {
   virtual ~SILAllocRefElimination() {}
 

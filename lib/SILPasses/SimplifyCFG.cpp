@@ -525,12 +525,6 @@ void SimplifyCFG::run() {
   }
 }
 
-/// \brief Simplify the CFG of SIL functions.
-void swift::performSimplifyCFG(SILModule *M) {
-  for (auto &Fn : *M)
-    SimplifyCFG(Fn).run();
-}
-
 class SimplifyCFGPass : public SILFunctionTrans {
   virtual ~SimplifyCFGPass() {}
 
