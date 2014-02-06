@@ -1789,45 +1789,6 @@ namespace {
       return expr;
     }
 
-    void simplifyPatternTypes(Pattern *pattern) {
-      switch (pattern->getKind()) {
-      case PatternKind::Paren:
-        // Parentheses don't affect the type.
-        return simplifyPatternTypes(
-                 cast<ParenPattern>(pattern)->getSubPattern());
-      case PatternKind::Var:
-        // 'var' or 'let' doesn't affect the type.
-        return simplifyPatternTypes(cast<VarPattern>(pattern)->getSubPattern());
-
-      case PatternKind::Any:
-      case PatternKind::Typed:
-        return;
-
-      case PatternKind::Named: {
-        // Simplify the type of any variables.
-        auto var = cast<NamedPattern>(pattern)->getDecl();
-        var->overwriteType(simplifyType(var->getType()));
-        return;
-      }
-
-      case PatternKind::Tuple: {
-        auto tuplePat = cast<TuplePattern>(pattern);
-        for (auto tupleElt : tuplePat->getFields()) {
-          simplifyPatternTypes(tupleElt.getPattern());
-        }
-        return;
-      }
-
-      //TODO
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-        llvm_unreachable("not implemented");
-      }
-
-      llvm_unreachable("Unhandled pattern kind");
-    }
-
     Expr *visitClosureExpr(ClosureExpr *expr) {
       llvm_unreachable("Handled by the walker directly");
     }

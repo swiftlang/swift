@@ -1128,10 +1128,6 @@ Expr *Parser::parseExprIdentifier() {
   return actOnIdentifierExpr(Name, Loc);
 }
 
-// Note: defined below.
-static void addFunctionParametersToScope(const Pattern *Pat, DeclContext *DC,
-                                         Parser &P);
-
 bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
                                             SourceLoc &arrowLoc,
                                             TypeRepr *&explicitResultType,
@@ -1322,7 +1318,7 @@ Expr *Parser::parseExprClosure() {
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
-    ::addFunctionParametersToScope(params, closure, *this);
+    addFunctionParametersToScope(params, closure);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -1771,52 +1767,14 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
       new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
-/// \brief Walk the given pattern adding named parameters to the current scope.
-/// This also causes redefinition errors to be emitted.
-static void addFunctionParametersToScope(const Pattern *Pat, DeclContext *DC,
-                                         Parser &P) {
-  switch (Pat->getKind()) {
-  case PatternKind::Named: {
-    // Reparent the decl and add it to the scope.
-    VarDecl *VD = cast<NamedPattern>(Pat)->getDecl();
-    VD->setDeclContext(DC);
-    P.addToScope(VD);
-    return;
-  }
-
-  case PatternKind::Any:
-    return;
-
-  case PatternKind::Paren:
-    addFunctionParametersToScope(cast<ParenPattern>(Pat)->getSubPattern(),
-                                 DC, P);
-    return;
-
-  case PatternKind::Typed:
-    addFunctionParametersToScope(cast<TypedPattern>(Pat)->getSubPattern(),
-                                 DC, P);
-    return;
-
-  case PatternKind::Var:
-    addFunctionParametersToScope(cast<VarPattern>(Pat)->getSubPattern(), DC, P);
-    return;
-
-  case PatternKind::Tuple:
-    for (const TuplePatternElt &field : cast<TuplePattern>(Pat)->getFields())
-      addFunctionParametersToScope(field.getPattern(), DC, P);
-    return;
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("pattern can't appear as a func argument!");
-  }
-
-  llvm_unreachable("bad pattern kind!");
-}
-
 void Parser::addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns,
                                           DeclContext *DC) {
-  for (Pattern *P : BodyPatterns)
-    ::addFunctionParametersToScope(P, DC, *this);
+  for (Pattern *Pat : BodyPatterns) {
+    Pat->forEachVariable([&](VarDecl *VD) {
+      // Reparent the decl and add it to the scope.
+      VD->setDeclContext(DC);
+      addToScope(VD);
+    });
+  }
 }
 

@@ -524,7 +524,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     Pattern *subPattern = TP->getSubPattern();
-    if (coercePatternToType(subPattern, dc, P->getType(),  options, resolver))
+    if (coercePatternToType(subPattern, dc, P->getType(), options, resolver))
       hadError = true;
     else
       TP->setSubPattern(subPattern);
@@ -537,10 +537,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Named:
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
-    if (options & TR_AllowUnspecifiedTypes) {
+    if (options & TR_AllowUnspecifiedTypes)
       return false;
-    }
-      
+
     diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {

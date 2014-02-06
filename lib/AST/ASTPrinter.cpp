@@ -275,16 +275,13 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
   }
       
-  case PatternKind::Expr: {
+  case PatternKind::Expr:
     // FIXME: Print expr.
     break;
-  }
       
-  case PatternKind::Var: {
-    auto var = cast<VarPattern>(pattern);
+  case PatternKind::Var:
     Printer << "var ";
-    printPattern(var->getSubPattern());
-  }
+    printPattern(cast<VarPattern>(pattern)->getSubPattern());
   }
 }
 

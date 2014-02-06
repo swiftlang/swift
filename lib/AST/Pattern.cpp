@@ -110,22 +110,28 @@ SourceLoc Pattern::getLoc() const {
 }
 
 void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
+  forEachVariable([&](VarDecl *VD) { variables.push_back(VD); });
+}
+
+/// \brief apply the specified function to all variables referenced in this
+/// pattern.
+void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
     return;
 
   case PatternKind::Named:
-    variables.push_back(cast<NamedPattern>(this)->getDecl());
+    fn(cast<NamedPattern>(this)->getDecl());
     return;
 
   case PatternKind::Paren:
   case PatternKind::Typed:
   case PatternKind::Var:
-    return getSemanticsProvidingPattern()->collectVariables(variables);
+    return getSemanticsProvidingPattern()->forEachVariable(fn);
 
   case PatternKind::Tuple:
     for (auto elt : cast<TuplePattern>(this)->getFields())
-      elt.getPattern()->collectVariables(variables);
+      elt.getPattern()->forEachVariable(fn);
     return;
 
   case PatternKind::Isa:
@@ -133,13 +139,13 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   
   case PatternKind::NominalType:
     for (auto elt : cast<NominalTypePattern>(this)->getElements())
-      elt.getSubPattern()->collectVariables(variables);
+      elt.getSubPattern()->forEachVariable(fn);
     return;
 
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(this);
     if (OP->hasSubPattern())
-      OP->collectVariables(variables);
+      OP->forEachVariable(fn);
     return;
   }
   

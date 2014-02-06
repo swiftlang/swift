@@ -121,6 +121,11 @@ public:
   /// \brief Collect the set of variables referenced in the given pattern.
   void collectVariables(SmallVectorImpl<VarDecl *> &variables) const;
 
+  /// \brief apply the specified function to all variables referenced in this
+  /// pattern.
+  void forEachVariable(const std::function<void(VarDecl*)> &f) const;
+
+
   Pattern *clone(ASTContext &context, bool Implicit = false) const;
   
   static bool classof(const Pattern *P) { return true; }
@@ -632,13 +637,14 @@ public:
     return P->getKind() == PatternKind::Var;
   }
 };
+
   
 inline Pattern *Pattern::getSemanticsProvidingPattern() {
-  if (ParenPattern *pp = dyn_cast<ParenPattern>(this))
+  if (auto *pp = dyn_cast<ParenPattern>(this))
     return pp->getSubPattern()->getSemanticsProvidingPattern();
-  if (TypedPattern *tp = dyn_cast<TypedPattern>(this))
+  if (auto *tp = dyn_cast<TypedPattern>(this))
     return tp->getSubPattern()->getSemanticsProvidingPattern();
-  if (VarPattern *vp = dyn_cast<VarPattern>(this))
+  if (auto *vp = dyn_cast<VarPattern>(this))
     return vp->getSubPattern()->getSemanticsProvidingPattern();
   return this;
 }

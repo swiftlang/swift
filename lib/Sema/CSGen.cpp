@@ -644,7 +644,6 @@ namespace {
         // Var doesn't affect the type.
         return getTypeForPattern(cast<VarPattern>(pattern)->getSubPattern(),
                                  forFunctionParam, locator);
-
       case PatternKind::Any:
         // For a pattern of unknown type, create a new type variable.
         return CS.createTypeVariable(CS.getConstraintLocator(locator),
@@ -689,7 +688,7 @@ namespace {
         for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
           auto tupleElt = tuplePat->getFields()[i];
           bool isVararg = tuplePat->hasVararg() && i == e-1;
-          Type eltTy = getTypeForPattern(tupleElt.getPattern(), forFunctionParam,
+          Type eltTy = getTypeForPattern(tupleElt.getPattern(),forFunctionParam,
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
 

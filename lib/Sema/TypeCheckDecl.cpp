@@ -552,48 +552,9 @@ static void checkCircularity(TypeChecker &tc, T *decl,
   }
 }
 
-namespace {
-  /// Apply the given function object to each bound variable within the pattern.
-  template<typename F>
-  void forEachBoundVar(Pattern *pattern, const F &f) {
-    switch (pattern->getKind()) {
-    case PatternKind::Tuple:
-      for (auto &field : cast<TuplePattern>(pattern)->getFields())
-        forEachBoundVar(field.getPattern(), f);
-      return;
-    case PatternKind::Paren:
-    case PatternKind::Typed:
-    case PatternKind::Var:
-      return forEachBoundVar(pattern->getSemanticsProvidingPattern(), f);
-    case PatternKind::NominalType:
-      for (auto &elt : cast<NominalTypePattern>(pattern)->getMutableElements())
-        forEachBoundVar(elt.getSubPattern(), f);
-      return;
-    case PatternKind::EnumElement:
-      if (auto subpattern = cast<EnumElementPattern>(pattern)->getSubPattern())
-        forEachBoundVar(subpattern, f);
-      return;
-
-      // Handle vars.
-    case PatternKind::Named:
-      // Don't change the type of a variable that we've been able to
-      // compute a type for.
-      f(cast<NamedPattern>(pattern)->getDecl());
-      return;
-
-      // Handle non-vars.
-    case PatternKind::Any:
-    case PatternKind::Isa:
-    case PatternKind::Expr:
-      return;
-    }
-    llvm_unreachable("bad pattern kind!");
-  }
-}
-
 /// Set each bound variable in the pattern to have an error type.
 static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
-  forEachBoundVar(pattern, [&](VarDecl *var ) {
+  pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
     if (var->hasType()) {
@@ -1018,7 +979,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // the variables.
   auto dc = binding->getDeclContext();
   if (dc->isGenericContext() && dc->isTypeContext()) {
-    forEachBoundVar(binding->getPattern(), [&](VarDecl *var) {
+    binding->getPattern()->forEachVariable([&](VarDecl *var) {
       var->setInterfaceType(
         tc.getInterfaceTypeFromInternalType(dc, var->getType()));
     });
@@ -1366,100 +1327,70 @@ public:
     // Nothing to do.
   }
 
+  void visitBoundVariable(VarDecl *VD) {
+    if (!VD->getType()->isMaterializable()) {
+      TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
+                  VD->getType());
+      VD->overwriteType(ErrorType::get(TC.Context));
+      VD->setInvalid();
+    }
+
+    validateAttributes(TC, VD);
+
+    // The instance var requires ObjC interop if it has an @objc or @iboutlet
+    // attribute or if it's a member of an ObjC class.
+    Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+    if (ContextTy && !VD->isStatic()) {
+      ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
+      ProtocolDecl *protocolContext =
+      dyn_cast<ProtocolDecl>(VD->getDeclContext());
+      bool ExplicitlyRequested = VD->getAttrs().isObjC() ||
+      VD->getAttrs().isIBOutlet();
+      if (TC.isRepresentableInObjC(VD, /*Diagnose=*/ExplicitlyRequested)) {
+        VD->setIsObjC(ExplicitlyRequested ||
+                      (classContext && classContext->isObjC()) ||
+                      (protocolContext && protocolContext->isObjC()));
+      }
+    }
+
+    // In a protocol context, variables written as "var x : Int" are really
+    // computed properties with just a getter.  Create the getter decl now.
+    if (isa<ProtocolDecl>(VD->getDeclContext()) &&
+        VD->getStorageKind() == VarDecl::Stored) {
+      convertStoredVarInProtocolToComputed(VD);
+
+      // Type check the getter declaration.
+      TC.typeCheckDecl(VD->getGetter(), true);
+    }
+
+    // If this is a stored ObjC property and should have an objc getter and
+    // setter, then synthesize the accessors and change its storage kind.
+    if (VD->getStorageKind() == VarDecl::Stored &&
+        VD->usesObjCGetterAndSetter() &&
+        // FIXME: properties in protocols should not be modeled as stored
+        // properties!
+        !isa<ProtocolDecl>(VD->getDeclContext())) {
+      convertStoredVarToStoredObjC(VD);
+
+      // Type check the body of the getter and setter.
+      TC.typeCheckDecl(VD->getGetter(), true);
+      if (VD->getSetter()) TC.typeCheckDecl(VD->getSetter(), true);
+    }
+
+    // If this is a willSet/didSet property, synthesize the getter and setter
+    // decl.
+    if (VD->getStorageKind() == VarDecl::WillSetDidSet && !VD->getGetter()) {
+      synthesizeWillSetDidSetAccessors(VD);
+
+      // Type check the body of the getter and setter.
+      TC.typeCheckDecl(VD->getGetter(), true);
+      TC.typeCheckDecl(VD->getSetter(), true);
+    }
+  }
+
+
   void visitBoundVars(Pattern *P) {
-    switch (P->getKind()) {
-    // Recur into patterns.
-    case PatternKind::Tuple:
-      for (auto &field : cast<TuplePattern>(P)->getFields())
-        visitBoundVars(field.getPattern());
-      return;
-    case PatternKind::Paren:
-    case PatternKind::Typed:
-    case PatternKind::Var:
-      return visitBoundVars(P->getSemanticsProvidingPattern());
-    case PatternKind::NominalType:
-      for (auto &elt : cast<NominalTypePattern>(P)->getMutableElements())
-        visitBoundVars(elt.getSubPattern());
-      return;
-    case PatternKind::EnumElement: {
-      auto *OP = cast<EnumElementPattern>(P);
-      if (OP->hasSubPattern())
-        visitBoundVars(OP->getSubPattern());
-      return;
-    }
-
-    // Handle vars.
-    case PatternKind::Named: {
-      VarDecl *VD = cast<NamedPattern>(P)->getDecl();
-
-      if (!VD->getType()->isMaterializable()) {
-        TC.diagnose(VD->getStartLoc(), diag::var_type_not_materializable,
-                    VD->getType());
-        VD->overwriteType(ErrorType::get(TC.Context));
-        VD->setInvalid();
-      }
-
-      validateAttributes(TC, VD);
-
-      // The instance var requires ObjC interop if it has an @objc or @iboutlet
-      // attribute or if it's a member of an ObjC class.
-      Type ContextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-      if (ContextTy && !VD->isStatic()) {
-        ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
-        ProtocolDecl *protocolContext =
-            dyn_cast<ProtocolDecl>(VD->getDeclContext());
-        bool ExplicitlyRequested = VD->getAttrs().isObjC() ||
-                                   VD->getAttrs().isIBOutlet();
-        if (TC.isRepresentableInObjC(VD, /*Diagnose=*/ExplicitlyRequested)) {
-          VD->setIsObjC(ExplicitlyRequested ||
-                        (classContext && classContext->isObjC()) ||
-                        (protocolContext && protocolContext->isObjC()));
-        }
-      }
-
-      // In a protocol context, variables written as "var x : Int" are really
-      // computed properties with just a getter.  Create the getter decl now.
-      if (isa<ProtocolDecl>(VD->getDeclContext()) &&
-          VD->getStorageKind() == VarDecl::Stored) {
-        convertStoredVarInProtocolToComputed(VD);
-
-        // Type check the getter declaration.
-        TC.typeCheckDecl(VD->getGetter(), true);
-      }
-      
-      // If this is a stored ObjC property and should have an objc getter and
-      // setter, then synthesize the accessors and change its storage kind.
-      if (VD->getStorageKind() == VarDecl::Stored &&
-          VD->usesObjCGetterAndSetter() &&
-          // FIXME: properties in protocols should not be modeled as stored
-          // properties!
-          !isa<ProtocolDecl>(VD->getDeclContext())) {
-        convertStoredVarToStoredObjC(VD);
-        
-        // Type check the body of the getter and setter.
-        TC.typeCheckDecl(VD->getGetter(), true);
-        if (VD->getSetter()) TC.typeCheckDecl(VD->getSetter(), true);
-      }
-
-      // If this is a willSet/didSet property, synthesize the getter and setter
-      // decl.
-      if (VD->getStorageKind() == VarDecl::WillSetDidSet && !VD->getGetter()) {
-        synthesizeWillSetDidSetAccessors(VD);
-        
-        // Type check the body of the getter and setter.
-        TC.typeCheckDecl(VD->getGetter(), true);
-        TC.typeCheckDecl(VD->getSetter(), true);
-      }
-      return;
-    }
-
-    // Handle non-vars.
-    case PatternKind::Any:
-    case PatternKind::Isa:
-    case PatternKind::Expr:
-      return;
-    }
-    llvm_unreachable("bad pattern kind!");
+    P->forEachVariable([&] (VarDecl *VD) { this->visitBoundVariable(VD); });
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -1487,13 +1418,10 @@ public:
     // If this is an declaration with an initializer, reject code if
     // uninitialized vars are not allowed.
     if (!PBD->hasInit() && !isInSILMode) {
-      SmallVector<VarDecl*, 4> vars;
-      PBD->getPattern()->collectVariables(vars);
-
-      for (auto *var : vars) {
+      PBD->getPattern()->forEachVariable([&](VarDecl *var) {
         // If the variable is computed, it never needs an initializer.
         if (var->hasAccessorFunctions())
-          continue;
+          return;
 
         auto *varDC = var->getDeclContext();
 
@@ -1505,7 +1433,7 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));
-          continue;
+          return;
         }
 
         // Static/type declarations require an initializer unless in a
@@ -1515,7 +1443,7 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));
-          continue;
+          return;
         }
 
         // Global variables require an initializer (except in top level code).
@@ -1525,9 +1453,9 @@ public:
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));
-          continue;
+          return;
         }
-      }
+      });
     }
 
     if (!IsSecondPass)
@@ -3303,8 +3231,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   if (decl->hasClangNode())
     return;
 
-  SmallVector<VarDecl *, 4> variables;
-
   // Verify that all of the instance variables of this type have default
   // constructors.
   for (auto member : decl->getMembers()) {
@@ -3314,19 +3240,19 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     if (!patternBind || patternBind->getInit())
       continue;
 
+    bool CantBuildInitializer = false;
+
     // Find the variables in the pattern. They'll each need to be
     // default-initialized.
-    variables.clear();
-    patternBind->getPattern()->collectVariables(variables);
+    patternBind->getPattern()->forEachVariable([&](VarDecl *VD) {
+      if (!VD->isStatic() && VD->hasStorage() && !VD->isInvalid())
+        CantBuildInitializer = true;
+    });
 
-    for (auto var : variables) {
-      if (var->isStatic() || !var->hasStorage() || var->isInvalid())
-        continue;
-
-      // Otherwise, there is a stored ivar without an initializer.  We can't
-      // generate a default initializer for this.
+    // If there is a stored ivar without an initializer, we can't generate a
+    // default initializer for this.
+    if (CantBuildInitializer)
       return;
-    }
   }
 
   // For a class, check whether the superclass (if it exists) is
