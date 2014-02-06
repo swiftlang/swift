@@ -671,6 +671,11 @@ static inline llvm::hash_code hash_value(SILValue V) {
   return llvm::hash_value(V.getDef());
 }
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
+  V.print(OS);
+  return OS;
+}
+
 } // end namespace swift
 
 

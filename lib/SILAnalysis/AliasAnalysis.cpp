@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -211,4 +212,16 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysis(M);
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     AliasAnalysis::AliasResult R) {
+  switch (R) {
+  case AliasAnalysis::AliasResult::NoAlias:
+    return OS << "NoAlias";
+  case AliasAnalysis::AliasResult::MayAlias:
+    return OS << "MayAlias";
+  case AliasAnalysis::AliasResult::MustAlias:
+    return OS << "MustAlias";
+  }
 }

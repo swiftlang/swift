@@ -65,6 +65,9 @@ public:
   virtual void invalidate(SILFunction *, InvalidationKind K) { invalidate(K); }
 };
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              AliasAnalysis::AliasResult R);
+
 } // end namespace swift
 
 #endif
