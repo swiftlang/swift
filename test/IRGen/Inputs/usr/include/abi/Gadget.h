@@ -42,3 +42,8 @@ typedef NS_ENUM(unsigned short, ChooseTo) {
   ChooseToTakeIt = 709,
   ChooseToLeaveIt = 1709
 };
+
+enum RawEnum {
+  Intergalactic,
+  Planetary
+};

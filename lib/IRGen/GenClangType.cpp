@@ -162,19 +162,13 @@ clang::CanQualType GenClangType::visitBoundGenericStructType(
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
-  // Typedef enums have a Clang Decl available.
-  auto *decl = type->getDecl();
-  if (auto *clangDecl = decl->getClangDecl()) {
-    auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
-    auto &clangCtx = getClangASTContext();
-    auto clangType = clangCtx.getTypeDeclType(typeDecl);
-    return clangCtx.getCanonicalType(clangType);
-  }
+  auto *clangDecl = type->getDecl()->getClangDecl();
+  assert(clangDecl && "Imported enum without Clang decl!");
 
-  // Plain enums just have the raw type set.
-  assert(!decl->getRawType() &&
-         "Expected raw type for Clang-imported enum!");
-  return visit(decl->getRawType()->getCanonicalType());
+  auto &clangCtx = getClangASTContext();
+  auto *typeDecl = cast<clang::TypeDecl>(clangDecl);
+  auto clangType = clangCtx.getTypeDeclType(typeDecl);
+  return clangCtx.getCanonicalType(clangType);
 }
 
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
