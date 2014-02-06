@@ -160,39 +160,50 @@ private:
     print(methodTy->getResult());
     os << ")" << FD->getName();
 
-    auto argPatterns = FD->getArgParamPatterns();
-    assert(argPatterns.size() == 2 && "not an ObjC-compatible method");
-    const TuplePattern *argParams = cast<TuplePattern>(argPatterns.back());
-    assert(!argParams->hasVararg() && "can't handle variadic methods");
-
     auto bodyPatterns = FD->getBodyParamPatterns();
     assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
-    const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
+    auto argPatterns = FD->getArgParamPatterns();
+    assert(argPatterns.size() == 2 && "not an ObjC-compatible method");
 
-    bool isFirst = true;
-    for_each(argParams->getFields(), bodyParams->getFields(),
-             [this, &isFirst] (const TuplePatternElt &argParam,
-                               const TuplePatternElt &bodyParam) {
-      // FIXME: Handle default arguments.
-      if (!isFirst) {
-        auto argPattern = argParam.getPattern()->getSemanticsProvidingPattern();
-        os << " " << cast<NamedPattern>(argPattern)->getBoundName();
-      }
+    if (isa<ParenPattern>(argPatterns.back())) {
+      assert(isa<ParenPattern>(bodyPatterns.back()));
 
-      auto bodyPattern = bodyParam.getPattern()->getSemanticsProvidingPattern();
+      auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
       os << ":(";
       this->print(bodyPattern->getType());
-      os << ")";
+      os << ")_";
 
-      if (isa<AnyPattern>(bodyPattern)) {
-        // FIXME: Do a better job synthesizing an initial argument name.
-        os << "_";
-      } else {
-        os << cast<NamedPattern>(bodyPattern)->getBoundName();
-      }
+    } else {
+      const TuplePattern *argParams = cast<TuplePattern>(argPatterns.back());
+      assert(!argParams->hasVararg() && "can't handle variadic methods");
 
-      isFirst = false;
-    });
+      const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
+
+      bool isFirst = true;
+      for_each(argParams->getFields(), bodyParams->getFields(),
+               [this, &isFirst] (const TuplePatternElt &argParam,
+                                 const TuplePatternElt &bodyParam) {
+        // FIXME: Handle default arguments.
+        if (!isFirst) {
+          auto argPattern = argParam.getPattern();
+          argPattern = argPattern->getSemanticsProvidingPattern();
+          os << " " << cast<NamedPattern>(argPattern)->getBoundName();
+        }
+
+        auto bodyPattern = bodyParam.getPattern();
+        bodyPattern = bodyPattern->getSemanticsProvidingPattern();
+        os << ":(";
+        this->print(bodyPattern->getType());
+        os << ")";
+
+        if (isa<AnyPattern>(bodyPattern))
+          os << "_";
+        else
+          os << cast<NamedPattern>(bodyPattern)->getBoundName();
+
+        isFirst = false;
+      });
+    }
 
     os << ";\n";
   }
