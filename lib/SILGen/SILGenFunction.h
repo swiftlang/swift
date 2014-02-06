@@ -572,7 +572,8 @@ public:
 
   /// Emit the specified VarDecl as an LValue if possible, otherwise return
   /// null.
-  ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var);
+  ManagedValue emitLValueForDecl(SILLocation loc, VarDecl *var,
+                                 bool isDirectPropertyAccess = false);
   
   /// Produce a singular RValue for a reference to the specified declaration,
   /// with the given type and in response to the specified epxression.  Try to

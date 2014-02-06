@@ -501,35 +501,28 @@ LValue SILGenLValue::visitExpr(Expr *e) {
 
 static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
                                             SILLocation loc, VarDecl *var,
-                                            CanType formalRValueType) {
+                                            CanType formalRValueType,
+                                            bool isDirectPropertyAccess) {
   LValue lv;
   auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
 
   // If it's a computed variable, push a reference to the getter and setter.
-  switch (var->getStorageKind()) {
-  case VarDecl::Observing:
-    assert(0 && "FIXME: Global willSet/didSet not impl");
-  case VarDecl::StoredObjC: assert(0 && "Can't happen, always a member");
-  case VarDecl::Stored: {
+  if (var->hasAccessorFunctions() && !isDirectPropertyAccess) {
+    ArrayRef<Substitution> substitutions;
+    if (auto genericParams
+        = gen.SGM.Types.getEffectiveGenericParamsForContext(
+                                                      var->getDeclContext()))
+      substitutions = gen.buildForwardingSubstitutions(genericParams);
+
+    lv.add<GetterSetterComponent>(var, /*isSuper=*/false, substitutions,
+                                  typeData);
+  } else {
     // If it's a physical value (e.g. a local variable in memory), push its
     // address.
-    auto address = gen.emitLValueForDecl(loc, var);
+    auto address = gen.emitLValueForDecl(loc, var, isDirectPropertyAccess);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     lv.add<ValueComponent>(address, typeData);
-    break;
-  }
-  case VarDecl::Computed: {
-    ArrayRef<Substitution> substitutions;
-    if (auto genericParams
-          = gen.SGM.Types.getEffectiveGenericParamsForContext(
-              var->getDeclContext())) {
-      substitutions = gen.buildForwardingSubstitutions(genericParams);
-    }
-
-    lv.add<GetterSetterComponent>(var, /*isSuper=*/false, substitutions, 
-                                  typeData);
-  }
   }
   return std::move(lv);
 }
@@ -537,7 +530,8 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // The only non-member decl that can be an lvalue is VarDecl.
   return emitLValueForNonMemberVarDecl(gen, e, cast<VarDecl>(e->getDecl()),
-                                       getSubstFormalRValueType(e));
+                                       getSubstFormalRValueType(e),
+                                       e->isDirectPropertyAccess());
 }
 
 LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
@@ -583,7 +577,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
            "static stored properties for classes/protocols not implemented");
     
     return emitLValueForNonMemberVarDecl(gen, e, var,
-                                         getSubstFormalRValueType(e));
+                                         getSubstFormalRValueType(e),
+                                         e->isDirectPropertyAccess());
   }
 
   // For member variables, this access is done w.r.t. a base computation that

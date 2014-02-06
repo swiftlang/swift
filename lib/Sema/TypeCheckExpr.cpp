@@ -460,7 +460,8 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
                                        SourceLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
-  return new (Context) DeclRefExpr(value, loc, Implicit, type);
+  return new (Context) DeclRefExpr(value, loc, Implicit,
+                                   /*isDirectPropertyAccess*/false, type);
 }
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,

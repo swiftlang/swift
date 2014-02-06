@@ -1032,6 +1032,8 @@ public:
     printCommon(E, "declref_expr")
       << " decl=";
     E->getDeclRef().dump(OS);
+    if (E->isDirectPropertyAccess())
+      OS << " direct_property_access";
     OS << " specialized=" << (E->isSpecialized()? "yes" : "no");
 
     for (auto TR : E->getGenericArgs()) {
@@ -1059,6 +1061,7 @@ public:
       << " name=" << E->getDecls()[0]->getName().str()
       << " #decls=" << E->getDecls().size()
       << " specialized=" << (E->isSpecialized()? "yes" : "no");
+
     for (ValueDecl *D : E->getDecls()) {
       OS << '\n';
       OS.indent(Indent);

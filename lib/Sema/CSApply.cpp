@@ -357,7 +357,8 @@ namespace {
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
                        ConstraintLocatorBuilder locator,
-                       bool specialized, bool implicit) {
+                       bool specialized, bool implicit,
+                       bool isDirectPropertyAccess) {
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
 
@@ -375,7 +376,7 @@ namespace {
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
-                              locator, implicit, /*direct ivar*/false);
+                              locator, implicit, isDirectPropertyAccess);
       }
 
       // If this is a declaration with generic function type, build a
@@ -388,11 +389,13 @@ namespace {
         auto type = solution.computeSubstitutions(genericFn, dc, openedType,
                                                   substitutions);
         return new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                     loc, implicit, type);
+                                     loc, implicit, isDirectPropertyAccess,
+                                     type);
       }
 
       auto type = simplifyType(openedType);
-      return new (ctx) DeclRefExpr(decl, loc, implicit, type);
+      return new (ctx) DeclRefExpr(decl, loc, implicit, isDirectPropertyAccess,
+                                   type);
     }
 
     /// Replace the result type for the given function with the given, new
@@ -1345,7 +1348,8 @@ namespace {
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
       return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
-                          locator, expr->isSpecialized(), expr->isImplicit());
+                          locator, expr->isSpecialized(), expr->isImplicit(),
+                          expr->isDirectPropertyAccess());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -1432,7 +1436,8 @@ namespace {
       auto decl = choice.getDecl();
 
       return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
-                          locator, expr->isSpecialized(), expr->isImplicit());
+                          locator, expr->isSpecialized(), expr->isImplicit(),
+                          /*isDirectPropertyAccess*/false);
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {

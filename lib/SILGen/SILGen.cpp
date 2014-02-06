@@ -390,6 +390,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
           // Decls captured by value don't escape.
           It->second.isConstant())
         continue;
+
       Captures.push_back(It->second.getAddress());
     }
     

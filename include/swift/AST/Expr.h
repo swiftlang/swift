@@ -98,6 +98,14 @@ class alignas(8) Expr {
   enum { NumStringLiteralExprBits = NumLiteralExprBits + 1 };
   static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
 
+  class DeclRefExprBitfields {
+    friend class DeclRefExpr;
+    unsigned : NumExprBits;
+    unsigned IsDirectPropertyAccess : 1;
+  };
+  enum { NumDeclRefExprBits = NumExprBits + 1 };
+  static_assert(NumDeclRefExprBits <= 32, "fits in an unsigned");
+
   class MemberRefExprBitfields {
     friend class MemberRefExpr;
     unsigned : NumExprBits;
@@ -154,6 +162,7 @@ protected:
     LiteralExprBitfields LiteralExprBits;
     IntegerLiteralExprBitfields IntegerLiteralExprBits;
     StringLiteralExprBitfields StringLiteralExprBits;
+    DeclRefExprBitfields DeclRefExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
@@ -524,12 +533,23 @@ class DeclRefExpr : public Expr {
   }
 
 public:
-  DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit, Type Ty = Type())
-    : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {}
+  DeclRefExpr(ConcreteDeclRef D, SourceLoc Loc, bool Implicit,
+              // If True, access to computed properties with storage goes to
+              // the storage, instead of through the accessors.
+              bool UsesDirectPropertyAccess = false, Type Ty = Type())
+    : Expr(ExprKind::DeclRef, Implicit, Ty), DOrSpecialized(D), Loc(Loc) {
+    DeclRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
+  }
 
   /// Retrieve the declaration to which this expression refers.
   ValueDecl *getDecl() const {
     return getDeclRef().getDecl();
+  }
+
+  /// Return true if this access is direct, meaning that it does not call the
+  /// getter or setter.
+  bool isDirectPropertyAccess() const {
+    return DeclRefExprBits.IsDirectPropertyAccess;
   }
 
   /// Retrieve the concrete declaration reference.

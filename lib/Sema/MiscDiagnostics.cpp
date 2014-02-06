@@ -154,7 +154,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         // Handle local and top-level computed variables.
-        if (DRE->getDecl() == Var) {
+        if (DRE->getDecl() == Var &&
+            !DRE->isDirectPropertyAccess()) {
           bool shouldDiagnose = true;
           if (auto *ParentExpr = Parent.getAsExpr()) {
             if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr))

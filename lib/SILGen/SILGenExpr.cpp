@@ -375,7 +375,8 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
 
 /// Emit the specified declaration as an LValue if possible, otherwise return
 /// null.
-ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var) {
+ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
+                                               bool isDirectPropertyAccess) {
 
   if (var->isDebuggerVar()) {
     DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
@@ -401,7 +402,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var) {
     return ManagedValue();
   }
   
-  // a getter produces an rvalue.
+  // a getter produces an rvalue unless this is a direct access to storage.
   if (var->hasAccessorFunctions())
     return ManagedValue();
   
@@ -2730,7 +2731,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     if (selfDecl->getType()->hasReferenceSemantics())
       self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType());
     else
-      self = SGF.emitLValueForDecl(loc, selfDecl);
+      self = SGF.emitLValueForDecl(loc, selfDecl, true);
 
     LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 

@@ -1211,63 +1211,85 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   
   /// The getter is always trivial: just perform a (direct!) load of storage.
   auto *Get = VD->getGetter();
-  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
-
-  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
-  auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-  auto *MRE = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                      /*implicit*/true,/*direct ivar*/true);
-  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
-  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
-  
+  if (VarDecl *SelfDecl = Get->getImplicitSelfDecl()) {
+    // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
+    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+    auto *MRE = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                        /*implicit*/true,/*direct ivar*/true);
+    ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
+    Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+  } else {
+    // Non-member observing accessors just directly load the variable.
+    // Create (return (decl_ref_expr(VD)))
+    auto *DRE = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                      /*direct ivar*/true);
+    ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), DRE, /*implicit*/true);
+    Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+  }
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
-  SelfDecl = Set->getImplicitSelfDecl();
+  auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = nullptr;
-  Set->getArgParamPatterns()[1]->forEachVariable([&](VarDecl *VD) {
+  Set->getArgParamPatterns().back()->forEachVariable([&](VarDecl *VD) {
     assert(!ValueDecl && "Already found 'value'?");
     ValueDecl = VD;
   });
-
 
   // The setter invokes willSet with the incoming value, then does a direct
   // store, then invokes didSet.
   SmallVector<ASTNode, 3> SetterBody;
 
-  // Create: (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
-  //                                          (decl_ref_expr(self))),
-  //                    (declrefexpr(value)))
+  // Create:
+  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
+  //                                    (decl_ref_expr(self))),
+  //              (declrefexpr(value)))
+  // or:
+  //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
   if (VD->getWillSetFunc()) {
-    auto *WillSetDRE = new (Ctx) DeclRefExpr(VD->getWillSetFunc(),
-                                             SourceLoc(), /*imp*/true);
-    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-    auto *DSCE = new (Ctx) DotSyntaxCallExpr(WillSetDRE, SourceLoc(), SelfDRE);
+    Expr *Callee = new (Ctx) DeclRefExpr(VD->getWillSetFunc(),
+                                         SourceLoc(), /*imp*/true);
     auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-    SetterBody.push_back(new (Ctx) CallExpr(DSCE, ValueDRE, true));
+    if (SelfDecl) {
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+    }
+    SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
   }
   
-  // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
-  //                decl_ref_expr(value))
-  auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+  // Create:
+  //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
+  // or:
+  //   (assign (decl_ref_expr(VD)), decl_ref_expr(value))
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  MRE = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                    /*implicit*/true, /*direct ivar*/true);
-  SetterBody.push_back(new (Ctx) AssignExpr(MRE, SourceLoc(),
-                                                ValueDRE, true));
-  
-  // Create: (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
-  //                                          (decl_ref_expr(self))),
-  //                    (tuple_expr()))
-  if (VD->getDidSetFunc()) {
-    auto *DidSetDRE = new (Ctx) DeclRefExpr(VD->getDidSetFunc(),
-                                            SourceLoc(), /*imp*/true);
+  Expr *Dest;
+  if (SelfDecl) {
     auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-    auto *DSCE = new (Ctx) DotSyntaxCallExpr(DidSetDRE, SourceLoc(), SelfDRE);
+    Dest = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
+                                   /*implicit*/true, /*direct ivar*/true);
+  } else {
+    Dest = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                 /*direct ivar*/true);
+  }
+  SetterBody.push_back(new (Ctx) AssignExpr(Dest, SourceLoc(), ValueDRE, true));
+  
+  // Create:
+  //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
+  //                                    (decl_ref_expr(self))),
+  //              (tuple_expr()))
+  // or:
+  //   (call_expr (decl_ref_expr(didSet)), (tuple_expr()))
+  if (VD->getDidSetFunc()) {
     auto *Tuple = new (Ctx) TupleExpr(SourceLoc(), {}, nullptr, SourceLoc(),
                                       /*trailing closure*/false, /*impl*/true);
-    SetterBody.push_back(new (Ctx) CallExpr(DSCE, Tuple, true));
+    Expr *Callee = new (Ctx) DeclRefExpr(VD->getDidSetFunc(),
+                                         SourceLoc(), /*imp*/true);
+    if (SelfDecl) {
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
+    }
+    SetterBody.push_back(new (Ctx) CallExpr(Callee, Tuple, true));
   }
   
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
