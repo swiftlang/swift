@@ -367,6 +367,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
 
   // 'inout' attribute.
   case TAK_inout:
+    if (!isInSILMode()) {
+      diagnose(Loc, diag::only_allowed_in_sil, "inout");
+      return false;
+    }
+
     // Verify that we're not combining this attribute incorrectly.  Cannot be
     // both inout and auto_closure.
     if (Attributes.has(TAK_auto_closure)) {
