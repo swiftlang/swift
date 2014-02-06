@@ -30,6 +30,9 @@ namespace swift {
     bool anotherIteration;
     /// The module that the pass manager will transform.
     SILModule *Mod;
+    /// If true, the pass manager will verify the module after all
+    /// transformations.
+    bool VerifyAfterAll;
 
     /// The list of transformations to run.
     llvm::SmallVector<SILTransform*, 8> Transformations;
@@ -39,7 +42,8 @@ namespace swift {
 
   public:
     /// C'tor
-    SILPassManager(SILModule *M) : anotherIteration(false), Mod(M) {}
+    SILPassManager(SILModule *M, bool Verify = false) :
+      anotherIteration(false), Mod(M), VerifyAfterAll(Verify) {}
 
     /// \brief Searches for an analysis of type T in the list of registered
     /// analysis. If the analysis is not found, the program terminates.

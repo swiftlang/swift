@@ -43,7 +43,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
   auto &Ctx = Module.getASTContext();
 
-  SILPassManager PM(&Module);
+  SILPassManager PM(&Module, Options.EnableParanoidVerification);
   PM.registerAnalysis(createCallGraphAnalysis(&Module));
   PM.registerAnalysis(createAliasAnalysis(&Module));
   PM.registerAnalysis(createDominanceAnalysis(&Module));
@@ -67,7 +67,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
-    SILPassManager PM(&Module);
+    SILPassManager PM(&Module, Options.EnableParanoidVerification);
     PM.registerAnalysis(createCallGraphAnalysis(&Module));
     PM.registerAnalysis(createAliasAnalysis(&Module));
     PM.registerAnalysis(createDominanceAnalysis(&Module));

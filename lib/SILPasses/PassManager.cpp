@@ -34,6 +34,9 @@ void SILPassManager::runOneIteration() {
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
       SMT->run();
+      if (VerifyAfterAll) {
+        DEBUG(Mod->verify());
+      }
       continue;
     }
 
@@ -44,6 +47,9 @@ void SILPassManager::runOneIteration() {
           SFT->injectPassManager(this);
           SFT->injectFunction(&F);
           SFT->run();
+          if (VerifyAfterAll) {
+            DEBUG(Mod->verify());
+          }
         }
       continue;
     }
