@@ -11,6 +11,11 @@
 ##===----------------------------------------------------------------------===##
 
 SWIFT_LEVEL := ..
+PARALLEL_DIRS := 
+
+ifeq ($(wildcard /AppleInternal/Library/Frameworks/CoreAutomation.framework),)
+else
+endif
 
 include $(SWIFT_LEVEL)/../../Makefile.config
 
