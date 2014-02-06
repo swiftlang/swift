@@ -53,7 +53,7 @@ enum class PassKind {
   StripDebugInfo,
   AllocRefElimination,
   InstCount,
-  AAEvaluator,
+  AADumper,
 };
 
 static llvm::cl::opt<std::string>
@@ -147,7 +147,7 @@ Passes(llvm::cl::desc("Passes:"),
                                    "inst-count",
                                    "Count all instructions in the given "
                                    "module."),
-                        clEnumValN(PassKind::AAEvaluator,
+                        clEnumValN(PassKind::AADumper,
                                    "aa-evaluator",
                                    "Evaluate AA on all pairs of ValueKinds in "
                                    "all function."),
@@ -301,8 +301,8 @@ int main(int argc, char **argv) {
     case PassKind::InstCount:
       PM.add(createSILInstCount());
       break;
-    case PassKind::AAEvaluator:
-      PM.add(createSILAAEvaluator());
+    case PassKind::AADumper:
+      PM.add(createSILAADumper());
       break;
     }
 

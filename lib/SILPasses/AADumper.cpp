@@ -1,4 +1,4 @@
-//===------ AAEvaluator.cpp - Compare all values in Function with AA ------===//
+//===-------- AADumper.cpp - Compare all values in Function with AA -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -51,7 +51,7 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
 
 namespace {
 
-class SILAAEvaluator : public SILFunctionTransform {
+class SILAADumper : public SILFunctionTransform {
   
   void run() {
     SILFunction &Fn = *getFunction();
@@ -75,8 +75,8 @@ class SILAAEvaluator : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createSILAAEvaluator() {
-  return new SILAAEvaluator();
+SILTransform *swift::createSILAADumper() {
+  return new SILAADumper();
 }
 
 

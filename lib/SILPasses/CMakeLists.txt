@@ -28,6 +28,6 @@ add_swift_library(swiftSILPasses
   StripDebugInfo.cpp
   AllocRefElimination.cpp
   InstCount.cpp
-  AAEvaluator.cpp
+  AADumper.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
 

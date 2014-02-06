@@ -74,7 +74,7 @@ namespace swift {
   // Utilities
   SILTransform *createStripDebug();
   SILTransform *createSILInstCount();
-  SILTransform *createSILAAEvaluator();
+  SILTransform *createSILAADumper();
 } // end namespace swift
 
 #endif
