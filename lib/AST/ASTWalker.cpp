@@ -437,7 +437,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (!Sub) return nullptr;
       E->setSubExpr(Sub);
     }
-    
+
+    if (auto TyR = E->getCastTypeLoc().getTypeRepr())
+      if (doIt(TyR))
+        return nullptr;
+
     return E;
   }
 
