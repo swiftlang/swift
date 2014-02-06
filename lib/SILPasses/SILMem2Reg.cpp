@@ -729,7 +729,6 @@ class SILMem2Reg : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F.getName() << " **\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-    assert(DA && "Unable to find dominance analysis.");
 
     MemoryToRegisters(F, DA->getDomInfo(&F)).run();
 

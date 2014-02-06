@@ -392,7 +392,6 @@ class SILCSE : public SILFunctionTransform {
           " *****\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-    assert(DA && "Unable to find dominance analysis.");
 
     CSE C;
     C.processFunction(F, DA->getDomInfo(&F));

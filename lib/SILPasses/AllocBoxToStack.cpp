@@ -338,8 +338,6 @@ class SILStackPromotion : public SILFunctionTransform {
   /// The entry point to the transformation.
   virtual void runOnFunction(SILFunction &F, SILPassManager *PM) {
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
-    assert(DA && "Unable to find dominance analysis.");
-
     PostDominanceInfo *PDI = DA->getPostDomInfo(&F);
 
     for (auto &BB : F) {

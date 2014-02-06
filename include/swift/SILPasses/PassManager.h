@@ -13,6 +13,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Transforms.h"
 
@@ -23,7 +24,7 @@ namespace swift {
   class SILModule;
   class SILFunction;
   class SILTransform;
-  
+
   /// \brief The SIL pass manager.
   class SILPassManager {
     /// When set to True the pass manager will re-run the transformation pipe.
@@ -42,9 +43,18 @@ namespace swift {
     SILPassManager(SILModule *M) : anotherIteration(false), Mod(M) {}
 
     /// \brief Searches for an analysis of type T in the list of registered
-    /// analysis.
+    /// analysis. If the analysis is not found, the program terminates.
     template<typename T>
     T* getAnalysis() {
+      if (T *A = getAnalysisOrNull<T>())
+        return A;
+      llvm_unreachable("Unable to find analysis for requested type.");
+    }
+
+    /// \brief Searches for an analysis of type T in the list of registered
+    /// analysis.
+    template<typename T>
+    T* getAnalysisOrNull() {
       for (SILAnalysis *A : Analysis)
         if (T* R = llvm::dyn_cast<T>(A))
           return R;
@@ -97,4 +107,3 @@ namespace swift {
 } // end namespace swift
 
 #endif
-
