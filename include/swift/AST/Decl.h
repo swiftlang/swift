@@ -2384,7 +2384,7 @@ public:
 
     /// This property has storage, a didSet specifier, a willSet specifier, or
     /// both.  Sema synthesizes a getter and setter that use these.
-    WillSetDidSet
+    Observing
   };
 private:
   llvm::PointerIntPair<AbstractStorageDecl*, 2, StorageKindTy> OverriddenDecl;
@@ -2395,16 +2395,16 @@ private:
     FuncDecl *Set = nullptr;       // User-defined setter
   };
 
-  struct WillSetDidSetRecord : GetSetRecord {
+  struct ObservingRecord : GetSetRecord {
     FuncDecl *WillSet = nullptr;   // willSet(value):
     FuncDecl *DidSet = nullptr;    // didSet:
   };
 
   GetSetRecord *GetSetInfo = nullptr;
 
-  WillSetDidSetRecord &getDidSetInfo() const {
-    assert(getStorageKind() == WillSetDidSet);
-    return *static_cast<WillSetDidSetRecord*>(GetSetInfo);
+  ObservingRecord &getDidSetInfo() const {
+    assert(getStorageKind() == Observing);
+    return *static_cast<ObservingRecord*>(GetSetInfo);
   }
 
   void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
@@ -2429,7 +2429,7 @@ public:
     switch (getStorageKind()) {
     case Stored:
     case StoredObjC:
-    case WillSetDidSet:
+    case Observing:
       return true;
     case Computed:
       return false;
@@ -2440,7 +2440,7 @@ public:
     switch (getStorageKind()) {
     case Computed:
     case StoredObjC:
-    case WillSetDidSet:
+    case Observing:
       return true;
     case Stored:
       return false;
@@ -2454,15 +2454,15 @@ public:
   /// \brief Turn this into a StorageObjC var, providing a getter and setter.
   void makeStoredObjC(FuncDecl *Get, FuncDecl *Set);
 
-  /// \brief Turn this into a DidSetWillSet var, providing the didSet/willSet
+  /// \brief Turn this into a Observing var, providing the didSet/willSet
   /// specifiers.
-  void makeWillSetDidSet(SourceLoc LBraceLoc,
+  void makeObserving(SourceLoc LBraceLoc,
                          FuncDecl *WillSet, FuncDecl *DidSet,
                          SourceLoc RBraceLoc);
 
-  /// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
+  /// \brief Specify the synthesized get/set functions for a Observing var.
   /// This is used by Sema.
-  void setDidSetWillSetAccessors(FuncDecl *Get, FuncDecl *Set);
+  void setObservingAccessors(FuncDecl *Get, FuncDecl *Set);
 
   SourceRange getBracesRange() const {
     assert(GetSetInfo && "Not computed!");
@@ -2476,11 +2476,11 @@ public:
   FuncDecl *getSetter() const { return GetSetInfo ? GetSetInfo->Set : nullptr; }
   
   /// \brief Return the funcdecl for the willSet specifier if it exists, this is
-  /// only valid on a VarDecl with DidSetWillSet storage.
+  /// only valid on a VarDecl with Observing storage.
   FuncDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
 
   /// \brief Return the funcdecl for the didSet specifier if it exists, this is
-  /// only valid on a VarDecl with DidSetWillSet storage.
+  /// only valid on a VarDecl with Observing storage.
   FuncDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
 
   /// Return true if this storage needs to be accessed with getters and
@@ -3089,7 +3089,7 @@ public:
   /// isGetterOrSetter - Determine whether this is a getter or a setter vs.
   /// a normal function.
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
-  bool isDidSetWillSet() const {
+  bool isObservingAccessor() const {
     return getAccessorKind() == AccessorKind::IsDidSet ||
            getAccessorKind() == AccessorKind::IsWillSet;
   }

@@ -812,7 +812,7 @@ public:
       if (fd->isObjC() ||
           (isa<ClassDecl>(fd->getDeclContext()) &&
            // didSet and willSet methods can always be directly dispatched.
-           !fd->isDidSetWillSet())) {
+           !fd->isObservingAccessor())) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);

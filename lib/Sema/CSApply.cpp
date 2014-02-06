@@ -251,11 +251,11 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
                                             DeclContext *DC) {
 
-  // "StoredObjC" and "WillSetDidSet" properties have storage, but are usually
+  // "StoredObjC" and "Observing" properties have storage, but are usually
   // accessed through accessors.  However, in init and destructor methods,
   // accesses are done direct.
   if ((member->getStorageKind() == VarDecl::StoredObjC ||
-       member->getStorageKind() == VarDecl::WillSetDidSet) &&
+       member->getStorageKind() == VarDecl::Observing) &&
       (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
       isa<DeclRefExpr>(base) &&
       cast<AbstractFunctionDecl>(DC)->getImplicitSelfDecl() ==
@@ -263,9 +263,9 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
     return true;
   }
 
-  // WillSetDidSet member are accessed directly from within their didSet/willSet
+  // Observing member are accessed directly from within their didSet/willSet
   // specifiers.  This prevents assignments from becoming infinite loops.
-  if (member->getStorageKind() == VarDecl::WillSetDidSet)
+  if (member->getStorageKind() == VarDecl::Observing)
     if (auto *FD = dyn_cast<FuncDecl>(DC))
       if (FD->getAccessorStorageDecl() == member)
         return true;

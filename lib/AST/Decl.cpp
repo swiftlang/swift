@@ -1062,20 +1062,20 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   setStorageKind(StoredObjC);
 }
 
-void AbstractStorageDecl::makeWillSetDidSet(SourceLoc LBraceLoc,
+void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,
                                             FuncDecl *WillSet, FuncDecl *DidSet,
                                             SourceLoc RBraceLoc) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert((WillSet || DidSet) &&
-         "Can't be WillSetDidSet without one or the other");
+         "Can't be Observing without one or the other");
   auto &Context = getASTContext();
-  void *Mem = Context.Allocate(sizeof(WillSetDidSetRecord),
-                               alignof(WillSetDidSetRecord));
-  GetSetInfo = new (Mem) WillSetDidSetRecord;
+  void *Mem = Context.Allocate(sizeof(ObservingRecord),
+                               alignof(ObservingRecord));
+  GetSetInfo = new (Mem) ObservingRecord;
   GetSetInfo->Braces = SourceRange(LBraceLoc, RBraceLoc);
 
-  // Mark that this is a WillSetDidSet property.
-  setStorageKind(WillSetDidSet);
+  // Mark that this is a Observing property.
+  setStorageKind(Observing);
 
   getDidSetInfo().WillSet = WillSet;
   getDidSetInfo().DidSet = DidSet;
@@ -1084,11 +1084,11 @@ void AbstractStorageDecl::makeWillSetDidSet(SourceLoc LBraceLoc,
   if (DidSet) DidSet->makeAccessor(this, AccessorKind::IsDidSet);
 }
 
-/// \brief Specify the synthesized get/set functions for a DidSetWillSet var.
+/// \brief Specify the synthesized get/set functions for a Observing var.
 /// This is used by Sema.
-void AbstractStorageDecl::setDidSetWillSetAccessors(FuncDecl *Get,
+void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
                                                     FuncDecl *Set) {
-  assert(getStorageKind() == WillSetDidSet && "VarDecl is wrong type");
+  assert(getStorageKind() == Observing && "VarDecl is wrong type");
   assert(!getGetter() && !getSetter() && "getter and setter already set");
   assert(Get && Set && "Must specify getter and setter");
 

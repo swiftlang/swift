@@ -1348,8 +1348,8 @@ void Serializer::writeDecl(const Decl *D) {
     case VarDecl::Computed:
       StorageKind = VarDeclStorageKind::Computed;
       break;
-    case VarDecl::WillSetDidSet:
-      StorageKind = VarDeclStorageKind::WillSetDidSet;
+    case VarDecl::Observing:
+      StorageKind = VarDeclStorageKind::Observing;
       WillSet = var->getWillSetFunc();
       DidSet = var->getDidSetFunc();
       break;

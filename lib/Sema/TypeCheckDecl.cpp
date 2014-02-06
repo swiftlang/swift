@@ -1200,8 +1200,8 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// (trivial) getter and the setter, which calls these.
-static void synthesizeWillSetDidSetAccessors(VarDecl *VD) {
-  assert(VD->getStorageKind() == VarDecl::WillSetDidSet);
+static void synthesizeObservingAccessors(VarDecl *VD) {
+  assert(VD->getStorageKind() == VarDecl::Observing);
   assert(!VD->getGetter() && !VD->getSetter() &&
          "willSet/didSet var already has a getter or setter");
   
@@ -1266,7 +1266,7 @@ static void synthesizeWillSetDidSetAccessors(VarDecl *VD) {
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
   
   
-  VD->setDidSetWillSetAccessors(Get, Set);
+  VD->setObservingAccessors(Get, Set);
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -1379,8 +1379,8 @@ public:
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
-    if (VD->getStorageKind() == VarDecl::WillSetDidSet && !VD->getGetter()) {
-      synthesizeWillSetDidSetAccessors(VD);
+    if (VD->getStorageKind() == VarDecl::Observing && !VD->getGetter()) {
+      synthesizeObservingAccessors(VD);
 
       // Type check the body of the getter and setter.
       TC.typeCheckDecl(VD->getGetter(), true);

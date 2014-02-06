@@ -1123,7 +1123,7 @@ namespace {
           // Add getter & setter in source order.
           FuncDecl *Accessors[2];
           
-          if (VD->getStorageKind() == VarDecl::WillSetDidSet) {
+          if (VD->getStorageKind() == VarDecl::Observing) {
             Accessors[0] = VD->getWillSetFunc();
             Accessors[1] = VD->getDidSetFunc();
           } else {
@@ -1497,7 +1497,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   if (WillSet || DidSet) {
     if (Get || Set) {
       diagnose(Get ? Get->getLoc() : Set->getLoc(),
-               diag::willsetdidset_with_getset, bool(DidSet), bool(Set));
+               diag::observingproperty_with_getset, bool(DidSet), bool(Set));
       Get = nullptr;
       Set = nullptr;
     }
@@ -1505,12 +1505,12 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     // We don't support willSet/didSet properties defined outside of a type.
     if (!(Flags & PD_HasContainerType)) {
       diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
-               diag::willsetdidset_requires_type);
+               diag::observingproperty_requires_type);
       Invalid = true;
       return;
     }
     
-    PrimaryVar->makeWillSetDidSet(LBLoc, WillSet, DidSet, RBLoc);
+    PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
     return;
   }
 
@@ -2599,7 +2599,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
         diagnose(SubscriptLoc, diag::subscript_without_get);
       if (WillSet || DidSet)
         diagnose(DidSet ? DidSet->getLoc() : WillSet->getLoc(),
-                 diag::willsetdidset_in_subscript, bool(DidSet));
+                 diag::observingproperty_in_subscript, bool(DidSet));
     }
 
     DefRange = SourceRange(LBLoc, RBLoc);

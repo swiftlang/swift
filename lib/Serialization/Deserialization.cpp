@@ -1527,12 +1527,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                         cast_or_null<FuncDecl>(getDecl(setterID)),
                         SourceLoc());
       break;
-    case VarDeclStorageKind::WillSetDidSet:
-      var->makeWillSetDidSet(SourceLoc(),
+    case VarDeclStorageKind::Observing:
+      var->makeObserving(SourceLoc(),
                              cast_or_null<FuncDecl>(getDecl(willSetID)),
                              cast_or_null<FuncDecl>(getDecl(didSetID)),
                              SourceLoc());
-      var->setDidSetWillSetAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
+      var->setObservingAccessors(cast_or_null<FuncDecl>(getDecl(getterID)),
                                      cast_or_null<FuncDecl>(getDecl(setterID)));
       break;
     }

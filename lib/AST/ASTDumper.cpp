@@ -422,7 +422,7 @@ namespace {
       case VarDecl::StoredObjC:
         OS << "'stored_objc'";
         break;
-      case VarDecl::WillSetDidSet:
+      case VarDecl::Observing:
         OS << "'willset_didset'";
         break;
       }
@@ -438,7 +438,7 @@ namespace {
         OS << "set =";
         printRec(Set);
       }
-      if (VD->getStorageKind() == VarDecl::WillSetDidSet) {
+      if (VD->getStorageKind() == VarDecl::Observing) {
         if (FuncDecl *WillSet = VD->getWillSetFunc()) {
           OS << "\n";
           OS.indent(Indent + 2);

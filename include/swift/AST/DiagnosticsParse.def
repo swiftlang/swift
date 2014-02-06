@@ -174,7 +174,7 @@ ERROR(mutating_invalid,sema_tcd,none,
 // Variable getters/setters
 ERROR(computed_property_no_accessors, decl_parsing, none,
       "computed property must have accessors specified", ())
-ERROR(willsetdidset_requires_type,decl_parsing,none,
+ERROR(observingproperty_requires_type,decl_parsing,none,
       "willSet/didSet properties must be defined in a type right now", ())
 ERROR(expected_getset_in_protocol,decl_parsing,none,
       "expected get or set in a protocol property", ())
@@ -201,10 +201,10 @@ ERROR(expected_colon_accessor,decl_parsing,none,
      (unsigned))
 ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
-ERROR(willsetdidset_with_getset,decl_parsing,none,
+ERROR(observingproperty_with_getset,decl_parsing,none,
       "%select{willSet|didSet}0 variable may not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
-ERROR(willsetdidset_in_subscript,decl_parsing,none,
+ERROR(observingproperty_in_subscript,decl_parsing,none,
       "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,decl_parsing,none,
       "variable with getter/setter cannot have an initial value", ())
