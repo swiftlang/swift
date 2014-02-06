@@ -1167,7 +1167,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
                                     TypeLoc ElementTy,
                                     Pattern *Indices, SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
-                                    AccessorKind Kind, Parser *P) {
+                                    unsigned Kind, Parser *P) {
   // Create the parameter list(s) for the getter.
   SmallVector<Pattern *, 4> Params;
   
@@ -1183,7 +1183,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
   Params.push_back(NamePattern);
 
   TypeLoc ReturnType;
-  if (Kind == AccessorKind::IsGetter) // Getters return something
+  if (Kind == 0) // Getters return something
     ReturnType = ElementTy.clone(P->Context);
   else  // Nothing else does.
     ReturnType = TypeLoc::withoutLoc(TupleType::getEmpty(P->Context));
@@ -1195,7 +1195,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
                              P->CurDeclContext);
 
   // non-static set:/willSet:/didSet: default to @mutating.
-  if (!D->isStatic() && Kind != AccessorKind::IsGetter)
+  if (!D->isStatic() && Kind != 0)
     D->setMutating();
 
   return D;
@@ -1206,10 +1206,10 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
 /// missing.
 static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                                               TypeLoc ElementTy,
-                                              Parser &P, AccessorKind Kind) {
+                                              Parser &P, unsigned Kind) {
   // Only set: and willSet: have a (value) parameter.  get: and didSet: take a
   // () parameter always.
-  if (Kind != AccessorKind::IsGetter && Kind != AccessorKind::IsDidSet)
+  if (Kind != 1 && Kind != 2)
     return TuplePattern::create(P.Context, SourceLoc(),
                                 ArrayRef<TuplePatternElt>(),
                                 SourceLoc(), /*hasVararg=*/false,
@@ -1220,13 +1220,10 @@ static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   Identifier Name;
   ASTContext &Context = P.Context;
 
-  // If the SpecifierLoc is invalid, then the caller just wants us to synthesize
-  // the default, not actually try to parse something.
-  if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
+  if (P.Tok.is(tok::l_paren)) {
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
-      P.diagnose(P.Tok, diag::expected_accessor_name,
-                 Kind != AccessorKind::IsSetter);
+      P.diagnose(P.Tok, diag::expected_accessor_name, Kind != 1);
       P.skipUntil(tok::r_paren, tok::l_brace);
       if (P.Tok.is(tok::r_paren))
         P.consumeToken();
@@ -1237,8 +1234,7 @@ static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
 
       // Look for the closing ')'.
       P.parseMatchingToken(tok::r_paren, EndLoc,
-                           Kind == AccessorKind::IsSetter
-                           ? diag::expected_rparen_set_name
+                           Kind == 1 ? diag::expected_rparen_set_name
                            : diag::expected_rparen_willSet_name, StartLoc);
     }
   }
@@ -1310,26 +1306,23 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
       DeclAttributes Attributes;
       parseDeclAttributeList(Attributes);
 
-      AccessorKind Kind;
-      FuncDecl **TheDeclPtr;
-      if (Tok.isContextualKeyword("get")) {
-        Kind = AccessorKind::IsGetter;
-        TheDeclPtr = &Get;
-      } else if (Tok.isContextualKeyword("set")) {
-        Kind = AccessorKind::IsSetter;
-        TheDeclPtr = &Set;
-      } else {
+      unsigned Kind;
+      if (Tok.isContextualKeyword("get"))
+        Kind = 0;
+      else if (Tok.isContextualKeyword("set"))
+        Kind = 1;
+      else {
         diagnose(Tok, diag::expected_getset_in_protocol);
         return true;
       }
 
-      FuncDecl *&TheDecl = *TheDeclPtr;
+      FuncDecl *&TheDecl = Kind ? Set : Get;
       SourceLoc Loc = consumeToken();
 
       // Have we already parsed this kind of clause?
       if (TheDecl) {
-        diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
-        diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
+        diagnose(Loc, diag::duplicate_property_accessor, Kind);
+        diagnose(TheDecl->getLoc(), diag::previous_accessor, Kind);
         TheDecl = nullptr;  // Forget the previous decl.
       }
 
@@ -1372,35 +1365,30 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     parseDeclAttributeList(Attributes);
 
     bool isImplicitGet = false;
-    AccessorKind Kind;
-    FuncDecl **TheDeclPtr;
-    if (Tok.isContextualKeyword("get")) {
-      Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &Get;
-    } else if (Tok.isContextualKeyword("set")) {
-      Kind = AccessorKind::IsSetter;
-      TheDeclPtr = &Set;
-    } else if (Tok.isContextualKeyword("willSet")) {
-      Kind = AccessorKind::IsWillSet;
-      TheDeclPtr = &WillSet;
-    } else if (Tok.isContextualKeyword("didSet")) {
-      Kind = AccessorKind::IsDidSet;
-      TheDeclPtr = &DidSet;
-    } else {
-      Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &Get;
+    unsigned Kind;
+    if (Tok.isContextualKeyword("get"))
+      Kind = 0;
+    else if (Tok.isContextualKeyword("set"))
+      Kind = 1;
+    else if (Tok.isContextualKeyword("willSet"))
+      Kind = 2;
+    else if (Tok.isContextualKeyword("didSet"))
+      Kind = 3;
+    else {
+      Kind = 0;
       isImplicitGet = true;
     }
 
     // Consume the contextual keyword, if present.
     SourceLoc Loc = isImplicitGet ? Tok.getLoc() : consumeToken();
 
-    FuncDecl *&TheDecl = *TheDeclPtr;
+    FuncDecl *&TheDecl =
+      Kind == 0 ? Get : Kind == 1 ? Set : Kind == 2 ? WillSet : DidSet;
 
     // Have we already parsed this kind of clause?
     if (TheDecl) {
-      diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
-      diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
+      diagnose(Loc, diag::duplicate_property_accessor, Kind);
+      diagnose(TheDecl->getLoc(), diag::previous_accessor, Kind);
       TheDecl = nullptr;  // Forget the previous decl.
     }
 
@@ -1412,7 +1400,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
     SourceLoc ColonLoc = Tok.getLoc();
     if (!isImplicitGet && !consumeIf(tok::colon)) {
-      diagnose(Tok, diag::expected_colon_accessor, (unsigned)Kind);
+      diagnose(Tok, diag::expected_colon_accessor, Kind);
       return true;
     }
 
@@ -1505,7 +1493,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                          LBLoc))
     RBLoc = LastValidLoc;
 
-  // If this is a willSet/didSet observing property, record this and we're done.
+  // If this is a willSet/didSet property, record this and we're done.
   if (WillSet || DidSet) {
     if (Get || Set) {
       diagnose(Get ? Get->getLoc() : Set->getLoc(),
@@ -1521,7 +1509,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       Invalid = true;
       return;
     }
-
+    
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
     return;
   }
@@ -2630,10 +2618,10 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     if (!Get) {
       auto ArgPattern =
         parseOptionalAccessorArgument(SubscriptLoc, ElementTy.get(), *this,
-                                      AccessorKind::IsGetter);
+                                      0/*getter*/);
       Get = createAccessorFunc(SubscriptLoc, ArgPattern, ElementTy.get(),
                                Indices.get(), /*StaticLoc*/ SourceLoc(),
-                               Flags, AccessorKind::IsGetter, this);
+                               Flags, 0/*getter*/, this);
      
       if (!isInSILMode()) {
         Get->setInvalid();
