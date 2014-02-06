@@ -107,6 +107,9 @@ private:
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->isObjC())
         continue;
+      if (auto FD = dyn_cast<FuncDecl>(VD))
+        if (FD->isAccessor())
+          continue;
       if (VD->getAttrs().isOptional() != protocolMembersOptional) {
         protocolMembersOptional = VD->getAttrs().isOptional();
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
