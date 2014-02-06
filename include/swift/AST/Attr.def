@@ -28,7 +28,6 @@
 
 // Type attributes
 TYPE_ATTR(auto_closure)
-TYPE_ATTR(inout)
 TYPE_ATTR(cc)
 TYPE_ATTR(noreturn)
 TYPE_ATTR(objc_block)
@@ -43,6 +42,7 @@ TYPE_ATTR(sil_unowned)
 TYPE_ATTR(sil_weak)
 TYPE_ATTR(out)
 TYPE_ATTR(in)
+TYPE_ATTR(inout)
 TYPE_ATTR(owned)
 TYPE_ATTR(guaranteed)
 TYPE_ATTR(autoreleased)

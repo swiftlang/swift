@@ -330,6 +330,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   }
   
   // Ok, it is a valid attribute, eat it, and then process it.
+  StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
   
   // Diagnose duplicated attributes.
@@ -343,8 +344,15 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   default: break;
   case TAK_local_storage:
   case TAK_sil_self:
+  case TAK_out:
+  case TAK_in:
+  case TAK_owned:
+  case TAK_guaranteed:
+  case TAK_autoreleased:
+  case TAK_callee_owned:
+  case TAK_callee_guaranteed:
     if (!isInSILMode()) {   // SIL's 'local_storage' type attribute.
-      diagnose(Loc, diag::only_allowed_in_sil, "local_storage");
+      diagnose(Loc, diag::only_allowed_in_sil, Text);
       Attributes.clearAttribute(attr);
     }
     break;
@@ -368,27 +376,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   // 'inout' attribute.
   case TAK_inout:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, "inout");
+      diagnose(Loc, diag::inout_not_attribute);
       return false;
     }
-
-    // Verify that we're not combining this attribute incorrectly.  Cannot be
-    // both inout and auto_closure.
-    if (Attributes.has(TAK_auto_closure)) {
-      diagnose(Loc, diag::cannot_combine_attribute, "auto_closure");
-      Attributes.clearAttribute(TAK_inout);
-    }
     break;
-
-  case TAK_auto_closure:
-    if (Attributes.has(TAK_inout)) {
-      // Verify that we're not combining this attribute incorrectly.  Cannot be
-      // both inout and auto_closure.
-      diagnose(Loc, diag::cannot_combine_attribute, "inout");
-      Attributes.clearAttribute(TAK_auto_closure);
-    }
-    break;
-      
       
     // 'cc' attribute.
   case TAK_cc: {

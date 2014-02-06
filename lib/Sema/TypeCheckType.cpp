@@ -1039,17 +1039,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_sil_self);
   }
 
-  if (attrs.has(TAK_inout)) {
-    // inout is only allowed on function inputs.
-    if (options & TR_FunctionInput) {
-      ty = InOutType::get(ty);
-    } else {
-      TC.diagnose(attrs.getLoc(TAK_inout), diag::inout_attribute_non_parameter);
-    }
-
-    attrs.clearAttribute(TAK_inout);
-  }
-
   // In SIL files *only*, permit @weak and @unowned to apply directly to types.
   if (attrs.hasOwnership() && ty->hasReferenceSemantics()) {
     if (auto SF = DC->getParentSourceFile()) {

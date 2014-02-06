@@ -194,7 +194,6 @@ void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
 
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   const TypeAttributes &Attrs = getAttrs();
-  if (Attrs.has(TAK_inout))        Printer << "@inout ";
   if (Attrs.has(TAK_auto_closure)) Printer << "@auto_closure ";
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_noreturn))     Printer << "@noreturn ";

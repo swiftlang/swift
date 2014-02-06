@@ -336,6 +336,8 @@ ERROR(invalid_infix_operator_precedence,decl_parsing,none,
       "'precedence' must be in the range of 0 to 255", ())
 
 // SIL
+ERROR(inout_not_attribute, decl_parsing, none,
+      "@inout is no longer an attribute", ())
 ERROR(only_allowed_in_sil, decl_parsing,none,
       "'%0' only allowed in SIL modules", (StringRef))
 ERROR(expected_sil_type, decl_parsing,none,
