@@ -507,18 +507,18 @@ public:
     if (state.first == EmissionState::Defined)
       return true;
 
-    size_t pendingSize = declsToWrite.size();
+    bool allRequirementsSatisfied = true;
 
     const ClassDecl *superclass = nullptr;
     if (Type superTy = CD->getSuperclass()) {
       superclass = superTy->getClassOrBoundGenericClass();
-      require(superclass);
+      allRequirementsSatisfied &= require(superclass);
     }
     for (auto proto : CD->getProtocols())
       if (proto->isObjC())
-        require(proto);
+        allRequirementsSatisfied &= require(proto);
 
-    if (declsToWrite.size() != pendingSize)
+    if (!allRequirementsSatisfied)
       return false;
 
     printer.print(CD);
@@ -538,14 +538,14 @@ public:
     if (state.first == EmissionState::Defined)
       return true;
 
-    size_t pendingSize = declsToWrite.size();
+    bool allRequirementsSatisfied = true;
 
     for (auto proto : PD->getProtocols()) {
       assert(proto->isObjC());
-      require(proto);
+      allRequirementsSatisfied &= require(proto);
     }
 
-    if (declsToWrite.size() != pendingSize)
+    if (!allRequirementsSatisfied)
       return false;
 
     printer.print(PD);
@@ -554,15 +554,15 @@ public:
   }
 
   bool writeExtension(const ExtensionDecl *ED) {
-    size_t pendingSize = declsToWrite.size();
+    bool allRequirementsSatisfied = true;
 
     const ClassDecl *CD = ED->getExtendedType()->getClassOrBoundGenericClass();
-    require(CD);
+    allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getProtocols())
       if (proto->isObjC())
-        require(proto);
+        allRequirementsSatisfied &= require(proto);
 
-    if (declsToWrite.size() != pendingSize)
+    if (!allRequirementsSatisfied)
       return false;
 
     printer.print(ED);
