@@ -147,22 +147,22 @@ private:
     os << "@end\n";
   }
 
-  void visitFuncDecl(FuncDecl *FD) {
-    assert(FD->getDeclContext()->isTypeContext() &&
-           "cannot handle free functions right now");
-    if (FD->isStatic())
+  void printAbstractFunction(AbstractFunctionDecl *AFD, StringRef name,
+                             bool isClassMethod) {
+    if (isClassMethod)
       os << "+ (";
     else
       os << "- (";
 
-    Type rawMethodTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
+    Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
     print(methodTy->getResult());
-    os << ")" << FD->getName();
 
-    auto bodyPatterns = FD->getBodyParamPatterns();
+    os << ")" << name;
+
+    auto bodyPatterns = AFD->getBodyParamPatterns();
     assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
-    auto argPatterns = FD->getArgParamPatterns();
+    auto argPatterns = AFD->getArgParamPatterns();
     assert(argPatterns.size() == 2 && "not an ObjC-compatible method");
 
     if (isa<ParenPattern>(argPatterns.back())) {
@@ -206,6 +206,31 @@ private:
     }
 
     os << ";\n";
+  }
+
+  void visitFuncDecl(FuncDecl *FD) {
+    assert(FD->getDeclContext()->isTypeContext() &&
+           "cannot handle free functions right now");
+    printAbstractFunction(FD, FD->getName().str(), FD->isStatic());
+  }
+
+  void visitConstructorDecl(ConstructorDecl *CD) {
+    llvm::SmallString<64> nameBuf("init");
+
+    if (auto paramTuple = dyn_cast<TuplePattern>(CD->getArgParamPatterns()[1])){
+      // FIXME: Somewhat copied from ConstructorDecl::getObjCSelector.
+      if (paramTuple->getNumFields() > 0) {
+        auto firstPattern = paramTuple->getFields().front().getPattern();
+        firstPattern = firstPattern->getSemanticsProvidingPattern();
+        if (auto firstNamed = dyn_cast<NamedPattern>(firstPattern)) {
+          StringRef nameStr = firstNamed->getBoundName().str();
+          nameBuf += (char)toupper(nameStr.front());
+          nameBuf += nameStr.substr(1);
+        }
+      }
+    }
+    
+    printAbstractFunction(CD, nameBuf, false);
   }
 
   /// Visit part of a type, such as the base of a pointer type.
