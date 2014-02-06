@@ -303,9 +303,6 @@ namespace {
       ED->getExtendedType().print(OS);
       printInherited(ED->getInherited());
       for (Decl *Member : ED->getMembers()) {
-        if (Member->isImplicit())
-          continue;
-
         OS << '\n';
         printRec(Member);
       }
@@ -349,9 +346,6 @@ namespace {
       printCommon(PD, "protocol");
       printInherited(PD->getInherited());
       for (auto VD : PD->getMembers()) {
-        if (VD->isImplicit())
-          continue;
-
         OS << '\n';
         printRec(VD);
       }
@@ -459,9 +453,6 @@ namespace {
       printCommon(UD, "enum_decl");
       printInherited(UD->getInherited());
       for (Decl *D : UD->getMembers()) {
-        if (D->isImplicit())
-          continue;
-
         OS << '\n';
         printRec(D);
       }
@@ -477,9 +468,6 @@ namespace {
       printCommon(SD, "struct_decl");
       printInherited(SD->getInherited());
       for (Decl *D : SD->getMembers()) {
-        if (D->isImplicit())
-          continue;
-
         OS << '\n';
         printRec(D);
       }
@@ -490,9 +478,6 @@ namespace {
       printCommon(CD, "class_decl");
       printInherited(CD->getInherited());
       for (Decl *D : CD->getMembers()) {
-        if (D->isImplicit())
-          continue;
-
         OS << '\n';
         printRec(D);
       }
