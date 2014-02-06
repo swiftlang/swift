@@ -132,14 +132,14 @@ public:
     if (T->getAs<InOutType>()) {}
   }
 
-  void addCallParameter(Identifier Name, Type ty) {
+  void addCallParameter(Identifier Name, Type Ty) {
     CurrentNestingLevel++;
-    
+
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
     // inout arguments are printed specially.
-    if (auto *IOT = ty->getAs<InOutType>()) {
+    if (auto *IOT = Ty->getAs<InOutType>()) {
       addTextChunk("inout ");
-      ty = IOT->getObjectType();
+      Ty = IOT->getObjectType();
     }
 
     if (!Name.empty()) {
@@ -160,7 +160,7 @@ public:
         getLastChunk().setIsAnnotation();
     }
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
-                     ty->getString());
+                     Ty->getString());
     CurrentNestingLevel--;
   }
 
