@@ -337,8 +337,6 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //===----------------------------------------------------------------------===//
 
 class AllocRefElimination : public SILFunctionTransform {
-  virtual ~AllocRefElimination() {}
-
   /// The entry point to the transformation.
   void run() {
     llvm::DenseMap<SILType, bool> DestructorAnalysisCache;

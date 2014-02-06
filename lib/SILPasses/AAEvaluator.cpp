@@ -52,8 +52,7 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
 namespace {
 
 class SILAAEvaluator : public SILFunctionTransform {
-  virtual ~SILAAEvaluator() {}
-
+  
   void run() {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "*** " << Fn.getName() << " ***\n";

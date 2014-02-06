@@ -518,8 +518,6 @@ static void processFunction(SILFunction &F) {
 }
 
 class ARCOpts : public SILFunctionTransform {
-  virtual ~ARCOpts() {}
-
   /// The entry point to the transformation.
   void run() {
     processFunction(*getFunction());

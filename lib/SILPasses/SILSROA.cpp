@@ -292,7 +292,6 @@ static void runSROAOnFunction(SILFunction &Fn) {
 }
 
 class SILSROA : public SILFunctionTransform {
-  virtual ~SILSROA() {}
 
   /// The entry point to the transformation.
   void run() {

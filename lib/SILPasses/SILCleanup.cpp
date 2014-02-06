@@ -53,7 +53,6 @@ void swift::performSILCleanup(SILModule *M) {
 }
 
 class SILCleanup : public swift::SILFunctionTransform {
-  virtual ~SILCleanup() {}
 
   /// The entry point to the transformation.
   void run() {

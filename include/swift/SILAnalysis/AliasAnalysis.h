@@ -47,8 +47,6 @@ private:
 public:
   AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias) {}
 
-  virtual ~AliasAnalysis() {}
-
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;
   }

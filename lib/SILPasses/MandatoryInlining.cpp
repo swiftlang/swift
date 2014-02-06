@@ -456,7 +456,6 @@ static void performSILMandatoryInlining(SILModule *M) {
 }
 
 class MandatoryInlining : public SILModuleTransform {
-  virtual ~MandatoryInlining() {}
 
   /// The entry point to the transformation.
   void run() {

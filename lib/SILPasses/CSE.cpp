@@ -384,8 +384,6 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 }
 
 class SILCSE : public SILFunctionTransform {
-  virtual ~SILCSE() {}
-
   void run() {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
           << " *****\n");

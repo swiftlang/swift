@@ -32,8 +32,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-
-
 using namespace swift;
 
 bool swift::runSILDiagnosticPasses(SILModule &Module,

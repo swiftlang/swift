@@ -39,7 +39,7 @@ namespace swift {
     SILTransform(SILTransform::TransformKind K) : Kind(K), PM(0) {}
 
     /// D'tor.
-    virtual ~SILTransform() {}
+    virtual ~SILTransform() = default;
 
     /// Returns the kind of derived class.
     TransformKind getKind() const { return Kind; }
@@ -61,9 +61,6 @@ namespace swift {
   public:
     /// C'tor.
     SILFunctionTransform() : SILTransform(TransformKind::Function), F(0) {}
-
-    /// D'tor.
-    virtual ~SILFunctionTransform() {}
 
     /// The entry point to the transformation.
     virtual void run() = 0;
@@ -89,9 +86,6 @@ namespace swift {
   public:
     /// C'tor.
     SILModuleTransform() : SILTransform(TransformKind::Module), M(0) {}
-
-    /// D'tor.
-    virtual ~SILModuleTransform() {}
 
     /// The entry point to the transformation.
     virtual void run() = 0;

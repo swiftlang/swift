@@ -1557,7 +1557,6 @@ static void lowerRawSILOperations(SILFunction &Fn) {
 /// analysis and promote alloc_box uses into SSA registers for later SSA-based
 /// dataflow passes.
 class DefiniteInitialization : public SILFunctionTransform {
-  virtual ~DefiniteInitialization() {}
 
   /// The entry point to the transformation.
   void run() {

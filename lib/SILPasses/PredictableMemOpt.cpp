@@ -959,7 +959,6 @@ static void optimizeMemoryAllocations(SILFunction &Fn) {
 }
 
 class PredictableMemoryOptimizations : public SILFunctionTransform {
-  virtual ~PredictableMemoryOptimizations() {}
 
   /// The entry point to the transformation.
   void run() {

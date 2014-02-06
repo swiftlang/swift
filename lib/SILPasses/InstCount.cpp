@@ -68,7 +68,6 @@ public:
 //===----------------------------------------------------------------------===//
 
 class SILInstCount : public SILFunctionTransform {
-  virtual ~SILInstCount() {}
 
   InstCountVisitor V;
 

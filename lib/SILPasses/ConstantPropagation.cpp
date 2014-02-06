@@ -809,8 +809,6 @@ static bool CCPFunctionBody(SILFunction &F) {
 }
 
 class ConstantPropagation : public SILFunctionTransform {
-  virtual ~ConstantPropagation() {}
-
   /// The entry point to the transformation.
   void run() {
     CCPFunctionBody(*getFunction());

@@ -789,8 +789,6 @@ processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
 }
 
 class CapturePromotionPass : public SILModuleTransform {
-  virtual ~CapturePromotionPass() {}
-
   /// The entry point to the transformation.
   virtual void run() {
     SmallVector<SILFunction*, 128> Worklist;

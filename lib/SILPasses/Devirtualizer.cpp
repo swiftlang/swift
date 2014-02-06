@@ -474,7 +474,6 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
 }
 
 class SILDevirtualizationPass : public SILFunctionTransform {
-  virtual ~SILDevirtualizationPass() {}
 
   /// The entry point to the transformation.
   void run() {

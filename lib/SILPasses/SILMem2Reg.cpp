@@ -727,7 +727,6 @@ bool MemoryToRegisters::run() {
 }
 
 class SILMem2Reg : public SILFunctionTransform {
-  virtual ~SILMem2Reg() {}
 
   void run() {
     SILFunction *F = getFunction();

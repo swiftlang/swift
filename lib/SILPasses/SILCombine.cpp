@@ -743,7 +743,6 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
 }
 
 class SILCombine : public SILFunctionTransform {
-  virtual ~SILCombine() {}
 
   /// The entry point to the transformation.
   void run() {

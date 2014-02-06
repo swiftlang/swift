@@ -253,7 +253,6 @@ static bool processFunction(SILFunction &Fn) {
 }
 
 class SILLowerAggregate : public SILFunctionTransform {
-  virtual ~SILLowerAggregate() {}
 
   /// The entry point to the transformation.
   void run() {

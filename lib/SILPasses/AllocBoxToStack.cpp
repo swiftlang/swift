@@ -332,8 +332,6 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
 }
 
 class AllocBoxToStack : public SILFunctionTransform {
-  virtual ~AllocBoxToStack() {}
-
   /// The entry point to the transformation.
   void run() {
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
