@@ -29,7 +29,9 @@ CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(MODULES_SDK)\""
 # necessary to write out a .bc file. jit and linker are used for
 # JIT execution.
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader bitwriter irreader ipo jit linker mcjit asmparser option
-USEDLIBS = swiftDriver.a swiftFrontend.a swiftIRGen.a swiftParse.a swiftClangImporter.a swiftSema.a swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPassesUtils.a swiftSILPasses.a swiftAST.a swiftBasic.a swiftIDE.a swiftImmediate.a swiftOptimizeARC.a
+USEDLIBS = swiftDriver.a swiftFrontend.a swiftIRGen.a swiftParse.a swiftClangImporter.a swiftSema.a \
+	swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPassesUtils.a swiftSILPasses.a swiftAST.a \
+	swiftBasic.a swiftIDE.a swiftImmediate.a swiftOptimizeARC.a swiftSILAnalysis.a
 LLVMLibsOptions :=     \
   -lclangCodeGen       \
   -lclangDriver        \

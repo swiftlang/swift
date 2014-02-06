@@ -23,7 +23,7 @@ LINK_COMPONENTS := option bitreader
 USEDLIBS = swiftDriver.a swiftFrontend.a swiftParse.a swiftSema.a	\
            swiftSerialization.a swiftSIL.a swiftSILGen.a					\
            swiftSILPassesUtils.a swiftSILPasses.a swiftAST.a			\
-           swiftBasic.a swiftNullClangImporter.a
+           swiftBasic.a swiftNullClangImporter.a swiftSILAnalysis.a
 
 LLVMLibsOptions :=     \
   -lclangAST	       \

@@ -19,7 +19,8 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader mcjit option
 USEDLIBS = swiftDriver.a swiftFrontend.a swiftParse.a \
 	swiftClangImporter.a swiftASTSectionImporter.a \
-	swiftSIL.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a
+	swiftSIL.a swiftSema.a swiftSerialization.a swiftAST.a swiftBasic.a \
+	swiftSILAnalysis.a
 
 LLVMLibsOptions :=     \
   -lclangDriver        \
