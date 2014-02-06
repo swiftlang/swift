@@ -45,8 +45,11 @@ static void writeImports(raw_ostream &os, Module *M) {
 }
 
 namespace {
-class ObjCPrinter : public DeclVisitor<ObjCPrinter>,
-                    public TypeVisitor<ObjCPrinter> {
+class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
+                    private TypeVisitor<ObjCPrinter> {
+  friend ASTVisitor;
+  friend TypeVisitor;
+
   llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
   Identifier unsafePointerID;
 
@@ -443,6 +446,82 @@ private:
   }
 };
 
+class ReferencedTypeFinder : private TypeVisitor<ReferencedTypeFinder> {
+  friend TypeVisitor;
+
+  std::function<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
+
+  ReferencedTypeFinder(decltype(Callback) &&callback) : Callback(callback) {}
+
+  void visitType(TypeBase *base) {
+    return;
+  }
+
+  void visitNameAliasType(NameAliasType *aliasTy) {
+    Callback(*this, aliasTy->getDecl());
+  }
+
+  void visitParenType(ParenType *parenTy) {
+    visit(parenTy->getSinglyDesugaredType());
+  }
+
+  void visitTupleType(TupleType *tupleTy) {
+    for (auto elemTy : tupleTy->getElementTypes())
+      visit(elemTy);
+  }
+
+  void visitNominalType(NominalType *nominal) {
+    Callback(*this, nominal->getDecl());
+  }
+
+  void visitMetatypeType(MetatypeType *metatype) {
+    visit(metatype->getInstanceType());
+  }
+
+  void visitSubstitutedType(SubstitutedType *sub) {
+    visit(sub->getSinglyDesugaredType());
+  }
+
+  void visitAnyFunctionType(AnyFunctionType *fnTy) {
+    visit(fnTy->getInput());
+    visit(fnTy->getResult());
+  }
+
+  void visitSyntaxSugarType(SyntaxSugarType *sugar) {
+    visit(sugar->getSinglyDesugaredType());
+  }
+
+  void visitProtocolCompositionType(ProtocolCompositionType *composition) {
+    for (auto proto : composition->getProtocols())
+      visit(proto);
+  }
+
+  void visitLValueType(LValueType *lvalue) {
+    visit(lvalue->getObjectType());
+  }
+
+  void visitInOutType(InOutType *inout) {
+    visit(inout->getObjectType());
+  }
+
+  void visitBoundGenericType(BoundGenericType *boundGeneric) {
+    for (auto argTy : boundGeneric->getGenericArgs())
+      visit(argTy);
+    // Ignore the base type; that can't be exposed to Objective-C. Every
+    // bound generic type we care about gets mapped to a particular construct
+    // in Objective-C we care about. (For example, Optional<NSFoo> is mapped to
+    // NSFoo *.)
+  }
+
+public:
+  using TypeVisitor::visit;
+
+  template<typename Fn>
+  static void walk(Type ty, const Fn &callback) {
+    ReferencedTypeFinder(std::cref(callback)).visit(ty);
+  }
+};
+
 class ModuleWriter {
   enum class EmissionState {
     DefinitionRequested = 0,
@@ -479,24 +558,46 @@ public:
     }
   }
 
-  void forwardDeclare(const ClassDecl *CD) {
-    if (!isLocal(CD))
+  void forwardDeclare(const NominalTypeDecl *NTD, StringRef introducer) {
+    if (!isLocal(NTD))
       return;
-    auto &state = seenTypes[CD];
+    auto &state = seenTypes[NTD];
     if (state.second)
       return;
-    os << "@class " << CD->getName() << ";\n";
+    os << introducer << ' ' << NTD->getName() << ";\n";
     state.second = true;
   }
 
+  void forwardDeclare(const ClassDecl *CD) {
+    forwardDeclare(CD, "@class");
+  }
+
   void forwardDeclare(const ProtocolDecl *PD) {
-    if (!isLocal(PD))
-      return;
-    auto &state = seenTypes[PD];
-    if (state.second)
-      return;
-    os << "@protocol " << PD->getName() << ";\n";
-    state.second = true;
+    forwardDeclare(PD, "@protocol");
+  }
+
+  void forwardDeclareMemberTypes(ArrayRef<Decl *> members) {
+    for (auto member : members) {
+      auto VD = dyn_cast<ValueDecl>(member);
+      if (!VD || !VD->isObjC())
+        continue;
+      ReferencedTypeFinder::walk(VD->getType(),
+                                 [this](ReferencedTypeFinder &finder,
+                                        const TypeDecl *TD) {
+        if (!isLocal(TD))
+          return;
+        if (auto CD = dyn_cast<ClassDecl>(TD))
+          forwardDeclare(CD);
+        else if (auto PD = dyn_cast<ProtocolDecl>(TD))
+          forwardDeclare(PD);
+        else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))
+          finder.visit(TAD->getUnderlyingType());
+        else if (isa<AbstractTypeParamDecl>(TD))
+          llvm_unreachable("should not see type params here");
+        else
+          assert(false && "unknown local type decl");
+      });
+    }
   }
 
   bool writeClass(const ClassDecl *CD) {
@@ -521,8 +622,9 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    printer.print(CD);
     state = { EmissionState::Defined, true };
+    forwardDeclareMemberTypes(CD->getMembers());
+    printer.print(CD);
     return true;
   }
 
@@ -548,8 +650,9 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    printer.print(PD);
     state = { EmissionState::Defined, true };
+    forwardDeclareMemberTypes(PD->getMembers());
+    printer.print(PD);
     return true;
   }
 
@@ -565,6 +668,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
+    forwardDeclareMemberTypes(ED->getMembers());
     printer.print(ED);
     return true;
   }
