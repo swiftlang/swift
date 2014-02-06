@@ -2250,67 +2250,6 @@ public:
     return false;
   }
 
-  /// Create a trivial type representation for 'self'.
-  TypeRepr *createTrivialSelfTypeRepr(Type type, SourceLoc loc) {
-    // Metatype.
-    if (auto metatype = type->getAs<MetatypeType>()) {
-      auto baseRepr = createTrivialSelfTypeRepr(metatype->getInstanceType(),
-                                                loc);
-      return new (TC.Context) MetatypeTypeRepr(baseRepr, loc);
-    }
-
-    // @inout
-    if (auto inout = type->getAs<InOutType>()) {
-      auto baseRepr = createTrivialSelfTypeRepr(inout->getObjectType(), loc);
-      // FIXME: Decls imported from clang have no sourceloc, which causes
-      // setAttr() to explode, since it needs valid source locs.
-      if (loc.isInvalid()) return baseRepr;
-
-      TypeAttributes typeAttrs;
-      typeAttrs.setAttr(TAK_inout, loc);
-      return new (TC.Context) AttributedTypeRepr(typeAttrs, baseRepr);
-    }
-
-    // Generic parameter type.
-    if (auto genericParam = type->getAs<GenericTypeParamType>()) {
-      auto name = genericParam->getName();
-      assert(!name.empty() && "Empty generic parameter name in 'self'");
-      auto result = new (TC.Context) SimpleIdentTypeRepr(loc, name);
-      result->setValue(type);
-      return result;
-    }
-
-    // Archetype
-    if (auto archetype = type->getAs<ArchetypeType>()) {
-      auto name = archetype->getName();
-      assert(!name.empty() && "Empty archetype name in 'self'");
-      auto result = new (TC.Context) SimpleIdentTypeRepr(loc, name);
-      result->setValue(type);
-      return result;
-    }
-    
-    // DynamicSelf
-    if (type->is<DynamicSelfType>()) {
-      auto result 
-        = new (TC.Context) SimpleIdentTypeRepr(loc, TC.Context.Id_DynamicSelf);
-      result->setValue(type);
-      return result;
-    }
-    
-    // Error
-    if (type->is<ErrorType>()) {
-      auto result
-        = new (TC.Context) ErrorTypeRepr(loc);
-      return result;
-    }
-
-    auto nominal = type->getAnyNominal();
-    assert(nominal && "'self' is not a nominal type");
-    auto result = new (TC.Context) SimpleIdentTypeRepr(loc, nominal->getName());
-    result->setValue(type);
-    return result;
-  }
-
   /// Configure the implicit 'self' parameter of a function, setting its type,
   /// pattern, etc.
   ///
@@ -2334,16 +2273,12 @@ public:
     selfDecl->setType(selfTy);
     
     auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
-    if (!argPattern->getTypeLoc().getTypeRepr()) {
-      argPattern->getTypeLoc()
-        = TypeLoc(createTrivialSelfTypeRepr(selfTy, func->getLoc()));
-    }
+    if (!argPattern->getTypeLoc().getTypeRepr())
+      argPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
 
     auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
-    if (!bodyPattern->getTypeLoc().getTypeRepr()) {
-      bodyPattern->getTypeLoc()
-        = TypeLoc(createTrivialSelfTypeRepr(selfTy, func->getLoc()));
-    }
+    if (!bodyPattern->getTypeLoc().getTypeRepr())
+      bodyPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
 
     return selfTy;
   }
