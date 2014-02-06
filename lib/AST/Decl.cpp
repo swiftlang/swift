@@ -1316,14 +1316,14 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   } else if (isa<ConstructorDecl>(theMethod)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
-      // @inout self.
+      // inout self.
       isMutating = true;
     } else {
       // allocating constructors have metatype 'self'.
       isStatic = true;
     }
   } else if (isa<DestructorDecl>(theMethod)) {
-    // destructors of value types always have an implicitly @inout self.
+    // destructors of value types always have an implicitly inout self.
     isMutating = true;
   }
 
@@ -1362,12 +1362,12 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   if (containerTy->hasReferenceSemantics())
     return selfTy;
   
-  // Mutating methods are always passed @inout so we can receive the side
+  // Mutating methods are always passed inout so we can receive the side
   // effect.
   //
   // With non-mutating methods on value types, we generally pass the value
   // directly in at +1.  The exception is for protocol methods, which we pass
-  // @inout at +0. We handle the abstraction difference in the witness thunk for
+  // inout at +0. We handle the abstraction difference in the witness thunk for
   // the received method, where we know the concrete receiver type.  We do this
   // by having existential_member_ref and archetype_member_ref take the 'self'
   // base object as an rvalue for @!mutating protocol members, even though that

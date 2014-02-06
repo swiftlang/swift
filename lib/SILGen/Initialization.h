@@ -47,7 +47,7 @@ public:
     /// This Initialization is for a _ binding or other ignored value; the
     /// corresponding result can be discarded.
     Ignored,
-    /// This Initialization is for an @inout or address-only argument binding,
+    /// This Initialization is for an inout or address-only argument binding,
     /// which is initialized using bindAddress().
     AddressBinding,
     /// This Initialization is to bind a 'let' declaration into VarLocs

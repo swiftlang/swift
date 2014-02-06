@@ -542,7 +542,7 @@ enum class TypeMatchKind : char {
   Conversion,
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches, both forms of subtyping, and inserting
-  /// address-of to convert implicit lvalues to @inout arguments.  This is
+  /// address-of to convert implicit lvalues to inout arguments.  This is
   /// used by assignment operators.
   OperatorConversion
 };

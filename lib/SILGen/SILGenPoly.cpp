@@ -92,8 +92,8 @@
 // There is one major exception to what sub-expressions in a type
 // expression can be abstracted with type variables: a type substitution
 // must always be materializable.  For example:
-//   func f(@inout Int, Int) -> Bool
-// 'f' cannot be passed to 'foo' above: T=@inout Int is not a legal
+//   func f(inout Int, Int) -> Bool
+// 'f' cannot be passed to 'foo' above: T=inout Int is not a legal
 // substitution.  Nor can it be passed to 'fred'.
 //
 // In general, abstraction patterns are derived from some explicit
@@ -115,9 +115,9 @@
 // taking one indirect parameter and returning one indirect result.
 //
 // But under the substitution
-//   T=(@inout Int,Int)->Bool
-// values of T are abstracted as if they were of type (@inout U,V)->W,
-// i.e. taking one parameter @inout, another indirectly, and returning
+//   T=(inout Int,Int)->Bool
+// values of T are abstracted as if they were of type (inout U,V)->W,
+// i.e. taking one parameter inout, another indirectly, and returning
 // one indirect result.
 //
 // We generally pass around an original, unsubstituted type as the
@@ -599,9 +599,9 @@ namespace {
 
       // Otherwise, we're using one of the indirect conventions.
 
-      // If it's @inout, we need writeback.
+      // If it's inout, we need writeback.
       if (outputType.isIndirectInOut()) {
-        llvm::errs() << "@inout writeback in abstraction difference thunk "
+        llvm::errs() << "inout writeback in abstraction difference thunk "
                         "not yet implemented\n";
         llvm::errs() << "input value "; input.getValue().dump();
         llvm::errs() << "output type " << outputType.getSILType() << "\n";
@@ -1312,7 +1312,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   if (isFree)
     origParams.pop_back();
   
-  // If there is an @inout difference in self, load the @inout self parameter.
+  // If there is an inout difference in self, load the inout self parameter.
   if (inOutSelf) {
     ManagedValue &selfParam = origParams.back();
     SILValue selfAddr = selfParam.getUnmanagedValue();

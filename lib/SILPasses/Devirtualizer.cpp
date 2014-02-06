@@ -102,7 +102,7 @@ static SILValue functionSingleReturn(SILFunction *F) {
   return RI->getOperand();
 }
 
-// Strip the @InOut qualifier.
+// Strip the InOut qualifier.
 CanType stripInOutQualifier(SILType Ty) {
   CanType ConcreteTy = Ty.getSwiftType();
   if (InOutType *IOT = dyn_cast<InOutType>(ConcreteTy))
@@ -452,7 +452,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   if (!Init)
     return;
 
-  // Strip the @InOut qualifier.
+  // Strip the InOut qualifier.
   CanType ConcreteTy = stripInOutQualifier(Init->getConcreteType());
 
   // For each protocol that our type conforms to:

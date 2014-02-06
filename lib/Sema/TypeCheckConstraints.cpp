@@ -1236,10 +1236,10 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr) {
-  // Can't load from an @inout value.
+  // Can't load from an inout value.
   if (auto *iot = expr->getType()->getAs<InOutType>()) {
     // Emit a fixit if we can find the & expression that turned this into an
-    // @inout.
+    // inout.
     if (auto addrOf =
         dyn_cast<AddressOfExpr>(expr->getSemanticsProvidingExpr())) {
       diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,

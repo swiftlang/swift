@@ -504,7 +504,7 @@ Type TypeBase::getRValueInstanceType() {
   if (auto metaTy = type->getAs<MetatypeType>())
     return metaTy->getInstanceType();
 
-  // For @mutable value type methods, we need to dig through @inout types.
+  // For @mutable value type methods, we need to dig through inout types.
   return type->getInOutObjectType();
 }
 

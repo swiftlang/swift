@@ -293,7 +293,7 @@ namespace {
       llvm_unreachable("should have been lowered by SILGen");
     }
         
-    // @inout go by the object type;  note that we ask the ordinary
+    // inout go by the object type;  note that we ask the ordinary
     // question, not the argument question.
     bool visitInOutType(CanInOutType origTy, CanInOutType substTy) {
       return differsByAbstractionInMemory(IGM,
@@ -591,7 +591,7 @@ namespace {
       CanType origObjectTy = origTy.getObjectType();
       CanType substObjectTy = substTy.getObjectType();
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
-        IGF.unimplemented(SourceLoc(), "remapping @inout values");
+        IGF.unimplemented(SourceLoc(), "remapping inout values");
       
       llvm::Value *substMV = In.claimNext();
       if (origObjectTy == substObjectTy)
@@ -762,7 +762,7 @@ namespace {
       CanType origObjectTy = origTy.getObjectType();
       CanType substObjectTy = substTy.getObjectType();
       if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
-        IGF.unimplemented(SourceLoc(), "remapping @inout");
+        IGF.unimplemented(SourceLoc(), "remapping inout");
       
       llvm::Value *origMV = In.claimNext();
       if (origObjectTy == substObjectTy)

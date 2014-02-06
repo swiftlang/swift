@@ -765,7 +765,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                           ConstraintLocator::ArrayElementType));
     
     case TypeKind::InOut:
-      // If the RHS is an @inout type, the LHS must be an @lvalue type.
+      // If the RHS is an inout type, the LHS must be an @lvalue type.
       if (kind >= TypeMatchKind::OperatorConversion) {
         if (shouldRecordFailures())
           recordFailure(getConstraintLocator(locator),
@@ -866,7 +866,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   }
 
   if (concrete && kind >= TypeMatchKind::OperatorConversion) {
-    // If the RHS is an @inout type, the LHS must be an @lvalue type.
+    // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *iot = type2->getAs<InOutType>()) {
       return matchTypes(type1, LValueType::get(iot->getObjectType()),
                         kind, subFlags,
@@ -1716,7 +1716,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
            "the output of funct1 is a free variable by construction");
 
     // If this application is part of an operator, then we allow an implicit
-    // lvalue to be compatible with @inout arguments.  This is used by
+    // lvalue to be compatible with inout arguments.  This is used by
     // assignment operators.
     TypeMatchKind ArgConv = TypeMatchKind::Conversion;
     if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||

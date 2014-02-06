@@ -774,7 +774,7 @@ bool DeclContext::lookupQualified(Type type,
     return false;
 
   
-  // Look through lvalue and @inout types.
+  // Look through lvalue and inout types.
   type = type->getLValueOrInOutObjectType();
 
   // Look through metatypes.

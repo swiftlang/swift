@@ -588,7 +588,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
 
   CanType varType = vd->getType()->getCanonicalType();
 
-  // If this is an @inout parameter, set up the writeback variable.
+  // If this is an inout parameter, set up the writeback variable.
   if (isa<InOutType>(varType))
     return InitializationPtr(new InOutInitialization(vd));
 
@@ -2035,8 +2035,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
          && "uncurry level of requirement and witness do not match");
       
   // In addition to the usual bevy of abstraction differences, protocol
-  // witnesses have potential differences in @inout-ness of self. @mutating
-  // value type methods may reassign 'self' as an @inout parameter, but may be
+  // witnesses have potential differences in inout-ness of self. @mutating
+  // value type methods may reassign 'self' as an inout parameter, but may be
   // conformed to by non-@mutating or class methods that cannot.
   // Handle this special case in the witness type before applying the
   // abstraction change.

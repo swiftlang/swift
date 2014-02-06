@@ -200,7 +200,7 @@ namespace {
       llvm_unreachable("shouldn't get an l-value type here");
     }
     RetTy visitInOutType(CanInOutType type) {
-      llvm_unreachable("shouldn't get an @inout type here");
+      llvm_unreachable("shouldn't get an inout type here");
     }
 
     // Dependent types should be contextualized before visiting.
@@ -1190,7 +1190,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   assert(uncurryLevel == 0);
 
-  // @inout types are a special case for lowering, because they get
+  // inout types are a special case for lowering, because they get
   // completely removed and represented as 'address' SILTypes.
   if (auto substInOutType = dyn_cast<InOutType>(substType)) {
     // Derive SILType for InOutType from the object type.
@@ -1590,7 +1590,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (ValueDecl *capture : captures) {
-    // A capture of a 'var' or '@inout' variable is done with the underlying
+    // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
     auto captureType =
       capture->getType()->getLValueOrInOutObjectType()->getCanonicalType();
@@ -1672,7 +1672,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   SmallVector<TupleTypeElt, 8> inputFields;
 
   for (ValueDecl *capture : captures) {
-    // A capture of a 'var' or '@inout' variable is done with the underlying
+    // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
     auto captureType =
       capture->getType()->getLValueOrInOutObjectType()->getCanonicalType();

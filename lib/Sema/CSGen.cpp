@@ -125,9 +125,9 @@ namespace {
         = CS.getConstraintLocator(expr, ConstraintLocator::SubscriptResult);
 
       // The base type must have a subscript declaration with type
-      // I -> @inout? O, where I and O are fresh type variables. The index
+      // I -> inout? O, where I and O are fresh type variables. The index
       // expression must be convertible to I and the subscript expression
-      // itself has type @inout? O, where O may or may not be an lvalue.
+      // itself has type inout? O, where O may or may not be an lvalue.
       auto inputTv = CS.createTypeVariable(indexLocator, /*options=*/0);
       auto outputTv = CS.createTypeVariable(resultLocator,
                                             TVO_CanBindToLValue);
@@ -755,11 +755,10 @@ namespace {
     }
 
     Type visitAddressOfExpr(AddressOfExpr *expr) {
-      // The address-of operator produces an explicit lvalue
-      // @inout T from an implicit lvalue @inout (implicit) T.
+      // The address-of operator produces an explicit inout T from an lvalue T.
       // We model this with the constraint
       //
-      //     S < @inout(implicit) T
+      //     S < inout T
       //
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),

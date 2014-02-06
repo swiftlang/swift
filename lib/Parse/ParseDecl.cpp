@@ -1882,8 +1882,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
   // container type as an element named 'self'.
   //
   // This turns an instance function "(int)->int" on FooTy into
-  // "(this: @inout FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(this: @inout FooTy.metatype)->(int)->int".
+  // "(inout self: FooTy)->(int)->int", and a static function
+  // "(int)->int" on FooTy into "(inout self: FooTy.metatype)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc, CurDeclContext);

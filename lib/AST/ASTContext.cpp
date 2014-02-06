@@ -539,7 +539,7 @@ FuncDecl *ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver,
   if (!decl || !isGenericIntrinsic(decl, input, output, param))
     return nullptr;
 
-  // Input must be @inout Optional<T>.
+  // Input must be inout Optional<T>.
   auto inputInOut = dyn_cast<InOutType>(input);
   if (!inputInOut || !isOptionalType(*this, optionalKind,
                                      inputInOut.getObjectType(), param))
@@ -1784,7 +1784,7 @@ LValueType *LValueType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
          "can not have ErrorType wrapped inside LValueType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
-         "can not have @inout or @lvalue wrapped inside an @lvalue");
+         "can not have 'inout' or @lvalue wrapped inside an @lvalue");
 
   auto properties = objectTy->getRecursiveProperties()
                     + RecursiveTypeProperties::IsNotMaterializable;
@@ -1804,7 +1804,7 @@ InOutType *InOutType::get(Type objectTy) {
   assert(!objectTy->is<ErrorType>() &&
          "can not have ErrorType wrapped inside InOutType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
-         "can not have @inout or @lvalue wrapped inside an @inout");
+         "can not have 'inout' or @lvalue wrapped inside an 'inout'");
   
   auto properties = objectTy->getRecursiveProperties()
                     + RecursiveTypeProperties::IsNotMaterializable;

@@ -141,7 +141,7 @@ public:
   public:
     /// box - For a non-constant value, this is the retainable box for the
     /// variable.  It may be invalid if no box was made for the value (e.g.,
-    /// because it was an @inout value, or constant).
+    /// because it was an inout value, or constant).
     SILValue box;
 
     bool isConstant() const { return addressOrValue.getInt(); }

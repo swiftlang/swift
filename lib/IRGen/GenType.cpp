@@ -1016,7 +1016,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   llvm_unreachable("bad type kind");
 }
 
-/// Convert an @inout type.  This is always just a bare pointer.
+/// Convert an inout type.  This is always just a bare pointer.
 const TypeInfo *TypeConverter::convertInOutType(InOutType *T) {
   auto referenceType =
     IGM.getStoragePointerTypeForUnlowered(CanType(T->getObjectType()));

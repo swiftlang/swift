@@ -214,7 +214,7 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     }
 
     // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through @inout arguments or for indirect returns.
+    // it is passed through inout arguments or for indirect returns.
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getSubstCalleeType()
             ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())

@@ -910,7 +910,7 @@ public:
     //  1) for a "static" / "type" method, the base is a metatype.
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
-    //  3) for an @mutating method, the base has @inout type.
+    //  3) for an @mutating method, the base has inout type.
     //  4) for a @!mutating method, the base is a general protocol rvalue, which
     //     is address-only.  The base is passed at +0, so it isn't consumed.
     //
@@ -975,7 +975,7 @@ public:
     //  1) for a "static" / "type" method, the base is a metatype.
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
-    //  3) for an @mutating method, the base has @inout type.
+    //  3) for an @mutating method, the base has inout type.
     //  4) for a @!mutating method, the base is a general archetype rvalue,
     //     which is address-only.  The base is passed at +0, so it isn't
     //     consumed.
@@ -1621,7 +1621,7 @@ namespace {
         SGF.getLoweredType(substArgType).getSwiftRValueType();
 
       // If the caller takes the argument indirectly, the argument has an
-      // @inout type.
+      // inout type.
       if (param.isIndirectInOut()) {
         assert(isa<InOutType>(substArgType));
         emitInOut(std::move(arg), loweredSubstArgType, param.getType(),
@@ -2500,12 +2500,12 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                     AbstractFunctionDecl *decl){
 
   if (base.isLValue()) {
-    // @inout bases get passed by their address.
+    // inout bases get passed by their address.
     if (decl->getImplicitSelfDecl()->getType()->is<InOutType>())
       return RValueSource(loc, RValue(*this, loc,
                                       base.getType().getSwiftType(),
                                       base));
-    // When calling an accessor, the base may be provided as an @inout value,
+    // When calling an accessor, the base may be provided as an inout value,
     // even though we only need an rvalue.  In this case, load the value out of
     // the address.
     // TODO: this causes us to materialize stuff (at the SIL level) that will

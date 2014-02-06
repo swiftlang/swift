@@ -1568,7 +1568,7 @@ public:
   }
 
   void visitInOutType(InOutType *T) {
-    Printer << "@inout ";
+    Printer << "inout ";
     visit(T->getObjectType());
   }
 

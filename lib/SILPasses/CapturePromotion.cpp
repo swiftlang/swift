@@ -152,7 +152,7 @@ private:
 
 namespace {
 /// \brief A SILCloner subclass which clones a closure function while converting
-/// one or more captures from @inout (by-reference) to by-value.
+/// one or more captures from 'inout' (by-reference) to by-value.
 class ClosureCloner : public SILCloner<ClosureCloner> {
 public:
   friend class SILVisitor<ClosureCloner>;
@@ -566,7 +566,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
         return false;
     return true;
   }
-  // An apply is ok if the argument is used as an @inout parameter or an
+  // An apply is ok if the argument is used as an inout parameter or an
   // indirect return, but counts as a possible mutation in both cases.
   if (auto *AI = dyn_cast<ApplyInst>(U)) {
     if (AI->getSubstCalleeType()

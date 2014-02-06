@@ -2196,7 +2196,7 @@ public:
     assert(selfDecl && selfTy && "Not a method");
 
     // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
-    // neither @inout.
+    // neither inout.
     selfDecl->setLet(!selfTy->is<InOutType>());
     selfDecl->setType(selfTy);
     

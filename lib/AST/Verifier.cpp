@@ -761,12 +761,12 @@ struct ASTNodeBase {};
         abort();
       }
       
-      // The only time the base is allowed to be @inout is if we are accessing
+      // The only time the base is allowed to be inout is if we are accessing
       // a computed property.
       if (E->getBase()->getType()->is<InOutType>()) {
         VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
         if (!VD || !VD->hasAccessorFunctions()) {
-          Out << "member_ref_expr on value of @inout type\n";
+          Out << "member_ref_expr on value of inout type\n";
           E->dump(Out);
           abort();
         }
@@ -1544,7 +1544,7 @@ struct ASTNodeBase {};
       if (InOutType *io = type->getAs<InOutType>()) {
         Type objectType = io->getObjectType();
         if (objectType->is<InOutType>()) {
-          Out << "type is an @inout of @inout type: ";
+          Out << "type is an inout of inout type: ";
           type.print(Out);
           Out << "\n";
         }

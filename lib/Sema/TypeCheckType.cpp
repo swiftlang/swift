@@ -1040,7 +1040,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   if (attrs.has(TAK_inout)) {
-    // @inout is only allowed on function inputs.
+    // inout is only allowed on function inputs.
     if (options & TR_FunctionInput) {
       ty = InOutType::get(ty);
     } else {

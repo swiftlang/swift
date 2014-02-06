@@ -338,7 +338,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   // use this as the source of the result.
   CanType canType = type->getCanonicalType();
 
-  // Uses of @inout argument values are lvalues.
+  // Uses of inout argument values are lvalues.
   if (auto iot = dyn_cast<InOutType>(canType))
     return iot->getObjectType();
   

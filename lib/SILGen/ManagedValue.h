@@ -30,7 +30,7 @@ namespace Lowering {
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
 /// the rvalue is consumed. A ManagedValue can also represent an LValue used as
-/// a value, such as a @inout function argument, and can be null.
+/// a value, such as an inout function argument, and can be null.
 ///
 /// Interesting relevant cases include:
 ///   LValue: the SILValue will always have an isAddress() SILType. LValues

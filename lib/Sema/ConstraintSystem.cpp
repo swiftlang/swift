@@ -922,7 +922,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // for 'self' to the type.
     if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value)) {
       // If self is a struct, properly qualify it based on our base
-      // qualification.  If we have an lvalue coming in, we expect an @inout.
+      // qualification.  If we have an lvalue coming in, we expect an inout.
       if (!selfTy->hasReferenceSemantics() && baseTy->is<LValueType>())
         selfTy = InOutType::get(selfTy);
 

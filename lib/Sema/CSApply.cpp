@@ -195,12 +195,12 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
                                     DeclContext *UseDC) {
   auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
   if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-    // If 'self' is an @inout type, turn the base type into an lvalue
+    // If 'self' is an inout type, turn the base type into an lvalue
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
     if (selfTy->is<InOutType>()) {
       // Unless we're looking at a non-@mutating existential member.  In which
-      // case, the member will be modeled as an @inout but ExistentialMemberRef
+      // case, the member will be modeled as an inout but ExistentialMemberRef
       // and ArchetypeMemberRef want to take the base as an rvalue.
       if (auto *fd = dyn_cast<FuncDecl>(func))
         if (!fd->isMutating() &&
@@ -551,7 +551,7 @@ namespace {
           selfTy = baseTy;
         else {
           // If the base is already an lvalue with the right base type, we can
-          // pass it as an @inout qualified type.
+          // pass it as an inout qualified type.
           selfTy = containerTy;
           if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
             if (base->getType()->is<LValueType>())
@@ -1567,7 +1567,7 @@ namespace {
     
     // A map used to track partial applications of value type methods to
     // require that they be fully applied. Partial applications of value types
-    // would capture 'self' as an @inout and hide any mutation of 'self',
+    // would capture 'self' as an inout and hide any mutation of 'self',
     // which is surprising.
     llvm::DenseMap<Expr*, ValueTypeMemberApplication>
       ValueTypeMemberApplications;
@@ -2979,7 +2979,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto *toIO = toType->getAs<InOutType>()) {
       (void)toIO;
       // In an @assignment operator like "++i", the operand is converted from
-      // an implicit lvalue to an @inout argument.
+      // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
       return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
                                             toType, /*isImplicit*/true);
@@ -3157,11 +3157,11 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
   if (!toType->is<InOutType>())
     return coerceToType(expr, toType, locator);
 
-  assert(fromType->is<LValueType>() && "Can only convert lvalues to @inout");
+  assert(fromType->is<LValueType>() && "Can only convert lvalues to inout");
 
   auto &ctx = cs.getTypeChecker().Context;
 
-  // Use AddressOfExpr to convert it to an explicit @inout argument for the
+  // Use AddressOfExpr to convert it to an explicit inout argument for the
   // receiver.
   return new (ctx) AddressOfExpr(expr->getStartLoc(), expr,
                                  toType, /*isImplicit*/true);

@@ -429,6 +429,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
                                   /*AllowSepAfterLast=*/false,
                                   diag::expected_rparen_tuple_type_list,
                                   [&] () -> ParserStatus {
+    // If this is an "inout" marker in an argument list, consume the inout.
+    SourceLoc InOutLoc;
+    if (Tok.isContextualKeyword("inout"))
+      InOutLoc = consumeToken(tok::identifier);
+                                    
     // If the tuple element starts with "ident :", then
     // the identifier is an element tag, and it is followed by a type
     // annotation.
@@ -448,6 +453,14 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       if (type.isNull())
         return makeParserError();
 
+      // If an 'inout' marker was specified, build the type.  Note that we bury
+      // the inout locator within the named locator.  This is weird but required
+      // by sema apparently.
+      if (InOutLoc.isValid())
+        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
+                                                            InOutLoc));
+
+      
       ElementsR.push_back(
           new (Context) NamedTypeRepr(name, type.get(), nameLoc));
     } else {
@@ -457,6 +470,10 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         return makeParserCodeCompletionStatus();
       if (type.isNull())
         return makeParserError();
+      if (InOutLoc.isValid())
+        type = makeParserResult(new (Context) InOutTypeRepr(type.get(),
+                                                            InOutLoc));
+
       ElementsR.push_back(type.get());
     }
 

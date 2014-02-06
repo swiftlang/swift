@@ -218,12 +218,12 @@ namespace {
   ///   B := Bool
   ///
   /// But if we have a substituted function type:
-  ///   (UnicodeScalar, (Int, Float), @inout Double) -> Bool
+  ///   (UnicodeScalar, (Int, Float), inout Double) -> Bool
   /// then its most general form is
-  ///   (A, B, @inout C) -> D
+  ///   (A, B, inout C) -> D
   /// because the substitution
-  ///   X := (UnicodeScalar, (Int, Float), @inout Double)
-  /// is invalid substitution, ultimately because '@inout Double'
+  ///   X := (UnicodeScalar, (Int, Float), inout Double)
+  /// is invalid substitution, ultimately because 'inout Double'
   /// is not materializable.
   class DestructureGeneralizedInputs
       : public CanTypeVisitor<DestructureGeneralizedInputs> {
@@ -254,7 +254,7 @@ namespace {
     }
 
     void visitInOutType(CanInOutType type) {
-      // @inout types aren't valid targets for substitution.
+      // inout types aren't valid targets for substitution.
       addInput(type.getObjectType(), ParameterConvention::Indirect_Inout);
     }
 

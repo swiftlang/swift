@@ -457,11 +457,11 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
-  /// getInOutObjectType - For an @inout type, retrieves the underlying object
+  /// getInOutObjectType - For an inout type, retrieves the underlying object
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
 
-  /// getLValueOrInOutObjectType - For an @lvalue or @inout type, retrieves the
+  /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
   /// underlying object type. Otherwise, returns the type itself.
   Type getLValueOrInOutObjectType();
 
@@ -2507,9 +2507,8 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 ///   - it is a tuple and at least one of its element types
 ///     carries an l-value.
 ///
-/// The type of a function argument may carry an l-value.  This
-/// is done by annotating the bound variable with the @inout
-/// attribute.
+/// The type of a function argument may carry an l-value.  This is done by
+/// annotating the bound variable with InOutType.
 ///
 /// The type of a return value, local variable, or field may not
 /// carry an l-value.
@@ -2542,7 +2541,7 @@ BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   }
 END_CAN_TYPE_WRAPPER(LValueType, Type)
   
-/// InOutType - An @inout qualified type is an argument to a function passed
+/// InOutType - An inout qualified type is an argument to a function passed
 /// with an explicit "Address of" operator.  It is read in and then written back
 /// to after the callee function is done.  This also models the receiver of
 /// @mutable methods on value types.
@@ -3103,7 +3102,7 @@ inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   return false;
 }
 
-/// getInOutObjectType - For an @inout type, retrieves the underlying object
+/// getInOutObjectType - For an inout type, retrieves the underlying object
 /// type.  Otherwise, returns the type itself.
 inline Type TypeBase::getInOutObjectType() {
   if (auto iot = getAs<InOutType>())
@@ -3117,7 +3116,7 @@ inline Type TypeBase::getRValueType() {
   return this;
 }
   
-/// getLValueOrInOutObjectType - For an @lvalue or @inout type, retrieves the
+/// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
 /// underlying object type. Otherwise, returns the type itself.
 inline Type TypeBase::getLValueOrInOutObjectType() {
   if (auto iot = getAs<InOutType>())

@@ -2345,10 +2345,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   if (IGM.DebugInfo) {
     auto Indirection = IndirectValue;
-    // LValues (@inout) are implicitly indirect because of their type.
+    // LValues are implicitly indirect because of their type.
     if (Decl && Decl->getType()->getKind() == TypeKind::LValue)
       Indirection = DirectValue;
-    // FIXME: @inout arguments that are not promoted are emitted as
+    // FIXME: inout arguments that are not promoted are emitted as
     // arguments and also boxed and thus may show up twice. This may
     // or may not be bad.
     IGM.DebugInfo->emitStackVariableDeclaration

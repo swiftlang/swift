@@ -47,7 +47,7 @@ enum IsFreeFunctionWitness_t : bool {
 };
   
 /// An enum to indicate whether a protocol method requirement is satisfied by a
-/// method with an abstraction difference in the @inout-ness of its self
+/// method with an abstraction difference in the inout-ness of its self
 /// parameter.
 enum HasInOutSelfAbstractionDifference_t : bool {
   DoesNotHaveInOutSelfAbstractionDifference = false,

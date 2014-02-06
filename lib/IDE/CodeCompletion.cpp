@@ -974,7 +974,7 @@ public:
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() == Ctx.Id_self) {
-      // Strip @inout from 'self'.  It is useful to show @inout for function
+      // Strip inout from 'self'.  It is useful to show inout for function
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
     }

@@ -1228,7 +1228,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::InOut: {
-    // This is an @inout type.
+    // This is an inout type.
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy, Scope);
     return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
