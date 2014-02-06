@@ -30,9 +30,11 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
+#include "GenClangType.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
@@ -908,9 +910,46 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
       loadableArgTI.loadAsTake(IGF, byval, argExplosion);
     } else {
-      loadableArgTI.reexplode(IGF, params, argExplosion);
+      // Load and explode direct arguments.
+
+      // FIXME: Hack to deal with types we cannot currently convert to
+      //        a clang type.
+      GenClangType GCT(IGF.IGM.Context);
+      auto clangTy = GCT.visit(arg->getType().getSwiftRValueType());
+      if (!clangTy) {
+        loadableArgTI.reexplode(IGF, params, argExplosion);
+        IGF.setLoweredExplosion(arg, argExplosion);
+        continue;
+      }
+      // The ABI IR types for the entrypoint might differ from the
+      // Swift IR types for the body of the function. Store each
+      // formal parameter, bitcast, and then load and explode to the
+      // expected Swift explosion.
+      auto *value = params.claimNext();
+      auto *fromTy = value->getType();
+      auto *toTy = loadableArgTI.getStorageType();
+
+      // If both are pointers, we can simply insert a bitcast, otherwise
+      // we need to store, bitcast, and load.
+      if (toTy->isPointerTy() && fromTy->isPointerTy()) {
+        argExplosion.add(IGF.Builder.CreateBitCast(value, toTy));
+        IGF.setLoweredExplosion(arg, argExplosion);
+        continue;
+      }
+
+      assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
+              IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
+             && "Coerced types should not differ in size!");
+
+      auto address = IGF.createAlloca(fromTy, loadableArgTI.getFixedAlignment(),
+                                      value->getName() + ".coerced");
+      IGF.Builder.CreateStore(value, address.getAddress());
+      auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
+                                            toTy->getPointerTo());
+      loadableArgTI.loadAsTake(IGF, Address(coerced, address.getAlignment()),
+                               argExplosion);
     }
-    
+
     IGF.setLoweredExplosion(arg, argExplosion);
   }
 }
