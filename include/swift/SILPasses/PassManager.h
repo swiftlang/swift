@@ -22,15 +22,13 @@
 namespace swift {
   class SILModule;
   class SILFunction;
-  class SILOptions;
   class SILTransform;
-  class SILPassManager;
-
-  /// The SIL pass manager.
+  
+  /// \brief The SIL pass manager.
   class SILPassManager {
-  private:
     /// When set to True the pass manager will re-run the transformation pipe.
     bool anotherIteration;
+    /// The module that the pass manager will transform.
     SILModule *Mod;
 
     /// The list of transformations to run.
@@ -43,6 +41,8 @@ namespace swift {
     /// C'tor
     SILPassManager(SILModule *M) : anotherIteration(false), Mod(M) {}
 
+    /// \brief Searches for an analysis of type T in the list of registered
+    /// analysis.
     template<typename T>
     T* getAnalysis() {
       for (SILAnalysis *A : Analysis)
@@ -52,29 +52,30 @@ namespace swift {
       return nullptr;
     }
 
-    /// Add another transformation to the pipe. This transfers the ownership
-    /// of the transformation to the pass manager that will delete it when done.
+    /// \brief Add another transformation to the pipe. This transfers the
+    /// ownership of the transformation to the pass manager that will delete it
+    /// when done.
     void add(SILTransform *T) { Transformations.push_back(T); }
 
-    /// Register another analysis. This transfers the ownership of the analysis
-    /// to the pass manager that will delete it when done.
+    /// \brief  Register another analysis. This transfers the ownership of the
+    /// analysis to the pass manager that will delete it when done.
     void registerAnalysis(SILAnalysis *A) {
       Analysis.push_back(A);
     }
 
-    /// Run the transformations on the module \p Mod.
+    /// \brief Run the transformations on the module \p Mod.
     void run();
 
-    /// Request another invocation of the transformation pipeline.
+    /// \brief Request another invocation of the transformation pipeline.
     void scheduleAnotherIteration() { anotherIteration = true; }
 
-    /// Broadcast the invalidation of the module to all analysis.
+    ///  \brief Broadcast the invalidation of the module to all analysis.
     void invalidateAllAnalysis(SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
         AP->invalidate(K);
     }
 
-    /// Broadcast the invalidation of the function to all analysis.
+    /// \brief Broadcast the invalidation of the function to all analysis.
     void invalidateAllAnalysis(SILFunction *F,
                                SILAnalysis::InvalidationKind K) {
       for (auto AP : Analysis)
