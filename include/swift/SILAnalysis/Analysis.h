@@ -75,7 +75,6 @@ namespace swift {
     }
 
     void bottomUpCallGraphOrder(std::vector<SILFunction*> &order);
-    void topDownCallGraphOrder(std::vector<SILFunction*> &order);
 
     virtual void invalidate(InvalidationKind K) {
     // TODO: invalidate the cache once we implement one.

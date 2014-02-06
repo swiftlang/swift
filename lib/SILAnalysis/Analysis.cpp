@@ -28,13 +28,6 @@ CallGraphAnalysis::bottomUpCallGraphOrder(std::vector<SILFunction*> &order) {
   swift::bottomUpCallGraphOrder(M, order);
 }
 
-void
-CallGraphAnalysis::topDownCallGraphOrder(std::vector<SILFunction*> &order) {
-  // TODO: cache this calculation.
-  swift::topDownCallGraphOrder(M, order);
-}
-
-
 SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }

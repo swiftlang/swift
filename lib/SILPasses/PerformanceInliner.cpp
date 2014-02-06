@@ -375,7 +375,8 @@ public:
 
     // Collect a call-graph bottom-up list of functions.
     std::vector<SILFunction *> Worklist;
-    CGA->topDownCallGraphOrder(Worklist);
+    CGA->bottomUpCallGraphOrder(Worklist);
+    std::reverse(Worklist.begin(), Worklist.end());
 
     SILPerformanceInliner inliner(Threshold);
 
