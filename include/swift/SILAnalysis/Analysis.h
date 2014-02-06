@@ -26,7 +26,7 @@ namespace swift {
   class SILAnalysis {
   public:
     /// The invalidation Lattice.
-    /// This is a heiarchy of invalidation messages that are sent to analysis
+    /// This is a hierarchy of invalidation messages that are sent to analysis
     /// objects. Every invalidation kind invalidates the levels below it.
     enum class InvalidationKind {
       Instructions,  // Invalidate instruction-related analysis.
@@ -35,7 +35,7 @@ namespace swift {
       All,           // Invalidate everything.
     };
 
-    /// The class heiarchy
+    /// The class hierarchy
     enum class AnalysisKind {
       CallGraph,
       Alias,
