@@ -118,13 +118,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_CLANG_TYPE_MATCH(type, "String", getClangIdType(getClangASTContext()));
 #undef CHECK_CLANG_TYPE_MATCH
 
-  // FIXME: We shouldn't see these in @objc entrypoints but currently
-  //        are (<rdar://problem/15967182>).
-  auto swiftStructDecl = type->getDecl();
-  if (swiftStructDecl->getName().str() == "ContiguousString")
-    return getUnhandledType();
-
-  llvm_unreachable("Unhandled struct type in Clang type generation");
+  // FIXME: Handle other structs resulting from imported non-struct Clang types.
   return getUnhandledType();
 }
 
