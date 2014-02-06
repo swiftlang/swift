@@ -37,7 +37,7 @@ namespace {
     explicit SILPerformanceInliner(unsigned threshold)
       : InlineCostThreshold(threshold) {}
 
-    void inlineCallsIntoFunction(SILFunction *F);
+    bool inlineCallsIntoFunction(SILFunction *F);
   };
 }
 
@@ -297,8 +297,10 @@ unsigned SILPerformanceInliner::getFunctionCost(SILFunction *F,
 //                                  Inliner
 //===----------------------------------------------------------------------===//
 
-/// Attempt to inline all calls smaller than our threshold into F until.
-void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
+/// \brief Attempt to inline all calls smaller than our threshold into F until.
+/// returns True if a function was inlined.
+bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
+  bool Changed = false;
   SILInliner Inliner(*Caller, SILInliner::InlineKind::PerformanceInline);
 
   DEBUG(llvm::dbgs() << "Visiting Function: " << Caller->getName() << "\n");
@@ -356,7 +358,9 @@ void SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // our next invocation of the inliner.
     Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
     NumFunctionsInlined++;
+    Changed = true;
   }
+  return Changed;
 }
 
 class SILPerformanceInlinerPass : public SILModuleTransform {
@@ -381,14 +385,16 @@ public:
 
     SILPerformanceInliner inliner(Threshold);
 
+    bool Changed = false;
     while (!Worklist.empty()) {
       SILFunction *F = Worklist.back();
       Worklist.pop_back();
-      inliner.inlineCallsIntoFunction(F);
+      Changed |= inliner.inlineCallsIntoFunction(F);
     }
 
     // Invalidate the call graph.
-    CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+    if (Changed)
+      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
   }
 };
 
