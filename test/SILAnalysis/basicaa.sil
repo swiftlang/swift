@@ -1,0 +1,20 @@
+// RUN: %sil-opt %s -aa-dump -o /dev/null | FileCheck %s
+
+import Builtin
+
+// Address Arguments Don't Alias.
+//
+// CHECK-LABEL: @address_args_dont_alias
+// CHECK: PAIR #1.
+// CHECK-NEXT: %0 = argument of bb0
+// CHECK-NEXT: %1 = argument of bb0
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #3.
+// CHECK-NEXT: %1 = argument of bb0
+// CHECK-NEXT: %0 = argument of bb0
+// CHECK-NEXT: NoAlias
+sil @address_args_dont_alias : $@thin (@inout Builtin.ObjectPointer, @inout Builtin.ObjectPointer) -> () {
+bb0(%0 : $*Builtin.ObjectPointer, %1 : $*Builtin.ObjectPointer):
+  %2 = tuple()
+  return %2 : $()
+}
