@@ -867,32 +867,6 @@ bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
     ->getClassOrBoundGenericClass();
 }
 
-static bool isObjCGetterSignature(IRGenModule &IGM,
-                                  AnyFunctionType *methodType) {
-  return hasObjCClassRepresentation(IGM, methodType->getResult()) &&
-    methodType->getInput()->isEqual(TupleType::getEmpty(IGM.Context));
-}
-
-static bool isObjCSetterSignature(IRGenModule &IGM,
-                                  AnyFunctionType *methodType) {
-  if (!methodType->getResult()->isEqual(TupleType::getEmpty(IGM.Context)))
-    return false;
-  if (hasObjCClassRepresentation(IGM, methodType->getInput()))
-    return true;
-  if (TupleType *inputTuple = methodType->getInput()->getAs<TupleType>()) {
-    return inputTuple->getNumElements() == 1
-      && hasObjCClassRepresentation(IGM, inputTuple->getElementType(0));
-  }
-  return false;
-}
-
-/// ObjC method encoding for a property getter of class type.
-/// - (SomeClass*)foo;
-static const char * const GetterMethodSignature = "@@:";
-/// ObjC method encoding for a property setter of class type.
-/// - (void)setFoo:(SomeClass*);
-static const char * const SetterMethodSignature = "v@:@";
-
 static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
                                                Type T) {
   ASTContext &Context = IGM.Context;
@@ -966,8 +940,26 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
     }
     return IGM.getAddrOfGlobalString(TypeStr.c_str());
   }
-
-  return cnull;
+  // Case of single argument function type.
+  Type ArgType;
+  if (auto PType = dyn_cast<ParenType>(Input.getPointer()))
+    ArgType = PType->getUnderlyingType()->getCanonicalType();
+  else
+    ArgType = Input;
+  
+  clangType = CTG.visit(ArgType->getCanonicalType());
+  if (clangType.isNull())
+    return cnull;
+  clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
+  if (!sz.isZero())
+    ParmOffset += sz.getQuantity();
+  TypeStr += llvm::itostr(ParmOffset);
+  TypeStr += "@0:";
+  TypeStr += llvm::itostr(PtrSize.getValue());
+  ParmOffset = 2 * PtrSize.getValue();
+  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  TypeStr += llvm::itostr(ParmOffset);
+  return IGM.getAddrOfGlobalString(TypeStr.c_str());
 }
 
 /// Emit the components of an Objective-C method descriptor: its selector,
@@ -990,13 +982,7 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
     // Account for the 'self' pointer being curried.
     methodType = methodType->getResult()->castTo<AnyFunctionType>();
   }
-  
-  if (isObjCGetterSignature(IGM, methodType))
-    atEncoding = IGM.getAddrOfGlobalString(GetterMethodSignature);
-  else if (isObjCSetterSignature(IGM, methodType))
-    atEncoding = IGM.getAddrOfGlobalString(SetterMethodSignature);
-  else
-    atEncoding = GetObjCEncodingForMethodType(IGM, methodType);
+  atEncoding = GetObjCEncodingForMethodType(IGM, methodType);
   
   /// The third element is the method implementation pointer.
   if (auto func = dyn_cast<FuncDecl>(method))
@@ -1014,13 +1000,29 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
                                           llvm::Constant *&selectorRef,
                                           llvm::Constant *&atEncoding,
                                           llvm::Constant *&impl) {
-  bool isClassProperty = hasObjCClassRepresentation(IGM, property->getType());
-  
   Selector getterSel(property, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
-  atEncoding = isClassProperty
-   ? IGM.getAddrOfGlobalString(GetterMethodSignature)
-   : GetObjCEncodingForType(IGM, property->getType());
+  
+  ASTContext &Context = IGM.Context;
+  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  GenClangType CTG(Context);
+  auto &clangASTContext = CI->getClangASTContext();
+  std::string TypeStr;
+  auto clangType = CTG.visit(property->getType()->getCanonicalType());
+  if (clangType.isNull()) {
+    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    return;
+  }
+  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  
+  Size PtrSize = IGM.getPointerSize();
+  Size::int_type ParmOffset = 2 * PtrSize.getValue();
+  
+  TypeStr += llvm::itostr(ParmOffset);
+  TypeStr += "@0:";
+  TypeStr += llvm::itostr(PtrSize.getValue());
+  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
   impl = getObjCGetterPointer(IGM, property);
 }
 
@@ -1047,13 +1049,38 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   assert(property->isSettable(property->getDeclContext()) &&
          "not a settable property?!");
 
-  bool isClassProperty = hasObjCClassRepresentation(IGM, property->getType());
-  
   Selector setterSel(property, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
-  atEncoding = isClassProperty
-     ? IGM.getAddrOfGlobalString(SetterMethodSignature)
-     : GetObjCEncodingForType(IGM, property->getType());
+  
+  ASTContext &Context = IGM.Context;
+  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  GenClangType CTG(Context);
+  auto &clangASTContext = CI->getClangASTContext();
+  std::string TypeStr;
+  auto clangType = clangASTContext.VoidTy;
+  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  
+  Size PtrSize = IGM.getPointerSize();
+  Size::int_type ParmOffset = 2 * PtrSize.getValue();
+
+  Type ArgType = property->getType();
+  clangType = CTG.visit(ArgType->getCanonicalType());
+  if (clangType.isNull()) {
+    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    return;
+  }
+  clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
+  if (!sz.isZero())
+    ParmOffset += sz.getQuantity();
+  TypeStr += llvm::itostr(ParmOffset);
+  TypeStr += "@0:";
+  TypeStr += llvm::itostr(PtrSize.getValue());
+  ParmOffset = 2 * PtrSize.getValue();
+  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  TypeStr += llvm::itostr(ParmOffset);
+  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+
   impl = getObjCSetterPointer(IGM, property);
 }
 
