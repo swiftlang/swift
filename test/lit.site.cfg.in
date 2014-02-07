@@ -72,6 +72,7 @@ if '@SWIFT_ASSERTS@' == 'ON':
 # %target-run          (run a command on the target machine)
 # %target-build-swift  (compile and link swift files for the target platform)
 # %target-run-simple-swift (build and run one test file on the target platform)
+# %target-run-stdlib-swift (like target-run-simple-swift with -parse-stdlib)
 
 # These substitutions must use the new swift driver, 
 # but cannot depend on %swift to get it.
@@ -136,7 +137,13 @@ config.target_run_simple_swift = (
     '%s -module-cache-path %%t/clang-module-cache %%s -o %%t/a.out && '
     '%s %%t/a.out'
     % (config.target_build_swift, config.target_run))
+config.target_run_stdlib_swift = (
+    'rm -rf %%t && mkdir -p %%t && '
+    '%s -module-cache-path %%t/clang-module-cache %%s -o %%t/a.out -parse-stdlib && '
+    '%s %%t/a.out'
+    % (config.target_build_swift, config.target_run))
 
 config.substitutions.append(('%target-run-simple-swift', config.target_run_simple_swift))
+config.substitutions.append(('%target-run-stdlib-swift', config.target_run_stdlib_swift))
 config.substitutions.append(('%target-run', config.target_run))
 config.substitutions.append(('%target-build-swift', config.target_build_swift))
