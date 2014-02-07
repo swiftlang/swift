@@ -59,6 +59,8 @@ class SILCleanup : public swift::SILFunctionTransform {
     cleanFunction(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
+
+  StringRef getName() override { return "SIL Cleanup"; }
 };
 
 SILTransform *swift::createSILCleanup() {

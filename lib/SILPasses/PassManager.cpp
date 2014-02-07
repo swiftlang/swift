@@ -34,7 +34,13 @@ void SILPassManager::runOneIteration() {
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
       SMT->run();
-      if (Options.EnableParanoidVerification) {
+
+      if (Options.PrintAll) {
+        llvm::dbgs() << "*** SIL module after " << SMT->getName()
+                     << " (" << NumOptzIterations << ") ***\n";
+        Mod->dump();
+      }
+      if (Options.VerifyAll) {
         DEBUG(Mod->verify());
       }
       continue;
@@ -47,7 +53,13 @@ void SILPassManager::runOneIteration() {
           SFT->injectPassManager(this);
           SFT->injectFunction(&F);
           SFT->run();
-          if (Options.EnableParanoidVerification) {
+
+          if (Options.PrintAll) {
+            llvm::dbgs() << "*** SIL function after " << SFT->getName()
+                         << " (" << NumOptzIterations << ") ***\n";
+            F.dump();
+          }
+          if (Options.VerifyAll) {
             DEBUG(Mod->verify());
           }
         }

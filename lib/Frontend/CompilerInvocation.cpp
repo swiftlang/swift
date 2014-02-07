@@ -599,6 +599,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableARCOptimizations = !Args.hasArg(OPT_disable_arc_opts);
+  Opts.VerifyAll = Args.hasArg(OPT_sil_verify_all);
+  Opts.PrintAll = Args.hasArg(OPT_sil_print_all);
 
   return false;
 }

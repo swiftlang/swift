@@ -302,6 +302,8 @@ class SILSROA : public SILFunctionTransform {
     runSROAOnFunction(*F);
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "SROA"; }
 };
 
 SILTransform *swift::createSROA() {

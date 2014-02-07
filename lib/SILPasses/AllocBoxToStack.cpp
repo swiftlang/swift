@@ -355,6 +355,8 @@ class AllocBoxToStack : public SILFunctionTransform {
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "AllocBox-To-Stack Optimization"; }
 };
 
 SILTransform *swift::createAllocBoxToStack() {

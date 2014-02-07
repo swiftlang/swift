@@ -814,6 +814,8 @@ class ConstantPropagation : public SILFunctionTransform {
     CCPFunctionBody(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "Constant Propagation"; }
 };
 
 SILTransform *swift::createConstantPropagation() {

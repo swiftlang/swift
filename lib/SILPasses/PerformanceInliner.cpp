@@ -165,6 +165,8 @@ public:
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
+
+  StringRef getName() override { return "Performance Inlining"; }
 };
 
 SILTransform *swift::createPerfInliner() {

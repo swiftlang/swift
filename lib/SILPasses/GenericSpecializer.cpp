@@ -445,6 +445,8 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
     }
   }
+
+  StringRef getName() override { return "Generic Specialization"; }
 };
 
 SILTransform *swift::createGenericSpecializer() {

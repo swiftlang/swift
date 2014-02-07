@@ -672,6 +672,8 @@ class DCE : public SILModuleTransform {
     performSILDeadCodeElimination(getModule());
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
+
+  StringRef getName() override { return "DCE"; }
 };
 
 SILTransform *swift::createDCE() {

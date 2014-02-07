@@ -263,6 +263,8 @@ class SILLowerAggregate : public SILFunctionTransform {
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "Lower Aggregates"; }
 };
 
 SILTransform *swift::createLowerAggregate() {

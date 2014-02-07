@@ -751,6 +751,8 @@ class SILCombine : public SILFunctionTransform {
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "SIL Combine"; }
 };
 
 class SILDeadFuncElimination : public SILModuleTransform {
@@ -778,6 +780,8 @@ class SILDeadFuncElimination : public SILModuleTransform {
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
+
+  StringRef getName() override { return "Dead Function Elimination"; }
 };
 
 SILTransform *swift::createSILCombine() {

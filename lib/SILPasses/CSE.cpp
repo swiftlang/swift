@@ -394,6 +394,8 @@ class SILCSE : public SILFunctionTransform {
     C.processFunction(*getFunction(), DA->getDomInfo(getFunction()));
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "CSE"; }
 };
 
 SILTransform *swift::createCSE() {

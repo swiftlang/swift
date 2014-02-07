@@ -528,6 +528,8 @@ class ARCOpts : public SILFunctionTransform {
     processFunction(*getFunction(), AA);
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "ARC Optimization"; }
 };
 
 SILTransform *swift::createARCOpts() {

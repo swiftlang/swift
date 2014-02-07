@@ -48,7 +48,10 @@ public:
   bool EnableARCOptimizations = true;
 
   /// Controls whether or not paranoid verification checks are run.
-  bool EnableParanoidVerification = false;
+  bool VerifyAll = false;
+
+  /// Dump SIL after each transform.
+  bool PrintAll = false;
 };
 
 } // end namespace swift

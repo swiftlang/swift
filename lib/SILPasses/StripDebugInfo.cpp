@@ -41,6 +41,8 @@ class StripDebugInfo : public swift::SILFunctionTransform {
     stripFunction(getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "Strip Debug Info"; }
 };
 
 SILTransform *swift::createStripDebug() {

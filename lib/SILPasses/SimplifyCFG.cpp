@@ -531,6 +531,8 @@ class SimplifyCFGPass : public SILFunctionTransform {
     SimplifyCFG(*getFunction()).run();
     invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
   }
+
+  StringRef getName() override { return "Simplify CFG"; }
 };
 
 

@@ -965,6 +965,8 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
     optimizeMemoryAllocations(*getFunction());
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
+
+  StringRef getName() override { return "Predictable Memory Opts"; }
 };
 
 SILTransform *swift::createPredictableMemoryOptimizations() {

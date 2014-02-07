@@ -71,6 +71,8 @@ class SILAADumper : public SILFunctionTransform {
                      << AA->alias(V1, V2) << "\n";
     llvm::outs() << "\n";
   }
+
+  StringRef getName() override { return "AA Dumper"; }
 };
 
 } // end anonymous namespace

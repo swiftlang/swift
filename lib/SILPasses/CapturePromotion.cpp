@@ -800,6 +800,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "Capture Promotion"; }
 };
 
 SILTransform *swift::createCapturePromotion() {

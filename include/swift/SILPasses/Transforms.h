@@ -47,6 +47,9 @@ namespace swift {
     /// Inject the pass manager running this pass.
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
+    /// Get the name of the transform.
+    virtual llvm::StringRef getName() { return "Unknown Transform"; }
+
   protected:
     /// \brief Searches for an analysis of type T in the list of registered
     /// analysis. If the analysis is not found, the program terminates.

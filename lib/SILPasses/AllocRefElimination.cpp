@@ -345,6 +345,8 @@ class AllocRefElimination : public SILFunctionTransform {
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "AllocRef Elimination"; }
 };
 
 SILTransform *swift::createAllocRefElimination() {

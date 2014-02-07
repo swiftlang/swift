@@ -159,6 +159,8 @@ class InOutDeshadowing : public SILFunctionTransform {
       }
     }
   }
+
+  StringRef getName() override { return "InOut Deshadowing"; }
 };
 
 SILTransform *swift::createInOutDeshadowing() {

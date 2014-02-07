@@ -440,6 +440,8 @@ class SILCodeMotion : public SILFunctionTransform {
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "SIL Code Motion"; }
 };
 
 SILTransform *swift::createCodeMotion() {

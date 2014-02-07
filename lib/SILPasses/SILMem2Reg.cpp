@@ -739,6 +739,8 @@ class SILMem2Reg : public SILFunctionTransform {
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
+
+  StringRef getName() override { return "SIL Mem2Reg"; }
 };
 
 SILTransform *swift::createMem2Reg() {

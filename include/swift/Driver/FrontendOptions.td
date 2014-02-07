@@ -109,6 +109,12 @@ def sil_link_all : Flag<["-"], "sil-link-all">,
 def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
   HelpText<"Serialize all generated SIL">;
 
+def sil_verify_all : Flag<["-"], "sil-verify-all">,
+  HelpText<"Verify SIL after each transform">;
+
+def sil_print_all : Flag<["-"], "sil-print-all">,
+  HelpText<"Print SIL after each transform">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

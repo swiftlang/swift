@@ -462,6 +462,8 @@ class MandatoryInlining : public SILModuleTransform {
     performSILMandatoryInlining(getModule());
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
+
+  StringRef getName() override { return "Mandatory Inlining"; }
 };
 
 SILTransform *swift::createMandatoryInlining() {

@@ -1569,6 +1569,8 @@ class DefiniteInitialization : public SILFunctionTransform {
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
+
+  StringRef getName() override { return "Definite Initialization"; }
 };
 
 SILTransform *swift::createDefiniteInitialization() {

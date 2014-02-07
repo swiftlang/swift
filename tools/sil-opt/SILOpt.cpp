@@ -171,11 +171,16 @@ SILDevirtThreshold("sil-devirt-threshold", llvm::cl::Hidden,
                    llvm::cl::init(0));
 
 static llvm::cl::opt<bool>
-EnableSILParanoidVerification("enable-sil-paranoid-verification",
-                              llvm::cl::Hidden,
-                              llvm::cl::init(false),
-                              llvm::cl::desc("Run sil verifications after "
-                                             "every pass."));
+EnableSILVerifyAll("enable-sil-verify-all",
+                   llvm::cl::Hidden,
+                   llvm::cl::init(false),
+                   llvm::cl::desc("Run sil verifications after every pass."));
+
+static llvm::cl::opt<bool>
+EnableSILPrintAll("-sil-print-all",
+                  llvm::cl::Hidden,
+                  llvm::cl::init(false),
+                  llvm::cl::desc("Print sil after every pass."));
 
 static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
@@ -235,7 +240,8 @@ int main(int argc, char **argv) {
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
   SILOpts.DevirtThreshold = SILDevirtThreshold;
-  SILOpts.EnableParanoidVerification = EnableSILParanoidVerification;
+  SILOpts.VerifyAll = EnableSILVerifyAll;
+  SILOpts.PrintAll = EnableSILPrintAll;
 
   SILPassManager PM(CI.getSILModule(), SILOpts);
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));

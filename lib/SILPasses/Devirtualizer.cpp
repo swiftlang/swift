@@ -1376,6 +1376,8 @@ public:
       PM->scheduleAnotherIteration();
     invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
   }
+
+  StringRef getName() override { return "Devirtualization"; }
 };
 
 SILTransform *swift::createDevirtualization() {
