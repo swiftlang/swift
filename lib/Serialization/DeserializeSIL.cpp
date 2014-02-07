@@ -1009,26 +1009,26 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getLocalValue(ValID2, ValResNum2, addrType));
     break;
   }
-  case ValueKind::StructElementAddrInst: {
-    // Use SILOneValueOneOperandLayout.
-    VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
-    auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStructElementAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2,
-                                  getSILType(Ty, (SILValueCategory)TyCategory)),
-                    Field,
-                    getSILType(Field->getType(), SILValueCategory::Address));
-    break;
-  }
+  case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst: {
     // Use SILOneValueOneOperandLayout.
     VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
     auto Ty = MF->getType(TyID);
-    ResultVal = Builder.createStructExtract(Loc,
-                    getLocalValue(ValID2, ValResNum2,
-                                  getSILType(Ty, (SILValueCategory)TyCategory)),
+    auto Val = getLocalValue(ValID2, ValResNum2,
+                             getSILType(Ty, (SILValueCategory)TyCategory));
+    auto ResultTy = Val.getType().getSwiftRValueType()
+      ->getTypeOfMember(Field->getModuleContext(),
+                        Field, nullptr)->getCanonicalType();
+    if ((ValueKind)OpCode == ValueKind::StructElementAddrInst)
+      ResultVal = Builder.createStructElementAddr(Loc,
+                    Val,
                     Field,
-                    getSILType(Field->getType(), SILValueCategory::Object));
+                    SILType::getPrimitiveAddressType(ResultTy));
+    else
+      ResultVal = Builder.createStructExtract(Loc,
+                    Val,
+                    Field,
+                    SILType::getPrimitiveObjectType(ResultTy));
     break;
   }
   case ValueKind::StructInst: {

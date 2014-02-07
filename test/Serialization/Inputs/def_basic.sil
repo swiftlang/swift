@@ -897,6 +897,20 @@ bb0(%0 : $CString, %1 : $CString, %2 : $Int64):
 
 sil @assert_fail : $@thin (CString, CString, Int64) -> ()
 
+// rdar: 15893086 
+struct GenericStruct<T> {
+  var x : T
+}
+
+// CHECK-LABEL: @extract_generic_struct
+sil @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64 {
+entry(%0 : $GenericStruct<Int64>):
+  // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #x
+  %1 = struct_extract %0 : $GenericStruct<Int64>, #x
+  // CHECK: return %1 : $Int64
+  return %1 : $Int64
+}
+
 @fragile
 class Foo {
   subscript (x: Int, y: Int) -> Int
@@ -1083,6 +1097,7 @@ bb0:
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> ()
+  %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
 
   %119 = tuple ()
   return %119 : $()
