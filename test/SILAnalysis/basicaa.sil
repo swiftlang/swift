@@ -150,7 +150,6 @@ struct StructLvl1 {
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
 // CHECK-NEXT: (0):   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
 // CHECK-NEXT: MayAlias
-
 sil @different_alloc_stack_dont_alias : $@thin () -> () {
   %0 = alloc_stack $StructLvl1
   %1 = alloc_stack $StructLvl1
@@ -172,4 +171,68 @@ sil @different_alloc_stack_dont_alias : $@thin () -> () {
 
   %12 = tuple()
   return %12 : $()
+}
+
+// Function Arguments can not alias with no alias arguments or with identified
+// function locals.
+//
+// @args_dont_alias_with_identified_function_locals
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #2.
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #3.
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #4.
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #5.
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = tuple ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #6.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #8.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #9.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #10.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #12.
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #13.
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #15.
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer         
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #16.
+// CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer         
+// CHECK-NEXT: NoAlias
+sil @args_dont_alias_with_identified_function_locals : $@thin (Builtin.ObjectPointer, Builtin.ObjectPointer, @inout Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer, %2 : $*Builtin.ObjectPointer):
+  %3 = alloc_stack $Builtin.ObjectPointer
+  dealloc_stack %3#0 : $*@local_storage Builtin.ObjectPointer
+  %4 = tuple()
+  return %4 : $()
 }
