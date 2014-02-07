@@ -25,6 +25,7 @@ using namespace swift;
 
 static llvm::cl::opt<bool>
 DisableAliasAnalysis("disable-aa", llvm::cl::init(false),
+                     llvm::cl::Hidden,
                      llvm::cl::desc("Always return most conservative AA "
                                     "result."));
 
