@@ -77,13 +77,27 @@ private:
  void visitApplyInst(ApplyInst *Inst) {
     auto Args = getOpValueArray<8>(Inst->getArguments());
 
+   // Handle recursions by replacing the apply to the callee with an apply to
+   // the newly specialized function.
+   SILValue CalleeVal = Inst->getCallee();
+   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
+   if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+     FRI = Builder.createFunctionRef(Inst->getLoc(),
+                                           &Builder.getFunction());
+
+     ApplyInst *NAI =
+     Builder.createApply(Inst->getLoc(), FRI, Args, Inst->isTransparent());
+     doPostProcess(Inst, NAI);
+     return;
+   }
+
     SmallVector<Substitution, 16> TempSubstList;
     for (auto &Sub : Inst->getSubstitutions())
       TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
                                         CallerInst->getSubstitutions()));
 
     ApplyInst *N = Builder.createApply(
-        getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
+        getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
         TempSubstList, Args, Inst->isTransparent());
    doPostProcess(Inst, N);
@@ -212,12 +226,6 @@ static bool canSpecializeFunction(SILFunction *F) {
       // We don't specialize the PartialApply instructions.
       if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(&I)) {
         if (PAI->hasSubstitutions())
-          return false;
-      }
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
-        SILValue CalleeVal = AI->getCallee();
-        FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
-        if (FRI && FRI->getReferencedFunction() == AI->getFunction())
           return false;
       }
     }
