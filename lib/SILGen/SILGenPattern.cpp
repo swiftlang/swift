@@ -1462,7 +1462,7 @@ public:
       
       // Branch either to the row destination or the new BB.
       trueBB = gen.createBasicBlock();
-      gen.B.createCondBranch(row.getCaseBlock(), guardBool,
+      gen.B.createCondBranch(CleanupLocation(row.getCaseBlock()), guardBool,
                              trueBB, getFalseBB());
       gen.B.emitBlock(trueBB);
     }
@@ -1478,10 +1478,8 @@ public:
     }
     
     // Jump to the case block, unwinding if necessary.
-    gen.Cleanups.emitBranchAndCleanups(JumpDest{caseBB,
-                                                row.getCleanupsDepth(),
-                                                row.getCaseBlock()},
-                                       gen.CurrentSILLoc);
+    JumpDest Dest(caseBB, row.getCleanupsDepth(), row.getCaseBlock());
+    gen.Cleanups.emitBranchAndCleanups(Dest, Dest.getCleanupLocation());
     
     // Position the case block logically.
     gen.B.moveBlockToEnd(caseBB);
@@ -1588,7 +1586,7 @@ static void emitCaseBody(SILGenFunction &gen,
   
   gen.visit(caseStmt->getBody());
   if (gen.B.hasValidInsertionPoint())
-    gen.B.createBranch(caseStmt, caseBlock.cont);
+    gen.B.createBranch(CleanupLocation(caseStmt->getBody()), caseBlock.cont);
 }
 
 /// Emit cases for a scope, identified by its continuation BB.

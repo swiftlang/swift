@@ -177,7 +177,8 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
 /// getLocForLinetable - extract the start location from a SILLocation.
 ///
 /// This returns a FullLocation, which contains the location that
-/// should be used for the linetable and the "true" AST location.
+/// should be used for the linetable and the "true" AST location (used
+/// for, e.g., variable declarations).
 static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
@@ -204,7 +205,9 @@ static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc)
   }
   if (Stmt* S = Loc.getAsASTNode<Stmt>()) {
     auto SLoc = getLoc(SM, S, UseEnd);
-    return {SLoc, SLoc};
+    auto LinetableLoc = (Loc.getKind() == SILLocation::CleanupKind)
+      ? getLoc(SM, S, true) : SLoc;
+    return {LinetableLoc, SLoc};
   }
 
   if (Decl* D = Loc.getAsASTNode<Decl>()) {
@@ -304,7 +307,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   if (CachedScope != ScopeCache.end())
     return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
 
-  Location L = getLocation(SM, DS->Loc).LocForLinetable;
+  Location L = getLocation(SM, DS->Loc).Loc;
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
   if (!Parent)

@@ -1158,7 +1158,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
     auto &I = *InsnIter;
     if (IGM.DebugInfo) {
       // Set the debug info location for I, if applicable.
-      auto ILoc = I.getLoc();
+      SILLocation ILoc = I.getLoc();
       // Handle cleanup locations.
       if (ILoc.getKind() == SILLocation::CleanupKind) {
         // Cleanup locations point to the decl of the the value that
