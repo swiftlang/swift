@@ -307,24 +307,6 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
     }
 }
 
-static void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
-  SILLocation Loc = AI->getLoc();
-  ArrayRef<Substitution> Subst;
-
-  SmallVector<SILValue, 4> Arguments;
-  for (auto &Op : AI->getArgumentOperands()) {
-    Arguments.push_back(Op.get());
-  }
-
-  SILBuilder Builder(AI);
-  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
-
-  ApplyInst *NAI =
-      Builder.createApply(Loc, FRI, Arguments, AI->isTransparent());
-  SILValue(AI, 0).replaceAllUsesWith(SILValue(NAI, 0));
-  recursivelyDeleteTriviallyDeadInstructions(AI, true);
-}
-
 static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
   if (A == B)
     return true;

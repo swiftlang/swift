@@ -40,6 +40,7 @@ namespace swift {
       CallGraph,
       Dominance,
       Alias,
+      SpecializedArgs,
     };
 
     /// Stores the kind of derived class.
@@ -90,6 +91,7 @@ namespace swift {
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
   SILAnalysis *createAliasAnalysis(SILModule *M);
   SILAnalysis *createDominanceAnalysis(SILModule *M);
+  SILAnalysis *createSpecializedArgsAnalysis(SILModule *M);
 
 } // end namespace swift
 

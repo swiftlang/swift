@@ -561,6 +561,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  if (const Arg *A = Args.getLastArg(OPT_sil_devirt_threshold)) {
+    if (StringRef(A->getValue()).getAsInteger(10, Opts.DevirtThreshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
                                      OPT_sil_link_all)) {

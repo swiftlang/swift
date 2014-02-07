@@ -11,6 +11,7 @@
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/CallGraph.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Intrinsics.h"
@@ -186,4 +187,22 @@ void swift::bottomUpCallGraphOrder(SILModule *M,
         }
 
   sorter.sort(order);
+}
+
+void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
+  SILLocation Loc = AI->getLoc();
+  ArrayRef<Substitution> Subst;
+
+  SmallVector<SILValue, 4> Arguments;
+  for (auto &Op : AI->getArgumentOperands()) {
+    Arguments.push_back(Op.get());
+  }
+
+  SILBuilder Builder(AI);
+  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, NewF);
+
+  ApplyInst *NAI =
+      Builder.createApply(Loc, FRI, Arguments, AI->isTransparent());
+  SILValue(AI, 0).replaceAllUsesWith(SILValue(NAI, 0));
+  recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }

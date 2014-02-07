@@ -166,6 +166,10 @@ static llvm::cl::opt<unsigned>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(50));
 
+static llvm::cl::opt<unsigned>
+SILDevirtThreshold("sil-devirt-threshold", llvm::cl::Hidden,
+                   llvm::cl::init(0));
+
 static llvm::cl::opt<bool>
 EnableSILParanoidVerification("enable-sil-paranoid-verification",
                               llvm::cl::Hidden,
@@ -230,12 +234,14 @@ int main(int argc, char **argv) {
 
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.DevirtThreshold = SILDevirtThreshold;
   SILOpts.EnableParanoidVerification = EnableSILParanoidVerification;
 
   SILPassManager PM(CI.getSILModule(), SILOpts);
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
   PM.registerAnalysis(createAliasAnalysis(CI.getSILModule()));
   PM.registerAnalysis(createDominanceAnalysis(CI.getSILModule()));
+  PM.registerAnalysis(createSpecializedArgsAnalysis(CI.getSILModule()));
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:

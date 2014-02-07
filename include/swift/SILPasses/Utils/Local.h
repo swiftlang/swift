@@ -64,6 +64,9 @@ namespace swift {
   /// Does the passed in BuiltinFunctionRefInst touch memory at all?
   bool isReadNone(BuiltinFunctionRefInst *FR);
 
+  // Rewrite a call, which may previously have been a dynmaic dispath, to a
+  // known function reference.
+  void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);
 } // end namespace swift
 
 #endif
