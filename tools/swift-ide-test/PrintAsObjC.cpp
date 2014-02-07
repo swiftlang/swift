@@ -29,19 +29,6 @@ static void writeImports(raw_ostream &os, Module *M) {
     // FIXME: Handle submodule imports.
     os << "@import " << import.second->Name << ";\n";
   }
-
-  // Headers and predefines required by the printer.
-  os << "\n@import ObjectiveC;\n"
-        "#include <stdint.h>\n"
-        "#include <stddef.h>\n"
-        "#include <stdbool.h>\n"
-        "#if defined(__has_include)\n"
-        "# if __has_include(<uchar.h>)\n"
-        "#  include <uchar.h>\n"
-        "# endif\n"
-        "#endif\n"
-        "\n"
-        "#define SWIFT_METATYPE(X) Class\n";
 }
 
 namespace {
