@@ -144,6 +144,16 @@ public:
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
 
+  /// An enum with different modes for automatically crashing at defined times.
+  enum class DebugCrashMode {
+    None, ///< Don't automatically crash.
+    AssertAfterParse, ///< Automatically assert after parsing.
+    CrashAfterParse, ///< Automatically crash after parsing.
+  };
+
+  /// Indicates a debug crash mode for the frontend.
+  DebugCrashMode CrashMode = DebugCrashMode::None;
+
   /// Indicates whether the RequestedAction has output.
   bool actionHasOutput();
 

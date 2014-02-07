@@ -39,6 +39,9 @@ def verify : Flag<["-"], "verify">,
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 
+def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
+class DebugCrashOpt : Group<debug_crash_Group>;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
 def debug_constraints : Flag<["-"], "debug-constraints">,
@@ -48,6 +51,15 @@ def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
   Alias<debug_constraints_attempt>;
+
+def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
+  DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
+def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
+  DebugCrashOpt, HelpText<"Force an assertion failure after parsing">;
+def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
+  DebugCrashOpt, HelpText<"Force a crash immediately">;
+def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
+  DebugCrashOpt, HelpText<"Force a crash after parsing">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;

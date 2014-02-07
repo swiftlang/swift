@@ -70,6 +70,14 @@ static bool performCompile(CompilerInstance &Instance,
     Invocation.getFrontendOptions().RequestedAction;
 
   Instance.performParse();
+
+  FrontendOptions::DebugCrashMode CrashMode =
+    Invocation.getFrontendOptions().CrashMode;
+  if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
+    llvm_unreachable("This is an assertion!");
+  else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
+    LLVM_BUILTIN_TRAP;
+
   ASTContext &Context = Instance.getASTContext();
   if (Context.hadError())
     return true;

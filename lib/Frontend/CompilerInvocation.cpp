@@ -65,6 +65,23 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                               DiagnosticEngine &Diags) {
   using namespace options;
 
+  if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
+    Option Opt = A->getOption();
+    if (Opt.matches(OPT_debug_assert_immediately)) {
+      llvm_unreachable("This is an assertion!");
+    } else if (Opt.matches(OPT_debug_crash_immediately)) {
+      LLVM_BUILTIN_TRAP;
+    } else if (Opt.matches(OPT_debug_assert_after_parse)) {
+      // Set in FrontendOptions
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterParse;
+    } else if (Opt.matches(OPT_debug_crash_after_parse)) {
+      // Set in FrontendOptions
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterParse;
+    } else {
+      llvm_unreachable("Unknown debug_crash_Group option!");
+    }
+  }
+
   if (Args.hasArg(OPT_emit_verbose_sil)) {
     Opts.EmitVerboseSIL = true;
   }
