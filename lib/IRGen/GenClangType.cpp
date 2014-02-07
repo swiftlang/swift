@@ -76,6 +76,11 @@ static clang::CanQualType getClangIdType(
   return clangCtx.getCanonicalType(clangType);
 }
 
+static clang::CanQualType getClangVaListType(
+  const clang::ASTContext &clangCtx) {
+  return clangCtx.getCanonicalType(clangCtx.getBuiltinVaListType());
+}
+
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   // First attempt a lookup in our map of imported structs.
   auto *decl = type->getDecl();
@@ -116,9 +121,10 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_CLANG_TYPE_MATCH(type, "NSZone", clangCtx.VoidPtrTy);
   // We import NSString* (an Obj-C object pointer) as String.
   CHECK_CLANG_TYPE_MATCH(type, "String", getClangIdType(getClangASTContext()));
+  CHECK_CLANG_TYPE_MATCH(type, "CVaListPointer", getClangVaListType(clangCtx));
 #undef CHECK_CLANG_TYPE_MATCH
 
-  // FIXME: Handle other structs resulting from imported non-struct Clang types.
+  llvm_unreachable("Unhandled struct type in Clang type generation");
   return getUnhandledType();
 }
 
