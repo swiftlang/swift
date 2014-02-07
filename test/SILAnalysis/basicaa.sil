@@ -37,3 +37,139 @@ bb1(%1 : $*Builtin.ObjectPointer, %2 : $*Builtin.ObjectPointer):
   %3 = tuple()
   return %3 : $()
 }
+
+struct StructLvl2 {
+  var tup : (Builtin.Int64, Builtin.Int32)
+}
+
+struct StructLvl1 {
+  var sub : StructLvl2
+  var x : Builtin.Int64
+}
+
+// Two values with different underlying alloc_stack can not alias.
+//
+// CHECK-LABEL: @different_alloc_stack_dont_alias
+// CHECK: PAIR #0.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #2.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #3.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #4.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #14.
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %14 = tuple ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #15.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #16.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #17.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #18.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #19.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #20.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #x
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #21.
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %4 = struct_element_addr %2 : $*StructLvl2, #tup
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #56.
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %9 = struct_element_addr %7 : $*StructLvl2, #tup
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #57.
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #58.
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #59.
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: (0):   %14 = tuple ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #60.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #61.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #62.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #63.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (1):   %1 = alloc_stack $StructLvl1
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #65.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #x
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #66.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %4 = struct_element_addr %2 : $*StructLvl2, #tup
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #67.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %5 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 0
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #68.
+// CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+// CHECK-NEXT: (0):   %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT: MayAlias
+
+sil @different_alloc_stack_dont_alias : $@thin () -> () {
+  %0 = alloc_stack $StructLvl1
+  %1 = alloc_stack $StructLvl1
+
+  %2 = struct_element_addr %0#1 : $*StructLvl1, #sub
+  %3 = struct_element_addr %0#1 : $*StructLvl1, #x
+  %4 = struct_element_addr %2 : $*StructLvl2, #tup
+  %5 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 0
+  %6 = tuple_element_addr %4 : $*(Builtin.Int64, Builtin.Int32), 1
+
+  %7 = struct_element_addr %1#1 : $*StructLvl1, #sub
+  %8 = struct_element_addr %1#1 : $*StructLvl1, #x
+  %9 = struct_element_addr %7 : $*StructLvl2, #tup
+  %10 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 0
+  %11 = tuple_element_addr %9 : $*(Builtin.Int64, Builtin.Int32), 1
+
+  dealloc_stack %1#0 : $*@local_storage StructLvl1
+  dealloc_stack %0#0 : $*@local_storage StructLvl1
+
+  %12 = tuple()
+  return %12 : $()
+}
