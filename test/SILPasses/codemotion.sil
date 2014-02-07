@@ -183,7 +183,35 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
   %8 = apply %7(%2, %2, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
   %10 = load %1 : $*Builtin.Int64
-  %11 = apply %3(%10, %9, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) 
+  %11 = apply %3(%10, %9, %4) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1)
   %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
   return %12 : $Builtin.Int64
 }
+
+// CHECK-LABEL: sil @load_store_forwarding_over_dealloc_stack
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: alloc_stack $Builtin.Int64
+// CHECK-NEXT: load
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: store
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil @load_store_forwarding_over_dealloc_stack : $@thin (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_stack $Builtin.Int64
+  %2 = alloc_stack $Builtin.Int64
+  store %0 to %1#1 : $*Builtin.Int64
+  %3 = alloc_stack $Builtin.Int64
+  %5 = load %2#1 : $*Builtin.Int64
+  dealloc_stack %3#0 : $*@local_storage Builtin.Int64
+  %4 = load %1#1 : $*Builtin.Int64
+  store %0 to %1#1 : $*Builtin.Int64
+  %6 = load %2#1 : $*Builtin.Int64
+  dealloc_stack %2#0 : $*@local_storage Builtin.Int64
+  dealloc_stack %1#0 : $*@local_storage Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+

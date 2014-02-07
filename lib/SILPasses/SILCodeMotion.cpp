@@ -126,6 +126,13 @@ bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
       continue;
     }
 
+    // Dealloc stack does not affect loads and stores.
+    if (isa<DeallocStackInst>(Inst)) {
+      DEBUG(llvm::dbgs() << "Found a dealloc stack. Does not affect loads and "
+            "stores.\n");
+      continue;
+    }
+
     if (auto *AI = dyn_cast<ApplyInst>(Inst))
       if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(&*AI->getCallee()))
         if (isReadNone(BI)) {
