@@ -2778,8 +2778,8 @@ public:
       CD->setInitializerType(InitFnTy);
     }
 
-    // A method is ObjC-compatible if it's explicitly @objc, a member of an
-    // ObjC-compatible class, or an accessor for an ObjC property.
+    // A initializer is ObjC-compatible if it's explicitly @objc or a member of
+    // an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
       ClassDecl *classContext = ContextTy->getClassOrBoundGenericClass();
