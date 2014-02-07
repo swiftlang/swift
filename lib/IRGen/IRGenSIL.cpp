@@ -907,10 +907,46 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
       Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
       loadableArgTI.loadAsTake(IGF, byval, argExplosion);
-    } else {
-      loadableArgTI.reexplode(IGF, params, argExplosion);
+      IGF.setLoweredExplosion(arg, argExplosion);
+      continue;
     }
-    
+
+    // Handle arguments passed to C/ObjC entrypoints as exploded
+    // aggregates.
+    if (requiresExternalExplosionArgument(IGF.IGM, arg->getType())) {
+      loadableArgTI.reexplode(IGF, params, argExplosion);
+      IGF.setLoweredExplosion(arg, argExplosion);
+      continue;
+    }
+
+    // The ABI IR types for the entrypoint might differ from the
+    // Swift IR types for the body of the function. Store each
+    // formal parameter, bitcast, and then load and explode to the
+    // expected Swift explosion.
+
+    auto *value = params.claimNext();
+    auto *fromTy = value->getType();
+    auto *toTy = loadableArgTI.getStorageType();
+
+    // If both are pointers, we can simply insert a bitcast, otherwise
+    // we need to store, bitcast, and load.
+    if (toTy->isPointerTy() && fromTy->isPointerTy()) {
+      argExplosion.add(IGF.Builder.CreateBitCast(value, toTy));
+      IGF.setLoweredExplosion(arg, argExplosion);
+      continue;
+    }
+
+    assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
+            IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
+           && "Coerced types should not differ in size!");
+
+    auto address = IGF.createAlloca(fromTy, loadableArgTI.getFixedAlignment(),
+                                    value->getName() + ".coerced");
+    IGF.Builder.CreateStore(value, address.getAddress());
+    auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
+                                              toTy->getPointerTo());
+    loadableArgTI.loadAsTake(IGF, Address(coerced, address.getAlignment()),
+                             argExplosion);
     IGF.setLoweredExplosion(arg, argExplosion);
   }
 }

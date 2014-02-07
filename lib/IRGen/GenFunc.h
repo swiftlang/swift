@@ -70,6 +70,10 @@ namespace irgen {
   llvm::PointerType *requiresExternalByvalArgument(IRGenModule &IGM,
                                                    SILType type);
   
+  /// Does an argument of this type need to be passed as the exploded
+  /// components?
+  bool requiresExternalExplosionArgument(IRGenModule &IGM, SILType type);
+
   /// Add function attributes to an attribute set for an indirect return
   /// argument.
   void addIndirectReturnAttributes(IRGenModule &IGM,

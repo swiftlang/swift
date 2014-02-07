@@ -767,6 +767,23 @@ static llvm::Type *getABIReturnType(SILType type,
   return returnInfo.getCoerceToType();
 }
 
+// FIXME: Generate IR types for all arguments together.
+static llvm::Type *getABIArgumentType(SILType type,
+                                      IRGenModule &IGM) {
+  GenClangType GCT(IGM.Context);
+  auto clangTy = GCT.visit(type.getSwiftRValueType());
+  assert(clangTy && "Unexpected failure in Clang type generation!");
+
+  SmallVector<clang::CanQualType,1> args;
+  args.push_back(clangTy);
+
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+  assert(FI.arg_size() == 1 && "Expected one IR type for one argument!");
+  return FI.arg_begin()->info.getCoerceToType();
+}
+
 llvm::Type *SignatureExpansion::expandResult() {
   // Handle the direct result type, checking for supposedly scalar
   // result types that we actually want to return indirectly.
@@ -833,7 +850,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 
     switch (FnType->getAbstractCC()) {
     case AbstractCC::C:
-    case AbstractCC::ObjCMethod:
+    case AbstractCC::ObjCMethod: {
       if (requiresExternalByvalArgument(IGM, param.getSILType())) {
         auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(param.getSILType()));
         addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
@@ -841,7 +858,16 @@ void SignatureExpansion::expand(SILParameterInfo param) {
         addPointerParameter(paramTI.getStorageType());
         return;
       }
-      SWIFT_FALLTHROUGH;
+
+      if (requiresExternalExplosionArgument(IGM, param.getSILType())) {
+        auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
+        schema.addToArgTypes(IGM, ParamIRTypes);
+        return;
+      }
+
+      ParamIRTypes.push_back(getABIArgumentType(param.getSILType(), IGM));
+      return;
+    }
     case AbstractCC::Freestanding:
     case AbstractCC::Method:
     case AbstractCC::WitnessMethod: {
@@ -1573,7 +1599,20 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   auto cc = expandAbstractCC(IGF.IGM, getCallee().getAbstractCC());
 
   // Make the call and clear the arguments array.
-  auto fnPtr = getCallee().getFunctionPointer();  
+  auto fnPtr = getCallee().getFunctionPointer();
+  auto fnPtrTy = cast<llvm::PointerType>(fnPtr->getType());
+  auto fnTy = cast<llvm::FunctionType>(fnPtrTy->getElementType());
+
+  // Coerce argument types for those cases where the IR type required
+  // by the ABI differs from the type used within the function body.
+  assert(fnTy->getNumParams() == Args.size());
+  for (int i = 0, e = fnTy->getNumParams(); i != e; ++i) {
+    auto *paramTy = fnTy->getParamType(i);
+    auto *argTy = Args[i]->getType();
+    if (paramTy != argTy)
+      Args[i] = IGF.coerceValue(Args[i], paramTy, IGF.IGM.DataLayout);
+  }
+
   llvm::CallSite call = emitInvoke(cc, fnPtr, Args,
                                    llvm::AttributeSet::get(fnPtr->getContext(),
                                                            Attrs));
@@ -1866,6 +1905,29 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
   return ti.getStorageType()->getPointerTo();
 }
 
+/// Does an argument of this type need to be passed by value on the stack to
+/// C or ObjC arguments?
+bool irgen::requiresExternalExplosionArgument(IRGenModule &IGM, SILType type) {
+  GenClangType GCT(IGM.Context);
+  auto clangTy = GCT.visit(type.getSwiftRValueType());
+
+  // FIXME: We currently cannot generate Clang types for every Swift
+  //        type we might see in a C/ObjC signature. Until we can,
+  //        we'll just pass these as explosions.
+  if (!clangTy) return true;
+
+  SmallVector<clang::CanQualType,1> args;
+  args.push_back(clangTy);
+
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
+  auto const &AI = FI.arg_begin()->info;
+  return AI.isExpand();
+}
+
 static void externalizeArgument(IRGenFunction &IGF,
                                 Explosion &in, Explosion &out,
                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
@@ -1880,9 +1942,40 @@ static void externalizeArgument(IRGenFunction &IGF,
      
     newByvals.push_back({out.size(), addr.getAlignment()});
     out.add(addr.getAddress());
-  } else {
-    ti.reexplode(IGF, in, out);
+    return;
   }
+
+  if (requiresExternalExplosionArgument(IGF.IGM, param.getSILType())) {
+    ti.reexplode(IGF, in, out);
+    return;
+  }
+
+  // Direct arguments that are passed as scalars or aggregates.
+  auto toTy = getABIArgumentType(ty, IGF.IGM);
+
+  // If the exploded parameter is just one value, we can just
+  // transfer it or if necessary coerce it with a bitcast or single
+  // store/load pair.
+  auto schema = ti.getSchema(out.getKind());
+  if (schema.size() == 1) {
+    auto *arg = in.claimNext();
+    if (arg->getType() != toTy)
+      arg = IGF.coerceValue(arg, toTy, IGF.IGM.DataLayout);
+
+    out.add(arg);
+    return;
+  }
+
+  // Otherwise we need to store multiple values and then load the
+  // aggregate.
+  auto swiftTy = ty.getSwiftRValueType();
+  Address addr = ti.allocateStack(IGF, swiftTy, "coerced-arg").getAddress();
+  ti.initializeFromParams(IGF, in, addr, swiftTy);
+
+  auto *coerced = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                            toTy->getPointerTo());
+  auto *value = IGF.Builder.CreateLoad(coerced);
+  out.add(value);
 }
 
 static void externalizeArguments(IRGenFunction &IGF,

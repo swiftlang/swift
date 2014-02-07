@@ -58,7 +58,7 @@ bb0(%0 : $X, %1 : $SwiftGizmo):
   return %7 : $()                                 // id: %8
 }
 
-// CHECK-LABEL: define internal void @_TToFCSo10SwiftGizmoD(%CSo10SwiftGizmo*, i8*) unnamed_addr
+// CHECK-LABEL: define internal void @_TToFCSo10SwiftGizmoD(i8*, i8*) unnamed_addr
 sil @_TToFCSo10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: entry
@@ -74,8 +74,7 @@ bb0(%0 : $SwiftGizmo):
   // Destroy instance variables
   // FIXME: This should move to .cxx_destruct
   // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64* @_TWvdvCSo10SwiftGizmo1xC12objc_dealloc1X, align 8
-  // CHECK-NEXT: [[I8GIZMO:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* %0 to i8*
-  // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8* [[I8GIZMO]], i64 [[XOFFSET]]
+  // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8* %0, i64 [[XOFFSET]]
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %C12objc_dealloc1X**
   // CHECK-NEXT: [[X:%[a-zA-Z0-9]+]] = load %C12objc_dealloc1X** [[XADDR]], align 8
   // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C12objc_dealloc1X*)*)(%C12objc_dealloc1X* [[X]]) #0
@@ -83,8 +82,8 @@ bb0(%0 : $SwiftGizmo):
   destroy_addr %3 : $*X                           // id: %4
 
   // Call super -dealloc.
-  // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* %0 to [[GIZMO]]*
-  // CHECK-NEXT: [[SUPER_OBJ:%[a-zA-Z0-9]+]] = bitcast [[GIZMO]]* %4 to %objc_object*
+  // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast i8* %0 to [[GIZMO]]*
+  // CHECK-NEXT: [[SUPER_OBJ:%[a-zA-Z0-9]+]] = bitcast [[GIZMO]]* [[SUPER]] to %objc_object*
   // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8
   // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 1
