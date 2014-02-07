@@ -14,6 +14,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/SILAnalysis/Analysis.h"
 
 #ifndef SWIFT_SILPASSES_PASSMANAGER_H
@@ -30,9 +31,8 @@ namespace swift {
     bool anotherIteration;
     /// The module that the pass manager will transform.
     SILModule *Mod;
-    /// If true, the pass manager will verify the module after all
-    /// transformations.
-    bool VerifyAfterAll;
+    /// Keep a copy of the options used to configure passes. This is mutable.
+    SILOptions Options;
 
     /// The list of transformations to run.
     llvm::SmallVector<SILTransform*, 8> Transformations;
@@ -42,8 +42,12 @@ namespace swift {
 
   public:
     /// C'tor
-    SILPassManager(SILModule *M, bool Verify = false) :
-      anotherIteration(false), Mod(M), VerifyAfterAll(Verify) {}
+    SILPassManager(SILModule *M, SILOptions Opts) :
+      anotherIteration(false), Mod(M), Options(std::move(Opts)) {}
+
+    SILOptions &getOptions() {
+      return Options;
+    }
 
     /// \brief Searches for an analysis of type T in the list of registered
     /// analysis. If the analysis is not found, the program terminates.

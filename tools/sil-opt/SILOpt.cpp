@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -166,6 +167,13 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(50));
 
 static llvm::cl::opt<bool>
+EnableSILParanoidVerification("enable-sil-paranoid-verification",
+                              llvm::cl::Hidden,
+                              llvm::cl::init(false),
+                              llvm::cl::desc("Run sil verifications after "
+                                             "every pass."));
+
+static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
                llvm::cl::desc("Emit locations during sil emission."));
 
@@ -220,7 +228,11 @@ int main(int argc, char **argv) {
   if (VerifyMode)
     enableDiagnosticVerifier(CI.getSourceMgr());
 
-  SILPassManager PM(CI.getSILModule());
+  SILOptions &SILOpts = Invocation.getSILOptions();
+  SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.EnableParanoidVerification = EnableSILParanoidVerification;
+
+  SILPassManager PM(CI.getSILModule(), SILOpts);
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
   PM.registerAnalysis(createAliasAnalysis(CI.getSILModule()));
   PM.registerAnalysis(createDominanceAnalysis(CI.getSILModule()));
@@ -278,7 +290,7 @@ int main(int argc, char **argv) {
       PM.add(createSimplifyCFG());
       break;
     case PassKind::PerformanceInlining:
-      PM.add(createPerfInliner(SILInlineThreshold));
+      PM.add(createPerfInliner());
       break;
     case PassKind::CodeMotion:
       PM.add(createCodeMotion());

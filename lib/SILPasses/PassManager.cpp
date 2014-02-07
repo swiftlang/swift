@@ -34,7 +34,7 @@ void SILPassManager::runOneIteration() {
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
       SMT->run();
-      if (VerifyAfterAll) {
+      if (Options.EnableParanoidVerification) {
         DEBUG(Mod->verify());
       }
       continue;
@@ -47,7 +47,7 @@ void SILPassManager::runOneIteration() {
           SFT->injectPassManager(this);
           SFT->injectFunction(&F);
           SFT->run();
-          if (VerifyAfterAll) {
+          if (Options.EnableParanoidVerification) {
             DEBUG(Mod->verify());
           }
         }

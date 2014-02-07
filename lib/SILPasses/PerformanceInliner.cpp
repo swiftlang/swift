@@ -363,15 +363,13 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 }
 
 class SILPerformanceInlinerPass : public SILModuleTransform {
-  unsigned Threshold;
-
 public:
-  SILPerformanceInlinerPass(unsigned th) : Threshold(th) {}
+  SILPerformanceInlinerPass() {}
 
   void run() {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
 
-    if (Threshold == 0) {
+    if (getOptions().InlineThreshold == 0) {
       DEBUG(llvm::dbgs() << "*** The Performance Inliner is disabled ***\n");
       return;
     }
@@ -382,7 +380,7 @@ public:
     std::vector<SILFunction *> Worklist(Order);
     std::reverse(Worklist.begin(), Worklist.end());
 
-    SILPerformanceInliner inliner(Threshold);
+    SILPerformanceInliner inliner(getOptions().InlineThreshold);
 
     bool Changed = false;
     while (!Worklist.empty()) {
@@ -397,6 +395,6 @@ public:
   }
 };
 
-SILTransform *swift::createPerfInliner(unsigned threshold) {
-  return new SILPerformanceInlinerPass(threshold);
+SILTransform *swift::createPerfInliner() {
+  return new SILPerformanceInlinerPass();
 }

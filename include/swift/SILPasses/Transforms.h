@@ -52,6 +52,8 @@ namespace swift {
     /// analysis. If the analysis is not found, the program terminates.
     template<typename T>
     T* getAnalysis() { return PM->getAnalysis<T>(); }
+
+    SILOptions &getOptions() { return PM->getOptions(); }
   };
 
   /// A transformation that operates on functions.

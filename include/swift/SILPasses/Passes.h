@@ -63,7 +63,7 @@ namespace swift {
   SILTransform *createMem2Reg();
   SILTransform *createCSE();
   SILTransform *createCodeMotion();
-  SILTransform *createPerfInliner(unsigned threshold);
+  SILTransform *createPerfInliner();
   SILTransform *createGenericSpecializer();
   SILTransform *createARCOpts();
   SILTransform *createSimplifyCFG();
