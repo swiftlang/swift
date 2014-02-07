@@ -101,6 +101,51 @@ static SILValue functionSingleReturn(SILFunction *F) {
   return RI->getOperand();
 }
 
+static SILValue findOrigin(SILValue S) {
+  SILValue Origin = S;
+  unsigned Depth = 0;
+  for (; Depth < RecursionMaxDepth; ++Depth) {
+    switch (Origin->getKind()) {
+      default:
+        break;
+      case ValueKind::UpcastInst:
+      case ValueKind::UnconditionalCheckedCastInst:
+        Origin = cast<SILInstruction>(Origin)->getOperand(0);
+        continue;
+      case ValueKind::ApplyInst: {
+        ApplyInst *AI = cast<ApplyInst>(Origin);
+        FunctionRefInst *FR =
+          dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+        if (!FR)
+          break;
+
+        SILFunction *F = FR->getReferencedFunction();
+        if (!F->size())
+          break;
+
+        // Does this function return one of its arguments ?
+        int RetArg = functionReturnsArgument(F);
+        if (RetArg != -1) {
+          Origin = AI->getOperand(1 /* 1st operand is Callee */ + RetArg);
+          continue;
+        }
+        SILValue RetV = functionSingleReturn(F);
+        if (RetV.isValid()) {
+          Origin = RetV;
+          continue;
+        }
+        break;
+      }
+    }
+    // No cast or pass-thru args found.
+    break;
+  }
+  DEBUG(if (Depth == RecursionMaxDepth)
+          llvm::dbgs() << "findMetaType: Max recursion depth.\n");
+
+  return Origin;
+}
+
 // Strip the InOut qualifier.
 CanType stripInOutQualifier(SILType Ty) {
   CanType ConcreteTy = Ty.getSwiftType();
@@ -111,56 +156,22 @@ CanType stripInOutQualifier(SILType Ty) {
 
 /// \brief Scan the use-def chain and skip cast instructions that don't change
 /// the value of the class. Stop on classes that define a class type.
-SILInstruction *findMetaType(SILValue S, unsigned Depth = 0) {
-  SILInstruction *Inst = dyn_cast<SILInstruction>(S);
+static SILInstruction *findMetaType(SILValue S, unsigned Depth = 0) {
+  SILInstruction *Inst = dyn_cast<SILInstruction>(findOrigin(S));
   if (!Inst)
     return nullptr;
 
-    if (Depth == RecursionMaxDepth) {
-      DEBUG(llvm::dbgs() << "findMetaType: Max recursion depth.\n");
-      return nullptr;
-    }
-
   switch (Inst->getKind()) {
-  case ValueKind::ApplyInst: {
-    // C'tors often return the last argument that is the allocation of the
-    // object. Try to find functions that return one of their arguments and
-    // check what that argument is.
-    ApplyInst *AI = cast<ApplyInst>(Inst);
-    FunctionRefInst *FR = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
-    if (!FR)
-      return nullptr;
-
-    SILFunction *F = FR->getReferencedFunction();
-    if (!F->size())
-      return nullptr;
-
-    // Does this function return one of its arguments ?
-    int RetArg = functionReturnsArgument(F);
-    if (RetArg != -1) {
-      SILValue Operand = AI->getOperand(1 /* 1st operand is Callee */ + RetArg);
-      return findMetaType(Operand, Depth + 1);
-    }
-
-    SILValue V = functionSingleReturn(F);
-    if (V.isValid())
-      return findMetaType(V, Depth + 1);
-
-    return nullptr;
-  }
   case ValueKind::AllocRefInst:
   case ValueKind::MetatypeInst:
     return Inst;
-  case ValueKind::UpcastInst:
-  case ValueKind::UnconditionalCheckedCastInst:
-    return findMetaType(Inst->getOperand(0), Depth + 1);
   default:
     return nullptr;
   }
 }
 
 /// \brief Recursively searches the ClassDecl for the type of \p S, or null.
-ClassDecl *findClassTypeForOperand(SILValue S) {
+static ClassDecl *findClassTypeForOperand(SILValue S) {
   // Look for an instruction that defines a class type.
   SILInstruction *Meta = findMetaType(S);
   if (!Meta)
