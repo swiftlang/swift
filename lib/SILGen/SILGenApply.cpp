@@ -997,7 +997,7 @@ public:
     bool isObjC = proto->isObjC();
 
     ArrayRef<Substitution> subs;
-    subs = e->getDeclRef().getPrimarySubstitutions();
+    subs = e->getDeclRef().getSubstitutions();
 
     // Figure out the result type of this expression. If we had any
     // substitutions not related to 'Self', we'll need to produce a

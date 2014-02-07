@@ -285,17 +285,7 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     }
     
     // Set up a mapping we can use to remap requirements to dependent types.
-    ArchetypeType *archetype;
-    // The 'Self' archetype doesn't show up in getAllArchetypes.
-    if (hasSelfArchetype()) {
-      if (paramIndex == 0)
-        archetype = typeParam->getArchetype();
-      else
-        archetype = getPrimaryArchetypes()[paramIndex - 1];
-    } else {
-      archetype = getPrimaryArchetypes()[paramIndex];
-    }
-      
+    ArchetypeType *archetype = getPrimaryArchetypes()[paramIndex];
     archetypeMap[archetype] = typeParamTy;
 
     genericParams.push_back(typeParamTy);

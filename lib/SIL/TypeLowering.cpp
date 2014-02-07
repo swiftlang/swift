@@ -1362,20 +1362,7 @@ TypeConverter::getInterfaceTypeInContext(CanType contextTy,
   unsigned depth = contextParams->getDepth();
   do {
     for (unsigned index : indices(contextParams->getParams())) {
-      auto param = contextParams->getParams()[index];
-      GenericTypeParamDecl *typeParam = param.getAsTypeParam();
-
-      ArchetypeType *archetype;
-      // The 'Self' archetype doesn't show up in getAllArchetypes.
-      if (contextParams->hasSelfArchetype()) {
-        if (index == 0)
-          archetype = typeParam->getArchetype();
-        else
-          archetype = contextParams->getPrimaryArchetypes()[index - 1];
-      } else {
-        archetype = contextParams->getPrimaryArchetypes()[index];
-      }
-      
+      ArchetypeType *archetype  = contextParams->getPrimaryArchetypes()[index];
       primaryArchetypes[archetype] = {depth, index};
     }
     contextParams = contextParams->getOuterParameters();

@@ -803,10 +803,6 @@ public:
     Requirements = NewRequirements;
   }
   
-  /// True if this parameter list includes the implicit <Self> parameter list
-  /// of a protocol.
-  bool hasSelfArchetype() const;
-
   /// \brief Retrieves the list containing all archetypes described by this
   /// generic parameter clause.
   ///
@@ -819,8 +815,6 @@ public:
 
   /// \brief Return the number of primary archetypes.
   unsigned getNumPrimaryArchetypes() const {
-    if (hasSelfArchetype())
-      return size() - 1;
     return size();
   }
   
@@ -838,6 +832,8 @@ public:
 
   /// \brief Sets all archetypes *without* copying the source array.
   void setAllArchetypes(ArrayRef<ArchetypeType *> AA) {
+    assert(AA.size() >= size()
+           && "allArchetypes is smaller than number of generic params?!");
     AllArchetypes = AA;
   }
 
@@ -3665,12 +3661,6 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
 }
 
-inline bool GenericParamList::hasSelfArchetype() const {
-  if (size() >= 1)
-    return isa<ProtocolDecl>(begin()[0].getDecl()->getDeclContext());
-  return false;
-}
-  
 } // end namespace swift
 
 #endif

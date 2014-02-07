@@ -2957,7 +2957,7 @@ namespace {
         else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
           considerBoundGenericType(bgTy, 0);
         else if (auto archeTy = dyn_cast<ArchetypeType>(selfTy))
-          considerArchetype(archeTy, archeTy, 0, 0);
+          considerWitnessArchetype(archeTy);
         else
           llvm_unreachable("witness for non-nominal type?!");
         
@@ -3136,6 +3136,27 @@ namespace {
         // method within the type we're matching against.
         if (arg == param || requiresFulfillment(arg, protocol))
           addFulfillment(arg, protocol, depth, index);
+      }
+    }
+    
+    /// We're binding an archetype for a protocol witness.
+    void considerWitnessArchetype(ArchetypeType *arg) {
+      // First of all, the archetype fulfills its own requirements.
+      considerArchetype(arg, arg, 0, 0);
+      
+      // FIXME: We can't pass associated types of Self through the witness
+      // CC, so as a hack, fake up impossible fulfillments for the associated
+      // types. For now all conformances are concrete, so the associated types
+      // can be recovered by substitution on the implementation side. For
+      // default implementations, we will need to get associated types from
+      // witness tables anyway.
+      considerArchetypeAssociatedTypes(arg);
+    }
+    
+    void considerArchetypeAssociatedTypes(ArchetypeType *arg) {
+      for (auto &assocTy : arg->getNestedTypes()) {
+        considerArchetype(assocTy.second, assocTy.second, ~0u, ~0u);
+        considerArchetypeAssociatedTypes(assocTy.second);
       }
     }
 

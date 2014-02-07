@@ -602,18 +602,6 @@ bool ArchetypeBuilder::addImplicitConformance(GenericTypeParamDecl *Param,
   return addConformanceRequirement(Impl->PotentialArchetypes[Key].second, Proto);
 }
 
-/// Determine whether this archetype is a protocol's 'Self' archetype or
-/// an associated type derived from it.
-///
-/// Archetypes based on a protocol's 'Self' archetype are not listed as part
-/// of the archetypes in a polymorphic function type, because they are
-/// handled implicitly by clients.
-static bool isArchetypeSelfDerived(ArchetypeType *archetype) {
-  while (auto parent = archetype->getParent())
-    archetype = parent;
-  return archetype->getSelfProtocol();
-}
-
 /// \brief Add the nested archetypes of the given archetype to the set of
 /// all archetypes.
 static void addNestedArchetypes(ArchetypeType *Archetype,
@@ -622,8 +610,7 @@ static void addNestedArchetypes(ArchetypeType *Archetype,
   for (auto Nested : Archetype->getNestedTypes()) {
     if (Known.insert(Nested.second)) {
       assert(!Nested.second->isPrimary() && "Unexpected primary archetype");
-      if (!isArchetypeSelfDerived(Nested.second))
-        All.push_back(Nested.second);
+      All.push_back(Nested.second);
       addNestedArchetypes(Nested.second, Known, All);
     }
   }
@@ -737,8 +724,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
     for (auto GP : Impl->GenericParams) {
       auto Archetype = Impl->PrimaryArchetypeMap[GP];
-      if (Archetype->isPrimary() && KnownArchetypes.insert(Archetype) &&
-          !isArchetypeSelfDerived(Archetype))
+      if (Archetype->isPrimary() && KnownArchetypes.insert(Archetype))
         Impl->AllArchetypes.push_back(Archetype);
     }
 
@@ -803,14 +789,15 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
       }
 
       // Return the archetype.
-      // FIXME: Use the allArchetypes vector instead of the generic param because
-      // of cross-module archetype serialization woes.
-      if (myGenericParams->hasSelfArchetype()) {
-        if (index == 0)
-          return myGenericParams->getParams()[0].getAsTypeParam()->getArchetype();
-        return myGenericParams->getPrimaryArchetypes()[index - 1];
-      }
-      return myGenericParams->getPrimaryArchetypes()[index];
+      // FIXME: Use the allArchetypes vector instead of the generic param if
+      // available because of cross-module archetype serialization woes.
+      if (!myGenericParams->getAllArchetypes().empty())
+        return myGenericParams->getPrimaryArchetypes()[index];
+
+      // During type-checking, we may try to mapTypeInContext before
+      // AllArchetypes has been built, so fall back to the generic params.
+      return myGenericParams->getParams()[index].getAsTypeParam()
+        ->getArchetype();
     }
 
     // Map a dependent member to the corresponding nested archetype.
