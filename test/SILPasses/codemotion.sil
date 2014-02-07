@@ -215,3 +215,27 @@ bb0(%0 : $Builtin.Int64):
   return %4 : $Builtin.Int64
 }
 
+struct Agg2 {
+  var t : (Builtin.Int64, Builtin.Int32)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+// CHECK-LABEL: sil @load_store_forwarding_from_aggregate_to_field
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]]
+// CHECK-NEXT: load [[INPUT_PTR]]
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: struct_extract
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: return
+sil @load_store_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
+bb0(%0 : $*Agg1):
+  %1 = load %0 : $*Agg1
+  %2 = struct_element_addr %0 : $*Agg1, #a
+  %3 = struct_element_addr %2 : $*Agg2, #t
+  %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
+  %5 = load %4 : $*Builtin.Int32
+  return %5 : $Builtin.Int32
+}

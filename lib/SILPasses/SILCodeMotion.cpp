@@ -16,6 +16,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
@@ -47,11 +48,112 @@ static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
   }
 }
 
+namespace {
+
+/// An abstract representation of a SIL Projection that allows one to refer to
+/// either nominal fields or tuple indices.
+class Projection {
+  SILType Type;
+  VarDecl *Decl;
+  unsigned Index;
+
+public:
+  Projection(SILType T, VarDecl *D) : Type(T), Decl(D), Index(-1) { }
+  Projection(SILType T, unsigned I) : Type(T), Decl(nullptr), Index(I) { }
+
+  SILType getType() const { return Type; }
+  VarDecl *getDecl() const { return Decl; }
+  unsigned getIndex() const { return Index; }
+
+  bool operator==(Projection &Other) const {
+    if (Decl)
+      return Decl == Other.getDecl();
+    else
+      return !Other.getDecl() && Index == Other.getIndex();
+  }
+
+  bool operator<(Projection Other) const {
+    // If Proj1 is a decl...
+    if (Decl) {
+      // It should be sorted before Proj2 is Proj2 is not a decl. Otherwise
+      // compare the pointers.
+      if (auto OtherDecl = Other.getDecl())
+        return uintptr_t(Decl) < uintptr_t(OtherDecl);
+      return true;
+    }
+
+    // If Proj1 is not a decl, then if Proj2 is a decl, Proj1 is not before
+    // Proj2. If Proj2 is not a decl, compare the indices.
+    return !Other.getDecl() && (Index < Other.Index);
+  }
+};
+
+} // end anonymous namespace.
+
+static bool isAddressProjection(SILValue V) {
+  switch (V->getKind()) {
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+// Given an already emitted load PrevLd, see if we can
+static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
+  SILValue PrevLIOp = PrevLI->getOperand();
+  SILValue LIOp = LI->getOperand();
+
+  // If they are equal, just return PrevLI.
+  if (PrevLIOp == LIOp)
+    return PrevLI;
+
+  // Otherwise see if LI can be projection extracted from PrevLI. First see if
+  // LI is a projection at all.
+  llvm::SmallVector<Projection, 4> Projections;
+  auto Iter = LIOp;
+  while (isAddressProjection(Iter) && PrevLIOp != Iter) {
+    if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter.getDef()))
+      Projections.push_back(Projection(Iter.getType(), SEA->getField()));
+    else
+      Projections.push_back(
+        Projection(Iter.getType(),
+                   cast<TupleElementAddrInst>(*Iter).getFieldNo()));
+    Iter = cast<SILInstruction>(*Iter).getOperand(0);
+  }
+
+  // We could not find an extract path in between the two values.
+  if (Projections.empty() || PrevLIOp != Iter)
+    return SILValue();
+
+  // Use the projection list we created to create the relevant extracts
+  SILValue LastExtract = PrevLI;
+  SILBuilder Builder(LI);
+  while (!Projections.empty()) {
+    auto P = Projections.pop_back_val();
+    if (auto *D = P.getDecl()) {
+      LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
+                                                D,
+                                                P.getType().getObjectType());
+      cast<StructExtractInst>(*LastExtract).getStructDecl();
+    } else {
+      LastExtract = Builder.createTupleExtract(LI->getLoc(), LastExtract,
+                                               P.getIndex(),
+                                               P.getType().getObjectType());
+      cast<TupleExtractInst>(*LastExtract).getTupleType();
+    }
+  }
+
+  // Return the last extract we created.
+  return LastExtract;
+}
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
   bool Changed = false;
-  StoreInst  *PrevStore = 0;
+  StoreInst *PrevStore = 0;
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
   auto II = BB->begin(), E = BB->end();
@@ -101,17 +203,20 @@ bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
 
       // Search the previous loads and replace the current load with one of the
       // previous loads.
-      for (auto PrevLd : Loads) {
-        if (PrevLd->getOperand() == LI->getOperand()) {
-          DEBUG(llvm::dbgs() << "    Replacing with previous load: "
-                << *PrevLd);
-          SILValue(LI, 0).replaceAllUsesWith(PrevLd);
-          recursivelyDeleteTriviallyDeadInstructions(LI, true);
-          Changed = true;
-          LI = 0;
-          NumDupLoads++;
-          break;
-        }
+      for (auto PrevLI : Loads) {
+        SILValue ForwardingExtract =
+          findExtractPathBetweenValues(PrevLI, LI);
+        if (!ForwardingExtract)
+          continue;
+
+        DEBUG(llvm::dbgs() << "    Replacing with previous load: "
+              << *ForwardingExtract);
+        SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
+        recursivelyDeleteTriviallyDeadInstructions(LI, true);
+        Changed = true;
+        LI = 0;
+        NumDupLoads++;
+        break;
       }
 
       if (LI)
@@ -316,6 +421,7 @@ class SILCodeMotion : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     SILFunction &F = *getFunction();
+
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F.getName() <<
           " *****\n");
 
