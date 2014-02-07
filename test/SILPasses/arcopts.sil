@@ -212,7 +212,7 @@ bb0(%0 : $Builtin.ObjectPointer):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @
+// CHECK-LABEL: sil @owned_arguments_are_known_safe_in_the_first_bb
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
