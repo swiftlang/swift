@@ -68,7 +68,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_debug_crash_Group)) {
     Option Opt = A->getOption();
     if (Opt.matches(OPT_debug_assert_immediately)) {
-      llvm_unreachable("This is an assertion!");
+      // This assertion should always fail, per the user's request, and should
+      // not be converted to llvm_unreachable.
+      assert(0 && "This is an assertion!");
     } else if (Opt.matches(OPT_debug_crash_immediately)) {
       LLVM_BUILTIN_TRAP;
     } else if (Opt.matches(OPT_debug_assert_after_parse)) {

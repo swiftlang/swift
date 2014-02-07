@@ -74,7 +74,9 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions::DebugCrashMode CrashMode =
     Invocation.getFrontendOptions().CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
-    llvm_unreachable("This is an assertion!");
+    // This assertion should always fail, per the user's request, and should
+    // not be converted to llvm_unreachable.
+    assert(0 && "This is an assertion!");
   else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
     LLVM_BUILTIN_TRAP;
 
