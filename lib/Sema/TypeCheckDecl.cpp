@@ -2788,6 +2788,11 @@ public:
       bool isObjC = CD->getAttrs().isObjC()
         || (classContext && classContext->isObjC())
         || (protocolContext && protocolContext->isObjC());
+
+      if (isObjC &&
+          (CD->isInvalid() ||
+           !TC.isRepresentableInObjC(CD, /*Diagnose=*/CD->getAttrs().isObjC())))
+        isObjC = false;
       CD->setIsObjC(isObjC);
     }
 
