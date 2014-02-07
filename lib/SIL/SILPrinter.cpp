@@ -348,9 +348,18 @@ public:
 
     if (!BB->pred_empty()) {
       OS.PadToColumn(50);
+      
       OS << "// Preds:";
-      for (auto BBI = BB->pred_begin(), E = BB->pred_end(); BBI != E; ++BBI)
-        OS << ' ' << getID(*BBI);
+
+      // Display the predecessors ids sorted to give a stable use order in the
+      // printer's output. This makes diffing large sections of SIL
+      // significantly easier.
+      llvm::SmallVector<ID, 32> PredIDs;
+      for (auto *BBI : BB->getPreds())
+        PredIDs.push_back(getID(BBI));
+      std::sort(PredIDs.begin(), PredIDs.end());
+      for (auto Id : PredIDs)
+        OS << ' ' << Id;
     }
     OS << '\n';
 
