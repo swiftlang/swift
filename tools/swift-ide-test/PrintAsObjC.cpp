@@ -398,7 +398,10 @@ private:
 
   void visitClassType(ClassType *CT) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
-    os << CD->getName() << " *";
+    if (CD->isObjC())
+      os << CD->getName() << " *";
+    else
+      os << "id";
   }
 
   void visitProtocolType(ProtocolType *PT, bool isMetatype = false) {
@@ -434,13 +437,15 @@ private:
     Type instanceTy = MT->getInstanceType();
     if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
       visitProtocolType(protoTy, /*isMetatype=*/true);
-    } else if (auto compositionTy = instanceTy->getAs<ProtocolCompositionType>()) {
-      visitProtocolCompositionType(compositionTy, /*isMetatype=*/true);
+    } else if (auto compTy = instanceTy->getAs<ProtocolCompositionType>()) {
+      visitProtocolCompositionType(compTy, /*isMetatype=*/true);
     } else {
       auto classTy = instanceTy->castTo<ClassType>();
-      os << "SWIFT_METATYPE("
-         << classTy->getClassOrBoundGenericClass()->getName()
-         << ")";
+      const ClassDecl *CD = classTy->getClassOrBoundGenericClass();
+      if (CD->isObjC())
+        os << "SWIFT_METATYPE(" << CD->getName() << ")";
+      else
+        os << "Class";
     }
   }
 
@@ -639,10 +644,14 @@ public:
   }
 
   void forwardDeclare(const ClassDecl *CD) {
+    if (!CD->isObjC())
+      return;
     forwardDeclare(CD, "@class");
   }
 
   void forwardDeclare(const ProtocolDecl *PD) {
+    assert(PD->isObjC() ||
+           *PD->getKnownProtocolKind() == KnownProtocolKind::DynamicLookup);
     forwardDeclare(PD, "@protocol");
   }
 
