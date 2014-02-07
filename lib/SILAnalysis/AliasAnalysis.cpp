@@ -16,6 +16,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILFunction.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -36,12 +37,19 @@ static SILValue getUnderlyingObject(SILValue V) {
   }
 }
 
-/// A no alias argument is an argument that is an address type.
-static bool isNoAliasArgument(SILValue V) {
+/// Return true if the given SILArgument is an argument to the first BB of a
+/// function.
+static bool isFunctionArgument(SILValue V) {
   auto *Arg = dyn_cast<SILArgument>(V.getDef());
   if (!Arg)
     return false;
-  return Arg->getType().isAddress();
+  return Arg->getParent() == &*Arg->getFunction()->begin();
+}
+
+/// A no alias argument is an argument that is an address type of the entry
+/// basic block of a function.
+static bool isNoAliasArgument(SILValue V) {
+  return isFunctionArgument(V) && V.getType().isAddress();
 }
 
 /// Return true if V is an object that at compile time can be uniquely
@@ -78,8 +86,8 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // Function arguments can't alias with things that are known to be
   // unambigously identified at the function level.
-  if ((isa<SILArgument>(O1.getDef()) && isIdentifiedFunctionLocal(O2)) ||
-      (isa<SILArgument>(O2.getDef()) && isIdentifiedFunctionLocal(O1)))
+  if ((isFunctionArgument(O1.getDef()) && isIdentifiedFunctionLocal(O2)) ||
+      (isFunctionArgument(O2.getDef()) && isIdentifiedFunctionLocal(O1)))
     return true;
 
   // We failed to prove that the two objects are different.

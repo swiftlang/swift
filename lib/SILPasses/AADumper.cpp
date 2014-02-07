@@ -69,6 +69,7 @@ class SILAADumper : public SILFunctionTransform {
       for (auto V2 : Values)
         llvm::outs() << "PAIR #" << PairCount++ << ".\n" << V1 << V2 
                      << AA->alias(V1, V2) << "\n";
+    llvm::outs() << "\n";
   }
 };
 

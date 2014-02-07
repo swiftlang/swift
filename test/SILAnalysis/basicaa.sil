@@ -2,9 +2,9 @@
 
 import Builtin
 
-// Address Arguments Don't Alias.
+// Address Arguments don't alias if they are arguments to the first BB.
 //
-// CHECK-LABEL: @address_args_dont_alias
+// CHECK-LABEL: @address_args_dont_alias_in_first_bb
 // CHECK: PAIR #1.
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: %1 = argument of bb0
@@ -13,8 +13,24 @@ import Builtin
 // CHECK-NEXT: %1 = argument of bb0
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: NoAlias
-sil @address_args_dont_alias : $@thin (@inout Builtin.ObjectPointer, @inout Builtin.ObjectPointer) -> () {
+sil @address_args_dont_alias_in_first_bb : $@thin (@inout Builtin.ObjectPointer, @inout Builtin.ObjectPointer) -> () {
 bb0(%0 : $*Builtin.ObjectPointer, %1 : $*Builtin.ObjectPointer):
   %2 = tuple()
   return %2 : $()
+}
+
+// Address Arguments may alias if they are arguments to a BB besides the first.
+//
+// FIXME: Once we support looking through PHIs, we will allow for must alias here.
+//
+// CHECK-LABEL: @address_args_may_alias_in_non_first_bb
+// CHECK-NOT: NoAlias
+// CHECK-NOT: MustAlias
+sil @address_args_may_alias_in_non_first_bb : $@thin (@inout Builtin.ObjectPointer) -> () {
+bb0(%0 : $*Builtin.ObjectPointer):
+  br bb1(%0 : $*Builtin.ObjectPointer, %0 : $*Builtin.ObjectPointer)
+
+bb1(%1 : $*Builtin.ObjectPointer, %2 : $*Builtin.ObjectPointer):
+  %3 = tuple()
+  return %3 : $()
 }
