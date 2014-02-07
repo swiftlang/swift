@@ -29,6 +29,7 @@ static void writeImports(raw_ostream &os, Module *M) {
     // FIXME: Handle submodule imports.
     os << "@import " << import.second->Name << ";\n";
   }
+  os << '\n';
 }
 
 namespace {
@@ -218,6 +219,47 @@ private:
     }
     
     printAbstractFunction(CD, nameBuf, false);
+  }
+
+  void visitVarDecl(VarDecl *VD) {
+    assert(VD->getDeclContext()->isTypeContext() &&
+           "cannot handle global variables right now");
+    assert(!VD->isStatic() && "class properties cannot be @objc");
+    // For now, never promise atomicity.
+    os << "@property (nonatomic";
+
+    if (!VD->isSettable(nullptr))
+      os << ", readonly";
+
+    // FIXME: Include "weak", "strong", "assign" here.
+    // They aren't actually needed (they won't change runtime semantics), but
+    // they provide documentation and improve the quality of warnings.
+
+    // Even though Swift doesn't use custom accessor names, we need to be
+    // consistent when an Objective-C property is overridden.
+    // FIXME: Will we ever need to do this for properties that /don't/ come
+    // from Objective-C?
+    bool overridesObjC = false;
+    for (VarDecl *baseDecl = VD->getOverriddenDecl(); baseDecl;
+         baseDecl = baseDecl->getOverriddenDecl()) {
+      if (baseDecl->hasClangNode()) {
+        overridesObjC = true;
+        break;
+      }
+    }
+
+    if (overridesObjC) {
+      llvm::SmallString<64> accessorName;
+      VD->getObjCGetterSelector(accessorName);
+      os << ", getter=" << accessorName;
+      accessorName.clear();
+      VD->getObjCSetterSelector(accessorName);
+      os << ", setter=" << accessorName;
+    }
+
+    os << ") ";
+    print(VD->getType(), VD->getName().str());
+    os << ";\n";
   }
 
   /// Visit part of a type, such as the base of a pointer type.
@@ -453,16 +495,18 @@ private:
     os << "instancetype";
   }
 
-  /// Print a full type.
+  /// Print a full type, optionally declaring the given \p name.
   ///
   /// This will properly handle nested function types (see
   /// finishFunctionType()). If only a part of a type is being printed, use
   /// visitPart().
-  void print(Type ty) {
+  void print(Type ty, StringRef name = "") {
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
 
     visitPart(ty);
+    if (!name.empty())
+      os << ' ' << name;
     while (!openFunctionTypes.empty()) {
       const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
       finishFunctionType(openFunctionTy);
@@ -624,6 +668,7 @@ public:
           assert(false && "unknown local type decl");
       });
     }
+    os << '\n';
   }
 
   bool writeClass(const ClassDecl *CD) {

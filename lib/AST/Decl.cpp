@@ -1108,7 +1108,7 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   // 'let' properties are generally immutable, unless they are a 'let' ivar
   // and we are in the init() for the type that holds the ivar.
   if (isLet()) {
-    if (auto *CD = dyn_cast<ConstructorDecl>(UseDC))
+    if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC))
       if (CD->getDeclContext() == getDeclContext())
         return true;
 

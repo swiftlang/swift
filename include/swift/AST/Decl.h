@@ -2526,6 +2526,8 @@ public:
   /// \brief Returns whether the var is settable in the specified context: this
   /// is either because it is a stored var, because it has a custom setter, or
   /// is a let member in an initializer.
+  ///
+  /// Pass a null context to check if it's always settable.
   bool isSettable(DeclContext *UseDC) const;
 
   PatternBindingDecl *getParentPattern() const {
