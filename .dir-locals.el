@@ -14,7 +14,6 @@
 
 ((nil
   (tab-width . 2)
-  (c-file-style . "swift")
   (eval .
         ;; Load the Swift project's settings.  To suppress this action
         ;; you can put "(provide 'swift-project-settings)" in your
@@ -31,12 +30,20 @@
             "utils")
            :append)
             ;; Load our project's settings -- indirectly brings in swift-mode
-          (require 'swift-project-settings))))
- (c++mode
-  (whitespace-style face lines indentation:space)
-  (eval whitespace-mode))
+          (require 'swift-project-settings)))
+  (c-file-style . "swift")
+  )
+ (c++-mode
+  (whitespace-style . (face lines indentation:space))
+  (eval . (whitespace-mode)))
+ (objc-mode
+  (whitespace-style . (face lines indentation:space))
+  (eval . (whitespace-mode)))
+ (c-mode
+  (whitespace-style . (face lines indentation:space))
+  (eval . (whitespace-mode)))
  (swift-mode
-  (tab-always-indent t)))
+  (tab-always-indent . t)))
 
 ;; Local Variables:
 ;; eval: (whitespace-mode -1)
