@@ -1,0 +1,4 @@
+module swift {
+  header "swift.h"
+  export *
+}
