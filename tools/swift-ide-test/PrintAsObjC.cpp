@@ -135,6 +135,17 @@ private:
     os << "@end\n";
   }
 
+  void printSingleMethodParam(const Pattern *param) {
+    os << ":(";
+    this->print(param->getType());
+    os << ")";
+
+    if (isa<AnyPattern>(param))
+      os << "_";
+    else
+      os << cast<NamedPattern>(param)->getBoundName();
+  }
+
   void printAbstractFunction(AbstractFunctionDecl *AFD, StringRef name,
                              bool isClassMethod) {
     if (isClassMethod)
@@ -157,9 +168,7 @@ private:
       assert(isa<ParenPattern>(bodyPatterns.back()));
 
       auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
-      os << ":(";
-      this->print(bodyPattern->getType());
-      os << ")_";
+      printSingleMethodParam(bodyPattern);
 
     } else {
       const TuplePattern *argParams = cast<TuplePattern>(argPatterns.back());
@@ -179,15 +188,7 @@ private:
         }
 
         auto bodyPattern = bodyParam.getPattern();
-        bodyPattern = bodyPattern->getSemanticsProvidingPattern();
-        os << ":(";
-        this->print(bodyPattern->getType());
-        os << ")";
-
-        if (isa<AnyPattern>(bodyPattern))
-          os << "_";
-        else
-          os << cast<NamedPattern>(bodyPattern)->getBoundName();
+        printSingleMethodParam(bodyPattern->getSemanticsProvidingPattern());
 
         isFirst = false;
       });
@@ -260,6 +261,54 @@ private:
     os << ") ";
     print(VD->getType(), VD->getName().str());
     os << ";\n";
+  }
+
+  void visitSubscriptDecl(SubscriptDecl *SD) {
+    os << "- (";
+    print(SD->getElementType());
+    os << ')';
+
+    switch (SD->getObjCSubscriptKind()) {
+    case ObjCSubscriptKind::None:
+      llvm_unreachable("subscript is already marked @objc");
+    case ObjCSubscriptKind::Indexed:
+      os << "objectAtIndexedSubscript";
+      break;
+    case ObjCSubscriptKind::Keyed:
+      os << "objectForKeyedSubscript";
+      break;
+    }
+
+    const Pattern *P = SD->getIndices();
+    if (auto tuple = dyn_cast<TuplePattern>(P)) {
+      assert(tuple->getNumFields() == 1);
+      assert(!tuple->hasVararg());
+      P = tuple->getFields().front().getPattern();
+    }
+    P = P->getSemanticsProvidingPattern();
+    
+    printSingleMethodParam(P);
+    os << ";\n";
+
+    if (SD->isSettable()) {
+      os << "- (void)setObject:(";
+      print(SD->getElementType());
+      os << ")value ";
+
+      switch (SD->getObjCSubscriptKind()) {
+      case ObjCSubscriptKind::None:
+        llvm_unreachable("subscript is already marked @objc");
+      case ObjCSubscriptKind::Indexed:
+        os << "atIndexedSubscript";
+        break;
+      case ObjCSubscriptKind::Keyed:
+        os << "forKeyedSubscript";
+        break;
+      }
+
+      printSingleMethodParam(P);
+      os << ";\n";
+    }
   }
 
   /// Visit part of a type, such as the base of a pointer type.
