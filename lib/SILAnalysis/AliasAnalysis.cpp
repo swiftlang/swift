@@ -17,10 +17,16 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+static llvm::cl::opt<bool>
+DisableAliasAnalysis("disable-aa", llvm::cl::init(false),
+                     llvm::cl::desc("Always return most conservative AA "
+                                    "result."));
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
@@ -99,6 +105,10 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
+  // If alias analysis is disabled, always return may alias.
+  if (DisableAliasAnalysis)
+    return AliasResult::MayAlias;
+
   // If the two values equal, quickly return must alias.
   if (V1 == V2)
     return AliasResult::MustAlias;
