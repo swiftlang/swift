@@ -30,11 +30,16 @@ using namespace swift::driver;
 using namespace swift::driver::tools;
 using namespace llvm::opt;
 
+static bool tripleIsiOSSimulator(const llvm::Triple &triple) {
+  llvm::Triple::ArchType arch = triple.getArch();
+  return (triple.isiOS() &&
+          (arch == llvm::Triple::ArchType::x86 ||
+           arch == llvm::Triple::ArchType::x86_64));
+}
+
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   if (triple.isiOS()) {
-    llvm::Triple::ArchType arch = triple.getArch();
-    if (arch == llvm::Triple::ArchType::x86 ||
-        arch == llvm::Triple::ArchType::x86_64)
+    if (tripleIsiOSSimulator(triple))
       return "iphonesimulator";
     return "iphoneos";
   }
@@ -427,9 +432,13 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
   // FIXME: Properly handle deployment targets.
-  assert(TC.getTriple().isiOS() || TC.getTriple().isMacOSX());
-  if (TC.getTriple().isiOS()) {
-    Arguments.push_back("-iphoneos_version_min");
+  llvm::Triple Triple = TC.getTriple();
+  assert(Triple.isiOS() || Triple.isMacOSX());
+  if (Triple.isiOS()) {
+    if (tripleIsiOSSimulator(Triple))
+      Arguments.push_back("-ios_simulator_version_min");
+    else
+      Arguments.push_back("-iphoneos_version_min");
     Arguments.push_back("7.0.0");
   } else {
     Arguments.push_back("-macosx_version_min");
