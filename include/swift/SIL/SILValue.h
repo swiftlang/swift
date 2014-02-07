@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
   class SILTypeList;
@@ -672,6 +673,7 @@ static inline llvm::hash_code hash_value(SILValue V) {
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
+  OS << "(" << V.getResultNumber() << "): ";
   V.print(OS);
   return OS;
 }
