@@ -149,6 +149,21 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   return LastExtract;
 }
 
+static void
+invalidateAliasingLoads(SILInstruction *Inst,
+                        llvm::SmallPtrSetImpl<LoadInst *> &Loads,
+                        AliasAnalysis *AA) {
+  llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
+  for (auto *LI : Loads)
+    if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, LI->getOperand())))
+      InvalidatedLoadList.push_back(LI);
+  for (auto *LI : InvalidatedLoadList) {
+    DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
+          "such that a load is invalidated:" << *LI);
+    Loads.erase(LI);
+  }
+}
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
@@ -164,16 +179,9 @@ bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      // Invalidate all loads that this store writes to.
-      llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
-      for (auto *LI : Loads)
-        if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, SILValue(LI))))
-          InvalidatedLoadList.push_back(LI);
-      for (auto *LI : InvalidatedLoadList) {
-        DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
-              "such that a load is invalidated:" << *LI);
-        Loads.erase(LI);
-      }
+      // Invalidate any load that we can not prove does not read from the stores
+      // destination.
+      invalidateAliasingLoads(Inst, Loads, AA);
 
       // If we are storing to the previously stored address then delete the old
       // store.
@@ -204,8 +212,7 @@ bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
       // Search the previous loads and replace the current load with one of the
       // previous loads.
       for (auto PrevLI : Loads) {
-        SILValue ForwardingExtract =
-          findExtractPathBetweenValues(PrevLI, LI);
+        SILValue ForwardingExtract = findExtractPathBetweenValues(PrevLI, LI);
         if (!ForwardingExtract)
           continue;
 
@@ -263,17 +270,10 @@ bool promoteMemoryOperationsInBlock(SILBasicBlock *BB, AliasAnalysis *AA) {
     // If we have an instruction that may write to memory and we can not prove
     // that it and its operands can not alias a load we have visited, invalidate
     // that load.
-    if (Inst->mayWriteToMemory()) {
-      llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
-      for (auto *LI : Loads)
-        if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, SILValue(LI))))
-          InvalidatedLoadList.push_back(LI);
-      for (auto *LI : InvalidatedLoadList) {
-        DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
-              "such that a load is invalidated:" << *LI);
-        Loads.erase(LI);
-      }
-    }
+    if (Inst->mayWriteToMemory())
+      // Invalidate any load that we can not prove does not read from one of the
+      // writing instructions operands.
+      invalidateAliasingLoads(Inst, Loads, AA);
   }
 
   return Changed;
