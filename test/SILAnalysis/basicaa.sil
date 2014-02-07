@@ -5,6 +5,10 @@ import Builtin
 // Address Arguments don't alias if they are arguments to the first BB.
 //
 // CHECK-LABEL: @address_args_dont_alias_in_first_bb
+// CHECK: PAIR #0.
+// CHECK-NEXT: %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
 // CHECK: PAIR #1.
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: %1 = argument of bb0
@@ -25,7 +29,6 @@ bb0(%0 : $*Builtin.ObjectPointer, %1 : $*Builtin.ObjectPointer):
 //
 // CHECK-LABEL: @address_args_may_alias_in_non_first_bb
 // CHECK-NOT: NoAlias
-// CHECK-NOT: MustAlias
 sil @address_args_may_alias_in_non_first_bb : $@thin (@inout Builtin.ObjectPointer) -> () {
 bb0(%0 : $*Builtin.ObjectPointer):
   br bb1(%0 : $*Builtin.ObjectPointer, %0 : $*Builtin.ObjectPointer)

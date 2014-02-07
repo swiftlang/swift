@@ -99,6 +99,10 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
+  // If the two values equal, quickly return must alias.
+  if (V1 == V2)
+    return AliasResult::MustAlias;
+
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
   // Strip off any casts on V1, V2.
