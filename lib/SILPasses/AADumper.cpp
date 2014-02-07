@@ -55,20 +55,19 @@ class SILAADumper : public SILFunctionTransform {
   
   void run() {
     SILFunction &Fn = *getFunction();
-    llvm::outs() << "*** " << Fn.getName() << " ***\n";
+    llvm::outs() << "@" << Fn.getName() << "\n";
     // Gather up all Values in Fn.
     std::vector<SILValue> Values;
     if (!gatherValues(Fn, Values))
       return;
 
-    llvm::outs() << "!!! Found Values !!!\n";
-
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
 
     // Emit the N^2 alias evaluation of the values.
+    unsigned PairCount = 0;
     for (auto V1 : Values)
       for (auto V2 : Values)
-        llvm::outs() << "V1:\n    " << V1 << "V2:\n    " << V2 << "Alias: "
+        llvm::outs() << "PAIR #" << PairCount++ << ".\n" << V1 << V2 
                      << AA->alias(V1, V2) << "\n";
   }
 };
