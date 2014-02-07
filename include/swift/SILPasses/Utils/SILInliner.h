@@ -23,6 +23,10 @@
 
 namespace swift {
 
+/// Helper that computes an integral cost metric for use with inlining/cloning
+/// passes that want to compare against a threshold.
+unsigned getFunctionCost(SILFunction *F, SILFunction *Callee, unsigned Cutoff);
+
 class SILInliner : public SILCloner<SILInliner> {
 public:
   friend class SILVisitor<SILInliner>;
