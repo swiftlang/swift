@@ -1754,7 +1754,7 @@ recur:
       }
       // Chain the inner continuation to the outer.
       if (gen.B.hasValidInsertionPoint())
-        gen.Cleanups.emitBranchAndCleanups(contDest, stmt);
+        gen.Cleanups.emitBranchAndCleanups(contDest, CleanupLocation(stmt));
     }
   }
 
