@@ -143,7 +143,7 @@ The standard library does provide three levels of weak reference
 :code:`null`.
 
 There is a great deal of interesting discussion of these
-reference classes `here <http://www.kdgregory.com/index.php?page=java.refobj>`.
+reference classes `here <http://www.kdgregory.com/index.php?page=java.refobj>`_.
 
 Java :code:`Reference` objects may be constructed with an
 optional :code:`ReferenceQueue`;  if so, then when the

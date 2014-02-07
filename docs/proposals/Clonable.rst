@@ -12,7 +12,7 @@
 :Edition: 2
 
 **Abstract:** to better support the creation of value types, we
-propose a “magic” `Clonable` protocol and an annotation for describing
+propose a “magic” ``Clonable`` protocol and an annotation for describing
 which instance variables should be cloned when a type is copied.  This
 proposal **augments revision 1** of the Clonable proposal with our
 rationale for dropping our support for ``val`` and ``ref``, a

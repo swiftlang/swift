@@ -29,7 +29,7 @@ and argument-passing (hereafter, “the big three operations”) each
 create an *independently modifiable copy* of the source value that is
 *interchangeable with the source*. [#interchange]_
 
-If `T` has value semantics, the `f`\ s below are all equivalent::
+If ``T`` has value semantics, the ``f``\ s below are all equivalent::
 
   func f1() -> T {
      var x : T
@@ -91,7 +91,7 @@ expects that copies of a reference share a target object, so
 modifications made via one copy are visible as side-effects through
 the others.
 
-If `T` has reference semantics, the `f`\ s below are all
+If ``T`` has reference semantics, the ``f``\ s below are all
 equivalent::
 
   func f1(T x) {
@@ -124,35 +124,35 @@ The Role of Mutation
 
 It's worth noting that in the absence of mutation, value semantics and
 reference semantics are indistinguishable.  You can easily prove that
-to yourself by striking the calls to `mutate()` in each of the
+to yourself by striking the calls to ``mutate()`` in each of the
 previous examples, and seeing that the equivalences hold for any type.
 In fact, the fundamental difference between reference and value
 semantics is that **value semantics never creates multiple paths to
 the same mutable state**. [#cow]_
 
-.. Admonition:: `struct` vs `class`
+.. Admonition:: ``struct`` vs ``class``
 
-   Although `struct`\ s were designed to support value semantics and
-   `class`\ es were designed to support reference semantics, it would
+   Although ``struct``\ s were designed to support value semantics and
+   ``class``\ es were designed to support reference semantics, it would
    be wrong to assume that they are always used that way.  As noted
    earlier, in the absence of mutation, value semantics and reference
-   semantics are indistinguishable.  Therefore, any immutable `class`
+   semantics are indistinguishable.  Therefore, any immutable ``class``
    trivially has value semantics (*and* reference semantics).
 
-   Second, it's easy to implement a `struct` with reference semantics:
-   simply keep the primary value in a `class` and refer to it through
-   an instance variable.  So, one cannot assume that a `struct` type
-   has value semantics.  `Array` could be seen (depending on how you
-   view its value) as an example of a reference-semantics `struct`
+   Second, it's easy to implement a ``struct`` with reference semantics:
+   simply keep the primary value in a ``class`` and refer to it through
+   an instance variable.  So, one cannot assume that a ``struct`` type
+   has value semantics.  ``Array`` could be seen (depending on how you
+   view its value) as an example of a reference-semantics ``struct``
    from the standard library.
 
 The Problem With Generics
 =========================
 
 The classic Liskov principle says the semantics of operations on
-`Duck`\ 's subtypes need to be consistent with those on `Duck` itself,
-so that functions operating on `Duck`\ s still “work” when passed a
-`Mallard`.  More generally, for a function to make meaningful
+``Duck``\ 's subtypes need to be consistent with those on ``Duck`` itself,
+so that functions operating on ``Duck``\ s still “work” when passed a
+``Mallard``.  More generally, for a function to make meaningful
 guarantees, the semantics of its sub-operations need to be consistent
 regardless of the actual argument types passed.
 
@@ -292,7 +292,7 @@ to observe a difference in behavior:
 2. In-place mutation of ``x`` *while a (reference) copy is extant* and
    thus can be observed through the copy iff ``x`` is a reference.
 
-Take, for example, `swap`, which uses variable initialization and
+Take, for example, ``swap``, which uses variable initialization and
 assignment to exchange two values::
 
   func swap<T>(lhs : [inout] T, rhs : [inout] T)
@@ -315,7 +315,7 @@ than copyability, it's reasonable to say that ``swap`` is built on
 is built on input iterators rather than on forward iterators.
 
 We could imagine a hypothetical syntax for moving in swift, where
-(unlike assignment) the value of the right-hand-side of the `<-` is
+(unlike assignment) the value of the right-hand-side of the ``<-`` is
 not necessarily preserved::
 
   var tmp <- lhs
@@ -332,20 +332,20 @@ three" operations::
 How to Build an Interesting Type with Value Semantics
 =====================================================
 
-Suppose we want to build a variable-sized data structure `X` with
+Suppose we want to build a variable-sized data structure ``X`` with
 (mutable) value semantics?  How do we do it?  
 
-If we make `X` a `class`, we automatically get reference semantics, so
+If we make ``X` a ``class``, we automatically get reference semantics, so
 its value must be copied before each mutation, which is tedious and
 error-prone.  Its public mutating interface must be in terms of free
 functions (not methods), so that the original reference value can be
-passed `[inout]` and overwritten.  Since there's no user access to the
+passed ``[inout]`` and overwritten.  Since there's no user access to the
 reference count, we can't determine that we hold the only reference to
 the value, so we can't optimize copy-on-write, even in single-threaded
 programs.  In multi-threaded programs, where each mutation implies
 synchronization on the reference count, the costs are even higher.
 
-If we make the type a `struct`, you have only two ways to create
+If we make the type a ``struct``, you have only two ways to create
 variable-sized data:
 
 1. Hold a type with reference semantics as an instance variable.
@@ -353,8 +353,8 @@ variable-sized data:
    copy-on-write.  We can, however, use methods for mutation in lieu
    of free functions.
 
-2. Use discriminated unions (`union`).  Interestingly, a datatype
-   built with `union` automatically has value semantics.  However,
+2. Use discriminated unions (``union``).  Interestingly, a datatype
+   built with ``union`` automatically has value semantics.  However,
    there vocabulary of efficient data structures that can be built
    this way is extremely limited.  For example, while a singly-linked
    list is trivial to implement, an efficient doubly-linked list is
