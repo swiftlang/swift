@@ -42,6 +42,17 @@ struct ID {
   } Kind;
   unsigned Number;
   int ResultNumber;
+
+  // A stable ordering of ID objects.
+  bool operator<(ID Other) const {
+    if (unsigned(Kind) < unsigned(Other.Kind))
+      return true;
+    if (Number < Other.Number)
+      return true;
+    if (ResultNumber < Other.ResultNumber)
+      return true;
+    return false;
+  }
 };
 
 enum SILColorKind {
@@ -381,8 +392,16 @@ public:
       if (std::next(V->use_begin()) != V->use_end())
         OS << 's';
       OS << ": ";
-      interleave(V->use_begin(), V->use_end(),
-                 [&] (Operand *o) { OS << getID(o->getUser()); },
+
+      // Display the user ids sorted to give a stable use order in the printer's
+      // output. This makes diffing large sections of SIL significantly easier.
+      llvm::SmallVector<ID, 32> UserIDs;
+      for (auto *Op : V->getUses())
+        UserIDs.push_back(getID(Op->getUser()));
+      std::sort(UserIDs.begin(), UserIDs.end());
+
+      interleave(UserIDs.begin(), UserIDs.end(),
+                 [&] (ID id) { OS << id; },
                  [&] { OS << ", "; });
       printedSlashes = true;
     }
