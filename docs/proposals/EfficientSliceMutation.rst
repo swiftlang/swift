@@ -53,7 +53,9 @@ Here's a version that uses a comparison function:
     }
   }
   
-The obvious alternative is to move the slices into temporary lvalues, as follows::
+The obvious alternative is to move the slices into temporary lvalues, as follows:
+
+.. parsed-literal::  
     
     @mutating
     func quickSort(compare: (StreamType.Element, StreamType.Element)->Bool) {
