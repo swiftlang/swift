@@ -18,6 +18,7 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/Tool.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/raw_ostream.h"
@@ -145,6 +146,8 @@ int Compilation::performJobsInList(const JobList &JL,
     if (TaskQueue::supportsBufferingOutput())
       llvm::errs() << Output;
 
+    const Command *FinishedCmd = (const Command *)Context;
+
     if (ReturnCode != 0) {
       // The task failed, so return true without performing any further
       // dependency analysis.
@@ -154,6 +157,11 @@ int Compilation::performJobsInList(const JobList &JL,
       if (Result == 0)
         Result = ReturnCode;
 
+      if (!FinishedCmd->getCreator().hasGoodDiagnostics() || ReturnCode != 1)
+        Diags.diagnose(SourceLoc(), diag::error_command_failed,
+                       FinishedCmd->getCreator().getNameForDiagnostics(),
+                       ReturnCode);
+
       return TaskFinishedResponse::StopExecution;
     }
 
@@ -161,7 +169,6 @@ int Compilation::performJobsInList(const JobList &JL,
     // JobList.
 
     // TODO: use the Command which just finished to evaluate other Commands.
-    const Command *FinishedCmd = (const Command *)Context;
     FinishedCommands.insert(FinishedCmd);
     for (const Job *J : JL) {
       if (const Command *Cmd = dyn_cast<Command>(J)) {
@@ -181,8 +188,29 @@ int Compilation::performJobsInList(const JobList &JL,
     return TaskFinishedResponse::ContinueExecution;
   };
 
+  auto taskSignalled = [&] (ProcessId Pid, StringRef ErrorMsg, StringRef Output,
+                            void *Context) -> TaskFinishedResponse {
+    // First, send the buffered output to stderr, though only if we support
+    // getting buffered output.
+    if (TaskQueue::supportsBufferingOutput())
+      llvm::errs() << Output;
+
+    if (!ErrorMsg.empty())
+      Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
+                     ErrorMsg);
+
+    const Command *FailedCmd = (const Command *)Context;
+    Diags.diagnose(SourceLoc(), diag::error_command_signalled,
+                   FailedCmd->getCreator().getNameForDiagnostics());
+
+    // Since the task signalled, so unconditionally set result to -2.
+    Result = -2;
+
+    return TaskFinishedResponse::StopExecution;
+  };
+
   // Ask the TaskQueue to execute.
-  TQ->execute(taskBegan, taskFinished);
+  TQ->execute(taskBegan, taskFinished, taskSignalled);
 
   return Result;
 }

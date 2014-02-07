@@ -48,7 +48,8 @@ void DummyTaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
 }
 
 bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
-                             TaskQueue::TaskFinishedCallback Finished) {
+                             TaskQueue::TaskFinishedCallback Finished,
+                             TaskQueue::TaskSignalledCallback Signalled) {
   typedef std::pair<pid_t, std::unique_ptr<DummyTask>> PidTaskPair;
   std::queue<PidTaskPair> ExecutingTasks;
 

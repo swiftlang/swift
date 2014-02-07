@@ -106,7 +106,8 @@ public:
   }
 
   /// Asks the Compilation to perform the Jobs which it knows about.
-  /// \returns result code for the Compilation's Jobs; 0 indicates success
+  /// \returns result code for the Compilation's Jobs; 0 indicates success and
+  /// -2 indicates that one of the Compilation's Jobs crashed during execution
   int performJobs();
 
 private:
@@ -118,7 +119,8 @@ private:
   /// \param FinishedCommands a set of Commands which have finished execution,
   /// or which are known not to need to execute.
   ///
-  /// \returns exit code of the first failed Job, or 0 on success
+  /// \returns exit code of the first failed Job, or 0 on success. A return
+  /// value of -2 indicates that a Job crashed during execution.
   int performJobsInList(const JobList &JL,
                         llvm::DenseSet<const Command *> &ScheduledCommands,
                         llvm::DenseSet<const Command *> &FinishedCommands);

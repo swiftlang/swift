@@ -238,8 +238,8 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
   QueuedTasks.push(std::move(T));
 }
 
-bool TaskQueue::execute(TaskBeganCallback Began,
-                        TaskFinishedCallback Finished) {
+bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
+                        TaskSignalledCallback Signalled) {
   typedef llvm::DenseMap<pid_t, std::unique_ptr<Task>> PidToTaskMap;
 
   // Stores the current executing Tasks, organized by pid.
@@ -338,6 +338,25 @@ bool TaskQueue::execute(TaskBeganCallback Began,
             } else if (Result != 0) {
               // Since we don't have a TaskFinishedCallback, treat a subtask
               // which returned a nonzero exit code as having failed.
+              SubtaskFailed = true;
+            }
+          } else if (WIFSIGNALED(Status)) {
+            // The process exited due to a signal.
+            int Signal = WTERMSIG(Status);
+
+            StringRef ErrorMsg = strsignal(Signal);
+
+            if (Signalled) {
+              TaskFinishedResponse Response = Signalled(T.getPid(), ErrorMsg,
+                                                        T.getOutput(),
+                                                        T.getContext());
+              if (Response == TaskFinishedResponse::StopExecution)
+                // If we have a TaskCrashedCallback, only set SubtaskFailed to
+                // true if the callback returns StopExecution.
+                SubtaskFailed = true;
+            } else {
+              // Since we don't have a TaskCrashedCallback, treat a crashing
+              // subtask as having failed.
               SubtaskFailed = true;
             }
           }

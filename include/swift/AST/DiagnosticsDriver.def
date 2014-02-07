@@ -42,6 +42,14 @@ WARNING(warning_parallel_execution_not_supported,driver,none,
         "parallel execution not supported; falling back to serial execution",
         ())
 
+ERROR(error_unable_to_execute_command,driver,none,
+      "unable to execute command: %0", (StringRef))
+ERROR(error_command_signalled,driver,none,
+      "%0 command failed due to signal (use -v to see invocation)", (StringRef))
+ERROR(error_command_failed,driver,none,
+      "%0 command failed with exit code %1 (use -v to see invocation)",
+      (StringRef, int))
+
 ERROR(error_cannot_specify__o_for_multiple_outputs,driver,none,
       "cannot specify -o when generating multiple output files", ())
 

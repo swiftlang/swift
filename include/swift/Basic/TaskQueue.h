@@ -79,6 +79,22 @@ public:
   typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
                                              StringRef Output, void *Context)>
     TaskFinishedCallback;
+
+  /// \brief A callback which will be executed if a task exited abnormally due
+  /// to a signal.
+  ///
+  /// \param Pid the ProcessId of the task which exited abnormally.
+  /// \param ErrorMsg a string describing why the task exited abnormally. If
+  /// no reason could be deduced, this may be empty.
+  /// \param Output the output from the task which exited abnormally, if
+  /// available. (This may not be available on all platforms.)
+  /// \param Context the context which was passed when the task was added
+  ///
+  /// \returns a TaskFinishedResponse indicating whether or not execution
+  /// should proceed
+  typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
+                                             StringRef Output, void *Context)>
+    TaskSignalledCallback;
 #pragma clang diagnostic pop
 
   /// \brief Indicates whether TaskQueue supports buffering output on the
@@ -112,10 +128,14 @@ public:
   ///
   /// \param Began a callback which will be called when a task begins
   /// \param Finished a callback which will be called when a task finishes
+  /// \param Signalled a callback which will be called if a task exited
+  /// abnormally due to a signal
   ///
   /// \returns true if all tasks did not execute successfully
-  virtual bool execute(TaskBeganCallback Began = TaskBeganCallback(),
-                       TaskFinishedCallback Finished = TaskFinishedCallback());
+  virtual bool
+  execute(TaskBeganCallback Began = TaskBeganCallback(),
+          TaskFinishedCallback Finished = TaskFinishedCallback(),
+          TaskSignalledCallback Signalled = TaskSignalledCallback());
 };
 
 /// \brief A class which simulates execution of tasks with behavior similar to
@@ -144,8 +164,10 @@ public:
                        ArrayRef<const char *> Env = llvm::None,
                        void *Context = nullptr);
 
-  virtual bool execute(TaskBeganCallback Began = TaskBeganCallback(),
-                       TaskFinishedCallback Finished = TaskFinishedCallback());
+  virtual bool
+  execute(TaskBeganCallback Began = TaskBeganCallback(),
+          TaskFinishedCallback Finished = TaskFinishedCallback(),
+          TaskSignalledCallback Signalled = TaskSignalledCallback());
 };
 
 } // end namespace sys

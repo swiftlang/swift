@@ -73,7 +73,8 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
   QueuedTasks.push(std::move(T));
 }
 
-bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished){
+bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
+                        TaskSignalledCallback Signalled) {
   bool ContinueExecution = true;
 
   // This implementation of TaskQueue doesn't support parallel execution.
@@ -104,13 +105,30 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished){
       Began(PI.Pid, T->Context);
     }
 
-    PI = Wait(PI, 0, true);
-    if (Finished) {
-      TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-                                               StringRef(), T->Context);
-      ContinueExecution = Response != TaskFinishedResponse::StopExecution;
-    } else if (PI.ReturnCode != 0) {
-      ContinueExecution = false;
+    std::string ErrMsg;
+    PI = Wait(PI, 0, true, &ErrMsg);
+    int ReturnCode = PI.ReturnCode;
+    if (ReturnCode == -2) {
+      // Wait() returning a return code of -2 indicates the process received
+      // a signal during execution.
+      if (Signalled) {
+        TaskFinishedResponse Response = Signalled(PI.Pid, ErrMsg, StringRef(),
+                                                  T->Context);
+        ContinueExecution = Response != TaskFinishedResponse::StopExecution;
+      } else {
+        // If we don't have a Signalled callback, unconditionally stop.
+        ContinueExecution = false;
+      }
+    } else {
+      // Wait() returned a normal return code, so just indicate that the task
+      // finished.
+      if (Finished) {
+        TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
+        StringRef(), T->Context);
+        ContinueExecution = Response != TaskFinishedResponse::StopExecution;
+      } else if (PI.ReturnCode != 0) {
+        ContinueExecution = false;
+      }
     }
   }
 
