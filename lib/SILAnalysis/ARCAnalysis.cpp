@@ -14,6 +14,7 @@
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
@@ -105,11 +106,48 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   }
 }
 
+static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
+  switch (B) {
+  case SILInstruction::MemoryBehavior::MayWrite:
+  case SILInstruction::MemoryBehavior::MayReadWrite:
+  case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+    return true;
+  case SILInstruction::MemoryBehavior::None:
+  case SILInstruction::MemoryBehavior::MayRead:
+    return false;
+  }
+}
+
+static bool isReadMemBehavior(SILInstruction::MemoryBehavior B) {
+  switch (B) {
+  case SILInstruction::MemoryBehavior::MayRead:
+  case SILInstruction::MemoryBehavior::MayReadWrite:
+  case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+    return true;
+  case SILInstruction::MemoryBehavior::None:
+  case SILInstruction::MemoryBehavior::MayWrite:
+    return false;
+  }
+}
+
 /// Can Inst use Target in a manner that requires Target to be alive at Inst?
-bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target) {
+bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target,
+                                AliasAnalysis *AA) {
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
   if (canInstUseRefCountValues(Inst))
+    return true;
+
+  // If Inst is a store and we can prove that it can not write target, return
+  // true.
+  if (isa<StoreInst>(Inst) &&
+      !isWriteMemBehavior(AA->getMemoryBehavior(Inst, Target)))
+    return true;
+
+  // If Inst is a store and we can prove that it can not write target, return
+  // true.
+  if (isa<LoadInst>(Inst) &&
+      !isReadMemBehavior(AA->getMemoryBehavior(Inst, Target)))
     return true;
 
   // Otherwise, assume that Inst can use Target.

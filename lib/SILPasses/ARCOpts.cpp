@@ -17,6 +17,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -144,7 +145,8 @@ public:
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser);
+  bool handlePotentialUser(SILInstruction *PotentialUser,
+                           AliasAnalysis *AA);
 
   /// Returns true if Decrement is a decrement instruction that matches the
   /// increment we are tracking. Performs all necessary state cleanups.
@@ -213,7 +215,8 @@ bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
   }
 }
 
-bool ReferenceCountState::handlePotentialUser(SILInstruction *Other) {
+bool ReferenceCountState::handlePotentialUser(SILInstruction *Other,
+                                              AliasAnalysis *AA) {
   // If our state is not initialized, return false since we are not tracking
   // anything.
   if (!isTrackingInstruction())
@@ -221,7 +224,7 @@ bool ReferenceCountState::handlePotentialUser(SILInstruction *Other) {
 
   // If we can prove that Other can not use the pointer we are tracking,
   // return...
-  if (cannotUseValue(Other, getValue()))
+  if (cannotUseValue(Other, getValue(), AA))
     return false;
 
   // Otherwise advance the sequence...
@@ -285,7 +288,8 @@ static bool
 processBBTopDown(SILBasicBlock &BB,
                  llvm::MapVector<SILValue, ReferenceCountState> &BBState,
                  llvm::DenseMap<SILInstruction *,
-                                ReferenceCountState> &DecToIncStateMap) {
+                                ReferenceCountState> &DecToIncStateMap,
+                 AliasAnalysis *AA) {
 
   bool NestingDetected = false;
 
@@ -411,7 +415,7 @@ processBBTopDown(SILBasicBlock &BB,
       // could be used by the given instruction.
       SILInstruction *Other = OtherState.second.getInstruction();
       (void)Other;
-      if (OtherState.second.handlePotentialUser(&I))
+      if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
     }
   }
@@ -486,7 +490,7 @@ performCodeMotion(llvm::DenseMap<SILInstruction *,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processFunction(SILFunction &F) {
+static void processFunction(SILFunction &F, AliasAnalysis *AA) {
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   llvm::MapVector<SILValue, ReferenceCountState> BBState;
@@ -505,7 +509,7 @@ static void processFunction(SILFunction &F) {
 
       // We need to rerun if we saw any nested increment/decrements and if we
       // removed any increment/decrement pairs.
-      Changed = processBBTopDown(BB, BBState, DecToIncStateMap);
+      Changed = processBBTopDown(BB, BBState, DecToIncStateMap, AA);
       Changed &= performCodeMotion(DecToIncStateMap);
       if (!Changed)
         break;
@@ -520,7 +524,8 @@ static void processFunction(SILFunction &F) {
 class ARCOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    processFunction(*getFunction());
+    auto *AA = getAnalysis<AliasAnalysis>();
+    processFunction(*getFunction(), AA);
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 };

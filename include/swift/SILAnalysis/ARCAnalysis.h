@@ -17,6 +17,7 @@ namespace swift {
 
 class SILValue;
 class SILInstruction;
+class AliasAnalysis;
 
 } // end namespace swift
 
@@ -28,7 +29,8 @@ bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target);
 
 /// Can Inst use Target in a manner that requires Target to be alive
 /// before Inst?
-bool cannotUseValue(SILInstruction *Inst, SILValue Target);
+bool cannotUseValue(SILInstruction *Inst, SILValue Target,
+                    AliasAnalysis *AA);
 
 } // end namespace arc
 } // end namespace swift
