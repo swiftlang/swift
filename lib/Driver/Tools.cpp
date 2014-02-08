@@ -257,6 +257,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back(ModuleOutputPath.c_str());
   }
 
+  Args.AddLastArg(Arguments, options::OPT_module_cache_path);
+
   const std::string &SerializedDiagnosticsPath =
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
   if (!SerializedDiagnosticsPath.empty()) {
