@@ -427,9 +427,10 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     assert(type && "Unable to perform type substitution");
 
     SmallVector<ProtocolConformance *, 4> conformances;
-    if (type->is<TypeVariableType>()) {
-      // If the type is a type variable, just fill in null conformances.
-      // FIXME: It seems like we should record these as requirements (?).
+    if (type->is<TypeVariableType>() || type->isDependentType()) {
+      // If the type is a type variable or is dependent, just fill in null
+      // conformances. FIXME: It seems like we should record these as
+      // requirements (?).
       conformances.assign(archetype->getConformsTo().size(), nullptr);
     } else {
       // Find the conformances.

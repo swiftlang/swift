@@ -2889,7 +2889,7 @@ namespace {
     /// The generic argument index.
     unsigned Index;
   };
-  typedef std::pair<ArchetypeType*, ProtocolDecl*> FulfillmentKey;
+  typedef std::pair<Type, ProtocolDecl*> FulfillmentKey;
 
   /// A class for computing how to pass arguments to a polymorphic
   /// function.  The subclasses of this are the places which need to
@@ -2928,10 +2928,32 @@ namespace {
 
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
+    ArchetypeBuilder ParamArchetypes;
+
+    // Retrieve a representative archetype for a dependent type if it refers to
+    // a generic parameter or a member of a generic parameter, or return null
+    // if it does not.
+    ArchetypeType *getRepresentativeArchetype(Type depType) {
+      assert(depType->isDependentType()
+             && "considering non-dependent type?!");
+      
+      auto *potential = ParamArchetypes.resolveArchetype(depType);
+      if (!potential)
+        return nullptr;
+      
+      return potential->getArchetype(nullptr, ParamArchetypes.getModule());
+    }
+
   public:
-    PolymorphicConvention(CanSILFunctionType fnType)
-        : FnType(fnType) {
+    PolymorphicConvention(CanSILFunctionType fnType, Module &M)
+        : FnType(fnType), ParamArchetypes(M, M.getASTContext().Diags) {
       assert(hasPolymorphicParameters(fnType));
+
+      // Build archetypes from the generic signature so we can consult the
+      // protocol requirements on the parameters and dependent types.
+      //
+      // TODO: The ArchetypeBuilder should be cached in the generic signature.
+      ParamArchetypes.addGenericSignature(fnType->getGenericSignature());
 
       // Protocol witnesses always derive all polymorphic parameter information
       // from the Self argument. We also *cannot* consider other arguments;
@@ -2946,8 +2968,8 @@ namespace {
         else
           TheSourceKind = SourceKind::WitnessExtraData;
           
-        // Testify to archetypes in the Self type.
-        auto params = fnType->getParameters();
+        // Testify to generic parameters in the Self type.
+        auto params = fnType->getInterfaceParameters();
         CanType selfTy = params.back().getType();
         if (auto metaTy = dyn_cast<MetatypeType>(selfTy))
           selfTy = metaTy.getInstanceType();
@@ -2956,8 +2978,11 @@ namespace {
           considerNominalType(nomTy, 0);
         else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
           considerBoundGenericType(bgTy, 0);
-        else if (auto archeTy = dyn_cast<ArchetypeType>(selfTy))
-          considerWitnessArchetype(archeTy);
+        else if (auto param = dyn_cast<GenericTypeParamType>(selfTy))
+          considerWitnessParamType(param);
+        else if (isa<ArchetypeType>(selfTy))
+          // A bound Self archetype from a protocol. Nothing to do.
+          (void)0;
         else
           llvm_unreachable("witness for non-nominal type?!");
         
@@ -2969,7 +2994,7 @@ namespace {
       // class-pointer argument.
 
       // Just consider the 'self' parameter for now.
-      auto params = fnType->getParameters();
+      auto params = fnType->getInterfaceParameters();
       if (params.empty()) return;
       SourceKind source = considerParameter(params.back());
 
@@ -2979,23 +3004,30 @@ namespace {
       TheSourceKind = source;
     }
     
-    /// Extract archetype metadata for a value witness function of the given
+    /// Extract dependent type metadata for a value witness function of the given
     /// type.
-    PolymorphicConvention(NominalTypeDecl *ntd)
-      : FnType(getNotionalFunctionType(ntd))
+    PolymorphicConvention(NominalTypeDecl *ntd, Module &M)
+      : FnType(getNotionalFunctionType(ntd)),
+        ParamArchetypes(M, M.getASTContext().Diags)
     {
       TheSourceKind = SourceKind::Metadata;
+      
+      // Build archetypes from the generic signature so we can consult the
+      // protocol requirements on the parameters and dependent types.
+      //
+      // TODO: The ArchetypeBuilder should be cached in the generic signature.
+      ParamArchetypes.addGenericSignature(FnType->getGenericSignature());
 
-      auto paramType = FnType->getParameters()[0].getType();
+      auto paramType = FnType->getInterfaceParameters()[0].getType();
       considerBoundGenericType(cast<BoundGenericType>(paramType), 0);
     }
     
     SourceKind getSourceKind() const { return TheSourceKind; }
 
-    Range<NestedArchetypeIterator> getAllArchetypes() const {
-      if (auto gp = FnType->getGenericParams())
-        return gp->getAllNestedArchetypes();
-      return NestedArchetypeIterator::emptyRange();
+    GenericSignatureWitnessIterator getAllDependentTypes() const {
+      if (auto gs = FnType->getGenericSignature())
+        return gs->getAllDependentTypes();
+      return GenericSignatureWitnessIterator::emptyRange();
     }
     
   private:
@@ -3111,9 +3143,9 @@ namespace {
         // prevents us from realizing that we can rederive T and U in the
         // following:
         //   \forall T U . Vector<T->U> -> ()
-        if (auto argArchetype = dyn_cast<ArchetypeType>(arg)) {
-          // Find the archetype from the generic type.
-          considerArchetype(argArchetype, params[i], depth, i);
+        if (arg->isDependentType()) {
+          // Find the archetype from the dependent type.
+          considerDependentType(arg, params[i], depth, i);
         }
       }
 
@@ -3122,27 +3154,34 @@ namespace {
       considerParentType(CanType(type->getParent()), depth);
     }
 
-    /// We found a reference to the arg archetype at the given depth
+    /// We found a reference to the dependent arg type at the given depth
     /// and index.  Add any fulfillments this gives us.
-    void considerArchetype(ArchetypeType *arg, ArchetypeType *param,
-                           unsigned depth, unsigned index) {
-      // First, record that we can find this archetype at this point.
+    void considerDependentType(Type arg,
+                               ArchetypeType *param,
+                               unsigned depth,
+                               unsigned index) {
+      // If we don't have a representative archetype for this dependent type,
+      // don't try to fulfill it. It doesn't directly correspond to one of our
+      // parameters or their associated types.
+      auto representative = getRepresentativeArchetype(arg);
+      if (!representative)
+        return;
+      
+      // First, record that we can find this dependent type at this point.
       addFulfillment(arg, nullptr, depth, index);
 
       // Now consider each of the protocols that the parameter guarantees.
       for (auto protocol : param->getConformsTo()) {
-        // If arg == param, the second check is always true.  This is
-        // a fast path for some common cases where we're defining a
-        // method within the type we're matching against.
-        if (arg == param || requiresFulfillment(arg, protocol))
+        if (requiresFulfillment(representative, protocol))
           addFulfillment(arg, protocol, depth, index);
       }
     }
     
     /// We're binding an archetype for a protocol witness.
-    void considerWitnessArchetype(ArchetypeType *arg) {
+    void considerWitnessParamType(CanGenericTypeParamType arg) {
+      assert(arg->getDepth() == 0 && arg->getIndex() == 0);
       // First of all, the archetype fulfills its own requirements.
-      considerArchetype(arg, arg, 0, 0);
+      considerDependentType(arg, getRepresentativeArchetype(arg), 0, 0);
       
       // FIXME: We can't pass associated types of Self through the witness
       // CC, so as a hack, fake up impossible fulfillments for the associated
@@ -3150,20 +3189,37 @@ namespace {
       // can be recovered by substitution on the implementation side. For
       // default implementations, we will need to get associated types from
       // witness tables anyway.
-      considerArchetypeAssociatedTypes(arg);
-    }
-    
-    void considerArchetypeAssociatedTypes(ArchetypeType *arg) {
-      for (auto &assocTy : arg->getNestedTypes()) {
-        considerArchetype(assocTy.second, assocTy.second, ~0u, ~0u);
-        considerArchetypeAssociatedTypes(assocTy.second);
+      for (auto depTy : getAllDependentTypes()) {
+        // Is this a dependent member?
+        auto depMemTy = dyn_cast<DependentMemberType>(CanType(depTy));
+        if (!depMemTy)
+          continue;
+
+        // Is it rooted in a generic parameter?
+        CanType rootTy;
+        do {
+          rootTy = depMemTy.getBase();
+        } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
+        
+        auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy);
+        if (!rootParamTy)
+          continue;
+
+        // If so, suppress providing metadata for the type by making up a bogus
+        // fulfillment.
+        if (rootParamTy == arg) {
+          considerDependentType(depTy,
+                                getRepresentativeArchetype(depTy),
+                                ~0u, ~0u);
+        }
       }
     }
-
+    
     /// Does the given archetype require the given protocol to be fulfilled?
-    static bool requiresFulfillment(ArchetypeType *arg, ProtocolDecl *proto) {
+    static bool requiresFulfillment(ArchetypeType *representative,
+                                    ProtocolDecl *proto) {
       // TODO: protocol inheritance should be considered here somehow.
-      for (auto argProto : arg->getConformsTo()) {
+      for (auto argProto : representative->getConformsTo()) {
         if (argProto == proto)
           return true;
       }
@@ -3171,9 +3227,10 @@ namespace {
     }
 
     /// Testify that there's a fulfillment at the given depth and level.
-    void addFulfillment(ArchetypeType *arg, ProtocolDecl *proto,
+    void addFulfillment(Type arg, ProtocolDecl *proto,
                         unsigned depth, unsigned index) {
       // Only add a fulfillment if it's not enough information otherwise.
+      assert(arg->isDependentType() && "fulfilling non-dependent type?!");
       auto key = FulfillmentKey(arg, proto);
       if (!Fulfillments.count(key))
         Fulfillments.insert(std::make_pair(key, Fulfillment(depth, index)));
@@ -3183,18 +3240,22 @@ namespace {
   /// A class for binding type parameters of a generic function.
   class EmitPolymorphicParameters : public PolymorphicConvention {
     IRGenFunction &IGF;
+    GenericParamList *ContextParams;
     SmallVector<llvm::Value*, 4> MetadataForDepths;
 
   public:
     EmitPolymorphicParameters(IRGenFunction &IGF,
-                              CanSILFunctionType fnType)
-      : PolymorphicConvention(fnType), IGF(IGF) {}
+                              SILFunction &Fn)
+      : PolymorphicConvention(Fn.getLoweredFunctionType(),
+                              *IGF.IGM.SILMod->getSwiftModule()),
+        IGF(IGF), ContextParams(Fn.getContextGenericParams()) {}
 
     void emit(Explosion &in);
     
     /// Emit polymorphic parameters for a generic value witness.
     EmitPolymorphicParameters(IRGenFunction &IGF, NominalTypeDecl *ntd)
-      : PolymorphicConvention(ntd), IGF(IGF) {}
+      : PolymorphicConvention(ntd, *IGF.IGM.SILMod->getSwiftModule()),
+        IGF(IGF), ContextParams(ntd->getGenericParams()) {}
     
     void emitForGenericValueWitness(llvm::Value *selfMeta);
 
@@ -3202,8 +3263,11 @@ namespace {
     // Emit metadata bindings after the source, if any, has been bound.
     void emitWithSourceBound(Explosion &in);
     
-    CanType getArgType() const {
-      return FnType->getParameters().back().getType();
+    CanType getArgTypeInContext() const {
+      return ArchetypeBuilder::mapTypeIntoContext(
+                            IGF.IGM.SILMod->getSwiftModule(), ContextParams,
+                            FnType->getInterfaceParameters().back().getType())
+        ->getCanonicalType();
     }
 
     /// Emit the source value for parameters.
@@ -3217,7 +3281,7 @@ namespace {
           
       case SourceKind::ClassPointer:
         return emitHeapMetadataRefForHeapObject(IGF, in.getLastClaimed(),
-                                                getArgType(),
+                                                getArgTypeInContext(),
                                                 /*suppress cast*/ true);
 
       case SourceKind::GenericLValueMetadata: {
@@ -3225,7 +3289,7 @@ namespace {
         metatype->setName("Self");
 
         // Mark this as the cached metatype for the l-value's object type.
-        CanType argTy = getArgType();
+        CanType argTy = getArgTypeInContext();
         IGF.setUnscopedLocalTypeData(argTy, LocalTypeData::Metatype, metatype);
         return metatype;
       }
@@ -3281,13 +3345,18 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
 
 void
 EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
+  for (auto depTy : getAllDependentTypes()) {
+    // Get the corresponding context archetype.
+    auto contextTy
+      = ArchetypeBuilder::mapTypeIntoContext(IGF.IGM.SILMod->getSwiftModule(),
+                                             ContextParams, depTy)
+        ->castTo<ArchetypeType>();
   
-  for (auto archetype : getAllArchetypes()) {
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
 
     // If the reference is fulfilled by the source, go for it.
-    auto it = Fulfillments.find(FulfillmentKey(archetype, nullptr));
+    auto it = Fulfillments.find(FulfillmentKey(depTy, nullptr));
     if (it != Fulfillments.end()) {
       auto &fulfillment = it->second;
       auto ancestor = getMetadataForDepth(fulfillment.Depth);
@@ -3302,14 +3371,14 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
 
     // Collect all the witness tables.
     SmallVector<llvm::Value *, 8> wtables;
-    for (auto protocol : archetype->getConformsTo()) {
+    for (auto protocol : contextTy->getConformsTo()) {
       if (!requiresProtocolWitnessTable(protocol))
         continue;
       
       llvm::Value *wtable;
 
       // If the protocol witness table is fulfilled by the source, go for it.
-      auto it = Fulfillments.find(FulfillmentKey(archetype, protocol));
+      auto it = Fulfillments.find(FulfillmentKey(depTy, protocol));
       if (it != Fulfillments.end()) {
         auto &fulfillment = it->second;
         auto ancestor = getMetadataForDepth(fulfillment.Depth);
@@ -3324,16 +3393,15 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
       }
       wtables.push_back(wtable);
     }
-
-    IGF.bindArchetype(archetype, metadata, wtables);
+    IGF.bindArchetype(contextTy, metadata, wtables);
   }
 }
 
 /// Perform all the bindings necessary to emit the given declaration.
 void irgen::emitPolymorphicParameters(IRGenFunction &IGF,
-                                      CanSILFunctionType type,
+                                      SILFunction &Fn,
                                       Explosion &in) {
-  EmitPolymorphicParameters(IGF, type).emit(in);
+  EmitPolymorphicParameters(IGF, Fn).emit(in);
 }
 
 /// Perform the metadata bindings necessary to emit a generic value witness.
@@ -3528,7 +3596,8 @@ namespace {
   public:
     EmitPolymorphicArguments(IRGenFunction &IGF,
                              CanSILFunctionType polyFn)
-      : PolymorphicConvention(polyFn), IGF(IGF) {}
+      : PolymorphicConvention(polyFn, *IGF.IGM.SILMod->getSwiftModule()),
+        IGF(IGF) {}
 
     void emit(CanType substInputType, ArrayRef<Substitution> subs,
               Explosion &out);
@@ -3566,8 +3635,8 @@ void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   CanType substInputType;
-  if (!substFnType->getParameters().empty()) {
-    auto selfParam = substFnType->getParameters().back();
+  if (!substFnType->getInterfaceParameters().empty()) {
+    auto selfParam = substFnType->getInterfaceParameters().back();
     substInputType = selfParam.getType();
     // If the parameter is a direct metatype parameter, this is a static method
     // of the instance type. We can assume this because:
@@ -3600,24 +3669,20 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
   // because non-primary archetypes (which correspond to associated types)
   // will have their witness tables embedded in the witness table corresponding
   // to their parent.
-  for (auto *archetype : getAllArchetypes()) {
-    // Find the substitution for the archetype.
-    auto const *subp = std::find_if(subs.begin(), subs.end(),
-                                    [&](Substitution const &sub) {
-                                      return sub.Archetype == archetype;
-                                    });
-    assert(subp != subs.end() && "no substitution for generic param?");
-    auto const &sub = *subp;
+  for (auto depTy : getAllDependentTypes()) {
+    // The substitutions should be in the same order.
+    const Substitution &sub = subs.front();
+    subs = subs.slice(1);
     
     CanType argType = sub.Replacement->getCanonicalType();
 
-    // Add the metadata reference unelss it's fulfilled.
-    if (!Fulfillments.count(FulfillmentKey(archetype, nullptr))) {
+    // Add the metadata reference unless it's fulfilled.
+    if (!Fulfillments.count(FulfillmentKey(depTy, nullptr))) {
       out.add(IGF.emitTypeMetadataRef(argType));
     }
 
     // Nothing else to do if there aren't any protocols to witness.
-    auto protocols = archetype->getConformsTo();
+    auto protocols = getRepresentativeArchetype(depTy)->getConformsTo();
     if (protocols.empty())
       continue;
 
@@ -3632,7 +3697,7 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
         continue;
 
       // Skip this if it's fulfilled by the source.
-      if (Fulfillments.count(FulfillmentKey(archetype, protocol)))
+      if (Fulfillments.count(FulfillmentKey(depTy, protocol)))
         continue;
 
       // If the target is an archetype, go to the type info.
@@ -3656,6 +3721,8 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
       out.add(wtable);
     }
   }
+  assert(subs.empty()
+         && "did not use all substitutions?!");
   
   // For a witness call, add the Self argument metadata arguments last.
   if (getSourceKind() == SourceKind::WitnessSelf) {
@@ -3672,23 +3739,25 @@ namespace {
     IRGenModule &IGM;
   public:
     ExpandPolymorphicSignature(IRGenModule &IGM, CanSILFunctionType fn)
-      : PolymorphicConvention(fn), IGM(IGM) {}
+      : PolymorphicConvention(fn, *IGM.SILMod->getSwiftModule()), IGM(IGM) {}
 
     void expand(SmallVectorImpl<llvm::Type*> &out) {
       addSource(out);
 
-      for (auto archetype : getAllArchetypes()) {
+      for (auto depTy : getAllDependentTypes()) {
         // Pass the type argument if not fulfilled.
-        if (!Fulfillments.count(FulfillmentKey(archetype, nullptr)))
+        if (!Fulfillments.count(FulfillmentKey(depTy, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);
 
         // Pass each signature requirement that needs a witness table
         // separately (unless fulfilled).
-        for (auto protocol : archetype->getConformsTo()) {
+        auto representative = getRepresentativeArchetype(depTy);
+        assert(representative && "no representative archetype for param?!");
+        for (auto protocol : representative->getConformsTo()) {
           if (!requiresProtocolWitnessTable(protocol))
             continue;
           
-          if (!Fulfillments.count(FulfillmentKey(archetype, protocol)))
+          if (!Fulfillments.count(FulfillmentKey(depTy, protocol)))
             out.push_back(IGM.WitnessTablePtrTy);
         }
       }

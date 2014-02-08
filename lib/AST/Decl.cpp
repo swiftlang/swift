@@ -292,6 +292,8 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
     archetypeMap[archetype] = typeParamTy;
 
     genericParams.push_back(typeParamTy);
+    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
+                                       typeParamTy, typeParamTy));
     
     // Collect conformance requirements declared on the archetype.
     if (auto super = archetype->getSuperclass()) {
@@ -302,6 +304,14 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
       requirements.push_back(Requirement(RequirementKind::Conformance,
                                        typeParamTy, proto->getDeclaredType()));
     }
+  }
+  
+  // FIXME: Emit WitnessMarker requirements for associated types in an order
+  // that preserves AllArchetypes order but otherwise makes no sense.
+  for (auto assocTy : getAssociatedArchetypes()) {
+    auto depTy = getAsDependentType(assocTy, archetypeMap);
+    requirements.push_back(Requirement(RequirementKind::WitnessMarker,
+                                       depTy, depTy));
   }
   
   // Collect requirements from the 'where' clause.

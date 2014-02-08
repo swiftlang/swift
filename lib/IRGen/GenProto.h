@@ -28,6 +28,7 @@ namespace swift {
   class ProtocolConformance;
   struct SILDeclRef;
   class SILType;
+  class SILFunction;
 
 namespace irgen {
   class AbstractCallee;
@@ -124,7 +125,7 @@ namespace irgen {
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
   void emitPolymorphicParameters(IRGenFunction &IGF,
-                                 CanSILFunctionType type,
+                                 SILFunction &Fn,
                                  Explosion &args);
   
   /// Perform the metadata bindings necessary to emit a generic value witness.

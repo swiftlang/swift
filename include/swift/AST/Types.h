@@ -2950,6 +2950,8 @@ BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
                                     const ASTContext &C) {
     return CanDependentMemberType(DependentMemberType::get(base, assocType, C));
   }
+
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getBase)
 END_CAN_TYPE_WRAPPER(DependentMemberType, Type)
 
 

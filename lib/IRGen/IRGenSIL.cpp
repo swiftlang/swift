@@ -844,8 +844,9 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
 /// convention.
 static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                             SILBasicBlock *entry,
-                                            Explosion &allParamValues,
-                                            CanSILFunctionType funcTy) {
+                                            Explosion &allParamValues) {
+  auto funcTy = IGF.CurSILFn->getLoweredFunctionType();
+  
   // Map the indirect return if present.
   ArrayRef<SILArgument*> params
     = emitEntryPointIndirectReturn(IGF, entry, allParamValues, funcTy,
@@ -883,7 +884,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   
   // Bind polymorphic arguments.
   if (hasPolymorphicParameters(funcTy))
-    emitPolymorphicParameters(IGF, funcTy, allParamValues);
+    emitPolymorphicParameters(IGF, *IGF.CurSILFn, allParamValues);
 }
 
 /// Emit entry point arguments for the parameters of a C function, or the
@@ -1040,7 +1041,7 @@ void IRGenSILFunction::emitSILFunction() {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod:
-    emitEntryPointArgumentsNativeCC(*this, entry->first, params, funcTy);
+    emitEntryPointArgumentsNativeCC(*this, entry->first, params);
     break;
   case AbstractCC::ObjCMethod:
     emitEntryPointArgumentsObjCMethodCC(*this, entry->first, params, funcTy);

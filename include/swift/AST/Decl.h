@@ -1774,6 +1774,64 @@ public:
   FilterDeclType *front() const { return *begin(); }
 };
 
+/// Iterator that walks the generic parameter types declared in a generic
+/// signature and their dependent members.
+class GenericSignatureWitnessIterator {
+  ArrayRef<Requirement> p;
+  
+public:
+  GenericSignatureWitnessIterator() = default;
+  GenericSignatureWitnessIterator(ArrayRef<Requirement> p)
+    : p(p)
+  {
+    assert(p.empty() || p.front().getKind() == RequirementKind::WitnessMarker);
+  }
+  
+  GenericSignatureWitnessIterator &operator++() {
+    do {
+      p = p.slice(1);
+    } while (!p.empty()
+             && p.front().getKind() != RequirementKind::WitnessMarker);
+    return *this;
+  }
+  
+  GenericSignatureWitnessIterator operator++(int) {
+    auto copy = *this;
+    ++(*this);
+    return copy;
+  }
+  
+  Type operator*() const {
+    assert(p.front().getKind() == RequirementKind::WitnessMarker);
+    return p.front().getFirstType();
+  }
+  
+  Type operator->() const {
+    assert(p.front().getKind() == RequirementKind::WitnessMarker);
+    return p.front().getFirstType();
+  }
+  
+  bool operator==(const GenericSignatureWitnessIterator &o) {
+    return p.data() == o.p.data() && p.size() == o.p.size();
+  }
+  
+  bool operator!=(const GenericSignatureWitnessIterator &o) {
+    return p.data() != o.p.data() || p.size() != o.p.size();
+  }
+  
+  static GenericSignatureWitnessIterator emptyRange() {
+    return GenericSignatureWitnessIterator();
+  }
+  
+  // Allow the witness iterator to be used with a ranged for.
+  GenericSignatureWitnessIterator begin() const {
+    return *this;
+  }
+  GenericSignatureWitnessIterator end() const {
+    return GenericSignatureWitnessIterator({p.end(), p.end()});
+  }
+};
+
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
@@ -1848,6 +1906,17 @@ public:
   static TypeSubstitutionMap
   getSubstitutionMap(ArrayRef<GenericTypeParamType *> genericParams,
                      ArrayRef<Substitution> args);
+
+  /// Return a range that iterates through first all of the generic parameters
+  /// of the signature, followed by all of their recursive member types exposed
+  /// through protocol requirements.
+  ///
+  /// The member types are presented in the
+  /// same order as GenericParamList::getAllArchetypes would present for an
+  /// equivalent GenericParamList.
+  GenericSignatureWitnessIterator getAllDependentTypes() const {
+    return GenericSignatureWitnessIterator(getRequirements());
+  }
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
