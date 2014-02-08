@@ -43,7 +43,7 @@ Arguments against the C++-style API (in no particular order):
   a functional-style interface (e.g. a = sort(b)) by reading the input sequence
   into a new array/vector, then applying the mutating algorithm to that
   temporary array.
-* We should eventually support syntax like "somearray[a..b].sort()", so we don't
+* We should eventually support syntax like "somearray[a...b].sort()", so we don't
   lose generality over C++'s iterator pair style of API.
 * In principle, the compiler's optimizer could be enhanced to eliminate extra
   array copies, at least in some obvious cases.

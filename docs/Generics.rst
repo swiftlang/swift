@@ -565,7 +565,7 @@ ordered collection::
   func find<C : OrderedCollection where C.Element : Comparable>(
          collection : C, value : C.Element) -> Int
   {
-    for index in 0..collection.size() {
+    for index in 0...collection.size() {
       if (collection.getAt(index) == value) { // okay: we know that C.Element is Comparable
         return index
       }

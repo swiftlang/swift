@@ -127,10 +127,10 @@ definition. These kinds are:
        var numpoints : int;
        func main() {
          result = new image()
-         foreach i in -2.0 .. 2.0 by 0.001 {
+         foreach i in -2.0 ... 2.0 by 0.001 {
            // Arbitrarily, create one MandelbrotCalculator for each row.
            var MC = new MandelbrotCalculator()
-           foreach j in -2.0 .. 2.0 by 0.001 {
+           foreach j in -2.0 ... 2.0 by 0.001 {
              MC.compute(i, j, self)
              ++numpoints;
            }

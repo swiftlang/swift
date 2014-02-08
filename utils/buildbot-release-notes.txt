@@ -25,6 +25,19 @@
       mutating func f() {}
     }
 
+* Half-open ranges (those that don't include their endpoint) are now
+  spelled with three '.'s instead of two, for consistency with Ruby.
+  In the next release, we'll introduce a fully-closed range, which
+  does include its endpoint.  So,
+
+    (swift) for x in 0...5 { print(\(x) )} ; print('\n') # works today
+    0 1 2 3 4
+    (swift) for x in 0..5 { print(\(x) )} ; print('\n')  # coming soon
+    0 1 2 3 4 5
+  
+  These changes are being released separately so that users have a
+  chance to update their code before its semantics changes.
+
 2014-02-05
 ----------
 

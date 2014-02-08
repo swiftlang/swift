@@ -143,7 +143,7 @@ those cases where the string's buffer is uniquely referenced::
 
     func inplace_upper() {
       self.unique()                  // copy buffer iff refcount > 1
-      for i in 0..buffer.length {
+      for i in 0...buffer.length {
         buffer[i].inplace_upper()    // naïve ASCII-only implementation
       }
     }

@@ -230,7 +230,7 @@ list of patterns after 'case'::
 
 or even more so::
 
-  case 0..2, 5..10, 14..18, 22..:
+  case 0...2, 5...10, 14...18, 22...:
     flagConditionallyAcceptableAge()
 
 On the other hand, if this list gets really long, the wrapping gets a
@@ -755,7 +755,7 @@ require refinement from the type of the matched value.
 
 For example, consider a pattern like this::
 
-  case 0..10:
+  case 0...10:
 
 We should be able to use this pattern when switching on a value which
 is not an Int, but if we type-check the expression on its own, we will

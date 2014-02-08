@@ -291,7 +291,7 @@ parameters::
 
   // Fill an array with independent copies of x
   func fill<T:val>(array:T[], x:T) {
-    for i in 0..array.length {
+    for i in 0...array.length {
       array[i] = x
     }
   }
@@ -336,7 +336,7 @@ TODO
 Array
 =====
 
-TODO: Int[..], etc.
+TODO: Int[...], etc.
 
 Equality and Identity
 =====================

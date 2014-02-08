@@ -25,8 +25,8 @@ could be written as follows:
     if start != end && start.succ() != end {
       let pivot = s[start]
       let mid = partition(&s, { $0 < pivot })
-      quicksort(**&s[start..mid]**) // Error: can't take address of rvalue
-      quicksort(**&s[mid..end]**)    // Error: can't take address of rvalue
+      quicksort(**&s[start...mid]**) // Error: can't take address of rvalue
+      quicksort(**&s[mid...end]**)    // Error: can't take address of rvalue
     }
   }
 
@@ -47,8 +47,8 @@ Here's a version that uses a comparison function:
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})
-        **self[start..mid].quicksort(compare)**
-        **self[mid..end].quicksort(compare)**
+        **self[start...mid].quicksort(compare)**
+        **self[mid...end].quicksort(compare)**
       }
     }
   }
@@ -63,7 +63,7 @@ The obvious alternative is to move the slices into temporary lvalues, as follows
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})
-        for r in [start..mid, mid..end] {
+        for r in [start...mid, mid...end] {
           var **subRange = self[r]**
           subRange.quicksort(compare)
           **self[r] = subrange**
@@ -124,10 +124,10 @@ for the following reasons:
 
     var arr = [1,2,3]
     func mutate(x: @inout Int[]) -> Int[] {
-      x = [3..4]
-      return arr[0..2]
+      x = [3...4]
+      return arr[0...2]
     }
-    mutate(&arr[0..2])
+    mutate(&arr[0...2])
 
   Inout slices thus require strong ownership of the backing store independent
   of the original object, which must also keep strong ownership of the backing
@@ -135,12 +135,12 @@ for the following reasons:
 - Move optimization requires unique referencing and would fail when there are
   multiple concurrent, non-overlapping ``@inout`` slices. ``swap(&x.a, &x.b)``
   is well-defined if ``x.a`` and ``x.b`` do not access overlapping state, and
-  so should ``swap(&x[0..50], &x[50..100])``.  More generally, we would like to
+  so should ``swap(&x[0...50], &x[50...100])``.  More generally, we would like to
   use inout slicing to implement divide-and- conquer parallel algorithms, as
   in::
 
-    async { mutate(&arr[0..50]) }
-    async { mutate(&arr[50..100]) }
+    async { mutate(&arr[0...50]) }
+    async { mutate(&arr[50...100]) }
 
 enter_inout and exit_inout
 ==========================
@@ -152,17 +152,17 @@ method is applied immediately after ``get``, and the ``exit_inout`` method is
 applied **to the value at the time of get** immediately before ``set``.
 This operation::
 
-  mutate(&arr[a..b])
+  mutate(&arr[a...b])
 
 thus behaves as if by the following sequence of calls when
 ``enter_inout`` and ``exit_inout`` are present for the property::
 
-  var slice = arr.subscript(a..b).get()
+  var slice = arr.subscript(a...b).get()
   var arr_orig = arr
-  arr_orig.subscript(a..b).enter_inout()
+  arr_orig.subscript(a...b).enter_inout()
   mutate(&slice)
-  arr_orig.subscript(a..b).exit_inout()
-  arr.subscript(a..b).set(slice)
+  arr_orig.subscript(a...b).exit_inout()
+  arr.subscript(a...b).set(slice)
 
 TODO: Copying the original value ``arr`` to ``arr_orig`` creates another strong
 reference to the backing store!

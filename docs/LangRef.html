@@ -452,7 +452,7 @@
     "Hello world!"
     
     // Interpolated expressions.
-    "\(min)..\(max)" + "Result is \((4+i)*j)"
+    "\(min)...\(max)" + "Result is \((4+i)*j)"
   </pre>
   
   
@@ -554,7 +554,7 @@
             excludes '-&gt;', see <b>[2]</b>
             excludes unary '&amp;', see <b>[3]</b>
             excludes '//', '/*', and '*/', see <b>[4]</b>
-            '..' is an operator, not two '.'s.
+            '...' is an operator, not three '.'s.
 
     operator-binary ::= operator
     operator-prefix ::= operator
@@ -947,8 +947,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
   href="#fully_typed_types">fully-typed</a> and irrefutable. If a result type is
   given, it must also be fully-typed.</p>
 
-  <p>The type of a function with signature <tt>(P<sub>0</sub>)(P<sub>1</sub>)..(P<sub><i>n</i></sub>) -&gt; R</tt>
-    is <tt>T<sub>0</sub> -&gt; T<sub>1</sub> -&gt; .. -&gt; T<sub><i>n</i></sub> -&gt; R</tt>,
+  <p>The type of a function with signature <tt>(P<sub>0</sub>)(P<sub>1</sub>)...(P<sub><i>n</i></sub>) -&gt; R</tt>
+    is <tt>T<sub>0</sub> -&gt; T<sub>1</sub> -&gt; ... -&gt; T<sub><i>n</i></sub> -&gt; R</tt>,
     where <tt>T<sub><i>i</i></sub></tt> is the bottom-up type of the pattern
     <tt>P<sub><i>i</i></sub></tt>.  This is called "currying".  The
     behavior of all the intermediate functions (those which do not
@@ -960,8 +960,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
     function body is finally evaluated as normal.</p>
 
   <p>A function declared with a selector-style signature
-    <tt>func(a<sub>0</sub>:T<sub>0</sub>) name<sub>1</sub>(a<sub>1</sub>:T<sub>1</sub>) .. name<sub><i>n</i></sub>(a<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>
-    has the type <tt>(_:T<sub>0</sub>, name<sub>1</sub>:T<sub>1</sub>, .. name<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>,
+    <tt>func(a<sub>0</sub>:T<sub>0</sub>) name<sub>1</sub>(a<sub>1</sub>:T<sub>1</sub>) ... name<sub><i>n</i></sub>(a<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>
+    has the type <tt>(_:T<sub>0</sub>, name<sub>1</sub>:T<sub>1</sub>, ... name<sub><i>n</i></sub>:T<sub><i>n</i></sub>) -&gt; R</tt>,
     that is, the names of the fields in the argument tuple are the
     <tt>name<sub><i>n</i></sub></tt> identifiers preceding each argument
     pattern. However, in the body of a function
@@ -2459,7 +2459,7 @@ ill-formed if the type does not conform to the protocol.</p>
     case (0, 0, 0):
       println("origin")
     <i>// Range comparison.</i>
-    case (-10..10, -10..10, -10..10):
+    case (-10...10, -10...10, -10...10):
       println("close to the origin")
     default:
       println("too far away")
@@ -2666,7 +2666,7 @@ ill-formed if the type does not conform to the protocol.</p>
     x += b ? y : z
     x += a ? b ? y : z : w
 
-    for i in 1..101 {
+    for i in 1...101 {
       println(i % 15      ? "fizzbuzz"
             : i %  3 == 0 ? "fizz"
             : i %  5 == 0 ? "buzz"
@@ -3584,7 +3584,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
  protocol.
 
   <p>Note that each iteration of the loop declares a distinct variable for each
-     variable in the pattern.  For example, in a loop like "for i in 0..10",
+     variable in the pattern.  For example, in a loop like "for i in 0...10",
      if i is captured inside the loop, each iteration captures a different "i",
      so there would be a total of ten versions generated each time the loop
      runs.</p>
@@ -3592,7 +3592,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   <p>Some examples include:</p>
   
   <pre class="example">
-    for i in 0..100 {
+    for i in 0...100 {
       println(String(i));
     }
  </pre>
