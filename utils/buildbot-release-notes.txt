@@ -38,6 +38,14 @@
   These changes are being released separately so that users have a
   chance to update their code before its semantics changes.
 
+* Objective-C properties with custom getters/setters are now imported
+  into Swift as properties. For example, the Objective-C property
+
+    @property (getter=isEnabled) BOOL enabled;
+
+  was previously imported as getter (isEnabled) and setter
+  (setEnabled) methods. Now, it is imported as a property (enabled).
+
 2014-02-05
 ----------
 
