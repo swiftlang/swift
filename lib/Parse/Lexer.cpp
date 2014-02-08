@@ -579,11 +579,6 @@ void Lexer::lexOperatorIdentifier() {
   if (*TokStart == '.') {
     while (*CurPtr == '.')
       ++CurPtr;
-
-    if (CurPtr-TokStart > 3) {
-      diagnose(TokStart, diag::lex_unexpected_long_period_series);
-      return formToken(tok::unknown, TokStart);
-    }
   } else {
     CurPtr = TokStart;
     bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);

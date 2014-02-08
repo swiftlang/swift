@@ -121,8 +121,6 @@ ERROR(lex_unary_equal_is_reserved,lexing,none,
       "prefix/postfix '=' is reserved", ())
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
-ERROR(lex_unexpected_long_period_series,lexing,none,
-      "unexpected long series of '.'", ())
 
 
 //------------------------------------------------------------------------------
