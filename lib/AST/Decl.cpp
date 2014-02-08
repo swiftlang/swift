@@ -25,6 +25,9 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
+
+#include "clang/AST/DeclObjC.h"
+
 using namespace swift;
 
 // Only allow allocation of Decls using the allocator in ASTContext.
@@ -1574,8 +1577,23 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
 }
 
 StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If we override a property, use its getter selector.
+  if (auto overridden = getOverriddenDecl())
+    return overridden->getObjCGetterSelector(buffer);
+
   llvm::raw_svector_ostream out(buffer);
 
+  // If there is an Objective-C @property declaration, use its getter
+  // name.
+  if (auto objcProperty = dyn_cast_or_null<clang::ObjCPropertyDecl>(
+                            getClangDecl())) {
+    auto selector = objcProperty->getGetterName();
+    if (!selector.isNull()) {
+      selector.print(out);
+      return out.str();
+    }
+  }
+  
   // The getter selector is the property name itself.
   // FIXME: 'is' prefix for boolean properties?
   out << getName().str();
@@ -1583,7 +1601,22 @@ StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
 }
 
 StringRef VarDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If we override a property, use its setter selector.
+  if (auto overridden = getOverriddenDecl())
+    return overridden->getObjCSetterSelector(buffer);
+
   llvm::raw_svector_ostream out(buffer);
+
+  // If there is an Objective-C @property declaration, use its setter
+  // name.
+  if (auto objcProperty = dyn_cast_or_null<clang::ObjCPropertyDecl>(
+                            getClangDecl())) {
+    auto selector = objcProperty->getSetterName();
+    if (!selector.isNull()) {
+      selector.print(out);
+      return out.str();
+    }
+  }
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.

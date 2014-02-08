@@ -18,3 +18,8 @@ module CoreGraphics {
 module objc_ext { header "objc_ext.h" }
 module macros { header "macros.h" }
 module user_objc { header "user_objc.h" }
+
+module Properties {
+  header "Properties.h"
+  export *
+}
