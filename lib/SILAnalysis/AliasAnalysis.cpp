@@ -110,9 +110,11 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 //===----------------------------------------------------------------------===//
 
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
+#ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
   if (DisableAliasAnalysis)
     return AliasResult::MayAlias;
+#endif
 
   // If the two values equal, quickly return must alias.
   if (V1 == V2)
