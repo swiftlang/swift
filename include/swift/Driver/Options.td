@@ -126,8 +126,6 @@ def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[DriverOption, FrontendOption]>,
   HelpText<"Specifies the Clang module cache path">;
-def module_cache_path_EQ : Joined<["-"], "module-cache-path=">,
-  Flags<[DriverOption, FrontendOption]>, Alias<module_cache_path>;
 
 def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
   HelpText<"Name of the module to build">;
