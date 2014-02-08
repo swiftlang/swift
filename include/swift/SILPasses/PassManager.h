@@ -43,7 +43,9 @@ namespace swift {
   public:
     /// C'tor
     SILPassManager(SILModule *M, SILOptions Opts) :
-      anotherIteration(false), Mod(M), Options(std::move(Opts)) {}
+      anotherIteration(false), Mod(M), Options(std::move(Opts)) {
+      registerAnalysis(new CompleteFunctions(Mod));
+    }
 
     SILOptions &getOptions() {
       return Options;

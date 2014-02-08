@@ -23,6 +23,20 @@
 
 using namespace swift;
 
+// anchor for virtual D'tor
+CompleteFunctions::~CompleteFunctions() {}
+
+void CompleteFunctions::setComplete() {
+  CompleteFuncs.clear();
+  if (!IsModulePending)
+    for (auto &F : *M)
+      if (!PendingFuncs.count(&F))
+        CompleteFuncs.insert(&F);
+
+  PendingFuncs.clear();
+  IsModulePending = false;
+}
+
 /// \brief return a bottom-up function order.
 const std::vector<SILFunction*> &CallGraphAnalysis::bottomUpCallGraphOrder() {
   // If we haven't calculated the order before do it now.

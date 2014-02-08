@@ -12,6 +12,7 @@
 
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
 
@@ -37,6 +38,7 @@ namespace swift {
 
     /// The class hierarchy
     enum class AnalysisKind {
+      CompleteFuncs,
       CallGraph,
       Dominance,
       Alias,
@@ -60,6 +62,43 @@ namespace swift {
 
     /// Invalidate all of the information for a specific function.
     virtual void invalidate(SILFunction *F, InvalidationKind K) {}
+  };
+
+  /// Keep track of functions that are completely optimized.
+  class CompleteFunctions : public SILAnalysis {
+    SILModule *M = nullptr;
+    llvm::DenseSet<SILFunction*> CompleteFuncs;
+    llvm::DenseSet<SILFunction*> PendingFuncs;
+    bool IsModulePending = false;
+    bool HasChanged = false;
+
+  public:
+    CompleteFunctions(SILModule *MM)
+      : SILAnalysis(AnalysisKind::CompleteFuncs), M(MM) {}
+
+    virtual ~CompleteFunctions();
+
+    static bool classof(const SILAnalysis *S) {
+      return S->getKind() == AnalysisKind::CompleteFuncs;
+    }
+
+    virtual void invalidate(InvalidationKind K) {
+      IsModulePending = true;
+      HasChanged = true;
+    }
+
+    virtual void invalidate(SILFunction* F, InvalidationKind) {
+      PendingFuncs.insert(F);
+      HasChanged = true;
+    }
+
+    bool hasChanged() const { return HasChanged; }
+    void resetChanged() { HasChanged = false; }
+
+    bool isComplete(SILFunction *F) const {
+      return CompleteFuncs.count(F);
+    }
+    void setComplete();
   };
 
   /// The Call Graph Analysis provides information about the call graph.

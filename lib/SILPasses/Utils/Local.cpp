@@ -10,6 +10,7 @@
 //
 //===---------------------------------------------------------------------===//
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
