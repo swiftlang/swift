@@ -490,11 +490,12 @@ performCodeMotion(llvm::DenseMap<SILInstruction *,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processFunction(SILFunction &F, AliasAnalysis *AA) {
+static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   llvm::MapVector<SILValue, ReferenceCountState> BBState;
   llvm::DenseMap<SILInstruction *, ReferenceCountState> DecToIncStateMap;
+  bool Changed = false;
 
   // For each basic block in F...
   for (auto &BB : F) {
@@ -512,19 +513,21 @@ static void processFunction(SILFunction &F, AliasAnalysis *AA) {
       if (!performCodeMotion(DecToIncStateMap))
         break;
 
+      Changed = true;
       DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
     }
 
     DEBUG(llvm::dbgs() << "\n");
   }
+  return Changed;
 }
 
 class ARCOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     auto *AA = getAnalysis<AliasAnalysis>();
-    processFunction(*getFunction(), AA);
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (processFunction(*getFunction(), AA))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "ARC Optimization"; }

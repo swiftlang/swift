@@ -336,6 +336,7 @@ class AllocBoxToStack : public SILFunctionTransform {
   void run() {
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
     PostDominanceInfo *PDI = DA->getPostDomInfo(getFunction());
+    bool Changed = false;
 
     for (auto &BB : *getFunction()) {
       auto I = BB.begin(), E = BB.end();
@@ -346,14 +347,15 @@ class AllocBoxToStack : public SILFunctionTransform {
             // Carefully move iterator to avoid invalidation problems.
             ++I;
             ABI->eraseFromParent();
+            Changed = true;
             continue;
           }
 
         ++I;
       }
     }
-
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (Changed)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "AllocBox-To-Stack Optimization"; }

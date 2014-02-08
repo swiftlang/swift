@@ -1372,9 +1372,10 @@ public:
                                 getAnalysis<SILSpecializedArgsAnalysis>(),
                                 getOptions().DevirtThreshold);
     bool Changed = DevirtImpl.run();
-    if (Changed)
+    if (Changed) {
       PM->scheduleAnotherIteration();
-    invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+    }
   }
 
   StringRef getName() override { return "Devirtualization"; }

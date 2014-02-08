@@ -794,11 +794,12 @@ class CapturePromotionPass : public SILModuleTransform {
     SmallVector<SILFunction*, 128> Worklist;
     for (auto &F : *getModule())
       processFunction(&F, Worklist);
-    
+
+    if (!Worklist.empty())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+
     while (!Worklist.empty())
       processFunction(Worklist.pop_back_val(), Worklist);
-
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "Capture Promotion"; }

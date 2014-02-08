@@ -267,8 +267,9 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   AI->eraseFromParent();
 }
 
-static void runSROAOnFunction(SILFunction &Fn) {
+static bool runSROAOnFunction(SILFunction &Fn) {
   std::vector<AllocStackInst *> Worklist;
+  bool Changed = false;
 
   // For each basic block BB in Fn...
   for (auto &BB : Fn)
@@ -287,8 +288,10 @@ static void runSROAOnFunction(SILFunction &Fn) {
     if (!Analyzer.analyze())
       continue;
 
+    Changed = true;
     Analyzer.chopUpAlloca(Worklist);
   }
+  return Changed;
 }
 
 class SILSROA : public SILFunctionTransform {
@@ -299,8 +302,8 @@ class SILSROA : public SILFunctionTransform {
     DEBUG(llvm::dbgs() << "***** SROA on function: " << F->getName() <<
           " *****\n");
 
-    runSROAOnFunction(*F);
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (runSROAOnFunction(*F))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "SROA"; }

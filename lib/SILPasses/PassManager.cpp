@@ -25,10 +25,6 @@ STATISTIC(NumOptzIterations, "Number of optimization iterations");
 
 void SILPassManager::runOneIteration() {
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
-  if (Options.PrintAll) {
-    llvm::dbgs() << "*** SIL module before transformation ***\n";
-    Mod->dump();
-  }
   NumOptzIterations++;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
 
@@ -83,6 +79,11 @@ void SILPassManager::runOneIteration() {
 }
 
 void SILPassManager::run() {
+  if (Options.PrintAll) {
+    llvm::dbgs() << "*** SIL module before transformation ("
+                 << NumOptzIterations << ") ***\n";
+    Mod->dump();
+  }
   // Keep optimizing the module untill no pass requested another iteration
   // of the pass.
   do {

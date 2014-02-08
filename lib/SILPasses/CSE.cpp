@@ -391,8 +391,8 @@ class SILCSE : public SILFunctionTransform {
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
     CSE C;
-    C.processFunction(*getFunction(), DA->getDomInfo(getFunction()));
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (C.processFunction(*getFunction(), DA->getDomInfo(getFunction())))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "CSE"; }

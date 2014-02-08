@@ -45,7 +45,7 @@ namespace {
   public:
     SimplifyCFG(SILFunction &Fn) : Fn(Fn) {}
 
-    void run();
+    bool run();
 
   private:
     /// popWorklist - Return the next basic block to look at, or null if the
@@ -92,12 +92,12 @@ namespace {
     bool removeIfDead(SILBasicBlock *BB);
     
     bool tryJumpThreading(BranchInst *BI);
-    void simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
+    bool simplifyAfterDroppingPredecessor(SILBasicBlock *BB);
 
-    void simplifyBranchOperands(OperandValueArrayRef Operands);
-    void simplifyBranchBlock(BranchInst *BI);
-    void simplifyCondBrBlock(CondBranchInst *BI);
-    void simplifySwitchEnumBlock(SwitchEnumInst *SEI);
+    bool simplifyBranchOperands(OperandValueArrayRef Operands);
+    bool simplifyBranchBlock(BranchInst *BI);
+    bool simplifyCondBrBlock(CondBranchInst *BI);
+    bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
 
   };
 } // end anonymous namespace
@@ -133,7 +133,7 @@ bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
 
 /// This is called when a predecessor of a block is dropped, to simplify the
 /// block and add it to the worklist.
-void SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
+bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   // TODO: If BB has only one predecessor and has bb args, fold them away, then
   // use instsimplify on all the users of those values - even ones outside that
   // block.
@@ -145,6 +145,7 @@ void SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
   for (auto *P : BB->getPreds())
     addToWorklist(P);
 
+  return false;
 }
 
 
@@ -302,14 +303,18 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
 /// simplifyBranchOperands - Simplify operands of branches, since it can
 /// result in exposing opportunities for CFG simplification.
-void SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
+bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
+  bool Simplified = false;
   for (auto O = Operands.begin(), E = Operands.end(); O != E; ++O)
     if (auto *I = dyn_cast<SILInstruction>(*O))
       if (SILValue Result = simplifyInstruction(I)) {
         SILValue(I, 0).replaceAllUsesWith(Result.getDef());
-        if (isInstructionTriviallyDead(I))
+        if (isInstructionTriviallyDead(I)) {
           I->eraseFromParent();
+          Simplified = true;
+        }
       }
+  return Simplified;
 }
 
 bool isTrampolineBlock(SILBasicBlock *SBB) {
@@ -339,10 +344,10 @@ bool isTrampolineBlock(SILBasicBlock *SBB) {
 
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
-void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
+bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
-  simplifyBranchOperands(BI->getArgs());
+  bool Simplified = simplifyBranchOperands(BI->getArgs());
   auto *ThisBB = BI->getParent();
 
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
@@ -365,7 +370,7 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     removeFromWorklist(DestBB);
     DestBB->eraseFromParent();
     ++NumBlocksMerged;
-    return;
+    return true;
   }
 
   // If the destination block is a simple trampoline (jump to another block)
@@ -376,7 +381,7 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(ThisBB);
-    return;
+    return true;
   }
 
   // If this unconditional branch has BBArgs, check to see if duplicating the
@@ -384,12 +389,14 @@ void SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // threading.
   if (!BI->getArgs().empty() &&
       tryJumpThreading(BI))
-    return;
+    return true;
+
+  return Simplified;
 }
 
 /// simplifyCondBrBlock - Simplify a basic block that ends with a conditional
 /// branch.
-void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
+bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
   simplifyBranchOperands(BI->getTrueArgs());
@@ -412,7 +419,7 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     simplifyAfterDroppingPredecessor(DeadBlock);
     addToWorklist(LiveBlock);
     ++NumConstantFolded;
-    return;
+    return true;
   }
 
   // If the destination block is a simple trampoline (jump to another block)
@@ -428,7 +435,7 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     BI->eraseFromParent();
     removeIfDead(TrueSide);
     addToWorklist(ThisBB);
-    return;
+    return true;
   }
 
   if (isTrampolineBlock(FalseSide)) {
@@ -439,7 +446,7 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     BI->eraseFromParent();
     removeIfDead(FalseSide);
     addToWorklist(ThisBB);
-    return;
+    return true;
   }
 
   // Simplify cond_br where both sides jump to the same blocks with the same
@@ -463,15 +470,16 @@ void SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
       addToWorklist(ThisBB);
       addToWorklist(TrueSide);
       ++NumConstantFolded;
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction.
-void SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
+bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
     auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
     auto *ThisBB = SEI->getParent();
@@ -496,11 +504,14 @@ void SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
       simplifyAfterDroppingPredecessor(B);
     addToWorklist(LiveBlock);
     ++NumConstantFolded;
-    return;
+    return true;
   }
+  return false;
 }
 
-void SimplifyCFG::run() {
+bool SimplifyCFG::run() {
+  bool Changed = false;
+
   // Add all of the blocks to the function.
   for (auto &BB : Fn)
     addToWorklist(&BB);
@@ -508,28 +519,30 @@ void SimplifyCFG::run() {
   // Iteratively simplify while there is still work to do.
   while (SILBasicBlock *BB = popWorklist()) {
     // If the block is dead, remove it.
-    if (removeIfDead(BB))
+    if (removeIfDead(BB)) {
+      Changed = true;
       continue;
-
+    }
     // Otherwise, try to simplify the terminator.
     TermInst *TI = BB->getTerminator();
     if (auto *BI = dyn_cast<BranchInst>(TI))
-      simplifyBranchBlock(BI);
+      Changed |= simplifyBranchBlock(BI);
     else if (auto *CBI = dyn_cast<CondBranchInst>(TI))
-      simplifyCondBrBlock(CBI);
+      Changed |= simplifyCondBrBlock(CBI);
     else if (auto *SII = dyn_cast<SwitchIntInst>(TI))
       (void)SII;
     else if (auto *SEI = dyn_cast<SwitchEnumInst>(TI))
-      simplifySwitchEnumBlock(SEI);
+      Changed |= simplifySwitchEnumBlock(SEI);
   }
+  return Changed;
 }
 
 class SimplifyCFGPass : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() {
-    SimplifyCFG(*getFunction()).run();
-    invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+    if (SimplifyCFG(*getFunction()).run())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
   }
 
   StringRef getName() override { return "Simplify CFG"; }

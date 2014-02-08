@@ -1485,7 +1485,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void processMemoryObject(SILInstruction *I) {
+static bool processMemoryObject(SILInstruction *I) {
   DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -1497,28 +1497,31 @@ static void processMemoryObject(SILInstruction *I) {
   collectDIElementUsesFrom(MemInfo, Uses, Releases, false);
 
   LifetimeChecker(MemInfo, Uses, Releases).doIt();
+  return true;
 }
 
 /// checkDefiniteInitialization - Check that all memory objects that require
 /// initialization before use are properly set and transform the code as
 /// required for flow-sensitive properties.
-static void checkDefiniteInitialization(SILFunction &Fn) {
+static bool checkDefiniteInitialization(SILFunction &Fn) {
   DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                      <<  Fn.getName() << "\n");
-
+  bool Changed = false;
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
       SILInstruction *Inst = I;
       if (isa<MarkUninitializedInst>(Inst))
-        processMemoryObject(Inst);
+        Changed |= processMemoryObject(Inst);
     }
   }
+  return Changed;
 }
 
 /// lowerRawSILOperations - There are a variety of raw-sil instructions like
 /// 'assign' that are only used by this pass.  Now that definite initialization
 /// checking is done, remove them.
-static void lowerRawSILOperations(SILFunction &Fn) {
+static bool lowerRawSILOperations(SILFunction &Fn) {
+  bool Changed = false;
   for (auto &BB : Fn) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
@@ -1532,6 +1535,7 @@ static void lowerRawSILOperations(SILFunction &Fn) {
         // reset our iteration range to the block after the insertion.
         if (B.getInsertionBB() != &BB)
           I = E;
+        Changed = true;
         continue;
       }
 
@@ -1539,16 +1543,19 @@ static void lowerRawSILOperations(SILFunction &Fn) {
       if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
         SILValue(MUI, 0).replaceAllUsesWith(MUI->getOperand());
         MUI->eraseFromParent();
+        Changed = true;
         continue;
       }
       
       // mark_function_escape just gets zapped.
       if (isa<MarkFunctionEscapeInst>(Inst)) {
         Inst->eraseFromParent();
+        Changed = true;
         continue;
       }
     }
   }
+  return Changed;
 }
 
 
@@ -1561,13 +1568,14 @@ class DefiniteInitialization : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     // Walk through and promote all of the alloc_box's that we can.
-    checkDefiniteInitialization(*getFunction());
+    if (checkDefiniteInitialization(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+
     DEBUG(getFunction()->verify());
 
     // Lower raw-sil only instructions used by this pass, like "assign".
-    lowerRawSILOperations(*getFunction());
-
-    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+    if (lowerRawSILOperations(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
 
   StringRef getName() override { return "Definite Initialization"; }

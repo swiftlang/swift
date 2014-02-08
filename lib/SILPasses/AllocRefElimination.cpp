@@ -256,12 +256,13 @@ analyzeUseGraph(AllocRefInst *AllocRef,
 //                            Function Processing
 //===----------------------------------------------------------------------===//
 
-static void
+static bool
 processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
   DEBUG(llvm::dbgs() << "***** Processing Function " << Fn.getName()
         << " *****\n");
 
   llvm::SmallVector<SILInstruction *, 16> DeleteList;
+  bool Changed = false;
 
   // For each BB in Fn...
   for (auto &BB : Fn)
@@ -318,6 +319,7 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 
       ++NumStoreOnlyAllocRefEliminated;
       ++II;
+      Changed = true;
     }
 
   // Erase all instructions that are in DeleteList.
@@ -330,6 +332,7 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }
+  return Changed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -341,9 +344,8 @@ class AllocRefElimination : public SILFunctionTransform {
   void run() {
     llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
 
-    processFunction(*getFunction(), DestructorAnalysisCache);
-
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (processFunction(*getFunction(), DestructorAnalysisCache))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "AllocRef Elimination"; }

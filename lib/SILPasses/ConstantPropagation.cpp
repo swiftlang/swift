@@ -710,6 +710,7 @@ static bool isFoldable(SILInstruction *I) {
 static bool CCPFunctionBody(SILFunction &F) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
+  bool Changed = false;
 
   // The list of instructions whose evaluation resulted in errror or warning.
   // This is used to avoid duplicate error reporting in case we reach the same
@@ -766,6 +767,7 @@ static bool CCPFunctionBody(SILFunction &F) {
 
       FoldedUsers.insert(User);
       ++NumInstFolded;
+      Changed = true;
 
       // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
       // any tuple_extract instructions using the apply.  This is a common case
@@ -805,14 +807,14 @@ static bool CCPFunctionBody(SILFunction &F) {
 
   }
 
-  return false;
+  return Changed;
 }
 
 class ConstantPropagation : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    CCPFunctionBody(*getFunction());
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    if (CCPFunctionBody(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   StringRef getName() override { return "Constant Propagation"; }
