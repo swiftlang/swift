@@ -392,6 +392,13 @@ public:
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
 
+  /// Add a cleanup to run the given object's destructor when the ASTContext is
+  /// deallocated.
+  template<typename T>
+  void addDestructorCleanup(T &object) {
+    addCleanup([&object]{ object.~T(); });
+  }
+
   /// Create a context for the initializer of a non-local variable,
   /// like a global or a field.  To reduce memory usage, if the
   /// context goes unused, it should be returned to the ASTContext

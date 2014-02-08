@@ -218,7 +218,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   assert(inputFile);
 
-  auto M = new (Ctx) Module(moduleID.first, Ctx);
+  auto M = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = M;
 
   (void)loadAST(*M, moduleID.second, std::move(inputFile));

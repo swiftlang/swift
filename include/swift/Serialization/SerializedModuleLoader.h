@@ -132,6 +132,8 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
+  ~SerializedASTFile() = default;
+
   SerializedASTFile(Module &M, ModuleFile &file)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
 

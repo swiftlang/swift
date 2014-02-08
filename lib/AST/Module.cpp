@@ -84,6 +84,7 @@ void BuiltinUnit::LookupCache::lookupValue(Identifier Name, NLKind LookupKind,
 // Out-of-line because std::unique_ptr wants LookupCache to be complete.
 BuiltinUnit::BuiltinUnit(Module &M)
    : FileUnit(FileUnitKind::Builtin, M) {
+  M.Ctx.addDestructorCleanup(*this);
 }
 
 //===----------------------------------------------------------------------===//
@@ -268,6 +269,12 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
 //===----------------------------------------------------------------------===//
 // Module Implementation
 //===----------------------------------------------------------------------===//
+
+Module::Module(Identifier name, ASTContext &ctx)
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name) {
+  ctx.addDestructorCleanup(*this);
+}
+
 
 void Module::addFile(FileUnit &newFile) {
   // Require Main and REPL files to be the first file added.
@@ -1099,6 +1106,7 @@ SourceFile::SourceFile(Module &M, SourceFileKind K,
                        Optional<unsigned> bufferID, bool hasBuiltinModuleAccess)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1), Kind(K) {
+  M.Ctx.addDestructorCleanup(*this);
   performAutoImport(*this, hasBuiltinModuleAccess);
 }
 

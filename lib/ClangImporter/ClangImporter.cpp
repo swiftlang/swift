@@ -304,7 +304,7 @@ Module *ClangImporter::loadModule(
   // FIXME: The name of this module could end up as a key in the ASTContext,
   // but that's not correct for submodules.
   Identifier name = Impl.SwiftContext.getIdentifier((*clangModule).Name);
-  auto result = new (Impl.SwiftContext) Module(name, Impl.SwiftContext);
+  auto result = Module::create(name, Impl.SwiftContext);
 
   auto file = new (Impl.SwiftContext) ClangModuleUnit(*result, *this,
                                                       clangModule);
@@ -332,7 +332,7 @@ ClangImporter::Implementation::getWrapperForModule(ClangImporter &importer,
 
   // FIXME: Handle hierarchical names better.
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
-  auto wrapper = new (SwiftContext) Module(name, SwiftContext);
+  auto wrapper = Module::create(name, SwiftContext);
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, importer,
                                                  underlying);

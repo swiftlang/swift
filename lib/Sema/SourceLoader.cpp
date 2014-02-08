@@ -93,7 +93,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take());
 
-  auto *importMod = new (Ctx) Module(moduleID.first, Ctx);
+  auto *importMod = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importMod;
 
   auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,

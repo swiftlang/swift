@@ -161,7 +161,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
 void CompilerInstance::performParse() {
   const SourceFileKind Kind = Invocation.getInputKind();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-  MainModule = new (*Context) Module(ID, *Context);
+  MainModule = Module::create(ID, *Context);
   Context->LoadedModules[ID.str()] = MainModule;
 
   if (Kind == SourceFileKind::SIL) {

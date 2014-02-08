@@ -33,8 +33,8 @@ bool ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   ASTContext Ctx(LangOpts, SearchPathOpts, SM, Diags);
   auto ModName = Ctx.getIdentifier("input");
 
-  Module Mod(ModName, Ctx);
-  SourceFile SF(Mod, SourceFileKind::Main, BufferID);
+  Module &Mod = *Module::create(ModName, Ctx);
+  SourceFile &SF = *new (Ctx) SourceFile(Mod, SourceFileKind::Main, BufferID);
 
   PersistentParserState PersistentState;
   Parser P(BufferID, SF, /*SIL=*/nullptr, &PersistentState);

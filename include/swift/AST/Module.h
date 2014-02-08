@@ -172,13 +172,12 @@ private:
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
 
-  // FIXME: This storage is never freed, because Modules are allocated on the
-  // ASTContext.
   TinyPtrVector<FileUnit *> Files;
 
+  Module(Identifier name, ASTContext &ctx);
 public:
-  Module(Identifier Name, ASTContext &C)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(C), Name(Name) {
+  static Module *create(Identifier name, ASTContext &ctx) {
+    return new (ctx) Module(name, ctx);
   }
 
   ArrayRef<FileUnit *> getFiles() {
@@ -413,9 +412,9 @@ protected:
     : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
   }
 
-public:
   virtual ~FileUnit() = default;
 
+public:
   FileUnitKind getKind() const {
     return Kind;
   }
@@ -571,6 +570,8 @@ private:
   /// May be -1, to indicate no association with a buffer.
   int BufferID;
 
+  friend ASTContext;
+  ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
@@ -606,7 +607,6 @@ public:
 
   SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
              bool hasBuiltinModuleAccess = false);
-  ~SourceFile();
 
   ArrayRef<std::pair<Module::ImportedModule, bool>> getImports() const {
     assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
@@ -714,6 +714,9 @@ private:
   std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
 
+  friend ASTContext;
+  ~BuiltinUnit() = default;
+
 public:
   explicit BuiltinUnit(Module &M);
 
@@ -733,6 +736,7 @@ public:
 /// Represents an externally-loaded file of some kind.
 class LoadedFile : public FileUnit {
 protected:
+  ~LoadedFile() = default;
   LoadedFile(FileUnitKind Kind, Module &M) noexcept
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");

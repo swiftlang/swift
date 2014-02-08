@@ -37,6 +37,8 @@ class ClangModuleUnit final : public LoadedFile {
 
   Module *getAdapterModule() const;
 
+  ~ClangModuleUnit() = default;
+
 public:
   ClangModuleUnit(Module &M, ClangImporter &owner,
                   clang::Module *clangModule);

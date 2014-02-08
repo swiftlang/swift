@@ -244,7 +244,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 }
 
 static Module *createBuiltinModule(ASTContext &ctx) {
-  auto M = new (ctx) Module(ctx.getIdentifier("Builtin"), ctx);
+  auto M = Module::create(ctx.getIdentifier("Builtin"), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
   return M;
 }
