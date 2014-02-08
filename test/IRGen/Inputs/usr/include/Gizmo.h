@@ -88,3 +88,9 @@ typedef NS_ENUM(unsigned, NSNegativeUnsignedOptions) {
   NSNegativeUnsignedFoo = -1,
   NSNegativeUnsignedBar = -0x7FFFFFFF - 1,
 };
+
+enum RawEnumInGizmo {
+  InGizmoOne=0x7FFFFFFF,
+  InGizmoTwo,
+  InGizmoThree
+};
