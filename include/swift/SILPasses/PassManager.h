@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/Casting.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -24,6 +25,7 @@ namespace swift {
   class SILModule;
   class SILFunction;
   class SILTransform;
+  class SILFunctionTransform;
 
   /// \brief The SIL pass manager.
   class SILPassManager {
@@ -95,6 +97,10 @@ namespace swift {
 
     /// D'tor.
     ~SILPassManager();
+
+  protected:
+    void runFunctionPasses(
+      llvm::ArrayRef<SILFunctionTransform*> FuncTransforms);
   };
 
 } // end namespace swift

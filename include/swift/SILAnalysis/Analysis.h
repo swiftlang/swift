@@ -92,12 +92,15 @@ namespace swift {
       HasChanged = true;
     }
 
+    /// Report whether anything was invalidated since the last reset.
     bool hasChanged() const { return HasChanged; }
     void resetChanged() { HasChanged = false; }
 
     bool isComplete(SILFunction *F) const {
       return CompleteFuncs.count(F);
     }
+    /// Mark functions complete at the end of the optimization pipeline if they
+    /// haven't changed.
     void setComplete();
   };
 

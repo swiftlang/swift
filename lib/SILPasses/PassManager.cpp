@@ -23,19 +23,54 @@ using namespace swift;
 
 STATISTIC(NumOptzIterations, "Number of optimization iterations");
 
+void SILPassManager::
+runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
+  CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
+  for (auto &F : *Mod) {
+    if (F.empty() || CompleteFuncs->isComplete(&F))
+      continue;
+
+    for (auto SFT : FuncTransforms) {
+      CompleteFuncs->resetChanged();
+      SFT->injectPassManager(this);
+      SFT->injectFunction(&F);
+      SFT->run();
+
+      // If this pass invalidated anything, print and verify.
+      if (CompleteFuncs->hasChanged()) {
+        if (Options.PrintAll) {
+          llvm::dbgs() << "*** SIL function after " << SFT->getName()
+                       << " (" << NumOptzIterations << ") ***\n";
+          F.dump();
+        }
+        if (Options.VerifyAll) {
+          DEBUG(Mod->verify());
+        }
+      }
+    }
+  }
+}
+
 void SILPassManager::runOneIteration() {
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
   NumOptzIterations++;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
+  SmallVector<SILFunctionTransform*, 16> PendingFuncTransforms;
 
   // For each transformation:
   for (SILTransform *ST : Transformations) {
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
+      // Run all function passes that we've seen since the last module pass.
+      runFunctionPasses(PendingFuncTransforms);
+      PendingFuncTransforms.clear();
+
+      CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
       SMT->run();
 
+      // If this pass invalidated anything, print and verify.
       if (CompleteFuncs->hasChanged()) {
         if (Options.PrintAll) {
           llvm::dbgs() << "*** SIL module after " << SMT->getName()
@@ -45,36 +80,19 @@ void SILPassManager::runOneIteration() {
         if (Options.VerifyAll) {
           DEBUG(Mod->verify());
         }
-        CompleteFuncs->resetChanged();
       }
       continue;
     }
 
     // Run function transformation on all functions.
     if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
-      for (auto &F : *Mod)
-        if (!F.empty() && !CompleteFuncs->isComplete(&F)) {
-          SFT->injectPassManager(this);
-          SFT->injectFunction(&F);
-          SFT->run();
-
-          if (CompleteFuncs->hasChanged()) {
-            if (Options.PrintAll) {
-              llvm::dbgs() << "*** SIL function after " << SFT->getName()
-                           << " (" << NumOptzIterations << ") ***\n";
-              F.dump();
-            }
-            if (Options.VerifyAll) {
-              DEBUG(Mod->verify());
-            }
-            CompleteFuncs->resetChanged();
-          }
-        }
+      PendingFuncTransforms.push_back(SFT);
       continue;
     }
 
     llvm_unreachable("Unknown pass kind.");
   }
+  runFunctionPasses(PendingFuncTransforms);
   CompleteFuncs->setComplete();
 }
 
