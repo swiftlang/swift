@@ -102,7 +102,6 @@ PUNCTUATOR(colon,         ":")
 PUNCTUATOR(semi,          ";")
 PUNCTUATOR(equal,         "=")
 PUNCTUATOR(at_sign,       "@")
-PUNCTUATOR(ellipsis,      "...")
 
 PUNCTUATOR(amp_prefix,    "&")
 PUNCTUATOR(arrow,         "->")

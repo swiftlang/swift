@@ -629,12 +629,6 @@ void Lexer::lexOperatorIdentifier() {
       return formToken(tok::unknown, TokStart);
     }
   } else {
-    if (CurPtr-TokStart == 3) {
-      switch ((TokStart[0] << 16) | (TokStart[1] << 8) | TokStart[0]) {
-      case ('.' << 16) | ('.' << 8) | '.':
-        return formToken(tok::ellipsis, TokStart);
-      }
-    }
     // If there is a "//" in the middle of an identifier token, it starts
     // a single-line comment.
     auto Pos = StringRef(TokStart, CurPtr-TokStart).find("//");

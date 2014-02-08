@@ -696,9 +696,9 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
     elts.push_back(*elt);
 
     // If there is no ellipsis, we're done with the element.
-    if (Tok.isNot(tok::ellipsis))
+    if (Tok.isNotEllipsis())
       return makeParserSuccess();
-    SourceLoc ellLoc = consumeToken(tok::ellipsis);
+    SourceLoc ellLoc = consumeToken();
 
     // An element cannot have both an initializer and an ellipsis.
     if (elt->getInit()) {

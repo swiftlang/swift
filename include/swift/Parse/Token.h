@@ -82,6 +82,13 @@ public:
     return !isAnyOperator();
   }
 
+  bool isEllipsis() const {
+    return isAnyOperator() && Text == "...";
+  }
+  bool isNotEllipsis() const {
+    return !isEllipsis();
+  }
+
   /// \brief Determine whether this token occurred at the start of a line.
   bool isAtStartOfLine() const { return AtStartOfLine; }
 

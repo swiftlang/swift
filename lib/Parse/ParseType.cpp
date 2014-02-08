@@ -487,8 +487,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         inFlight.fixItRemove(SourceRange(equalLoc, init.get()->getEndLoc()));
     }
 
-    if (Tok.is(tok::ellipsis)) {
-      EllipsisLoc = consumeToken(tok::ellipsis);
+    if (Tok.isEllipsis()) {
+      EllipsisLoc = consumeToken();
       if (Tok.is(tok::r_paren)) {
         HadEllipsis = true;
       } else {
@@ -824,7 +824,7 @@ static bool canParseAttributes(Parser &P) {
 
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      Tok.isNot(tok::ellipsis) && !isStartOfDecl(Tok, peekToken())) {
+      Tok.isNotEllipsis() && !isStartOfDecl(Tok, peekToken())) {
     do {
       // The contextual inout marker is part of argument lists.
       if (Tok.isContextualKeyword("inout"))
@@ -845,7 +845,7 @@ bool Parser::canParseTypeTupleBody() {
         // better if we skip over them.
         if (consumeIf(tok::equal)) {
           while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
-                 Tok.isNot(tok::r_brace) && Tok.isNot(tok::ellipsis) &&
+                 Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
                  Tok.isNot(tok::comma) &&
                  !isStartOfDecl(Tok, peekToken())) {
             skipSingle();
@@ -866,7 +866,7 @@ bool Parser::canParseTypeTupleBody() {
     } while (consumeIf(tok::comma));
   }
   
-  if (Tok.is(tok::ellipsis)) {
+  if (Tok.isEllipsis()) {
     consumeToken();
   }
   
