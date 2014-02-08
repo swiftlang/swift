@@ -1402,6 +1402,8 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::TypeDecl:
+      choice.getDecl()->dumpRef(out);
+      out << " as ";
       if (choice.getBaseType())
         out << choice.getBaseType()->getString() << ".";
         
