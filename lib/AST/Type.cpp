@@ -926,7 +926,7 @@ Identifier GenericTypeParamType::getName() const {
   if (auto decl = getDecl())
     return decl->getName();
   
-  // Otherwise, we're canonical. Produce an anonymous '$T_n_n' name.
+  // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
   assert(isCanonical());
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
@@ -938,7 +938,10 @@ Identifier GenericTypeParamType::getName() const {
   
   llvm::SmallString<10> nameBuf;
   llvm::raw_svector_ostream os(nameBuf);
-  os << "$T_" << getDepth() << '_' << getIndex();
+
+  static const char *tau = u8"\u03C4_";
+  
+  os << tau << getDepth() << '_' << getIndex();
   Identifier name = C.getIdentifier(os.str());
   names.insert({depthIndex, name});
   return name;
