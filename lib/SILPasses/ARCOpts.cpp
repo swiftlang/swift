@@ -499,7 +499,6 @@ static void processFunction(SILFunction &F, AliasAnalysis *AA) {
   // For each basic block in F...
   for (auto &BB : F) {
     DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
-    bool Changed;
 
     // Process the basic block until we do not eliminate any inc/dec pairs
     // and see any nested increments.
@@ -509,9 +508,8 @@ static void processFunction(SILFunction &F, AliasAnalysis *AA) {
 
       // We need to rerun if we saw any nested increment/decrements and if we
       // removed any increment/decrement pairs.
-      Changed = processBBTopDown(BB, BBState, DecToIncStateMap, AA);
-      Changed &= performCodeMotion(DecToIncStateMap);
-      if (!Changed)
+      processBBTopDown(BB, BBState, DecToIncStateMap, AA);
+      if (!performCodeMotion(DecToIncStateMap))
         break;
 
       DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
