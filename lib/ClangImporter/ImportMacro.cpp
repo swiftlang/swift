@@ -177,6 +177,7 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
     return known->second;
   }
   
+  ImportingEntityRAII ImportingEntity(*this);
   // We haven't tried to import this macro yet. Do so now, and cache the
   // result.
   auto valueDecl = ::importMacro(*this, name, macro);

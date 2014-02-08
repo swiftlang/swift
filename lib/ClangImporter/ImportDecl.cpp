@@ -819,7 +819,7 @@ namespace {
       constructor->setBody(body);
 
       // Add this as an external definition.
-      Impl.SwiftContext.addedExternalDecl(constructor);
+      Impl.registerExternalDecl(constructor);
 
       // We're done.
       return constructor;
@@ -1164,7 +1164,7 @@ namespace {
       // Add the type decl to ExternalDefinitions so that we can type-check
       // raw values and IRGen can emit metadata for it.
       // FIXME: There might be better ways to do this.
-      Impl.SwiftContext.addedExternalDecl(result);
+      Impl.registerExternalDecl(result);
       return result;
     }
 
@@ -1250,7 +1250,7 @@ namespace {
       // Add the struct decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
       // FIXME: There might be better ways to do this.
-      Impl.SwiftContext.addedExternalDecl(result);
+      Impl.registerExternalDecl(result);
       
       return result;
     }
@@ -1435,7 +1435,7 @@ namespace {
         const_cast<clang::FunctionDecl *>(decl)->addAttr(attr);
 
         result->setClangNode(decl);
-        Impl.SwiftContext.addedExternalDecl(result);
+        Impl.registerExternalDecl(result);
       }
 
       result->setBodyResultType(resultTy);
@@ -1898,7 +1898,7 @@ namespace {
       setVarDeclContexts(bodyPatterns, result);
 
       // Inform the context that we have external definitions.
-      Impl.SwiftContext.addedExternalDecl(result);
+      Impl.registerExternalDecl(result);
 
       return result;
     }
@@ -2739,7 +2739,7 @@ namespace {
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
       // FIXME: There might be better ways to do this.
-      Impl.SwiftContext.addedExternalDecl(result);
+      Impl.registerExternalDecl(result);
 
       return result;
     }
@@ -2810,7 +2810,7 @@ namespace {
       result->setMemberLoader(&Impl, 0);
 
       // Pass the class to the type checker to create an implicit destructor.
-      Impl.SwiftContext.addedExternalDecl(result);
+      Impl.registerExternalDecl(result);
 
       return result;
     }
@@ -3103,6 +3103,25 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   return Result;
 }
 
+void ClangImporter::Implementation::finishedImportingEntity() {
+  assert(NumCurrentImportingEntities &&
+         "finishedImportingEntity not paired with startedImportingEntity");
+  if (NumCurrentImportingEntities == 1) {
+    // We decrease NumCurrentImportingEntities only after pending actions
+    // are finished, to avoid recursively re-calling finishPendingActions().
+    finishPendingActions();
+  }
+  --NumCurrentImportingEntities;
+}
+
+void ClangImporter::Implementation::finishPendingActions() {
+  while (!RegisteredExternalDecls.empty()) {
+    Decl *D = RegisteredExternalDecls.front();
+    RegisteredExternalDecls.pop();
+    SwiftContext.addedExternalDecl(D);
+  }
+}
+
 Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
     const clang::NamedDecl *ClangDecl,
     bool SuperfluousTypedefsAreTransparent) {
@@ -3121,6 +3140,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   bool TypedefIsSuperfluous = false;
   bool HadForwardDeclaration = false;
 
+  ImportingEntityRAII ImportingEntity(*this);
   Decl *Result = importDeclImpl(ClangDecl, TypedefIsSuperfluous,
                                 HadForwardDeclaration);
   if (!Result)
@@ -3339,7 +3359,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   var->makeComputed(SourceLoc(), func, nullptr, SourceLoc());
 
   // Register this thunk as an external definition.
-  SwiftContext.addedExternalDecl(func);
+  registerExternalDecl(func);
 
   return var;
 }

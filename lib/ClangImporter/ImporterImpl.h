@@ -27,6 +27,7 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include <queue>
 #include <set>
 
 namespace clang {
@@ -146,6 +147,10 @@ public:
   };
 
   Implementation(ASTContext &ctx) : SwiftContext(ctx) { }
+
+  ~Implementation() {
+    assert(NumCurrentImportingEntities == 0);
+  }
 
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
@@ -300,7 +305,33 @@ public:
 private:
   Optional<bool> checkedFoundationModule;
 
+  /// External Decls that we have imported but not passed to the ASTContext yet.
+  std::queue<Decl *> RegisteredExternalDecls;
+
+  unsigned NumCurrentImportingEntities = 0;
+
+  void startedImportingEntity() {
+    ++NumCurrentImportingEntities;
+  }
+  void finishedImportingEntity();
+  void finishPendingActions();
+
+  struct ImportingEntityRAII {
+    Implementation &Impl;
+
+    ImportingEntityRAII(Implementation &Impl) : Impl(Impl) {
+      Impl.startedImportingEntity();
+    }
+    ~ImportingEntityRAII() {
+      Impl.finishedImportingEntity();
+    }
+  };
+
 public:
+  void registerExternalDecl(Decl *D) {
+    RegisteredExternalDecls.push(D);
+  }
+
   /// \brief Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
