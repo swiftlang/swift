@@ -691,8 +691,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.
-  if (!FrontendOpts.InputFilenames.empty())
-    Opts.MainInputFilename = FrontendOpts.InputFilenames[0];
+  if (FrontendOpts.PrimaryInput && FrontendOpts.PrimaryInput->isFilename()) {
+    unsigned Index = FrontendOpts.PrimaryInput->Index;
+    Opts.MainInputFilename = FrontendOpts.InputFilenames[Index];
+  } else if (FrontendOpts.InputFilenames.size() == 1) {
+    Opts.MainInputFilename = FrontendOpts.InputFilenames.front();
+  }
   Opts.OutputFilename = FrontendOpts.OutputFilename;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
