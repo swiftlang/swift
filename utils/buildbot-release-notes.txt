@@ -50,13 +50,13 @@
   spelled with three '.'s instead of two, for consistency with Ruby.
 
     (swift) for x in 0...5 { print(x) } ; print('\n') # new syntax
-    0 1 2 3 4
+    01234
   
   Next week, we'll introduce a fully-closed range which does include 
   its endpoint.  This will provide:
 
     (swift) for x in 0..5 { print(x) } ; print('\n')  # coming soon
-    0 1 2 3 4 5
+    012345
   
   These changes are being released separately so that users have a
   chance to update their code before its semantics changes.
