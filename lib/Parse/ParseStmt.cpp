@@ -454,15 +454,12 @@ namespace {
     SmallVectorImpl<Decl*> &Decls;
     
     AddVarsToScope(Parser &P, SmallVectorImpl<Decl*> &Decls)
-    : TheParser(P),
-    Decls(Decls) {}
+    : TheParser(P), Decls(Decls) {}
     
     Pattern *walkToPatternPost(Pattern *P) override {
       // Handle vars.
       if (auto *Named = dyn_cast<NamedPattern>(P)) {
         VarDecl *VD = Named->getDecl();
-        assert(VD->getDeclContext() == TheParser.CurDeclContext);
-        VD->setDeclContext(TheParser.CurDeclContext);
         Decls.push_back(VD);
         TheParser.addToScope(VD);
       }

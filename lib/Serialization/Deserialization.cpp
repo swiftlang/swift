@@ -1370,7 +1370,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theStruct->getGenericParams()) {
-        genericParam.getAsTypeParam()->setDeclContext(theStruct);
         paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -1412,7 +1411,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
+    // FIXME: There is no reason to serialize the ImplicitSelfID.  The param
+    // pattern list encompasses this.
+    auto *SelfDecl = getDecl(implicitSelfID, nullptr);
+    
     auto genericParams = maybeReadGenericParams(parent);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
@@ -1420,7 +1422,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                           /*bodyParams=*/nullptr, nullptr,
                                           genericParams, parent);
     declOrOffset = ctor;
-    selfDecl->setDeclContext(ctor);
 
     Pattern *argParams0 = maybeReadPattern();
     Pattern *argParams1 = maybeReadPattern();
@@ -1480,11 +1481,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     ctor->setIsObjC(isObjC);
     if (isTransparent)
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
-
-    if (genericParams)
-      for (auto &genericParam : *ctor->getGenericParams())
-        genericParam.getAsTypeParam()->setDeclContext(ctor);
-
     break;
   }
 
@@ -1614,10 +1610,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setDeserializedSignature(argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
-    if (genericParams)
-      for (auto &genericParam : *fn->getGenericParams())
-        genericParam.getAsTypeParam()->setDeclContext(fn);
-
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 
     fn->setStatic(isClassMethod);
@@ -1714,7 +1706,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       proto->setGenericParams(genericParams);
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *proto->getGenericParams()) {
-        genericParam.getAsTypeParam()->setDeclContext(proto);
         paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
                              ->castTo<GenericTypeParamType>());
       }
@@ -1846,7 +1837,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {
-        genericParam.getAsTypeParam()->setDeclContext(theClass);
         paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -1905,7 +1895,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theEnum->getGenericParams()) {
-        genericParam.getAsTypeParam()->setDeclContext(theEnum);
         paramTypes.push_back(genericParam.getAsTypeParam()->getDeclaredType()
                                ->castTo<GenericTypeParamType>());
       }
@@ -2058,11 +2047,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
+    // FIXME: There is no reason to serialize implicitSelfID, the param pattern
+    // captures this.
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
                                          /*selfpat*/nullptr, parent);
     declOrOffset = dtor;
-    selfDecl->setDeclContext(dtor);
 
 
     Pattern *selfParams = maybeReadPattern();

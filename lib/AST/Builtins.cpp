@@ -201,11 +201,7 @@ getBuiltinGenericFunction(Identifier Id,
                                SourceLoc(), GenericParams, FnType, ArgPattern,
                                ArgPattern, TypeLoc::withoutLoc(ResBodyType),
                                &M->getMainFile(FileUnitKind::Builtin));
-  
-  // Recontextualize the generic parameters to the function.
-  for (auto param : GenericParams->getParams())
-    param.getAsTypeParam()->setDeclContext(func);
-  
+    
   func->setInterfaceType(InterfaceType);
   
   return func;

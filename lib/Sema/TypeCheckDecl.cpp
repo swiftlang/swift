@@ -1093,11 +1093,6 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
                           TypeLoc::withoutLoc(VD->getType()),
                           VD->getDeclContext());
   Get->setImplicit();
-  
-  
-  // Reparent the self argument.
-  SelfDecl->setDeclContext(Get);
-
   return Get;
 }
 
@@ -1122,10 +1117,6 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
                                VD->getDeclContext());
   Set->setImplicit();
   
-  // Reparent the self and value arguments.
-  SelfDecl->setDeclContext(Set);
-  ValueDecl->setDeclContext(Set);
-
   // Setters default to mutating.
   Set->setMutating();
   
@@ -3085,7 +3076,6 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   SourceLoc Loc = decl->getLoc();
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
-  SmallVector<VarDecl *, 8> allArgs;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -3098,7 +3088,6 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) VarDecl(/*static*/false, /*IsLet*/true,
                                         Loc, var->getName(), varType, decl);
-      allArgs.push_back(arg);
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
@@ -3112,14 +3101,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   auto constructorID = context.Id_init;
   VarDecl *selfDecl;
   Pattern *selfPat = buildImplicitSelfParameter(Loc, decl, &selfDecl);
-  ConstructorDecl *ctor
-    = new (context) ConstructorDecl(constructorID, Loc,
-                                    selfPat, pattern, selfPat, pattern,
-                                    nullptr, decl);
-  selfDecl->setDeclContext(ctor);
-  for (auto var : allArgs) {
-    var->setDeclContext(ctor);
-  }
+  auto *ctor = new (context) ConstructorDecl(constructorID, Loc,
+                                             selfPat, pattern, selfPat, pattern,
+                                             nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -3206,10 +3190,8 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   VarDecl *selfDecl;
   Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD, &selfDecl);
 
-  DestructorDecl *DD =
-    new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(), selfPat,
-                                 CD);
-  selfDecl->setDeclContext(DD);
+  auto *DD = new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(),
+                                          selfPat, CD);
 
   DD->setImplicit();
 

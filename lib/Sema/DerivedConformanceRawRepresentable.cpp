@@ -121,8 +121,6 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                                TypeLoc::withoutLoc(rawType), enumDecl);
   toRawDecl->setImplicit();
   
-  selfDecl->setDeclContext(toRawDecl);
-  
   SmallVector<CaseStmt*, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
@@ -212,13 +210,6 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                  enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
-  selfDecl->setDeclContext(fromRawDecl);
-  rawDecl->setDeclContext(fromRawDecl);
-  cast<NamedPattern>(bodyParams[0]->getSemanticsProvidingPattern())
-    ->getDecl()->setDeclContext(fromRawDecl);
-  cast<NamedPattern>(bodyParams[1]->getSemanticsProvidingPattern())
-    ->getDecl()->setDeclContext(fromRawDecl);
-
 
   SmallVector<CaseStmt*, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {

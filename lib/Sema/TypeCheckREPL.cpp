@@ -585,7 +585,6 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context));
   CE->setType(FuncTy);
-  Arg->setDeclContext(CE);
   
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;

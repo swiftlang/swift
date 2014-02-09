@@ -44,20 +44,6 @@ namespace inferred_attributes {
 }
 }
 
-/// \brief Set the declaration context of each variable within the given
-/// patterns to \p dc.
-static void setVarDeclContexts(ArrayRef<Pattern *> patterns, DeclContext *dc) {
-  for (auto pattern : patterns) {
-    auto pat = pattern->getSemanticsProvidingPattern();
-    if (auto named = dyn_cast<NamedPattern>(pat))
-      named->getDecl()->setDeclContext(dc);
-    if (auto tuple = dyn_cast<TuplePattern>(pat)) {
-      for (auto elt : tuple->getFields())
-        setVarDeclContexts(elt.getPattern(), dc);
-    }
-  }
-}
-
 /// \brief Retrieve the type of 'self' for the given context.
 static Type getSelfTypeForContext(DeclContext *dc) {
   // For a protocol, the type is 'Self'.
@@ -786,10 +772,6 @@ namespace {
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
 
-      // Fix the declaration contexts.
-      selfDecl->setDeclContext(constructor);
-      setVarDeclContexts(paramPatterns, constructor);
-
       // Assign all of the member variables appropriately.
       SmallVector<ASTNode, 4> stmts;
       unsigned paramIdx = 0;
@@ -1439,8 +1421,6 @@ namespace {
       }
 
       result->setBodyResultType(resultTy);
-      setVarDeclContexts(argPatterns, result);
-      setVarDeclContexts(bodyPatterns, result);
       return result;
     }
 
@@ -1629,9 +1609,6 @@ namespace {
 
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
-
-      setVarDeclContexts(argPatterns, result);
-      setVarDeclContexts(bodyPatterns, result);
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -1892,10 +1869,6 @@ namespace {
       
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
-      
-      selfVar->setDeclContext(result);
-      setVarDeclContexts(argPatterns, result);
-      setVarDeclContexts(bodyPatterns, result);
 
       // Inform the context that we have external definitions.
       Impl.registerExternalDecl(result);
@@ -2012,8 +1985,6 @@ namespace {
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
 
-      setVarDeclContexts(getterArgs, thunk);
-
       thunk->setIsObjC(true);
       return thunk;
     }
@@ -2097,8 +2068,6 @@ namespace {
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
-
-      setVarDeclContexts(setterArgs, thunk);
 
       thunk->setIsObjC(true);
       return thunk;
@@ -2285,9 +2254,7 @@ namespace {
                                       TypeLoc::withoutLoc(elementTy),
                                       SourceRange(), getterThunk, setterThunk,
                                       dc);
-      setVarDeclContexts(argPatterns, subscript->getDeclContext());
-
-      subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
+       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
       subscript->setIsObjC(true);
 
@@ -3261,8 +3228,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                getterArgs, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);
-
-  setVarDeclContexts(getterArgs, func);
 
   // Create the integer literal value.
   // FIXME: Handle other kinds of values.

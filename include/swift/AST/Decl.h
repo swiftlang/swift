@@ -2686,9 +2686,10 @@ public:
                 SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
                 DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
-      ArrowLoc(ArrowLoc), Indices(Indices), ElementTy(ElementTy) {
+      ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     assert(Get && "subscripts should always have at least a getter");
     makeComputed(Braces.Start, Get, Set, Braces.End);
+    setIndices(Indices);
   }
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
@@ -2698,7 +2699,7 @@ public:
   /// \brief Retrieve the indices for this subscript operation.
   Pattern *getIndices() { return Indices; }
   const Pattern *getIndices() const { return Indices; }
-  void setIndices(Pattern *p) { Indices = p; }
+  void setIndices(Pattern *p);
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.

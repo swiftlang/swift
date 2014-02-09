@@ -1246,6 +1246,13 @@ static bool isIntegralType(Type type) {
   return false;
 }
 
+void SubscriptDecl::setIndices(Pattern *p) {
+  Indices = p;
+  
+  // FIXME: What context should the indices patterns be in?
+}
+
+
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   auto indexTy = getIndices()->getType();
 
