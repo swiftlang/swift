@@ -136,12 +136,14 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
       LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
                                                 D,
                                                 P.getType().getObjectType());
-      cast<StructExtractInst>(*LastExtract).getStructDecl();
+      assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
+             "Instruction must have a struct decl!");
     } else {
       LastExtract = Builder.createTupleExtract(LI->getLoc(), LastExtract,
                                                P.getIndex(),
                                                P.getType().getObjectType());
-      cast<TupleExtractInst>(*LastExtract).getTupleType();
+      assert(cast<TupleExtractInst>(*LastExtract).getTupleType() &&
+             "Instruction must have a tuple type!");
     }
   }
 
