@@ -1304,46 +1304,6 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               Context);
 }
 
-static void getReplacementTypes(GenericParamList &genericParams,
-                                ArrayRef<Substitution> subs,
-                                SmallVectorImpl<Type> &replacements) {
-  (void) genericParams;
-
-#ifndef NDEBUG
-  // Ensure the substitution vector matches the generic parameter order.
-  auto params = genericParams.getNestedGenericParams();
-  auto pi = params.begin();
-#endif
-  
-  for (auto &sub : subs) {
-    // FIXME: Only substitute primary archetypes.
-    if (!sub.Archetype->isPrimary())
-      continue;
-
-    assert((pi++)->getAsTypeParam()->getArchetype() == sub.Archetype
-           && "substitution doesn't match archetype");
-    replacements.push_back(sub.Replacement);
-  }
-  
-  assert(pi == params.end()
-         && "did not substitute all archetypes?!");
-}
-
-/// Apply a substitution to this polymorphic SILFunctionType so that
-/// it has the form of the normal SILFunctionType for the substituted
-/// type, except using the original conventions.
-CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,
-                                                 Module *astModule,
-                                                 ArrayRef<Substitution> subs) {
-  assert(isPolymorphic());
-  auto &params = *getGenericParams();
-
-  SmallVector<Type, 4> replacements;
-  getReplacementTypes(params, subs, replacements);
-
-  return substGenericArgs(silModule, astModule, replacements);
-}
-
 namespace {
   /// Given a lowered SIL type, apply a substitution to it to produce another
   /// lowered SIL type which uses the same abstraction conventions.
@@ -1352,15 +1312,12 @@ namespace {
     SILModule &TheSILModule;
     Module *TheASTModule;
     TypeSubstitutionMap &Subs;
-    bool InterfaceTypes;
 
     ASTContext &getASTContext() { return TheSILModule.getASTContext(); }
   public:
     SILTypeSubstituter(SILModule &silModule, Module *astModule,
-                       TypeSubstitutionMap &subs,
-                       bool interfaceTypes)
-      : TheSILModule(silModule), TheASTModule(astModule), Subs(subs),
-        InterfaceTypes(interfaceTypes)
+                       TypeSubstitutionMap &subs)
+      : TheSILModule(silModule), TheASTModule(astModule), Subs(subs)
     {}
 
     // SIL type lowering only does special things to tuples and functions.
@@ -1369,15 +1326,14 @@ namespace {
     CanSILFunctionType visitSILFunctionType(CanSILFunctionType origType,
                                             bool dropGenerics = false)
     {
-      auto result = InterfaceTypes ? origType->getInterfaceResult()
-                                   : origType->getResult();
-      SILResultInfo substResult = subst(result);
+      GenericContextScope scope(TheSILModule.Types,
+                                origType->getGenericSignature());
+    
+      SILResultInfo substResult = subst(origType->getInterfaceResult());
 
       SmallVector<SILParameterInfo, 8> substParams;
-      substParams.reserve(origType->getParameters().size());
-      auto params = InterfaceTypes ? origType->getInterfaceParameters()
-                                   : origType->getParameters();
-      for (auto &origParam : params) {
+      substParams.reserve(origType->getInterfaceParameters().size());
+      for (auto &origParam : origType->getInterfaceParameters()) {
         substParams.push_back(subst(origParam));
       }
 
@@ -1385,11 +1341,30 @@ namespace {
         = (dropGenerics ? nullptr : origType->getGenericParams());
       auto genericSig
         = (dropGenerics ? nullptr : origType->getGenericSignature());
+      
+      // FIXME: Resubstitute the non-interface types into the generic context.
+      auto mapIntoContext = [&](Type t) -> Type {
+        return ArchetypeBuilder::mapTypeIntoContext(TheASTModule,
+                                                    genericParams, t);
+      };
+      
+      SmallVector<SILParameterInfo, 8> substOldParams;
+      SILResultInfo substOldResult;
+      if (dropGenerics) {
+        // If we drop the generic signature, they are the same.
+        substOldParams = substParams;
+        substOldResult = substResult;
+      } else {
+        substOldResult = substResult.transform(mapIntoContext);
+        for (auto &param : substParams)
+          substOldParams.push_back(param.transform(mapIntoContext));
+      }
+      
       return SILFunctionType::get(genericParams,
                                   genericSig,
                                   origType->getExtInfo(),
                                   origType->getCalleeConvention(),
-                                  substParams, substResult,
+                                  substOldParams, substOldResult,
                                   substParams, substResult,
                                   getASTContext());
     }
@@ -1449,8 +1424,7 @@ namespace {
 
 SILType SILType::substType(SILModule &silModule, Module *astModule,
                            TypeSubstitutionMap &subs, SILType SrcTy) {
-  SILTypeSubstituter STST(silModule, astModule, subs,
-                          /*interface types*/ false);
+  SILTypeSubstituter STST(silModule, astModule, subs);
   return STST.subst(SrcTy);
 }
 
@@ -1459,29 +1433,8 @@ CanSILFunctionType SILType::substFuncType(SILModule &silModule,
                                           TypeSubstitutionMap &subs,
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics) {
-  SILTypeSubstituter STST(silModule, astModule, subs,
-                          /*interface types*/ false);
+  SILTypeSubstituter STST(silModule, astModule, subs);
   return STST.visitSILFunctionType(SrcTy, dropGenerics);
-}
-
-CanSILFunctionType SILFunctionType::substGenericArgs(SILModule &silModule,
-                                                     Module *astModule,
-                                                     ArrayRef<Type> args) {
-  assert(isPolymorphic());
-
-  TypeSubstitutionMap subs;
-
-  unsigned i = 0;
-  for (auto &param : getGenericParams()->getNestedGenericParams()) {
-    auto archetype = param.getAsTypeParam()->getArchetype();
-    subs.insert(std::make_pair(archetype, args[i++]));
-  }
-  assert(i == args.size() && "got more arguments than generic params");
-
-  SILTypeSubstituter substituter(silModule, astModule, subs,
-                                 /*interface types*/ false);
-  return substituter.visitSILFunctionType(CanSILFunctionType(this),
-                                          /*dropGenerics*/ true);
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that
@@ -1493,12 +1446,7 @@ SILFunctionType::substInterfaceGenericArgs(SILModule &silModule,
                                            ArrayRef<Substitution> subs) {
   assert(isPolymorphic());
   TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
-  SILTypeSubstituter substituter(silModule, astModule, map,
-                                 /*interface types*/ true);
-  
-  GenericContextScope scope(silModule.Types,
-                            getGenericSignature()->getGenericParams(),
-                            getGenericSignature()->getRequirements());
+  SILTypeSubstituter substituter(silModule, astModule, map);
   
   return substituter.visitSILFunctionType(CanSILFunctionType(this),
                                           /*dropGenerics*/ true);

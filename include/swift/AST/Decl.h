@@ -899,6 +899,10 @@ public:
                            llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
                            ASTContext &C) const;
   
+  /// Derive a type substitution map for this generic parameter list from a
+  /// matching substitution vector.
+  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
+  
   void print(raw_ostream &OS);
   void dump();
 };

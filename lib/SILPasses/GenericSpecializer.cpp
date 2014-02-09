@@ -39,19 +39,27 @@ class TypeSubCloner : public SILCloner<TypeSubCloner> {
 public:
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
-  static SILFunction *cloneFunction(SILFunction *F, TypeSubstitutionMap &Subs,
+  static SILFunction *cloneFunction(SILFunction *F,
+                                    TypeSubstitutionMap &InterfaceSubs,
+                                    TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplyInst *Caller) {
     // Clone and specialize the function.
-    TypeSubCloner TSC(F, Subs, NewName, Caller);
+    TypeSubCloner TSC(F, InterfaceSubs, ContextSubs, NewName, Caller);
     TSC.populateCloned();
     return TSC.getCloned();
   }
 
 private:
-  TypeSubCloner(SILFunction *F, TypeSubstitutionMap &Subst, StringRef NewName,
-                ApplyInst *Caller) : SILCloner(*initCloned(F, Subst, NewName)),
-        SwiftMod(F->getModule().getSwiftModule()), SubsMap(Subst), OrigFunc(F),
-  CallerInst(Caller) { }
+  TypeSubCloner(SILFunction *F,
+                TypeSubstitutionMap &InterfaceSubs,
+                TypeSubstitutionMap &ContextSubs,
+                StringRef NewName,
+                ApplyInst *Caller)
+      : SILCloner(*initCloned(F, InterfaceSubs, NewName)),
+        SwiftMod(F->getModule().getSwiftModule()),
+        SubsMap(ContextSubs),
+        OrigFunc(F),
+        CallerInst(Caller) { }
 
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.
@@ -142,14 +150,15 @@ private:
   
   /// Create a new empty function with the correct arguments and a unique name.
   static SILFunction *initCloned(SILFunction *Orig,
-                                 TypeSubstitutionMap &Subst,
+                                 TypeSubstitutionMap &InterfaceSubs,
                                  StringRef NewName) {
     SILModule &M = Orig->getModule();
     Module *SM = M.getSwiftModule();
 
     CanSILFunctionType FTy =
-        SILType::substFuncType(M, SM, Subst, Orig->getLoweredFunctionType(),
-                                                /*dropGenerics = */ true);
+        SILType::substFuncType(M, SM, InterfaceSubs,
+                               Orig->getLoweredFunctionType(),
+                               /*dropGenerics = */ true);
 
     // Create a new empty function.
     SILFunction *NewF =
@@ -330,6 +339,18 @@ static bool hasSameSubstitutions(ApplyInst *A, ApplyInst *B) {
   return true;
 }
 
+void dumpTypeSubstitutionMap(const TypeSubstitutionMap &map) {
+  llvm::errs() << "{\n";
+  for (auto &kv : map) {
+    llvm::errs() << "  ";
+    kv.first->print(llvm::errs());
+    llvm::errs() << " => ";
+    kv.second->print(llvm::errs());
+    llvm::errs() << "\n";
+  }
+  llvm::errs() << "}\n";
+}
+
 bool
 GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   bool Changed = false;
@@ -366,13 +387,17 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   // For each bucket of AI instructions of the same type.
   for (auto &Bucket : Buckets) {
     assert(Bucket.size() && "Empty bucket!");
-    TypeSubstitutionMap Subs;
 
-    // Create the substitution map.
-    for (auto &Sub : Bucket[0]->getSubstitutions())
-      Subs[Sub.Archetype] = Sub.Replacement;
+    // Create the substitution maps.
+    TypeSubstitutionMap InterfaceSubs
+      = F->getLoweredFunctionType()->getGenericSignature()
+         ->getSubstitutionMap(Bucket[0]->getSubstitutions());
+    
+    TypeSubstitutionMap ContextSubs
+      = F->getContextGenericParams()
+         ->getSubstitutionMap(Bucket[0]->getSubstitutions());
 
-    if (!canSpecializeFunctionWithSubList(F, Subs))
+    if (!canSpecializeFunctionWithSubList(F, InterfaceSubs))
       continue;
 
     llvm::SmallString<64> ClonedName;
@@ -405,7 +430,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       createdFunction = false;
     } else {
       // Create a new function.
-      NewF = TypeSubCloner::cloneFunction(F, Subs, ClonedName, Bucket[0]);
+      NewF = TypeSubCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
+                                          ClonedName, Bucket[0]);
       createdFunction = false;
     }
 

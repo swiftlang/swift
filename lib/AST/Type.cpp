@@ -1456,23 +1456,7 @@ ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
   return Params->getAllArchetypes();
 }
 
-FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
-                                                        ArrayRef<Type> args) {
-  TypeSubstitutionMap subs;
-  unsigned i = 0;
-  for (auto &param : getGenericParams().getNestedGenericParams()) {
-    subs.insert(std::make_pair(param.getAsTypeParam()->getArchetype(),
-                               args[i++]));
-  }
-  assert(i == args.size()
-         && "got more arguments than generic parameters");
-  
-  Type input = getInput().subst(module, subs, true, nullptr);
-  Type result = getResult().subst(module, subs, true, nullptr);
-  return FunctionType::get(input, result, getExtInfo());
-}
-
-static void getReplacementTypes(GenericParamList &genericParams,
+static void getReplacementTypes(const GenericParamList &genericParams,
                                 ArrayRef<Substitution> subs,
                                 SmallVectorImpl<Type> &replacements) {
   (void) genericParams;
@@ -1495,6 +1479,38 @@ static void getReplacementTypes(GenericParamList &genericParams,
   
   assert(pi == params.end()
          && "did not substitute all archetypes?!");
+}
+
+static TypeSubstitutionMap getSubstitutionMapFromReplacementTypes(
+                                        const GenericParamList &genericParams,
+                                        ArrayRef<Type> args) {
+  TypeSubstitutionMap map;
+  unsigned i = 0;
+  for (auto &param : genericParams.getNestedGenericParams()) {
+    map.insert(std::make_pair(param.getAsTypeParam()->getArchetype(),
+                              args[i++]));
+  }
+  assert(i == args.size()
+         && "got more arguments than generic parameters");
+  
+  return map;
+}
+
+TypeSubstitutionMap
+GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
+  SmallVector<Type, 4> replacementTypes;
+  getReplacementTypes(*this, Subs, replacementTypes);
+  return getSubstitutionMapFromReplacementTypes(*this, replacementTypes);
+}
+
+FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
+                                                        ArrayRef<Type> args) {
+  TypeSubstitutionMap subs
+    = getSubstitutionMapFromReplacementTypes(getGenericParams(), args);
+  
+  Type input = getInput().subst(module, subs, true, nullptr);
+  Type result = getResult().subst(module, subs, true, nullptr);
+  return FunctionType::get(input, result, getExtInfo());
 }
 
 FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
