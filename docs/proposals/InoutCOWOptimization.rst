@@ -1,129 +1,122 @@
 :orphan:
    
-==============================
- Efficient Mutation of Slices
-==============================
+================================================
+ Copy-On-Write Optimization of ``inout`` Values
+================================================
 
 :Authors: Dave Abrahams, Joe Groff
           
-We propose language and library facilities that allow slices to be
-mutated "in-place" without incurring unnecessary copies.
+:Summary: Our writeback model interacts with Copy-On-Write (COW) to
+          cause some surprising ineffiencies, such as O(N) performance
+          for ``x[0][0] = 1``. We propose a modified COW optimization
+          that recovers O(1) performance for these cases and supports
+          the efficient use of slices in algorithm implementation.
 
-Motivation
-==========
+Whence the Problem?
+===================
+
+The problem is caused as follows:
+
+* COW depends on the programmer being able to mediate all writes (so
+  she can copy if necessary)
+  
+* Writes to container elements and slices are mediated through
+  subscript setters, so in ::
+
+    x[0].mutate()
+
+  we “``subscript get:``” ``x[0]`` into a temporary, mutate the
+  temporary, and “``subscript set:``” it back into ``x[0]``.
+
+* When the element itself is a COW type, that temporary implies a
+  retain count of at least 2 on the element's buffer.
+
+* Therefore, mutating such an element causes an expensive copy, *even
+  when the element's buffer isn't otherwise shared*.
+
+Naturally, this problem generalizes to any COW value backed by a
+getter/setter pair, such as a computed or resilient ``String``
+property::
+
+  anObject.title.append('.') // O(N)
+
+Interaction With Slices
+=======================
 
 Consider the classic divide-and-conquer algorithm QuickSort, which
 could be written as follows:
 
 .. parsed-literal::
 
-  func quickSort<
-    Seq: Sliceable
-    where Seq.StreamType.Element: Comparable
-  >(s: @inout Seq) {
-    let (start,end) = (s.startIndex(), s.endIndex())
-    if start != end && start.succ() != end {
-      let pivot = s[start]
-      let mid = partition(&s, { $0 < pivot })
-      quicksort(**&s[start...mid]**) // Error: can't take address of rvalue
-      quicksort(**&s[mid...end]**)    // Error: can't take address of rvalue
-    }
-  }
-
-Today, we don't even allow that to be written, because the slices used
-in the algorithm are rvalues, and therefore can't be passed as
-``@inout`` parameters.  A similar and more-idiomatic formulation as a
-method of ``Sliceable``, even if we had a way to express the
-restriction on the ``Element`` type, would likewise be forbidden under
-current rules because method targets are implicitly ``@inout``.
-Here's a version that uses a comparison function:
-
-.. parsed-literal::
-
   protocol Sliceable {
+    ...
     @mutating
     func quickSort(compare: (StreamType.Element, StreamType.Element)->Bool) {
       let (start,end) = (startIndex(), endIndex())
       if start != end && start.succ() != end {
         let pivot = self[start]
         let mid = partition({compare($0, pivot)})
-        **self[start...mid].quicksort(compare)**
-        **self[mid...end].quicksort(compare)**
+        **self[start...mid].quickSort(compare)**
+        **self[mid...end].quickSort(compare)**
       }
     }
   }
-  
-The obvious alternative is to move the slices into temporary lvalues, as follows:
 
-.. parsed-literal::  
-    
-    @mutating
-    func quickSort(compare: (StreamType.Element, StreamType.Element)->Bool) {
-      let (start,end) = (startIndex(), endIndex())
-      if start != end && start.succ() != end {
-        let pivot = self[start]
-        let mid = partition({compare($0, pivot)})
-        for r in [start...mid, mid...end] {
-          var **subRange = self[r]**
-          subRange.quicksort(compare)
-          **self[r] = subrange**
-        }
-      }
-    }
+The implicit ``inout`` on the target of the recursive ``quickSort``
+calls currently forces two allocations and O(N) copies in each layer
+of the QuickSort implementation.  Note that this problem applies to
+simple containers such as ``Int[]``, not just containers of COW
+elements.
 
-The problem with this formulation, of course, is that sorting
-``subRange`` forces it to acquire a unique copy of its elements, even
-though those elements will, just a few lines later, be written back
-into the range from which they were copied.  Even if it were possible
-to take the address of an rvalue slice, the same arguments would
-apply: since the slice is an independent value, the first mutation
-would force it to be copied.  While slices must keep a reference to
-the underlying buffer for memory safety and lifetime management, a
-reference to an ``@inout`` slice should *not* force a copy of the
-underlying buffer.
+Without solving this problem, mutating algorithms must operate on
+``MutableCollection``\ s and pairs of their ``Index`` types, and we
+must hope the ARC optimizer is able to eliminate the additional
+reference at the top-level call.  However, that does nothing for the
+cases mentioned in the previous section.
 
 Our Solution
 ============
 
-This optimization can be implemented by maintaining an **inout reference
-count** for value backing store objects that tracks the number of active
-``@inout`` references that are allowed to mutate the buffer without copying.
-A container value and all in-place ``@inout`` slices retain strong references
-to the backing store, as usual, but also bump this inout reference count while
-they are allowed to mutate the backing store in-place.
-The logic for deciding whether to copy a buffer prior to a
-mutation changes from the current "strong refcount equals one" criterion into
-"strong refcount is less than or equal to inout refcount".
+We need to prevent lvalues created in an ``inout`` context from
+forcing a copy-on-write.  To accomplish that:
 
-Because this optimization benefits a relatively small set of slicing subscript
-properties, we think it is reasonable to expose it as a manual optimization for
-the library. To expose this implementation strategy to the library, we propose
-to create a special pair of property operations that can be used to
-treat slice-like properties specially in the presence of writeback, with labels
-``enter_inout:`` and ``exit_inout:``. Copy-on-write containers can then use
-these labels to maintain the inout reference count of their backing stores and
-optimize in-place mutation of ``@inout`` slices.
+* We give COW buffers a property ``TOP`` that can store the address of
+  some reference to the buffer.
+  
+* When a unique reference ``r`` to a COW buffer ``b`` is copied into
+  an ``inout`` lvalue, we store ``r``\ 's address in ``b.TOP``.
 
+* When ``b`` is written into a non-``inout`` lvalue, ``b.TOP`` is
+  cleared.
+
+* A COW buffer can be modified in-place when it is uniquely referenced
+  *or* when its ``TOP`` is non-null.
+
+We believe this can be done with little user-facing change; the author
+of a COW type would add an attribute to the property that storing the
+buffer, and would use a slightly different check for in-place
+writability.
+  
 Other Considered Solutions
 --------------------------
 
 Move optimization seemed like a potential solution when we first considered
 this problem--given that it is already unspecified to reference a property
-while an active ``@inout`` reference can modify it, it seems natural to move
-ownership of the value to the ``@inout`` when entering writeback and move it
+while an active ``inout`` reference can modify it, it seems natural to move
+ownership of the value to the ``inout`` when entering writeback and move it
 back to the original value when exiting writeback. We do not think it is viable
 for the following reasons:
 
 - In general, relying on optimizations to provide performance semantics is
   brittle.
 - Move optimization would not be memory safe if either the original value or
-  ``@inout`` slice were modified to give up ownership of the original backing
+  ``inout`` slice were modified to give up ownership of the original backing
   store.  Although observing a value while it has inout aliases is unspecified,
   it should remain memory-safe to do so. This should remain memory safe, albeit
   unspecified::
 
     var arr = [1,2,3]
-    func mutate(x: @inout Int[]) -> Int[] {
+    func mutate(x: inout Int[]) -> Int[] {
       x = [3...4]
       return arr[0...2]
     }
@@ -133,7 +126,7 @@ for the following reasons:
   of the original object, which must also keep strong ownership of the backing
   store.
 - Move optimization requires unique referencing and would fail when there are
-  multiple concurrent, non-overlapping ``@inout`` slices. ``swap(&x.a, &x.b)``
+  multiple concurrent, non-overlapping ``inout`` slices. ``swap(&x.a, &x.b)``
   is well-defined if ``x.a`` and ``x.b`` do not access overlapping state, and
   so should ``swap(&x[0...50], &x[50...100])``.  More generally, we would like to
   use inout slicing to implement divide-and- conquer parallel algorithms, as
@@ -186,7 +179,7 @@ backing store object. For example::
   /// Backing store for a copy-on-write Array type.
   class ArrayBuffer<T> {
     /// The number of inout references to this backing store. Includes a count
-    /// for the originating non-@inout value.
+    /// for the originating non-inout value.
     var inoutRefcount: Word = 1
 
     func _getStrongReferenceCount() -> Word {
