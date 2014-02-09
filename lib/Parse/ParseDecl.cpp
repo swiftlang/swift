@@ -1082,60 +1082,26 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   return makeParserResult(Status, TAD);
 }
 
-namespace {
-  class AddVarsToScope : public ASTWalker {
-  public:
-    Parser &TheParser;
-    ASTContext &Context;
-    DeclContext *CurDeclContext;
-    SmallVectorImpl<Decl*> &Decls;
-    bool IsStatic;
-    DeclAttributes &Attributes;
-    PatternBindingDecl *PBD;
-    
-    AddVarsToScope(Parser &P,
-                   ASTContext &Context,
-                   DeclContext *CurDeclContext,
-                   SmallVectorImpl<Decl*> &Decls,
-                   bool IsStatic,
-                   DeclAttributes &Attributes,
-                   PatternBindingDecl *PBD)
-      : TheParser(P),
-        Context(Context),
-        CurDeclContext(CurDeclContext),
-        Decls(Decls),
-        IsStatic(IsStatic),
-        Attributes(Attributes),
-        PBD(PBD)
-    {}
-    
-    Pattern *walkToPatternPost(Pattern *P) override {
-      // Handle vars.
-      if (auto *Named = dyn_cast<NamedPattern>(P)) {
-        VarDecl *VD = Named->getDecl();
-        VD->setDeclContext(CurDeclContext);
-        VD->setStatic(IsStatic);
-        VD->setParentPattern(PBD);
-        if (Attributes.isValid())
-          VD->getMutableAttrs() = Attributes;
+static void addAccessorsInOrder(FuncDecl *FDA, FuncDecl *FDB,
+                                SmallVectorImpl<Decl*> &Decls,
+                                Parser &P) {
+  // If we only have one accessor, make sure it is A.
+  if (!FDA) { FDA = FDB; FDB = nullptr; }
+  // If we have no accessors, don't do anything.
+  if (!FDA) return;
+  
+  // If we have two accessors, order them.
+  if (FDA && FDB &&
+      !P.SourceMgr.isBeforeInBuffer(FDA->getFuncLoc(),
+                                    FDB->getFuncLoc()))
+    std::swap(FDA, FDB);
 
-        Decls.push_back(VD);
-        TheParser.addToScope(VD);
-      }
-      return P;
-    }
-  };
+  Decls.push_back(FDA);
+  if (FDB) Decls.push_back(FDB);
 }
 
-void Parser::addVarsToScope(Pattern *Pat,
-                            SmallVectorImpl<Decl*> &Decls,
-                            bool IsStatic,
-                            DeclAttributes &Attributes,
-                            PatternBindingDecl *PBD) {
-  // FIXME: This would be simpler if it used Pat->CollectVariables
-  Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
-                           Decls, IsStatic, Attributes, PBD));
-}
+
+
 
 /// createGetterFunc - This function creates the getter function (with no body)
 /// for a computed property or subscript.
@@ -1505,8 +1471,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       return;
     }
 
-    if (WillSet) Decls.push_back(WillSet);
-    if (DidSet) Decls.push_back(DidSet);
+    addAccessorsInOrder(WillSet, DidSet, Decls, *this);
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
 
     // Observing properties will have getters and setters synthesized by sema.
@@ -1540,8 +1505,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 
   // If things went well, turn this into a computed variable.
   if (!Invalid && PrimaryVar && (Set || Get)) {
-    if (Get) Decls.push_back(Get);
-    if (Set) Decls.push_back(Set);
+    addAccessorsInOrder(Get, Set, Decls, *this);
     PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
   }
 }
@@ -1679,7 +1643,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       Decls.push_back(PBD);
     }
     
-    // We need to revert CurDeclContext before calling addVarsToScope.
+    // We need to revert CurDeclContext before parsing accessors.
     if (topLevelDecl)
       topLevelParser.getValue().pop();
 
@@ -1710,8 +1674,19 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     PBD->setHasStorage(hasStorage);
 
-    addVarsToScope(pattern.get(), Decls, StaticLoc.isValid(), Attributes, PBD);
-
+    
+    // Add all parsed vardecls to this scope and set their DeclContext properly.
+    pattern.get()->forEachVariable([&](VarDecl *VD) {
+      assert(VD->getDeclContext() == CurDeclContext);
+      VD->setStatic(StaticLoc.isValid());
+      VD->setParentPattern(PBD);
+      if (Attributes.isValid())
+        VD->getMutableAttrs() = Attributes;
+      
+      Decls.push_back(VD);
+      addToScope(VD);
+    });
+    
     // Propagate back types for simple patterns, like "var A, B : T".
     if (TypedPattern *TP = dyn_cast<TypedPattern>(PBD->getPattern())) {
       if (isa<NamedPattern>(TP->getSubPattern()) && !PBD->hasInit()) {
@@ -2664,16 +2639,13 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     Decls.push_back(Subscript);
 
     // Add get/set in source order.
+    addAccessorsInOrder(Get, Set, Decls, *this);
+    
     FuncDecl* Accessors[2] = {Get, Set};
-    if (Accessors[0] && Accessors[1] &&
-        !SourceMgr.isBeforeInBuffer(Accessors[0]->getFuncLoc(),
-                                    Accessors[1]->getFuncLoc())) {
-      std::swap(Accessors[0], Accessors[1]);
-    }
     for (auto FD : Accessors) {
       if (FD) {
+        assert(FD->getDeclContext() == CurDeclContext);
         FD->setDeclContext(CurDeclContext);
-        Decls.push_back(FD);
       }
     }
   }
@@ -2682,7 +2654,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 }
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+Parser::parseDeclConstructor(ParseDeclOptions Flags,
+                             DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 

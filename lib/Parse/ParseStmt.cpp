@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -445,6 +446,62 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
+
+namespace {
+  class AddVarsToScope : public ASTWalker {
+  public:
+    Parser &TheParser;
+    ASTContext &Context;
+    DeclContext *CurDeclContext;
+    SmallVectorImpl<Decl*> &Decls;
+    bool IsStatic;
+    DeclAttributes &Attributes;
+    PatternBindingDecl *PBD;
+    
+    AddVarsToScope(Parser &P,
+                   ASTContext &Context,
+                   DeclContext *CurDeclContext,
+                   SmallVectorImpl<Decl*> &Decls,
+                   bool IsStatic,
+                   DeclAttributes &Attributes,
+                   PatternBindingDecl *PBD)
+    : TheParser(P),
+    Context(Context),
+    CurDeclContext(CurDeclContext),
+    Decls(Decls),
+    IsStatic(IsStatic),
+    Attributes(Attributes),
+    PBD(PBD)
+    {}
+    
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P)) {
+        VarDecl *VD = Named->getDecl();
+        VD->setDeclContext(CurDeclContext);
+        VD->setStatic(IsStatic);
+        VD->setParentPattern(PBD);
+        if (Attributes.isValid())
+          VD->getMutableAttrs() = Attributes;
+        
+        Decls.push_back(VD);
+        TheParser.addToScope(VD);
+      }
+      return P;
+    }
+  };
+}
+
+void Parser::addVarsToScope(Pattern *Pat,
+                            SmallVectorImpl<Decl*> &Decls,
+                            bool IsStatic,
+                            DeclAttributes &Attributes,
+                            PatternBindingDecl *PBD) {
+  // FIXME: This would be simpler if it used Pat->CollectVariables
+  Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
+                           Decls, IsStatic, Attributes, PBD));
+}
+
 
 /// Parse the condition of an 'if' or 'while'.
 ///
