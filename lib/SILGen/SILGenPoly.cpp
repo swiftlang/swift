@@ -1361,7 +1361,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   
   TranslateArguments(*this, loc, TranslationKind::OrigToSubst,
                      origParams, witnessParams,
-                     witnessSubstFTy->getParametersWithoutIndirectResult())
+                     witnessSubstFTy->getInterfaceParametersWithoutIndirectResult())
     .translate(stripInputTupleLabels(reqtOrigInputTy),
                witnessSubstInputTys);
 
@@ -1385,7 +1385,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     
     TranslateArguments(*this, loc, TranslationKind::SubstToOrig,
                        witnessParams, genParams,
-                       witnessFTy->getParametersWithoutIndirectResult())
+                       witnessFTy->getInterfaceParametersWithoutIndirectResult())
       .translate(stripInputTupleLabels(witnessOrigTy.getFunctionInputType()),
                  witnessSubstInputTys);
     witnessParams = std::move(genParams);
