@@ -3092,8 +3092,7 @@ void ClangImporter::Implementation::finishedImportingEntity() {
 
 void ClangImporter::Implementation::finishPendingActions() {
   while (!RegisteredExternalDecls.empty()) {
-    Decl *D = RegisteredExternalDecls.front();
-    RegisteredExternalDecls.pop();
+    Decl *D = RegisteredExternalDecls.pop_back_val();
     SwiftContext.addedExternalDecl(D);
   }
 }

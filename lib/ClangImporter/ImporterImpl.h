@@ -27,7 +27,6 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include <queue>
 #include <set>
 
 namespace clang {
@@ -306,7 +305,7 @@ private:
   Optional<bool> checkedFoundationModule;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
-  std::queue<Decl *> RegisteredExternalDecls;
+  SmallVector<Decl *, 4> RegisteredExternalDecls;
 
   unsigned NumCurrentImportingEntities = 0;
 
@@ -327,7 +326,7 @@ private:
 
 public:
   void registerExternalDecl(Decl *D) {
-    RegisteredExternalDecls.push(D);
+    RegisteredExternalDecls.push_back(D);
   }
 
   /// \brief Retrieve the Clang AST context.
