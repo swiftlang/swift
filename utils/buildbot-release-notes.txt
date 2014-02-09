@@ -48,8 +48,8 @@
 
 * Half-open ranges (those that don't include their endpoint) are now
   spelled with three '.'s instead of two, for consistency with Ruby.
-  In the next release, we'll introduce a fully-closed range, which
-  does include its endpoint.  So,
+  Next week, we'll introduce a fully-closed range which does include 
+  its endpoint.  This will provide:
 
     (swift) for x in 0...5 { print(\(x) )} ; print('\n') # works today
     0 1 2 3 4
