@@ -232,7 +232,7 @@ parseSelectorArgument(Parser &P,
  
  
   // If this is a type-only selector chunk, parse the type and r_paren, then
-  // build this as if it were a tuplepattern(typed_pattern(named_pattern)).
+  // build this as if it were a parenpattern(typed_pattern(named_pattern)).
   ParserResult<Pattern> PatternRes;
   if (isTypeOnlySelectorArg) {
     SourceLoc TypeLoc = P.Tok.getLoc();
@@ -246,17 +246,13 @@ parseSelectorArgument(Parser &P,
     // This was checked by the speculative parse above.
     SourceLoc RPLoc = P.consumeToken(tok::r_paren);
 
-    // NamedPattern.
+    // Create the patterns for the identifier.
     Identifier ident = cast<NamedPattern>(ArgPattern)->getDecl()->getName();
     auto Name = P.createBindingFromPattern(TypeLoc, ident, /*isLet*/true);
+    Name->setImplicit();
     auto TypedPat = new (P.Context) TypedPattern(Name, Ty.get());
-    
-    TuplePatternElt TupleElt(TypedPat, /*init*/nullptr,
-                             DefaultArgumentKind::None);
-    
     PatternRes = makeParserResult(
-      TuplePattern::createSimple(P.Context, LPLoc, TupleElt, RPLoc,
-                                 /*isVararg*/false, SourceLoc()));
+      new (P.Context) ParenPattern(LPLoc, TypedPat, RPLoc));
   } else {
     // Otherwise, this is a standard tuple
     PatternRes = P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
