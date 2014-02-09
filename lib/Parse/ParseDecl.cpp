@@ -1794,6 +1794,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
 
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
+  // Forgive the lexer
+  if (Tok.is(tok::amp_prefix)) {
+    Tok.setKind(tok::oper_prefix);
+  }
   Identifier Name;
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && 
