@@ -1209,12 +1209,14 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
       SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
                                                  Ret.second.end());
 
+      // Add the non-self-derived substitutions from the original application.
       assert(AI->getSubstitutions().size() && "Subst list must not be empty");
       assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
              "The first substitution needs to be a 'self' substitution.");
-
-      ArrayRef<Substitution> NonSelfSubsts = AI->getSubstitutions().slice(1);
-      NewSubstList.append(NonSelfSubsts.begin(), NonSelfSubsts.end());
+      for (auto &origSub : AI->getSubstitutions().slice(1)) {
+        if (!origSub.Archetype->isSelfDerived())
+          NewSubstList.push_back(origSub);
+      }
 
       ApplyInst *SAI = Builder.createApply(Loc, FRI,
                                            AI->getSubstCalleeSILType(),

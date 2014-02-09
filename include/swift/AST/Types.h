@@ -2278,13 +2278,6 @@ public:
     return getExtInfo().isNoReturn();
   }
 
-  CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
-                                      ArrayRef<Type> subs)
-    SIL_FUNCTION_TYPE_DEPRECATED;
-  CanSILFunctionType substGenericArgs(SILModule &silModule, Module *astModule,
-                                      ArrayRef<Substitution> subs)
-    SIL_FUNCTION_TYPE_DEPRECATED;
-
   CanSILFunctionType substInterfaceGenericArgs(SILModule &silModule,
                                                Module *astModule,
                                                ArrayRef<Substitution> subs);
@@ -2689,6 +2682,19 @@ public:
   /// parameter.
   ProtocolDecl *getSelfProtocol() const {
     return AssocTypeOrProto.dyn_cast<ProtocolDecl *>();
+  }
+  
+  /// True if this is the 'Self' parameter of a protocol or an associated type
+  /// of 'Self'.
+  bool isSelfDerived() {
+    ArchetypeType *t = this;
+
+    do {
+      if (t->getSelfProtocol())
+        return true;
+    } while ((t = t->getParent()));
+
+    return false;
   }
 
   /// Retrieve either the associated type or the protocol to which this
