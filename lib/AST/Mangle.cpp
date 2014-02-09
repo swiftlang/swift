@@ -960,14 +960,16 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       Buffer << Index(paramTy->getDepth() - 1);
     }
     Buffer << Index(paramTy->getIndex());
+    return;
   }
 
   case TypeKind::DependentMember: {
     Buffer << 'q';
 
     auto memTy = cast<DependentMemberType>(type);
-    mangleType(type, explosion, 0);
+    mangleType(memTy.getBase(), explosion, 0);
     mangleIdentifier(memTy->getName());
+    return;
   }
 
   case TypeKind::Function:
