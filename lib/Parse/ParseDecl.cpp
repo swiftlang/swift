@@ -1375,9 +1375,9 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 ///      attribute-list 'var' identifier : type-annotation
 ///                     initializer? { get-set }
 /// \endverbatim
-void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                                SourceLoc StaticLoc, VarDecl *&boundVar,
-                                SmallVectorImpl<Decl *> &Decls) {
+VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
+                                    SourceLoc StaticLoc,
+                                    SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
@@ -1396,8 +1396,6 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     diagnose(pattern.getLoc(), diag::getset_nontrivial_pattern);
   else
     setLocalDiscriminator(PrimaryVar);
-
-  boundVar = PrimaryVar;
 
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
@@ -1432,6 +1430,10 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                          LBLoc))
     RBLoc = LastValidLoc;
 
+  // If we have an invalid case, bail out now.
+  if (!PrimaryVar)
+    return nullptr;
+  
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
     if (Get || Set) {
@@ -1452,7 +1454,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
                diag::observingproperty_requires_type);
       Invalid = true;
-      return;
+      return nullptr;
     }
 
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
@@ -1473,7 +1475,7 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     Set->setImplicit();
     Decls.push_back(Set);
     PrimaryVar->setObservingAccessors(Get, Set);
-    return;
+    return PrimaryVar;
   }
 
   // Otherwise, this must be a get/set property.  The set is optional, but get
@@ -1487,8 +1489,11 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   }
 
   // If things went well, turn this into a computed variable.
-  if (!Invalid && PrimaryVar && (Set || Get))
+  if (!Invalid && (Set || Get)) {
     PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
+    return PrimaryVar;
+  }
+  return nullptr;
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
@@ -1638,20 +1643,21 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       if (isLet)
         diagnose(Tok, diag::let_cannot_be_computed_property);
 
-      if (PBD->getInit()) {
-        diagnose(pattern.get()->getLoc(), diag::getset_init)
-          .highlight(PBD->getInit()->getSourceRange());
-        PBD->setInit(nullptr, false);
-      }
+      if (auto *boundVar =
+            parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, Decls)) {
+        hasStorage = boundVar->hasStorage();
 
-      VarDecl *boundVar = nullptr;
-      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar, Decls);
+        if (PBD->getInit()) {
+          diagnose(pattern.get()->getLoc(), diag::getset_init)
+            .highlight(PBD->getInit()->getSourceRange());
+          PBD->setInit(nullptr, false);
+        }
+      }
 
       if (isLet)
         return makeParserError();
 
       HasGetSet = true;
-      if (boundVar) hasStorage = boundVar->hasStorage();
     }
 
     PBD->setHasStorage(hasStorage);
