@@ -476,10 +476,16 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
   Type Ty = TL.getType();
 
   if ((options & TR_Variadic) && !hadError) {
-    // FIXME: Use ellipsis loc for diagnostic.
-    Ty = TC.getArraySliceType(TP->getLoc(), Ty);
-    if (Ty.isNull())
+    // If isn't legal to declare something both inout and variadic.
+    if (Ty->is<InOutType>()) {
+      TC.diagnose(TP->getLoc(), diag::inout_cant_be_variadic);
       hadError = true;
+    } else {
+      // FIXME: Use ellipsis loc for diagnostic.
+      Ty = TC.getArraySliceType(TP->getLoc(), Ty);
+      if (Ty.isNull())
+        hadError = true;
+    }
   }
 
   if (hadError) {

@@ -804,6 +804,8 @@ namespace {
                                          TypeResolutionOptions options);
     SILResultInfo resolveSILResult(TypeRepr *repr,
                                    TypeResolutionOptions options);
+    Type resolveInOutType(InOutTypeRepr *repr,
+                          TypeResolutionOptions options);
     Type resolveArrayType(ArrayTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveOptionalType(OptionalTypeRepr *repr,
@@ -839,12 +841,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Attributed:
     return resolveAttributedType(cast<AttributedTypeRepr>(repr), options);
-  case TypeReprKind::InOut: {
-    Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
-    if (ty->is<ErrorType>())
-      return ty;
-    return InOutType::get(ty);
-  }
+  case TypeReprKind::InOut:
+    return resolveInOutType(cast<InOutTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1234,6 +1232,16 @@ SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
   if (hadError) type = ErrorType::get(Context);
   return SILResultInfo(type->getCanonicalType(), convention);
 }
+
+Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
+                                    TypeResolutionOptions options) {
+  Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
+  if (ty->is<ErrorType>())
+    return ty;
+  
+  return InOutType::get(ty);
+}
+
 
 Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
