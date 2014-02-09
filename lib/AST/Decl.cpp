@@ -1382,6 +1382,15 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   return selfTy;
 }
 
+void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
+  // Set the specified generic parameters onto this abstract function, setting
+  // the parameters' context to the function along the way.
+  GenericParams = GP;
+  if (GP)
+    for (auto Param : *GP)
+      Param.setDeclContext(this);
+}
+
 
 Type AbstractFunctionDecl::
 computeSelfType(GenericParamList **outerGenericParams) {
@@ -1473,6 +1482,14 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   }
 }
 
+/// Set the DeclContext of any VarDecls in P to the specified DeclContext.
+static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
+  if (!P) return;
+  P->forEachVariable([&](VarDecl *VD) {
+    VD->setDeclContext(DC);
+  });
+}
+
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        SourceLoc StaticLoc, SourceLoc FuncLoc,
                                        Identifier Name, SourceLoc NameLoc,
@@ -1518,6 +1535,15 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
   for (unsigned i = 0; i != NumParamPatterns; ++i)
     BodyParamsRef[i] = BodyParams[i];
 
+  // Set the decl context of any vardecls to this FuncDecl.
+  for (auto P : ArgParams)
+    setDeclContextOfPatternVars(P, this);
+
+  if (BodyParams != ArgParams) {
+    for (auto P : BodyParams)
+      setDeclContextOfPatternVars(P, this);
+  }
+
   this->FnRetType = FnRetType;
 }
 
@@ -1561,6 +1587,46 @@ bool FuncDecl::isBinaryOperator() const {
   return argTuple->getNumFields() == 2
     || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
 }
+
+ConstructorDecl::ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
+                                 Pattern *SelfArgParam, Pattern *ArgParams,
+                                 Pattern *SelfBodyParam, Pattern *BodyParams,
+                                 GenericParamList *GenericParams,
+                                 DeclContext *Parent)
+  : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
+                         ConstructorLoc, 2, GenericParams) {
+  setArgParams(SelfArgParam, ArgParams);
+  setBodyParams(SelfBodyParam, BodyParams);
+  
+  ConstructorDeclBits.ComputedBodyInitKind = 0;
+}
+
+void ConstructorDecl::setArgParams(Pattern *selfPattern, Pattern *argParams) {
+  ArgParams[0] = selfPattern;
+  ArgParams[1] = argParams;
+  setDeclContextOfPatternVars(selfPattern, this);
+  setDeclContextOfPatternVars(argParams, this);
+}
+
+void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
+  BodyParams[0] = selfPattern;
+  BodyParams[1] = bodyParams;
+  setDeclContextOfPatternVars(selfPattern, this);
+  setDeclContextOfPatternVars(bodyParams, this);
+}
+
+DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
+                               Pattern *SelfPattern, DeclContext *Parent)
+  : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
+                         DestructorLoc, 1, nullptr),
+  SelfPattern(SelfPattern) {
+}
+
+void DestructorDecl::setSelfPattern(Pattern *selfPattern) {
+  SelfPattern = selfPattern;
+  setDeclContextOfPatternVars(SelfPattern, this);
+}
+
 
 DynamicSelfType *FuncDecl::getDynamicSelf() const {
   if (!hasDynamicSelf())

@@ -19,7 +19,6 @@
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Fallthrough.h"
@@ -37,8 +36,8 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
                                            VarDecl **SelfDeclRet = nullptr) {
   ASTContext &Ctx = CurDeclContext->getASTContext();
   auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                   Loc, Ctx.Id_self,
-                                   Type(), CurDeclContext);
+                                     Loc, Ctx.Id_self,
+                                     Type(), CurDeclContext);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
   if (SelfDeclRet)
     *SelfDeclRet = SelfDecl;
@@ -1140,12 +1139,6 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
     D->setMutating();
 
-  // Reparent the argument decls.
-  for (Pattern *Pat : D->getBodyParamPatterns())
-    Pat->forEachVariable([&](VarDecl *VD) {
-      VD->setDeclContext(D);
-    });
-
   return D;
 }
 
@@ -1373,7 +1366,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
-    addFunctionParametersToScope(TheDecl->getBodyParamPatterns(), TheDecl);
+    addFunctionParametersToScope(TheDecl->getBodyParamPatterns());
 
     // Establish the new context.
     ParseFunctionBody CC(*this, TheDecl);
@@ -1723,31 +1716,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   return Status;
 }
 
-namespace {
-/// Recursively walks a pattern and sets all variables' decl contexts to the
-/// given context.
-class SetVarContext : public ASTWalker {
-  DeclContext *DC;
-
-public:
-  SetVarContext(DeclContext *DC) : DC(DC) {}
-
-  Pattern *walkToPatternPost(Pattern *P) override {
-    // Handle vars.
-    if (auto *Named = dyn_cast<NamedPattern>(P))
-      Named->getDecl()->setDeclContext(DC);
-    return P;
-  }
-};
-} // unnamed namespace
-
-static void setVarContext(ArrayRef<Pattern *> Patterns, DeclContext *DC) {
-  for (auto P : Patterns) {
-    P->walk(SetVarContext(DC));
-  }
-}
-
-
 void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                          const DeclAttributes &Attrs) {
   auto BeginParserPosition = getParserPosition();
@@ -1914,18 +1882,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
       CodeCompletion->setDelayedParsedDecl(FD);
 
     DefaultArgs.setFunctionContext(FD);
-    addFunctionParametersToScope(FD->getBodyParamPatterns(), FD);
-    setVarContext(FD->getArgParamPatterns(), FD);
+    addFunctionParametersToScope(FD->getBodyParamPatterns());
     setLocalDiscriminator(FD);
-
-    // Now that we have a context, update the generic parameters with that
-    // context.
-    if (GenericParams) {
-      for (auto Param : *GenericParams) {
-        Param.setDeclContext(FD);
-      }
-    }
-
+    
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
 
@@ -2539,8 +2498,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
-  Indices.get()->walk(SetVarContext(CurDeclContext));
-
+  
   // '->'
   if (!Tok.is(tok::arrow)) {
     diagnose(Tok, diag::expected_arrow_subscript);
@@ -2700,7 +2658,6 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   if (HasSelectorStyleSignature)
     CD->setHasSelectorStyleSignature();
 
-  SelfDecl->setDeclContext(CD);
   DefaultArgs.setFunctionContext(CD);
 
   // Pass the function signature to code completion.
@@ -2711,14 +2668,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
-  if (GenericParams) {
-    for (auto Param : *GenericParams)
-      Param.setDeclContext(CD);
-  }
-  addFunctionParametersToScope(BodyPattern, CD);
-  ArgPattern->walk(SetVarContext(CD));
-
-  addToScope(SelfDecl);
+  addFunctionParametersToScope(ArrayRef<Pattern*>{SelfPattern, BodyPattern} );
 
   // '{'
   if (!Tok.is(tok::l_brace)) {

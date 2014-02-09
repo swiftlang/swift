@@ -1994,7 +1994,7 @@ public:
   /// \brief Retrieve the parameters of this closure.
   Pattern *getParams() { return ParamPattern; }
   const Pattern *getParams() const { return ParamPattern; }
-  void setParams(Pattern *P) { ParamPattern = P; }
+  void setParams(Pattern *P);
 
   /// Returns a discriminator which determines this expression's index
   /// in the sequence of closure expressions within the current

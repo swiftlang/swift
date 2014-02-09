@@ -328,6 +328,17 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
     SubExpr(SubExpr), Self(Self)
 {}
 
+void AbstractClosureExpr::setParams(Pattern *P) {
+  ParamPattern = P;
+  // Change the DeclContext of any parameters to be this closure.
+  if (P) {
+    P->forEachVariable([&](VarDecl *VD) {
+      VD->setDeclContext(this);
+    });
+  }
+}
+
+
 Type AbstractClosureExpr::getResultType() const {
   if (getType()->is<ErrorType>())
     return getType();

@@ -2774,8 +2774,9 @@ protected:
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
         DeclContext(DeclContextKind::AbstractFunctionDecl, Parent),
-        Body(nullptr), GenericParams(GenericParams) {
+        Body(nullptr), GenericParams(nullptr) {
     setBodyKind(BodyKind::None);
+    setGenericParams(GenericParams);
     AbstractFunctionDeclBits.HasSelectorStyleSignature = false;
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
 
@@ -2790,6 +2791,7 @@ protected:
     AbstractFunctionDeclBits.BodyKind = unsigned(K);
   }
 
+  void setGenericParams(GenericParamList *GenericParams);
 public:
   /// \brief If this is a method in a type extension for some type,
   /// return that type, otherwise return Type().
@@ -3358,28 +3360,14 @@ public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *SelfArgParam, Pattern *ArgParams,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
-                  GenericParamList *GenericParams, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
-                           ConstructorLoc, 2, GenericParams) {
-    setArgParams(SelfArgParam, ArgParams);
-    setBodyParams(SelfBodyParam, BodyParams);
+                  GenericParamList *GenericParams, DeclContext *Parent);
 
-    ConstructorDeclBits.ComputedBodyInitKind = 0;
-  }
+  void setArgParams(Pattern *selfPattern, Pattern *argParams);
+  void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
-
-  void setArgParams(Pattern *selfPattern, Pattern *argParams) {
-    ArgParams[0] = selfPattern;
-    ArgParams[1] = argParams;
-  }
-
-  void setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
-    BodyParams[0] = selfPattern;
-    BodyParams[1] = bodyParams;
-  }
 
   /// getArgumentType - get the type of the argument tuple
   Type getArgumentType() const;
@@ -3462,15 +3450,9 @@ class DestructorDecl : public AbstractFunctionDecl {
   Pattern *SelfPattern;
 public:
   DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
-                 Pattern *SelfPattern, DeclContext *Parent)
-    : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                           DestructorLoc, 1, nullptr),
-      SelfPattern(SelfPattern) {
-  }
-
-  void setSelfPattern(Pattern *selfPattern) {
-    SelfPattern = selfPattern;
-  }
+                 Pattern *SelfPattern, DeclContext *Parent);
+  
+  void setSelfPattern(Pattern *selfPattern);
 
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
