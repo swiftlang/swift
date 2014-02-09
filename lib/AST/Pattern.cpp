@@ -145,7 +145,7 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   case PatternKind::EnumElement: {
     auto *OP = cast<EnumElementPattern>(this);
     if (OP->hasSubPattern())
-      OP->forEachVariable(fn);
+      OP->getSubPattern()->forEachVariable(fn);
     return;
   }
   
