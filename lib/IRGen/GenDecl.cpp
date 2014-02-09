@@ -307,7 +307,6 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     auto fnTy = SILFunctionType::get(nullptr, nullptr, extInfo,
                                      ParameterConvention::Direct_Unowned,
                                      paramTy, retTy,
-                                     paramTy, retTy,
                                      Context);
     auto silFnTy = SILType::getPrimitiveLocalStorageType(fnTy);
     DebugInfo->emitArtificialFunction(mainIGF, mainFn, silFnTy);

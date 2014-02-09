@@ -2604,8 +2604,7 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::SIL_FUNCTION_TYPE: {
-    TypeID resultID, interfaceResultID;
-    uint8_t rawResultConvention;
+    TypeID interfaceResultID;
     uint8_t rawInterfaceResultConvention;
     uint8_t rawCallingConvention;
     uint8_t rawCalleeConvention;
@@ -2616,8 +2615,6 @@ Type ModuleFile::getType(TypeID TID) {
     ArrayRef<uint64_t> paramIDs;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
-                                                   resultID,
-                                                   rawResultConvention,
                                                    interfaceResultID,
                                                    rawInterfaceResultConvention,
                                                    genericContextID,
@@ -2638,16 +2635,8 @@ Type ModuleFile::getType(TypeID TID) {
                                      thin, noreturn);
 
     // Process the result.
-    auto resultConvention = getActualResultConvention(rawResultConvention);
-    if (!resultConvention.hasValue()) {
-      error();
-      return nullptr;
-    }
-    SILResultInfo result(getType(resultID)->getCanonicalType(),
-                         resultConvention.getValue());
-    
     auto interfaceResultConvention
-      = getActualResultConvention(rawResultConvention);
+      = getActualResultConvention(rawInterfaceResultConvention);
     if (!interfaceResultConvention.hasValue()) {
       error();
       return nullptr;
@@ -2657,12 +2646,8 @@ Type ModuleFile::getType(TypeID TID) {
 
     // Process the parameters.
     unsigned numParamIDs = paramIDs.size() - numGenericParams;
-    if (numParamIDs % 2 != 0) {
-      error();
-      return nullptr;
-    }
     SmallVector<SILParameterInfo, 8> allParams;
-    allParams.reserve(numParamIDs / 2);
+    allParams.reserve(numParamIDs);
     for (size_t i = 0, e = numParamIDs; i != e; i += 2) {
       auto type = getType(paramIDs[i])->getCanonicalType();
       auto convention = getActualParameterConvention(paramIDs[i+1]);
@@ -2674,10 +2659,6 @@ Type ModuleFile::getType(TypeID TID) {
       allParams.push_back(param);
     }
     
-    ArrayRef<SILParameterInfo> params{allParams.data(), allParams.size()/2U};
-    ArrayRef<SILParameterInfo> interfaceParams
-      {params.end(), allParams.size()/2U};
-
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
     if (!calleeConvention.hasValue()) {
@@ -2706,8 +2687,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     typeOrOffset = SILFunctionType::get(genericParams, genericSig, extInfo,
                                         calleeConvention.getValue(),
-                                        params, result,
-                                        interfaceParams, interfaceResult,
+                                        allParams, interfaceResult,
                                         ctx);
     break;
   }

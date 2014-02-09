@@ -462,8 +462,6 @@ namespace decls_block {
 
   using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
-    TypeIDField,           // result type
-    ResultConventionField, // result convention
     TypeIDField,           // interface result type
     ResultConventionField, // interface result convention
     DeclIDField,           // decl that owns the generic params
@@ -473,7 +471,6 @@ namespace decls_block {
     BCFixed<1>,            // noreturn?
     BCFixed<30>,           // number of generic parameters
     BCArray<TypeIDField>   // parameter types and conventions, alternating
-                           // followed by interface types and conventions
                            // followed by generic parameter types
     // Trailed by its generic requirements, if any.
     // Trailed by its generic parameters, if the owning decl ID is 0.

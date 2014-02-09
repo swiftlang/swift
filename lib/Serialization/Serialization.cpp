@@ -1830,19 +1830,11 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     auto genericParams = fnTy->getGenericParams();
 
     auto callingConvention = fnTy->getAbstractCC();
-    auto result = fnTy->getResult();
     auto interfaceResult = fnTy->getInterfaceResult();
-    auto stableResultConvention =
-      getRawStableResultConvention(result.getConvention());
     auto stableInterfaceResultConvention =
       getRawStableResultConvention(interfaceResult.getConvention());
 
     SmallVector<TypeID, 8> paramTypes;
-    for (auto param : fnTy->getParameters()) {
-      paramTypes.push_back(addTypeRef(param.getType()));
-      unsigned conv = getRawStableParameterConvention(param.getConvention());
-      paramTypes.push_back(TypeID(conv));
-    }
     for (auto param : fnTy->getInterfaceParameters()) {
       paramTypes.push_back(addTypeRef(param.getType()));
       unsigned conv = getRawStableParameterConvention(param.getConvention());
@@ -1860,8 +1852,6 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(result.getType()),
-                                      stableResultConvention,
                                       addTypeRef(interfaceResult.getType()),
                                       stableInterfaceResultConvention,
                                       // FIXME: Always serialize a new

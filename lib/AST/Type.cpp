@@ -1917,31 +1917,13 @@ case TypeKind::Id:
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
 
-    SILResultInfo origResult = fnTy->getResult();
-    Type transResult = origResult.getType().transform(fn);
-    if (!transResult)
-      return Type();
-    CanType canTransResult = transResult->getCanonicalType();
-    changed = changed || (canTransResult != origResult.getType());
-    
     SILResultInfo origInterfaceResult = fnTy->getInterfaceResult();
-    Type transInterfaceResult = origResult.getType().transform(fn);
+    Type transInterfaceResult = origInterfaceResult.getType().transform(fn);
     if (!transInterfaceResult)
       return Type();
     CanType canTransInterfaceResult = transInterfaceResult->getCanonicalType();
-    changed = changed || (canTransInterfaceResult != origResult.getType());
+    changed = changed || (canTransInterfaceResult != origInterfaceResult.getType());
 
-    SmallVector<SILParameterInfo, 8> transParams;
-    for (auto origParam : fnTy->getParameters()) {
-      Type transParam = origParam.getType().transform(fn);
-      if (!transParam) return Type();
-
-      CanType canTransParam = transParam->getCanonicalType();
-      transParams.push_back(SILParameterInfo(canTransParam,
-                                             origParam.getConvention()));
-      changed = changed || (canTransParam != origParam.getType());
-    }
-    
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (auto origParam : fnTy->getInterfaceParameters()) {
       Type transParam = origParam.getType().transform(fn);
@@ -1959,9 +1941,6 @@ case TypeKind::Id:
                                 fnTy->getGenericSignature(),
                                 fnTy->getExtInfo(),
                                 fnTy->getCalleeConvention(),
-                                transParams,
-                                SILResultInfo(canTransResult,
-                                              origResult.getConvention()),
                                 transInterfaceParams,
                                 SILResultInfo(canTransInterfaceResult,
                                           origInterfaceResult.getConvention()),

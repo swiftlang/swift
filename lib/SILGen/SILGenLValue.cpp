@@ -832,7 +832,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
                        ResultConvention::Unowned);
   auto bfrFnType = SILFunctionType::get(nullptr, nullptr, bfrInfo,
                                         ParameterConvention::Direct_Owned,
-                                        Param, Result, Param, Result,
+                                        Param, Result,
                                         gen.getASTContext());
   auto bfr = gen.B.createBuiltinFunctionRef(loc, "inttoptr_Word",
                                     SILType::getPrimitiveObjectType(bfrFnType));

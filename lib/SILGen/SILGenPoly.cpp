@@ -877,7 +877,6 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   // The type of the thunk function.
   auto thunkType = SILFunctionType::get(generics, genericSig, extInfo,
                                         ParameterConvention::Direct_Unowned,
-                                        params, expectedType->getInterfaceResult(),
                                         interfaceParams, interfaceResult,
                                         gen.getASTContext());
 
@@ -887,7 +886,6 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   } else {
     substFnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                        ParameterConvention::Direct_Unowned,
-                                       params, expectedType->getInterfaceResult(),
                                        params, expectedType->getInterfaceResult(),
                                        gen.getASTContext());
   }

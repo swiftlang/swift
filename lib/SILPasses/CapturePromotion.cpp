@@ -282,40 +282,10 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
     buffer << Orig->getName() << "_promote" << Counter++;
   } while (M.lookUpFunction(ClonedName));
 
-  SmallVector<SILParameterInfo, 4> ClonedArgTys;
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
 
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
-  // TODO: Eliminate non-interface-type processing when SILFunctionType doesn't
-  // need non-interface types.
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-  auto OrigParams = OrigFTI->getParameters();
-
-  // Iterate over the argument types of the original function, collapsing each
-  // pair of a promotable box argument and the address of its contents into a
-  // single argument of the object (rather than address) type of the box's
-  // contents
   unsigned Index = 0;
-  for (auto &param : OrigParams) {
-    if (Index && PromotableIndices.count(Index - 1)) {
-      assert(param.getConvention() == ParameterConvention::Indirect_Inout);
-      auto &paramTL = M.Types.getTypeLowering(param.getSILType());
-      ParameterConvention convention;
-      if (paramTL.isPassedIndirectly()) {
-        convention = ParameterConvention::Indirect_In;
-      } else if (paramTL.isTrivial()) {
-        convention = ParameterConvention::Direct_Unowned;
-      } else {
-        convention = ParameterConvention::Direct_Owned;
-      }
-      ClonedArgTys.push_back(SILParameterInfo(param.getType(), convention));
-    } else if (!PromotableIndices.count(Index)) {
-      ClonedArgTys.push_back(param);
-    }
-    ++Index;
-  }
-  
-  Index = 0;
   for (auto &param : OrigFTI->getInterfaceParameters()) {
     if (Index && PromotableIndices.count(Index - 1)) {
       assert(param.getConvention() == ParameterConvention::Indirect_Inout);
@@ -341,12 +311,9 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
                          OrigFTI->getGenericSignature(),
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
-                         ClonedArgTys,
-                         OrigFTI->getResult(),
                          ClonedInterfaceArgTys,
                          OrigFTI->getInterfaceResult(),
                          M.getASTContext());
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
   // This inserts the new cloned function before the original function.
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,

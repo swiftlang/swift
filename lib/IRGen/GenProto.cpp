@@ -3036,11 +3036,9 @@ namespace {
       SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
                                        /*thin*/ true,
                                        /*noreturn*/ false);
-      SILParameterInfo param(D->getDeclaredTypeInContext()->getCanonicalType(),
-                             ParameterConvention::Direct_Owned);
       SILResultInfo result(TupleType::getEmpty(ctx),
                            ResultConvention::Unowned);
-      SILParameterInfo iparam(D->getDeclaredInterfaceType()->getCanonicalType(),
+      SILParameterInfo param(D->getDeclaredInterfaceType()->getCanonicalType(),
                               ParameterConvention::Direct_Owned);
       
       GenericSignature *sig = nullptr;
@@ -3054,7 +3052,7 @@ namespace {
                                   sig,
                                   extInfo,
                                   ParameterConvention::Direct_Unowned,
-                                  param, result, iparam, result, ctx);
+                                  param, result, ctx);
     }
 
     SourceKind considerParameter(SILParameterInfo param) {

@@ -941,7 +941,7 @@ static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
   
   auto FnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                      ParameterConvention::Direct_Owned,
-                                     Params, Result, Params, Result,
+                                     Params, Result,
                                      B.getASTContext());
   auto Ty = SILType::getPrimitiveObjectType(FnType);
   return B.createBuiltinFunctionRef(Loc, NameStr, Ty);
@@ -969,7 +969,7 @@ static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
   
   auto FnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                      ParameterConvention::Direct_Owned,
-                                     Param, Result, Param, Result,
+                                     Param, Result,
                                      B.getASTContext());
   auto Ty = SILType::getPrimitiveObjectType(FnType);
 

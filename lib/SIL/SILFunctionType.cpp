@@ -57,8 +57,6 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
                               type->getGenericSignature(),
                               extInfo,
                               callee,
-                              type->getParameters(),
-                              type->getResult(),
                               type->getInterfaceParameters(),
                               type->getInterfaceResult(),
                               type->getASTContext());
@@ -366,17 +364,6 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       .visit(substFnInterfaceType.getInput());
   }
   
-  // FIXME: Map the interface types into the archetype context.
-  auto mapIntoContext = [&](Type t) -> Type {
-    return ArchetypeBuilder::mapTypeIntoContext(M.getSwiftModule(),
-                                                genericParams, t);
-  };
-  SILResultInfo oldResult = result.transform(mapIntoContext);
-  SmallVector<SILParameterInfo, 8> oldInputs;
-  oldInputs.reserve(inputs.size());
-  for (auto &input : inputs)
-    oldInputs.push_back(input.transform(mapIntoContext));
-  
   auto calleeConvention = ParameterConvention::Direct_Unowned;
   if (!extInfo.isThin()) calleeConvention = conventions.getCallee();
 
@@ -385,7 +372,6 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
 
   return SILFunctionType::get(genericParams, genericSig,
                               extInfo, calleeConvention,
-                              oldInputs, oldResult,
                               inputs, result,
                               M.getASTContext());
 }
@@ -1280,25 +1266,10 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
   assert(substLoweredType->isThin() == substLoweredInterfaceType->isThin());
 
   // FIXME: Map into archetype context.
-  auto mapIntoContext = [&](Type t) -> Type {
-    return ArchetypeBuilder::mapTypeIntoContext(M.getSwiftModule(),
-                                                genericParams, t);
-  };
-  
-  SILResultInfo substOldResult
-    = substResult.transform(mapIntoContext);
-  SmallVector<SILParameterInfo, 8> substOldParams;
-  substOldParams.reserve(substituter.getSubstParams().size());
-  for (auto &param : substituter.getSubstParams()) {
-    substOldParams.push_back(param.transform(mapIntoContext));
-  }
-  
   return SILFunctionType::get(genericParams,
                               genericSig,
                               substLoweredType->getExtInfo(),
                               origFnType->getCalleeConvention(),
-                              substOldParams,
-                              substOldResult,
                               substituter.getSubstParams(),
                               substResult,
                               Context);
@@ -1342,29 +1313,10 @@ namespace {
       auto genericSig
         = (dropGenerics ? nullptr : origType->getGenericSignature());
       
-      // FIXME: Resubstitute the non-interface types into the generic context.
-      auto mapIntoContext = [&](Type t) -> Type {
-        return ArchetypeBuilder::mapTypeIntoContext(TheASTModule,
-                                                    genericParams, t);
-      };
-      
-      SmallVector<SILParameterInfo, 8> substOldParams;
-      SILResultInfo substOldResult;
-      if (dropGenerics) {
-        // If we drop the generic signature, they are the same.
-        substOldParams = substParams;
-        substOldResult = substResult;
-      } else {
-        substOldResult = substResult.transform(mapIntoContext);
-        for (auto &param : substParams)
-          substOldParams.push_back(param.transform(mapIntoContext));
-      }
-      
       return SILFunctionType::get(genericParams,
                                   genericSig,
                                   origType->getExtInfo(),
                                   origType->getCalleeConvention(),
-                                  substOldParams, substOldResult,
                                   substParams, substResult,
                                   getASTContext());
     }

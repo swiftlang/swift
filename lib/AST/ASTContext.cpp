@@ -1580,8 +1580,6 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
                                  GenericSignature *genericSig,
                                  ExtInfo ext,
                                  ParameterConvention calleeConvention,
-                                 ArrayRef<SILParameterInfo> params,
-                                 SILResultInfo result,
                                  ArrayRef<SILParameterInfo> interfaceParams,
                                  SILResultInfo interfaceResult,
                                  const ASTContext &ctx,
@@ -1589,21 +1587,16 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
   : TypeBase(TypeKind::SILFunction, &ctx, properties),
     GenericParams(genericParams),
     GenericSig(genericSig),
-    Result(result),
     InterfaceResult(interfaceResult) {
-  assert(params.size() == interfaceParams.size());
-      
   SILFunctionTypeBits.ExtInfo = ext.Bits;
-  SILFunctionTypeBits.NumParameters = params.size();
+  SILFunctionTypeBits.NumParameters = interfaceParams.size();
   assert(!isIndirectParameter(calleeConvention));
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
-  memcpy(getMutableParameters().data(), params.data(),
-         params.size() * sizeof(SILParameterInfo));
-
   memcpy(getMutableInterfaceParameters().data(), interfaceParams.data(),
          interfaceParams.size() * sizeof(SILParameterInfo));
       
   // Make sure the interface types are sane.
+#ifndef NDEBUG
   if (genericSig) {
     for (auto gparam : genericSig->getGenericParams()) {
       (void)gparam;
@@ -1621,43 +1614,18 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
       return t->is<ArchetypeType>();
     }) && "interface type of generic type should not contain context archetypes");
   }
-
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-  assert(getParameters().size() == getInterfaceParameters().size());
-  for (unsigned i : indices(getParameters())) {
-    (void)i;
-    assert(getParameters()[i].getConvention()
-             == getInterfaceParameters()[i].getConvention()
-           && "interface parameter convention differs");
-    assert(getParameters()[i].getType()
-             == ArchetypeBuilder::mapTypeIntoContext(ctx.getStdlibModule(),
-                                                     genericParams,
-                                         getInterfaceParameters()[i].getType())
-               ->getCanonicalType()
-           && "interface parameter type differs");
-  }
-      
-  assert(getResult().getConvention() == getInterfaceResult().getConvention()
-         && "interface result convention differs");
-  assert(getResult().getType()
-          == ArchetypeBuilder::mapTypeIntoContext(ctx.getStdlibModule(),
-                                                  genericParams,
-                                              getInterfaceResult().getType())
-              ->getCanonicalType()
-         && "interface result type differs");
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
+#endif
 }
 
 CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
                                         GenericSignature *genericSig,
                                         ExtInfo ext, ParameterConvention callee,
-                                        ArrayRef<SILParameterInfo> params,
-                                        SILResultInfo result,
                                         ArrayRef<SILParameterInfo> interfaceParams,
                                         SILResultInfo interfaceResult,
                                         const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericParams, ext, callee, params, result);
+  SILFunctionType::Profile(id, genericParams, ext, callee,
+                           interfaceParams, interfaceResult);
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -1670,7 +1638,7 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
   // Allocate storage for the object.
   // FIXME: 2*params.size() so we can stash interface types.
   size_t bytes = sizeof(SILFunctionType)
-               + sizeof(SILParameterInfo) * 2 * params.size();
+               + sizeof(SILParameterInfo) * interfaceParams.size();
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   // Right now, generic SIL function types cannot be dependent or contain type
@@ -1684,12 +1652,12 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
     // Nongeneric SIL functions are dependent if they have dependent argument
     // or return types. They still never contain type variables and are always
     // materializable.
-    if (result.getType()->isDependentType()) {
+    if (interfaceResult.getType()->isDependentType()) {
       properties += RecursiveTypeProperties::IsDependent;
       goto did_set_dependent;
     }
     
-    for (auto &param : params) {
+    for (auto &param : interfaceParams) {
       if (param.getType()->isDependentType()) {
         properties += RecursiveTypeProperties::IsDependent;
         goto did_set_dependent;
@@ -1700,7 +1668,7 @@ did_set_dependent:
 
   auto fnType =
     new (mem) SILFunctionType(genericParams, genericSig, ext, callee,
-                              params, result, interfaceParams, interfaceResult,
+                              interfaceParams, interfaceResult,
                               ctx, properties);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
