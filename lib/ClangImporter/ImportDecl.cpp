@@ -2256,10 +2256,9 @@ namespace {
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
                                       decl->getLoc(),
-                                      TypeLoc::withoutLoc(elementTy),
-                                      SourceRange(), getterThunk, setterThunk,
-                                      dc);
-       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
+                                      TypeLoc::withoutLoc(elementTy), dc);
+      subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
+      subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
       subscript->setIsObjC(true);
 

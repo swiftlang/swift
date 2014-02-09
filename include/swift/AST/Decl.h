@@ -2682,15 +2682,17 @@ class SubscriptDecl : public AbstractStorageDecl {
 
 public:
   SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
-                SourceLoc ArrowLoc, TypeLoc ElementTy,
-                SourceRange Braces, FuncDecl *Get, FuncDecl *Set,
-                DeclContext *Parent)
+                SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent)
     : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
-    assert(Get && "subscripts should always have at least a getter");
-    makeComputed(Braces.Start, Get, Set, Braces.End);
     setIndices(Indices);
   }
+  
+  void setAccessors(SourceRange Braces, FuncDecl *Get, FuncDecl *Set) {
+    assert(Get && "subscripts should always have at least a getter");
+    makeComputed(Braces.Start, Get, Set, Braces.End);
+  }
+  
   
   SourceLoc getSubscriptLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getSubscriptLoc(); }

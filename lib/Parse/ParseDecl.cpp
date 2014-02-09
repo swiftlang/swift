@@ -1081,27 +1081,6 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   return makeParserResult(Status, TAD);
 }
 
-static void addAccessorsInOrder(FuncDecl *FDA, FuncDecl *FDB,
-                                SmallVectorImpl<Decl*> &Decls,
-                                Parser &P) {
-  // If we only have one accessor, make sure it is A.
-  if (!FDA) { FDA = FDB; FDB = nullptr; }
-  // If we have no accessors, don't do anything.
-  if (!FDA) return;
-  
-  // If we have two accessors, order them.
-  if (FDA && FDB &&
-      !P.SourceMgr.isBeforeInBuffer(FDA->getFuncLoc(),
-                                    FDB->getFuncLoc()))
-    std::swap(FDA, FDB);
-
-  Decls.push_back(FDA);
-  if (FDB) Decls.push_back(FDB);
-}
-
-
-
-
 /// createGetterFunc - This function creates the getter function (with no body)
 /// for a computed property or subscript.
 static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
@@ -1237,7 +1216,8 @@ static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
 bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          FuncDecl *&WillSet, FuncDecl *&DidSet,
-                         SourceLoc &LastValidLoc, SourceLoc StaticLoc) {
+                         SourceLoc &LastValidLoc, SourceLoc StaticLoc,
+                         SmallVectorImpl<Decl *> &Decls) {
   Get = Set = WillSet = DidSet = nullptr;
 
   // Properties in protocols use sufficiently limited syntax that we have a
@@ -1287,6 +1267,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                                    StaticLoc, Flags, Kind, this);
       if (Attributes.isValid())
         TheDecl->getMutableAttrs() = Attributes;
+      
+      Decls.push_back(TheDecl);
     }
 
     return false;
@@ -1378,6 +1360,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                                         Entries, Tok.getLoc());
     TheDecl->setBody(Body);
     
+    Decls.push_back(TheDecl);
     LastValidLoc = Body->getRBraceLoc();
   }
 
@@ -1433,7 +1416,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   FuncDecl *WillSet = nullptr, *DidSet = nullptr;
   SourceLoc LastValidLoc = LBLoc;
   if (parseGetSet(Flags, /*Indices=*/0, TyLoc,
-                  Get, Set, WillSet, DidSet, LastValidLoc, StaticLoc))
+                  Get, Set, WillSet, DidSet, LastValidLoc, StaticLoc,
+                  Decls))
     Invalid = true;
   
   // Parse the final '}'.
@@ -1452,8 +1436,14 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     if (Get || Set) {
       diagnose(Get ? Get->getLoc() : Set->getLoc(),
                diag::observingproperty_with_getset, bool(DidSet), bool(Set));
-      Get = nullptr;
-      Set = nullptr;
+      if (Get) {
+        Get->setType(ErrorType::get(Context));
+        Get->setInvalid(); Get = nullptr;
+      }
+      if (Set) {
+        Set->setType(ErrorType::get(Context));
+        Set->setInvalid(); Set = nullptr;
+      }
     }
 
     // We don't support willSet/didSet properties defined outside of a type.
@@ -1464,7 +1454,6 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       return;
     }
 
-    addAccessorsInOrder(WillSet, DidSet, Decls, *this);
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
 
     // Observing properties will have getters and setters synthesized by sema.
@@ -1497,10 +1486,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   }
 
   // If things went well, turn this into a computed variable.
-  if (!Invalid && PrimaryVar && (Set || Get)) {
-    addAccessorsInOrder(Get, Set, Decls, *this);
+  if (!Invalid && PrimaryVar && (Set || Get))
     PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
-  }
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
@@ -2490,6 +2477,18 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
     return ElementTy;
 
+  
+  // Build an AST for the subscript declaration.
+  auto *Subscript = new (Context) SubscriptDecl(Context.Id_subscript,
+                                                SubscriptLoc, Indices.get(),
+                                                ArrowLoc, ElementTy.get(),
+                                                CurDeclContext);
+  if (Attributes.isValid())
+    Subscript->getMutableAttrs() = Attributes;
+  
+  Decls.push_back(Subscript);
+
+  
   // '{'
   // Parse getter and setter.
   SourceRange DefRange = SourceRange();
@@ -2510,7 +2509,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
     if (parseGetSet(Flags, Indices.get(),ElementTy.get(),
                     Get, Set, WillSet, DidSet, LastValidLoc,
-                    /*StaticLoc*/ SourceLoc()))
+                    /*StaticLoc*/ SourceLoc(), Decls))
       Status.setIsParseError();
 
     // Parse the final '}'.
@@ -2542,42 +2541,32 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     Status.setIsParseError();
   }
 
-  // FIXME: We should build the declarations even if they are invalid.
-  if (Status.isSuccess()) {
-    // If we had no getter (e.g., because we're in SIL mode or because the
-    // program isn't valid) create a stub here.
-    if (!Get) {
-      auto ArgPattern =
-        parseOptionalAccessorArgument(SubscriptLoc, ElementTy.get(), *this,
-                                      AccessorKind::IsGetter);
-      Get = createAccessorFunc(SubscriptLoc, ArgPattern, ElementTy.get(),
-                               Indices.get(), /*StaticLoc*/ SourceLoc(),
-                               Flags, AccessorKind::IsGetter, this);
-     
-      if (!isInSILMode()) {
-        Get->setInvalid();
-        Get->setType(ErrorType::get(Context));
-      }
-    }
+  // If we had no getter (e.g., because we're in SIL mode or because the
+  // program isn't valid) create a stub here.
+  if (!Get) {
+    auto ArgPattern =
+      parseOptionalAccessorArgument(SubscriptLoc, ElementTy.get(), *this,
+                                    AccessorKind::IsGetter);
+    Get = createAccessorFunc(SubscriptLoc, ArgPattern, ElementTy.get(),
+                             Indices.get(), /*StaticLoc*/ SourceLoc(),
+                             Flags, AccessorKind::IsGetter, this);
     
-    // Build an AST for the subscript declaration.
-    SubscriptDecl *Subscript
-      = new (Context) SubscriptDecl(Context.Id_subscript,
-                                    SubscriptLoc, Indices.get(), ArrowLoc,
-                                    ElementTy.get(), DefRange,
-                                    Get, Set, CurDeclContext);
-    // No need to setLocalDiscriminator because subscripts cannot
-    // validly appear outside of type decls.
-
-    if (Attributes.isValid())
-      Subscript->getMutableAttrs() = Attributes;
-
-    Decls.push_back(Subscript);
-
-    // Add get/set in source order.
-    addAccessorsInOrder(Get, Set, Decls, *this);
+    if (!isInSILMode()) {
+      Get->setInvalid();
+      Get->setType(ErrorType::get(Context));
+    }
+    Decls.push_back(Get);
   }
 
+  Subscript->setAccessors(DefRange, Get, Set);
+  
+  if (!Status.isSuccess()) {
+    Subscript->setType(ErrorType::get(Context));
+    Subscript->setInvalid();
+  }  
+  
+  // No need to setLocalDiscriminator because subscripts cannot
+  // validly appear outside of type decls.
   return Status;
 }
 

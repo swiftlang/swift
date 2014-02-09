@@ -1968,13 +1968,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     assert(indices);
 
     auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
-    auto getter = cast_or_null<FuncDecl>(getDecl(getterID));
-    auto setter = cast_or_null<FuncDecl>(getDecl(setterID));
 
     auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
                                              SourceLoc(), indices, SourceLoc(),
-                                             elemTy, SourceRange(),
-                                             getter, setter, DC);
+                                             elemTy, DC);
+    subscript->setAccessors(SourceRange(),
+                            cast_or_null<FuncDecl>(getDecl(getterID)),
+                            cast_or_null<FuncDecl>(getDecl(setterID)));
     declOrOffset = subscript;
 
     subscript->setType(getType(declTypeID));
