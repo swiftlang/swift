@@ -602,6 +602,57 @@ ParserResult<Expr> Parser::parseExprSuper() {
   return nullptr;
 }
 
+
+/// Copy a numeric literal value into AST-owned memory, stripping underscores
+/// so the semantic part of the value can be parsed by APInt/APFloat parsers.
+static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
+  char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
+  char *p = start;
+  
+  for (char c : orig)
+    if (c != '_')
+      *p++ = c;
+  
+  return StringRef(start, p - start);
+}
+
+/// isStartOfGetSetAccessor - The current token is a { token in a place that
+/// might be the start of a trailing closure.  Check to see if the { is followed
+/// by a didSet:/willSet: label.  If so, this isn't a trailing closure, it is
+/// the start of a get-set block in a variable definition.
+static bool isStartOfGetSetAccessor(Parser &P) {
+  assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
+  
+  // The only case this can happen is if the accessor label is immediately after
+  // a brace.  "get" is implicit, so it can't be checked for.  Conveniently
+  // however, get/set properties are not allowed to have initializers, so we
+  // don't have an ambiguity, we just have to check for observing accessors.
+    Token NextToken = P.peekToken();
+  if (!NextToken.isContextualKeyword("didSet") &&
+      !NextToken.isContextualKeyword("willSet"))
+    return false;
+  
+  // If it does start with didSet/willSet, check to see if the token after it is
+  // a ":" or "(value):", to be absolutely sure that this is the start of a
+  // didSet/willSet specifier (not something like "{ didSet = 42 }").  To do
+  // this, we have to speculatively parse.
+  Parser::BacktrackingScope backtrack(P);
+
+  // Eat the "{ identifier".
+  P.consumeToken(tok::l_brace);
+  P.consumeToken(tok::identifier);
+
+  // If this is "{ didSet:" then it is the start of a get/set accessor.
+  if (P.Tok.is(tok::colon)) return true;
+
+  // If this is "{ willSet(v):" then it is the start of a get/set accessor.
+  if (P.Tok.is(tok::colon)) return true;
+  return P.consumeIf(tok::l_paren) &&
+         P.consumeIf(tok::identifier) &&
+         P.consumeIf(tok::r_paren) &&
+         P.consumeIf(tok::colon);
+}
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -656,20 +707,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 ///   expr-postfix(trailing-closure):
 ///     expr-postfix(basic)
 ///     expr-trailing-closure
-
-/// Copy a numeric literal value into AST-owned memory, stripping underscores
-/// so the semantic part of the value can be parsed by APInt/APFloat parsers.
-static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
-  char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
-  char *p = start;
-  
-  for (char c : orig)
-    if (c != '_')
-      *p++ = c;
-  
-  return StringRef(start, p - start);
-}
-
+///
 ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   ParserResult<Expr> Result;
   switch (Tok.getKind()) {
@@ -953,7 +991,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     }
     
     // Check for a trailing closure, if allowed.
-    if (!isExprBasic && Tok.isFollowingLBrace()) {
+    if (!isExprBasic && Tok.isFollowingLBrace() &&
+        !isStartOfGetSetAccessor(*this)) {
       // Parse the closure.
       Expr *closure = parseExprClosure();
       

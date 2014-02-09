@@ -1647,7 +1647,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
             parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, Decls)) {
         hasStorage = boundVar->hasStorage();
 
-        if (PBD->getInit()) {
+        if (PBD->getInit() && !boundVar->hasStorage()) {
           diagnose(pattern.get()->getLoc(), diag::getset_init)
             .highlight(PBD->getInit()->getSourceRange());
           PBD->setInit(nullptr, false);

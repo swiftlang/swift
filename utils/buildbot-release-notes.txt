@@ -69,6 +69,16 @@
   was previously imported as getter (isEnabled) and setter
   (setEnabled) methods. Now, it is imported as a property (enabled).
 
+* didSet/willSet properties may now have an initial value specified:
+
+     class MyAwesomeView : UIView {
+      var enabled : Bool = false {       // Initial value.
+      didSet: self.setNeedsDisplay(true)
+      }
+      ...
+    }
+
+
 2014-02-05
 ----------
 
