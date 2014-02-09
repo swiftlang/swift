@@ -1466,7 +1466,6 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<AK_objc, AK_transparent>(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
-    auto implicitSelf = ctor->getImplicitSelfDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1476,8 +1475,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
                                   addTypeRef(ctor->getType()),
-                                  addTypeRef(ctor->getInterfaceType()),
-                                  addDeclRef(implicitSelf));
+                                  addTypeRef(ctor->getInterfaceType()));
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
     assert(ctor->getArgParamPatterns().size() == 2);
@@ -1494,15 +1492,13 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<AK_objc>(dtor);
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
-    auto implicitSelf = dtor->getImplicitSelfDecl();
 
     unsigned abbrCode = DeclTypeAbbrCodes[DestructorLayout::Code];
     DestructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addDeclRef(DC),
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 addTypeRef(dtor->getType()),
-                                 addDeclRef(implicitSelf));
+                                 addTypeRef(dtor->getType()));
     assert(dtor->getArgParamPatterns().size() == 1);
     for (auto pattern : dtor->getArgParamPatterns())
       writePattern(pattern);

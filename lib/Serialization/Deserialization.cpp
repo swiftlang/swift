@@ -1400,21 +1400,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit, hasSelectorStyleSignature, isObjC, isTransparent;
     TypeID signatureID;
     TypeID interfaceID;
-    DeclID implicitSelfID;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
                                                isObjC, isTransparent,
-                                               signatureID, interfaceID,
-                                               implicitSelfID);
+                                               signatureID, interfaceID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
 
-    // FIXME: There is no reason to serialize the ImplicitSelfID.  The param
-    // pattern list encompasses this.
-    auto *SelfDecl = getDecl(implicitSelfID, nullptr);
-    
     auto genericParams = maybeReadGenericParams(parent);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
@@ -2036,19 +2030,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID parentID;
     bool isImplicit, isObjC;
     TypeID signatureID;
-    DeclID implicitSelfID;
 
     decls_block::DestructorLayout::readRecord(scratch, parentID, isImplicit,
-                                              isObjC, signatureID,
-                                              implicitSelfID);
+                                              isObjC, signatureID);
 
     DeclContext *parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
-
-    auto selfDecl = cast<VarDecl>(getDecl(implicitSelfID, nullptr));
-    // FIXME: There is no reason to serialize implicitSelfID, the param pattern
-    // captures this.
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
                                          /*selfpat*/nullptr, parent);

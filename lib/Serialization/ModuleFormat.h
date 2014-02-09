@@ -596,8 +596,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,  // transparent?
     TypeIDField, // type (signature)
-    TypeIDField, // type (interface)
-    DeclIDField  // implicit this decl
+    TypeIDField // type (interface)
     // Trailed by its generic parameters, if any, followed by the parameter
     // patterns.
   >;
@@ -711,8 +710,7 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    TypeIDField, // type (signature)
-    DeclIDField  // implicit this decl
+    TypeIDField // type (signature)
     // Trailed by a pattern for self.
   >;
 
