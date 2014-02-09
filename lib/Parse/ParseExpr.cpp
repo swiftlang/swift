@@ -1319,7 +1319,7 @@ Expr *Parser::parseExprClosure() {
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
-    addFunctionParametersToScope(params);
+    addPatternVariablesToScope(params);
   } else {
     // There are no parameters; allow anonymous closure variables.
     // FIXME: We could do this all the time, and then provide Fix-Its
@@ -1768,8 +1768,8 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
       new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
-void Parser::addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns) {
-  for (Pattern *Pat : BodyPatterns) {
+void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
+  for (Pattern *Pat : Patterns) {
     Pat->forEachVariable([&](VarDecl *VD) {
       // Add any variable declarations to the current scope.
       addToScope(VD);

@@ -586,7 +586,7 @@ public:
   ParserResult<DestructorDecl>
   parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
-  void addFunctionParametersToScope(ArrayRef<Pattern *> BodyPatterns);
+  void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
 
   ParserResult<OperatorDecl> parseDeclOperator(bool AllowTopLevel,
                                                DeclAttributes &Attributes);

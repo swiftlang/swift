@@ -1348,7 +1348,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse the body.
     Scope S(this, ScopeKind::FunctionBody);
-    addFunctionParametersToScope(TheDecl->getBodyParamPatterns());
+    addPatternVariablesToScope(TheDecl->getBodyParamPatterns());
 
     // Establish the new context.
     ParseFunctionBody CC(*this, TheDecl);
@@ -1869,7 +1869,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
       CodeCompletion->setDelayedParsedDecl(FD);
 
     DefaultArgs.setFunctionContext(FD);
-    addFunctionParametersToScope(FD->getBodyParamPatterns());
+    addPatternVariablesToScope(FD->getBodyParamPatterns());
     setLocalDiscriminator(FD);
     
     // Establish the new context.
@@ -2627,7 +2627,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
-  addFunctionParametersToScope(ArrayRef<Pattern*>{SelfPattern, BodyPattern} );
+  addPatternVariablesToScope(ArrayRef<Pattern*>{SelfPattern, BodyPattern} );
 
   // '{'
   if (!Tok.is(tok::l_brace)) {

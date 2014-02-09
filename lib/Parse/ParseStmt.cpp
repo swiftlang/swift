@@ -521,8 +521,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                                  /*parent*/ CurDeclContext);
     
     // Introduce variables to the current scope.
-    SmallVector<Decl *, 2> Decls;
-    addVarsToScope(Pattern.get(), Decls, *this);
+    addPatternVariablesToScope(Pattern.get());
 
   } else {
     ParserResult<Expr> Expr = parseExprBasic(ID);
@@ -979,8 +978,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // FIXME: We may want to merge this scope with the scope introduced by
   // the stmt-brace, as in C++.
   Scope S(this, ScopeKind::ForeachVars);
-  SmallVector<Decl *, 2> Decls;
-  addVarsToScope(Pattern.get(), Decls, *this);
+  
+  // Introduce variables to the current scope.
+  addPatternVariablesToScope(Pattern.get());
 
   ParserStatus Status;
 
