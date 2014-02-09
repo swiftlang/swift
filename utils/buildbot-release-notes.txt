@@ -1,6 +1,27 @@
 2014-02-12
 ----------
 
+* Selector arguments in function arguments with only a type are now implicitly
+  named after the selector chunk that contains them.  For example, instead of:
+  
+    func addIntsWithFirst(first : Int) second(second : Int) -> Int {
+      return first+second
+    }
+  
+  you can now write:
+  
+    func addIntsWithFirst(first : Int) second(Int) -> Int {
+      return first+second
+    }
+    
+  if you want to explicitly want to ignore an argument, it is recommended that
+  you continue to use the "_" to discard it, as in:
+  
+    func addIntsWithFirst(first : Int) second(_ : Int) -> Int {...}
+
+  This feature is not available for the first selector piece.  See
+  rdar://15993514 for more examples.
+
 * The @inout attribute in argument lists has been promoted to a 
   context-sensitive keyword.  Where before you might have written:
 

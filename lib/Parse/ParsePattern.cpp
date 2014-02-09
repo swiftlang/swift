@@ -193,16 +193,75 @@ parseSelectorArgument(Parser &P,
     } else {
       selectorNames[id] = decl;
     }
+  } else {
+    // If the selector is named "_", then we ignore it.
+    assert(isa<AnyPattern>(ArgPattern) && "Unexpected selector pattern");
   }
 
   if (!P.Tok.is(tok::l_paren)) {
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
   }
+  
+  // Consume the (.
+  SourceLoc LPLoc = P.consumeToken(tok::l_paren);
 
-  ParserResult<Pattern> PatternRes =
-      P.parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,
-                          /*DefArgs=*/&defaultArgs);
+  // Decide if this is a singular unnamed selector piece (e.g. "foo(Int)" or if
+  // it is a standard tuple body pattern (e.g. "foo(x : Int)").  The former is
+  // shorthand where the elements get the name of the selector chunk, in the
+  // later, the names are specified for each piece.
+  
+  // Before doing a speculative parse, check for the common case of
+  // "identifier:" (always a tuple) or "identifier)" (always unnamed).
+  bool isTypeOnlySelectorArg;
+  
+  if (!isa<NamedPattern>(ArgPattern))
+    // "_" is never a selector name.
+    isTypeOnlySelectorArg = false;
+  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
+    isTypeOnlySelectorArg = false;
+  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
+    isTypeOnlySelectorArg = true;
+  else {
+    // Otherwise, we do a full speculative parse to determine this.
+    Parser::BacktrackingScope backtrack(P);
+    
+    // This is type-only if it is a valid type followed by an r_paren.
+    isTypeOnlySelectorArg = P.canParseType() && P.Tok.is(tok::r_paren);
+  }
+ 
+ 
+  // If this is a type-only selector chunk, parse the type and r_paren, then
+  // build this as if it were a tuplepattern(typed_pattern(named_pattern)).
+  ParserResult<Pattern> PatternRes;
+  if (isTypeOnlySelectorArg) {
+    SourceLoc TypeLoc = P.Tok.getLoc();
+    
+    ParserResult<TypeRepr> Ty = P.parseTypeAnnotation();
+    if (Ty.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Pattern>();
+    if (Ty.isNull())
+      Ty = makeParserResult(new (P.Context) ErrorTypeRepr(TypeLoc));
+
+    // This was checked by the speculative parse above.
+    SourceLoc RPLoc = P.consumeToken(tok::r_paren);
+
+    // NamedPattern.
+    Identifier ident = cast<NamedPattern>(ArgPattern)->getDecl()->getName();
+    auto Name = P.createBindingFromPattern(TypeLoc, ident, /*isLet*/true);
+    auto TypedPat = new (P.Context) TypedPattern(Name, Ty.get());
+    
+    TuplePatternElt TupleElt(TypedPat, /*init*/nullptr,
+                             DefaultArgumentKind::None);
+    
+    PatternRes = makeParserResult(
+      TuplePattern::createSimple(P.Context, LPLoc, TupleElt, RPLoc,
+                                 /*isVararg*/false, SourceLoc()));
+  } else {
+    // Otherwise, this is a standard tuple
+    PatternRes = P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
+                                            LPLoc, /*DefArgs=*/&defaultArgs);
+  }
   if (PatternRes.hasCodeCompletion())
     return PatternRes;
   if (PatternRes.isNull()) {
@@ -663,17 +722,24 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
       TuplePatternElt(pattern.get(), init, getDefaultArgKind(init)));
 }
 
-/// Parse a tuple pattern.
+ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
+                                                DefaultArgumentInfo *defaults) {
+  SourceLoc LPLoc = consumeToken(tok::l_paren);
+  return parsePatternTupleAfterLP(isLet, isArgumentList, LPLoc, defaults);
+}
+
+/// Parse a tuple pattern.  The leading left paren has already been consumed and
+/// we are looking at the next token.  LPLoc specifies its location.
 ///
 ///   pattern-tuple:
 ///     '(' pattern-tuple-body? ')'
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
-
-ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
-                                                DefaultArgumentInfo *defaults) {
-  SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
-  SourceLoc EllipsisLoc;
+ParserResult<Pattern>
+Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
+                                 SourceLoc LPLoc,
+                                 DefaultArgumentInfo *defaults) {
+  SourceLoc RPLoc, EllipsisLoc;
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;

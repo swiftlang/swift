@@ -709,6 +709,9 @@ public:
                            DefaultArgumentInfo *args);
   ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList,
                                           DefaultArgumentInfo *args);
+  ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,
+                                                 SourceLoc LPLoc,
+                                                 DefaultArgumentInfo *args);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
   ParserResult<Pattern> parsePatternIdentifier(bool isLet);
   ParserResult<Pattern> parsePatternVarOrLet();
