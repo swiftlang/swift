@@ -447,34 +447,6 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
 
-namespace {
-  class AddVarsToScope : public ASTWalker {
-  public:
-    Parser &TheParser;
-    SmallVectorImpl<Decl*> &Decls;
-    
-    AddVarsToScope(Parser &P, SmallVectorImpl<Decl*> &Decls)
-    : TheParser(P), Decls(Decls) {}
-    
-    Pattern *walkToPatternPost(Pattern *P) override {
-      // Handle vars.
-      if (auto *Named = dyn_cast<NamedPattern>(P)) {
-        VarDecl *VD = Named->getDecl();
-        Decls.push_back(VD);
-        TheParser.addToScope(VD);
-      }
-      return P;
-    }
-  };
-}
-
-static void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
-                           Parser &P) {
-  // FIXME: This would be simpler if it used Pat->CollectVariables
-  Pat->walk(AddVarsToScope(P, Decls));
-}
-
-
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
@@ -1097,6 +1069,27 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
                                  cases, rBraceLoc, Context));
 }
 
+namespace {
+  class CollectVarsAndAddToScope : public ASTWalker {
+  public:
+    Parser &TheParser;
+    SmallVectorImpl<Decl*> &Decls;
+    
+    CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<Decl*> &Decls)
+    : TheParser(P), Decls(Decls) {}
+    
+    Pattern *walkToPatternPost(Pattern *P) override {
+      // Handle vars.
+      if (auto *Named = dyn_cast<NamedPattern>(P)) {
+        VarDecl *VD = Named->getDecl();
+        Decls.push_back(VD);
+        TheParser.addToScope(VD);
+      }
+      return P;
+    }
+  };
+}
+
 ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
                                          SmallVectorImpl<Decl *> &boundDecls) {
   // We must have at least one case label.
@@ -1138,8 +1131,11 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
         ParserResult<Pattern> pattern = parseMatchingPattern();
         Status |= pattern;
         if (pattern.isNonNull()) {
-          // Add variable bindings from the pattern to the case scope.
-          addVarsToScope(pattern.get(), boundDecls, *this);
+          // Add variable bindings from the pattern to the case scope.  We have
+          // to do this with a full AST walk, because the freshly parsed pattern
+          // represents tuples and var patterns as tupleexprs and
+          // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+          pattern.get()->walk(CollectVarsAndAddToScope(*this, boundDecls));
           patterns.push_back(pattern.get());
         }
       } while (consumeIf(tok::comma));

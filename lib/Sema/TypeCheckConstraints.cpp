@@ -301,8 +301,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
         ValueDecl *D = Result.getValueDecl();
         if (!D->hasType()) {
           assert(D->getDeclContext()->isLocalContext());
-          TC.diagnose(Loc, diag::use_local_before_declaration, Name);
-          TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
+          if (!D->isInvalid()) {
+            TC.diagnose(Loc, diag::use_local_before_declaration, Name);
+            TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
+          }
           return new (TC.Context) ErrorExpr(Loc);
         }
         if (matchesDeclRefKind(D, UDRE->getRefKind()))

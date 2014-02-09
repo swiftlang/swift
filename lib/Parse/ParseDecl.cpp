@@ -1654,17 +1654,17 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     PBD->setHasStorage(hasStorage);
 
+    // Add all parsed vardecls to this scope.
+    addPatternVariablesToScope(pattern.get());
     
-    // Add all parsed vardecls to this scope and set their DeclContext properly.
+    // Configure them properly with attributes and 'static'.
     pattern.get()->forEachVariable([&](VarDecl *VD) {
-      assert(VD->getDeclContext() == CurDeclContext);
       VD->setStatic(StaticLoc.isValid());
       VD->setParentPattern(PBD);
       if (Attributes.isValid())
         VD->getMutableAttrs() = Attributes;
       
       Decls.push_back(VD);
-      addToScope(VD);
     });
     
     // Propagate back types for simple patterns, like "var A, B : T".

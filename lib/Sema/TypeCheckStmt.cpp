@@ -514,7 +514,15 @@ public:
           }
 
           // Coerce the pattern to the subject's type.
-          hadTypeError |= TC.coercePatternToType(pattern, DC, subjectType,None);
+          if (TC.coercePatternToType(pattern, DC, subjectType, None)) {
+            // If that failed, mark any variables binding pieces of the pattern
+            // as invalid to silence follow-on errors.
+            pattern->forEachVariable([&](VarDecl *VD) {
+              VD->overwriteType(ErrorType::get(TC.Context));
+              VD->setInvalid();
+            });
+            hadTypeError = true;
+          }
         }
         
         // Check the guard expression, if present.
