@@ -310,9 +310,7 @@ private:
 
   unsigned NumCurrentImportingEntities = 0;
 
-  void startedImportingEntity() {
-    ++NumCurrentImportingEntities;
-  }
+  void startedImportingEntity();
   void finishedImportingEntity();
   void finishPendingActions();
 

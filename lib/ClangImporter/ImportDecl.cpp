@@ -31,8 +31,13 @@
 #include "clang/Lex/Preprocessor.h"
 
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
+
+#define DEBUG_TYPE "Clang Importer"
+
+STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
 
 using namespace swift;
 
@@ -3068,6 +3073,11 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     Result->setClangNode(ClangDecl);
   }
   return Result;
+}
+
+void ClangImporter::Implementation::startedImportingEntity() {
+  ++NumCurrentImportingEntities;
+  ++NumTotalImportedEntities;
 }
 
 void ClangImporter::Implementation::finishedImportingEntity() {
