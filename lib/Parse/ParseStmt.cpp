@@ -451,39 +451,18 @@ namespace {
   class AddVarsToScope : public ASTWalker {
   public:
     Parser &TheParser;
-    ASTContext &Context;
-    DeclContext *CurDeclContext;
     SmallVectorImpl<Decl*> &Decls;
-    bool IsStatic;
-    DeclAttributes &Attributes;
-    PatternBindingDecl *PBD;
     
-    AddVarsToScope(Parser &P,
-                   ASTContext &Context,
-                   DeclContext *CurDeclContext,
-                   SmallVectorImpl<Decl*> &Decls,
-                   bool IsStatic,
-                   DeclAttributes &Attributes,
-                   PatternBindingDecl *PBD)
+    AddVarsToScope(Parser &P, SmallVectorImpl<Decl*> &Decls)
     : TheParser(P),
-    Context(Context),
-    CurDeclContext(CurDeclContext),
-    Decls(Decls),
-    IsStatic(IsStatic),
-    Attributes(Attributes),
-    PBD(PBD)
-    {}
+    Decls(Decls) {}
     
     Pattern *walkToPatternPost(Pattern *P) override {
       // Handle vars.
       if (auto *Named = dyn_cast<NamedPattern>(P)) {
         VarDecl *VD = Named->getDecl();
-        VD->setDeclContext(CurDeclContext);
-        VD->setStatic(IsStatic);
-        VD->setParentPattern(PBD);
-        if (Attributes.isValid())
-          VD->getMutableAttrs() = Attributes;
-        
+        assert(VD->getDeclContext() == TheParser.CurDeclContext);
+        VD->setDeclContext(TheParser.CurDeclContext);
         Decls.push_back(VD);
         TheParser.addToScope(VD);
       }
@@ -492,14 +471,10 @@ namespace {
   };
 }
 
-void Parser::addVarsToScope(Pattern *Pat,
-                            SmallVectorImpl<Decl*> &Decls,
-                            bool IsStatic,
-                            DeclAttributes &Attributes,
-                            PatternBindingDecl *PBD) {
+static void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
+                           Parser &P) {
   // FIXME: This would be simpler if it used Pat->CollectVariables
-  Pat->walk(AddVarsToScope(*this, Context, CurDeclContext,
-                           Decls, IsStatic, Attributes, PBD));
+  Pat->walk(AddVarsToScope(P, Decls));
 }
 
 
@@ -550,8 +525,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // Introduce variables to the current scope.
     SmallVector<Decl *, 2> Decls;
-    DeclAttributes Attributes;
-    addVarsToScope(Pattern.get(), Decls, /*static*/ false, Attributes);
+    addVarsToScope(Pattern.get(), Decls, *this);
 
   } else {
     ParserResult<Expr> Expr = parseExprBasic(ID);
@@ -1009,8 +983,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
   // the stmt-brace, as in C++.
   Scope S(this, ScopeKind::ForeachVars);
   SmallVector<Decl *, 2> Decls;
-  DeclAttributes Attributes;
-  addVarsToScope(Pattern.get(), Decls, /*static*/ false, Attributes);
+  addVarsToScope(Pattern.get(), Decls, *this);
 
   ParserStatus Status;
 
@@ -1169,9 +1142,7 @@ ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
         Status |= pattern;
         if (pattern.isNonNull()) {
           // Add variable bindings from the pattern to the case scope.
-          DeclAttributes defaultAttributes;
-          addVarsToScope(pattern.get(), boundDecls,
-                         /*static*/ false, defaultAttributes);
+          addVarsToScope(pattern.get(), boundDecls, *this);
           patterns.push_back(pattern.get());
         }
       } while (consumeIf(tok::comma));

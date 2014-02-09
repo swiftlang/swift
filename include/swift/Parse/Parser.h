@@ -522,14 +522,6 @@ public:
 
   void setLocalDiscriminator(ValueDecl *D);
 
-  /// \brief Add the variables in the given pattern to the current scope,
-  /// collecting the variables in the vector \c Decls and applying
-  /// \c Attributes and \c Static to each one.
-  void addVarsToScope(Pattern *Pat, SmallVectorImpl<Decl*> &Decls,
-                      bool IsStatic,
-                      DeclAttributes &Attributes,
-                      PatternBindingDecl *PBD = nullptr);
-  
   bool parseDeclAttributeList(DeclAttributes &Attributes) {
     if (Tok.is(tok::at_sign))
       return parseDeclAttributeListPresent(Attributes);

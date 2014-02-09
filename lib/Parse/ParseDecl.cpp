@@ -2000,12 +2000,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   if (Attributes.isValid())
     UD->getMutableAttrs() = Attributes;
 
-  // Now that we have a context, update the generic parameters with that
-  // context.
-  if (GenericParams)
-    for (auto Param : *GenericParams)
-      Param.setDeclContext(UD);
-
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, UD);
@@ -2260,14 +2254,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   if (Attributes.isValid())
     SD->getMutableAttrs() = Attributes;
 
-  // Now that we have a context, update the generic parameters with that
-  // context.
-  if (GenericParams) {
-    for (auto Param : *GenericParams) {
-      Param.setDeclContext(SD);
-    }
-  }
-
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
     ContextChange CC(*this, SD);
@@ -2345,14 +2331,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   // Attach attributes.
   if (Attributes.isValid())
     CD->getMutableAttrs() = Attributes;
-
-  // Now that we have a context, update the generic parameters with that
-  // context.
-  if (GenericParams) {
-    for (auto Param : *GenericParams) {
-      Param.setDeclContext(CD);
-    }
-  }
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
@@ -2598,14 +2576,6 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
 
     // Add get/set in source order.
     addAccessorsInOrder(Get, Set, Decls, *this);
-    
-    FuncDecl* Accessors[2] = {Get, Set};
-    for (auto FD : Accessors) {
-      if (FD) {
-        assert(FD->getDeclContext() == CurDeclContext);
-        FD->setDeclContext(CurDeclContext);
-      }
-    }
   }
 
   return Status;
@@ -2762,8 +2732,6 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   auto *DD = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
                                           SelfPattern, CurDeclContext);
   // No need to setLocalDiscriminator.
-
-  SelfDecl->setDeclContext(DD);
   addToScope(SelfDecl);
 
   // Parse the body.

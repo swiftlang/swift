@@ -650,6 +650,18 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return getInterfaceType()->castTo<MetatypeType>()->getInstanceType();
 }
 
+/// Provide the set of parameters to a generic type, or null if
+/// this function is not generic.
+void NominalTypeDecl::setGenericParams(GenericParamList *params) {
+  assert(!GenericParams && "Already has generic parameters");
+  GenericParams = params;
+  
+  if (params)
+    for (auto Param : *params)
+      Param.setDeclContext(this);
+}
+
+
 bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   // Enums with raw types can derive their RawRepresentable conformance.
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
@@ -1618,8 +1630,8 @@ void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,
                                Pattern *SelfPattern, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent, NameHack,
-                         DestructorLoc, 1, nullptr),
-  SelfPattern(SelfPattern) {
+                         DestructorLoc, 1, nullptr) {
+  setSelfPattern(SelfPattern);
 }
 
 void DestructorDecl::setSelfPattern(Pattern *selfPattern) {

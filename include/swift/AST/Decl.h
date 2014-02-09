@@ -2001,7 +2001,9 @@ protected:
                   GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, NameLoc, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
-    GenericParams(GenericParams), DeclaredTy(nullptr) {}
+    GenericParams(nullptr), DeclaredTy(nullptr) {
+    setGenericParams(GenericParams);
+  }
 
   friend class ProtocolType;
 
@@ -2020,11 +2022,8 @@ public:
 
   /// Provide the set of parameters to a generic type, or null if
   /// this function is not generic.
-  void setGenericParams(GenericParamList *params) {
-    assert(!GenericParams && "Already has generic parameters");
-    GenericParams = params;
-  }
-
+  void setGenericParams(GenericParamList *params);
+  
   /// Set the generic signature of this type.
   void setGenericSignature(ArrayRef<GenericTypeParamType *> params,
                            ArrayRef<Requirement> requirements);
