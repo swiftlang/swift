@@ -275,6 +275,11 @@ public:
     return getSwiftRValueType()->isClassExistentialType();
   }
   
+  /// True if the type is dependent on a generic signature.
+  bool isDependentType() const {
+    return getSwiftRValueType()->isDependentType();
+  }
+  
   /// Returns the ASTContext for the referenced Swift type.
   const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();

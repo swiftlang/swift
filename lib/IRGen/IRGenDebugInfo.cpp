@@ -444,15 +444,17 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    DeclContext* DeclCtx) {
   SmallVector<llvm::Value *, 16> Parameters;
 
+  GenericContextScope scope(IGM, FnTy->getGenericSignature());
+
   // The function return type is the first element in the list.
   createParameterType(Parameters,
-                      FnTy->getSemanticResultSILType(),
+                      FnTy->getSemanticInterfaceResultSILType(),
                       Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto Param : FnTy->getParameters())
+  for (auto Param : FnTy->getInterfaceParameters())
     createParameterType(Parameters, Param.getSILType(),
                         Scope, DeclCtx);
 
@@ -1401,11 +1403,20 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return getOrCreateDesugaredType(CanTy, DbgTy, Scope);
   }
 
+  case TypeKind::GenericTypeParam: {
+    auto ParamTy = cast<GenericTypeParamType>(BaseTy);
+    // FIXME: Provide a more meaningful debug type.
+    return DBuilder.createUnspecifiedType(ParamTy->getName().str());
+  }
+  case TypeKind::DependentMember: {
+    auto MemberTy = cast<DependentMemberType>(BaseTy);
+    // FIXME: Provide a more meaningful debug type.
+    return DBuilder.createUnspecifiedType(MemberTy->getName().str());
+  }
+
   case TypeKind::Array:
   case TypeKind::AssociatedType:
-  case TypeKind::DependentMember:
   case TypeKind::Error:
-  case TypeKind::GenericTypeParam:
   case TypeKind::LValue:
   case TypeKind::Module:
   case TypeKind::DynamicSelf:

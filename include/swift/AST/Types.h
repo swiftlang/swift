@@ -2092,7 +2092,7 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
 // Some macros to aid the SILFunctionType transition.
-#if 0
+#if 1
 # define SIL_FUNCTION_TYPE_DEPRECATED __attribute__((deprecated))
 # define SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN \
     _Pragma("clang diagnostic push") \
