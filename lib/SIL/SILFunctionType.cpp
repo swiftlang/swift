@@ -1104,24 +1104,30 @@ namespace {
   public:
     SILFunctionTypeSubstituter(TypeConverter &TC,
                                CanSILFunctionType origFnType)
-      : TC(TC), OrigFnType(origFnType), OrigParams(origFnType->getParameters())
+      : TC(TC), OrigFnType(origFnType),
+        OrigParams(origFnType->getInterfaceParameters())
     {}
 
     SILResultInfo substResult(AbstractionPattern origResultType,
                               CanType substResultType) {
-      SILResultInfo origResult = OrigFnType->getResult();
+      SILResultInfo origResult = OrigFnType->getInterfaceResult();
       bool origHasIndirectResult = OrigFnType->hasIndirectResult();
+      bool resultIsDependent;
 
       // Claim the implicit indirect result parameter.
       SILParameterInfo origIndirectResult;
       if (origHasIndirectResult) {
         origIndirectResult = claimNextOrigParam();
+        resultIsDependent = origIndirectResult.getType()->isDependentType();
         assert(origIndirectResult.isIndirectResult());
+      } else {
+        resultIsDependent = origResult.getType()->isDependentType();
       }
 
-      // If the result type didn't change, we can just use the
-      // original result.
-      if (origResultType.getAsType() == substResultType) {
+      // If the result type didn't change and doesn't depend on context, we can
+      // just use the original result.
+      if (origResultType.getAsType() == substResultType
+          && !resultIsDependent) {
         // That includes the implicit indirect result parameter.
         if (origHasIndirectResult)
           SubstParams.push_back(origIndirectResult);
@@ -1177,8 +1183,9 @@ namespace {
       auto origParam = claimNextOrigParam();
       assert(!origParam.isIndirectResult());
 
-      // If the type hasn't changed, just use the original parameter.
-      if (origType == substType) {
+      // If the type hasn't changed and doesn't rely on context, just use the
+      // original parameter.
+      if (origType == substType && !origParam.getType()->isDependentType()) {
         SubstParams.push_back(origParam);
         return;
       }
