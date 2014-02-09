@@ -209,8 +209,6 @@
   <!-- ===================================================================== -->
 
   <div class="commentary">
-    The difference between reserved punctuation and identifiers is that you
-    can't "overload an operator" with one of these names.<br><br>
     Note that -&gt; is used for function types "() -&gt; Int", not pointer
     dereferencing.
   </div>
@@ -232,7 +230,9 @@
   </pre>
 
   <p>These are all reserved punctuation that are lexed into tokens.  Most other
-     punctuation is matched as <a href="#identifier">identifiers</a>.
+     non-alphanumeric characters are matched as
+     <a href="#operator">operators</a>.  Unlike operators, these tokens are not
+     overloadable.
   </p>
 
   <!-- ===================================================================== -->
@@ -529,32 +529,16 @@
     &#xF8FF;     // Is a private-use character
   </pre>
 
-  <h4>Operators</h4>
-
-  <div class="commentary">
-    <br><br><b>[1]</b> The '=' token is explicitly handled in the grammar elsewhere,
-    and in general users cannot provide custom definitions for the '=' operator.
-    This distinctly differs from C++, which allows '=' to be overloaded.
-
-    <br><br><b>[2]</b> The '-&gt;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
-      and cannot be used as an operator identifier.
-
-    <br><br><b>[3]</b> The unary prefix '&amp;' token is <a href="#reserved_punctuation">reserved punctuation</a>,
-      and cannot be used as an operator identifier.
-
-    <br><br><b>[4]</b> The '//', '/*', and '*/' tokens are <a href="#whitespace">reserved for comments</a>,
-      and cannot be used as operator identifiers.
-  </div>
+  <!-- ===================================================================== -->
+  <h3 id="operator">Operator Tokens</h3>
+  <!-- ===================================================================== -->
 
   <pre class="grammar">
-    <a name="operator">operator</a> ::= [@/=-+*%&lt;&gt;!&amp;|^~]+
-    <a name="operator">operator</a> ::= \.\.
+    <a name="operator">operator</a> ::= [/=-+*%&lt;&gt;!&amp;|^~]+
+    <a name="operator">operator</a> ::= \.+
 
-      Note: excludes '=', see <b>[1]</b>
-            excludes '-&gt;', see <b>[2]</b>
-            excludes unary '&amp;', see <b>[3]</b>
-            excludes '//', '/*', and '*/', see <b>[4]</b>
-            '...' is an operator, not three '.'s.
+    <a href="#reserved_punctuation">Reserved for punctuation</a>: '.', '=', '-&gt;', and unary prefix '&amp;'
+    <a href="#whitespace">Reserved for comments</a>: '//', '/*' and '*/'
 
     operator-binary ::= operator
     operator-prefix ::= operator
@@ -580,8 +564,8 @@
 
   <p>As an exception, an operator immediately followed by a dot ('.')
     is only considered right-bound if not already left-bound. This
-    allows <code>a@.prop</code> to be parsed as <code>(a@).prop</code>
-    rather than as <code>a @ .prop</code>.</p>
+    allows <code>a!.prop</code> to be parsed as <code>(a!).prop</code>
+    rather than as <code>a ! .prop</code>.</p>
 
   <p>The '!' operator is postfix if it is left-bound.</p>
 
@@ -3096,7 +3080,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#dollarident">dollarident</a>
+    expr-dot ::= <a href="#expr">expr-postfix</a> '.' <a href="#integer_literal">integer_literal</a>
   </pre>
     
   <p>If the base expression has <a href="#type-tuple">tuple type</a>, then the
