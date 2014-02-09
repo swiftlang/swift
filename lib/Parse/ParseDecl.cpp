@@ -1118,33 +1118,7 @@ namespace {
         VD->setParentPattern(PBD);
         if (Attributes.isValid())
           VD->getMutableAttrs() = Attributes;
-        
-        if (VD->hasAccessorFunctions()) {
-          // Add getter & setter in source order.
-          FuncDecl *Accessors[4] = { nullptr };
-          
-          if (VD->getStorageKind() == VarDecl::Observing) {
-            Accessors[0] = VD->getWillSetFunc();
-            Accessors[1] = VD->getDidSetFunc();
-            Accessors[2] = VD->getGetter();
-            Accessors[3] = VD->getSetter();
-          } else {
-            Accessors[0] = VD->getGetter();
-            Accessors[1] = VD->getSetter();
-          }
-          if (Accessors[0] && Accessors[1] &&
-              !Context.SourceMgr.isBeforeInBuffer(
-                  Accessors[0]->getFuncLoc(), Accessors[1]->getFuncLoc())) {
-            std::swap(Accessors[0], Accessors[1]);
-          }
-          for (auto FD : Accessors) {
-            if (FD) {
-              FD->setDeclContext(CurDeclContext);
-              Decls.push_back(FD);
-            }
-          }
-        }
-        
+
         Decls.push_back(VD);
         TheParser.addToScope(VD);
       }
@@ -1459,7 +1433,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 ///      attribute-list 'var' identifier : type-annotation { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                                SourceLoc StaticLoc, VarDecl *&boundVar) {
+                                SourceLoc StaticLoc, VarDecl *&boundVar,
+                                SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
@@ -1530,6 +1505,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       return;
     }
 
+    if (WillSet) Decls.push_back(WillSet);
+    if (DidSet) Decls.push_back(DidSet);
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
 
     // Observing properties will have getters and setters synthesized by sema.
@@ -1539,13 +1516,14 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     Get = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
                              StaticLoc, Flags, AccessorKind::IsGetter, this);
     Get->setImplicit();
+    Decls.push_back(Get);
 
     ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
                                                AccessorKind::IsSetter);
     Set = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
                              StaticLoc, Flags, AccessorKind::IsSetter, this);
     Set->setImplicit();
-
+    Decls.push_back(Set);
     PrimaryVar->setObservingAccessors(Get, Set);
     return;
   }
@@ -1561,16 +1539,21 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   }
 
   // If things went well, turn this into a computed variable.
-  if (!Invalid && PrimaryVar && (Set || Get))
+  if (!Invalid && PrimaryVar && (Set || Get)) {
+    if (Get) Decls.push_back(Get);
+    if (Set) Decls.push_back(Set);
     PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
+  }
 }
 
 /// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-var:
-///      'type'? 'let' attribute-list pattern initializer (',' pattern initializer )*
-///      'type'? 'var' attribute-list pattern initializer? (',' pattern initializer? )*
+///      'type'? 'let' attribute-list pattern initializer
+///              (',' pattern initializer )*
+///      'type'? 'var' attribute-list pattern initializer?
+///              (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation { get-set }
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
@@ -1621,9 +1604,10 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (pattern.isNull())
       return makeParserError();
 
-    // If this is a var in the top-level of script/repl source file,
-    // wrap everything in a TopLevelCodeDecl, since it represents
-    // executable code.
+    // If this is a var in the top-level of script/repl source file, wrap the
+    // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
+    // code.  The VarDecl and any accessor decls (for computed properties) go in
+    // CurDeclContext.
     //
     // Note that, once we've built the TopLevelCodeDecl, we have to be
     // really cautious not to escape this scope in a way that doesn't
@@ -1688,6 +1672,16 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       
       PBD->setInit(init.getPtrOrNull(), false);
     }
+    
+    if (topLevelDecl) {
+      Decls.push_back(topLevelDecl);
+    } else {
+      Decls.push_back(PBD);
+    }
+    
+    // We need to revert CurDeclContext before calling addVarsToScope.
+    if (topLevelDecl)
+      topLevelParser.getValue().pop();
 
 
     // If we syntactically match the second decl-var production, with a
@@ -1705,7 +1699,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       }
 
       VarDecl *boundVar = nullptr;
-      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar);
+      parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, boundVar, Decls);
 
       if (isLet)
         return makeParserError();
@@ -1715,16 +1709,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
 
     PBD->setHasStorage(hasStorage);
-
-    if (topLevelDecl) {
-      Decls.push_back(topLevelDecl);
-    } else {
-      Decls.push_back(PBD);
-    }
-
-    // We need to revert CurDeclContext before calling addVarsToScope.
-    if (topLevelDecl)
-      topLevelParser.getValue().pop();
 
     addVarsToScope(pattern.get(), Decls, StaticLoc.isValid(), Attributes, PBD);
 

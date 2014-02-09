@@ -572,8 +572,8 @@ public:
                    FuncDecl *&DidSet, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc);
   void parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
-                          SourceLoc StaticLoc,
-                          VarDecl *&boundVar);
+                          SourceLoc StaticLoc, VarDecl *&boundVar,
+                          SmallVectorImpl<Decl *> &Decls);
   
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
