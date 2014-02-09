@@ -557,7 +557,7 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   // FIXME: Should we decide to support integer constant expressions in the
   // future, we will need to remove this check to accept any compositional
   // expressions
-  ParserResult<Expr> sizeEx = parseExpr(diag::expected_expr_array_type, true);
+  ParserResult<Expr> sizeEx = parseExprBasic(diag::expected_expr_array_type);
   
   if (parseMatchingToken(tok::r_square, rsquareLoc,
                          diag::expected_rbracket_array_type, lsquareLoc))

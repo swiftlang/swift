@@ -1372,7 +1372,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 ///
 /// \verbatim
 ///   decl-var:
-///      attribute-list 'var' identifier : type-annotation { get-set }
+///      attribute-list 'var' identifier : type-annotation
+///                     initializer? { get-set }
 /// \endverbatim
 void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                                 SourceLoc StaticLoc, VarDecl *&boundVar,
@@ -1498,7 +1499,8 @@ void Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 ///              (',' pattern initializer )*
 ///      'type'? 'var' attribute-list pattern initializer?
 ///              (',' pattern initializer? )*
-///      'var' attribute-list identifier : type-annotation { get-set }
+///      'var' attribute-list identifier : type-annotation
+///            initializer? { get-set }
 /// \endverbatim
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,

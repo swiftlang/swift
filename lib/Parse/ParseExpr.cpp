@@ -87,7 +87,7 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
 ///     expr-sequence(basic | trailing-closure)
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
-ParserResult<Expr> Parser::parseExpr(Diag<> Message, bool isExprBasic) {
+ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   // If we see a pattern in expr position, parse it to an UnresolvedPatternExpr.
   // Name binding will resolve whether it's in a valid pattern position.
   if (isOnlyStartOfMatchingPattern()) {

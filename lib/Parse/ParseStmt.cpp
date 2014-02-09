@@ -64,8 +64,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
 
-  ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr,
-                                            /*usesExprBasic*/ false);
+  ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
   if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
     CodeCompletion->completeExpr();
     return ResultExpr;
@@ -857,7 +856,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     SmallVector<Expr *, 1> ThirdExprs;
 
     // Parse the first expression.
-    Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
+    Third = parseExprBasic(diag::expected_expr);
     Status |= Third;
     if (Third.isNonNull())
       ThirdExprs.push_back(Third.get());
@@ -866,7 +865,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     while (Tok.is(tok::comma)) {
       consumeToken(tok::comma);
 
-      Third = parseExpr(diag::expected_expr, /*isExprBasic=*/true);
+      Third = parseExprBasic(diag::expected_expr);
       Status |= Third;
 
       if (Third.isNonNull())

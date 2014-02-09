@@ -99,8 +99,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
     P.Context.createDefaultArgumentContext(P.CurDeclContext, argIndex);
   Parser::ParseFunctionBody initScope(P, initDC);
 
-  ParserResult<Expr> initR =
-    P.parseExpr(diag::expected_init_value);
+  ParserResult<Expr> initR = P.parseExpr(diag::expected_init_value);
 
   // Give back the default-argument context if we didn't need it.
   if (!initScope.hasClosures()) {

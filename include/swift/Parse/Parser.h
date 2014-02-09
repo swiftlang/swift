@@ -750,11 +750,13 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
-
-  ParserResult<Expr> parseExpr(Diag<> ID, bool isExprBasic = false);
-  ParserResult<Expr> parseExprBasic(Diag<> ID) {
-    return parseExpr(ID, /*isExprBasic=*/true);
+  ParserResult<Expr> parseExpr(Diag<> ID) {
+    return parseExprImpl(ID, /*isExprBasic=*/false);
   }
+  ParserResult<Expr> parseExprBasic(Diag<> ID) {
+    return parseExprImpl(ID, /*isExprBasic=*/true);
+  }
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprSequence(Diag<> ID, bool isExprBasic);
