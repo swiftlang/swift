@@ -438,11 +438,6 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(SILType SILTy,
   return createParameterTypes(SILTy.castTo<SILFunctionType>(), Scope, DeclCtx);
 }
 
-static SILType mapSILTypeIntoContext(DeclContext *DC, SILType depTy) {
-  Type ty = ArchetypeBuilder::mapTypeIntoContext(DC,depTy.getSwiftRValueType());
-  return SILType::getPrimitiveType(ty->getCanonicalType(), depTy.getCategory());
-}
-
 /// Create the array of function parameters for a function type.
 llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
                                                    llvm::DIDescriptor Scope,
@@ -450,19 +445,16 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   SmallVector<llvm::Value *, 16> Parameters;
 
   // The function return type is the first element in the list.
-  auto ResultTy = mapSILTypeIntoContext(DeclCtx,
-                                    FnTy->getSemanticInterfaceResultSILType());
   createParameterType(Parameters,
-                      ResultTy,
+                      FnTy->getSemanticResultSILType(),
                       Scope, DeclCtx);
 
   // Actually, the input type is either a single type or a tuple
   // type. We currently represent a function with one n-tuple argument
   // as an n-ary function.
-  for (auto DepParam : FnTy->getInterfaceParameters()) {
-    auto ParamTy = mapSILTypeIntoContext(DeclCtx, DepParam.getSILType());
-    createParameterType(Parameters, ParamTy, Scope, DeclCtx);
-  }
+  for (auto Param : FnTy->getParameters())
+    createParameterType(Parameters, Param.getSILType(),
+                        Scope, DeclCtx);
 
   return DBuilder.getOrCreateArray(Parameters);
 }
