@@ -138,6 +138,62 @@ static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
   return Result->walk(ReplaceRoot(NewRoot));
 }
 
+/// Parse a single argument, the leading token is expected to be a (.
+static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
+                                     Parser::DefaultArgumentInfo *defaultArgs) {
+  // Consume the (.
+  SourceLoc LPLoc = P.consumeToken(tok::l_paren);
+
+  // Decide if this is a singular unnamed argument (e.g. "foo(Int)" or if
+  // it is a standard tuple body pattern (e.g. "foo(x : Int)").  The former is
+  // shorthand where the elements get the name of the selector chunk.  The
+  // later includes the names are specified for each piece.
+
+  // Before doing a speculative parse, check for the common case of
+  // "identifier:" (always a tuple) or "identifier)" (always unnamed).
+  bool isTypeOnlySelectorArg;
+
+  if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
+    isTypeOnlySelectorArg = false;
+  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
+    isTypeOnlySelectorArg = true;
+  else {
+    // Otherwise, we do a full speculative parse to determine this.
+    Parser::BacktrackingScope backtrack(P);
+
+    // This is type-only if it is a valid type followed by an r_paren.
+    isTypeOnlySelectorArg = P.canParseType() && P.Tok.is(tok::r_paren);
+  }
+
+  // If this is a standard tuple, parse it.
+  if (!isTypeOnlySelectorArg)
+    return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
+                                      LPLoc, /*DefArgs=*/defaultArgs);
+
+  // If this is a type-only selector chunk, parse the type and r_paren, then
+  // build this as if it were a parenpattern(typed_pattern(named_pattern)).
+  SourceLoc TypeLoc = P.Tok.getLoc();
+
+  ParserResult<TypeRepr> Ty = P.parseTypeAnnotation();
+  if (Ty.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Pattern>();
+  if (Ty.isNull())
+    Ty = makeParserResult(new (P.Context) ErrorTypeRepr(TypeLoc));
+
+  // This was checked by the speculative parse above.
+  SourceLoc RPLoc = P.consumeToken(tok::r_paren);
+
+  // Create the patterns for the identifier.
+  Pattern *Name;
+  if (leadingIdent.empty())
+    Name = new (P.Context) AnyPattern(TypeLoc, /*Implicit=*/true);
+  else
+    Name = P.createBindingFromPattern(TypeLoc, leadingIdent, /*isLet*/true);
+  Name->setImplicit();
+  auto TypedPat = new (P.Context) TypedPattern(Name, Ty.get());
+  return makeParserResult(new (P.Context) ParenPattern(LPLoc, TypedPat, RPLoc));
+}
+
 
 static ParserStatus
 parseSelectorArgument(Parser &P,
@@ -151,12 +207,15 @@ parseSelectorArgument(Parser &P,
          "selector argument did not start with an identifier!");
   Pattern *ArgPattern = ArgPatternRes.get();
   ArgPattern->setImplicit();
-  
+
+  Identifier leadingIdent;
+
   // Check that a selector name isn't used multiple times, which would
   // lead to the function type having multiple arguments with the same name.
   if (NamedPattern *name = dyn_cast<NamedPattern>(ArgPattern)) {
     VarDecl *decl = name->getDecl();
     decl->setImplicit();
+    leadingIdent = name->getDecl()->getName();
     StringRef id = decl->getName().str();
     auto prevName = selectorNames.find(id);
     if (prevName != selectorNames.end()) {
@@ -173,62 +232,8 @@ parseSelectorArgument(Parser &P,
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
   }
-  
-  // Consume the (.
-  SourceLoc LPLoc = P.consumeToken(tok::l_paren);
 
-  // Decide if this is a singular unnamed selector piece (e.g. "foo(Int)" or if
-  // it is a standard tuple body pattern (e.g. "foo(x : Int)").  The former is
-  // shorthand where the elements get the name of the selector chunk, in the
-  // later, the names are specified for each piece.
-  
-  // Before doing a speculative parse, check for the common case of
-  // "identifier:" (always a tuple) or "identifier)" (always unnamed).
-  bool isTypeOnlySelectorArg;
-  
-  if (!isa<NamedPattern>(ArgPattern))
-    // "_" is never a selector name.
-    isTypeOnlySelectorArg = false;
-  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
-    isTypeOnlySelectorArg = false;
-  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
-    isTypeOnlySelectorArg = true;
-  else {
-    // Otherwise, we do a full speculative parse to determine this.
-    Parser::BacktrackingScope backtrack(P);
-    
-    // This is type-only if it is a valid type followed by an r_paren.
-    isTypeOnlySelectorArg = P.canParseType() && P.Tok.is(tok::r_paren);
-  }
- 
- 
-  // If this is a type-only selector chunk, parse the type and r_paren, then
-  // build this as if it were a parenpattern(typed_pattern(named_pattern)).
-  ParserResult<Pattern> PatternRes;
-  if (isTypeOnlySelectorArg) {
-    SourceLoc TypeLoc = P.Tok.getLoc();
-    
-    ParserResult<TypeRepr> Ty = P.parseTypeAnnotation();
-    if (Ty.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Pattern>();
-    if (Ty.isNull())
-      Ty = makeParserResult(new (P.Context) ErrorTypeRepr(TypeLoc));
-
-    // This was checked by the speculative parse above.
-    SourceLoc RPLoc = P.consumeToken(tok::r_paren);
-
-    // Create the patterns for the identifier.
-    Identifier ident = cast<NamedPattern>(ArgPattern)->getDecl()->getName();
-    auto Name = P.createBindingFromPattern(TypeLoc, ident, /*isLet*/true);
-    Name->setImplicit();
-    auto TypedPat = new (P.Context) TypedPattern(Name, Ty.get());
-    PatternRes = makeParserResult(
-      new (P.Context) ParenPattern(LPLoc, TypedPat, RPLoc));
-  } else {
-    // Otherwise, this is a standard tuple
-    PatternRes = P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
-                                            LPLoc, /*DefArgs=*/&defaultArgs);
-  }
+  auto PatternRes = parseArgument(P, leadingIdent, &defaultArgs);
   if (PatternRes.hasCodeCompletion())
     return PatternRes;
   if (PatternRes.isNull()) {
@@ -301,9 +306,8 @@ parseSelectorFunctionArguments(Parser &P,
   } else if (TuplePattern *FirstTuple = dyn_cast<TuplePattern>(FirstPattern)) {
     LParenLoc = FirstTuple->getLParenLoc();
     RParenLoc = FirstTuple->getRParenLoc();
-    if (FirstTuple->getNumFields() != 1) {
+    if (FirstTuple->getNumFields() != 1)
       P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-    }
 
     if (FirstTuple->getNumFields() >= 1) {
       const TuplePatternElt &FirstElt = FirstTuple->getFields()[0];
@@ -328,8 +332,7 @@ parseSelectorFunctionArguments(Parser &P,
   } else
     llvm_unreachable("unexpected function argument pattern!");
 
-  assert(ArgElts.size() > 0);
-  assert(BodyElts.size() > 0);
+  assert(!ArgElts.empty() && !BodyElts.empty());
 
   // Parse additional selectors as long as we can.
   llvm::StringMap<VarDecl *> SelectorNames;
