@@ -698,7 +698,7 @@ Globals
   decl-name ::= identifier
   decl-name ::= local-decl-name
   local-decl-name ::= 'L' index identifier  // locally-discriminated declaration
-  reabstract-signature ::= ('G' generics)? type type
+  reabstract-signature ::= ('G' generic-signature)? type type
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``
@@ -811,7 +811,7 @@ Types
   protocol-context ::= 'P' protocol
   tuple-element ::= identifier? type
 
-  type ::= 'u' generic-signature '_' type   // generic type (new)
+  type ::= 'u' generic-signature type        // generic type (new)
   type ::= 'q' index                         // dependent generic parameter
                                              //   with depth = 0, idx = N
   type ::= 'qd' index index                  // dependent generic parameter
@@ -890,7 +890,7 @@ the conformance.
   requirement ::= 'E' type type     // same-type requirement
 
 A generic signature begins by describing the number of generic parameters at
-each depth of the signature, followed by the requirements The requirements a
+each depth of the signature, followed by the requirements.
 
 Value Witnesses
 ~~~~~~~~~~~~~~~

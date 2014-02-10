@@ -840,7 +840,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   assert(!sourceType->isPolymorphic());
   assert(!expectedType->isThin());
 
-  // Just use the generic parameters from the context.
+  // Just use the generic signature from the context.
   // This isn't necessarily optimal.
   auto generics = gen.F.getLoweredFunctionType()->getGenericParams();
   auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
@@ -886,7 +886,8 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   } else {
     substFnType = SILFunctionType::get(nullptr, nullptr, extInfo,
                                        ParameterConvention::Direct_Unowned,
-                                       params, expectedType->getInterfaceResult(),
+                                       params,
+                                       expectedType->getInterfaceResult(),
                                        gen.getASTContext());
   }
 
@@ -908,9 +909,11 @@ static ManagedValue createThunk(SILGenFunction &gen,
   CanSILFunctionType substFnType;
   auto thunkType = buildThunkType(gen, fn, expectedType,
                                   substFnType, substitutions);
-  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc, thunkType,
+  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
+                                       gen.F.getContextGenericParams(),
+                                       thunkType,
                                        fn.getType().castTo<SILFunctionType>(),
-                                                     expectedType);
+                                       expectedType);
 
   // Build it if necessary.
   if (thunk->empty()) {

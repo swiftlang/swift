@@ -900,9 +900,11 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
         silFnType.print(llvm::dbgs());
         llvm::dbgs() << "\n");
 
+  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   // FIXME: Sanity-check that getConstantContextGenericParams produces the same
   // context params as the old path.
   assert(contextGenerics == silFnType->getGenericParams());
+  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
   SILConstantInfo result = {
     formalType, formalInterfaceType,

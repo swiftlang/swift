@@ -113,6 +113,8 @@ public:
 
   void mangleDeclTypeForDebugger(ValueDecl *decl);
   void mangleTypeForDebugger(Type decl, DeclContext *DC);
+  void mangleGenericSignature(GenericSignature *sig,
+                              ResilienceExpansion expansion);
   
 private:
   void mangleFunctionType(CanAnyFunctionType fn, ResilienceExpansion expansion,
@@ -126,9 +128,6 @@ private:
                              bool mangleAsFunction);
   bool tryMangleStandardSubstitution(NominalTypeDecl *type);
   bool tryMangleSubstitution(void *ptr);
-  
-  void mangleGenericSignature(GenericSignature *sig,
-                              ResilienceExpansion expansion);
 };
   
 } // end namespace Mangle

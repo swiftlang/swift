@@ -552,6 +552,7 @@ void Mangler::mangleGenericSignature(GenericSignature *sig,
     assert(param->getIndex() == count && "generic params not ordered");
     ++count;
   }
+  Buffer << Index(count);
   Buffer << 'R';
   // Mangle the requirements.
   for (auto &reqt : sig->getRequirements()) {

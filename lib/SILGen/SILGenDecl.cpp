@@ -2140,6 +2140,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
 
 SILFunction *
 SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
+                                            GenericParamList *thunkContextParams,
                                             CanSILFunctionType thunkType,
                                             CanSILFunctionType fromType,
                                             CanSILFunctionType toType) {
@@ -2152,16 +2153,25 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
     // This is actually the SIL helper function.  For now, IR-gen
     // makes the actual thunk.
     stream << "_TTR";
-    if (auto generics = thunkType->getGenericParams()) {
+    if (auto generics = thunkType->getGenericSignature()) {
       stream << 'G';
-      mangler.bindGenericParameters(generics, /*mangle*/ true);
+      mangler.mangleGenericSignature(generics,
+                                     ResilienceExpansion::Minimal);
     }
-    mangler.mangleType(fromType, ResilienceExpansion::Minimal, /*uncurry*/ 0);
-    mangler.mangleType(toType, ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    
+    // Substitute context parameters out of the "from" and "to" types.
+    auto fromInterfaceType
+      = Types.getInterfaceTypeInContext(fromType, thunkContextParams);
+    auto toInterfaceType
+      = Types.getInterfaceTypeInContext(toType, thunkContextParams);
+    
+    mangler.mangleType(fromInterfaceType,
+                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
+    mangler.mangleType(toInterfaceType,
+                       ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
-  // FIXME: Fake up context generic params for the thunk.
   return M.getOrCreateSharedFunction(loc, buffer.str(),
-                                     thunkType, thunkType->getGenericParams(),
+                                     thunkType, thunkContextParams,
                                      IsBare, IsTransparent);
 }
