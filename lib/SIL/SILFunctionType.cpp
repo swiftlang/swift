@@ -867,6 +867,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   auto formalType = makeConstantType(constant, /*withCaptures*/ true);
   auto formalInterfaceType = makeConstantInterfaceType(constant,
                                                        /*withCaptures*/ true);
+  auto contextGenerics = getConstantContextGenericParams(constant,
+                                                         /*withCaptures*/true);
   
   // The formal type is just that with the right CC and thin-ness.
   AbstractCC cc = getAbstractCC(constant);
@@ -887,7 +889,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
                                           CanAnyFunctionType(),
                                           CanAnyFunctionType(),
                                           /*thin*/ true);
-
+  
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
         llvm::dbgs() << "\n  formal type: ";
@@ -898,14 +900,15 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
         silFnType.print(llvm::dbgs());
         llvm::dbgs() << "\n");
 
+  // FIXME: Sanity-check that getConstantContextGenericParams produces the same
+  // context params as the old path.
+  assert(contextGenerics == silFnType->getGenericParams());
+  
   SILConstantInfo result = {
     formalType, formalInterfaceType,
     loweredType, loweredInterfaceType,
     silFnType,
-    // FIXME: Lower this independently from the AST using
-    // getEffectiveGenericParamsOfContext, which currently happens as part of
-    // makeConstantType.
-    silFnType->getGenericParams()
+    contextGenerics
   };
   ConstantTypes[constant] = result;
   return result;

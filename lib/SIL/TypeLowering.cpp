@@ -1828,6 +1828,62 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
   }
 }
 
+/// Get the context generic parameters for an entity.
+GenericParamList *
+TypeConverter::getConstantContextGenericParams(SILDeclRef c,
+                                               bool withCaptures) {
+  ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
+  
+  /// Get the function generic params, including outer params if withCaptures is
+  /// set.
+  auto getLocalFuncParams = [&](FuncDecl *func) -> GenericParamList * {
+    // FIXME: For local generic functions we need to chain the local generic
+    // context to the outer context.
+    if (auto GP = func->getGenericParamsOfContext())
+      return GP;
+    return getEffectiveGenericParamsForContext(func->getParent());
+  };
+  
+  switch (c.kind) {
+  case SILDeclRef::Kind::Func: {
+    if (auto *ACE = c.getAbstractClosureExpr()) {
+      // Closures are currently never natively generic.
+      if (!withCaptures) return nullptr;
+      return getEffectiveGenericParamsForContext(ACE->getParent());
+    }
+    FuncDecl *func = cast<FuncDecl>(vd);
+    return getLocalFuncParams(func);
+  }
+  case SILDeclRef::Kind::Getter:
+  case SILDeclRef::Kind::Setter: {
+    auto *asd = cast<AbstractStorageDecl>(vd);
+    FuncDecl *accessor =
+      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
+    return getLocalFuncParams(accessor);
+  }
+  case SILDeclRef::Kind::EnumElement:
+    return cast<EnumElementDecl>(vd)->getDeclContext()
+      ->getGenericParamsOfContext();
+  case SILDeclRef::Kind::Allocator:
+  case SILDeclRef::Kind::Initializer:
+  case SILDeclRef::Kind::Destroyer:
+  case SILDeclRef::Kind::Deallocator: {
+    auto *afd = cast<AbstractFunctionDecl>(vd);
+    return afd->getGenericParamsOfContext();
+  }
+  case SILDeclRef::Kind::GlobalAccessor: {
+    return cast<VarDecl>(vd)->getDeclContext()->getGenericParamsOfContext();
+  }
+  case SILDeclRef::Kind::DefaultArgGenerator: {
+    // FIXME: Should be generic if the function is generic
+    return nullptr;
+  }
+  case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarDestroyer:
+    return cast<ClassDecl>(vd)->getGenericParamsOfContext();
+  }
+}
+
 CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
                                                    bool withCaptures) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();

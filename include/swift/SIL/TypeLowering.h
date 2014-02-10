@@ -466,6 +466,8 @@ class TypeConverter {
   CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant,
                                                bool addCaptures);
+  GenericParamList *getConstantContextGenericParams(SILDeclRef constant,
+                                                    bool addCaptures);
   
   // Types converted during foreign bridging.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
