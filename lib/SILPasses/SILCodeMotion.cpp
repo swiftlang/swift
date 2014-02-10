@@ -18,6 +18,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
@@ -48,58 +49,6 @@ static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
   }
 }
 
-namespace {
-
-/// An abstract representation of a SIL Projection that allows one to refer to
-/// either nominal fields or tuple indices.
-class Projection {
-  SILType Type;
-  VarDecl *Decl;
-  unsigned Index;
-
-public:
-  Projection(SILType T, VarDecl *D) : Type(T), Decl(D), Index(-1) { }
-  Projection(SILType T, unsigned I) : Type(T), Decl(nullptr), Index(I) { }
-
-  SILType getType() const { return Type; }
-  VarDecl *getDecl() const { return Decl; }
-  unsigned getIndex() const { return Index; }
-
-  bool operator==(Projection &Other) const {
-    if (Decl)
-      return Decl == Other.getDecl();
-    else
-      return !Other.getDecl() && Index == Other.getIndex();
-  }
-
-  bool operator<(Projection Other) const {
-    // If Proj1 is a decl...
-    if (Decl) {
-      // It should be sorted before Proj2 is Proj2 is not a decl. Otherwise
-      // compare the pointers.
-      if (auto OtherDecl = Other.getDecl())
-        return uintptr_t(Decl) < uintptr_t(OtherDecl);
-      return true;
-    }
-
-    // If Proj1 is not a decl, then if Proj2 is a decl, Proj1 is not before
-    // Proj2. If Proj2 is not a decl, compare the indices.
-    return !Other.getDecl() && (Index < Other.Index);
-  }
-};
-
-} // end anonymous namespace.
-
-static bool isAddressProjection(SILValue V) {
-  switch (V->getKind()) {
-  case ValueKind::StructElementAddrInst:
-  case ValueKind::TupleElementAddrInst:
-    return true;
-  default:
-    return false;
-  }
-}
-
 // Given an already emitted load PrevLd, see if we can
 static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   SILValue PrevLIOp = PrevLI->getOperand();
@@ -113,7 +62,8 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   // LI is a projection at all.
   llvm::SmallVector<Projection, 4> Projections;
   auto Iter = LIOp;
-  while (isAddressProjection(Iter) && PrevLIOp != Iter) {
+  while (Projection::isAddressProjection(Iter) &&
+         !isa<RefElementAddrInst>(Iter.getDef()) && PrevLIOp != Iter) {
     if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter.getDef()))
       Projections.push_back(Projection(Iter.getType(), SEA->getField()));
     else

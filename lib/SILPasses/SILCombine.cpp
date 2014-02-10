@@ -22,6 +22,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/PatternMatch.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -442,57 +443,23 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //                                  Visitors
 //===----------------------------------------------------------------------===//
 
-namespace {
-  /// Helper struct only used locally here for representing an arbitrary
-  /// projection.
-  ///
-  /// FIXME: This is useful functionality, whenever one is attempting to deal
-  /// with projections at a higher level.
-  struct ProjectionField {
-    VarDecl *V;
-    unsigned Index;
-
-    bool operator==(ProjectionField &Other) const {
-      if (isDecl()) {
-        return Other.isDecl() && V == Other.V;
-      } else {
-        return !Other.isDecl() && Index == Other.Index;
-      }
-    }
-
-    bool operator<(ProjectionField Other) const {
-      // If Proj1 is a decl...
-      if (isDecl())
-        // It should be sorted before Proj2 is Proj2 is not a decl. Otherwise
-        // compare the pointers.
-        return !Other.isDecl() || (uintptr_t(V) < uintptr_t(Other.V));
-
-      // If Proj1 is not a decl, then if Proj2 is a decl, Proj1 is not before
-      // Proj2. If Proj2 is not a decl, compare the indices.
-      return !Other.isDecl() && (Index < Other.Index);
-    }
-
-    bool isDecl() const { return V; }
-  };
-} // end anonymous namespace.
-
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.
-  using ProjInstPairTy = std::pair<ProjectionField, SILInstruction *>;
+  using ProjInstPairTy = std::pair<Projection, SILInstruction *>;
 
   // Go through the loads uses and add any users that are projections to the
   // projection list.
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
   for (auto *UI : LI->getUses()) {
     if (auto *SEI = dyn_cast<StructExtractInst>(UI->getUser())) {
-      Projections.push_back({{SEI->getField(), 0}, SEI});
+      Projections.push_back({{SEI->getType(), SEI->getField()}, SEI});
       continue;
     }
 
     if (auto *TEI = dyn_cast<TupleExtractInst>(UI->getUser())) {
-      Projections.push_back({{nullptr, TEI->getFieldNo()}, TEI});
+      Projections.push_back({{TEI->getType(), TEI->getFieldNo()}, TEI});
       continue;
     }
 
@@ -504,7 +471,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   std::sort(Projections.begin(), Projections.end());
 
   // Go through our sorted list creating new GEPs only when we need to.
-  ProjectionField *LastProj = nullptr;
+  Projection *LastProj = nullptr;
   LoadInst *LastNewLoad = nullptr;
   for (auto &Pair : Projections) {
     auto &Proj = Pair.first;
@@ -521,13 +488,13 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // Ok, we have started to visit the range of instructions associated with
     // a new projection. If we have a VarDecl, create a struct_element_addr +
     // load. Make sure to update LastProj, LastNewLoad.
-    if (Proj.isDecl()) {
+    if (auto *V = Proj.getDecl()) {
       assert(isa<StructExtractInst>(Inst) && "A projection with a VarDecl "
              "should be associated with a struct_extract.");
 
       LastProj = &Proj;
       auto *SEA =
-        Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(), Proj.V,
+        Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(), V,
                                          Inst->getType(0).getAddressType());
       LastNewLoad = Builder->createLoad(LI->getLoc(), SEA);
       replaceInstUsesWith(*Inst, LastNewLoad, 0);
@@ -542,7 +509,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     LastProj = &Proj;
     auto *TEA =
       Builder->createTupleElementAddr(LI->getLoc(), LI->getOperand(),
-                                      Proj.Index,
+                                      Proj.getIndex(),
                                       Inst->getType(0).getAddressType());
     LastNewLoad = Builder->createLoad(LI->getLoc(), TEA);
     replaceInstUsesWith(*Inst, LastNewLoad, 0);
