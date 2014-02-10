@@ -1614,7 +1614,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
 
   if (auto FT = T->getAs<FunctionType>()) {
-    if (FT->isThin())
+    if (!FT->isBlock())
       return false;
     Type Input = FT->getInput();
     if (auto InputTuple = Input->getAs<TupleType>()) {
@@ -1690,6 +1690,13 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (T->is<ArchetypeType>()) {
     diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
         .highlight(TypeRange);
+    return;
+  }
+
+  if (T->is<FunctionType>()) {
+    diagnose(TypeRange.Start, diag::not_objc_function_type_param)
+      .highlight(TypeRange);
+    return;
   }
 }
 

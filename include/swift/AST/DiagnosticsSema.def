@@ -832,6 +832,8 @@ NOTE(not_objc_swift_enum,sema_objc,none,
       "Swift enums cannot be represented in Objective-C", ())
 NOTE(not_objc_generic_type_param,sema_objc,none,
      "generic type parameters cannot be represented in Objective-C", ())
+NOTE(not_objc_function_type_param,sema_objc,none,
+     "Swift functions cannot be represented in Objective-C", ())
 
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
       "method cannot be marked @objc because curried functions cannot be "
