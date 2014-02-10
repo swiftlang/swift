@@ -373,48 +373,46 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
                                bool &HasSelectorStyleSignature) {
-  // A function argument list is either curried or selector style, it can't be
-  // a mix of the two.  Decide at the second chunk, when we clear this pointer.
-  DefaultArgumentInfo *DefaultArgInfo = &DefaultArgs;
+  // Parse all of the selector arguments or curried argument pieces.
+
+  // Parse the first function argument clause.
+  ParserResult<Pattern> ArgPattern =
+    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
+
+  if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
+    return ArgPattern;
+
+  // If we've reached the end of the first argument, decide whether this is
+  // a curried argument list, a selector style argument list, or if we're
+  // done.
+  HasSelectorStyleSignature = isAtStartOfBindingName();
+
+  if (HasSelectorStyleSignature) {
+    // This looks like a selector-style argument.  Try to convert the first
+    // argument pattern into a single argument type and parse subsequent
+    // selector forms.
+    return ParserStatus(ArgPattern) |
+      parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
+                                     DefaultArgs, ArgPattern.get());
+  }
 
   ParserStatus Result;
-
-  // Parse all of the selector arguments or curried argument pieces.
   while (1) {
-    // Parse the first function argument clause.
-    ParserResult<Pattern> ArgPattern =
-      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, DefaultArgInfo);
-
-    if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
-      return ArgPattern;
-
-    // If we've reached the end of the first argument, decide whether this is
-    // a curried argument list, a selector style argument list, or if we're
-    // done.
-    if (DefaultArgInfo) {
-      HasSelectorStyleSignature = isAtStartOfBindingName();
-      DefaultArgInfo = nullptr;
-    }
-
-    if (HasSelectorStyleSignature) {
-      // This looks like a selector-style argument.  Try to convert the first
-      // argument pattern into a single argument type and parse subsequent
-      // selector forms.
-      return ParserStatus(ArgPattern) |
-             parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
-                                            DefaultArgs, ArgPattern.get());
-    }
-
     ArgPatterns.push_back(ArgPattern.get());
     BodyPatterns.push_back(ArgPattern.get());
     Result |= ArgPattern;
 
     // If we're out of pieces, we're done.
-    if (Tok.isNot(tok::l_paren)) {
-      assert(!ArgPatterns.empty());
-      return Result;
-    }
+    if (Tok.isNot(tok::l_paren))
+      break;
+
+    ArgPattern = parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, nullptr);
+
+    if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
+      return ArgPattern;
   }
+
+  return Result;
 }
 
 /// parseFunctionSignature - Parse a function definition signature.
