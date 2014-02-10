@@ -872,6 +872,15 @@ public:
     return false;
   }
 
+  bool isSelfOrOpenedArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
+    ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
+    if (!archetype)
+      return false;
+
+    return archetype->getOpenedExistentialType() || 
+           isSelfArchetype(t, protocols);
+  }
+
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
     auto methodType = requireObjectType(SILFunctionType, EMI,
                                         "result of protocol_method");
@@ -1019,8 +1028,10 @@ public:
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
     
-    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
-            "project_existential result must be Self archetype of protocol");
+    require(isSelfOrOpenedArchetype(PEI->getType().getSwiftRValueType(), 
+                                    protocols),
+            "project_existential result must be Self archetype of protocol or "
+            "an opened existential archetype");
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
@@ -1033,8 +1044,10 @@ public:
     require(operandType.isClassExistentialType(),
             "project_existential_ref operand must be class existential");
     
-    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
-            "project_existential_ref result must be Self archetype of protocol");
+    require(isSelfOrOpenedArchetype(PEI->getType().getSwiftRValueType(), 
+                                    protocols),
+            "project_existential_ref result must be Self archetype of protocol "
+            "or an opened existential archetype");
   }
   
   void checkInitExistentialInst(InitExistentialInst *AEI) {

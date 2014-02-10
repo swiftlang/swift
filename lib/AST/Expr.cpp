@@ -422,3 +422,8 @@ SourceRange UnresolvedMemberExpr::getSourceRange() const {
 
   return SourceRange(DotLoc, NameLoc);
 }
+
+ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
+  return getOpaqueValue()->getType()->castTo<ArchetypeType>();
+}
+

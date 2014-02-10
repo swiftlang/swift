@@ -1679,6 +1679,8 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
+    assert(!archetypeTy->getOpenedExistentialType() &&
+           "Opened existential type cannot be serialized");
 
     TypeID indexOrParentID;
     if (archetypeTy->isPrimary())

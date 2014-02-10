@@ -222,6 +222,7 @@ namespace {
     RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                        SGFContext C);
     RValue visitForceValueExpr(ForceValueExpr *E, SGFContext C);
+    RValue visitOpenExistentialExpr(OpenExistentialExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
 
@@ -3621,6 +3622,35 @@ RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
   ManagedValue V = SGF.emitGetOptionalValueFrom(E, optTemp->getManagedAddress(),
                                                 optTL, C);
   return RValue(SGF, E, V);
+}
+
+RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E, 
+                                               SGFContext C) {
+  // Emit the existential value.
+  ManagedValue existentialValue
+    = SGF.emitRValueAsSingleValue(E->getExistentialValue());
+  
+  // Project the existential value into the opened archetype value.
+  // FIXME: Existential projection isn't quite right here; we need to
+  // indicate that we should also project out the conformances.
+  auto archetypeTy = E->getOpenedArchetype();
+  SILValue archetypeValue;
+  if (existentialValue.getValue().getType().isAddress()) {
+    archetypeValue = SGF.B.createProjectExistential(
+                       E, existentialValue.getValue(),
+                       SGF.getLoweredType(archetypeTy));
+  } else {
+    assert(existentialValue.getValue().getType().isObject());
+    archetypeValue = SGF.B.createProjectExistentialRef(
+                       E, existentialValue.getValue(),
+                       SGF.getLoweredType(archetypeTy));
+  }
+  
+  // Register the opaque value for the projected existential.
+  SILGenFunction::OpaqueValueRAII opaqueValueRAII(SGF, E->getOpaqueValue(), 
+                                                  archetypeValue);
+
+  return visit(E->getSubExpr(), C);
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {

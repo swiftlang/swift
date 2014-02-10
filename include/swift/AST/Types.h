@@ -2576,18 +2576,19 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 
-/// ArchetypeType - An archetype is a type that is a stand-in used to describe
-/// type parameters and associated types in generic definition and protocols.
-/// Archetypes will be replaced with actual, concrete types at some later
-/// point in time, whether it be at compile time due to a direct binding or
-/// at run time due to the use of generic types.
+/// An archetype is a type that represents a runtime type that is
+/// known to conform to some set of requirements.
+///
+/// Archetypes are used to represent generic type parameters and their
+/// associated types, as well as the runtime type stored within an
+/// existential container.
 class ArchetypeType : public SubstitutableType {
 public:
   typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
     AssocTypeOrProtocolType;
 
 private:
-  ArchetypeType *Parent;
+  llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
   unsigned IndexIfPrimary;
@@ -2614,6 +2615,10 @@ public:
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
 
+  /// getNew - Create a new archetype that represents the opened type
+  /// of an existential value.
+  static ArchetypeType *getNew(Type existential);
+
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }
 
@@ -2623,7 +2628,14 @@ public:
 
   /// \brief Retrieve the parent of this archetype, or null if this is a
   /// primary archetype.
-  ArchetypeType *getParent() const { return Parent; }
+  ArchetypeType *getParent() const { 
+    return ParentOrOpened.dyn_cast<ArchetypeType *>(); 
+  }
+
+  /// Retrieve the opened existential type 
+  Type getOpenedExistentialType() const {
+    return ParentOrOpened.dyn_cast<TypeBase *>();
+  }
 
   /// Retrieve the associated type to which this archetype (if it is a nested
   /// archetype) corresponds.
@@ -2701,8 +2713,17 @@ private:
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties(),
                         ConformsTo, Superclass),
-      Parent(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
+      ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       IndexIfPrimary(Index? *Index + 1 : 0) { }
+
+  ArchetypeType(const ASTContext &Ctx, 
+                Type Existential,
+                ArrayRef<ProtocolDecl *> ConformsTo,
+                Type Superclass)
+    : SubstitutableType(TypeKind::Archetype, &Ctx,
+                        RecursiveTypeProperties(),
+                        ConformsTo, Superclass),
+      ParentOrOpened(Existential.getPointer()), IndexIfPrimary(0) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 

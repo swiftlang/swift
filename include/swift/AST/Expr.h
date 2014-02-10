@@ -1578,6 +1578,59 @@ public:
   }
 };
 
+/// \brief An expression that opens up a value of protocol or protocol
+/// composition type and gives a name to its dynamic type.
+///
+/// This expression is implicitly created by the type checker in
+/// narrow circumstances where we need a way to refer to the dynamic
+/// type, i.e., when calling a \c DynamicSelf method on a protocol. In
+/// the future, this may become an actual operation within the
+/// language.
+class OpenExistentialExpr : public Expr {
+  Expr *ExistentialValue;
+  OpaqueValueExpr *OpaqueValue;
+  Expr *SubExpr;
+  SourceLoc ExclaimLoc;
+
+public:
+  OpenExistentialExpr(Expr *existentialValue,
+                      OpaqueValueExpr *opaqueValue,
+                      Expr *subExpr)
+    : Expr(ExprKind::OpenExistential, /*Implicit=*/ true, subExpr->getType()),
+      ExistentialValue(existentialValue), OpaqueValue(opaqueValue), 
+      SubExpr(subExpr) { }
+
+  SourceRange getSourceRange() const {
+    return SubExpr->getSourceRange();
+  }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+
+  /// Retrieve the expression that is being evaluated using the
+  /// archetype value.
+  ///
+  /// This subexpression (and no other) may refer to the archetype
+  /// type or the opaque value that stores the archetype's value.
+  Expr *getSubExpr() const { return SubExpr; }
+
+  /// Set the subexpression that is being evaluated.
+  void setSubExpr(Expr *expr) { SubExpr = expr; }
+
+  /// Retrieve the existential value that is being opened.
+  Expr *getExistentialValue() const { return ExistentialValue; }
+
+  /// Retrieve the opaque value representing the value (of archetype
+  /// type) stored in the existential.
+  OpaqueValueExpr *getOpaqueValue() const { return OpaqueValue; }
+
+  /// Retrieve the opened archetype, which can only be referenced
+  /// within this expression's subexpression.
+  ArchetypeType *getOpenedArchetype() const;
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OpenExistential;
+  }
+};
+
 /// ImplicitConversionExpr - An abstract class for expressions which
 /// implicitly convert the value of an expression in some way.
 class ImplicitConversionExpr : public Expr {

@@ -78,6 +78,10 @@ struct ASTNodeBase {};
     /// \brief The set of opaque value expressions active at this point.
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
+    /// The set of opened existential archetypes that are currently
+    /// active.
+    llvm::DenseSet<ArchetypeType *> OpenedExistentialArchetypes;
+
     /// A key into ClosureDiscriminators is a combination of a
     /// ("canonicalized") local DeclContext* and a flag for whether to
     /// use the explicit closure sequence (false) or the implicit
@@ -332,7 +336,25 @@ struct ASTNodeBase {};
     /// @{
     /// These verification functions are run on type checked ASTs if there were
     /// no errors.
-    void verifyChecked(Expr *E) {}
+    void verifyChecked(Expr *E) {
+      bool failed = E->getType().findIf([&](Type type) -> bool {
+          if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+            if (archetypeTy->getOpenedExistentialType()) {
+              if (OpenedExistentialArchetypes.count(archetypeTy) == 0) {
+                Out << "Found opened existential archetype "
+                    << archetypeTy->getString()
+                    << " outside enclosing OpenExistentialExpr\n";
+                
+                E->dump(Out);
+                return true;
+              }
+            }
+          }
+          return false;
+        });
+      if (failed) assert(false);
+    }
+
     void verifyChecked(Stmt *S) {}
     void verifyChecked(Pattern *P) {}
     void verifyChecked(Decl *D) {}
@@ -405,6 +427,22 @@ struct ASTNodeBase {};
     void cleanup(BraceStmt *BS) {
       InImplicitBraceStmt.pop_back();
       popScope(BS);
+    }
+
+    bool shouldVerify(OpenExistentialExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      OpaqueValues[expr->getOpaqueValue()] = 0;
+      assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
+      OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
+      return true;
+    }
+
+    void cleanup(OpenExistentialExpr *expr) {
+      OpaqueValues.erase(expr->getOpaqueValue());
+      assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
+      OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
     }
 
     /// Canonicalize the given DeclContext pointer, in terms of

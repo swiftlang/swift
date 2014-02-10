@@ -1133,6 +1133,10 @@ namespace {
       // The result is of type T.
       return valueTy;
     }
+
+    Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
   };
 
   /// \brief AST walker that "sanitizes" an expression for the
@@ -1186,7 +1190,7 @@ namespace {
                                     memberLoc, expr->isImplicit());
         }
       }
-      
+     
       return expr;
     }
   };

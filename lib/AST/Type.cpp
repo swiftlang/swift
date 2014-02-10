@@ -1341,6 +1341,19 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                         Superclass, Index);
 }
 
+ArchetypeType *
+ArchetypeType::getNew(Type existential) {
+  auto arena = AllocationArena::Permanent;
+  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
+  assert(existential->isExistentialType() && "Not an existential type?");
+  existential->isExistentialType(conformsTo);
+  ProtocolType::canonicalizeProtocols(conformsTo);
+  auto &ctx = existential->getASTContext();
+  return new (ctx, arena) ArchetypeType(ctx, existential, 
+                                        ctx.AllocateCopy(conformsTo),
+                                        existential->getSuperclass(nullptr));
+}
+
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {
@@ -2388,8 +2401,8 @@ Substitution Substitution::subst(Module *module,
          [&](const Substitution &s) { return s.Archetype == replacementArch; });
       assert(archetypeSub != subs.end()
              && "no substitution for substituted archetype?!");
-      // Get the conformances for the type that apply to the original substituted
-      // archetype.
+      // Get the conformances for the type that apply to the original
+      // substituted archetype.
       for (auto proto : Archetype->getConformsTo()) {
         for (auto c : archetypeSub->Conformance) {
           if (c->getProtocol() == proto) {

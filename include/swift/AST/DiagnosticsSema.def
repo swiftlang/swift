@@ -487,8 +487,6 @@ ERROR(dynamic_self_not_result_type_suggest,sema_tcd,none,
       "did you mean %0?", (Identifier))
 ERROR(dynamic_self_requirement,sema_tcd,none,
       "candidate result type is not 'DynamicSelf'", ())
-ERROR(dynamic_self_protocol,sema_tcd,none,
-      "'DynamicSelf' is not supported with protocols", ())
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,sema_tcd,none,

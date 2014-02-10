@@ -281,7 +281,7 @@ namespace {
     ConstraintSystem &cs;
     DeclContext *dc;
     const Solution &solution;
-
+    
   private:
     /// \brief Coerce the given tuple to another tuple type.
     ///
@@ -436,6 +436,57 @@ namespace {
       return FunctionType::get(inputType, resultType, fnType->getExtInfo());
     }
 
+    /// Describes an opened existential that has not yet been closed.
+    struct OpenedExistential {
+      /// The existential value being opened.
+      Expr *ExistentialValue;
+
+      /// The opaque value (of archetype type) stored within the
+      /// existential.
+      OpaqueValueExpr *OpaqueValue;
+    };
+
+    /// A mapping from archetype types that resulted from opening an
+    /// existential to the opened existential. This mapping captures
+    /// only those existentials that have been opened, but for which
+    /// we have not yet created an \c OpenExistentialExpr.
+    llvm::SmallDenseMap<ArchetypeType *, OpenedExistential> OpenedExistentials;
+
+    /// Open an existential value into a new, opaque value of
+    /// archetype type.
+    ///
+    /// \param base An expression of existential type whose value will
+    /// be opened.
+    ///
+    /// \returns A pair (opaque-value, archetype) that provides a
+    /// reference to the value stored within the expression
+    /// (opaque-value) and a new archetype that describes the dynamic
+    /// type stored within the existential.
+    std::tuple<OpaqueValueExpr *, ArchetypeType *>
+    openExistentialReference(Expr *base) {
+      auto &tc = cs.getTypeChecker();
+      base = tc.coerceToRValue(base);
+      
+      auto baseTy = base->getType()->getRValueInstanceType();
+      assert(baseTy->isExistentialType() && "Type must be existential");
+
+      // Create the archetype.
+      SmallVector<ProtocolDecl *, 4> protocols;
+      auto &ctx = tc.Context;
+      (void)baseTy->isExistentialType(protocols);
+      auto archetype = ArchetypeType::getNew(baseTy);
+
+      // Create the opaque opened value.
+      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(),
+                                                    archetype);
+      archetypeVal->setUniquelyReferenced(true);
+
+      // Record this opened existential.
+      OpenedExistentials[archetype] = { base, archetypeVal };
+
+      return std::make_tuple(archetypeVal, archetype);
+    }
+
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
@@ -504,6 +555,38 @@ namespace {
       // DynamicSelf with the actual object type.
       if (auto func = dyn_cast<FuncDecl>(member)) {
         if (func->hasDynamicSelf()) {
+          // For a DynamicSelf method on an existential, open up the
+          // existential.
+          if (func->getExtensionType()->is<ProtocolType>() &&
+              baseTy->isExistentialType()) {
+            std::tie(base, baseTy) = openExistentialReference(base);
+            containerTy = baseTy;
+            openedType = replaceFunctionResultType(func, openedType, baseTy, 1);
+
+            // The member reference is a specialized declaration
+            // reference that replaces the Self of the protocol with
+            // the existential type; change it to refer to the opened
+            // archetype type.
+            // FIXME: We should do this before we create the
+            // specialized declaration reference, but that requires
+            // redundant hasDynamicSelf checking.
+            auto oldSubstitutions = memberRef.getSubstitutions();
+            SmallVector<Substitution, 4> newSubstitutions(
+                                           oldSubstitutions.begin(),
+                                           oldSubstitutions.end());
+            auto &selfSubst = newSubstitutions.front();
+            assert(selfSubst.Archetype->getSelfProtocol() &&
+                   "Not the Self archetype for a protocol?");
+            selfSubst.Replacement = baseTy;
+            unsigned numConformances = selfSubst.Conformance.size();
+            auto newConformances
+              = context.Allocate<ProtocolConformance *>(numConformances);
+            std::fill(newConformances.begin(), newConformances.end(), nullptr);
+            selfSubst.Conformance = newConformances;
+            memberRef = ConcreteDeclRef(context, memberRef.getDecl(),
+                                        newSubstitutions);
+          }
+
           refTy = replaceFunctionResultType(func, refTy, containerTy);
           dynamicSelfFnType = replaceFunctionResultType(func, refTy, baseTy);
 
@@ -583,14 +666,8 @@ namespace {
       if (isArchetypeOrExistentialRef) {
         assert(!IsDirectPropertyAccess &&
                "Direct property access doesn't make sense for this");
-
-        // FIXME: DynamicSelf on archetypes and existentials.
-        if (dynamicSelfFnType) {
-          tc.diagnose(dotLoc, diag::dynamic_self_protocol);
-          return nullptr;
-        }
-
-        assert(!dynamicSelfFnType && "DynamicSelf not yet supported in protocols");
+        assert(!dynamicSelfFnType && 
+               "Archetype/existential DynamicSelf with extra conversion");
 
         Expr *ref;
 
@@ -608,6 +685,7 @@ namespace {
         }
         ref->setImplicit(Implicit);
         ref->setType(simplifyType(openedType));
+
         return ref;
       }
 
@@ -1323,7 +1401,8 @@ namespace {
     /// \brief Retrieve the type of a reference to the given declaration.
     Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {
       if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-        // Resolve the reference to this type declaration in our current context.
+        // Resolve the reference to this type declaration in our
+        // current context.
         auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, dc,
                                                              isSpecialized);
         if (!type)
@@ -1574,7 +1653,7 @@ namespace {
     // require that they be fully applied. Partial applications of value types
     // would capture 'self' as an inout and hide any mutation of 'self',
     // which is surprising.
-    llvm::DenseMap<Expr*, ValueTypeMemberApplication>
+    llvm::SmallDenseMap<Expr*, ValueTypeMemberApplication, 2>
       ValueTypeMemberApplications;
     
   public:
@@ -2240,13 +2319,24 @@ namespace {
       return expr;
     }
 
+    Expr *visitOpenExistentialExpr(OpenExistentialExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     void finalize() {
       // Check that all value type methods were fully applied.
+      auto &tc = cs.getTypeChecker();
       for (auto &unapplied : ValueTypeMemberApplications) {
-        cs.getTypeChecker().diagnose(unapplied.first->getLoc(),
-                               diag::partial_application_of_value_type_method,
-                               unapplied.second.kind);
+        tc.diagnose(unapplied.first->getLoc(),
+                    diag::partial_application_of_value_type_method,
+                    unapplied.second.kind);
       }
+
+      // We should have complained above if there were any
+      // existentials that haven't been closed yet.
+      assert((OpenedExistentials.empty() || 
+              !ValueTypeMemberApplications.empty()) &&
+             "Opened existentials have not been closed");
     }
   };
 }
@@ -3305,7 +3395,34 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     assert(!apply->getType()->is<PolymorphicFunctionType>() &&
            "Polymorphic function type slipped through");
-    return tc.substituteInputSugarTypeForResult(apply);
+    Expr *result = tc.substituteInputSugarTypeForResult(apply);
+
+    // If the result is an archetype from an opened existential, erase
+    // the existential and create the OpenExistentialExpr.
+    // FIXME: This is a localized form of a much more general rule for
+    // placement of open existential expressions. It only works for 
+    // DynamicSelf.
+    if (auto archetypeTy = result->getType()->getAs<ArchetypeType>()) {
+      auto opened = OpenedExistentials.find(archetypeTy);
+      if (opened != OpenedExistentials.end()) {
+        // Erase the archetype to its corresponding existential.
+        result = coerceToType(result, archetypeTy->getOpenedExistentialType(),
+                              locator);
+        if (!result)
+          return result;
+
+        // Create the expression that opens the existential.
+        result = new (tc.Context) OpenExistentialExpr(
+                                    opened->second.ExistentialValue,
+                                    opened->second.OpaqueValue,
+                                    result);        
+
+        // Remove this from the set of opened existentials.
+        OpenedExistentials.erase(opened);
+      }
+    }
+
+    return result;
   }
 
   // We have a type constructor.

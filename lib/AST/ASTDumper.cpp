@@ -1473,6 +1473,15 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitOpenExistentialExpr(OpenExistentialExpr *E) {
+    printCommon(E, "open_existential_expr") << '\n';
+    printRec(E->getOpaqueValue());
+    OS << '\n';
+    printRec(E->getExistentialValue());
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 };
 
 } // end anonymous namespace.

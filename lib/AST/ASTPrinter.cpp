@@ -1573,8 +1573,12 @@ public:
   }
 
   void visitArchetypeType(ArchetypeType *T) {
-    
-    Printer << T->getFullName();
+    if (auto existentialTy = T->getOpenedExistentialType()) {
+      Printer << "opened ";
+      visit(existentialTy);
+    } else {
+      Printer << T->getFullName();
+    }
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
