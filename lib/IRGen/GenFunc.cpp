@@ -801,14 +801,6 @@ llvm::Type *SignatureExpansion::expandResult() {
     if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
       return addIndirectResult();
 
-    // FIXME: Until we can generate Clang types for every parameter
-    //        that can appear in an @objc signature, we'll fall back on
-    //        the Swift IR type selection in some cases.
-    GenClangType GCT(IGM.Context);
-    auto clangTy = GCT.visit(resultType.getSwiftRValueType());
-    if (!clangTy)
-      return schema.getScalarResultType(IGM);
-
     return getABIReturnType(resultType, IGM);
   }
   case AbstractCC::Freestanding:
@@ -1854,13 +1846,7 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   auto resultTy = fnType->getInterfaceResult().getSILType();
   GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
-
-  // FIXME: We are unable to produce an appropriate Clang type in some
-  //        cases, so fall back on the test used for native Swift
-  //        types.
-  if (!clangTy)
-    return IGM.requiresIndirectResult(fnType->getInterfaceResult().getSILType(),
-                                      level);
+  assert(clangTy && "Unexpected failure in Clang type generation!");
 
   SmallVector<clang::CanQualType,1> args;
   auto extInfo = clang::FunctionType::ExtInfo();
@@ -1882,12 +1868,7 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 
   GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(type.getSwiftRValueType());
-
-  // FIXME: Temporarily choose IR types one argument at a time, and
-  //        fall back on Swift choices if we cannot generate a Clang
-  //        type.
-  if (!clangTy)
-    return IGM.requiresIndirectResult(type, ResilienceExpansion::Minimal);
+  assert(clangTy && "Unexpected failure in Clang type generation!");
 
   SmallVector<clang::CanQualType,1> args;
   args.push_back(clangTy);
@@ -1910,11 +1891,7 @@ llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
 bool irgen::requiresExternalExplosionArgument(IRGenModule &IGM, SILType type) {
   GenClangType GCT(IGM.Context);
   auto clangTy = GCT.visit(type.getSwiftRValueType());
-
-  // FIXME: We currently cannot generate Clang types for every Swift
-  //        type we might see in a C/ObjC signature. Until we can,
-  //        we'll just pass these as explosions.
-  if (!clangTy) return true;
+  assert(clangTy && "Unexpected failure in Clang type generation!");
 
   SmallVector<clang::CanQualType,1> args;
   args.push_back(clangTy);

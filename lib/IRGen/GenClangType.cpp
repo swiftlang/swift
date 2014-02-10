@@ -177,10 +177,27 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
   return clangCtx.getCanonicalType(clangType);
 }
 
+// FIXME: We hit this building Foundation, with a call on the type
+//        encoding path. It seems like we shouldn't see FunctionType
+//        at that point.
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
-  // FIXME: We hit this building Foundation, with a call on the type
-  // encoding path.
-  return getUnhandledType();
+  auto &clangCtx = getClangASTContext();
+  // We'll select (void)(^)() for function types. As long as it's a
+  // pointer type it doesn't matter exactly which for either ABI type
+  // generation or Obj-C type encoding.
+  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  auto blockTy = clangCtx.getBlockPointerType(fnTy);
+  return clangCtx.getCanonicalType(blockTy);
+}
+
+clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
+  // We'll select (void)(^)() for function types. As long as it's a
+  // pointer type it doesn't matter exactly which for either ABI type
+  // generation or Obj-C type encoding.
+  auto &clangCtx = getClangASTContext();
+  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  auto blockTy = clangCtx.getBlockPointerType(fnTy);
+  return clangCtx.getCanonicalType(blockTy);
 }
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
@@ -198,15 +215,15 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
 
 clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
   CanBuiltinObjCPointerType type) {
-  return getUnhandledType();
+  auto &clangCtx = getClangASTContext();
+  auto ptrTy = clangCtx.getObjCObjectPointerType(clangCtx.VoidTy);
+  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
-  return getUnhandledType();
-}
-
-clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
-  return getUnhandledType();
+  // We see these in the case where we invoke an @objc function
+  // through a protocol.
+  return getClangIdType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
@@ -215,10 +232,11 @@ clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
   return getClangIdType(getClangASTContext());
 }
 
-// FIXME: We should not be seeing these by the time we generate Clang types.
 clang::CanQualType GenClangType::visitGenericTypeParamType(
   CanGenericTypeParamType type) {
-  return getUnhandledType();
+  // We see these in the case where we invoke an @objc function
+  // through a protocol argument that is a generic type.
+  return getClangIdType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitType(CanType type) {
