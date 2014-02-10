@@ -83,14 +83,22 @@ namespace irgen {
   
   /// Emit a projection from an existential container address to the address
   /// of its concrete value buffer.
+  ///
+  /// \param openedArchetype If non-null, the archetype that will capture the
+  /// metadata and witness tables produced by projecting the archetype.
   Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                           Address base,
-                                          SILType baseTy);
+                                          SILType baseTy,
+                                          CanArchetypeType openedArchetype);
   
   /// Extract the instance pointer from a class existential value.
+  ///
+  /// \param openedArchetype If non-null, the archetype that will capture the
+  /// metadata and witness tables produced by projecting the archetype.
   llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
-                                                     Explosion &base,
-                                                     SILType baseTy);
+                                              Explosion &base,
+                                              SILType baseTy,
+                                              CanArchetypeType openedArchetype);
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.

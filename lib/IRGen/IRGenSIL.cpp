@@ -2585,7 +2585,8 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
       Explosion existential = IGF.getLoweredExplosion(operand);
       llvm::Value *instance
         = emitClassExistentialProjection(IGF, existential,
-                                         operand.getType());
+                                         operand.getType(),
+                                         CanArchetypeType());
       
       llvm::Value *toValue = IGF.emitDowncast(instance, destTy, mode);
       return Address(toValue, Alignment(1));
@@ -2797,11 +2798,26 @@ void IRGenSILFunction::visitDeinitExistentialInst(
                                        i->getOperand().getType());
 }
 
+/// Retrieve the opened archetype type for the result of a projection
+/// instruction.
+static CanArchetypeType getOpenedArchetypeType(SILType projectResultTy) {
+  if (auto archetypeTy 
+        = projectResultTy.getSwiftRValueType()->getAs<ArchetypeType>()) {
+    if (archetypeTy->getOpenedExistentialType())
+      return CanArchetypeType(archetypeTy);
+  }
+
+  return CanArchetypeType();
+}
+
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
-  Address object = emitOpaqueExistentialProjection(*this, base, baseTy);
+
+  auto openedArchetype = getOpenedArchetypeType(i->getType());
+  Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
+                                                   openedArchetype);
   
   setLoweredAddress(SILValue(i, 0), object);
 }
@@ -2810,10 +2826,11 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
                                           swift::ProjectExistentialRefInst *i) {
   SILType baseTy = i->getOperand().getType();
   Explosion base = getLoweredExplosion(i->getOperand());
+  auto openedArchetype = getOpenedArchetypeType(i->getType());
   
   Explosion result(ResilienceExpansion::Maximal);
   llvm::Value *instance
-    = emitClassExistentialProjection(*this, base, baseTy);
+    = emitClassExistentialProjection(*this, base, baseTy, openedArchetype);
   result.add(instance);
   setLoweredExplosion(SILValue(i, 0), result);
 }

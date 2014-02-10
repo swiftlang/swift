@@ -701,6 +701,8 @@ namespace {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
     }
 
+    unsigned getNumProtocols() const { return NumProtocols; }
+
     unsigned getExplosionSize(ResilienceExpansion kind) const override {
       return 1 + NumProtocols;
     }
@@ -2837,7 +2839,9 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
                                   llvm::Value *metadata,
                                   ArrayRef<llvm::Value*> wtables) {
   // Set the metadata pointer.
-  metadata->setName(archetype->getFullName());
+  bool setNames = !archetype->getOpenedExistentialType();
+  if (setNames)
+    metadata->setName(archetype->getFullName());
   setMetadataRef(*this, archetype, metadata);
 
   // Set the protocol witness tables.
@@ -2847,8 +2851,10 @@ void IRGenFunction::bindArchetype(ArchetypeType *archetype,
     auto proto = archetype->getConformsTo()[i];
     if (!requiresProtocolWitnessTable(proto)) continue;
     auto wtable = wtables[wtableI++];
-    wtable->setName(Twine(archetype->getFullName()) + "." +
+    if (setNames) {
+      wtable->setName(Twine(archetype->getFullName()) + "." +
                       proto->getName().str());
+    }
     setWitnessTable(*this, archetype, i, wtable);
   }
   assert(wtableI == wtables.size());
@@ -4232,16 +4238,33 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
 
 /// Emit a projection from an existential container to its concrete value
 /// buffer with the type metadata for the contained value.
+///
+/// \param openedArchetype When non-null, the opened archetype
+/// that captures the details of this existential.
 static std::pair<Address, llvm::Value*>
 emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
-                                            Address base,
-                                            SILType baseTy) {
+                                              Address base,
+                                              SILType baseTy,
+                                              CanArchetypeType openedArchetype){
   assert(baseTy.isExistentialType());
   if (baseTy.isClassExistentialType()) {
     auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
     auto metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
+
+    // If we are projecting into an opened archetype, capture the
+    // witness tables.
+    if (openedArchetype) {
+      SmallVector<llvm::Value *, 4> wtables;
+      for (unsigned i = 0, n = baseTI.getNumProtocols(); i != n; ++i) {
+        auto wtableAddr = baseTI.projectWitnessTable(IGF, base, i);
+        wtables.push_back(IGF.Builder.CreateLoad(wtableAddr));
+      }
+
+      IGF.bindArchetype(openedArchetype, metadata, wtables);
+    }
+
     return {valueAddr, metadata};
   } else {
     auto &baseTI = IGF.getTypeInfo(baseTy).as<OpaqueExistentialTypeInfo>();
@@ -4250,6 +4273,17 @@ emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
     llvm::Value *metadata = layout.loadMetadataRef(IGF, base);
     Address buffer = layout.projectExistentialBuffer(IGF, base);
     llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
+
+    // If we are projecting into an opened archetype, capture the
+    // witness tables.
+    if (openedArchetype) {
+      SmallVector<llvm::Value *, 4> wtables;
+      for (unsigned i = 0, n = layout.getNumTables(); i != n; ++i) {
+        wtables.push_back(layout.loadWitnessTable(IGF, base, i));
+      }
+      IGF.bindArchetype(openedArchetype, metadata, wtables);
+    }
+
     return {Address(object, Alignment(1)), metadata};
   }
 }
@@ -4258,19 +4292,35 @@ emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
 /// buffer.
 Address irgen::emitOpaqueExistentialProjection(IRGenFunction &IGF,
                                                Address base,
-                                               SILType baseTy) {
-  return emitIndirectExistentialProjectionWithMetadata(IGF, base, baseTy)
+                                               SILType baseTy,
+                                               CanArchetypeType openedArchetype)
+{
+  return emitIndirectExistentialProjectionWithMetadata(IGF, base, baseTy,
+                                                       openedArchetype)
     .first;
 }
 
 /// Extract the instance pointer from a class existential value.
-llvm::Value *irgen::emitClassExistentialProjection(IRGenFunction &IGF,
-                                                          Explosion &base,
-                                                          SILType baseTy) {
+llvm::Value *
+irgen::emitClassExistentialProjection(IRGenFunction &IGF,
+                                      Explosion &base,
+                                      SILType baseTy,
+                                      CanArchetypeType openedArchetype) {
   assert(baseTy.isClassExistentialType());
   auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
   
-  return baseTI.getValue(IGF, base);
+  if (!openedArchetype)
+    return baseTI.getValue(IGF, base);
+
+  // Capture the metadata and witness tables from this existential
+  // into the given archetype.
+  ArrayRef<llvm::Value*> wtables;
+  llvm::Value *value;
+  std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
+  auto metadata = emitTypeMetadataRefForOpaqueHeapObject(IGF, value);
+  IGF.bindArchetype(openedArchetype, metadata, wtables);
+
+  return value;
 }
 
 static Address
@@ -4331,7 +4381,8 @@ Address irgen::emitIndirectExistentialDowncast(IRGenFunction &IGF,
   Address value;
   llvm::Value *srcMetadata;
   std::tie(value, srcMetadata)
-    = emitIndirectExistentialProjectionWithMetadata(IGF, container, srcType);
+    = emitIndirectExistentialProjectionWithMetadata(IGF, container, srcType,
+                                                    CanArchetypeType());
 
   return emitOpaqueDowncast(IGF, value, srcMetadata, destType, mode);
 }

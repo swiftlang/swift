@@ -187,21 +187,21 @@ public:
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
-  /// The value bound should have already been retained. Each time the
-  /// opaque value expression is referenced, it will be retained/released
-  /// separately. When this RAII object goes out of scope, the value will be
-  /// destroyed.
+  /// Each time the opaque value expression is referenced, it will be
+  /// retained/released separately. When this RAII object goes out of
+  /// scope, the value will be destroyed if requested.
   class OpaqueValueRAII {
     SILGenFunction &Self;
     OpaqueValueExpr *OpaqueValue;
+    bool Destroy;
 
     OpaqueValueRAII(const OpaqueValueRAII &) = delete;
     OpaqueValueRAII &operator=(const OpaqueValueRAII &) = delete;
 
   public:
     OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
-                    SILValue value)
-      : Self(self), OpaqueValue(opaqueValue)
+                    SILValue value, bool destroy)
+      : Self(self), OpaqueValue(opaqueValue), Destroy(destroy)
     {
       assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
              "Opaque value already has a binding");

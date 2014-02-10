@@ -1696,6 +1696,15 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   llvm_unreachable("bad difference kind");
 }
 
+/// Check whether this type is an archetype that is known to refer to
+/// a class.
+static bool isClassArchetype(CanType type) {
+  if (auto archetypeTy = cast<ArchetypeType>(type))
+    return archetypeTy->requiresClass();
+  
+  return false;
+}
+
 /// Emit the result of this call to an explosion.
 void CallEmission::emitToExplosion(Explosion &out) {
   assert(LastArgWritten <= 1);
@@ -1771,7 +1780,8 @@ void CallEmission::emitToExplosion(Explosion &out) {
     if (auto origArchetype = dyn_cast<ArchetypeType>(origResultType)) {
       if (origArchetype->requiresClass()) {
         // Remap a class archetype to an instance.
-        assert(substResultType->getClassOrBoundGenericClass() &&
+        assert((substResultType->getClassOrBoundGenericClass() ||
+                isClassArchetype(substResultType)) &&
                "remapping class archetype to non-class?!");
         Explosion temp(getCallee().getExplosionLevel());
         emitToUnmappedExplosion(temp);

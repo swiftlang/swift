@@ -41,7 +41,8 @@ void SILDebuggerClient::anchor() {}
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
   // Destroy the value, unless it was both uniquely referenced and consumed.
   auto entry = Self.OpaqueValues.find(OpaqueValue);
-  if (!OpaqueValue->isUniquelyReferenced() || !entry->second.second) {
+  if (Destroy && 
+      (!OpaqueValue->isUniquelyReferenced() || !entry->second.second)) {
     SILValue &value = entry->second.first;
     auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
     if (lowering.isTrivial()) {
@@ -3637,18 +3638,19 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
   SILValue archetypeValue;
   if (existentialValue.getValue().getType().isAddress()) {
     archetypeValue = SGF.B.createProjectExistential(
-                       E, existentialValue.getValue(),
+                       E, existentialValue.forward(SGF),
                        SGF.getLoweredType(archetypeTy));
   } else {
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createProjectExistentialRef(
-                       E, existentialValue.getValue(),
+                       E, existentialValue.forward(SGF),
                        SGF.getLoweredType(archetypeTy));
   }
   
   // Register the opaque value for the projected existential.
   SILGenFunction::OpaqueValueRAII opaqueValueRAII(SGF, E->getOpaqueValue(), 
-                                                  archetypeValue);
+                                                  archetypeValue,
+                                                  /*destroy=*/false);
 
   return visit(E->getSubExpr(), C);
 }
