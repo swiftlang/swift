@@ -1202,21 +1202,24 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   
   /// The getter is always trivial: just perform a (direct!) load of storage.
   auto *Get = VD->getGetter();
+  Expr *GetResult;
   if (VarDecl *SelfDecl = Get->getImplicitSelfDecl()) {
     // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
     auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-    auto *MRE = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+    GetResult = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
                                         /*implicit*/true,/*direct ivar*/true);
-    ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
-    Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
   } else {
     // Non-member observing accessors just directly load the variable.
     // Create (return (decl_ref_expr(VD)))
-    auto *DRE = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+    GetResult = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
                                       /*direct ivar*/true);
-    ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), DRE, /*implicit*/true);
-    Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
   }
+  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), GetResult,
+                                        /*implicit*/true);
+  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+
+  // Mark it transparent, there is no user benefit to this actually existing.
+  Get->getMutableAttrs().setAttr(AK_transparent, Loc);
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
@@ -3666,6 +3669,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                     diag::transparent_on_invalid_extension);
         D->getMutableAttrs().clearAttribute(AK_transparent);
       }
+    } else if (isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor() &&
+               cast<FuncDecl>(D)->getAccessorStorageDecl()->getStorageKind()
+                  == VarDecl::Observing) {
+      // @transparent is always ok on observing accessors, since they are
+      // directly dispatched (even in classes).
     } else {
       assert(AFD || VD);
       DeclContext *Ctx = AFD ? AFD->getParent() : VD->getDeclContext();
