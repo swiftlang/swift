@@ -85,6 +85,16 @@ far as to specialize for the case where all parameters are ``non-@objc``
 classes.  This will give us C-like performance for array operations on Int's,
 Float's, and other struct types [#boundscheck]_.
 
+To implement this, we'll need to implement a new generic builtin, something
+along the lines of "Builtin.isObjCType<T>()", which returns an Builtin.Int1
+value.  SILCombine and IRGen should eagerly fold this to "0" iff T is known to
+be a protocol other than AnyObject, if it is known to be a non-@objc class, or
+if it is known to be any struct, enum or tuple.  Otherwise, the builtin is left
+alone, and if it reaches IRGen, IRGen should conservatively fold it to "1".  In
+the common case where Array<T> is inlined and specialized, this will allow us to
+eliminate all of the overhead in the important C cases.
+
+
 Opportunity Feature
 ===================
 
