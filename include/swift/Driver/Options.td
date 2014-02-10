@@ -237,6 +237,10 @@ def Xcc : Separate<["-"], "Xcc">, Flags<[DriverOption, FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
+def Xllvm : Separate<["-"], "Xllvm">, Flags<[DriverOption, FrontendOption]>,
+  MetaVarName<"<arg>">,
+  HelpText<"Pass <arg> to llvm.">;
+
 def target : Joined<["--"], "target=">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Separate<["-"], "target">,

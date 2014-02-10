@@ -25,6 +25,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
@@ -37,6 +39,17 @@ void swift::CompilerInstance::createSILModule() {
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
+
+  // Honor -Xllvm.
+  if (!Invok.getFrontendOptions().LLVMArgs.empty()) {
+    llvm::SmallVector<const char *, 4> Args;
+    Args.push_back("swift (LLVM option parsing)");
+    for (unsigned i = 0, e = Invok.getFrontendOptions().LLVMArgs.size(); i != e;
+         ++i)
+      Args.push_back(Invok.getFrontendOptions().LLVMArgs[i].c_str());
+    Args.push_back(nullptr);
+    llvm::cl::ParseCommandLineOptions(Args.size(), Args.data());
+  }
 
   Context.reset(new ASTContext(Invocation.getLangOptions(),
                                Invocation.getSearchPathOptions(),

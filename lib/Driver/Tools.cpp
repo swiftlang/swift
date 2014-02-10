@@ -110,6 +110,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
 
   inputArgs.AddLastArg(arguments, options::OPT_g);
+
+  // Pass through any -Xllvm flags.
+  inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
 }
 
 
