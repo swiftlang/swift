@@ -69,6 +69,15 @@ ERROR(error_immediate_mode_primary_file,frontend,none,
 ERROR(error_mode_cannot_emit_module,frontend,none,
   "this mode does not support emitting modules", ()) 
 
+ERROR(error_bad_module_name,frontend,none,
+      "module name \"%0\" is not a valid identifier"
+      "%select{|; use -module-name flag to specify an alternate name}1",
+      (StringRef, bool))
+ERROR(error_stdlib_module_name,frontend,none,
+      "module name \"%0\" is reserved for the standard library"
+      "%select{|; use -module-name flag to specify an alternate name}1",
+      (StringRef, bool))
+
 ERROR(error_repl_requires_no_input_files,frontend,none,
   "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,frontend,none,

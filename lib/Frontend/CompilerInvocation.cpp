@@ -261,7 +261,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
            Opts.InputFilenames.size() == 1)) {
         ModuleName = "main";
       } else {
-        Diags.diagnose(SourceLoc(), diag::bad_module_name,
+        Diags.diagnose(SourceLoc(), diag::error_bad_module_name,
                        ModuleName, A == nullptr);
         ModuleName = "__bad__";
       }

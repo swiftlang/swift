@@ -22,7 +22,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
@@ -420,14 +419,18 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
     OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
   }
 
-  if (!Lexer::isIdentifier(OI.ModuleName)) {
+  if (!Lexer::isIdentifier(OI.ModuleName) ||
+      (OI.ModuleName == STDLIB_NAME &&
+       !Args.hasArg(options::OPT_parse_stdlib))) {
     OI.ModuleNameIsFallback = true;
-    if (OI.CompilerOutputType == types::TY_Nothing || Inputs.size() == 1)
+    if (OI.CompilerOutputType == types::TY_Nothing)
       OI.ModuleName = "main";
     else if (!Inputs.empty() || OI.CompilerMode == OutputInfo::Mode::REPL) {
       // Having an improper module name is only bad if we have inputs or if
       // we're in REPL mode.
-      Diags.diagnose(SourceLoc(), diag::bad_module_name,
+      auto DID = (OI.ModuleName == STDLIB_NAME) ? diag::error_stdlib_module_name
+                                                : diag::error_bad_module_name;
+      Diags.diagnose(SourceLoc(), DID,
                      OI.ModuleName, !Args.hasArg(options::OPT_module_name));
       OI.ModuleName = "__bad__";
     }

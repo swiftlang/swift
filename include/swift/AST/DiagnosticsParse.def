@@ -127,11 +127,6 @@ ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(bad_module_name,decl_parsing,none,
-      "module name \"%0\" is not a valid identifier"
-      "%select{|; use -module-name flag to specify an alternate name}1",
-      (StringRef, bool))
-
 ERROR(declaration_same_line_without_semi,decl_parsing,none,
       "consecutive declarations on a line must be separated by ';'", ())
 
