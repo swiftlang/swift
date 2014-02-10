@@ -19,9 +19,6 @@
   
     func addIntsWithFirst(first : Int) second(_ : Int) -> Int {...}
 
-  This feature is not available for the first selector piece.  See
-  rdar://15993514 for more examples.
-
 * The @inout attribute in argument lists has been promoted to a 
   context-sensitive keyword.  Where before you might have written:
 
