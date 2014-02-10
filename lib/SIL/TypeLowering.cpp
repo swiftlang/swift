@@ -1519,11 +1519,11 @@ TypeConverter::getEffectiveGenericParamsForContext(DeclContext *dc) {
   // FIXME: This is a clunky way of uncurrying nested type parameters from
   // a function context.
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-    return getConstantFunctionType(SILDeclRef(func))->getGenericParams();
+    return getConstantInfo(SILDeclRef(func)).ContextGenericParams;
   }
 
   if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-    return getConstantFunctionType(SILDeclRef(closure))->getGenericParams();
+    return getConstantInfo(SILDeclRef(closure)).ContextGenericParams;
   }
 
   return dc->getGenericParamsOfContext();
