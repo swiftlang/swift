@@ -223,11 +223,11 @@ sil @different_alloc_stack_dont_alias : $@thin () -> () {
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #15.
 // CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
-// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer         
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #16.
 // CHECK-NEXT: (0):   %2 = argument of bb0 : $*Builtin.ObjectPointer
-// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer         
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
 // CHECK-NEXT: NoAlias
 sil @args_dont_alias_with_identified_function_locals : $@thin (Builtin.ObjectPointer, Builtin.ObjectPointer, @inout Builtin.ObjectPointer) -> () {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer, %2 : $*Builtin.ObjectPointer):
@@ -235,4 +235,363 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer, %2 : $*Builtin.Obj
   dealloc_stack %3#0 : $*@local_storage Builtin.ObjectPointer
   %4 = tuple()
   return %4 : $()
+}
+
+sil @create_object_pointer : $@thin () -> (Builtin.ObjectPointer)
+sil @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+
+// @escapesource_functionlocal_test_readwrite_nonescaping_alloca
+
+// Test %1 (the aliasing argument)
+
+// CHECK: PAIR #13.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #14.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #15.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #16.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #17.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #18.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #19.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT:    function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #20.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #21.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #22.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #23.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #24.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #25.
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+
+// Test %3 (the escaping alloca).
+
+// CHECK: PAIR #52.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #53.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #54.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #55.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #56.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #57.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #58.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #59.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #60.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #61.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #62.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #63.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #64.
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #65.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #66.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #67.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #68.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #69.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #70.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #71.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #72.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #73.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #74.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #75.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #76.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #77.
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+
+// Test %5 (the read write apply inst).
+
+// CHECK: PAIR #91.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #92.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #93.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #94.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #95.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #96.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #97.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #98.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #99.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #100.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #101.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #102.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #103.
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+
+// Test %8 (the escaping load)
+
+// CHECK: PAIR #130.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #131.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #132.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #133.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #134.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #135.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #136.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #137.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #138.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #139.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #140.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #141.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #142.
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+
+// Test %9 (the read write apply inst)
+
+// CHECK: PAIR #143.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %0 = argument of bb0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #144.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %1 = argument of bb0 : $Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #145.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #146.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (1):   %2 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #147.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #148.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (1):   %3 = alloc_stack $Builtin.ObjectPointer
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #149.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: function_ref create_object_pointer
+// CHECK-NEXT:   %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #150.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #151.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %6 = load %0 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #152.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: function_ref use_object_pointer
+// CHECK-NEXT:   %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #153.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %8 = load %3#1 : $*Builtin.ObjectPointer
+// CHECK-NEXT: MayAlias
+// CHECK: PAIR #154.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #155.
+// CHECK-NEXT: (0):   %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK-NEXT: (0):   %12 = tuple ()
+// CHECK-NEXT: MayAlias
+sil @escapesource_functionlocal_test_escapesource_nonescapinglocal : $@thin (@inout Builtin.ObjectPointer, Builtin.ObjectPointer) -> () {
+bb0(%0 : $*Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer):
+  %2 = alloc_stack $Builtin.ObjectPointer
+  %3 = alloc_stack $Builtin.ObjectPointer
+  %4 = function_ref @create_object_pointer : $@thin () -> Builtin.ObjectPointer
+  %5 = apply %4() : $@thin () -> Builtin.ObjectPointer
+  %6 = load %0 : $*Builtin.ObjectPointer
+  %7 = function_ref @use_object_pointer : $@thin (Builtin.ObjectPointer) -> ()
+  %8 = load %3#1 : $*Builtin.ObjectPointer
+  %9 = apply %7(%8) : $@thin (Builtin.ObjectPointer) -> ()
+  dealloc_stack %3#0 : $*@local_storage Builtin.ObjectPointer
+  dealloc_stack %2#0 : $*@local_storage Builtin.ObjectPointer
+  %12 = tuple ()
+  return %12 : $()
 }

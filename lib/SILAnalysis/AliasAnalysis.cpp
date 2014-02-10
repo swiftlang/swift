@@ -85,6 +85,276 @@ static bool isIdentifiedFunctionLocal(SILValue V) {
   return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
 }
 
+/// Returns true if the ValueBase inside V is an apply whose calle is a no read
+/// builtin_function_ref.
+static bool isNoReadApplyInst(SILValue V) {
+  auto *AI = dyn_cast<ApplyInst>(V.getDef());
+  if (!AI)
+    return false;
+
+  auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+
+  return BI && isReadNone(BI);
+}
+
+namespace {
+
+/// Are there any uses that should be ignored as capture uses.
+///
+/// TODO: Expand this if we ever do the store of pointer analysis mentioned in
+/// Basic AA.
+enum CaptureException : unsigned {
+  None=0,
+  ReturnsCannotCapture=1,
+};
+
+} // end anonymous namespace
+
+/// Is Inst an instruction whose operands escape only if Inst itself escapes?
+static bool isTransitiveEscapeInst(SILInstruction *Inst) {
+  switch (Inst->getKind()) {
+  case ValueKind::AllocArrayInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::AllocRefInst:
+  case ValueKind::AllocStackInst:
+  case ValueKind::ApplyInst:
+  case ValueKind::ArchetypeMethodInst:
+  case ValueKind::BuiltinFunctionRefInst:
+  case ValueKind::CopyAddrInst:
+  case ValueKind::DeallocBoxInst:
+  case ValueKind::DeallocRefInst:
+  case ValueKind::DeallocStackInst:
+  case ValueKind::DebugValueAddrInst:
+  case ValueKind::DebugValueInst:
+  case ValueKind::DestroyAddrInst:
+  case ValueKind::DestroyValueInst:
+  case ValueKind::FloatLiteralInst:
+  case ValueKind::FunctionRefInst:
+  case ValueKind::GlobalAddrInst:
+  case ValueKind::InitExistentialInst:
+  case ValueKind::IntegerLiteralInst:
+  case ValueKind::LoadInst:
+  case ValueKind::LoadWeakInst:
+  case ValueKind::MetatypeInst:
+  case ValueKind::SILGlobalAddrInst:
+  case ValueKind::StoreInst:
+  case ValueKind::StoreWeakInst:
+  case ValueKind::StringLiteralInst:
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::StrongRetainAutoreleasedInst:
+  case ValueKind::StrongRetainInst:
+  case ValueKind::StrongRetainUnownedInst:
+  case ValueKind::UnownedReleaseInst:
+  case ValueKind::UnownedRetainInst:
+  case ValueKind::InjectEnumAddrInst:
+  case ValueKind::DeinitExistentialInst:
+  case ValueKind::UnreachableInst:
+  case ValueKind::IsNonnullInst:
+  case ValueKind::CondFailInst:
+  case ValueKind::DynamicMethodBranchInst:
+  case ValueKind::ReturnInst:
+  case ValueKind::AutoreleaseReturnInst:
+  case ValueKind::UpcastExistentialInst:
+    return false;
+
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::ArchetypeMetatypeInst:
+  case ValueKind::ArchetypeRefToSuperInst:
+  case ValueKind::BranchInst:
+  case ValueKind::BridgeToBlockInst:
+  case ValueKind::CheckedCastBranchInst:
+  case ValueKind::ClassMetatypeInst:
+  case ValueKind::ClassMethodInst:
+  case ValueKind::CondBranchInst:
+  case ValueKind::ConvertFunctionInst:
+  case ValueKind::CopyValueInst:
+  case ValueKind::DynamicMethodInst:
+  case ValueKind::EnumInst:
+  case ValueKind::IndexAddrInst:
+  case ValueKind::IndexRawPointerInst:
+  case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::InitExistentialRefInst:
+  case ValueKind::ObjectPointerToRefInst:
+  case ValueKind::PartialApplyInst:
+  case ValueKind::PeerMethodInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::ProjectExistentialInst:
+  case ValueKind::ProjectExistentialRefInst:
+  case ValueKind::ProtocolMetatypeInst:
+  case ValueKind::ProtocolMethodInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::RefToObjectPointerInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RefToUnownedInst:
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::StructExtractInst:
+  case ValueKind::StructInst:
+  case ValueKind::SuperMethodInst:
+  case ValueKind::SwitchEnumAddrInst:
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::SwitchIntInst:
+  case ValueKind::TakeEnumDataAddrInst:
+  case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::TupleExtractInst:
+  case ValueKind::TupleInst:
+  case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnownedToRefInst:
+  case ValueKind::UpcastExistentialRefInst:
+  case ValueKind::UpcastInst:
+    return true;
+
+  case ValueKind::AssignInst:
+  case ValueKind::MarkFunctionEscapeInst:
+  case ValueKind::MarkUninitializedInst:
+    llvm_unreachable("Invalid in canonical SIL.");
+
+  case ValueKind::SILArgument:
+  case ValueKind::SILUndef:
+    llvm_unreachable("These do not use other values.");
+  }
+}
+
+/// Returns true if V is a value that is used in a manner such that we know its
+/// captured or we don't understand whether or not it was captured. In such a
+/// case to be conservative, we must assume it is captured.
+static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
+  llvm::SmallVector<Operand *, 16> Worklist;
+  llvm::SmallPtrSet<Operand *, 16> Visited;
+
+  DEBUG(llvm::dbgs() << "        Checking for capture.\n");
+
+  // All all uses of V to the worklist.
+  for (auto *UI : V.getUses()) {
+    Visited.insert(UI);
+    Worklist.push_back(UI);
+  }
+
+  // Until the worklist is empty...
+  while (!Worklist.empty()) {
+    // Pop off an operand and grab the operand's user...
+    Operand *Op = Worklist.pop_back_val();
+    SILInstruction *Inst = Op->getUser();
+
+    DEBUG(llvm::dbgs() << "            Visiting: " << *Inst);
+
+    // If Inst is an instruction with the transitive escape property, V escapes
+    // if and only if the results of Inst escape as well.
+    if (isTransitiveEscapeInst(Inst)) {
+      DEBUG(llvm::dbgs() << "                Found transitive escape "
+            "instruction!");
+      for (auto *UI : Inst->getUses())
+        if (Visited.insert(UI))
+          Worklist.push_back(UI);
+      continue;
+    }
+
+    // An apply of a builtin that does not read memory can not capture a value.
+    //
+    // TODO: Use analysis of the other function perhaps to see if it captures
+    // memory in some manner?
+    // TODO: Add in knowledge about how parameters work on swift to make this
+    // more aggressive.
+    if (auto *AI = dyn_cast<ApplyInst>(Inst))
+      if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef()))
+        if (isReadNone(BI))
+          continue;
+
+    // Loading from a pointer does not cause it to be captured.
+    if (isa<LoadInst>(Inst))
+      continue;
+
+    // If we have a store and are storing into the pointer, this is not a
+    // capture. Otherwise it is safe.
+    if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+      if (SI->getDest() == Op->get()) {
+        continue;
+      } else {
+        return true;
+      }
+    }
+
+    // Deallocation instructions don't capture.
+    if (isa<DeallocationInst>(Inst))
+      continue;
+
+    // Debug instructions don't capture.
+    if (isa<DebugValueInst>(Inst) || isa<DebugValueAddrInst>(Inst))
+      continue;
+
+    // RefCountOperations don't capture.
+    //
+    // The release case is true since Swift does not allow destructors to
+    // resurrent objects. This is enforced via a runtime failure.
+    if (isa<RefCountingInst>(Inst))
+      continue;
+
+    // If we have a return instruction and we are assuming that returns don't
+    // capture, we are safe.
+    if (Exception == CaptureException::ReturnsCannotCapture &&
+        (isa<ReturnInst>(Inst) || isa<AutoreleaseReturnInst>(Inst)))
+      continue;
+
+    // We could not prove that Inst does not capture V. Be conservative and
+    // return true.
+    return true;
+  }
+
+  // We successfully proved that V is not captured. Return false.
+  return false;
+}
+
+/// Return true if the pointer is to a function-local object that never escapes
+/// from the function.
+static bool isNonEscapingLocalObject(SILValue V) {
+  // If this is a local allocation, or the result of a no read apply inst (which
+  // can not affect memory in the caller), check to see if the allocation
+  // escapes.
+  if (isa<AllocationInst>(*V) || isNoReadApplyInst(V))
+    return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);
+
+  // If this is a no alias argument then it has not escaped before entering the
+  // function. Check if it escapes inside the function.
+  if (isNoAliasArgument(V))
+      return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);
+
+  // Otherwise we could not prove that V is a non escaping local object. Be
+  // conservative and return false.
+  return false;
+}
+
+/// Returns true if V is a function argument that is not an address implying
+/// that we do not have the gaurantee that it will not alias anything inside the
+/// function.
+static bool isAliasingFunctionArgument(SILValue V) {
+  return isFunctionArgument(V) && !V.getType().isAddress();
+}
+
+/// Returns true if V is an apply inst that may read or write to memory.
+static bool isReadWriteApplyInst(SILValue V) {
+  return isa<ApplyInst>(*V) && !isNoReadApplyInst(V.getDef());
+}
+
+/// Return true if the pointer is one which would have been considered an escape
+/// by isNonEscapingLocalObject.
+static bool isEscapeSource(SILValue V) {
+  if (isReadWriteApplyInst(V))
+    return true;
+
+  if (isAliasingFunctionArgument(V))
+    return true;
+
+  // The LoadInst case works since valueMayBeCaptured always assumes stores are
+  // escapes.
+  if (isa<LoadInst>(*V))
+    return true;
+
+  // We could not prove anything, be conservative and return false.
+  return false;
+}
+
+
 /// Returns true if we can prove that the two input SILValues which do not equal
 /// can not alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
@@ -92,14 +362,30 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they can not alias.
-  if (isIdentifiableObject(O1) && isIdentifiableObject(O2))
+  if (isIdentifiableObject(O1) && isIdentifiableObject(O2)) {
+    DEBUG(llvm::dbgs() << "            Found two unequal identified "
+          "objects.\n");
     return true;
+  }
 
   // Function arguments can't alias with things that are known to be
   // unambigously identified at the function level.
   if ((isFunctionArgument(O1.getDef()) && isIdentifiedFunctionLocal(O2)) ||
-      (isFunctionArgument(O2.getDef()) && isIdentifiedFunctionLocal(O1)))
+      (isFunctionArgument(O2.getDef()) && isIdentifiedFunctionLocal(O1))) {
+    DEBUG(llvm::dbgs() << "            Found unequal function arg and "
+          "identified function local!\n");
     return true;
+  }
+
+  // If one pointer is the result of an apply or load and the other is a
+  // non-escaping local object within the same function, then we know the object
+  // couldn't escape to a point where the call could return it.
+  if ((isEscapeSource(O1) && isNonEscapingLocalObject(O2)) ||
+      (isEscapeSource(O2) && isNonEscapingLocalObject(O1))) {
+    DEBUG(llvm::dbgs() << "            Found unequal escape source and non "
+          "escaping local object!\n");
+    return true;
+  }
 
   // We failed to prove that the two objects are different.
   return false;
@@ -139,7 +425,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   auto Pair = AliasCache.find(Key);
   if (Pair != AliasCache.end()) {
     DEBUG(llvm::dbgs() << "      Found value in the cache: "
-          << unsigned(Pair->second));
+          << Pair->second << "\n");
 
     return Pair->second;
   }
