@@ -475,6 +475,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugConstraintSolver = true;
   }
 
+  if (Args.hasArg(OPT_debugger_support)) {
+    Opts.DebuggerSupport = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {

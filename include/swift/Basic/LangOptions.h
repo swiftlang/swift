@@ -40,6 +40,9 @@ namespace swift {
     
     /// \brief Enable experimental "switch" pattern-matching features.
     bool EnableExperimentalPatterns = false;
+
+    /// \brief Enable features useful for running in the debugger.
+    bool DebuggerSupport = false;
   };
 }
 

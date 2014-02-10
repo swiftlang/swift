@@ -61,6 +61,9 @@ def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
   DebugCrashOpt, HelpText<"Force a crash after parsing">;
 
+def debugger_support : Flag<["-"], "debugger-support">,
+  HelpText<"Process swift code as if running in the debugger">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 
