@@ -199,12 +199,11 @@ static ParserStatus
 parseSelectorArgument(Parser &P,
                       SmallVectorImpl<TuplePatternElt> &argElts,
                       SmallVectorImpl<TuplePatternElt> &bodyElts,
-                      llvm::StringMap<VarDecl *> &selectorNames,
                       Parser::DefaultArgumentInfo &defaultArgs,
                       SourceLoc &rp) {
   ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(true);
   assert(ArgPatternRes.isNonNull() &&
-         "selector argument did not start with an identifier!");
+         "selector argument did not start with an identifier or _!");
   Pattern *ArgPattern = ArgPatternRes.get();
   ArgPattern->setImplicit();
 
@@ -216,13 +215,6 @@ parseSelectorArgument(Parser &P,
     VarDecl *decl = name->getDecl();
     decl->setImplicit();
     leadingIdent = name->getDecl()->getName();
-    StringRef id = decl->getName().str();
-    auto prevName = selectorNames.find(id);
-    if (prevName != selectorNames.end()) {
-      P.diagnoseRedefinition(prevName->getValue(), decl);
-    } else {
-      selectorNames[id] = decl;
-    }
   } else {
     // If the selector is named "_", then we ignore it.
     assert(isa<AnyPattern>(ArgPattern) && "Unexpected selector pattern");
@@ -335,13 +327,11 @@ parseSelectorFunctionArguments(Parser &P,
   assert(!ArgElts.empty() && !BodyElts.empty());
 
   // Parse additional selectors as long as we can.
-  llvm::StringMap<VarDecl *> SelectorNames;
-
   ParserStatus Status;
   for (;;) {
     if (P.isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(P, ArgElts, BodyElts, SelectorNames,
-                                      DefaultArgs, RParenLoc);
+      Status |= parseSelectorArgument(P, ArgElts, BodyElts, DefaultArgs,
+                                      RParenLoc);
       continue;
     }
     if (P.Tok.is(tok::l_paren)) {
@@ -531,15 +521,13 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   SourceLoc LParenLoc = Tok.getLoc();
 
   // Parse additional selectors as long as we can.
-  llvm::StringMap<VarDecl *> selectorNames;
-
   ParserStatus Status;
   SmallVector<TuplePatternElt, 4> ArgElts;
   SmallVector<TuplePatternElt, 4> BodyElts;
   SourceLoc RParenLoc;
   for (;;) {
     if (isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(*this, ArgElts, BodyElts, selectorNames,
+      Status |= parseSelectorArgument(*this, ArgElts, BodyElts,
                                       DefaultArgs, RParenLoc);
       continue;
     }
