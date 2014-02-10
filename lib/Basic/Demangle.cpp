@@ -1067,6 +1067,93 @@ private:
                                  archetypeName(index));
   }
   
+  NodePointer demangleDependentType() {
+    // A dependent member type begins with a non-index, non-'d' character.
+    auto c = Mangled.peek();
+    if (c != 'd' && c != '_' && !isdigit(c)) {
+      NodePointer baseType = demangleType();
+      if (!baseType) return nullptr;
+      NodePointer depTy = demangleIdentifier(Node::Kind::DependentMemberType);
+      if (!depTy) return nullptr;
+      
+      depTy->addChild(baseType);
+      return depTy;
+    }
+    
+    // Otherwise, we have a generic parameter.
+    Node::IndexType depth, index;
+    if (Mangled.nextIf('d')) {
+      if (!demangleIndex(depth))
+        return nullptr;
+      depth += 1;
+      if (!demangleIndex(index))
+        return nullptr;
+    } else {
+      depth = 0;
+      if (!demangleIndex(index))
+        return nullptr;
+    }
+    
+    std::string name = "T_";
+    {
+      llvm::raw_string_ostream os(name);
+      os << depth << '_' << index;
+      os.flush();
+    }
+    
+    NodePointer paramTy = Node::create(Node::Kind::DependentGenericParamType,
+                                       std::move(name));
+    return paramTy;
+  }
+  
+  NodePointer demangleGenericSignature() {
+    NodePointer sig = Node::create(Node::Kind::DependentGenericSignature);
+    // First read in the parameter counts at each depth.
+    while (!Mangled.nextIf('R')) {
+      Node::IndexType count;
+      if (!demangleIndex(count))
+        return nullptr;
+      NodePointer countNode = Node::create(Node::Kind::DependentGenericParamCount,
+                                           count);
+      sig->addChild(countNode);
+    }
+    
+    // Next read in the generic requirements.
+    while (!Mangled.nextIf('_')) {
+      NodePointer reqt = demangleGenericRequirement();
+      if (!reqt) return nullptr;
+      sig->addChild(reqt);
+    }
+    
+    return sig;
+  }
+  
+  NodePointer demangleGenericRequirement() {
+    if (Mangled.nextIf('P')) {
+      NodePointer type = demangleType();
+      if (!type) return nullptr;
+      NodePointer requirement = demangleType();
+      if (!requirement) return nullptr;
+      NodePointer reqt
+        = Node::create(Node::Kind::DependentGenericConformanceRequirement);
+      reqt->addChild(type);
+      reqt->addChild(requirement);
+      return reqt;
+    }
+    if (Mangled.nextIf('E')) {
+      NodePointer first = demangleType();
+      if (!first) return nullptr;
+      NodePointer second = demangleType();
+      if (!second) return nullptr;
+      NodePointer reqt
+        = Node::create(Node::Kind::DependentGenericSameTypeRequirement);
+      reqt->addChild(first);
+      reqt->addChild(second);
+      return reqt;
+    }
+    return nullptr;
+  }
+  
   NodePointer demangleArchetypeType() {
     auto makeSelfType = [&](NodePointer proto) -> NodePointer {
       NodePointer selfType
@@ -1366,6 +1453,9 @@ private:
     if (c == 'Q') {
       return demangleArchetypeType();
     }
+    if (c == 'q') {
+      return demangleDependentType();
+    }
     if (c == 'R') {
       NodePointer inout = Node::create(Node::Kind::InOut);
       NodePointer type = demangleTypeImpl();
@@ -1382,6 +1472,17 @@ private:
     }
     if (c == 't') {
       return demangleTuple(IsVariadic::yes);
+    }
+    if (c == 'u') {
+      NodePointer sig = demangleGenericSignature();
+      if (!sig) return nullptr;
+      NodePointer sub = demangleType();
+      if (!sub) return nullptr;
+      NodePointer dependentGenericType
+        = Node::create(Node::Kind::DependentGenericType);
+      dependentGenericType->addChild(sig);
+      dependentGenericType->addChild(sub);
+      return dependentGenericType;
     }
     if (c == 'U') {
       GenericContext genericContext(*this);
@@ -1429,11 +1530,8 @@ private:
   }
 
   bool demangleReabstractSignature(NodePointer signature) {
-    Optional<GenericContext> genericContext;
-
     if (Mangled.nextIf('G')) {
-      genericContext.emplace(*this);
-      NodePointer generics = demangleGenerics(genericContext.getValue());
+      NodePointer generics = demangleGenericSignature();
       if (!generics) return failure();
       signature->addChild(std::move(generics));
     }
@@ -2086,7 +2184,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     Printer << "reabstraction thunk ";
     if (pointer->getKind() == Node::Kind::ReabstractionThunkHelper)
       Printer << "helper ";
-    auto generics = getFirstChildOfKind(pointer, Node::Kind::Generics);
+    auto generics = getFirstChildOfKind(pointer, Node::Kind::DependentGenericSignature);
     assert(pointer->getNumChildren() == 2 + unsigned(generics != nullptr));
     if (generics) {
       print(generics);
@@ -2269,6 +2367,74 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
     return;
+      
+  case Node::Kind::DependentGenericSignature: {
+    Printer << '<';
+    
+    unsigned depth = 0;
+    unsigned numChildren = pointer->getNumChildren();
+    for (;
+         depth < numChildren
+           && pointer->getChild(depth)->getKind()
+               == Node::Kind::DependentGenericParamCount;
+         ++depth) {
+      unsigned count = pointer->getChild(depth)->getIndex();
+      for (unsigned index = 0; index < count; ++index) {
+        if (depth || index)
+          Printer << ", ";
+        Printer << "T_" << depth << '_' << index;
+      }
+    }
+    
+    if (depth != numChildren) {
+      Printer << " where ";
+      for (unsigned i = depth; i < numChildren; ++i) {
+        if (i > depth)
+          Printer << ", ";
+        print(pointer->getChild(i));
+      }
+    }
+    Printer << '>';
+    return;
+  }
+  case Node::Kind::DependentGenericParamCount:
+    llvm_unreachable("should be printed as a child of a "
+                     "DependentGenericSignature");
+  case Node::Kind::DependentGenericConformanceRequirement: {
+    Node *type = pointer->getChild(0);
+    Node *reqt = pointer->getChild(1);
+    print(type);
+    Printer << ": ";
+    print(reqt);
+    return;
+  }
+  case Node::Kind::DependentGenericSameTypeRequirement: {
+    Node *fst = pointer->getChild(0);
+    Node *snd = pointer->getChild(1);
+    
+    print(fst);
+    Printer << " == ";
+    print(snd);
+    return;
+  }
+  case Node::Kind::DependentGenericParamType: {
+    Printer << pointer->getText();
+    return;
+  }
+  case Node::Kind::DependentGenericType: {
+    Node *sig = pointer->getChild(0);
+    Node *depTy = pointer->getChild(1);
+    print(sig);
+    Printer << ' ';
+    print(depTy);
+    return;
+  }
+  case Node::Kind::DependentMemberType: {
+    Node *base = pointer->getChild(0);
+    print(base);
+    Printer << '.' << pointer->getText();
+    return;
+  }
   }
   llvm_unreachable("bad node kind!");
 }
