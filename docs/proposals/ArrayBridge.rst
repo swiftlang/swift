@@ -1,6 +1,6 @@
 :orphan:
 
-.. ===--- ArrayBridge.rst - Proposal for Bridging Swift Array and NSArray ---===..
+.. ===-- ArrayBridge.rst - Proposal for Bridging Swift Array and NSArray --===..
 ..
 .. This source file is part of the Swift.org open source project
 ..
@@ -10,7 +10,7 @@
 .. See http://swift.org/LICENSE.txt for license information
 .. See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 ..
-.. ===----------------------------------------------------------------------===..
+.. ===---------------------------------------------------------------------===..
 
 =====================================
  Bridging Swift Arrays to/from Cocoa
@@ -26,10 +26,10 @@
 Basic Requirements
 ==================
 
-A successfully-bridged array type would be both “great for Cocoa” and
-“great for C.”  
+A successfully-bridged array type would be both "great for Cocoa" and
+"great for C."
 
-Being “great for Cocoa” means this must work and be efficient::
+Being "great for Cocoa" means this must work and be efficient::
 
   var a = [cocoaObject1, cocoaObject2]
   someCocoaObject.passAnNSArray(a)
@@ -40,7 +40,7 @@ Being “great for Cocoa” means this must work and be efficient::
 
   var c: AnyObject[] = someNSWindow.views
 
-Being “great For C” means that an array created in Swift should have
+Being "great For C" means that an array created in Swift should have
 C-like performance and must be representable as a base pointer and
 length, for interaction with C APIs, at zero cost.
 
@@ -97,7 +97,7 @@ as failing to satisfy the requirements.
 We considered the earlier proposal by Joe that would make ``T[]`` a
 (hand-rolled) existential wrapper type.  Among other things, we felt
 this approach would expose multiple array types too prominently and
-would tend to “bless” an inappropriately-specific protocol as the
+would tend to "bless" an inappropriately-specific protocol as the
 generic collection interface (for example, a generic collection should
 not be indexable with ``Int``).
 
