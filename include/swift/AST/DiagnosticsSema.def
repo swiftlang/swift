@@ -286,6 +286,9 @@ ERROR(missing_in_class_init_3plus,sema_tcd,none,
 NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values", (Type, bool))
+ERROR(parameter_must_have_name_specified,sema_tcd,none,
+      "implicitly named parameter shadows function name, use \"_:\" instead",())
+
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,

@@ -1974,6 +1974,7 @@ public:
       badType = semaFuncParamPatterns(FD, FD->getArgParamPatterns(), resolver)||
                 semaFuncParamPatterns(FD, FD->getBodyParamPatterns(), resolver);
 
+
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
     if (FD->hasType())
@@ -1985,6 +1986,24 @@ public:
       return;
     }
 
+
+    // Reject things like "func f(Int)" if it has a body, since this will
+    // implicitly name the argument 'f'.  Instead, suggest that the user write
+    // this as "func f(_: Int)".
+    if (FD->hasBody() && FD->getBodyParamPatterns().size() == 1) {
+      Pattern *BodyPattern = FD->getBodyParamPatterns()[0];
+      if (auto *NP = dyn_cast<NamedPattern>(BodyPattern
+                                            ->getSemanticsProvidingPattern()))
+        if (NP->getDecl()->getName() == FD->getName() && NP->isImplicit()) {
+          TC.diagnose(BodyPattern->getLoc(),
+                      diag::parameter_must_have_name_specified)
+            .fixItInsert(BodyPattern->getLoc(), "_: ");
+          // Mark the decl as invalid to avoid inscrutable downstream errors.
+          NP->getDecl()->setInvalid();
+          NP->getDecl()->overwriteType(ErrorType::get(TC.Context));
+        }
+    }
+    
     Type funcTy = FD->getBodyResultTypeLoc().getType();
     if (!funcTy) {
       funcTy = TupleType::getEmpty(TC.Context);

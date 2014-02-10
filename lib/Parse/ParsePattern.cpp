@@ -362,7 +362,8 @@ parseSelectorFunctionArguments(Parser &P,
 ///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
 ///
 ParserStatus
-Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
+Parser::parseFunctionArguments(Identifier functionName,
+                               SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
                                bool &HasSelectorStyleSignature) {
@@ -370,7 +371,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
 
   // Parse the first function argument clause.
   ParserResult<Pattern> ArgPattern =
-    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
+    parseArgument(*this, functionName, &DefaultArgs);
 
   if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
     return ArgPattern;
@@ -416,7 +417,8 @@ Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
-Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
+Parser::parseFunctionSignature(Identifier Name,
+                               SmallVectorImpl<Pattern *> &argPatterns,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
                                TypeRepr *&retType,
@@ -426,8 +428,8 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    Status = parseFunctionArguments(argPatterns, bodyPatterns, defaultArgs,
-                                    HasSelectorStyleSignature);
+    Status = parseFunctionArguments(Name, argPatterns, bodyPatterns,
+                                    defaultArgs, HasSelectorStyleSignature);
 
     if (bodyPatterns.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking

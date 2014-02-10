@@ -665,11 +665,13 @@ public:
     void setFunctionContext(DeclContext *DC);
   };
 
-  ParserStatus parseFunctionArguments(SmallVectorImpl<Pattern*> &ArgPatterns,
+  ParserStatus parseFunctionArguments(Identifier functionName,
+                                      SmallVectorImpl<Pattern*> &ArgPatterns,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       bool &HasSelectorStyleSignature);
-  ParserStatus parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
+  ParserStatus parseFunctionSignature(Identifier functionName,
+                                      SmallVectorImpl<Pattern *> &argPatterns,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       TypeRepr *&retType,

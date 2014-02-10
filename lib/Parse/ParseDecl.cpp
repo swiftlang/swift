@@ -1845,8 +1845,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
   TypeRepr *FuncRetTy = nullptr;
   bool HasSelectorStyleSignature;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(ArgParams, BodyParams, DefaultArgs, FuncRetTy,
-                             HasSelectorStyleSignature);
+      parseFunctionSignature(Name, ArgParams, BodyParams, DefaultArgs,
+                             FuncRetTy, HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
