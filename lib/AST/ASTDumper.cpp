@@ -417,7 +417,7 @@ namespace {
         OS << "'stored_objc'";
         break;
       case VarDecl::Observing:
-        OS << "'willset_didset'";
+        OS << "'observing'";
         break;
       }
       if (FuncDecl *Get = VD->getGetter()) {

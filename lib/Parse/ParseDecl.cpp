@@ -1449,14 +1449,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
       }
     }
 
-    // We don't support willSet/didSet properties defined outside of a type.
-    if (!(Flags & PD_HasContainerType)) {
-      diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
-               diag::observingproperty_requires_type);
-      Invalid = true;
-      return nullptr;
-    }
-
     PrimaryVar->makeObserving(LBLoc, WillSet, DidSet, RBLoc);
 
     // Observing properties will have getters and setters synthesized by sema.

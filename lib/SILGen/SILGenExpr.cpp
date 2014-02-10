@@ -403,7 +403,8 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
   }
   
   // a getter produces an rvalue unless this is a direct access to storage.
-  if (var->hasAccessorFunctions())
+  if (!var->hasStorage() ||
+      (!isDirectPropertyAccess && var->hasAccessorFunctions()))
     return ManagedValue();
   
   // If this is a global variable, invoke its accessor function to get its

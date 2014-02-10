@@ -627,7 +627,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   // a brace.  "get" is implicit, so it can't be checked for.  Conveniently
   // however, get/set properties are not allowed to have initializers, so we
   // don't have an ambiguity, we just have to check for observing accessors.
-    Token NextToken = P.peekToken();
+  Token NextToken = P.peekToken();
   if (!NextToken.isContextualKeyword("didSet") &&
       !NextToken.isContextualKeyword("willSet"))
     return false;

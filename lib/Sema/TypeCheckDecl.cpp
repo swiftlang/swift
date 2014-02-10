@@ -1428,8 +1428,8 @@ public:
     // uninitialized vars are not allowed.
     if (!PBD->hasInit() && !isInSILMode) {
       PBD->getPattern()->forEachVariable([&](VarDecl *var) {
-        // If the variable is computed, it never needs an initializer.
-        if (var->hasAccessorFunctions())
+        // If the variable has no storage, it never needs an initializer.
+        if (!var->hasStorage())
           return;
 
         auto *varDC = var->getDeclContext();
@@ -1439,6 +1439,16 @@ public:
         // type).
         if (var->isLet() && !varDC->isTypeContext()) {
           TC.diagnose(var->getLoc(), diag::let_requires_initializer);
+          PBD->setInvalid();
+          var->setInvalid();
+          var->overwriteType(ErrorType::get(TC.Context));
+          return;
+        }
+        
+        // Non-member observing properties need an initializer.
+        if (var->getStorageKind() == VarDecl::Observing &&
+            !var->getDeclContext()->isTypeContext()) {
+          TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));

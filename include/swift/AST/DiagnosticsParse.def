@@ -172,8 +172,6 @@ ERROR(mutating_invalid,sema_tcd,none,
 // Variable getters/setters
 ERROR(computed_property_no_accessors, decl_parsing, none,
       "computed property must have accessors specified", ())
-ERROR(observingproperty_requires_type,decl_parsing,none,
-      "willSet/didSet properties must be defined in a type right now", ())
 ERROR(expected_getset_in_protocol,decl_parsing,none,
       "expected get or set in a protocol property", ())
 ERROR(getset_missing_type,decl_parsing,none,
