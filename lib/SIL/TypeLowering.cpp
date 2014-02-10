@@ -1558,7 +1558,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                            DeclContext *parentContext) {
   // Capture generic parameters from the enclosing context.
   GenericParamList *genericParams
-    = getEffectiveGenericParamsForContext(parentContext);;
+    = getEffectiveGenericParamsForContext(parentContext);
 
   if (captures.empty()) {
     if (!genericParams)

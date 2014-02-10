@@ -47,12 +47,13 @@ CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
 
 /// Adjust a function type to have a slightly different type.
 CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
-                                             SILFunctionType::ExtInfo extInfo,
-                                                ParameterConvention callee) {
+                                               SILFunctionType::ExtInfo extInfo,
+                                               ParameterConvention callee) {
   if (type->getExtInfo() == extInfo &&
       type->getCalleeConvention() == callee)
     return type;
 
+  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   return SILFunctionType::get(type->getGenericParams(),
                               type->getGenericSignature(),
                               extInfo,
@@ -60,6 +61,7 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
                               type->getInterfaceParameters(),
                               type->getInterfaceResult(),
                               type->getASTContext());
+  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
 }
 
 namespace {
@@ -1308,6 +1310,7 @@ namespace {
         substParams.push_back(subst(origParam));
       }
 
+      SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
       auto genericParams
         = (dropGenerics ? nullptr : origType->getGenericParams());
       auto genericSig
@@ -1319,6 +1322,7 @@ namespace {
                                   origType->getCalleeConvention(),
                                   substParams, substResult,
                                   getASTContext());
+      SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
     }
 
     SILType subst(SILType type) {

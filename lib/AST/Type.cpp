@@ -1950,6 +1950,7 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
+    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     return SILFunctionType::get(fnTy->getGenericParams(),
                                 fnTy->getGenericSignature(),
                                 fnTy->getExtInfo(),
@@ -1958,6 +1959,7 @@ case TypeKind::Id:
                                 SILResultInfo(canTransInterfaceResult,
                                           origInterfaceResult.getConvention()),
                                 Ptr->getASTContext());
+    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   }
 
   case TypeKind::UnownedStorage:
