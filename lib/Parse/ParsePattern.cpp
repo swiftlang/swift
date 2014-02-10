@@ -19,35 +19,7 @@
 #include "swift/AST/ExprHandle.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SaveAndRestore.h"
-
 using namespace swift;
-
-/// Parse function arguments.
-///   func-arguments:
-///     curried-arguments | selector-arguments
-///   curried-arguments:
-///     pattern-tuple+
-///   selector-arguments:
-///     '(' selector-element ')' (identifier '(' selector-element ')')+
-///   selector-element:
-///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
-static ParserStatus
-parseCurriedFunctionArguments(Parser &P,
-                              SmallVectorImpl<Pattern *> &argPat,
-                              SmallVectorImpl<Pattern *> &bodyPat) {
-  // parseFunctionArguments parsed the first argument pattern.
-  // Parse additional curried argument clauses as long as we can.
-  while (P.Tok.is(tok::l_paren)) {
-    ParserResult<Pattern> pattern =
-      P.parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, /*defargs*/nullptr);
-    if (pattern.isNull() || pattern.hasCodeCompletion())
-      return pattern;
-
-    argPat.push_back(pattern.get());
-    bodyPat.push_back(pattern.get());
-  }
-  return makeParserSuccess();
-}
 
 /// \brief Determine the kind of a default argument given a parsed
 /// expression that has not yet been type-checked.
@@ -386,36 +358,62 @@ parseSelectorFunctionArguments(Parser &P,
   return Status;
 }
 
+/// Parse function arguments.
+///   func-arguments:
+///     curried-arguments | selector-arguments
+///   curried-arguments:
+///     pattern-tuple+
+///   selector-arguments:
+///     '(' selector-element ')' (identifier '(' selector-element ')')+
+///   selector-element:
+///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
+///
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
                                bool &HasSelectorStyleSignature) {
-  // Parse the first function argument clause.
-  ParserResult<Pattern> FirstPattern =
-    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
-  if (FirstPattern.isNull()) {
-    // Recover by creating a '()' pattern.
-    auto EmptyTuplePattern =
-        TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
-    ArgPatterns.push_back(EmptyTuplePattern);
-    BodyPatterns.push_back(EmptyTuplePattern);
-  }
+  // A function argument list is either curried or selector style, it can't be
+  // a mix of the two.  Decide at the second chunk, when we clear this pointer.
+  DefaultArgumentInfo *DefaultArgInfo = &DefaultArgs;
 
-  // FIXME: more strict check would be to look for l_paren as well.
-  if (isAtStartOfBindingName()) {
-    // This looks like a selector-style argument.  Try to convert the first
-    // argument pattern into a single argument type and parse subsequent
-    // selector forms.
-    HasSelectorStyleSignature = true;
-    return ParserStatus(FirstPattern) |
-           parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
-                                          DefaultArgs, FirstPattern.get());
-  } else {
-    ArgPatterns.push_back(FirstPattern.get());
-    BodyPatterns.push_back(FirstPattern.get());
-    return ParserStatus(FirstPattern) |
-           parseCurriedFunctionArguments(*this, ArgPatterns, BodyPatterns);
+  ParserStatus Result;
+
+  // Parse all of the selector arguments or curried argument pieces.
+  while (1) {
+    // Parse the first function argument clause.
+    ParserResult<Pattern> ArgPattern =
+      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, DefaultArgInfo);
+
+    if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
+      return ArgPattern;
+
+    // If we've reached the end of the first argument, decide whether this is
+    // a curried argument list, a selector style argument list, or if we're
+    // done.
+    if (DefaultArgInfo) {
+      HasSelectorStyleSignature = isAtStartOfBindingName();
+      DefaultArgInfo = nullptr;
+    }
+
+    if (HasSelectorStyleSignature) {
+      // This looks like a selector-style argument.  Try to convert the first
+      // argument pattern into a single argument type and parse subsequent
+      // selector forms.
+      return ParserStatus(ArgPattern) |
+             parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
+                                            DefaultArgs, ArgPattern.get());
+    }
+
+    ArgPatterns.push_back(ArgPattern.get());
+    BodyPatterns.push_back(ArgPattern.get());
+    Result |= ArgPattern;
+
+    // If we're out of pieces, we're done.
+    if (Tok.isNot(tok::l_paren)) {
+      assert(!ArgPatterns.empty());
+      return Result;
+    }
   }
 }
 
@@ -436,10 +434,20 @@ Parser::parseFunctionSignature(SmallVectorImpl<Pattern *> &argPatterns,
 
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
-  if (Tok.is(tok::l_paren))
+  if (Tok.is(tok::l_paren)) {
     Status = parseFunctionArguments(argPatterns, bodyPatterns, defaultArgs,
                                     HasSelectorStyleSignature);
-  else {
+
+    if (bodyPatterns.empty()) {
+      // If we didn't get anything, add a () pattern to avoid breaking
+      // invariants.
+      assert(Status.hasCodeCompletion() || Status.isError());
+      bodyPatterns.push_back(TuplePattern::create(Context, Tok.getLoc(),
+                                                  {}, Tok.getLoc()));
+      argPatterns.push_back(bodyPatterns.back());
+    }
+
+  } else {
     diagnose(Tok, diag::func_decl_without_paren);
     Status = makeParserError();
 
