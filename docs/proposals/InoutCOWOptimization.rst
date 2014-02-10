@@ -86,8 +86,10 @@ forcing a copy-on-write.  To accomplish that:
 * When a unique reference ``r`` to a COW buffer ``b`` is copied into
   an ``inout`` lvalue, we store ``r``\ 's address in ``b.TOP``.
 
-* When ``b`` is written into a non-``inout`` lvalue, ``b.TOP`` is
-  cleared.
+* When ``b`` is written (but not written-back) into a non-``inout``
+  lvalue, ``b.TOP`` is cleared.
+
+* When ``b`` is written-back into ``r``, ``b.TOP`` is cleared.
 
 * A COW buffer can be modified in-place when it is uniquely referenced
   *or* when its ``TOP`` is non-null.
