@@ -15,6 +15,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
+#include "swift/Strings.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
@@ -722,7 +723,7 @@ private:
 
   NodePointer createSwiftType(Node::Kind typeKind, StringRef name) {
     NodePointer type = Node::create(typeKind);
-    type->addChild(Node::create(Node::Kind::Module, "swift"));
+    type->addChild(Node::create(Node::Kind::Module, STDLIB_NAME));
     type->addChild(Node::create(Node::Kind::Identifier, name));
     return type;
   }
@@ -736,7 +737,7 @@ private:
     if (Mangled.nextIf('C'))
       return Node::create(Node::Kind::Module, "C");
     if (Mangled.nextIf('s'))
-      return Node::create(Node::Kind::Module, "swift");
+      return Node::create(Node::Kind::Module, STDLIB_NAME);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))
@@ -1682,7 +1683,7 @@ private:
 
   static bool isSwiftModule(Node *node) {
     return (node->getKind() == Node::Kind::Module &&
-            node->getText() == "swift");
+            node->getText() == STDLIB_NAME);
   }
 
   static bool isIdentifier(Node *node, StringRef desired) {

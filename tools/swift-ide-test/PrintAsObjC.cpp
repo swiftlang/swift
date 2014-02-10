@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PrintAsObjC.h"
+#include "swift/Strings.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/TypeVisitor.h"
@@ -371,7 +372,7 @@ private:
       MAP(String, "NSString *");
       MAP(COpaquePointer, "void *");
 
-      Identifier ID_ObjectiveC = ctx.getIdentifier("ObjectiveC");
+      Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = "BOOL";
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = "SEL";
     }

@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/Strings.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -257,7 +258,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     SourceMgr(SourceMgr),
     Diags(Diags),
     TheBuiltinModule(createBuiltinModule(*this)),
-    StdlibModuleName(getIdentifier("swift")),
+    StdlibModuleName(getIdentifier(STDLIB_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),

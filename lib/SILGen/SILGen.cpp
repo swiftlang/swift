@@ -12,6 +12,7 @@
 
 #include "SILGenFunction.h"
 #include "llvm/ADT/Optional.h"
+#include "swift/Strings.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/NameLookup.h"
@@ -155,7 +156,7 @@ static SILType getObjCBoolTy(SILGenModule &SGM) {
 
 SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
-                       "Foundation", "convertNSStringToString",
+                       FOUNDATION_MODULE_NAME, "convertNSStringToString",
                        {getNSStringTy(*this), getInOutStringTy(*this)},
                        Types.getEmptyTupleType());
 }
@@ -181,7 +182,7 @@ SILDeclRef SILGenModule::getStringDefaultInitFn() {
     
     if (!defaultCtor) {
       diagnose(SourceLoc(), diag::bridging_function_missing,
-               "swift", "String.init()");
+               STDLIB_NAME, "String.init()");
       exit(1);
     }
     
@@ -191,21 +192,21 @@ SILDeclRef SILGenModule::getStringDefaultInitFn() {
 
 SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
-                       "Foundation", "convertStringToNSString",
+                       FOUNDATION_MODULE_NAME, "convertStringToNSString",
                        {getInOutStringTy(*this)},
                        getNSStringTy(*this));
 }
 
 SILDeclRef SILGenModule::getBoolToObjCBoolFn() {
   return getBridgingFn(BoolToObjCBoolFn, *this,
-                       "ObjectiveC", "convertBoolToObjCBool",
+                       OBJC_MODULE_NAME, "convertBoolToObjCBool",
                        {getBoolTy(*this)},
                        getObjCBoolTy(*this));
 }
 
 SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
   return getBridgingFn(ObjCBoolToBoolFn, *this,
-                       "ObjectiveC", "convertObjCBoolToBool",
+                       OBJC_MODULE_NAME, "convertObjCBoolToBool",
                        {getObjCBoolTy(*this)},
                        getBoolTy(*this));
 }

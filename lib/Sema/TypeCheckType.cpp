@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
 
+#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/NameLookup.h"
@@ -1723,7 +1724,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 
   lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCRepresentableTypes);
 
-  Identifier ID_ObjectiveC = Context.getIdentifier("ObjectiveC");
+  Identifier ID_ObjectiveC = Context.getIdentifier(OBJC_MODULE_NAME);
   if (auto ObjCModule = Context.getLoadedModule(ID_ObjectiveC)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));

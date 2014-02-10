@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
@@ -117,7 +118,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   MappedCTypeKind CTypeKind;
   unsigned Bitwidth;
   StringRef SwiftModuleName;
-  bool IsSwiftModule; // True if SwiftModuleName == "swift".
+  bool IsSwiftModule; // True if SwiftModuleName == STDLIB_NAME.
   StringRef SwiftTypeName;
   MappedLanguages Languages;
   bool CanBeMissing;
@@ -129,8 +130,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
-      if (Impl.SwiftContext.StdlibModuleName.str() ==              \
-          SWIFT_MODULE_NAME)                                       \
+      if (SWIFT_MODULE_NAME == STDLIB_NAME)                        \
         IsSwiftModule = true;                                      \
       else {                                                       \
         IsSwiftModule = false;                                     \
@@ -3046,7 +3046,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   // imported.
   if (!Result->getDeclContext()->isModuleScopeContext() ||
       (Result->getModuleContext() != getSwiftModule() &&
-       Result->getModuleContext() != getNamedModule("ObjectiveC"))) {
+       Result->getModuleContext() != getNamedModule(OBJC_MODULE_NAME))) {
     assert(
         // Either the Swift declaration was from stdlib,
         !Result->getClangDecl() ||

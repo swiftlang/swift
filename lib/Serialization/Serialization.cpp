@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
 #include "ModuleFormat.h"
 #include "Serialization.h"
 #include "SILFormat.h"

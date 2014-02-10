@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -141,7 +142,7 @@ namespace {
         if (pointeeStruct &&
             !pointeeStruct->getDecl()->isCompleteDefinition() &&
             pointee->getDecl()->getName() == "NSZone") {
-          Module *Foundation = Impl.getNamedModule("Foundation");
+          Module *Foundation = Impl.getNamedModule(FOUNDATION_MODULE_NAME);
           Type wrapperTy = Impl.getNamedSwiftType(Foundation, "NSZone");
           if (wrapperTy)
             return wrapperTy;
@@ -724,7 +725,7 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
 
 bool ClangImporter::Implementation::hasFoundationModule() {
   if (!checkedFoundationModule) {
-    Identifier name = SwiftContext.getIdentifier("Foundation");
+    Identifier name = SwiftContext.getIdentifier(FOUNDATION_MODULE_NAME);
     auto mod = SwiftContext.getModule({ {name, SourceLoc()} });
     checkedFoundationModule = (mod != nullptr);
   }

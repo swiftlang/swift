@@ -18,7 +18,7 @@
 
 #include "Tools.h"
 #include "ToolChains.h"
-#include "swift/Subsystems.h"
+#include "swift/Strings.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
