@@ -49,6 +49,9 @@ std::string getSwiftFullVersion() {
   OS << SWIFT_VENDOR;
 #endif
   OS << "Swift version " SWIFT_VERSION_STRING;
+#ifdef SWIFT_SUBMIT_VERSION_STRING
+  OS << " (" SWIFT_SUBMIT_VERSION_STRING ")";
+#endif
   return OS.str();
 }
   

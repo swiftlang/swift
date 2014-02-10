@@ -21,10 +21,6 @@ if(MODULES_SDK)
                    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
-if (SWIFT_SUBMIT_VERSION)
-  add_definitions(-DSWIFT_VERSION_STRING="swift-${SWIFT_SUBMIT_VERSION}.${SWIFT_SUBMIT_SUBVERSION}")
-endif()
-
 install(TARGETS ${name}
   RUNTIME DESTINATION bin)
 
