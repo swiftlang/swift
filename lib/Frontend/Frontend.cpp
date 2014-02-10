@@ -48,7 +48,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
          ++i)
       Args.push_back(Invok.getFrontendOptions().LLVMArgs[i].c_str());
     Args.push_back(nullptr);
-    llvm::cl::ParseCommandLineOptions(Args.size(), Args.data());
+    llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
   }
 
   Context.reset(new ASTContext(Invocation.getLangOptions(),
