@@ -32,7 +32,7 @@ A successfully-bridged array type would be both "great for Cocoa" and
 Being "great for Cocoa" means this must work and be efficient::
 
   var a = [cocoaObject1, cocoaObject2]
-  someCocoaObject.passAnNSArray(a)
+  someCocoaObject.takesAnNSArray(a)
 
   func processViews(views: AnyObject[]) { ... }
   var b = someNSWindow.views // views is an NSArray
@@ -64,20 +64,26 @@ class, converts implicitly to NSArray.
 Optimization
 ============
 
-Any type with two (or more) representations naturally penalizes
+Any type with more than one representation naturally penalizes
 fine-grained operations such as indexing, because the cost of
 repeatedly branching to handle each representation becomes
-significant.
+significant.  For example, the design above would pose significant performance
+problems for arrays of integers, because every subscript operation would have to
+check to see if the representation is an NSArray, realize it is not, then do the
+constant time index into the native representation.  Beyond requiring an extra
+check, this check would disable optimizations that can provide a signficant
+performance win (like auto-vectorization).
 
 However, the inherent limitations of ``NSArray`` mean that we can
 often know at compile-time which representation is in play.  So the
 plan is to teach the compiler to optimize for the ``Native`` case
-unless the element type is an ``@objc`` class.  When ``T`` is
-statically known not to be an ``@objc`` class, it should be possible
-to eliminate the ``Cocoa`` case entirely.  When generating code for
+unless the element type is an ``@objc`` class or AnyObject.  When ``T`` is
+statically known not to be an ``@objc`` class or AnyObject, it will be
+possible to eliminate the ``Cocoa`` case entirely.  When generating code for
 generic algorithms, we can favor the ``Native`` case, perhaps going so
-far as to specialize for the case where all parameters are
-``non-@objc`` classes.
+far as to specialize for the case where all parameters are ``non-@objc``
+classes.  This will give us C-like performance for array operations on Int's,
+Float's, and other struct types [#boundscheck]_.
 
 Opportunity Feature
 ===================
@@ -85,7 +91,9 @@ Opportunity Feature
 For hardcore systems programming, we can expose ``ContiguousArray`` as
 a user-consumable type.  That will allow programmers who don't care
 about Cocoa interoperability to avoid ever paying the cost of
-branching on representation.
+branching on representation.  This type would not bridge transparently to Array,
+but could be useful if you need an array of Objective-C type, don't care about
+NSArray compatibility, and care deeply about performance.
 
 Other Approaches Considered
 ===========================
@@ -94,7 +102,7 @@ We considered an approach where conversions between ``NSArray`` and
 native Swift ``Array`` were entirely manual and quickly ruled it out
 as failing to satisfy the requirements.
 
-We considered the earlier proposal by Joe that would make ``T[]`` a
+We considered another promising proposal that would make ``T[]`` a
 (hand-rolled) existential wrapper type.  Among other things, we felt
 this approach would expose multiple array types too prominently and
 would tend to "bless" an inappropriately-specific protocol as the
@@ -113,3 +121,6 @@ here, tuning the criteria by which we'd decide to optimize for a
    ``NSArray`` *will* be physically copied.  We accept that copy as
    the cost of doing business.
 
+.. [#boundscheck] Of course, by default, array bounds checking is enabled.
+   C does not include array bounds checks, so to get true C performance in all
+   cases, these will have to be disabled.
