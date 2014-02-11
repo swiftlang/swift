@@ -75,6 +75,8 @@
       ...
     }
 
+  they can also be used as non-member properties now, e.g. as a global
+  variable or a local variable in a function.
 
 2014-02-05
 ----------
