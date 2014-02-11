@@ -436,6 +436,13 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
     // what the base pointer of the two values are. Be conservative and return
     // MayAlias.
+    //
+    // FIXME: The only way this should happen realistically is if there are
+    // casts in between two projection instructions. getUnderlyingObject will
+    // ignore that, while findAddressProjectionPathBetweenValues wont. The two
+    // solutions are to make address projections variadic (something on the wee
+    // horizon) or enable Projection to represent a cast as a special sort of
+    // projection.
     if (!Result)
       return AliasAnalysis::AliasResult::MayAlias;
 
