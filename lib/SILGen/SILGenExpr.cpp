@@ -179,6 +179,9 @@ namespace {
     RValue visitCovariantFunctionConversionExpr(
              CovariantFunctionConversionExpr *E,
              SGFContext C);
+    RValue visitCovariantReturnConversionExpr(
+             CovariantReturnConversionExpr *E,
+             SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
@@ -901,10 +904,23 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   CanAnyFunctionType destTy
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
-  SILValue converted = SGF.B.createConvertFunction(e, original.getValue(),
-                                                   resultType);
-  ManagedValue result(converted, original.getCleanup());
-  return RValue(SGF, e, result);
+  SILValue result = SGF.B.createConvertFunction(e, 
+                                                original.forward(SGF),
+                                                resultType);
+  return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
+}
+
+RValue RValueEmitter::visitCovariantReturnConversionExpr(
+                        CovariantReturnConversionExpr *e,
+                        SGFContext C) {
+  ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
+  SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
+  SILValue result = SGF.B.createRefToObjectPointer(e,
+                                                   original.forward(SGF),
+                                                   objectPtrTy);
+  SILType resultTy = SGF.getLoweredType(e->getType());
+  result = SGF.B.createObjectPointerToRef(e, result, resultTy);
+  return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
 namespace {

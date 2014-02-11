@@ -1780,9 +1780,7 @@ public:
 /// This conversion is technically unsafe; however, semantic analysis will
 /// only introduce such a conversion in cases where other language features
 /// (i.e., DynamicSelf) enforce static safety. Additionally, this conversion
-/// avoid changing the
-///
-/// FIXME: This should be a CapturingExpr.
+/// avoids changing the ABI of the function in question.
 class CovariantFunctionConversionExpr : public ImplicitConversionExpr {
 public:
   CovariantFunctionConversionExpr(Expr *subExpr, Type type)
@@ -1791,8 +1789,25 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CovariantFunctionConversion;
-    }
-  };
+  }
+};
+
+/// Perform a conversion from a superclass to a subclass for a call to
+/// a method with a covariant result type.
+///
+/// This conversion is technically unsafe; however, semantic analysis will
+/// only introduce such a conversion in cases where other language features
+/// (i.e., DynamicSelf) enforce static safety.
+class CovariantReturnConversionExpr : public ImplicitConversionExpr {
+public:
+  CovariantReturnConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::CovariantReturnConversion, subExpr,
+                             type) { }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CovariantReturnConversion;
+  }
+};
 
 /// MetatypeConversionExpr - Convert a metatype to another metatype
 /// using essentially a derived-to-base conversion.

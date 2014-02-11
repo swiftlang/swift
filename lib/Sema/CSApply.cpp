@@ -3371,6 +3371,21 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;
+
+  // If we're applying a function that resulted from a covariant
+  // function conversion, strip off that conversion.
+  // FIXME: It would be nicer if we could build the ASTs properly in the
+  // first shot.
+  Type covariantResultType;
+  if (auto covariant = dyn_cast<CovariantFunctionConversionExpr>(fn)) {
+    // Strip off one layer of application from the covariant result.
+    covariantResultType
+      = covariant->getType()->castTo<AnyFunctionType>()->getResult();
+   
+    // Use the subexpression as the function.
+    fn = covariant->getSubExpr();
+  }
+
   apply->setFn(fn);
 
   // Check whether the argument is 'super'.
@@ -3420,6 +3435,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         // Remove this from the set of opened existentials.
         OpenedExistentials.erase(opened);
       }
+    }
+
+    // If we have a covariant result type, perform the conversion now.
+    if (covariantResultType) {
+      if (covariantResultType->is<FunctionType>())
+        result = new (tc.Context) CovariantFunctionConversionExpr(
+                                    result,
+                                    covariantResultType);
+      else
+        result = new (tc.Context) CovariantReturnConversionExpr(
+                                    result, 
+                                    covariantResultType);
     }
 
     return result;

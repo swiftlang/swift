@@ -1249,6 +1249,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E){
+    printCommon(E, "covariant_return_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitErasureExpr(ErasureExpr *E) {
     printCommon(E, "erasure_expr") << '\n';
     printRec(E->getSubExpr());
