@@ -29,5 +29,6 @@ add_swift_library(swiftSILPasses
   AllocRefElimination.cpp
   InstCount.cpp
   AADumper.cpp
+  LoadStoreOpts.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
 

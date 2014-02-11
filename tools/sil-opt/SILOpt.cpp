@@ -55,6 +55,7 @@ enum class PassKind {
   AllocRefElimination,
   InstCount,
   AADumper,
+  LoadStoreOpts,
 };
 
 static llvm::cl::opt<std::string>
@@ -152,6 +153,10 @@ Passes(llvm::cl::desc("Passes:"),
                                    "aa-dump",
                                    "Dump AA result for all pairs of ValueKinds"
                                    " in all functions."),
+                        clEnumValN(PassKind::LoadStoreOpts,
+                                   "load-store-opts",
+                                   "Remove duplicate loads, dead stores, and "
+                                   "perform load forwarding."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -327,6 +332,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::AADumper:
       PM.add(createSILAADumper());
+      break;
+    case PassKind::LoadStoreOpts:
+      PM.add(createLoadStoreOpts());
       break;
     }
 

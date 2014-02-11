@@ -81,6 +81,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createMem2Reg());
     PM.add(createCSE());
     PM.add(createSILCombine());
+    PM.add(createLoadStoreOpts());
     PM.add(createCodeMotion());
     PM.add(createSimplifyCFG());
     PM.add(createDevirtualization());
