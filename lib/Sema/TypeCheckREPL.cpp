@@ -96,7 +96,7 @@ namespace {
 
     Expr *buildPrintRefExpr(SourceLoc loc) {
       assert(!C.PrintDecls.empty());
-      return TC.buildRefExpr(C.PrintDecls, loc, /*Implicit=*/true);
+      return TC.buildRefExpr(C.PrintDecls, DC, loc, /*Implicit=*/true);
     }
   };
 }

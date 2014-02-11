@@ -323,7 +323,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       return new (TC.Context) ErrorExpr(Loc);
     }
 
-    return TC.buildRefExpr(ResultValues, Loc, UDRE->isImplicit(),
+    return TC.buildRefExpr(ResultValues, Context, Loc, UDRE->isImplicit(),
                            UDRE->isSpecialized());
   }
 
@@ -1165,7 +1165,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   }
   
   // Build the 'expr ~= var' expression.
-  auto *matchOp = buildRefExpr(choices, EP->getLoc(), /*Implicit=*/true);
+  auto *matchOp = buildRefExpr(choices, DC, EP->getLoc(), /*Implicit=*/true);
   auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
                                                 EP->getLoc(),
                                                 /*Implicit=*/true);

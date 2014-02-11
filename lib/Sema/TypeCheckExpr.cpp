@@ -460,16 +460,20 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
 Expr *TypeChecker::buildCheckedRefExpr(ValueDecl *value, DeclContext *UseDC,
                                        SourceLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
+  bool isDirectPropertyAccess = value->isUseFromContextDirect(UseDC);
   return new (Context) DeclRefExpr(value, loc, Implicit,
-                                   /*isDirectPropertyAccess*/false, type);
+                                   isDirectPropertyAccess, type);
 }
 
-Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
+Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
+                                DeclContext *UseDC, SourceLoc NameLoc,
                                 bool Implicit, bool isSpecialized) {
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit);
+    bool isDirectPropertyAccess = Decls[0]->isUseFromContextDirect(UseDC);
+    auto result = new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit,
+                                            isDirectPropertyAccess);
     if (isSpecialized)
       result->setSpecialized();
     return result;

@@ -35,10 +35,8 @@ Type Solution::getFixedType(TypeVariableType *typeVar) const {
   return knownBinding->second;
 }
 
-Type Solution::computeSubstitutions(
-                 Type origType,
-                 DeclContext *dc,
-                 Type openedType,
+Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
+                                    Type openedType,
                  SmallVectorImpl<Substitution> &substitutions) const {
   auto &tc = getConstraintSystem().getTypeChecker();
   auto &ctx = tc.Context;
@@ -263,14 +261,8 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
     return true;
   }
 
-  // Observing member are accessed directly from within their didSet/willSet
-  // specifiers.  This prevents assignments from becoming infinite loops.
-  if (member->getStorageKind() == VarDecl::Observing)
-    if (auto *FD = dyn_cast<FuncDecl>(DC))
-      if (FD->getAccessorStorageDecl() == member)
-        return true;
-
-  return false;
+  // If the value is always directly accessed from this context, do it.
+ return member->isUseFromContextDirect(DC);
 }
 
 namespace {
@@ -1966,9 +1958,8 @@ namespace {
             break;
         }
         
-        Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(),
-                               SourceLoc(),
-                               /*implicit*/ true);
+        Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(), dc,
+                                     SourceLoc(), /*implicit*/ true);
         Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
                                MetatypeType::get(baseElementType, tc.Context));
         Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);

@@ -435,6 +435,20 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
 
+/// Return true if a DeclRefExpr or MemberRefExpr use of this value is
+/// "direct" when being used in the specified context.
+bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
+  // Observing member are accessed directly from within their didSet/willSet
+  // specifiers.  This prevents assignments from becoming infinite loops.
+  if (auto *var = dyn_cast<AbstractStorageDecl>(this))
+    if (auto *UseFD = dyn_cast<FuncDecl>(UseDC))
+      if (var->hasStorage() && var->hasAccessorFunctions() &&
+          UseFD->getAccessorStorageDecl() == var)
+        return true;
+  
+  return false;
+}
+
 
 bool ValueDecl::isDefinition() const {
   switch (getKind()) {

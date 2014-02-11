@@ -1429,6 +1429,10 @@ public:
   /// Returns the protocol requirements that this decl conforms to.
   ArrayRef<ValueDecl *> getConformances();
 
+  /// Return true if a DeclRefExpr or MemberRefExpr use of this value is
+  /// "direct" when being used in the specified context.
+  bool isUseFromContextDirect(const DeclContext *DC) const;
+  
   /// Dump a reference to the given declaration.
   void dumpRef(raw_ostream &os) const;
 

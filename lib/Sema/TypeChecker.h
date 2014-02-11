@@ -862,8 +862,9 @@ public:
 
   /// \brief Build a reference to a declaration, where name lookup returned
   /// the given set of declarations.
-  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, SourceLoc NameLoc,
-                     bool Implicit, bool isSpecialized = false);
+  Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
+                     SourceLoc NameLoc, bool Implicit,
+                     bool isSpecialized = false);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.
