@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
@@ -391,6 +392,62 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   return false;
 }
 
+/// Returns true if every projection in V1Path and V2Path equal. Returns false
+/// otherwise.
+static bool projectionListsEqual(llvm::SmallVectorImpl<Projection> &V1Path,
+                                 llvm::SmallVectorImpl<Projection> &V2Path) {
+  if (V1Path.size() != V2Path.size())
+    return false;
+
+  for (unsigned i = 0, e = V1Path.size(); i != e; ++i)
+    if (V1Path[i] != V2Path[i])
+      return false;
+
+  return true;
+}
+
+/// Uses a bunch of ad-hoc rules to disambiguate a GEP instruction against
+/// another pointer. We know that V1 is a GEP, but we don't know anything about
+/// V2. O1, O2 are getUnderlyingObject of V1, V2 respectively.
+static
+AliasAnalysis::AliasResult
+aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
+                       SILValue O2) {
+
+  // If V2 is also a gep instruction with a must-alias or not-aliasing base
+  // pointer, figure out if the indices of the GEPs tell us anything about the
+  // derived pointers.
+  if (Projection::isAddressProjection(V2)) {
+    // Do the base pointers alias?
+    AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
+
+    // If we get a NoAlias or a MayAlias, then there is nothing we can do here
+    // so just return the base alias value.
+    if (BaseAlias != AliasAnalysis::AliasResult::MustAlias)
+      return BaseAlias;
+
+    // Otherwise, we have a MustAlias result. Since the base pointers alias each
+    // other exactly, see if computing offsets from the common pointer tells us
+    // about the relation of the resulting pointer.
+    llvm::SmallVector<Projection, 4> V1Path, V2Path;
+    bool Result = findAddressProjectionPathBetweenValues(O1, V1, V1Path);
+    Result &= findAddressProjectionPathBetweenValues(O1, V2, V2Path);
+
+    // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
+    // what the base pointer of the two values are. Be conservative and return
+    // MayAlias.
+    if (!Result)
+      return AliasAnalysis::AliasResult::MayAlias;
+
+    // If all of the projections are equal, the two GEPs must be the same.
+    if (projectionListsEqual(V1Path, V2Path))
+      return AliasAnalysis::AliasResult::MustAlias;
+  }
+
+  // We failed to prove anything. Be conservative and return MayAlias.
+  return AliasAnalysis::AliasResult::MayAlias;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//
@@ -442,6 +499,27 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
     return AliasCache[Key] = AliasResult::NoAlias;
+
+  // Ok, either O1, O2 are the same or we could not prove anything based off of
+  // their inequality. Now we climb up use-def chains and attempt to do tricks
+  // based off of GEPs.
+
+  // First if one instruction is a gep and the other is not, canonicalize our
+  // inputs so that V1 always is the instruction containing the GEP.
+  if (!Projection::isAddressProjection(V1) &&
+      Projection::isAddressProjection(V2)) {
+    std::swap(V1, V2);
+    std::swap(O1, O2);
+  }
+
+  // If V1 is an address projection, attempt to use information from the
+  // aggregate type tree to disambiguate it from V2.
+  if (Projection::isAddressProjection(V1)) {
+    AliasResult Result = aliasAddressProjection(*this, V1, V2, O1, O2);
+    if (Result != AliasResult::MayAlias)
+      return AliasCache[Key] = Result;
+  }
+
 
   // We could not prove anything. Be conservative and return that V1, V2 may
   // alias.

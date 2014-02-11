@@ -69,6 +69,10 @@ public:
       return !Other.getDecl() && Index == Other.getIndex();
   }
 
+  bool operator!=(Projection &Other) const {
+    return !(*this == Other);
+  }
+
   bool operator<(Projection Other) const {
     // If Proj1 is a decl...
     if (auto *D = getDecl()) {

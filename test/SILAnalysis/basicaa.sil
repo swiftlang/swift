@@ -595,3 +595,21 @@ bb0(%0 : $*Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer):
   %12 = tuple ()
   return %12 : $()
 }
+
+// CHECK-LABEL: @projections_from_the_same_source_with_the_same_projection_path_mustalias
+// CHECK: PAIR #67.
+// CHECK-NEXT: (0):   %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT: (0):   %3 = tuple_element_addr %2 : $*(Builtin.Int64, Builtin.Int32), 1
+// CHECK-NEXT: MustAlias
+sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : $@thin () -> () {
+  %0 = alloc_stack $StructLvl1
+  %1 = struct_element_addr %0#1 : $*StructLvl1, #sub
+  %2 = struct_element_addr %1 : $*StructLvl2, #tup
+  %3 = tuple_element_addr %2 : $*(Builtin.Int64, Builtin.Int32), 1
+  %4 = struct_element_addr %0#1 : $*StructLvl1, #sub
+  %5 = struct_element_addr %4 : $*StructLvl2, #tup
+  %6 = tuple_element_addr %5 : $*(Builtin.Int64, Builtin.Int32), 1
+  dealloc_stack %0#0 : $*@local_storage StructLvl1
+  %7 = tuple()
+  return %7 : $()
+}
