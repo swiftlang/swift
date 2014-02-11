@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -479,3 +480,33 @@ FormalLinkage swift::getConformanceLinkage(const ProtocolConformance *conf) {
   return FormalLinkage::PublicUnique;
 }
 
+/// Returns true if we are able to find an address projection path from V1 to
+/// V2. Inserts the found path into Path.
+bool
+swift::
+findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
+                                       SmallVectorImpl<Projection> &Path) {
+  // If V1 == V2, there is a "trivial" address projection in between the
+  // two. This is represented by returning true, but putting nothing into Path.
+  if (V1 == V2)
+    return true;
+
+  // Otherwise see if V2 can be projection extracted from V1. First see if
+  // V2 is a projection at all.
+  auto Iter = V2;
+  while (Projection::isAddressProjection(Iter) && V1 != Iter) {
+    if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter.getDef()))
+      Path.push_back(Projection(Iter.getType(), SEA->getField(),
+                                Projection::NominalType::Struct));
+    else if (auto *TEA = dyn_cast<TupleElementAddrInst>(Iter.getDef()))
+      Path.push_back(Projection(Iter.getType(), TEA->getFieldNo()));
+    else
+      Path.push_back(Projection(Iter.getType(),
+                                cast<RefElementAddrInst>(*Iter).getField(),
+                                Projection::NominalType::Class));
+    Iter = cast<SILInstruction>(*Iter).getOperand(0);
+  }
+
+  // Return true if we have a non-empty projection list and if V1 == Iter.
+  return !Path.empty() && V1 == Iter;
+}

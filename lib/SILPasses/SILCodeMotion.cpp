@@ -49,40 +49,33 @@ static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
   }
 }
 
-// Given an already emitted load PrevLd, see if we can
+/// Given the already emitted load PrevLI, see if we can find a projection
+/// address path to LI. If we can, emit the corresponding aggregate projection
+/// insts and return the last such inst.
 static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
+  // Attempt to find the projection path from LI -> PrevLI.
   SILValue PrevLIOp = PrevLI->getOperand();
   SILValue LIOp = LI->getOperand();
+  llvm::SmallVector<Projection, 4> ProjectionPath;
 
-  // If they are equal, just return PrevLI.
-  if (PrevLIOp == LIOp)
-    return PrevLI;
-
-  // Otherwise see if LI can be projection extracted from PrevLI. First see if
-  // LI is a projection at all.
-  llvm::SmallVector<Projection, 4> Projections;
-  auto Iter = LIOp;
-  while (Projection::isAddressProjection(Iter) &&
-         !isa<RefElementAddrInst>(Iter.getDef()) && PrevLIOp != Iter) {
-    if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter.getDef()))
-      Projections.push_back(Projection(Iter.getType(), SEA->getField()));
-    else
-      Projections.push_back(
-        Projection(Iter.getType(),
-                   cast<TupleElementAddrInst>(*Iter).getFieldNo()));
-    Iter = cast<SILInstruction>(*Iter).getOperand(0);
-  }
-
-  // We could not find an extract path in between the two values.
-  if (Projections.empty() || PrevLIOp != Iter)
+  // If we failed to find the path, return an empty value early.
+  if (!findAddressProjectionPathBetweenValues(PrevLIOp, LIOp, ProjectionPath))
     return SILValue();
 
-  // Use the projection list we created to create the relevant extracts
+  // If we found a projection path, but there are no projections, then the two
+  // loads must be the same, return PrevLI.
+  if (ProjectionPath.empty())
+    return PrevLI;
+
+  // Ok, at this point we know that we can construct our aggregate projections
+  // from our list of address projections.
   SILValue LastExtract = PrevLI;
   SILBuilder Builder(LI);
-  while (!Projections.empty()) {
-    auto P = Projections.pop_back_val();
+  while (!ProjectionPath.empty()) {
+    auto P = ProjectionPath.pop_back_val();
     if (auto *D = P.getDecl()) {
+      assert(P.getNominalType() != Projection::NominalType::Class &&
+             "Aggregate projections do not exist for classes.");
       LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
                                                 D,
                                                 P.getType().getObjectType());

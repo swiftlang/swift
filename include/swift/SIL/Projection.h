@@ -21,38 +21,61 @@
 
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
 
 /// An abstract representation of a SIL Projection that allows one to refer to
 /// either nominal fields or tuple indices.
 class Projection {
+public:
+
+  /// The nominal type of the projection if representing a var decl. This allows
+  /// us to distinguish in between struct_element_addr and ref_element_addr in a
+  /// manner independent of the two.
+  enum class NominalType : unsigned {
+    Struct,
+    Class,
+  };
+
+private:
+  /// The type of this projection.
   SILType Type;
-  VarDecl *Decl;
+
+  /// The decl associated with this projection if the projection is representing
+  /// a nominal type.
+  llvm::PointerIntPair<VarDecl *, 1> Decl;
+
+  /// The index associated with the projection if the projection is representing
+  /// a tuple type.
   unsigned Index;
 
 public:
-  Projection(SILType T, VarDecl *D) : Type(T), Decl(D), Index(-1) {}
-  Projection(SILType T, unsigned I) : Type(T), Decl(nullptr), Index(I) {}
+
+  Projection(SILType T, VarDecl *D, NominalType NT) : Type(T),
+                                                      Decl(D, unsigned(NT)),
+                                                      Index(-1) {}
+  Projection(SILType T, unsigned I) : Type(T), Decl(), Index(I) {}
 
   SILType getType() const { return Type; }
-  VarDecl *getDecl() const { return Decl; }
+  VarDecl *getDecl() const { return Decl.getPointer(); }
   unsigned getIndex() const { return Index; }
+  NominalType getNominalType() const { return NominalType(Decl.getInt()); }
 
   bool operator==(Projection &Other) const {
-    if (Decl)
-      return Decl == Other.getDecl();
+    if (auto *D = getDecl())
+      return D == Other.getDecl();
     else
       return !Other.getDecl() && Index == Other.getIndex();
   }
 
   bool operator<(Projection Other) const {
     // If Proj1 is a decl...
-    if (Decl) {
+    if (auto *D = getDecl()) {
       // It should be sorted before Proj2 is Proj2 is not a decl. Otherwise
       // compare the pointers.
       if (auto OtherDecl = Other.getDecl())
-        return uintptr_t(Decl) < uintptr_t(OtherDecl);
+        return uintptr_t(D) < uintptr_t(OtherDecl);
       return true;
     }
 
@@ -72,6 +95,10 @@ public:
     }
   }
 };
+
+bool
+findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
+                                       llvm::SmallVectorImpl<Projection> &Path);
 
 } // end namespace swift
 
