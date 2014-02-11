@@ -352,9 +352,9 @@ ERROR(sil_local_storage_non_address, decl_parsing,none,
 ERROR(sil_value_redefinition, decl_parsing,none,
       "redefinition of value '%0'", (StringRef))
 ERROR(sil_value_use_type_mismatch, decl_parsing,none,
-      "value '%0' defined with mismatching type %1", (StringRef, Type))
+      "value '%0' defined with mismatching type %1 (expected %2)", (StringRef, Type, Type))
 ERROR(sil_value_def_type_mismatch, decl_parsing,none,
-      "value '%0' used with mismatching type %1", (StringRef, Type))
+      "value '%0' used with mismatching type %1 (expected %2)", (StringRef, Type, Type))
 ERROR(sil_use_of_undefined_value, decl_parsing,none,
       "use of undefined value '%0'", (StringRef))
 NOTE(sil_prior_reference,parsing,none,

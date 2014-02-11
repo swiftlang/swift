@@ -2,13 +2,57 @@
 
 sil_stage raw
 
-// CHECK: sil @foo : $<T> (@out T, @in T) -> () {
+// CHECK-LABEL: sil @foo : $@thin <T> (@out T, @in T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK:   return undef : $()
 // CHECK: }
-sil @foo : $<T> (@out T, @in T) -> () {
+sil @foo : $@thin <T> (@out T, @in T) -> () {
 entry(%o : $*T, %i : $*T):
   copy_addr [take] %i to [initialization] %o : $*T
   return undef : $()
+}
+
+struct Bar {}
+struct Bas {}
+
+// CHECK-LABEL: sil @ref_foo_1 : $@thin () -> () {
+// CHECK:   %2 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:   %3 = apply %2<ZYX = Bar>(%1#1, %0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+sil @ref_foo_1 : $@thin () -> () {
+entry:
+  %i = alloc_stack $Bar
+  %o = alloc_stack $Bar
+  %f = function_ref @foo : $@thin <XYZ> (@out XYZ, @in XYZ) -> ()
+  %z = apply %f<ZYX = Bar>(%o#1, %i#1) : $@thin <ZYX> (@out ZYX, @in ZYX) -> ()
+  dealloc_stack %o#0 : $*@local_storage Bar
+  dealloc_stack %i#0 : $*@local_storage Bar
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @ref_foo_2 : $@thin () -> () {
+// CHECK:  %2 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %3 = apply %2<CBA = Bas>(%1#1, %0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+sil @ref_foo_2 : $@thin () -> () {
+entry:
+  %i = alloc_stack $Bas
+  %o = alloc_stack $Bas
+  %f = function_ref @foo : $@thin <ABC> (@out ABC, @in ABC) -> ()
+  %z = apply %f<CBA = Bas>(%o#1, %i#1) : $@thin <CBA> (@out CBA, @in CBA) -> ()
+  dealloc_stack %o#0 : $*@local_storage Bas
+  dealloc_stack %i#0 : $*@local_storage Bas
+  return %z : $()
+}
+
+// CHECK-LABEL: sil @ref_foo_partial_apply : $@thin () -> @owned @callee_owned (@out Bas) -> () {
+// CHECK:  %1 = function_ref @foo : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  %2 = partial_apply %1<Y = Bas>(%0#1) : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0) -> ()
+// CHECK:  return %2 : $@callee_owned (@out Bas) -> ()
+sil @ref_foo_partial_apply : $@thin () -> @owned @callee_owned (@out Bas) -> () {
+entry:
+  %i = alloc_stack $Bas
+  %f = function_ref @foo : $@thin <Z> (@out Z, @in Z) -> ()
+  %g = partial_apply %f<Y = Bas>(%i#1) : $@thin <Y> (@out Y, @in Y) -> ()
+  dealloc_stack %i#0 : $*@local_storage Bas
+  return %g : $@callee_owned (@out Bas) -> ()
 }

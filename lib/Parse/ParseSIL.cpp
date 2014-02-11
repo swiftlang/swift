@@ -277,7 +277,8 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     
     // Verify that the types match up.
     if (Fn->getLoweredFunctionType() != Ty) {
-      P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(), Ty);
+      P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(),
+                 Fn->getLoweredFunctionType(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
       Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
                                SILFileLocation(Loc));
@@ -315,7 +316,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
     // If so, check for matching types.
     if (FnRef->getLoweredFunctionType() != Ty) {
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
-                 Name.str(), FnRef->getLoweredFunctionType());
+                 Name.str(), FnRef->getLoweredFunctionType(), Ty);
       FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
                                   SILFileLocation(Loc));
     }
@@ -412,7 +413,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
     if (EntryTy != Type) {
       HadError = true;
       P.diagnose(Name.NameLoc, diag::sil_value_use_type_mismatch, Name.Name,
-                 EntryTy.getSwiftRValueType()); // FIXME: lost value type
+                 EntryTy.getSwiftRValueType(), Type.getSwiftRValueType());
       // Make sure to return something of the requested type.
       return new (SILMod) GlobalAddrInst(Loc, nullptr, Type);
     }
@@ -459,7 +460,8 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     if (Entry->getTypes() != Value->getTypes()) {
       // FIXME: report correct entry
       P.diagnose(NameLoc, diag::sil_value_def_type_mismatch, Name,
-                 Entry->getType(0).getSwiftRValueType());
+                 Entry->getType(0).getSwiftRValueType(),
+                 Value->getType(0).getSwiftRValueType());
       HadError = true;
     } else {
       // Forward references only live here if they have a single result.
@@ -487,7 +489,8 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
       // Verify that any forward-referenced values line up.
       if (Entries.size() > Value->getTypes().size()) {
         P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                   Entry->getType(0).getSwiftRValueType());
+                   Entry->getType(0).getSwiftRValueType(),
+                   Value->getType(0).getSwiftRValueType());
         HadError = true;
         return;
       }
@@ -499,7 +502,8 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
 
         if (Entries[i]->getType(0) != Value->getType(i)) {
           P.diagnose(Loc, diag::sil_value_def_type_mismatch, Name,
-                     Entry->getType(0).getSwiftRValueType());
+                     Entry->getType(0).getSwiftRValueType(),
+                     Value->getType(i).getSwiftRValueType());
           HadError = true;
           return;
         }
@@ -1087,6 +1091,7 @@ bool parseApplySubstitutions(SILParser &SP,
     SP.P.diagnose(SP.P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
+  SP.P.consumeToken();
   
   return false;
 }
@@ -2125,7 +2130,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     if (global->getLoweredType().getAddressType() != Ty) {
       P.diagnose(IdLoc, diag::sil_value_use_type_mismatch, GlobalName.str(),
-                 global->getLoweredType().getSwiftRValueType());
+                 global->getLoweredType().getSwiftRValueType(),
+                 Ty.getSwiftRValueType());
       return true;
     }
 
@@ -2320,8 +2326,6 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     return true;
   }
 
-  auto ArgTys = FTI->getInterfaceParameterSILTypes();
-  
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
     if (!GenericParams) {
@@ -2331,6 +2335,21 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (getApplySubstitutionsFromParsed(*this, GenericParams, parsedSubs, subs))
       return true;
   }
+
+  SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
+
+  SILType FnTy = FnVal.getType();
+  CanSILFunctionType substFTI = FTI;
+  if (!subs.empty()) {
+    auto silFnTy = FnTy.castTo<SILFunctionType>();
+    substFTI
+      = silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(),
+                                           subs);
+    FnTy = SILType::getPrimitiveObjectType(substFTI);
+  }
+  
+  auto ArgTys = substFTI->getInterfaceParameterSILTypes();
+
   switch (Opcode) {
   default: assert(0 && "Unexpected case");
   case ValueKind::ApplyInst : {
@@ -2339,22 +2358,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
                  "have the right argument types");
       return true;
     }
-
-    SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
+    
     unsigned ArgNo = 0;
     SmallVector<SILValue, 4> Args;
     for (auto &ArgName : ArgNames)
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
-
-    SILType FnTy = FnVal.getType();
-    CanSILFunctionType substFTI = FTI;
-    if (!subs.empty()) {
-      auto silFnTy = FnTy.castTo<SILFunctionType>();
-      auto substFTI
-        = silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(),
-                                             subs);
-      FnTy = SILType::getPrimitiveObjectType(substFTI);
-    }
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
                               substFTI->getInterfaceResult().getSILType(),
@@ -2371,19 +2379,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     // Compute the result type of the partial_apply, based on which arguments
     // are getting applied.
-    SILValue FnVal = getLocalValue(FnName, Ty, InstLoc);
     SmallVector<SILValue, 4> Args;
     unsigned ArgNo = ArgTys.size() - ArgNames.size();
     for (auto &ArgName : ArgNames)
       Args.push_back(getLocalValue(ArgName, ArgTys[ArgNo++], InstLoc));
 
-    SILType FnTy = FnVal.getType();
-    if (!subs.empty()) {
-      auto silFnTy = FnTy.castTo<SILFunctionType>();
-      FnTy = SILType::getPrimitiveObjectType(
-        silFnTy->substInterfaceGenericArgs(SILMod, P.SF.getParentModule(), subs));
-    }
-    
     SILType closureTy =
       SILBuilder::getPartialApplyResultType(Ty, ArgNames.size(), SILMod, subs);
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
