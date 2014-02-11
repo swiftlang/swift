@@ -303,6 +303,23 @@ void Driver::buildInputs(const ToolChain &TC,
   }
 }
 
+static bool maybeBuildingExecutable(const OutputInfo &OI,
+                                    const DerivedArgList &Args,
+                                    const Driver::InputList &Inputs) {
+  switch (OI.LinkAction) {
+  case LinkKind::Executable:
+    return true;
+  case LinkKind::DynamicLibrary:
+    return false;
+  case LinkKind::None:
+    break;
+  }
+
+  if (Args.hasArg(options::OPT_parse_as_library, options::OPT_parse_stdlib))
+    return false;
+  return Inputs.size() == 1;
+}
+
 void Driver::buildOutputInfo(const DerivedArgList &Args,
                              const InputList &Inputs, OutputInfo &OI) const {
   // By default, the driver does not link its output; this will be updated
@@ -423,7 +440,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       (OI.ModuleName == STDLIB_NAME &&
        !Args.hasArg(options::OPT_parse_stdlib))) {
     OI.ModuleNameIsFallback = true;
-    if (OI.CompilerOutputType == types::TY_Nothing)
+    if (OI.CompilerOutputType == types::TY_Nothing ||
+        maybeBuildingExecutable(OI, Args, Inputs))
       OI.ModuleName = "main";
     else if (!Inputs.empty() || OI.CompilerMode == OutputInfo::Mode::REPL) {
       // Having an improper module name is only bad if we have inputs or if
