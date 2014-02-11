@@ -284,14 +284,21 @@ static bool isInterestingInstruction(ValueKind Kind) {
 }
 #endif
 
-static bool
+/// Analyze a single BB for refcount inc/dec instructions.
+///
+/// If anything was found it will be added to DecToIncStateMap.
+///
+/// NestingDetected will be set to indicate that the block needs to be
+/// reanalyzed if code motion occurs.
+static void
 processBBTopDown(SILBasicBlock &BB,
                  llvm::MapVector<SILValue, ReferenceCountState> &BBState,
                  llvm::DenseMap<SILInstruction *,
                                 ReferenceCountState> &DecToIncStateMap,
+                 bool &NestingDetected,
                  AliasAnalysis *AA) {
 
-  bool NestingDetected = false;
+  NestingDetected = false;
 
 #ifndef NDEBUG
   // If we are in debug mode, to make the output less verbose, make sure we are
@@ -300,7 +307,7 @@ processBBTopDown(SILBasicBlock &BB,
   for (auto &I : BB)
     FoundOneInst |= isInterestingInstruction(I.getKind());
   if (!FoundOneInst)
-    return false;
+    return;
 #endif
 
   // If the current BB is the entry BB, initialize a state corresponding to each
@@ -419,10 +426,6 @@ processBBTopDown(SILBasicBlock &BB,
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
     }
   }
-
-  // Return whether or not we saw a nested retain to signal if so to process
-  // this basic block again.
-  return NestingDetected;
 }
 
 //===----------------------------------------------------------------------===//
@@ -507,13 +510,17 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
       BBState.clear();
       DecToIncStateMap.clear();
 
+      bool NestingDectected;
+      processBBTopDown(BB, BBState, DecToIncStateMap, NestingDectected, AA);
+
+      bool RemovedRetain = performCodeMotion(DecToIncStateMap);
+      Changed |= RemovedRetain;
+
       // We need to rerun if we saw any nested increment/decrements and if we
       // removed any increment/decrement pairs.
-      processBBTopDown(BB, BBState, DecToIncStateMap, AA);
-      if (!performCodeMotion(DecToIncStateMap))
+      if (!NestingDectected || !RemovedRetain)
         break;
 
-      Changed = true;
       DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
     }
 
