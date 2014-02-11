@@ -40,6 +40,14 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
   }
 
+  void getLocalCaptures(SmallVectorImpl<CaptureInfo::
+                        LocalCaptureTy> &Result) const {
+    auto FD = dyn_cast_or_null<FuncDecl>(
+                                TheFunction.dyn_cast<AbstractFunctionDecl *>());
+    getCaptureInfo().getLocalCaptures(FD, Result);
+  }
+
+
   ArrayRef<Pattern *> getArgParamPatterns() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getArgParamPatterns();

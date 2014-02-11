@@ -1734,20 +1734,22 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                              AbstractionPattern(expectedType), expectedType);
   }
 
-  SmallVector<ValueDecl*, 4> captures;
-  TheClosure.getCaptureInfo().getLocalCaptures(captures);
+  SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
+  TheClosure.getLocalCaptures(captures);
   SmallVector<SILValue, 4> capturedArgs;
-  for (ValueDecl *capture : captures) {
+  for (auto capture : captures) {
+    auto *vd = capture.getPointer();
+    
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::None:
       break;
 
     case CaptureKind::Constant: {
       // let declarations.
-      auto Entry = VarLocs[cast<VarDecl>(capture)];
+      auto Entry = VarLocs[vd];
 
 #if 0
-      assert(Entry.isConstant() && cast<VarDecl>(capture)->isLet() &&
+      assert(Entry.isConstant() && vd->isLet() &&
              "only let decls captured by constant");
       SILValue Val = Entry.getConstant();
       // FIXME: This should work for both paths.  partial_apply hasn't been
@@ -1769,7 +1771,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         Val = B.emitCopyValueOperation(loc, Val);
         
         // Use an RValue to explode Val if it is a tuple.
-        RValue RV(*this, loc, capture->getType()->getCanonicalType(),
+        RValue RV(*this, loc, vd->getType()->getCanonicalType(),
                   ManagedValue::forUnmanaged(Val));
         std::move(RV).forwardAll(*this, capturedArgs);
         break;
@@ -1794,8 +1796,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
       // address of the value.
-      assert(VarLocs.count(capture) && "no location for captured var!");
-      VarLoc vl = VarLocs[capture];
+      assert(VarLocs.count(vd) && "no location for captured var!");
+      VarLoc vl = VarLocs[vd];
       assert(vl.box && "no box for captured var!");
       assert(vl.isAddress() && vl.getAddress() &&
              "no address for captured var!");
@@ -1806,20 +1808,20 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
     case CaptureKind::LocalFunction: {
       // SILValue is a constant such as a local func. Pass on the reference.
-      ManagedValue v = emitRValueForDecl(loc, capture, capture->getType());
+      ManagedValue v = emitRValueForDecl(loc, vd, vd->getType());
       capturedArgs.push_back(v.forward(*this));
       break;
     }
     case CaptureKind::GetterSetter: {
       // Pass the setter and getter closure references on.
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(vd,
                                                SILDeclRef::Kind::Setter));
       capturedArgs.push_back(v.forward(*this));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Pass the getter closure reference on.
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(capture,
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(vd,
                                                SILDeclRef::Kind::Getter));
       capturedArgs.push_back(v.forward(*this));
       break;
@@ -2836,26 +2838,28 @@ void SILGenFunction::emitClassMemberDestruction(SILValue selfValue,
 
 static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
-                               ValueDecl *capture) {
-  ASTContext &c = capture->getASTContext();
+                               CaptureInfo::LocalCaptureTy capture) {
+  ASTContext &c = gen.getASTContext();
   
   auto addSILArgument = [&](SILType t) {
     args.push_back(new (gen.SGM.M) SILArgument(t, gen.F.begin()));
   };
 
+  auto *vd = capture.getPointer();
+  
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant:
-    if (!gen.getTypeLowering(capture->getType()).isAddressOnly()) {
-      addSILArgument(gen.getLoweredType(capture->getType()));
+    if (!gen.getTypeLowering(vd->getType()).isAddressOnly()) {
+      addSILArgument(gen.getLoweredType(vd->getType()));
       break;
     }
     SWIFT_FALLTHROUGH;
 
   case CaptureKind::Box: {
-    SILType ty = gen.getLoweredType(capture->getType()->getRValueType())
+    SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
       .getAddressType();
     // Forward the captured owning ObjectPointer.
     addSILArgument(SILType::getObjectPointerType(c));
@@ -2865,17 +2869,17 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   }
   case CaptureKind::LocalFunction:
     // Forward the captured value.
-    addSILArgument(gen.getLoweredType(capture->getType()));
+    addSILArgument(gen.getLoweredType(vd->getType()));
     break;
   case CaptureKind::GetterSetter: {
     // Forward the captured setter.
-    Type setTy = cast<AbstractStorageDecl>(capture)->getSetter()->getType();
+    Type setTy = cast<AbstractStorageDecl>(vd)->getSetter()->getType();
     addSILArgument(gen.getLoweredType(setTy));
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Forward the captured getter.
-    Type getTy = cast<AbstractStorageDecl>(capture)->getGetter()->getType();
+    Type getTy = cast<AbstractStorageDecl>(vd)->getGetter()->getType();
     addSILArgument(gen.getLoweredType(getTy));
     break;
   }
@@ -2923,8 +2927,8 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward captures.
   if (hasCaptures) {
-    SmallVector<ValueDecl*, 4> LocalCaptures;
-    fd->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+    fd->getLocalCaptures(LocalCaptures);
     for (auto capture : LocalCaptures)
       forwardCaptureArgs(*this, curriedArgs, capture);
   }

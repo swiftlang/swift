@@ -3197,6 +3197,11 @@ public:
   /// its selector in the given buffer (as UTF-8).
   StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
 
+  void getLocalCaptures(SmallVectorImpl<CaptureInfo::
+                           LocalCaptureTy> &Result) const {
+    return getCaptureInfo().getLocalCaptures(this, Result);
+  }
+
   FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
   void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
   

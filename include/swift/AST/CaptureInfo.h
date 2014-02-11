@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include <vector>
 
 namespace llvm {
@@ -23,6 +24,7 @@ class raw_ostream;
 
 namespace swift {
 class ValueDecl;
+class FuncDecl;
 
 /// \brief Stores information about captured variables.
 class CaptureInfo {
@@ -34,10 +36,17 @@ public:
   ArrayRef<ValueDecl *> getCaptures() const { return Captures; }
   void setCaptures(ArrayRef<ValueDecl *> C) { Captures = C; }
 
+  typedef llvm::PointerIntPair<ValueDecl*, 1, bool> LocalCaptureTy;
+
   /// \brief Return a filtered list of the captures for this function,
   /// filtering out global variables.  This function returns the list that
   /// actually needs to be closed over.
-  void getLocalCaptures(SmallVectorImpl<ValueDecl*> &Result) const;
+  ///
+  /// In addition to the decl in question, this also includes a bool which
+  /// indicates whether this is a "direct" capture: a capture of a vardecl
+  /// address, even though the vardecl also has accessors.
+  void getLocalCaptures(const FuncDecl *Context,
+                        SmallVectorImpl<LocalCaptureTy> &Result) const;
 
   /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;

@@ -799,7 +799,6 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
   case IITDescriptor::Vector:
   case IITDescriptor::ExtendVecArgument:
   case IITDescriptor::TruncVecArgument:
-  case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
     // These types cannot be expressed in swift yet.
     return Type();

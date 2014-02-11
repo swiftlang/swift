@@ -794,19 +794,23 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
   return gen.B.createTuple(capture, ty, Elts);
 }
   
-static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
-  ASTContext &c = capture->getASTContext();
+static void emitCaptureArguments(SILGenFunction &gen,
+                                 CaptureInfo::LocalCaptureTy capture) {
+  ASTContext &c = gen.getASTContext();
+  
+  auto *VD = capture.getPointer();
+  auto type = VD->getType();
   switch (getDeclCaptureKind(capture)) {
   case CaptureKind::None:
     break;
 
   case CaptureKind::Constant: {
-    if (!gen.getTypeLowering(capture->getType()).isAddressOnly()) {
+    if (!gen.getTypeLowering(VD->getType()).isAddressOnly()) {
       // Constant decls are captured by value.  If the captured value is a tuple
       // value, we need to reconstitute it before sticking it in VarLocs.
-      SILType ty = gen.getLoweredType(capture->getType());
-      SILValue val = emitReconstitutedConstantCaptureArguments(ty, capture,gen);
-      gen.VarLocs[capture] = SILGenFunction::VarLoc::getConstant(val);
+      SILType ty = gen.getLoweredType(VD->getType());
+      SILValue val = emitReconstitutedConstantCaptureArguments(ty, VD, gen);
+      gen.VarLocs[VD] = SILGenFunction::VarLoc::getConstant(val);
       gen.enterDestroyCleanup(val);
       break;
     }
@@ -818,41 +822,40 @@ static void emitCaptureArguments(SILGenFunction &gen, ValueDecl *capture) {
   case CaptureKind::Box: {
     // LValues are captured as two arguments: a retained ObjectPointer that owns
     // the captured value, and the address of the value itself.
-    SILType ty = gen.getLoweredType(capture->getType()).getAddressType();
+    SILType ty = gen.getLoweredType(type).getAddressType();
     SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
-                                               gen.F.begin(), capture);
-    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), capture);
-    gen.VarLocs[capture] = SILGenFunction::VarLoc::getAddress(addr, box);
+                                               gen.F.begin(), VD);
+    SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), VD);
+    gen.VarLocs[VD] = SILGenFunction::VarLoc::getAddress(addr, box);
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);
     break;
   }
   case CaptureKind::LocalFunction: {
     // Local functions are captured by value.
-    assert(!capture->getType()->is<LValueType>() &&
-           !capture->getType()->is<InOutType>() &&
+    assert(!type->is<LValueType>() && !type->is<InOutType>() &&
            "capturing inout by value?!");
-    const TypeLowering &ti = gen.getTypeLowering(capture->getType());
+    const TypeLowering &ti = gen.getTypeLowering(type);
     SILValue value = new (gen.SGM.M) SILArgument(ti.getLoweredType(),
-                                                 gen.F.begin(), capture);
-    gen.LocalFunctions[SILDeclRef(capture)] = value;
+                                                 gen.F.begin(), VD);
+    gen.LocalFunctions[SILDeclRef(VD)] = value;
     gen.enterDestroyCleanup(value);
     break;
   }
   case CaptureKind::GetterSetter: {
     // Capture the setter and getter closures by value.
-    Type setTy = cast<AbstractStorageDecl>(capture)->getSetter()->getType();
+    Type setTy = cast<AbstractStorageDecl>(VD)->getSetter()->getType();
     SILType lSetTy = gen.getLoweredType(setTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(),capture);
-    gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Setter)] = value;
+    SILValue value = new (gen.SGM.M) SILArgument(lSetTy, gen.F.begin(), VD);
+    gen.LocalFunctions[SILDeclRef(VD, SILDeclRef::Kind::Setter)] = value;
     gen.enterDestroyCleanup(value);
     SWIFT_FALLTHROUGH;
   }
   case CaptureKind::Getter: {
     // Capture the getter closure by value.
-    Type getTy = cast<AbstractStorageDecl>(capture)->getGetter()->getType();
+    Type getTy = cast<AbstractStorageDecl>(VD)->getGetter()->getType();
     SILType lGetTy = gen.getLoweredType(getTy);
-    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(),capture);
-    gen.LocalFunctions[SILDeclRef(capture, SILDeclRef::Kind::Getter)] = value;
+    SILValue value = new (gen.SGM.M) SILArgument(lGetTy, gen.F.begin(), VD);
+    gen.LocalFunctions[SILDeclRef(VD, SILDeclRef::Kind::Getter)] = value;
     gen.enterDestroyCleanup(value);
     break;
   }
@@ -868,8 +871,8 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  SmallVector<ValueDecl*, 4> LocalCaptures;
-  TheClosure.getCaptureInfo().getLocalCaptures(LocalCaptures);
+  SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+  TheClosure.getLocalCaptures(LocalCaptures);
   for (auto capture : LocalCaptures)
     emitCaptureArguments(*this, capture);
 }

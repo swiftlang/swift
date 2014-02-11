@@ -101,7 +101,7 @@ enum class CaptureKind {
 };
   
 /// Return the CaptureKind to use when capturing a decl.
-CaptureKind getDeclCaptureKind(ValueDecl *capture);
+CaptureKind getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture);
   
 /// Flag used to place context-dependent TypeLowerings in their own arena which
 /// can be disposed when a generic context is exited.
@@ -632,11 +632,11 @@ public:
   
   /// Get a function type curried with its capture context.
   CanAnyFunctionType getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                                 ArrayRef<ValueDecl*> captures,
+                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
                                                  DeclContext *parentContext);
   CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
                                                  CanAnyFunctionType funcType,
-                                                 ArrayRef<ValueDecl*> captures,
+                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
                                                  DeclContext *parentContext);
   
   /// Map an AST-level type to the corresponding foreign representation type we

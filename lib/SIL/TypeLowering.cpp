@@ -115,8 +115,14 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
   }
 #include "swift/SIL/BridgedTypes.def"
 
-CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
-  if (VarDecl *var = dyn_cast<VarDecl>(capture)) {
+CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
+  if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
+    // If captured directly, the variable is captured by box.
+    if (capture.getInt()) {
+      assert(var->hasStorage());
+      return CaptureKind::Box;
+    }
+
     switch (var->getStorageKind()) {
     case VarDecl::StoredObjC:
     case VarDecl::Computed:
@@ -134,7 +140,7 @@ CaptureKind Lowering::getDeclCaptureKind(ValueDecl *capture) {
   
   // "Captured" local typealiases require no context.
   // FIXME: Is this true for dependent typealiases?
-  if (isa<TypeAliasDecl>(capture))
+  if (isa<TypeAliasDecl>(capture.getPointer()))
     return CaptureKind::None;
   
   return CaptureKind::LocalFunction;
@@ -1554,7 +1560,7 @@ TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
 
 CanAnyFunctionType
 TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
-                                           ArrayRef<ValueDecl*> captures,
+                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
                                            DeclContext *parentContext) {
   // Capture generic parameters from the enclosing context.
   GenericParamList *genericParams
@@ -1576,11 +1582,12 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
-  for (ValueDecl *capture : captures) {
+  for (auto capture : captures) {
+    auto VD = capture.getPointer();
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
     auto captureType =
-      capture->getType()->getLValueOrInOutObjectType()->getCanonicalType();
+      VD->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::None:
@@ -1592,13 +1599,13 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy =cast<AbstractStorageDecl>(capture)->getSetter()->getType();
+      Type setterTy = cast<AbstractStorageDecl>(VD)->getSetter()->getType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
-      Type getterTy =cast<AbstractStorageDecl>(capture)->getGetter()->getType();
+      Type getterTy = cast<AbstractStorageDecl>(VD)->getGetter()->getType();
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
     }
@@ -1635,7 +1642,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
 CanAnyFunctionType
 TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
-                                           ArrayRef<ValueDecl*> captures,
+                                 ArrayRef<CaptureInfo::LocalCaptureTy> captures,
                                            DeclContext *context) {
   // Capture generic parameters from the enclosing context.
   GenericSignature *genericSig
@@ -1658,11 +1665,12 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
-  for (ValueDecl *capture : captures) {
+  for (auto capture : captures) {
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
+    auto vd = capture.getPointer();
     auto captureType =
-      capture->getType()->getLValueOrInOutObjectType()->getCanonicalType();
+      vd->getType()->getLValueOrInOutObjectType()->getCanonicalType();
 
     switch (getDeclCaptureKind(capture)) {
     case CaptureKind::None:
@@ -1674,15 +1682,14 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::GetterSetter: {
       // Capture the setter and getter closures.
-      Type setterTy =
-        cast<AbstractStorageDecl>(capture)->getSetter()->getInterfaceType();
+      Type setterTy = cast<AbstractStorageDecl>(vd)->getSetter()->getInterfaceType();
       inputFields.push_back(TupleTypeElt(setterTy));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Capture the getter closure.
       Type getterTy =
-        cast<AbstractStorageDecl>(capture)->getGetter()->getInterfaceType();
+        cast<AbstractStorageDecl>(vd)->getGetter()->getInterfaceType();
 
       inputFields.push_back(TupleTypeElt(getterTy));
       break;
@@ -1748,7 +1755,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<ValueDecl*, 4> captures;
+    SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       // TODO: Substitute out archetypes from the enclosing context with generic
       // parameters.
@@ -1756,7 +1763,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       funcTy = cast<AnyFunctionType>(
                            getInterfaceTypeInContext(funcTy, ACE->getParent()));
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(captures);
+      ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
       return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
                                                   ACE->getParent());
     }
@@ -1769,7 +1776,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                          getInterfaceTypeInContext(funcTy, func->getParent()));
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
-    func->getCaptureInfo().getLocalCaptures(captures);
+    func->getLocalCaptures(captures);
     return getFunctionInterfaceTypeWithCaptures(funcTy, captures,
                                                 func);
   }
@@ -1786,8 +1793,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    SmallVector<ValueDecl*, 4> LocalCaptures;
-    accessor->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+    accessor->getLocalCaptures(LocalCaptures);
     auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
                                                      LocalCaptures,
                                                      asd->getDeclContext());
@@ -1898,11 +1905,11 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
-    SmallVector<ValueDecl*, 4> captures;
+    SmallVector<CaptureInfo::LocalCaptureTy, 4> captures;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       if (!withCaptures) return funcTy;
-      ACE->getCaptureInfo().getLocalCaptures(captures);
+      ACE->getCaptureInfo().getLocalCaptures(nullptr, captures);
       return getFunctionTypeWithCaptures(funcTy, captures, ACE->getParent());
     }
 
@@ -1910,7 +1917,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
     if (!withCaptures) return funcTy;
-    func->getCaptureInfo().getLocalCaptures(captures);
+    func->getLocalCaptures(captures);
     return getFunctionTypeWithCaptures(funcTy, captures,
                                        func->getDeclContext());
   }
@@ -1928,8 +1935,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     if (!withCaptures) return accessorMethodType;
     
     // If this is a local variable, its property methods may be closures.
-    SmallVector<ValueDecl*, 4> LocalCaptures;
-    accessor->getCaptureInfo().getLocalCaptures(LocalCaptures);
+    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
+    accessor->getLocalCaptures(LocalCaptures);
     return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
                                        asd->getDeclContext());
   }

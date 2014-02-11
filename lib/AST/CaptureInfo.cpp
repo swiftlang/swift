@@ -23,14 +23,27 @@ bool CaptureInfo::hasLocalCaptures() const {
   return false;
 }
 
-void CaptureInfo::getLocalCaptures(SmallVectorImpl<ValueDecl*> &Result) const {
-  if (hasLocalCaptures()) {
-    Result.reserve(Captures.size());
 
-    // Filter out global variables.
-    for (auto VD : Captures)
-      if (VD->getDeclContext()->isLocalContext())
-        Result.push_back(VD);
+void CaptureInfo::getLocalCaptures(const FuncDecl *FuncContext,
+                               SmallVectorImpl<LocalCaptureTy> &Result) const {
+  if (!hasLocalCaptures()) return;
+
+  Result.reserve(Captures.size());
+
+  // Filter out global variables.
+  for (auto VD : Captures) {
+    if (!VD->getDeclContext()->isLocalContext())
+      continue;
+
+    // Determine whether this is a direct capture.  This is a direct capture
+    // if we're looking at an accessor capturing its underlying decl.
+    bool isDirectCapture = false;
+    if (FuncContext)
+      if (auto *ASD = FuncContext->getAccessorStorageDecl())
+        if (ASD == VD)
+          isDirectCapture = true;
+
+    Result.push_back({VD, isDirectCapture} );
   }
 }
 
