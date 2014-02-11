@@ -842,7 +842,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
 
   // Just use the generic signature from the context.
   // This isn't necessarily optimal.
-  auto generics = gen.F.getLoweredFunctionType()->getGenericParams();
+  auto generics = gen.F.getContextGenericParams();
   auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllArchetypes())

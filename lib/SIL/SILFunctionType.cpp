@@ -867,8 +867,9 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   auto formalType = makeConstantType(constant, /*withCaptures*/ true);
   auto formalInterfaceType = makeConstantInterfaceType(constant,
                                                        /*withCaptures*/ true);
-  auto contextGenerics = getConstantContextGenericParams(constant,
-                                                         /*withCaptures*/true);
+  GenericParamList *contextGenerics, *innerGenerics;
+  std::tie(contextGenerics, innerGenerics)
+    = getConstantContextGenericParams(constant, /*withCaptures*/true);
   
   // The formal type is just that with the right CC and thin-ness.
   AbstractCC cc = getAbstractCC(constant);
@@ -910,7 +911,8 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
     formalType, formalInterfaceType,
     loweredType, loweredInterfaceType,
     silFnType,
-    contextGenerics
+    contextGenerics,
+    innerGenerics,
   };
   ConstantTypes[constant] = result;
   return result;

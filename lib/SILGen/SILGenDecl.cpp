@@ -1979,8 +1979,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // Get the type of the protocol requirement and the original type of the
   // witness.
   // FIXME: Rework for interface types.
+  auto requirementInfo = Types.getConstantInfo(requirement);
   auto requirementTy
-    = cast<PolymorphicFunctionType>(Types.getConstantFormalType(requirement));
+    = cast<PolymorphicFunctionType>(requirementInfo.FormalType);
   auto witnessOrigTy = Types.getConstantFormalType(witness);
   unsigned witnessUncurryLevel = witness.uncurryLevel;
 
@@ -2118,12 +2119,24 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                          requirement.uncurryLevel);
   }
   
+  // Collect the context generic parameters for the witness.
+  GenericParamList *witnessContextParams = conformanceParams;
+  // If the requirement is generic, reparent its parameters to the conformance
+  // parameters.
+  if (auto reqtParams = requirementInfo.InnerGenericParams) {
+    // Preserve the depth of generic arguments by adding an empty outer generic
+    // param list if the conformance is concrete.
+    GenericParamList *outerParams = conformanceParams;
+    if (!outerParams)
+      outerParams = GenericParamList::getEmpty(getASTContext());
+
+    witnessContextParams
+      = reqtParams->cloneWithOuterParameters(getASTContext(), outerParams);
+  }
+  
   auto *f = SILFunction::create(M, linkage, nameBuffer,
                 witnessSILType.castTo<SILFunctionType>(),
-                // FIXME: Tease out the logic above for forming the generic
-                // param list for the PolymorphicFunctionType and use it to
-                // directly get the context generic params here.
-                witnessSILType.castTo<SILFunctionType>()->getGenericParams(),
+                witnessContextParams,
                 SILLocation(witness.getDecl()),
                 IsNotBare,
                 IsNotTransparent);
