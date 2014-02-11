@@ -1544,8 +1544,6 @@ namespace {
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc, bool forceClassMethod = false) {
-      auto loc = Impl.importSourceLoc(decl->getLocStart());
-
       // The name of the method is the first part of the selector.
       auto name
         = Impl.importName(decl->getSelector().getIdentifierInfoForSlot(0));
@@ -1581,19 +1579,6 @@ namespace {
       if (!type)
         return nullptr;
 
-      auto resultTy = type->castTo<FunctionType>()->getResult();
-
-      // Add the 'self' parameter to the function type.
-      type = FunctionType::get(selfVar->getType(), type);
-
-      Type interfaceType;
-      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
-        std::tie(type, interfaceType)
-          = getProtocolMethodType(proto, type->castTo<AnyFunctionType>());
-      }
-
-      // FIXME: Related result type?
-
       // Check whether we recursively imported this method
       if (!forceClassMethod && dc == Impl.importDeclContextOf(decl)) {
         // FIXME: Should also be able to do this for forced class
@@ -1603,13 +1588,42 @@ namespace {
           return known->second;
       }
 
-      // FIXME: Poor location info.
-      auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
-          Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
-          /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
-          TypeLoc::withoutLoc(resultTy), dc);
+                      Impl.SwiftContext, SourceLoc(), SourceLoc(), name, 
+                      SourceLoc(), /*GenericParams=*/nullptr, Type(), 
+                      argPatterns, bodyPatterns, TypeLoc(), dc);
+
+      auto resultTy = type->castTo<FunctionType>()->getResult();
+      Type interfaceType;
+
+      // If the method has a related result type that is representable
+      // in Swift as DynamicSelf, do so.
+      if (decl->hasRelatedResultType()) {
+        result->setDynamicSelf(true);
+        resultTy = result->getDynamicSelf();
+        
+        // Update the method type with the new result type.
+        auto methodTy = type->castTo<FunctionType>();
+        type = FunctionType::get(methodTy->getInput(), resultTy, 
+                                 methodTy->getExtInfo());
+
+        // Create the interface type of the method.
+        interfaceType = FunctionType::get(methodTy->getInput(),
+                                          result->getDynamicSelfInterface(),
+                                          methodTy->getExtInfo());
+        interfaceType = FunctionType::get(selfVar->getType(), interfaceType);
+      }
+
+      // Add the 'self' parameter to the function type.
+      type = FunctionType::get(selfVar->getType(), type);
+
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        std::tie(type, interfaceType)
+          = getProtocolMethodType(proto, type->castTo<AnyFunctionType>());
+      }
+
       result->setBodyResultType(resultTy);
+      result->setType(type);
       result->setInterfaceType(interfaceType);
 
       if (hasSelectorStyleSignature)
@@ -1915,11 +1929,21 @@ namespace {
         interfaceInputTy = MetatypeType::get(interfaceInputTy,
                                              Impl.SwiftContext);
 
+      auto interfaceResultTy = fnType->getResult().transform(
+        [&](Type type) -> Type {
+          if (type->is<DynamicSelfType>()) {
+            return DynamicSelfType::get(proto->getSelf()->getDeclaredType(),
+                                        Impl.SwiftContext);
+          }
+
+          return type;
+        });
+
       Type interfaceType = GenericFunctionType::get(
                              proto->getGenericParamTypes(),
                              proto->getGenericRequirements(),
                              interfaceInputTy,
-                             fnType->getResult(),
+                             interfaceResultTy,
                              AnyFunctionType::ExtInfo());
       return { type, interfaceType };
     }

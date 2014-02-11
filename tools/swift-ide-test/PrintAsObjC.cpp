@@ -156,7 +156,15 @@ private:
 
     Type rawMethodTy = AFD->getType()->castTo<AnyFunctionType>()->getResult();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
-    print(methodTy->getResult());
+
+    // Constructors and methods returning DynamicSelf return
+    // instancetype.
+    if (isa<ConstructorDecl>(AFD) ||
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
+      os << "instancetype";
+    } else {
+      print(methodTy->getResult());
+    }
 
     os << ")" << name;
 

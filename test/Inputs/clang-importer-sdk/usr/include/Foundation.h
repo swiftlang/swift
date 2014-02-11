@@ -28,13 +28,19 @@ typedef signed char BOOL;
 
 NSString *NSStringToNSString(NSString *str);
 
-@interface Hive {
+@interface Hive : NSObject {
   B *queen;
 }
+- init;
+
 @property __attribute__((iboutletcollection(B))) NSArray *bees;
 
 @property(getter=isMakingHoney) BOOL makingHoney;
 @property(setter=assignGuard:) id guard;
+
++ (instancetype)hiveWithQueen:(B *)queen;
+
+- (instancetype)visit;
 @end
 
 BOOL BOOLtoBOOL(BOOL b);
@@ -124,6 +130,8 @@ typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
 
 @protocol NSWobbling
 -(void)wobble;
+
+- (instancetype)returnMyself; 
 
 @optional
 -(void)wibble;
