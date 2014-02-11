@@ -39,8 +39,8 @@ swift::swift_allocObject(HeapMetadata const *metadata,
 
   for (;;) {
     object = reinterpret_cast<HeapObject *>(
-      calloc(1, llvm::RoundUpToAlignment(requiredSize,
-                                         requiredAlignmentMask+1)));
+      malloc(llvm::RoundUpToAlignment(requiredSize,
+                                      requiredAlignmentMask + 1)));
     if (object) {
       break;
     }
