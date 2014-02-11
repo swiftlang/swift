@@ -987,12 +987,6 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
 }
 
 bool SILGenModule::requiresObjCSuperDispatch(ValueDecl *vd) {
-  if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
-    DeclContext *ctorDC = cd->getDeclContext();
-    if (auto *cls = dyn_cast<ClassDecl>(ctorDC)) {
-      return cls->isObjC();
-    }
-  }
   return requiresObjCDispatch(vd);
 }
 

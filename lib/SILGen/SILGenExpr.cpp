@@ -2680,8 +2680,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     // properties are initialized via the .cxx_construct method, which
     // will be called by the runtime.
 
-    // FIXME: Note that 'self' has been fully initialized at this
-    // point.
+    // Note that 'self' has been fully initialized at this point.
   } else {
     // Emit the member initializers.
     emitMemberInitializers(selfDecl, selfClassDecl);
