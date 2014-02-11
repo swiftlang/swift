@@ -548,7 +548,7 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
   case ValueKind::LoadInst:
     // If the load address doesn't alias the given address, it doesn't read or
     // write the specified memory.
-    if (alias(Inst->getOperand(0), V) == AliasResult::NoAlias) {
+    if (isNoAlias(Inst->getOperand(0), V)) {
       DEBUG(llvm::dbgs() << "  Load does not alias inst. Returning None.\n");
       return MemoryBehavior::None;
     }
@@ -561,7 +561,7 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
   case ValueKind::StoreInst:
     // If the store dest cannot alias the pointer in question, then the
     // specified value can not be modified by the store.
-    if (alias(cast<StoreInst>(Inst)->getDest(), V) == AliasResult::NoAlias) {
+    if (isNoAlias(cast<StoreInst>(Inst)->getDest(), V)) {
       DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
             "None.\n");
       return MemoryBehavior::None;

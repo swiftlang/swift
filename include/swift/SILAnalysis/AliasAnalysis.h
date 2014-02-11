@@ -54,6 +54,21 @@ public:
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2);
 
+  /// Convenience method that returns true if V1 and V2 must alias.
+  bool isMustAlias(SILValue V1, SILValue V2) {
+    return alias(V1, V2) == AliasResult::MustAlias;
+  }
+
+  /// Convenience method that returns true if V1, V2 can not alias.
+  bool isNoAlias(SILValue V1, SILValue V2) {
+    return alias(V1, V2) == AliasResult::NoAlias;
+  }
+
+  /// Convenience method that returns true if V1, V2 may alias.
+  bool isMayAlias(SILValue V1, SILValue V2) {
+    return alias(V1, V2) == AliasResult::MayAlias;
+  }
+
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V);
