@@ -21,6 +21,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Debug.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/ASTContext.h"
@@ -30,10 +31,12 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
+#include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenClangType.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -892,111 +895,132 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
                                            SILBasicBlock *entry,
                                            Explosion &params,
-                                           ArrayRef<SILArgument*> args) {
-  for (SILArgument *arg : args) {
-    auto &argTI = IGF.getTypeInfo(arg->getType());
-    if (arg->getType().isAddress()) {
-      IGF.setLoweredAddress(arg,
-                            argTI.getAddressForPointer(params.claimNext()));
-      continue;
-    }
+                                           CanSILFunctionType funcTy) {
+  // Map the indirect return if present.
+  ArrayRef<SILArgument*> args
+    = emitEntryPointIndirectReturn(IGF, entry, params, funcTy, [&] {
+        return requiresExternalIndirectResult(IGF.IGM, funcTy);
+      });
 
+  GenClangType GCT(IGF.IGM.Context);
+  SmallVector<clang::CanQualType,4> argTys;
+  auto const &clangCtx = GCT.getClangASTContext();
+
+  const auto &resultInfo = funcTy->getInterfaceResult();
+  auto clangResultTy = GCT.visit(resultInfo.getSILType().getSwiftRValueType());
+  unsigned nextArgTyIdx = 0;
+
+  if (IGF.CurSILFn->getAbstractCC() == AbstractCC::ObjCMethod) {
+    // First include the self argument and _cmd arguments as types to
+    // be considered for ABI type selection purposes.
+    SILArgument *selfArg = args.back();
+    args = args.slice(0, args.size() - 1);
+    auto clangTy = GCT.visit(selfArg->getType().getSwiftRValueType());
+    argTys.push_back(clangTy);
+    argTys.push_back(clangCtx.VoidPtrTy);
+
+    // Now set the lowered explosion for the self argument and drop
+    // the explosion element for the _cmd argument.
+    auto &selfType = IGF.getTypeInfo(selfArg->getType());
+    Explosion self(IGF.CurSILFnExplosionLevel);
+    cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
+    IGF.setLoweredExplosion(selfArg, self);
+
+    // Discard the implicit _cmd argument.
+    params.claimNext();
+
+    // We've handled the self and _cmd arguments, so when we deal with
+    // generating explosions for the remaining arguments we can skip
+    // these.
+    nextArgTyIdx = 2;
+  }
+
+  // Convert each argument to a Clang type.
+  for (SILArgument *arg : args) {
+    auto clangTy = GCT.visit(arg->getType().getSwiftRValueType());
+    argTys.push_back(clangTy);
+  }
+
+  // Generate the ABI types for this set of result type + argument types.
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGF.IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy,
+                                                       argTys, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  assert(FI.arg_size() == argTys.size() &&
+         "Expected one ArgInfo for each parameter type!");
+  assert(args.size() == (argTys.size() - nextArgTyIdx) &&
+         "Number of arguments not equal to number of argument types!");
+
+  // Generate lowered explosions for each explicit argument.
+  for (auto i : indices(args)) {
+    auto *arg = args[i];
+    auto argTyIdx = i + nextArgTyIdx;
+    auto &argTI = IGF.getTypeInfo(arg->getType());
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
     Explosion argExplosion(IGF.CurSILFnExplosionLevel);
 
-    // Load and explode an argument that is 'byval' in the C calling convention.
-    if (requiresExternalByvalArgument(IGF.IGM, arg->getType())) {
+    auto AI = FI.arg_begin()[argTyIdx].info;
+
+    switch (AI.getKind()) {
+    case clang::CodeGen::ABIArgInfo::Extend:
+      // FIXME: Add extension attributes.
+      SWIFT_FALLTHROUGH;
+    case clang::CodeGen::ABIArgInfo::Direct: {
+
+      // The ABI IR types for the entrypoint might differ from the
+      // Swift IR types for the body of the function. Store each
+      // formal parameter, bitcast, and then load and explode to the
+      // expected Swift explosion.
+
+      auto *value = params.claimNext();
+      auto *fromTy = value->getType();
+      auto *toTy = loadableArgTI.getStorageType();
+
+      // If both are pointers, we can simply insert a bitcast, otherwise
+      // we need to store, bitcast, and load.
+      if (toTy->isPointerTy() && fromTy->isPointerTy()) {
+        argExplosion.add(IGF.Builder.CreateBitCast(value, toTy));
+        IGF.setLoweredExplosion(arg, argExplosion);
+        continue;
+      }
+
+      assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
+              IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
+             && "Coerced types should not differ in size!");
+
+      auto address = IGF.createAlloca(fromTy, loadableArgTI.getFixedAlignment(),
+                                      value->getName() + ".coerced");
+      IGF.Builder.CreateStore(value, address.getAddress());
+      auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
+                                                toTy->getPointerTo());
+      loadableArgTI.loadAsTake(IGF, Address(coerced, address.getAlignment()),
+                               argExplosion);
+      IGF.setLoweredExplosion(arg, argExplosion);
+      continue;
+    }
+    case clang::CodeGen::ABIArgInfo::Indirect: {
+      assert(AI.getIndirectByVal()
+             && "Unexpected indirect that is not byval!");
       Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
       loadableArgTI.loadAsTake(IGF, byval, argExplosion);
       IGF.setLoweredExplosion(arg, argExplosion);
       continue;
     }
-
-    // Handle arguments passed to C/ObjC entrypoints as exploded
-    // aggregates.
-    if (requiresExternalExplosionArgument(IGF.IGM, arg->getType())) {
+    case clang::CodeGen::ABIArgInfo::Expand: {
       loadableArgTI.reexplode(IGF, params, argExplosion);
       IGF.setLoweredExplosion(arg, argExplosion);
       continue;
     }
 
-    // The ABI IR types for the entrypoint might differ from the
-    // Swift IR types for the body of the function. Store each
-    // formal parameter, bitcast, and then load and explode to the
-    // expected Swift explosion.
-
-    auto *value = params.claimNext();
-    auto *fromTy = value->getType();
-    auto *toTy = loadableArgTI.getStorageType();
-
-    // If both are pointers, we can simply insert a bitcast, otherwise
-    // we need to store, bitcast, and load.
-    if (toTy->isPointerTy() && fromTy->isPointerTy()) {
-      argExplosion.add(IGF.Builder.CreateBitCast(value, toTy));
-      IGF.setLoweredExplosion(arg, argExplosion);
+    case clang::CodeGen::ABIArgInfo::Ignore:
+    case clang::CodeGen::ABIArgInfo::InAlloca:
+      llvm_unreachable("Need to handle InAlloca during signature expansion");
       continue;
     }
-
-    assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
-            IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
-           && "Coerced types should not differ in size!");
-
-    auto address = IGF.createAlloca(fromTy, loadableArgTI.getFixedAlignment(),
-                                    value->getName() + ".coerced");
-    IGF.Builder.CreateStore(value, address.getAddress());
-    auto *coerced = IGF.Builder.CreateBitCast(address.getAddress(),
-                                              toTy->getPointerTo());
-    loadableArgTI.loadAsTake(IGF, Address(coerced, address.getAlignment()),
-                             argExplosion);
-    IGF.setLoweredExplosion(arg, argExplosion);
   }
 }
 
-
-/// Emit entry point arguments for a SILFunction with the ObjC method calling
-/// convention. This convention inserts the '_cmd' objc_msgSend argument after
-/// the first non-sret argument.
-static void emitEntryPointArgumentsObjCMethodCC(IRGenSILFunction &IGF,
-                                                SILBasicBlock *entry,
-                                                Explosion &params,
-                                                CanSILFunctionType funcTy) {
-  // Map the indirect return if present.
-  ArrayRef<SILArgument*> args
-    = emitEntryPointIndirectReturn(IGF, entry, params, funcTy, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTy,
-                                            IGF.CurSILFnExplosionLevel);
-    });
-  
-  // Map the self argument. This should always be an ObjC pointer type so
-  // should never need to be loaded from a byval.
-  SILArgument *selfArg = args.back();
-  auto &selfType = IGF.getTypeInfo(selfArg->getType());
-  Explosion self(IGF.CurSILFnExplosionLevel);
-  cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
-  IGF.setLoweredExplosion(selfArg, self);
-  
-  // Discard the implicit _cmd argument.
-  params.claimNext();
-  
-  // Map the rest of the arguments as in the C calling convention.
-  emitEntryPointArgumentsCOrObjC(IGF, entry, params,
-                                 args.slice(0, args.size() - 1));
-}
-
-/// Emit entry point arguments for a SILFunction with the C calling
-/// convention.
-static void emitEntryPointArgumentsCCC(IRGenSILFunction &IGF,
-                                       SILBasicBlock *entry,
-                                       Explosion &params,
-                                       CanSILFunctionType funcTy) {
-  // Map the indirect return if present.
-  ArrayRef<SILArgument*> args
-    = emitEntryPointIndirectReturn(IGF, entry, params, funcTy, [&] {
-      return requiresExternalIndirectResult(IGF.IGM, funcTy,
-                                            IGF.CurSILFnExplosionLevel);
-    });
-  emitEntryPointArgumentsCOrObjC(IGF, entry, params, args);
-}
 
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
@@ -1044,10 +1068,8 @@ void IRGenSILFunction::emitSILFunction() {
     emitEntryPointArgumentsNativeCC(*this, entry->first, params);
     break;
   case AbstractCC::ObjCMethod:
-    emitEntryPointArgumentsObjCMethodCC(*this, entry->first, params, funcTy);
-    break;
   case AbstractCC::C:
-    emitEntryPointArgumentsCCC(*this, entry->first, params, funcTy);
+    emitEntryPointArgumentsCOrObjC(*this, entry->first, params, funcTy);
     break;
   }
   

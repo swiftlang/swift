@@ -484,8 +484,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                       explosionLevel,
                                       ExtraData::None,
                                       attrs);
-  bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType,
-                                                       explosionLevel);
+  bool indirectResult = requiresExternalIndirectResult(IGF.IGM, origFnType);
   if (kind != ObjCMessageKind::Normal)
     fnTy = getMsgSendSuperTy(IGF.IGM, fnTy, indirectResult);
 

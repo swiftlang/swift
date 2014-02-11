@@ -60,6 +60,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Optional.h"
 #include "swift/SIL/SILModule.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclGroup.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -725,8 +726,7 @@ namespace {
                        ResilienceExpansion explosionLevel)
       : IGM(IGM), FnType(fnType), ExplosionLevel(explosionLevel) {}
 
-    llvm::Type *expandResult();
-    void expandParameters();
+    llvm::Type *expandSignatureTypes();
 
   private:
     void expand(SILParameterInfo param);
@@ -740,6 +740,10 @@ namespace {
     void addPointerParameter(llvm::Type *storageType) {
       ParamIRTypes.push_back(storageType->getPointerTo());
     }
+
+    llvm::Type *expandResult();
+    void expandParameters();
+    llvm::Type *expandExternalSignatureTypes();
   };
 }
 
@@ -749,39 +753,6 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   addPointerParameter(resultTI.getStorageType());
   addIndirectReturnAttributes(IGM, Attrs);
   return IGM.VoidTy;
-}
-
-static llvm::Type *getABIReturnType(SILType type,
-                                    IRGenModule &IGM) {
-  GenClangType GCT(IGM.Context);
-  auto clangTy = GCT.visit(type.getSwiftRValueType());
-  assert(clangTy && "Unexpected failure in Clang type generation!");
-
-  SmallVector<clang::CanQualType,1> args;
-
-  auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-
-  auto &returnInfo = FI.getReturnInfo();
-  return returnInfo.getCoerceToType();
-}
-
-// FIXME: Generate IR types for all arguments together.
-static llvm::Type *getABIArgumentType(SILType type,
-                                      IRGenModule &IGM) {
-  GenClangType GCT(IGM.Context);
-  auto clangTy = GCT.visit(type.getSwiftRValueType());
-  assert(clangTy && "Unexpected failure in Clang type generation!");
-
-  SmallVector<clang::CanQualType,1> args;
-  args.push_back(clangTy);
-
-  auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-  assert(FI.arg_size() == 1 && "Expected one IR type for one argument!");
-  return FI.arg_begin()->info.getCoerceToType();
 }
 
 llvm::Type *SignatureExpansion::expandResult() {
@@ -797,12 +768,9 @@ llvm::Type *SignatureExpansion::expandResult() {
   ExplosionSchema schema = IGM.getSchema(resultType, ExplosionLevel);
   switch (FnType->getAbstractCC()) {
   case AbstractCC::C:
-  case AbstractCC::ObjCMethod: {
-    if (requiresExternalIndirectResult(IGM, FnType, ExplosionLevel))
-      return addIndirectResult();
-
-    return getABIReturnType(resultType, IGM);
-  }
+  case AbstractCC::ObjCMethod:
+    llvm_unreachable("Expanding C/ObjC parameters in the wrong place!");
+    break;
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod: {
@@ -811,6 +779,101 @@ llvm::Type *SignatureExpansion::expandResult() {
     return schema.getScalarResultType(IGM);
   }
   }
+}
+
+/// Expand the result and parameter types to the appropriate LLVM IR
+/// types for C and Objective-C signatures.
+llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
+  assert(FnType->getAbstractCC() == AbstractCC::ObjCMethod ||
+         FnType->getAbstractCC() == AbstractCC::C);
+
+  // Convert the SIL result type to a Clang type.
+  auto resultTy = FnType->getInterfaceResult().getSILType();
+  GenClangType GCT(IGM.Context);
+  auto clangResultTy = GCT.visit(resultTy.getSwiftRValueType());
+
+  // Now convert the parameters to Clang types.
+  auto params = FnType->getInterfaceParameters();
+  unsigned paramOffset = 0;
+
+  SmallVector<clang::CanQualType,4> paramTys;
+  auto const &clangCtx = GCT.getClangASTContext();
+
+  if (FnType->getAbstractCC() == AbstractCC::ObjCMethod) {
+    // ObjC methods take their 'self' argument first, followed by an
+    // implicit _cmd argument.
+    auto &self = params.back();
+    auto clangTy = GCT.visit(self.getSILType().getSwiftRValueType());
+    paramTys.push_back(clangTy);
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.slice(0, params.size() - 1);
+    paramOffset = 2;
+  }
+
+  // Convert each parameter to a Clang type.
+  for (auto param : params) {
+    auto clangTy = GCT.visit(param.getSILType().getSwiftRValueType());
+    paramTys.push_back(clangTy);
+  }
+
+  // We shouldn't have any LLVM parameter types yet.
+  assert(ParamIRTypes.empty() && "Expected empty ParamIRTypes");
+
+  // Generate function info for this signature.
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy, paramTys,
+                                                   extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  assert(FI.arg_size() == paramTys.size() &&
+         "Expected one ArgInfo for each parameter type!");
+
+  auto &returnInfo = FI.getReturnInfo();
+  // If we return indirectly, that is the first parameter type.
+  if (returnInfo.isIndirect())
+    addIndirectResult();
+
+  for (auto i : indices(paramTys)) {
+    auto &AI = FI.arg_begin()[i].info;
+
+    switch (AI.getKind()) {
+    case clang::CodeGen::ABIArgInfo::Extend:
+      // FIXME: Add extension attributes.
+      SWIFT_FALLTHROUGH;
+    case clang::CodeGen::ABIArgInfo::Direct:
+      ParamIRTypes.push_back(AI.getCoerceToType());
+      break;
+    case clang::CodeGen::ABIArgInfo::Indirect: {
+      assert(AI.getIndirectByVal()
+             && "Unexpected indirect that is not byval!");
+      assert(i >= paramOffset &&
+             "Unexpected index for indirect byval argument");
+      auto &param = params[i - paramOffset];
+      auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(param.getSILType()));
+      addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
+                                 paramTI.getFixedAlignment());
+      addPointerParameter(paramTI.getStorageType());
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::Expand: {
+      assert(i >= paramOffset && "Unexpected index for expanded argument");
+      auto &param = params[i - paramOffset];
+      auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
+      schema.addToArgTypes(IGM, ParamIRTypes);
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::Ignore:
+      break;
+    case clang::CodeGen::ABIArgInfo::InAlloca:
+      llvm_unreachable("Need to handle InAlloca during signature expansion");
+    }
+  }
+
+  if (returnInfo.isIndirect() || returnInfo.isIgnore())
+    return IGM.VoidTy;
+
+  // FIXME: Add extension attributes.
+  return returnInfo.getCoerceToType();
 }
 
 void SignatureExpansion::expand(SILParameterInfo param) {
@@ -843,21 +906,7 @@ void SignatureExpansion::expand(SILParameterInfo param) {
     switch (FnType->getAbstractCC()) {
     case AbstractCC::C:
     case AbstractCC::ObjCMethod: {
-      if (requiresExternalByvalArgument(IGM, param.getSILType())) {
-        auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(param.getSILType()));
-        addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
-                                   paramTI.getFixedAlignment());
-        addPointerParameter(paramTI.getStorageType());
-        return;
-      }
-
-      if (requiresExternalExplosionArgument(IGM, param.getSILType())) {
-        auto schema = IGM.getSchema(param.getSILType(), ExplosionLevel);
-        schema.addToArgTypes(IGM, ParamIRTypes);
-        return;
-      }
-
-      ParamIRTypes.push_back(getABIArgumentType(param.getSILType(), IGM));
+      llvm_unreachable("Unexpected C/ObjC method in parameter expansion!");
       return;
     }
     case AbstractCC::Freestanding:
@@ -876,32 +925,46 @@ void SignatureExpansion::expand(SILParameterInfo param) {
 /// Expand the abstract parameters of a SIL function type into the
 /// physical parameters of an LLVM function type.
 void SignatureExpansion::expandParameters() {
-  auto params = FnType->getInterfaceParameters();
-
   // Some CCs secretly rearrange the parameters.
   switch (FnType->getAbstractCC()) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
-  case AbstractCC::WitnessMethod:
+  case AbstractCC::WitnessMethod: {
+    auto params = FnType->getInterfaceParameters();
+
+    for (auto param : params) {
+      expand(param);
+    }
+
+    if (hasPolymorphicParameters(FnType))
+      expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
+    break;
+  }
+  case AbstractCC::ObjCMethod:
   case AbstractCC::C:
-    break;
-
-  case AbstractCC::ObjCMethod: {
-    // ObjC methods take their 'self' argument first, followed by an
-    // implicit _cmd argument.
-    expand(params.back());
-    ParamIRTypes.push_back(IGM.Int8PtrTy);
-    params = params.slice(0, params.size() - 1);
+    llvm_unreachable("Expanding C/ObjC parameters in the wrong place!");
     break;
   }
-  }
 
-  for (auto param : params) {
-    expand(param);
-  }
+}
 
-  if (hasPolymorphicParameters(FnType))
-    expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
+/// Expand the result and parameter types of a SIL function into the
+/// phyical parameter types of an LLVM function and return the result
+/// type.
+llvm::Type *SignatureExpansion::expandSignatureTypes() {
+  switch (FnType->getAbstractCC()) {
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+  case AbstractCC::WitnessMethod: {
+    llvm::Type *resultType = expandResult();
+    expandParameters();
+    return resultType;
+  }
+  case AbstractCC::ObjCMethod:
+  case AbstractCC::C:
+    return expandExternalSignatureTypes();
+    break;
+  }
 }
 
 Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
@@ -916,8 +979,7 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
   GenericContextScope scope(IGM, FormalType->getGenericSignature());
   SignatureExpansion expansion(IGM, FormalType, explosionLevel);
-  llvm::Type *resultType = expansion.expandResult();
-  expansion.expandParameters();
+  llvm::Type *resultType = expansion.expandSignatureTypes();
 
   // Data arguments are last.
   // See the comment in this file's header comment.
@@ -1846,8 +1908,7 @@ void CallEmission::setFromCallee() {
 /// sret indirect result?
 llvm::PointerType *
 irgen::requiresExternalIndirectResult(IRGenModule &IGM,
-                                      CanSILFunctionType fnType,
-                                      ResilienceExpansion level) {
+                                      CanSILFunctionType fnType) {
   if (fnType->hasIndirectResult()) {
     return IGM.getStoragePointerType(
                              fnType->getIndirectInterfaceResult().getSILType());
@@ -1871,106 +1932,122 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   return ti.getStorageType()->getPointerTo();
 }
 
-/// Does an argument of this type need to be passed by value on the stack to
-/// C or ObjC arguments?
-llvm::PointerType *irgen::requiresExternalByvalArgument(IRGenModule &IGM,
-                                                        SILType type) {
-
-  GenClangType GCT(IGM.Context);
-  auto clangTy = GCT.visit(type.getSwiftRValueType());
-  assert(clangTy && "Unexpected failure in Clang type generation!");
-
-  SmallVector<clang::CanQualType,1> args;
-  args.push_back(clangTy);
-
-  auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-
-  assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
-  auto const &AI = FI.arg_begin()->info;
-  if (!AI.isIndirect() || !AI.getIndirectByVal())
-    return nullptr;
-
-  auto &ti = IGM.getTypeInfo(type);
-  return ti.getStorageType()->getPointerTo();
-}
-
-/// Does an argument of this type need to be passed by value on the stack to
-/// C or ObjC arguments?
-bool irgen::requiresExternalExplosionArgument(IRGenModule &IGM, SILType type) {
-  GenClangType GCT(IGM.Context);
-  auto clangTy = GCT.visit(type.getSwiftRValueType());
-  assert(clangTy && "Unexpected failure in Clang type generation!");
-
-  SmallVector<clang::CanQualType,1> args;
-  args.push_back(clangTy);
-
-  auto extInfo = clang::FunctionType::ExtInfo();
-  auto &FI = IGM.ABITypes->arrangeFreeFunctionCall(clangTy, args, extInfo,
-                                             clang::CodeGen::RequiredArgs::All);
-
-  assert(FI.arg_size() == 1 && "Expected IR type for one argument!");
-  auto const &AI = FI.arg_begin()->info;
-  return AI.isExpand();
-}
-
-static void externalizeArgument(IRGenFunction &IGF,
-                                Explosion &in, Explosion &out,
-                    SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
-                                SILParameterInfo param) {
-  auto ty = param.getSILType();
-  auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
-  if (requiresExternalByvalArgument(IGF.IGM, ty)) {
-    // FIXME: deallocate temporary!
-    Address addr = ti.allocateStack(IGF, ty.getSwiftRValueType(),
-                                    "byval-temporary").getAddress();
-    ti.initialize(IGF, in, addr);
-     
-    newByvals.push_back({out.size(), addr.getAlignment()});
-    out.add(addr.getAddress());
-    return;
-  }
-
-  if (requiresExternalExplosionArgument(IGF.IGM, param.getSILType())) {
-    ti.reexplode(IGF, in, out);
-    return;
-  }
-
-  // Direct arguments that are passed as scalars or aggregates.
-  auto toTy = getABIArgumentType(ty, IGF.IGM);
-
-  // If the exploded parameter is just one value, we can just
-  // transfer it or if necessary coerce it with a bitcast or single
-  // store/load pair.
-  auto schema = ti.getSchema(out.getKind());
-  if (schema.size() == 1) {
-    auto *arg = in.claimNext();
-    if (arg->getType() != toTy)
-      arg = IGF.coerceValue(arg, toTy, IGF.IGM.DataLayout);
-
-    out.add(arg);
-    return;
-  }
-
-  // Otherwise we need to store multiple values and then load the
-  // aggregate.
-  auto swiftTy = ty.getSwiftRValueType();
-  Address addr = ti.allocateStack(IGF, swiftTy, "coerced-arg").getAddress();
-  ti.initializeFromParams(IGF, in, addr, swiftTy);
-
-  auto *coerced = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                            toTy->getPointerTo());
-  auto *value = IGF.Builder.CreateLoad(coerced);
-  out.add(value);
-}
-
-static void externalizeArguments(IRGenFunction &IGF,
+static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
-                    SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
-                                 ArrayRef<SILParameterInfo> params) {
+                     SmallVectorImpl<std::pair<unsigned, Alignment>> &newByvals,
+                                 ArrayRef<SILParameterInfo> &params) {
+
+  unsigned paramOffset = 0;
+
+  GenClangType GCT(IGF.IGM.Context);
+  SmallVector<clang::CanQualType,4> paramTys;
+  auto const &clangCtx = GCT.getClangASTContext();
+  if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
+    // The method will be uncurried to ((ArgsN...), ..., (Args1...),
+    // Self). The self arg gets lowered to the first argument, and the
+    // implicit _cmd argument goes in between it and the rest of the
+    // args.
+    // self
+    auto &self = params.back();
+    auto clangTy = GCT.visit(self.getSILType().getSwiftRValueType());
+    paramTys.push_back(clangTy);
+    paramTys.push_back(clangCtx.VoidPtrTy);
+    params = params.slice(0, params.size() - 1);
+    paramOffset = 2;
+  }
+
   for (auto param : params) {
-    externalizeArgument(IGF, in, out, newByvals, param);
+    auto clangTy = GCT.visit(param.getSILType().getSwiftRValueType());
+    paramTys.push_back(clangTy);
+  }
+
+  const auto &resultInfo = callee.getSubstFunctionType()->getInterfaceResult();
+  auto clangResultTy = GCT.visit(resultInfo.getSILType().getSwiftRValueType());
+
+  // Generate function info for this set of arguments.
+  auto extInfo = clang::FunctionType::ExtInfo();
+  auto &FI = IGF.IGM.ABITypes->arrangeFreeFunctionCall(clangResultTy,
+                                                       paramTys, extInfo,
+                                             clang::CodeGen::RequiredArgs::All);
+
+  assert(FI.arg_size() == paramTys.size() &&
+         "Expected one ArgInfo for each parameter type!");
+
+  for (auto i : indices(paramTys)) {
+    auto &AI = FI.arg_begin()[i].info;
+
+    switch (AI.getKind()) {
+    case clang::CodeGen::ABIArgInfo::Extend:
+      // FIXME: Handle extension attribute.
+      SWIFT_FALLTHROUGH;
+    case clang::CodeGen::ABIArgInfo::Direct: {
+      // Direct arguments that are passed as scalars or aggregates.
+      auto toTy = AI.getCoerceToType();
+
+      if (i < paramOffset) {
+        // We do not have SILParameterInfo for the self and _cmd arguments,
+        // but we expect these to be internally consistent in the compiler
+        // so we shouldn't need to do any coercion.
+        assert(callee.getAbstractCC() == AbstractCC::ObjCMethod &&
+               "Unexpected index in externalizing arguments!");
+        out.add(in.claimNext());
+        continue;
+      }
+
+      auto ty = params[i - paramOffset].getSILType();
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
+
+      // If the exploded parameter is just one value, we can just
+      // transfer it or if necessary coerce it with a bitcast or single
+      // store/load pair.
+      auto schema = ti.getSchema(out.getKind());
+      if (schema.size() == 1) {
+        auto *arg = in.claimNext();
+        if (arg->getType() != toTy)
+          arg = IGF.coerceValue(arg, toTy, IGF.IGM.DataLayout);
+
+        out.add(arg);
+        continue;
+      }
+
+      // Otherwise we need to store multiple values and then load the
+      // aggregate.
+      auto swiftTy = ty.getSwiftRValueType();
+      Address addr = ti.allocateStack(IGF, swiftTy, "coerced-arg").getAddress();
+      ti.initializeFromParams(IGF, in, addr, swiftTy);
+
+      auto *coerced = IGF.Builder.CreateBitCast(addr.getAddress(),
+                                                toTy->getPointerTo());
+      auto *value = IGF.Builder.CreateLoad(coerced);
+      out.add(value);
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::Indirect: {
+      assert(AI.getIndirectByVal()
+             && "Unexpected indirect that is not byval!");
+      assert(i >= paramOffset &&
+             "Unexpected index for indirect byval argument");
+      auto ty = params[i - paramOffset].getSILType();
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
+      Address addr = ti.allocateStack(IGF, ty.getSwiftRValueType(),
+                                      "byval-temporary").getAddress();
+      ti.initialize(IGF, in, addr);
+
+      newByvals.push_back({out.size(), addr.getAlignment()});
+      out.add(addr.getAddress());
+      break;
+    }
+    case clang::CodeGen::ABIArgInfo::Expand: {
+      auto ty = params[i - paramOffset].getSILType();
+      auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
+      ti.reexplode(IGF, in, out);
+    }
+    case clang::CodeGen::ABIArgInfo::Ignore:
+      break;
+    case clang::CodeGen::ABIArgInfo::InAlloca:
+      llvm_unreachable("Need to handle InAlloca when externalizing arguments");
+      break;
+    }
   }
 }
 
@@ -1982,30 +2059,16 @@ void CallEmission::addArg(Explosion &arg) {
 
   // Convert arguments to a representation appropriate to the calling
   // convention.
-  AbstractCC cc = CurCallee.getAbstractCC();
-  switch (cc) {
-  case AbstractCC::C: {
-    Explosion externalized(arg.getKind());
-    externalizeArguments(IGF, arg, externalized, newByvals, origParams);
-    arg = std::move(externalized);
-    break;
-  }
+  switch (getCallee().getAbstractCC()) {
+  case AbstractCC::C:
   case AbstractCC::ObjCMethod: {
-    // The method will be uncurried to ((ArgsN...), ..., (Args1...),
-    // Self). The self arg gets lowered to the first argument, and the
-    // implicit _cmd argument goes in between it and the rest of the
-    // args.
     Explosion externalized(arg.getKind());
-    // self
-    externalized.add(arg.claimNext());
-    // _cmd
-    externalized.add(arg.claimNext());
-    // method args
-    origParams = origParams.slice(0, origParams.size() - 1);
-    externalizeArguments(IGF, arg, externalized, newByvals, origParams);
+    externalizeArguments(IGF, getCallee(), arg, externalized, newByvals,
+                         origParams);
     arg = std::move(externalized);
     break;
   }
+
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod:
