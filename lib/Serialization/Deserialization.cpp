@@ -2611,13 +2611,11 @@ Type ModuleFile::getType(TypeID TID) {
     bool thin;
     bool noreturn = false;
     unsigned numGenericParams;
-    DeclID genericContextID;
     ArrayRef<uint64_t> paramIDs;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
                                                    interfaceResultID,
                                                    rawInterfaceResultConvention,
-                                                   genericContextID,
                                                    rawCalleeConvention,
                                                    rawCallingConvention,
                                                    thin,
@@ -2681,11 +2679,7 @@ Type ModuleFile::getType(TypeID TID) {
     if (!genericParamTypes.empty() || !requirements.empty())
       genericSig = GenericSignature::get(genericParamTypes, requirements, ctx);
 
-    // Read the context generic parameters.
-    auto genericParams =
-      maybeGetOrReadGenericParams(genericContextID, FileContext);
-
-    typeOrOffset = SILFunctionType::get(genericParams, genericSig, extInfo,
+    typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),
                                         allParams, interfaceResult,
                                         ctx);

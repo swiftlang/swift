@@ -830,7 +830,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
                          ParameterConvention::Direct_Unowned);
   SILResultInfo Result(gen.getASTContext().TheRawPointerType,
                        ResultConvention::Unowned);
-  auto bfrFnType = SILFunctionType::get(nullptr, nullptr, bfrInfo,
+  auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
                                         ParameterConvention::Direct_Owned,
                                         Param, Result,
                                         gen.getASTContext());

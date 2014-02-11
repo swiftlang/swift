@@ -1563,7 +1563,7 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
 }
 
 void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
-                              GenericParamList *genericParams,
+                              GenericSignature *genericParams,
                               ExtInfo info,
                               ParameterConvention calleeConvention,
                               ArrayRef<SILParameterInfo> params,
@@ -1577,8 +1577,7 @@ void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,
   result.profile(id);
 }
 
-SILFunctionType::SILFunctionType(GenericParamList *genericParams,
-                                 GenericSignature *genericSig,
+SILFunctionType::SILFunctionType(GenericSignature *genericSig,
                                  ExtInfo ext,
                                  ParameterConvention calleeConvention,
                                  ArrayRef<SILParameterInfo> interfaceParams,
@@ -1586,7 +1585,6 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
                                  const ASTContext &ctx,
                                  RecursiveTypeProperties properties)
   : TypeBase(TypeKind::SILFunction, &ctx, properties),
-    GenericParams(genericParams),
     GenericSig(genericSig),
     InterfaceResult(interfaceResult) {
   SILFunctionTypeBits.ExtInfo = ext.Bits;
@@ -1618,14 +1616,13 @@ SILFunctionType::SILFunctionType(GenericParamList *genericParams,
 #endif
 }
 
-CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
-                                        GenericSignature *genericSig,
+CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                                         ExtInfo ext, ParameterConvention callee,
                                         ArrayRef<SILParameterInfo> interfaceParams,
                                         SILResultInfo interfaceResult,
                                         const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  SILFunctionType::Profile(id, genericParams, ext, callee,
+  SILFunctionType::Profile(id, genericSig, ext, callee,
                            interfaceParams, interfaceResult);
 
   // Do we already have this generic function type?
@@ -1649,7 +1646,7 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
   RecursiveTypeProperties properties;
   static_assert(RecursiveTypeProperties::BitWidth == 3,
                 "revisit this if you add new recursive type properties");
-  if (!genericParams) {
+  if (!genericSig) {
     // Nongeneric SIL functions are dependent if they have dependent argument
     // or return types. They still never contain type variables and are always
     // materializable.
@@ -1668,7 +1665,7 @@ CanSILFunctionType SILFunctionType::get(GenericParamList *genericParams,
 did_set_dependent:
 
   auto fnType =
-    new (mem) SILFunctionType(genericParams, genericSig, ext, callee,
+    new (mem) SILFunctionType(genericSig, ext, callee,
                               interfaceParams, interfaceResult,
                               ctx, properties);
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);

@@ -304,7 +304,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
                                             /*thin*/ true,
                                             /*noreturn*/ false);
-    auto fnTy = SILFunctionType::get(nullptr, nullptr, extInfo,
+    auto fnTy = SILFunctionType::get(nullptr, extInfo,
                                      ParameterConvention::Direct_Unowned,
                                      paramTy, retTy,
                                      Context);

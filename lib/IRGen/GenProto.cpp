@@ -3054,9 +3054,7 @@ namespace {
                                              sigArrays.second,
                                              ctx);
       
-      return SILFunctionType::get(D->getGenericParamsOfContext(),
-                                  sig,
-                                  extInfo,
+      return SILFunctionType::get(sig, extInfo,
                                   ParameterConvention::Direct_Unowned,
                                   param, result, ctx);
     }

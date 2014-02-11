@@ -1826,9 +1826,7 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::SILFunction: {
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
-    auto genericParams = fnTy->getGenericParams();
 
     auto callingConvention = fnTy->getAbstractCC();
     auto interfaceResult = fnTy->getInterfaceResult();
@@ -1855,10 +1853,6 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addTypeRef(interfaceResult.getType()),
                                       stableInterfaceResultConvention,
-                                      // FIXME: Always serialize a new
-                                      // GenericParamList for now.
-                                      // Interface types will kill this soon.
-                                      DeclID(0),
                                       stableCalleeConvention,
                                       getRawStableCC(callingConvention),
                                       fnTy->isThin(),
@@ -1869,10 +1863,7 @@ SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
       writeRequirements(sig->getRequirements());
     else
       writeRequirements({});
-    if (genericParams)
-      writeGenericParams(genericParams, DeclTypeAbbrCodes);
     break;
-SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   }
 
   case TypeKind::Array: {

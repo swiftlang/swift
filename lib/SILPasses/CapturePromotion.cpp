@@ -306,16 +306,13 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   }
 
   // Create the thin function type for the cloned closure.
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
   auto ClonedTy =
-    SILFunctionType::get(OrigFTI->getGenericParams(),
-                         OrigFTI->getGenericSignature(),
+    SILFunctionType::get(OrigFTI->getGenericSignature(),
                          OrigFTI->getExtInfo(),
                          OrigFTI->getCalleeConvention(),
                          ClonedInterfaceArgTys,
                          OrigFTI->getInterfaceResult(),
                          M.getASTContext());
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   
   // This inserts the new cloned function before the original function.
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,

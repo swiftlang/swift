@@ -578,7 +578,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
                                           /*thin*/ true,
                                           /*noreturn*/ false);
 
-  return SILFunctionType::get(nullptr, nullptr, extInfo,
+  return SILFunctionType::get(nullptr, extInfo,
                               /*callee*/ ParameterConvention::Direct_Unowned,
                               inputs, result, ctx);
 }

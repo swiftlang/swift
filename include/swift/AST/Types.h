@@ -2116,9 +2116,6 @@ public:
   typedef AnyFunctionType::ExtInfo ExtInfo;
 
 private:
-  /// TODO: Retire in favor of GenericSig.
-  GenericParamList *GenericParams;
-  
   GenericSignature *GenericSig;
 
   /// TODO: Permit an arbitrary number of results.
@@ -2131,8 +2128,7 @@ private:
     return MutableArrayRef<SILParameterInfo>(ptr, n);
   }
 
-  SILFunctionType(GenericParamList *genericParams,
-                  GenericSignature *genericSig,
+  SILFunctionType(GenericSignature *genericSig,
                   ExtInfo ext,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> interfaceParams,
@@ -2143,8 +2139,7 @@ private:
   static SILType getParameterSILType(const SILParameterInfo &param);// SILType.h
 
 public:
-  static CanSILFunctionType get(GenericParamList *genericParams,
-                                GenericSignature *genericSig,
+  static CanSILFunctionType get(GenericSignature *genericSig,
                                 ExtInfo ext,
                                 ParameterConvention calleeConvention,
                                 ArrayRef<SILParameterInfo> interfaceParams,
@@ -2207,10 +2202,6 @@ public:
   }
 
   bool isPolymorphic() const { return GenericSig != nullptr; }
-  /// TODO: Remove in favor of getGenericSignature().
-  GenericParamList *getGenericParams() const SIL_FUNCTION_TYPE_DEPRECATED {
-    return GenericParams;
-  }
   GenericSignature *getGenericSignature() const { return GenericSig; }
 
   ExtInfo getExtInfo() const { return ExtInfo(SILFunctionTypeBits.ExtInfo); }
@@ -2240,14 +2231,11 @@ public:
                                                ArrayRef<Substitution> subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    // FIXME: Should profile by the generic signature and interface types.
-    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-    Profile(ID, getGenericParams(), getExtInfo(), getCalleeConvention(),
+    Profile(ID, getGenericSignature(), getExtInfo(), getCalleeConvention(),
             getInterfaceParameters(), getInterfaceResult());
-    SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericParamList *genericParams,
+                      GenericSignature *genericSig,
                       ExtInfo info,
                       ParameterConvention calleeConvention,
                       ArrayRef<SILParameterInfo> params,

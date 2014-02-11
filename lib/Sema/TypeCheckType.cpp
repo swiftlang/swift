@@ -1161,7 +1161,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     interfaceParams = params;
     interfaceResult = result;
   }
-  return SILFunctionType::get(repr->getGenericParams(), genericSig, extInfo,
+  return SILFunctionType::get(genericSig, extInfo,
                               callee,
                               interfaceParams, interfaceResult,
                               Context);

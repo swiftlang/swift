@@ -54,8 +54,7 @@ CanSILFunctionType Lowering::adjustFunctionType(CanSILFunctionType type,
     return type;
 
   SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-  return SILFunctionType::get(type->getGenericParams(),
-                              type->getGenericSignature(),
+  return SILFunctionType::get(type->getGenericSignature(),
                               extInfo,
                               callee,
                               type->getInterfaceParameters(),
@@ -372,7 +371,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   // Always strip the auto-closure bit.
   extInfo = extInfo.withIsAutoClosure(false);
 
-  return SILFunctionType::get(genericParams, genericSig,
+  return SILFunctionType::get(genericSig,
                               extInfo, calleeConvention,
                               inputs, result,
                               M.getASTContext());
@@ -901,12 +900,6 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
         silFnType.print(llvm::dbgs());
         llvm::dbgs() << "\n");
 
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-  // FIXME: Sanity-check that getConstantContextGenericParams produces the same
-  // context params as the old path.
-  assert(contextGenerics == silFnType->getGenericParams());
-  SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
-  
   SILConstantInfo result = {
     formalType, formalInterfaceType,
     loweredType, loweredInterfaceType,
@@ -1275,8 +1268,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
   assert(substLoweredType->isThin() == substLoweredInterfaceType->isThin());
 
   // FIXME: Map into archetype context.
-  return SILFunctionType::get(genericParams,
-                              genericSig,
+  return SILFunctionType::get(genericSig,
                               substLoweredType->getExtInfo(),
                               origFnType->getCalleeConvention(),
                               substituter.getSubstParams(),
@@ -1317,19 +1309,14 @@ namespace {
         substParams.push_back(subst(origParam));
       }
 
-      SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_BEGIN
-      auto genericParams
-        = (dropGenerics ? nullptr : origType->getGenericParams());
       auto genericSig
         = (dropGenerics ? nullptr : origType->getGenericSignature());
       
-      return SILFunctionType::get(genericParams,
-                                  genericSig,
+      return SILFunctionType::get(genericSig,
                                   origType->getExtInfo(),
                                   origType->getCalleeConvention(),
                                   substParams, substResult,
                                   getASTContext());
-      SIL_FUNCTION_TYPE_IGNORE_DEPRECATED_END
     }
 
     SILType subst(SILType type) {

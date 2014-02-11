@@ -939,7 +939,7 @@ static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
   };
   SILResultInfo Result(IntTy, ResultConvention::Unowned);
   
-  auto FnType = SILFunctionType::get(nullptr, nullptr, extInfo,
+  auto FnType = SILFunctionType::get(nullptr, extInfo,
                                      ParameterConvention::Direct_Owned,
                                      Params, Result,
                                      B.getASTContext());
@@ -967,7 +967,7 @@ static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
   SILResultInfo Result(Int1Ty->getCanonicalType(),
                        ResultConvention::Unowned);
   
-  auto FnType = SILFunctionType::get(nullptr, nullptr, extInfo,
+  auto FnType = SILFunctionType::get(nullptr, extInfo,
                                      ParameterConvention::Direct_Owned,
                                      Param, Result,
                                      B.getASTContext());

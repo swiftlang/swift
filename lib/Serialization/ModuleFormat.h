@@ -464,7 +464,6 @@ namespace decls_block {
     SIL_FUNCTION_TYPE,
     TypeIDField,           // interface result type
     ResultConventionField, // interface result convention
-    DeclIDField,           // decl that owns the generic params
     ParameterConventionField, // callee convention
     AbstractCCField,       // calling convention
     BCFixed<1>,            // thin?
@@ -473,7 +472,6 @@ namespace decls_block {
     BCArray<TypeIDField>   // parameter types and conventions, alternating
                            // followed by generic parameter types
     // Trailed by its generic requirements, if any.
-    // Trailed by its generic parameters, if the owning decl ID is 0.
   >;
 
   template <unsigned Code>
