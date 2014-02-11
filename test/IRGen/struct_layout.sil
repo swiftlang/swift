@@ -19,6 +19,15 @@ import swift
 
 // armv7: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i32 21
 
+// arm64: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
+// arm64: %V4main14Rdar15410780_B = type <{ %Sq[[B:(\.[0-9]+)?]] }>
+// arm64: %Sq[[B]] = type <{ [257 x i8], [1 x i8] }>
+// arm64: %V4main14Rdar15410780_C = type <{ %Sq[[C:(\.[0-9]+)?]] }>
+// arm64: %Sq[[C]] = type <{ [24 x i8], [1 x i8] }>
+// arm64: @_TWVV4main14Rdar15410780_A = constant {{.*}} (i64 257
+// arm64: @_TWVV4main14Rdar15410780_B = constant {{.*}} (i64 258
+
+
 // <rdar://problem/15410780>
 struct Rdar15410780_A {
   var a: Builtin.Int2048
