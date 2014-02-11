@@ -1,0 +1,14 @@
+// RUN: %swift %s -emit-silgen | FileCheck %s
+
+sil_stage raw
+
+// CHECK: sil @foo : $<T> (@out T, @in T) -> () {
+// CHECK: bb0(%0 : $*T, %1 : $*T):
+// CHECK:   copy_addr [take] %1 to [initialization] %0 : $*T
+// CHECK:   return undef : $()
+// CHECK: }
+sil @foo : $<T> (@out T, @in T) -> () {
+entry(%o : $*T, %i : $*T):
+  copy_addr [take] %i to [initialization] %o : $*T
+  return undef : $()
+}

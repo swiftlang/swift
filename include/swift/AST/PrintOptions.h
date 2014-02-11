@@ -17,6 +17,8 @@
 #define SWIFT_AST_PRINTOPTIONS_H
 
 namespace swift {
+  class GenericParamList;
+  
   struct PrintOptions {
     /// \brief The indentation width.
     unsigned Indent = 2;
@@ -61,6 +63,10 @@ namespace swift {
 
     /// \brief Whether to print implicit parts of the AST.
     bool SkipImplicit = false;
+
+    /// \brief Print dependent types as references into this generic parameter
+    /// list.
+    GenericParamList *ContextGenericParams = nullptr;
 
     /// \brief Retrieve the set of options that prints everything.
     static PrintOptions printEverything() {

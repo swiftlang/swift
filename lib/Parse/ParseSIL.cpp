@@ -160,16 +160,32 @@ namespace {
     /// @}
 
     // Parsing logic.
-    bool parseSILType(SILType &Result);
+    bool parseSILType(SILType &Result, GenericParamList *&genericParams);
+    bool parseSILType(SILType &Result) {
+      GenericParamList *Junk;
+      return parseSILType(Result, Junk);
+    }
     bool parseSILType(SILType &Result, SourceLoc &TypeLoc) {
       TypeLoc = P.Tok.getLoc();
       return parseSILType(Result);
+    }
+    bool parseSILType(SILType &Result, SourceLoc &TypeLoc,
+                      GenericParamList *&GenericParams) {
+      TypeLoc = P.Tok.getLoc();
+      return parseSILType(Result, GenericParams);
     }
 
     /// Parse a SIL type without the leading '$' or value category specifier.
     bool parseSILTypeWithoutQualifiers(SILType &Result,
                                        SILValueCategory category,
-                                       const TypeAttributes &attrs);
+                                       const TypeAttributes &attrs,
+                                       GenericParamList *&genericParams);
+    bool parseSILTypeWithoutQualifiers(SILType &Result,
+                                       SILValueCategory category,
+                                       const TypeAttributes &attrs) {
+      GenericParamList *Junk;
+      return parseSILTypeWithoutQualifiers(Result, category, attrs, Junk);
+    }
 
     bool parseSILDeclRef(SILDeclRef &Result);
     bool parseGlobalName(Identifier &Name);
@@ -656,14 +672,18 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
 
 bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
                                               SILValueCategory category,
-                                              const TypeAttributes &attrs) {
+                                              const TypeAttributes &attrs,
+                                              GenericParamList *&GenericParams){
+  GenericParams = nullptr;
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
   if (TyR.isNull())
     return true;
 
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
-    if (auto generics = fnType->getGenericParams())
+    if (auto generics = fnType->getGenericParams()) {
       handleGenericParams(generics);
+      GenericParams = generics;
+    }
   }
   
   // Apply attributes to the type.
@@ -681,7 +701,7 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
-bool SILParser::parseSILType(SILType &Result) {
+bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams){
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
     return true;
 
@@ -705,8 +725,7 @@ bool SILParser::parseSILType(SILType &Result) {
     category = SILValueCategory::LocalStorage;
     attrs.clearAttribute(TAK_local_storage);
   }
-  
-  return parseSILTypeWithoutQualifiers(Result, category, attrs);
+  return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams);
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
@@ -2289,9 +2308,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
   SILType Ty;
   SourceLoc TypeLoc;
+  GenericParamList *GenericParams = nullptr;
   if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
       P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-      parseSILType(Ty, TypeLoc))
+      parseSILType(Ty, TypeLoc, GenericParams))
     return true;
 
   auto FTI = Ty.getAs<SILFunctionType>();
@@ -2304,12 +2324,11 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   
   SmallVector<Substitution, 4> subs;
   if (!parsedSubs.empty()) {
-    auto generics = FTI->getGenericParams();
-    if (!generics) {
+    if (!GenericParams) {
       P.diagnose(TypeLoc, diag::sil_substitutions_on_non_polymorphic_type);
       return true;
     }
-    if (getApplySubstitutionsFromParsed(*this, generics, parsedSubs, subs))
+    if (getApplySubstitutionsFromParsed(*this, GenericParams, parsedSubs, subs))
       return true;
   }
   switch (Opcode) {
@@ -2500,7 +2519,8 @@ bool Parser::parseDeclSIL() {
     // Construct a Scope for the function body so TypeAliasDecl can be added to
     // the scope.
     Scope Body(this, ScopeKind::FunctionBody);
-    if (FunctionState.parseSILType(FnType))
+    GenericParamList *ContextParams;
+    if (FunctionState.parseSILType(FnType, ContextParams))
       return true;
     auto SILFnType = FnType.getAs<SILFunctionType>();
     if (!SILFnType || !FnType.isObject()) {
@@ -2523,7 +2543,7 @@ bool Parser::parseDeclSIL() {
       // FIXME: Get the generic parameters from the function type. We'll want
       // to parse this from the TypeRepr when SILFunctionType loses its context
       // params.
-      FunctionState.F->setContextGenericParams(SILFnType->getGenericParams());
+      FunctionState.F->setContextGenericParams(ContextParams);
       
       // Parse the basic block list.
       do {

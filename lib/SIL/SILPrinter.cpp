@@ -1208,7 +1208,15 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose) const {
     OS << "[transparent] ";
   
   printName(OS);
-  OS << " : " << SILType::getPrimitiveObjectType(LoweredType);
+  OS << " : $";
+  
+  // Print the type by substituting our context parameters for the dependent
+  // parameters.
+  {
+    PrintOptions withContextGenericParams;
+    withContextGenericParams.ContextGenericParams = ContextGenericParams;
+    LoweredType->print(OS, withContextGenericParams);
+  }
   
   if (!isExternalDeclaration()) {
     OS << " {\n";

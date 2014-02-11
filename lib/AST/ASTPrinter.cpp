@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1064,6 +1065,7 @@ namespace {
 class TypePrinter : public TypeVisitor<TypePrinter> {
   ASTPrinter &Printer;
   const PrintOptions &Options;
+  Optional<std::vector<GenericParamList *>> UnwrappedGenericParams;
 
   void printDeclContext(DeclContext *DC) {
     switch (DC->getContextKind()) {
@@ -1581,7 +1583,27 @@ public:
     }
   }
 
+  GenericParamList *getGenericParamListAtDepth(unsigned depth) {
+    assert(Options.ContextGenericParams);
+    auto &paramLists = UnwrappedGenericParams.cache([&]{
+      std::vector<GenericParamList *> paramLists;
+      for (auto *params = Options.ContextGenericParams;
+           params;
+           params = params->getOuterParameters()) {
+        paramLists.push_back(params);
+      }
+      return paramLists;
+    });
+    return paramLists.rbegin()[depth];
+  }
+  
   void visitGenericTypeParamType(GenericTypeParamType *T) {
+    // Substitute a context archetype if we have context generic params.
+    if (Options.ContextGenericParams) {
+      return visit(getGenericParamListAtDepth(T->getDepth())
+                     ->getPrimaryArchetypes()[T->getIndex()]);
+    }
+    
     auto Name = T->getName();
     if (Name.empty())
       Printer << "<anonymous>";
