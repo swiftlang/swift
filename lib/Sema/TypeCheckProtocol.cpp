@@ -669,9 +669,8 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
     if (auto resultFn = genericFn->getResult()->getAs<FunctionType>()) {
       // For generic functions, build a new generic function... but strip off
       // the requirements. They don't add value.
-      auto sigWithoutReqts = GenericSignature::get(genericFn->getGenericParams(),
-                                                   {},
-                                                   genericFn->getASTContext());
+      auto sigWithoutReqts
+        = GenericSignature::get(genericFn->getGenericParams(), {});
       return GenericFunctionType::get(sigWithoutReqts,
                                       resultFn->getInput(),
                                       resultFn->getResult(),

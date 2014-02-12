@@ -1378,7 +1378,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements);
 
-      theStruct->setGenericSignature(paramTypes, requirements);
+      auto sig = GenericSignature::get(paramTypes, requirements);
+      theStruct->setGenericSignature(sig);
     }
 
     theStruct->computeType();
@@ -1707,7 +1708,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements);
 
-      proto->setGenericSignature(paramTypes, requirements);
+      auto sig = GenericSignature::get(paramTypes, requirements);
+      proto->setGenericSignature(sig);
     }
 
 
@@ -1838,7 +1840,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements);
 
-      theClass->setGenericSignature(paramTypes, requirements);
+      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
+      theClass->setGenericSignature(sig);
     }
     theClass->setIsObjC(isObjC);
     if (isIBLiveView)
@@ -1896,7 +1899,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       SmallVector<Requirement, 4> requirements;
       readGenericRequirements(requirements);
 
-      theEnum->setGenericSignature(paramTypes, requirements);
+      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
+      theEnum->setGenericSignature(sig);
     }
 
     theEnum->computeType();
@@ -2594,7 +2598,7 @@ Type ModuleFile::getType(TypeID TID) {
                                              thin,
                                              noreturn);
 
-    auto sig = GenericSignature::get(genericParams, requirements, ctx);
+    auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
                                             getType(inputID),
                                             getType(resultID),
@@ -2676,7 +2680,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     GenericSignature *genericSig = nullptr;
     if (!genericParamTypes.empty() || !requirements.empty())
-      genericSig = GenericSignature::get(genericParamTypes, requirements, ctx);
+      genericSig = GenericSignature::get(genericParamTypes, requirements);
 
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),

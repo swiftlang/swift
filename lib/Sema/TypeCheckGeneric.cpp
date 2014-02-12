@@ -681,6 +681,8 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
 
   bool isImplicitConstructor = isa<ConstructorDecl>(func) && 
                                func->isImplicit();
+  auto sig = GenericSignature::get(allGenericParams, requirements);
+
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
     Type argTy;
     Type initArgTy;
@@ -713,8 +715,10 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     auto info = AnyFunctionType::ExtInfo()
                   .withIsNoReturn(func->getAttrs().isNoReturn());
 
-    auto sig = GenericSignature::get(allGenericParams, requirements, Context);
-    if (i == e-1) {
+    // FIXME: We shouldn't even get here if the function isn't locally generic
+    // to begin with, but fixing that requires a lot of reengineering for local
+    // definitions in generic contexts.
+    if (sig && i == e-1) {
       funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
         initFuncTy = GenericFunctionType::get(sig, initArgTy, initFuncTy, info);
@@ -781,7 +785,8 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   collectRequirements(builder, allGenericParams, requirements);
 
   // Record the generic type parameter types and the requirements.
-  nominal->setGenericSignature(allGenericParams, requirements);
+  auto sig = GenericSignature::get(allGenericParams, requirements);
+  nominal->setGenericSignature(sig);
 
   return invalid;
 }

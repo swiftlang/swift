@@ -182,8 +182,7 @@ getBuiltinGenericFunction(Identifier Id,
 
   Requirement Marker(RequirementKind::WitnessMarker,
                      GenericParamTypes[0], Type());
-  GenericSignature *Sig = GenericSignature::get(GenericParamTypes, Marker,
-                                                Context);
+  GenericSignature *Sig = GenericSignature::get(GenericParamTypes, Marker);
   
   Type InterfaceType = GenericFunctionType::get(Sig,
                                                 ArgParamType, ResType,

@@ -2716,7 +2716,8 @@ namespace {
         Requirement(RequirementKind::Conformance, genericParam,
                     result->getDeclaredType())
       };
-      result->setGenericSignature(genericParam, genericRequirements);
+      auto sig = GenericSignature::get(genericParam, genericRequirements);
+      result->setGenericSignature(sig);
 
       result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);

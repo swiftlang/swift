@@ -1466,6 +1466,7 @@ GenericFunctionType::get(GenericSignature *sig,
                          Type input,
                          Type output,
                          const ExtInfo &info) {
+  assert(sig && "no generic signature for generic function type?!");
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
@@ -1878,12 +1879,15 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        ASTContext &ctx) {
+                                        ArrayRef<Requirement> requirements) {
+  if (params.empty() && requirements.empty())
+    return nullptr;
+  
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
   GenericSignature::Profile(ID, params, requirements);
   
+  auto &ctx = getASTContext(params, requirements);
   void *insertPos;
   if (auto *sig = ctx.Impl.GenericSignatures.FindNodeOrInsertPos(ID, insertPos))
     return sig;
@@ -1893,15 +1897,14 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                + sizeof(GenericTypeParamType *) * params.size()
                + sizeof(Requirement) * requirements.size();
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
-  auto newSig = new (mem) GenericSignature(params, requirements, ctx);
+  auto newSig = new (mem) GenericSignature(params, requirements);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
 
 CanGenericSignature GenericSignature::getCanonical(
                                         ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        ASTContext &ctx) {
+                                        ArrayRef<Requirement> requirements) {
   // Canonicalize the parameters and requirements.
   SmallVector<GenericTypeParamType*, 8> canonicalParams;
   canonicalParams.reserve(params.size());
@@ -1916,5 +1919,5 @@ CanGenericSignature GenericSignature::getCanonical(
                               reqt.getFirstType()->getCanonicalType(),
                               reqt.getSecondType().getCanonicalTypeOrNull()));
   }
-  return CanGenericSignature(get(canonicalParams, canonicalRequirements, ctx));
+  return CanGenericSignature(get(canonicalParams, canonicalRequirements));
 }

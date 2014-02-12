@@ -303,8 +303,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   GenericSignature *genericSig = nullptr;
   if (auto genFnType = dyn_cast<GenericFunctionType>(substFnInterfaceType)) {
     genericSig = GenericSignature::get(genFnType->getGenericParams(),
-                                       genFnType->getRequirements(),
-                                       M.getASTContext());
+                                       genFnType->getRequirements());
   }
   assert(bool(genericParams) == bool(genericSig));
 
@@ -1244,8 +1243,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
     genericParams = &polySubstFn->getGenericParams();
   if (auto genSubstFn = dyn_cast<GenericFunctionType>(substLoweredInterfaceType))
     genericSig = GenericSignature::get(genSubstFn->getGenericParams(),
-                                       genSubstFn->getRequirements(),
-                                       genSubstFn->getASTContext());
+                                       genSubstFn->getRequirements());
   assert(bool(genericParams) == bool(genericSig));
 
   GenericContextScope scope(*this, genericSig);

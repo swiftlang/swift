@@ -2038,8 +2038,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                            sig->getRequirements().end());
       allReqts.append(gft->getRequirements().begin(),
                       gft->getRequirements().end());
-      GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts,
-                                                           getASTContext());
+      GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts);
       
       witnessSubstIfaceTy = cast<GenericFunctionType>(
         GenericFunctionType::get(witnessSig,

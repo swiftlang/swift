@@ -613,6 +613,16 @@ void ProtocolType::canonicalizeProtocols(
   llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
 }
 
+ASTContext &GenericSignature::getASTContext(
+                                ArrayRef<swift::GenericTypeParamType *> params,
+                                ArrayRef<swift::Requirement> requirements) {
+  // The params and requirements cannot both be empty.
+  if (!params.empty())
+    return params.front()->getASTContext();
+  else
+    return requirements.front().getFirstType()->getASTContext();
+}
+
 CanGenericSignature GenericSignature::getCanonicalSignature() {
   if (CanonicalSignatureOrASTContext.is<ASTContext*>())
     return CanGenericSignature(this);
@@ -620,14 +630,8 @@ CanGenericSignature GenericSignature::getCanonicalSignature() {
   if (auto p = CanonicalSignatureOrASTContext.dyn_cast<GenericSignature*>())
     return CanGenericSignature(p);
   
-  ASTContext *C;
-  if (!getGenericParams().empty())
-    C = &getGenericParams().front()->getASTContext();
-  else
-    C = &getRequirements().front().getFirstType()->getASTContext();
-  
   CanGenericSignature canSig = getCanonical(getGenericParams(),
-                                            getRequirements(), *C);
+                                            getRequirements());
   
   CanonicalSignatureOrASTContext = canSig;
   return canSig;
@@ -1614,8 +1618,7 @@ const {
     }
   }
   
-  GenericSignature *sig = GenericSignature::get(unappliedParams, unappliedReqts,
-                                                M->getASTContext());
+  GenericSignature *sig = GenericSignature::get(unappliedParams, unappliedReqts);
   
   Type input = getInput().subst(M, subs, true, nullptr);
   Type result = getResult().subst(M, subs, true, nullptr);
@@ -2241,8 +2244,7 @@ case TypeKind::Id:
         anyChanges = true;
     }
     
-    auto sig = GenericSignature::get(genericParams, requirements,
-                                     Ptr->getASTContext());
+    auto sig = GenericSignature::get(genericParams, requirements);
 
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);

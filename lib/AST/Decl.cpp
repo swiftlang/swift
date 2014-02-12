@@ -192,7 +192,7 @@ GenericParamList::getAsCanonicalGenericSignature(
                        reqt.getFirstType()->getCanonicalType(),
                        reqt.getSecondType()->getCanonicalType());
   
-  return GenericSignature::get(params, requirements, C);
+  return GenericSignature::get(params, requirements);
 }
 
 // Helper for getAsGenericSignatureElements to remap an archetype in a
@@ -687,8 +687,7 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                                   ArrayRef<Requirement> requirements,
-                                   ASTContext &ctx)
+                                   ArrayRef<Requirement> requirements)
   : NumGenericParams(params.size()), NumRequirements(requirements.size()),
     CanonicalSignatureOrASTContext()
 {
@@ -709,14 +708,12 @@ GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
   }
   
   if (isCanonical)
-    CanonicalSignatureOrASTContext = &ctx;
+    CanonicalSignatureOrASTContext = (ASTContext *)nullptr;
 }
 
-void NominalTypeDecl::setGenericSignature(
-                        ArrayRef<GenericTypeParamType *> params,
-                        ArrayRef<Requirement> requirements) {
+void NominalTypeDecl::setGenericSignature(GenericSignature *sig) {
   assert(!GenericSig && "Already have generic signature");
-  GenericSig = GenericSignature::get(params, requirements, getASTContext());
+  GenericSig = sig;
 }
 
 void NominalTypeDecl::computeType() {

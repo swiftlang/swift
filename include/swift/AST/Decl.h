@@ -1873,24 +1873,24 @@ class GenericSignature : public llvm::FoldingSetNode {
   }
 
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                   ArrayRef<Requirement> requirements,
-                   ASTContext &ctx);
+                   ArrayRef<Requirement> requirements);
 
   llvm::PointerUnion<GenericSignature *, ASTContext *>
     CanonicalSignatureOrASTContext;
+  
+  static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
+                                   ArrayRef<Requirement> requirements);
   
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
   static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
-                               ArrayRef<Requirement> requirements,
-                               ASTContext &ctx);
+                               ArrayRef<Requirement> requirements);
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
   static CanGenericSignature getCanonical(ArrayRef<GenericTypeParamType *> params,
-                                          ArrayRef<Requirement> requirements,
-                                          ASTContext &ctx);
+                                          ArrayRef<Requirement> requirements);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -1942,14 +1942,7 @@ public:
     return CanonicalSignatureOrASTContext.is<ASTContext*>();
   }
   
-  ASTContext &getASTContext() {
-    if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext*>())
-      return *ctx;
-    
-    return *getCanonicalSignature()
-      ->CanonicalSignatureOrASTContext
-      .get<ASTContext*>();
-  }
+  ASTContext &getASTContext() const;
   
   CanGenericSignature getCanonicalSignature();
 
@@ -2076,8 +2069,7 @@ public:
   void setGenericParams(GenericParamList *params);
   
   /// Set the generic signature of this type.
-  void setGenericSignature(ArrayRef<GenericTypeParamType *> params,
-                           ArrayRef<Requirement> requirements);
+  void setGenericSignature(GenericSignature *sig);
 
   /// Retrieve the generic parameter types.
   ArrayRef<GenericTypeParamType *> getGenericParamTypes() const {
