@@ -770,7 +770,7 @@ ERROR(expected_type_after_as,expr_parsing,none,
 
 // Call expressions
 ERROR(expected_selector_call_args,expr_parsing,PointsToFirstBadToken,
-      "expected '(' following selector piece %0", (Identifier))
+      "expected '(' or '{' following selector piece %0", (Identifier))
 
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics

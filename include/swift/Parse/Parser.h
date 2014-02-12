@@ -785,7 +785,7 @@ public:
   ///   closure-signature-result:
   ///     '->' type
   /// \endverbatim
-  Expr *parseExprClosure();
+  ParserResult<Expr> parseExprClosure();
 
   /// \brief Parse the closure signature, if present.
   ///

@@ -411,7 +411,7 @@ ParserResult<Expr> Parser::parseExprNew() {
   if (elementTy.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (elementTy.isNull())
-    return nullptr;
+    return makeParserError();
 
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
@@ -432,6 +432,9 @@ ParserResult<Expr> Parser::parseExprNew() {
     }
 
     auto boundValue = parseExpr(diag::expected_expr_new_array_bound);
+    if (boundValue.hasCodeCompletion())
+      return boundValue;
+
     if (boundValue.isNull() || !Tok.is(tok::r_square)) {
       if (!boundValue.isNull())
         diagnose(Tok, diag::expected_bracket_array_new);
@@ -462,7 +465,14 @@ ParserResult<Expr> Parser::parseExprNew() {
   // Check for an initialization closure.
   Expr *constructExpr = nullptr;
   if (Tok.isFollowingLBrace()) {
-    constructExpr = parseExprClosure();
+    ParserResult<Expr> construction = parseExprClosure();
+    if (construction.hasCodeCompletion())
+      return construction;
+
+    if (construction.isParseError())
+      return construction;
+
+    constructExpr = construction.get();
     assert(constructExpr);
   }
 
@@ -769,7 +779,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     break;
 
   case tok::l_brace:     // expr-closure
-    Result = makeParserResult(parseExprClosure());
+    Result = parseExprClosure();
     break;
 
   case tok::period_prefix: {     // .foo
@@ -995,20 +1005,26 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (!isExprBasic && Tok.isFollowingLBrace() &&
         !isStartOfGetSetAccessor(*this)) {
       // Parse the closure.
-      Expr *closure = parseExprClosure();
+      ParserResult<Expr> closure = parseExprClosure();
+      if (closure.hasCodeCompletion())
+        return closure;
       
+      if (closure.isParseError())
+        return closure;
+
       // Introduce the trailing closure into the call, or form a call, as
       // necessary.
       if (auto call = dyn_cast<CallExpr>(Result.get())) {
         // When a closure follows a call, it becomes the last argument of
         // that call.
         Expr *arg = addTrailingClosureToArgument(Context, call->getArg(),
-                                                 closure);
+                                                 closure.get());
         call->setArg(arg);
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
-                                                 nullptr, SourceLoc(), closure);
+                                                 nullptr, SourceLoc(), 
+                                                 closure.get());
         Result = makeParserResult(new (Context) CallExpr(Result.get(), arg,
                                                        /*Implicit=*/true));
       }
@@ -1325,7 +1341,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   return invalid;
 }
 
-Expr *Parser::parseExprClosure() {
+ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
 
   // Parse the opening left brace.
@@ -1342,7 +1358,10 @@ Expr *Parser::parseExprClosure() {
   // size expression, there will not be a local context. A parse error will
   // be reported at the signature's declaration site.
   if (!CurLocalContext) {
-    return new (Context) ErrorExpr(inLoc);
+    skipUntil(tok::r_brace);
+    if (Tok.is(tok::r_brace))
+      consumeToken();
+    return makeParserError();
   }
   
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
@@ -1370,7 +1389,8 @@ Expr *Parser::parseExprClosure() {
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;
-  parseBraceItems(bodyElements, BraceItemListKind::Brace);
+  ParserStatus status;
+  status |= parseBraceItems(bodyElements, BraceItemListKind::Brace);
 
   // Parse the closing '}'.
   SourceLoc rightBrace;
@@ -1417,7 +1437,7 @@ Expr *Parser::parseExprClosure() {
                                      rightBrace),
                    hasSingleExpressionBody);
 
-  return closure;
+  return makeParserResult(closure);
 }
 
 ///   expr-anon-closure-argument:
@@ -1626,6 +1646,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 ///
 /// selector-arg:
 ///   identifier expr-paren
+///   identifier expr-closure
 ParserResult<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
@@ -1664,8 +1685,8 @@ ParserResult<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
     Identifier selectorPiece = Context.getIdentifier(Tok.getText());
     consumeToken(tok::identifier);
 
-    // Look for the following '(' that provides arguments.
-    if (Tok.isNot(tok::l_paren)) {
+    // Look for the following '(' or '{' that provides arguments.
+    if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_brace)) {
       diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
       hadError = true;
       break;
@@ -1673,7 +1694,9 @@ ParserResult<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
 
     // Parse the expression. We parse a full expression list, but
     // complain about it later.
-    ParserResult<Expr> selectorArg = parseExprList(tok::l_paren, tok::r_paren);
+    ParserResult<Expr> selectorArg 
+      = Tok.is(tok::l_paren)? parseExprList(tok::l_paren, tok::r_paren)
+                            : parseExprClosure();
     if (selectorArg.hasCodeCompletion())
       return selectorArg;
     if (selectorArg.isParseError()) {
