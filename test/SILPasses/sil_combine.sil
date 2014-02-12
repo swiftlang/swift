@@ -507,11 +507,11 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @downcast_upcast_roundtrip
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @downcast_upcast_roundtrip : $@thin <T_0_0, T_0_1> (HeapBuffer<T_0_0, T_0_1>) -> HeapBuffer<T_0_0, T_0_1> {
-bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
-  %2 = upcast %0 : $HeapBuffer<T_0_0, T_0_1> to $RawBuffer // user: %3                                                                                     
-  %3 = unconditional_checked_cast downcast %2 : $RawBuffer to $HeapBuffer<T_0_0, T_0_1>
-  return %3 : $HeapBuffer<T_0_0, T_0_1>
+sil @downcast_upcast_roundtrip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
+bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
+  %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3                                                                                     
+  %3 = unconditional_checked_cast downcast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
 // CHECK-LABEL: sil @cond_fail_applied_to_zero_removal
@@ -543,11 +543,11 @@ bb0(%0 : $Builtin.ObjectPointer):
 // CHECK-LABEL: sil @object_pointer_to_ref_ref_to_object_pointer_round_trip
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @object_pointer_to_ref_ref_to_object_pointer_round_trip : $@thin <T_0_0, T_0_1> (HeapBuffer<T_0_0, T_0_1>) -> HeapBuffer<T_0_0, T_0_1> {
-bb0(%0 : $HeapBuffer<T_0_0, T_0_1>):
-  %1 = ref_to_object_pointer %0 : $HeapBuffer<T_0_0, T_0_1> to $Builtin.ObjectPointer
-  %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $HeapBuffer<T_0_0, T_0_1>
-  return %2 : $HeapBuffer<T_0_0, T_0_1>
+sil @object_pointer_to_ref_ref_to_object_pointer_round_trip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
+bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
+  %1 = ref_to_object_pointer %0 : $HeapBufferStorage<T_0_0, T_0_1> to $Builtin.ObjectPointer
+  %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $HeapBufferStorage<T_0_0, T_0_1>
+  return %2 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
 // CHECK-LABEL: sil @raw_pointer_to_ref_ref_to_raw_pointer_round_trip
