@@ -808,6 +808,7 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+  ParserResult<Expr> parseExprCallSuffix(bool isConstructor);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);

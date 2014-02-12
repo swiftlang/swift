@@ -534,16 +534,16 @@ ParserResult<Expr> Parser::parseExprSuper() {
       }
       // The constructor decl will be resolved by sema.
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
-                                                             dotLoc, ctorLoc,
-                                                             /*Implicit=*/false);
+                                     dotLoc, ctorLoc,
+                                     /*Implicit=*/false);
       if (Tok.isFollowingLParen()) {
-        // Parse Swift-style initializer arguments.
+        // Parse initializer arguments.
         ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
         if (arg.hasCodeCompletion())
           return makeParserCodeCompletionResult<Expr>();
-        // FIXME: Unfortunate recovery here.
-        if (arg.isNull())
-          return nullptr;
+
+        if (arg.isParseError())
+          return makeParserError();
         
         result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
       } else {
@@ -684,7 +684,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 ///     expr-postfix '[' expr ']'
 ///
 ///   expr-call:
-///     expr-postfix expr-paren
+///     expr-postfix expr-call-suffix
 ///
 ///   expr-force-value:
 ///     expr-postfix '!'
@@ -967,10 +967,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
-      ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
+      ParserResult<Expr> Arg = parseExprCallSuffix(/*isConstructor=*/false);
       if (Arg.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
-      if (Arg.isNull())
+
+      if (Arg.isParseError())
         return nullptr;
       Result = makeParserResult(
           new (Context) CallExpr(Result.get(), Arg.get(), /*Implicit=*/false));
@@ -1616,6 +1617,87 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
                               /*hasTrailingClosure=*/false,
                               /*Implicit=*/false));
+}
+
+/// \brief Parse an expression call suffix.
+///
+/// expr-call-suffix:
+///   expr-paren selector-arg*
+///
+/// selector-arg:
+///   identifier expr-paren
+ParserResult<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
+  assert(Tok.isFollowingLParen() && "Not a call suffix?");
+
+  // Parse the first argument.
+  ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
+  if (firstArg.hasCodeCompletion())
+    return firstArg;
+
+  // If we don't have any selector arguments, we're done.
+  // FIXME: Indentation-sensitive continuation.
+  if (!Tok.is(tok::identifier) || Tok.isAtStartOfLine())
+    return firstArg;
+
+  // Add the first argument.
+  SmallVector<Expr *, 4> selectorArgs;
+  SmallVector<Identifier, 4> selectorPieces;
+  bool hadError = false;
+  if (firstArg.isParseError()) {
+    hadError = true;
+  } else {
+    selectorArgs.push_back(firstArg.get());
+    selectorPieces.push_back(Identifier());
+  }
+
+  // Parse the remaining selector arguments.
+  while (true) {
+    // Otherwise, an identifier on the same line continues the
+    // selector arguments.
+    // FIXME: Indentation-sensitive continuation.
+    if (Tok.isNot(tok::identifier) || Tok.isAtStartOfLine()) {
+      // We're done.
+      break;
+    }
+
+    // Consume the selector piece.
+    Identifier selectorPiece = Context.getIdentifier(Tok.getText());
+    consumeToken(tok::identifier);
+
+    // Look for the following '(' that provides arguments.
+    if (Tok.isNot(tok::l_paren)) {
+      diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
+      hadError = true;
+      break;
+    }
+
+    // Parse the expression. We parse a full expression list, but
+    // complain about it later.
+    ParserResult<Expr> selectorArg = parseExprList(tok::l_paren, tok::r_paren);
+    if (selectorArg.hasCodeCompletion())
+      return selectorArg;
+    if (selectorArg.isParseError()) {
+      hadError = true;
+    } else {
+      selectorArgs.push_back(selectorArg.get());
+      selectorPieces.push_back(selectorPiece);
+    }
+  }
+
+  if (hadError)
+    return makeParserError();
+
+  // FIXME: Improve AST here to represent individual selector pieces
+  // and their arguments cleanly.
+  return makeParserResult(
+           new (Context) TupleExpr(selectorArgs.front()->getStartLoc(),
+                                   Context.AllocateCopy(selectorArgs),
+                                   Context.AllocateCopy<Identifier>(
+                                     selectorPieces.begin(),
+                                     selectorPieces.end()),
+                                   selectorArgs.back()->getEndLoc(),
+                                   /*hasTrailingClosure=*/false,
+                                   /*implicit=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
