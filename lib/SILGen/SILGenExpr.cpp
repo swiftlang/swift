@@ -1782,9 +1782,21 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 #endif
 
       // Non-address-only constants are passed at +1.
-      if (Entry.isConstant() && !Entry.getConstant().getType().isAddress()) {
-        SILValue Val = Entry.getConstant();
-        Val = B.emitCopyValueOperation(loc, Val);
+      auto &tl = getTypeLowering(vd->getType());
+      
+      if (tl.isLoadable()) {
+        SILValue Val;
+        if (Entry.isConstant()) {
+          assert(!Entry.getConstant().getType().isAddress());
+          
+          Val = Entry.getConstant();
+          Val = B.emitCopyValueOperation(loc, Val);
+        } else {
+          // If we have a mutable binding for a 'let', such as 'self' in an
+          // 'init' method, load it.
+          Val = emitLoad(loc, Entry.getAddress(), tl, SGFContext(), IsNotTake)
+            .forward(*this);
+        }
         
         // Use an RValue to explode Val if it is a tuple.
         RValue RV(*this, loc, vd->getType()->getCanonicalType(),
