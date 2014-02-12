@@ -381,7 +381,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   auto determineOutputFilename = [&](OptSpecifier optWithoutPath,
                                      OptSpecifier optWithPath,
                                      const char *extension,
-                                     bool useMainOutput = false) -> std::string{
+                                     bool useMainOutput) -> std::string {
     if (const Arg *A = Args.getLastArg(optWithPath)) {
       Args.ClaimAllArgs(optWithoutPath);
       return A->getValue();
@@ -415,11 +415,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.SerializedDiagnosticsPath =
     determineOutputFilename(OPT_serialize_diagnostics,
                             OPT_serialize_diagnostics_path,
-                            "dia");
+                            "dia", false);
   Opts.ObjCHeaderOutputPath =
     determineOutputFilename(OPT_emit_objc_header,
                             OPT_emit_objc_header_path,
-                            "h");
+                            "h", false);
 
   bool canUseMainOutputForModule =
     Opts.RequestedAction == FrontendOptions::EmitModuleOnly;
