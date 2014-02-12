@@ -679,9 +679,9 @@ ParserResult<Stmt> Parser::parseStmtFor() {
 }
 
 ///   stmt-for-c-style:
-///     'for' stmt-for-c-style-init? ';' expr? ';'
+///     'for' stmt-for-c-style-init? ';' expr-basic? ';'
 ///           (expr-basic (',' expr-basic)*)? stmt-brace
-///     'for' '(' stmt-for-c-style-init? ';' expr? ';'
+///     'for' '(' stmt-for-c-style-init? ';' expr-basic? ';'
 ///           (expr-basic (',' expr-basic)*)? ')' stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
@@ -798,7 +798,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
       CodeCompletion, IterationVariable);
 
   if (Tok.isNot(tok::semi)) {
-    Second = parseExpr(diag::expected_cond_for_stmt);
+    Second = parseExprBasic(diag::expected_cond_for_stmt);
     Status |= Second;
   }
 

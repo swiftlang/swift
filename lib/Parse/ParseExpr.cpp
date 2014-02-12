@@ -776,14 +776,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // If there is an expr-call-suffix, parse it and form a call.
     if (hasExprCallSuffix(isExprBasic)) {
-      ParserResult<Expr> Arg = parseExprCallSuffix();
-      if (Arg.isNull())
-        return Arg;
-
-      if (Result.isNonNull())
-        Result = makeParserResult(
-                   new (Context) CallExpr(Result.get(), Arg.get(), 
-                                          /*Implicit=*/false));
+      Result = parseExprCallSuffix(Result);
       break;
     }
 
@@ -984,14 +977,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
         // If there is an expr-call-suffix, parse it and form a call.
         if (hasExprCallSuffix(isExprBasic)) {
-          ParserResult<Expr> Arg = parseExprCallSuffix();
-          if (Arg.isNull())
-            return Arg;
-          
-          if (Result.isNonNull())
-            Result = makeParserResult(
-                       new (Context) CallExpr(Result.get(), Arg.get(), 
-                                              /*Implicit=*/false));
+          Result = parseExprCallSuffix(Result);
           continue;
         }
       } else {
@@ -1670,29 +1656,54 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 ///
 /// \param isExprBasic Whether we're in an expr-basic or not.
 bool Parser::hasExprCallSuffix(bool isExprBasic) {
-  return Tok.isFollowingLParen();
+  // FIXME: We're requiring the hanging brace here. That's probably
+  // not what we want.
+  return Tok.isFollowingLParen() || 
+    (!isExprBasic && Tok.isFollowingLBrace() && 
+     !isStartOfGetSetAccessor(*this));
 }
 
 /// \brief Parse an expression call suffix.
 ///
 /// expr-call-suffix:
 ///   expr-paren selector-arg*
+///   expr-closure selector-arg* (except in expr-basic)
 ///
 /// selector-arg:
 ///   identifier expr-paren
 ///   identifier expr-closure
-ParserResult<Expr> Parser::parseExprCallSuffix() {
-  assert(Tok.isFollowingLParen() && "Not a call suffix?");
+ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn) {
+  assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) 
+         && "Not a call suffix?");
 
   // Parse the first argument.
-  ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
+  bool firstArgIsClosure = !Tok.isFollowingLParen();
+  ParserResult<Expr> firstArg
+    = firstArgIsClosure? parseExprClosure()
+                      : parseExprList(Tok.getKind(), tok::r_paren);
   if (firstArg.hasCodeCompletion())
     return firstArg;
 
   // If we don't have any selector arguments, we're done.
   // FIXME: Indentation-sensitive continuation.
-  if (!Tok.is(tok::identifier) || Tok.isAtStartOfLine())
-    return firstArg;
+  if (!Tok.is(tok::identifier) || Tok.isAtStartOfLine()) {
+    if (fn.isParseError())
+      return fn;
+    if (firstArg.isParseError())
+      return firstArg;
+
+    // If the argument was a closure, create a trailing closure argument.
+    Expr *arg = firstArg.get();
+    if (firstArgIsClosure) {
+      arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, nullptr, 
+                                         SourceLoc(), arg);
+    }
+
+    // Form the call.
+    return makeParserResult(new (Context) CallExpr(
+                                            fn.get(), arg,
+                                            /*Implicit=*/firstArgIsClosure));
+  }
 
   // Add the first argument.
   SmallVector<Expr *, 4> selectorArgs;
@@ -1746,15 +1757,16 @@ ParserResult<Expr> Parser::parseExprCallSuffix() {
 
   // FIXME: Improve AST here to represent individual selector pieces
   // and their arguments cleanly.
-  return makeParserResult(
-           new (Context) TupleExpr(selectorArgs.front()->getStartLoc(),
-                                   Context.AllocateCopy(selectorArgs),
-                                   Context.AllocateCopy<Identifier>(
-                                     selectorPieces.begin(),
-                                     selectorPieces.end()),
-                                   selectorArgs.back()->getEndLoc(),
-                                   /*hasTrailingClosure=*/false,
-                                   /*implicit=*/false));
+  Expr *arg = new (Context) TupleExpr(selectorArgs.front()->getStartLoc(),
+                                      Context.AllocateCopy(selectorArgs),
+                                      Context.AllocateCopy<Identifier>(
+                                        selectorPieces.begin(),
+                                        selectorPieces.end()),
+                                      selectorArgs.back()->getEndLoc(),
+                                      /*hasTrailingClosure=*/false,
+                                      /*implicit=*/false);
+  return makeParserResult(new (Context) CallExpr(fn.get(), arg, 
+                                                 /*Implicit=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
