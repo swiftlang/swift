@@ -78,6 +78,20 @@
   they can also be used as non-member properties now, e.g. as a global
   variable or a local variable in a function.
 
+* Objective-C instancetype methods are now imported as methods that
+  return Swift's "DynamicSelf" type. While DynamicSelf is not
+  generally useful for defining methods in Swift, importing to it
+  eliminates the need for casting with the numerous instancetype APIs,
+  e.g.,
+
+    let tileNode: SKSpriteNode = SKSpriteNode.spriteNodeWithTexture(tileAtlas.textureNamed("tile\(tileNumber).png"))!
+
+  becomes
+
+    let tileNode = SKSpriteNode.spriteNodeWithTexture(tileAtlas.textureNamed("tile\(tileNumber).png"))
+
+  DynamicSelf will become more interesting in the coming weeks.
+
 2014-02-05
 ----------
 
