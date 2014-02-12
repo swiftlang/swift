@@ -68,6 +68,8 @@ ERROR(error_immediate_mode_primary_file,frontend,none,
 
 ERROR(error_mode_cannot_emit_module,frontend,none,
   "this mode does not support emitting modules", ()) 
+ERROR(error_mode_cannot_emit_header,frontend,none,
+  "this mode does not support emitting Objective-C headers", ())
 
 ERROR(error_bad_module_name,frontend,none,
       "module name \"%0\" is not a valid identifier"

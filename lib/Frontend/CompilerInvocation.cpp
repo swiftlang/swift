@@ -378,7 +378,21 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  auto determineOutputFilename = [&] (const char *Extension) -> std::string {
+  auto determineOutputFilename = [&](OptSpecifier optWithoutPath,
+                                     OptSpecifier optWithPath,
+                                     const char *extension,
+                                     bool useMainOutput = false) -> std::string{
+    if (const Arg *A = Args.getLastArg(optWithPath)) {
+      Args.ClaimAllArgs(optWithoutPath);
+      return A->getValue();
+    }
+
+    if (!Args.hasArg(optWithoutPath))
+      return {};
+
+    if (useMainOutput && !Opts.OutputFilename.empty())
+      return Opts.OutputFilename;
+
     StringRef OriginalPath;
     if (!Opts.OutputFilename.empty() && Opts.OutputFilename != "-")
       // Put the serialized diagnostics file next to the output file.
@@ -394,38 +408,46 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       OriginalPath = Opts.ModuleName;
 
     llvm::SmallString<128> Path(OriginalPath);
-    llvm::sys::path::replace_extension(Path, Extension);
+    llvm::sys::path::replace_extension(Path, extension);
     return Path.str();
   };
 
-  if (const Arg *A = Args.getLastArg(OPT_serialize_diagnostics_path)) {
-    // Claim -serialize-diagnostics, if present.
-    Args.ClaimAllArgs(OPT_serialize_diagnostics);
-    Opts.SerializedDiagnosticsPath = A->getValue();
-  } else if (Args.hasArg(OPT_serialize_diagnostics)) {
-    // -serialize-diagnostics has been passed without
-    // -serialize-diagnostics-path, so determine a path based on other inputs.
-    static const char *const DiagnosticsFilePathExtension = "dia";
-    Opts.SerializedDiagnosticsPath =
-      determineOutputFilename(DiagnosticsFilePathExtension);
-  }
+  Opts.SerializedDiagnosticsPath =
+    determineOutputFilename(OPT_serialize_diagnostics,
+                            OPT_serialize_diagnostics_path,
+                            "dia");
+  Opts.ObjCHeaderOutputPath =
+    determineOutputFilename(OPT_emit_objc_header,
+                            OPT_emit_objc_header_path,
+                            "h");
 
-  if (const Arg *A = Args.getLastArg(OPT_emit_module_path)) {
-    // Claim -emit-module, if present.
-    Args.ClaimAllArgs(OPT_emit_module);
-    Opts.ModuleOutputPath = A->getValue();
-  } else if (Args.hasArg(OPT_emit_module)) {
-    // -emit-module has been passed without -emit-module-path, so determine
-    // a path based on other inputs.
-    if (Opts.RequestedAction == FrontendOptions::EmitModuleOnly &&
-        !Opts.OutputFilename.empty())
-      // We're in EmitModuleOnly mode, so use OutputFilename if we have one.
-      Opts.ModuleOutputPath = Opts.OutputFilename;
-    else
-      // We're either not in EmitModuleOnly mode, or we don't have an
-      // OutputFilename, so determine an output path based on other inputs.
-      Opts.ModuleOutputPath =
-        determineOutputFilename(SERIALIZED_MODULE_EXTENSION);
+  bool canUseMainOutputForModule =
+    Opts.RequestedAction == FrontendOptions::EmitModuleOnly;
+  Opts.ModuleOutputPath =
+    determineOutputFilename(OPT_emit_module,
+                            OPT_emit_module_path,
+                            SERIALIZED_MODULE_EXTENSION,
+                            canUseMainOutputForModule);
+
+  if (!Opts.ObjCHeaderOutputPath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
+      return true;
+    case FrontendOptions::Parse:
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+      break;
+    }
   }
 
   if (!Opts.ModuleOutputPath.empty()) {

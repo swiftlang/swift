@@ -82,6 +82,9 @@ public:
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 
+  /// The path to which we should emit an Objective-C header for the module.
+  std::string ObjCHeaderOutputPath;
+
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;

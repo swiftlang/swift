@@ -168,6 +168,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_Dependencies:
     case types::TY_ClangModuleFile:
     case types::TY_SerializedDiagnostics:
+    case types::TY_ObjCHeader:
     case types::TY_Image:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
@@ -323,6 +324,14 @@ Job *MergeModule::constructJob(const JobAction &JA,
 
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
+
+  const std::string &ObjCHeaderOutputPath =
+    Output->getAdditionalOutputForType(types::TY_ObjCHeader);
+  if (!ObjCHeaderOutputPath.empty()) {
+    Arguments.push_back("-emit-objc-header");
+    Arguments.push_back("-emit-objc-header-path");
+    Arguments.push_back(ObjCHeaderOutputPath.c_str());
+  }
 
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));

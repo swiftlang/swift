@@ -146,6 +146,12 @@ def emit_module_path : Separate<["-"], "emit-module-path">,
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption]>, Alias<emit_module_path>;
 
+def emit_objc_header : Flag<["-"], "emit-objc-header">, Flags<[FrontendOption]>,
+  HelpText<"Emit an Objective-C header file">;
+def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
+  Flags<[FrontendOption]>, MetaVarName<"<path>">,
+  HelpText<"Emit an Objective-C header file to <path>">;
+
 // Linker options
 
 def linker_option_Group : OptionGroup<"<linker-specific options>">;

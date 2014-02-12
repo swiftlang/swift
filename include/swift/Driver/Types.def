@@ -48,6 +48,7 @@ TYPE("raw-sil",         RawSIL,             "sil",             "")
 TYPE("llvm-ir",         LLVM_IR,            "ir",              "")
 TYPE("llvm-bc",         LLVM_BC,            "bc",              "")
 TYPE("diagnostics",     SerializedDiagnostics, "dia",          "")
+TYPE("objc-header",     ObjCHeader,         "h",               "")
 
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")

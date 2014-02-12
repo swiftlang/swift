@@ -402,12 +402,21 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID);
 
+  bool shouldEmitObjCHeader = Args.hasArg(options::OPT_emit_objc_header,
+                                          options::OPT_emit_objc_header_path);
+  if (shouldEmitObjCHeader &&
+      OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_emit_objc_header_with_single_compile);
+  }
+
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if (Args.hasArg(options::OPT_g) && OI.shouldLink()) {
+  } else if ((Args.hasArg(options::OPT_g) && OI.shouldLink()) ||
+             shouldEmitObjCHeader) {
     // An option has been passed which requires a module, but the user hasn't
     // requested one. Generate a module, but treat it as an intermediate output.
     OI.ShouldGenerateModule = true;
@@ -817,6 +826,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                                           OutputFile,
                                                           BaseInput));
 
+  // Choose the swiftmodule output path.
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA) &&
       Output->getPrimaryOutputType() != types::TY_SwiftModuleFile) {
     StringRef OFMModuleOutputPath;
@@ -864,6 +874,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     }
   }
 
+  // Choose the serialized diagnostics output path.
   if (C.getArgs().hasArg(options::OPT_serialize_diagnostics) &&
       isa<CompileJobAction>(JA)) {
     StringRef OFMSerializeDiagnosticsPath;
@@ -898,6 +909,40 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     if (llvm::sys::fs::can_write(OutputPath) &&
         llvm::sys::fs::is_regular_file(OutputPath))
       llvm::sys::fs::remove(OutputPath);
+  }
+
+  // Choose the Objective-C header output path.
+  if (isa<MergeModuleJobAction>(JA) &&
+      C.getArgs().hasArg(options::OPT_emit_objc_header,
+                         options::OPT_emit_objc_header_path)) {
+    StringRef ObjCHeaderPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_ObjCHeader);
+      if (iter != OutputMap->end())
+        ObjCHeaderPath = iter->second;
+    }
+
+    if (ObjCHeaderPath.empty())
+      if (auto A = C.getArgs().getLastArg(options::OPT_emit_objc_header_path))
+        ObjCHeaderPath = A->getValue();
+
+    if (!ObjCHeaderPath.empty()) {
+      Output->setAdditionalOutputForType(types::TY_ObjCHeader, ObjCHeaderPath);
+    } else {
+      // Put the header next to the primary output file.
+      // FIXME: That's not correct if the user /just/ passed -emit-header
+      // and not -emit-module.
+      llvm::SmallString<128> Path;
+      if (Output->getPrimaryOutputType() != types::TY_Nothing)
+        Path = Output->getPrimaryOutputFilename();
+      else if (!Output->getBaseInput().empty())
+        Path = llvm::sys::path::stem(Output->getBaseInput());
+      else
+        Path = OI.ModuleName;
+
+      llvm::sys::path::replace_extension(Path, "h");
+      Output->setAdditionalOutputForType(types::TY_ObjCHeader, Path);
+    }
   }
 
   if (DriverPrintBindings) {
