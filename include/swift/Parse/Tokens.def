@@ -38,12 +38,12 @@ KEYWORD(extension)
 KEYWORD(func)
 KEYWORD(import)
 KEYWORD(init)
-KEYWORD(let)
 KEYWORD(protocol)
 KEYWORD(static)
 KEYWORD(struct)
 KEYWORD(subscript)
 KEYWORD(typealias)
+KEYWORD(val)
 KEYWORD(var)
 
 KEYWORD(undef)      // This is only enabled when parsing .sil files.

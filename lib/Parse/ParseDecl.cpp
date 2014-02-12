@@ -488,7 +488,7 @@ static bool isStartOfModifiedDecl(const Token &Tok, const Token &Tok2,
     return false;
   
   return
-       (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
+       (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_val) || Tok2.is(tok::kw_var) ||
         Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
         Tok2.is(tok::kw_subscript) || Tok2.is(tok::kw_struct) ||
         Tok2.is(tok::kw_enum) || Tok2.is(tok::kw_class) ||
@@ -501,7 +501,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::at_sign:
   case tok::kw_static:
   case tok::kw_extension:
-  case tok::kw_let:
+  case tok::kw_val:
   case tok::kw_var:
   case tok::kw_typealias:
   case tok::kw_enum:
@@ -616,7 +616,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     DeclResult = parseDeclExtension(Flags, Attributes);
     Status = DeclResult;
     break;
-  case tok::kw_let:
+  case tok::kw_val:
   case tok::kw_var:
     Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc);
     UnhandledStatic = false;
@@ -795,7 +795,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
       Kind = ImportKind::Protocol;
       break;
     case tok::kw_var:
-    case tok::kw_let:
+    case tok::kw_val:
       Kind = ImportKind::Var;
       break;
     case tok::kw_func:
@@ -1503,8 +1503,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
                                   SourceLoc StaticLoc) {
-  bool isLet = Tok.is(tok::kw_let);
-  assert(Tok.getKind() == tok::kw_let || Tok.getKind() == tok::kw_var);
+  bool isLet = Tok.is(tok::kw_val);
+  assert(Tok.getKind() == tok::kw_val || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
 
   
@@ -1730,7 +1730,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
     // that point.
     backtrackToPosition(BeginParserPosition);
     consumeToken(tok::l_brace);
-    while (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) ||
+    while (Tok.is(tok::kw_var) || Tok.is(tok::kw_val) ||
            (Tok.isNot(tok::eof) && !isStartOfDecl(Tok, peekToken()))) {
       consumeToken();
     }
