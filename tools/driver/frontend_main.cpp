@@ -27,6 +27,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Immediate/Immediate.h"
+#include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -66,13 +67,12 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
 static bool performCompile(CompilerInstance &Instance,
                            CompilerInvocation &Invocation,
                            ArrayRef<const char *> Args) {
-  FrontendOptions::ActionType Action =
-    Invocation.getFrontendOptions().RequestedAction;
+  FrontendOptions opts = Invocation.getFrontendOptions();
+  FrontendOptions::ActionType Action = opts.RequestedAction;
 
   Instance.performParse();
 
-  FrontendOptions::DebugCrashMode CrashMode =
-    Invocation.getFrontendOptions().CrashMode;
+  FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
     // This assertion should always fail, per the user's request, and should
     // not be converted to llvm_unreachable.
@@ -89,6 +89,24 @@ static bool performCompile(CompilerInstance &Instance,
     return false;
   }
 
+  // Write an Objective-C header for the module if requested.
+  // This should work with -parse.
+  if (!opts.ObjCHeaderOutputPath.empty()) {
+    std::string errorInfo;
+    llvm::raw_fd_ostream out(opts.ObjCHeaderOutputPath.c_str(), errorInfo,
+                             llvm::sys::fs::F_Binary);
+
+    if (out.has_error() || !errorInfo.empty()) {
+      Context.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                             opts.ObjCHeaderOutputPath, errorInfo);
+      out.clear_error();
+    }
+
+    bool hadError = printAsObjC(out, Instance.getMainModule());
+    assert(!hadError && "no known error cases");
+    (void)hadError;
+  }
+
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse)
     return false;
@@ -97,26 +115,19 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been told to dump the AST (either after parsing or type-checking,
   // which is already differentiated in CompilerInstance::performParse()),
-  // so dump the main source file and return.
+  // so dump or print the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
-      Action == FrontendOptions::DumpAST) {
+      Action == FrontendOptions::DumpAST ||
+      Action == FrontendOptions::PrintAST) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
       SourceFileKind Kind = Invocation.getInputKind();
       SF = &Instance.getMainModule()->getMainSourceFile(Kind);
     }
-    SF->dump();
-    return false;
-  }
-
-  // We've been told to pretty print the AST, so do that and return.
-  if (Action == FrontendOptions::PrintAST) {
-    SourceFile *SF = PrimarySourceFile;
-    if (!SF) {
-      SourceFileKind Kind = Invocation.getInputKind();
-      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
-    }
-    SF->print(llvm::outs(), PrintOptions::printEverything());
+    if (Action == FrontendOptions::PrintAST)
+      SF->print(llvm::outs(), PrintOptions::printEverything());
+    else
+      SF->dump();
     return false;
   }
 
@@ -137,9 +148,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::EmitSILGen) {
-    return writeSIL(*SM, Instance.getMainModule(),
-                    Invocation.getFrontendOptions().EmitVerboseSIL,
-                    Invocation.getFrontendOptions().OutputFilename);
+    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                    opts.OutputFilename);
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
@@ -157,15 +167,11 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
-  if (!Invocation.getFrontendOptions().ModuleOutputPath.empty()) {
+  if (!opts.ModuleOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    serialize(DC,
-              Invocation.getFrontendOptions().ModuleOutputPath.c_str(),
-              SM.get(),
-              Invocation.getFrontendOptions().SILSerializeAll,
-              Invocation.getFrontendOptions().InputFilenames,
-              Invocation.getFrontendOptions().ModuleLinkName);
+    serialize(DC, opts.ModuleOutputPath.c_str(), SM.get(),
+              opts.SILSerializeAll, opts.InputFilenames, opts.ModuleLinkName);
 
     if (Action == FrontendOptions::EmitModuleOnly)
       return false;
@@ -176,9 +182,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::EmitSIL) {
-    return writeSIL(*SM, Instance.getMainModule(),
-                    Invocation.getFrontendOptions().EmitVerboseSIL,
-                    Invocation.getFrontendOptions().OutputFilename);
+    return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
+                    opts.OutputFilename);
   }
 
   assert(Action >= FrontendOptions::Immediate &&
@@ -216,8 +221,7 @@ static bool performCompile(CompilerInstance &Instance,
     // JITCodeEmitter doesn't support it. This can be fixed by
     // migrating to MCJIT.
     IRGenOpts.DebugInfo = false;
-    const std::vector<std::string> &ImmediateArgv =
-      Invocation.getFrontendOptions().ImmediateArgv;
+    const std::vector<std::string> &ImmediateArgv = opts.ImmediateArgv;
     const ProcessCmdLine &CmdLine = ImmediateArgv.empty() ?
                                       ProcessCmdLine(Args.begin(), Args.end()) :
                                       ProcessCmdLine(ImmediateArgv.begin(),
@@ -236,12 +240,10 @@ static bool performCompile(CompilerInstance &Instance,
   auto &LLVMContext = llvm::getGlobalContext();
   if (PrimarySourceFile) {
     performIRGeneration(IRGenOpts, *PrimarySourceFile, SM.get(),
-                        Invocation.getFrontendOptions().OutputFilename,
-                        LLVMContext);
+                        opts.OutputFilename, LLVMContext);
   } else {
     performIRGeneration(IRGenOpts, Instance.getMainModule(), SM.get(),
-                        Invocation.getFrontendOptions().OutputFilename,
-                        LLVMContext);
+                        opts.OutputFilename, LLVMContext);
   }
 
   return false;
