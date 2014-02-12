@@ -154,14 +154,18 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
   // "identifier =" (always unnamed).  We know to parse the second identifier in
   // "identifier(identifier = ...)" as a type because all arguments are required
   // to have types.
-  bool isTypeOnlySelectorArg;
+  bool isImpliedNameArgument;
 
   if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
-    isTypeOnlySelectorArg = false;
+    isImpliedNameArgument = false;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
-    isTypeOnlySelectorArg = true;
+    isImpliedNameArgument = true;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::equal))
-    isTypeOnlySelectorArg = true;
+    isImpliedNameArgument = true;
+  else if (P.Tok.is(tok::l_paren))
+    // Nested tuple values destructure the argument further, never parse them
+    // as an implied name.
+    isImpliedNameArgument = false;
   else {
     // Otherwise, we do a full speculative parse to determine this.
     Parser::BacktrackingScope backtrack(P);
@@ -171,13 +175,13 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
       P.consumeToken(tok::identifier);
 
     // This is type-only if it is a valid type followed by an r_paren or equal.
-    isTypeOnlySelectorArg = P.canParseType();
-    if (isTypeOnlySelectorArg)
-      isTypeOnlySelectorArg = P.Tok.is(tok::r_paren) || P.Tok.is(tok::equal);
+    isImpliedNameArgument = P.canParseType();
+    if (isImpliedNameArgument)
+      isImpliedNameArgument = P.Tok.is(tok::r_paren) || P.Tok.is(tok::equal);
   }
 
   // If this is a standard tuple, parse it.
-  if (!isTypeOnlySelectorArg)
+  if (!isImpliedNameArgument)
     return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
                                       LPLoc, /*DefArgs=*/defaultArgs);
 
