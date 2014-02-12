@@ -1526,6 +1526,11 @@ public:
       }
     }
 
+    if (auto getter = SD->getGetter())
+      TC.validateDecl(getter);
+    if (auto setter = SD->getSetter())
+      TC.validateDecl(setter);
+
     validateAttributes(TC, SD);
   }
 
@@ -3050,7 +3055,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::Var: {
     if (D->hasType())
       return;
-    if (PatternBindingDecl *PBD = cast<VarDecl>(D)->getParentPattern()) {
+
+    auto VD = cast<VarDecl>(D);
+    if (auto getter = VD->getGetter())
+      validateDecl(getter);
+    if (auto setter = VD->getSetter())
+      validateDecl(setter);
+
+    if (PatternBindingDecl *PBD = VD->getParentPattern()) {
       validatePatternBindingDecl(*this, PBD);
       if (PBD->isInvalid() || !PBD->getPattern()->hasType()) {
         PBD->getPattern()->setType(ErrorType::get(Context));
