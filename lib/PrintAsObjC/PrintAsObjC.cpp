@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "PrintAsObjC.h"
+#include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Strings.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
@@ -22,16 +22,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
-
-static void writeImports(raw_ostream &os, Module *M) {
-  SmallVector<Module::ImportedModule, 16> imports;
-  M->getImportedModules(imports, /*includePrivate=*/true);
-  for (auto import : imports) {
-    // FIXME: Handle submodule imports.
-    os << "@import " << import.second->Name << ";\n";
-  }
-  os << '\n';
-}
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
@@ -925,24 +915,15 @@ public:
 };
 }
 
-static bool writeDecls(raw_ostream &os, Module *M) {
-  return ModuleWriter(os, *M).writeDecls();
+static void writeImports(raw_ostream &os, Module &M) {
+  SmallVector<Module::ImportedModule, 16> imports;
+  M.getImportedModules(imports, /*includePrivate=*/true);
+  for (auto import : imports)
+    os << "@import " << import.second->Name << ";\n";
+  os << '\n';
 }
 
-int swift::doPrintAsObjC(const CompilerInvocation &InitInvok) {
-  CompilerInstance CI;
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
-  if (CI.setup(InitInvok))
-    return 1;
-  CI.performParse();
-
-  if (CI.getASTContext().hadError())
-    return 1;
-
-  writeImports(llvm::outs(), CI.getMainModule());
-  bool HadError = writeDecls(llvm::outs(), CI.getMainModule());
-
-  return HadError;
+bool swift::printAsObjC(llvm::raw_ostream &os, Module *M) {
+  writeImports(os, *M);
+  return ModuleWriter(os, *M).writeDecls();
 }

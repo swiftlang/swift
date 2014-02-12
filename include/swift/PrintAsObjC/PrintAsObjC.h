@@ -10,8 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-  class CompilerInvocation;
+#ifndef SWIFT_PRINTASOBJC_H
+#define SWIFT_PRINTASOBJC_H
 
-  int doPrintAsObjC(const CompilerInvocation &InitInvok);
+namespace llvm {
+  class raw_ostream;
+};
+
+namespace swift {
+  class Module;
+
+  /// Print the Objective-C-compatible declarations in a module as a Clang
+  /// header.
+  ///
+  /// Returns true on error.
+  bool printAsObjC(llvm::raw_ostream &out, Module *M);
 }
+
+#endif

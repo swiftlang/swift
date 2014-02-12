@@ -1,5 +1,5 @@
-##===- lib/Makefile ----------------------------------------*- Makefile -*-===##
-# 
+##===- swift/lib/PrintAsObjC/Makefile ---------------------*- Makefile -*-===##
+#
 # This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -9,11 +9,11 @@
 # See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 ##===----------------------------------------------------------------------===##
-SWIFT_LEVEL := ..
 
-PARALLEL_DIRS = Basic AST Sema Parse SIL SILAnalysis SILGen SILPasses \
-                IRGen ClangImporter NullClangImporter                 \
-                ASTSectionImporter Serialization IDE Driver Frontend  \
-                Immediate OptimizeARC PrintAsObjC
+SWIFT_LEVEL := ../..
+include $(SWIFT_LEVEL)/../../Makefile.config
+
+LIBRARYNAME := swiftPrintAsObjC
 
 include $(SWIFT_LEVEL)/Makefile
+
