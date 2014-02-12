@@ -26,6 +26,10 @@ enum class ModuleStatus {
   /// The module is valid.
   Valid,
 
+  /// The module file format is too old to be used by this version of the
+  /// compiler.
+  FormatTooOld,
+
   /// The module file format is too new to be used by this version of the
   /// compiler.
   FormatTooNew,

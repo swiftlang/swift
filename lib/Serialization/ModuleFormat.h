@@ -31,15 +31,13 @@ const unsigned char SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
 /// Serialized module format major version number.
 ///
-/// When the format changes in such a way that older compilers will not be
-/// able to read the file at all, this number should be incremented.
-const unsigned VERSION_MAJOR = 1;
+/// Always 0 for Swift 1.0.
+const uint16_t VERSION_MAJOR = 0;
 
 /// Serialized module format minor version number.
 ///
-/// When the format changes in a backwards-compatible way, this number should
-/// be incremented.
-const unsigned VERSION_MINOR = 0;
+/// When the format changes IN ANY WAY, this number should be incremented.
+const uint16_t VERSION_MINOR = 1;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

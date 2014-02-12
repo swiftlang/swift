@@ -94,8 +94,19 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         uint16_t versionMajor = scratch[0];
         if (versionMajor > VERSION_MAJOR)
           result = ModuleStatus::FormatTooNew;
+        else if (versionMajor < VERSION_MAJOR)
+          result = ModuleStatus::FormatTooOld;
         else
           result = ModuleStatus::Valid;
+
+        // Major version 0 does not have stable minor versions.
+        if (versionMajor == 0) {
+          uint16_t versionMinor = scratch[1];
+          if (versionMinor != VERSION_MINOR)
+            result = versionMinor < VERSION_MINOR ? ModuleStatus::FormatTooOld
+                                                  : ModuleStatus::FormatTooNew;
+        }
+
         versionSeen = true;
       }
       break;

@@ -71,6 +71,8 @@ ERROR(serialization_malformed_module,sema,none,
       "malformed module file", ())
 ERROR(serialization_module_too_new,sema,none,
       "module file was created by a newer version of the compiler", ())
+ERROR(serialization_module_too_old,sema,none,
+      "module file was created by an older version of the compiler", ())
 ERROR(serialization_missing_single_dependency,sema,none,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,sema,none,

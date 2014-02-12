@@ -100,6 +100,10 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
     if (diagLoc)
       Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new);
     return nullptr;
+  case ModuleStatus::FormatTooOld:
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old);
+    return nullptr;
   case ModuleStatus::Malformed:
     if (diagLoc)
       Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
