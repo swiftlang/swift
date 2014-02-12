@@ -419,6 +419,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
 ///     identifier ':' type-annotation
 ///     type-annotation
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
+  Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   SmallVector<TypeRepr *, 8> ElementsR;
@@ -521,6 +522,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 ///
 ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   assert(Tok.isFollowingLSquare());
+  Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
   ParserResult<TypeRepr> NestedType = makeParserResult(Base);
   ArrayTypeRepr *ATR = nullptr;

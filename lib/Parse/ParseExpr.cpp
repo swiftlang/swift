@@ -416,6 +416,7 @@ ParserResult<Expr> Parser::parseExprNew() {
   bool hadInvalid = false;
   SmallVector<NewArrayExpr::Bound, 4> bounds;
   while (Tok.isFollowingLSquare()) {
+    Parser::StructureMarkerRAII ParsingIndices(*this, Tok);
     SourceRange brackets;
     brackets.Start = consumeToken(tok::l_square);
 
@@ -987,6 +988,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         consumeToken();
         continue;
       }
+
+      if (Result.isParseError())
+        continue;
 
       Identifier Name = Context.getIdentifier(Tok.getText());
       Result = makeParserResult(
@@ -1606,6 +1610,8 @@ Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
 ///     (identifier ':')? expr
 ///
 ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
+  StructureMarkerRAII ParsingExprList(*this, Tok);
+
   SourceLoc LLoc = consumeToken(LeftTok);
   SourceLoc RLoc;
 
@@ -1721,8 +1727,7 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
     return firstArg;
 
   // If we don't have any selector arguments, we're done.
-  // FIXME: Indentation-sensitive continuation.
-  if (!Tok.is(tok::identifier) || Tok.isAtStartOfLine()) {
+  if (!Tok.is(tok::identifier) || !isContinuation(Tok)) {
     if (fn.isParseError())
       return fn;
     if (firstArg.isParseError())
@@ -1756,8 +1761,7 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   while (true) {
     // Otherwise, an identifier on the same line continues the
     // selector arguments.
-    // FIXME: Indentation-sensitive continuation.
-    if (Tok.isNot(tok::identifier) || Tok.isAtStartOfLine()) {
+    if (Tok.isNot(tok::identifier) || !isContinuation(Tok)) {
       // We're done.
       break;
     }
@@ -1812,6 +1816,7 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
 ///     expr-dictionary
 //      lsquare-starting ']'
 ParserResult<Expr> Parser::parseExprCollection() {
+  Parser::StructureMarkerRAII ParsingCollection(*this, Tok);
   SourceLoc LSquareLoc = consumeToken(tok::l_square);
 
   // Parse an empty collection literal.

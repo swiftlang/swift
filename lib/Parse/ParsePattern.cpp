@@ -142,6 +142,7 @@ static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
 static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
                                      Parser::DefaultArgumentInfo *defaultArgs) {
   // Consume the (.
+  Parser::StructureMarkerRAII ParsingArgument(P, P.Tok);
   SourceLoc LPLoc = P.consumeToken(tok::l_paren);
 
   // Decide if this is a singular unnamed argument (e.g. "foo(Int)" or if
@@ -782,6 +783,7 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
 
 ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
                                                 DefaultArgumentInfo *defaults) {
+  StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   return parsePatternTupleAfterLP(isLet, isArgumentList, LPLoc, defaults);
 }

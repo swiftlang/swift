@@ -568,6 +568,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
 ///     decl-extension
 ///     decl-let
 ///     decl-var
+///     decl-class
 ///     decl-func
 ///     decl-enum
 ///     decl-struct
@@ -579,7 +580,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
-  
+
+  // Note that we're parsing a declaration.
+  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                  StructureMarkerKind::Declaration);
+
   DeclAttributes Attributes;
   parseDeclAttributeList(Attributes);
 

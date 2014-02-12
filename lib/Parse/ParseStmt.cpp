@@ -54,12 +54,17 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     consumeToken();
     return makeParserError();
   }
+  
   if (isStartOfStmt(Tok)) {
     ParserResult<Stmt> Res = parseStmt();
     if (Res.isNonNull())
       Result = Res.get();
     return Res;
   }
+
+  // Note that we're parsing a statement.
+  StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
+                                  StructureMarkerKind::Statement);
 
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
@@ -367,6 +372,10 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 ParserResult<Stmt> Parser::parseStmt() {
+  // Note that we're parsing a statement.
+  StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
+                                  StructureMarkerKind::Statement);
+
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);

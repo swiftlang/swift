@@ -198,6 +198,63 @@ public:
     }
   };
 
+  /// Describes the kind of a lexical structure marker, indicating
+  /// what kind of structural element we started parsing at a
+  /// particular location.
+  enum class StructureMarkerKind : unsigned char {
+    /// The start of a declaration.
+    Declaration,
+    /// The start of a statement.
+    Statement,
+    /// An open parentheses.
+    OpenParen,
+    /// An open brace.
+    OpenBrace,
+    /// An open square bracket.
+    OpenSquare
+  };
+
+  /// A structure marker, which identifies the location at which the
+  /// parser saw an entity it is parsing.
+  struct StructureMarker {
+    /// The location at which the marker occurred.
+    SourceLoc Loc;
+
+    /// The kind of marker.
+    StructureMarkerKind Kind;
+
+    /// The leading whitespace for this marker, if it has already been
+    /// computed.
+    Optional<StringRef> LeadingWhitespace;
+  };
+
+  /// An RAII object that notes when we have seen a structure marker.
+  class StructureMarkerRAII {
+    Parser &P;
+
+  public:
+    StructureMarkerRAII(Parser &parser, SourceLoc loc,
+                               StructureMarkerKind kind)
+      : P(parser) {
+      P.StructureMarkers.push_back({loc, kind, Nothing});
+    }
+
+    StructureMarkerRAII(Parser &parser, const Token &tok);
+
+    ~StructureMarkerRAII() {
+      P.StructureMarkers.pop_back();
+    }
+  };
+  friend class StructureMarkerRAII;
+
+  /// The stack of structure markers indicating the locations of
+  /// structural elements actively being parsed, including the start
+  /// of declarations, statements, and opening operators of various
+  /// kinds.
+  ///
+  /// This vector is managed by \c StructureMarkerRAII objects.
+  llvm::SmallVector<StructureMarker, 16> StructureMarkers;
+
 public:
   Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
          PersistentParserState *PersistentState = nullptr);
@@ -345,6 +402,18 @@ public:
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
   void skipSingle();
+
+  /// Determine whether the given token is a continuation.
+  bool isContinuation(const Token &tok) {
+    // If this token isn't at the start of the line, it's a continuation.
+    if (!tok.isAtStartOfLine())
+      return true;
+
+    return isContinuationSlow(tok);
+  }
+
+  /// Determine whether the given token is a continuation; slow path.
+  bool isContinuationSlow(const Token &tok);
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {

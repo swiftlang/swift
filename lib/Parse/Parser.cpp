@@ -88,8 +88,9 @@ private:
   }
 };
 
-void parseDelayedDecl(PersistentParserState &ParserState,
-                      CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+static void parseDelayedDecl(
+              PersistentParserState &ParserState,
+              CodeCompletionCallbacksFactory *CodeCompletionFactory) {
   if (!ParserState.hasDelayedDecl())
     return;
 
@@ -396,6 +397,101 @@ void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
          !isStartOfDecl(Tok, peekToken())) {
     skipSingle();
   }
+}
+
+Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
+                                                 const Token &tok)
+  : P(parser)
+{
+  switch (tok.getKind()) {
+  case tok::l_brace:
+    P.StructureMarkers.push_back({tok.getLoc(),
+                                  StructureMarkerKind::OpenBrace,
+                                  Nothing});
+    break;
+
+  case tok::l_paren:
+    P.StructureMarkers.push_back({tok.getLoc(),
+                                  StructureMarkerKind::OpenParen,
+                                  Nothing});
+    break;
+
+  case tok::l_square:
+    P.StructureMarkers.push_back({tok.getLoc(),
+                                  StructureMarkerKind::OpenSquare,
+                                  Nothing});
+    break;
+
+  default:
+    llvm_unreachable("Not a matched token");
+  }
+}
+
+/// Given a source location, extract the whitespace from the start of the
+/// line up to the given source location.
+///
+/// \returns a string containing the leading whitespace for the line on which
+/// the given token resides.
+static StringRef getLeadingWhitespace(SourceManager &sm, SourceLoc loc) {
+  assert(loc.isValid() && "Can't get leading whitespace for an invalid loc");
+  unsigned bufferID = sm.findBufferContainingLoc(loc);
+  StringRef buffer = sm->getMemoryBuffer(bufferID)->getBuffer();
+  unsigned locOffset = sm.getLocOffsetInBuffer(loc, bufferID);
+
+  // Find the beginning of the current line.
+  unsigned startOffset = locOffset;
+  while (startOffset) {
+    char c = buffer[startOffset-1];
+
+    // If we hit the beginning of the line, we're done.
+    if (c == '\n' || c == '\r')
+      break;
+
+    --startOffset;
+  }
+
+  // Skip over whitespace.
+  unsigned endOffset = startOffset;
+  while (endOffset < locOffset) {
+    char c = buffer[endOffset];
+
+    // If we hit a non-whitespace character, we're done.
+    if (c != ' ' && c != '\t')
+      break;
+
+    ++endOffset;
+  }
+
+  return buffer.slice(startOffset, endOffset);
+}
+
+bool Parser::isContinuationSlow(const Token &tok) {
+  auto &marker = StructureMarkers.back();
+  switch (marker.Kind) {
+  case StructureMarkerKind::Declaration:
+  case StructureMarkerKind::Statement:
+    // Check the source locations below;
+    break;
+
+  case StructureMarkerKind::OpenBrace:
+  case StructureMarkerKind::OpenParen:
+  case StructureMarkerKind::OpenSquare:
+    // We're in a context where continuations aren't indentation-sensitive.
+    return true;
+  }
+
+  // Compute (and cache) the marker's leading whitespace.
+  auto markerLeadingWhitespace
+    = marker.LeadingWhitespace.cache([&]() -> StringRef {
+      return getLeadingWhitespace(Context.SourceMgr, marker.Loc);
+  });
+
+  // Compute the leading whitespace for the tokens.
+  auto locLeadingWhitespace
+    = getLeadingWhitespace(Context.SourceMgr, tok.getLoc());
+
+  return locLeadingWhitespace.size() > markerLeadingWhitespace.size() &&
+         locLeadingWhitespace.startswith(markerLeadingWhitespace);
 }
 
 //===----------------------------------------------------------------------===//
