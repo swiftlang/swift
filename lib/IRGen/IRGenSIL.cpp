@@ -969,21 +969,29 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     case clang::CodeGen::ABIArgInfo::Direct: {
 
       // The ABI IR types for the entrypoint might differ from the
-      // Swift IR types for the body of the function. Store each
-      // formal parameter, bitcast, and then load and explode to the
-      // expected Swift explosion.
+      // Swift IR types for the body of the function.
 
       auto *value = params.claimNext();
       auto *fromTy = value->getType();
-      auto *toTy = loadableArgTI.getStorageType();
 
-      // If both are pointers, we can simply insert a bitcast, otherwise
-      // we need to store, bitcast, and load.
-      if (toTy->isPointerTy() && fromTy->isPointerTy()) {
-        argExplosion.add(IGF.Builder.CreateBitCast(value, toTy));
-        IGF.setLoweredExplosion(arg, argExplosion);
-        continue;
+      // If the argument explodes to a single element in the body of
+      // the function, we might be able to use it directly, or coerce
+      // it to the appropriate type easily.
+      ExplosionSchema schema = argTI.getSchema(IGF.CurSILFnExplosionLevel);
+      if (schema.size() == 1) {
+        auto &element = *schema.begin();
+        auto *toValTy = element.isScalar() ?
+          element.getScalarType() : element.getAggregateType();
+        if (fromTy == toValTy) {
+          argExplosion.add(value);
+          IGF.setLoweredExplosion(arg, argExplosion);
+          continue;
+        }
       }
+
+      // Otherwise we need to store the incoming value and then load
+      // to an explosion of the right types.
+      auto *toTy = loadableArgTI.getStorageType();
 
       assert((IGF.IGM.DataLayout.getTypeSizeInBits(fromTy) ==
               IGF.IGM.DataLayout.getTypeSizeInBits(toTy))
