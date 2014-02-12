@@ -3,9 +3,9 @@
 
 * We are renaming the 'let' keyword to 'val'.  The 'let' keyword didn't work
   out primarily because it is not a noun, so "defining a let" never sounded 
-  right.  We chose 'let' over 'const' and other options because it is a very
-  similar to 'var' (so the similarity is useful), because 'const' in C has
-  varied and sordid connotations in C that we don't want to bring over, and 
+  right.  We chose 'val' over 'const' and other options because 'var' and 'val
+  have similar semantics (making syntactic similarity useful), because 'const' 
+  has varied and sordid connotations in C that we don't want to bring over, and 
   because we don't want to punish the "preferred" case with a longer keyword.
 
   For migration purposes, the compiler now accepts 'let' and 'val' as synonyms,
