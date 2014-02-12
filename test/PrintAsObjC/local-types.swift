@@ -2,13 +2,15 @@
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -module-cache-path=%t/clang-module-cache -emit-module -o %t %s -module-name local
-// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path=%t/clang-module-cache -print-as-objc %t/local.swiftmodule -source-filename %s > %t/local.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -emit-module -o %t %s -module-name local
+// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path %t/clang-module-cache -print-as-objc %t/local.swiftmodule -source-filename %s > %t/local.h
 // RUN: FileCheck %s < %t/local.h
+// RUN: %check-in-clang %t/local.h
 
 import ObjectiveC
 
 // CHECK-LABEL: @interface AFullyDefinedClass
+// CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class AFullyDefinedClass {}
 
@@ -25,8 +27,10 @@ class ANonObjCClass {}
 // CHECK-NEXT: @protocol ZForwardProtocol5;
 // CHECK-NEXT: @protocol ZForwardProtocol6;
 // CHECK-NEXT: @protocol ZForwardProtocol7;
-// CHECK-NEXT: @class ANonObjCClass;
-// CHECK-NEXT: @interface UseForward
+// CHECK-NEXT: @protocol ZForwardProtocol8;
+// CHECK-NEXT: @class ZForwardClass3;
+
+// CHECK-LABEL: @interface UseForward
 // CHECK-NEXT: - (void)definedAlready:(AFullyDefinedClass *)a;
 // CHECK-NEXT: - (void)a:(ZForwardClass1 *)a;
 // CHECK-NEXT: - (ZForwardClass2 *)b;
@@ -36,7 +40,11 @@ class ANonObjCClass {}
 // CHECK-NEXT: - (void)e2:(id <ZForwardProtocol2>)e;
 // CHECK-NEXT: - (void)f:(id <ZForwardProtocol5> (^)(id <ZForwardProtocol3>, id <ZForwardProtocol4>))f;
 // CHECK-NEXT: - (void)g:(id <ZForwardProtocol6, ZForwardProtocol7>)g;
-// CHECK-NEXT: - (void)h:(ANonObjCClass *)h;
+// CHECK-NEXT: - (Class)h:(id)h;
+// CHECK-NEXT: - (void)i:(id <ZForwardProtocol8>)_;
+// CHECK-NEXT: @property (nonatomic, readonly) ZForwardClass3 * j;
+// CHECK-NEXT: @property (nonatomic, readonly) SWIFT_METATYPE(ZForwardClass4) k;
+// CHECK-NEXT: init
 // CHECK-NEXT: @end
 
 @objc class UseForward {
@@ -49,17 +57,23 @@ class ANonObjCClass {}
   func d(d: (ZForwardProtocol1)) {}
   func e(e: ZForwardProtocol2.metatype) {}
   func e2(e: ZForwardProtocol2) {}
-  func f(f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
+  func f(f: @objc_block (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
   func g(g: protocol<ZForwardProtocol6, ZForwardProtocol7>) {}
 
-  func h(h: ANonObjCClass) {}
+  func h(h: ANonObjCClass) -> ANonObjCClass.metatype { return typeof(h) }
+  func i(_: ZForwardProtocol8) {}
+
+  var j: ZForwardClass3 { return ZForwardClass3() }
+  var k: ZForwardClass4.metatype { return ZForwardClass4 }
 }
 
 // CHECK-NOT: @class ZForwardClass1;
 // CHECK-NOT: @protocol ZForwardProtocol1;
-// CHECK: @interface UseForwardAgain
+
+// CHECK-LABEL: @interface UseForwardAgain
 // CHECK-NEXT: - (void)a:(ZForwardClass1 *)a;
 // CHECK-NEXT: - (void)b:(id <ZForwardProtocol1>)b;
+// CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class UseForwardAgain {
   func a(a: ZForwardClass1) {}
@@ -67,16 +81,20 @@ class ANonObjCClass {}
 }
 
 typealias ZForwardAlias = ZForwardAliasClass;
-class ZForwardAliasClass {}
+@objc class ZForwardAliasClass {}
 
 // CHECK-NOT: @class UseForward;
-// CHECK: @interface ZForwardClass1
+
+// CHECK-LABEL: @interface ZForwardClass1
 // CHECK-NEXT: - (void)circular:(UseForward *)a;
+// CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class ZForwardClass1 {
   func circular(a: UseForward) {}
 }
-class ZForwardClass2 {}
+@objc class ZForwardClass2 {}
+@objc class ZForwardClass3 {}
+@objc class ZForwardClass4 {}
 
 @class_protocol @objc protocol ZForwardProtocol1 {}
 @class_protocol @objc protocol ZForwardProtocol2 {}
@@ -85,3 +103,4 @@ class ZForwardClass2 {}
 @class_protocol @objc protocol ZForwardProtocol5 {}
 @class_protocol @objc protocol ZForwardProtocol6 {}
 @class_protocol @objc protocol ZForwardProtocol7 {}
+@class_protocol @objc protocol ZForwardProtocol8 {}
