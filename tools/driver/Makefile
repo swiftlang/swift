@@ -31,7 +31,8 @@ CXXFLAGS += -DSWIFT_MODULES_SDK="\"$(MODULES_SDK)\""
 LINK_COMPONENTS := $(TARGETS_TO_BUILD) bitreader bitwriter irreader ipo jit linker mcjit asmparser option
 USEDLIBS = swiftDriver.a swiftFrontend.a swiftIRGen.a swiftParse.a swiftClangImporter.a swiftSema.a \
 	swiftSerialization.a swiftSIL.a swiftSILGen.a swiftSILPassesUtils.a swiftSILPasses.a swiftAST.a \
-	swiftBasic.a swiftIDE.a swiftImmediate.a swiftOptimizeARC.a swiftSILAnalysis.a
+	swiftBasic.a swiftIDE.a swiftImmediate.a swiftOptimizeARC.a \
+	swiftSILAnalysis.a swiftPrintAsObjC.a
 LLVMLibsOptions :=     \
   -lclangCodeGen       \
   -lclangDriver        \
