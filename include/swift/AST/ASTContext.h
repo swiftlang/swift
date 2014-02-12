@@ -188,6 +188,9 @@ public:
   /// The name of the standard library module "swift".
   Identifier StdlibModuleName;
 
+  /// The name of the module "ObjectiveC".
+  Identifier ObjCModuleName;
+
   // Define the set of known identifiers.
 #define IDENTIFIER(Id) Identifier Id_##Id;
 #include "swift/AST/KnownIdentifiers.def"

@@ -1185,7 +1185,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Module *M = D->getDeclContext()->getParentModule();
 
     // Don't print qualifiers for types from the standard library.
-    if (M == T->getASTContext().getStdlibModule())
+    if (M->isStdlibModule() ||
+        M->Name == T->getASTContext().ObjCModuleName)
       return false;
 
     // Don't print qualifiers for imported types.
