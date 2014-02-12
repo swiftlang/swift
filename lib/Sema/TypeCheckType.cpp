@@ -1524,7 +1524,8 @@ static bool checkObjCInGenericContext(TypeChecker &tc,
 
   // Diagnose this problem, if asked to.
   if (diagnose) {
-    int kind = isa<VarDecl>(value)? 2
+    int kind = isa<SubscriptDecl>(value)? 3
+             : isa<VarDecl>(value)? 2
              : isa<ConstructorDecl>(value)? 1
              : 0;
     tc.diagnose(value->getLoc(), diag::objc_in_generic_context, kind);
@@ -1596,6 +1597,49 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
   diagnose(VD->getLoc(), diag::objc_invalid_on_var, AttrKind)
       .highlight(TypeRange);
   diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(), VD->getType(),
+                                     TypeRange);
+
+  return Result;
+}
+
+bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose){
+  // Figure out the type of the indices.
+  Type IndicesType = SD->getIndices()->getType();
+  if (auto TupleTy = IndicesType->getAs<TupleType>()) {
+    if (TupleTy->getNumElements() == 1 && !TupleTy->getFields()[0].isVararg())
+      IndicesType = TupleTy->getElementType(0);
+  }
+
+  bool IndicesResult = isRepresentableInObjC(SD->getDeclContext(), IndicesType);
+  bool ElementResult = isRepresentableInObjC(SD->getDeclContext(),
+                                             SD->getElementType());
+  bool Result = IndicesResult && ElementResult;
+
+  if (Result && checkObjCInGenericContext(*this, SD, Diagnose))
+    return false;
+
+  // Make sure we know how to map the selector appropriately.
+  if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
+    SourceRange IndexRange = SD->getIndices()->getSourceRange();
+    diagnose(SD->getLoc(), diag::objc_invalid_subscript_key_type)
+      .highlight(IndexRange);
+    return false;
+  }
+
+  if (!Diagnose || Result)
+    return Result;
+
+  SourceRange TypeRange;
+  if (!IndicesResult)
+    TypeRange = SD->getIndices()->getSourceRange();
+  else
+    TypeRange = SD->getElementTypeLoc().getSourceRange();
+  diagnose(SD->getLoc(), diag::objc_invalid_on_subscript)
+    .highlight(TypeRange);
+
+  diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
+                                     !IndicesResult? IndicesType
+                                                   : SD->getElementType(),
                                      TypeRange);
 
   return Result;

@@ -913,6 +913,7 @@ public:
 
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD, bool Diagnose);
   bool isRepresentableInObjC(const VarDecl *VD, bool Diagnose);
+  bool isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose);
   bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const DeclContext *DC, Type T);
 

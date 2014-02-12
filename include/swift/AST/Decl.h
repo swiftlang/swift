@@ -2771,6 +2771,7 @@ public:
   /// operation.
   Type getElementType() const { return ElementTy.getType(); }
   TypeLoc &getElementTypeLoc() { return ElementTy; }
+  const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
   /// \brief Returns whether the subscript operation has a setter.
   bool isSettable() const { return getSetter() != nullptr; }

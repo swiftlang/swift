@@ -1512,6 +1512,8 @@ public:
       }
     }
 
+    validateAttributes(TC, SD);
+
     // A subscript is ObjC-compatible if it's explicitly @objc, or a
     // member of an ObjC-compatible class or property.
     if (dc->getDeclaredTypeInContext()) {
@@ -1521,7 +1523,8 @@ public:
       bool isObjC = (classContext && classContext->isObjC())
                   || (protocolContext && protocolContext->isObjC())
                   || SD->getAttrs().isObjC();
-      if (isObjC && SD->getObjCSubscriptKind() != ObjCSubscriptKind::None) {
+      if (isObjC &&
+          TC.isRepresentableInObjC(SD, /*Diagnose=*/SD->getAttrs().isObjC())) {
         SD->setIsObjC(true);
       }
     }
@@ -1530,8 +1533,6 @@ public:
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
-
-    validateAttributes(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3437,9 +3438,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         error = diag::invalid_objc_decl;
     } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
       /* ok */
-    } else if (isa<SubscriptDecl>(D) && isInClassContext(D) &&
-               cast<SubscriptDecl>(D)->getObjCSubscriptKind() 
-                 != ObjCSubscriptKind::None) {
+    } else if (isa<SubscriptDecl>(D) && isInClassContext(D)) {
       /* ok */
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (!isInClassContext(VD))

@@ -818,12 +818,18 @@ ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
 ERROR(objc_invalid_on_static_var,sema_tcd,none,
       "type properties cannot be declared '@objc'", ())
 ERROR(objc_in_generic_context,sema_objc,none,
-      "%select{method|initializer|variable}0 in a generic class cannot be "
-      "represented in Objective-C", (int))
+      "%select{method|initializer|variable|subscript}0 in a generic class "
+      "cannot be represented in Objective-C", (int))
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be marked %select{@objc|@IBOutlet}0 because its type "
       "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_subscript_key_type,sema_objc,none,
+      "subscript cannot be marked @objc because its key "
+      "type is neither an integer nor an object", ())
+ERROR(objc_invalid_on_subscript,sema_objc,none,
+      "subscript cannot be marked @objc because its type "
+      "cannot be represented in Objective-C", ())
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
      "'protocol<>' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,sema_objc,none,
