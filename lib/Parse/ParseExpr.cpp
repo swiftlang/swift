@@ -676,7 +676,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 ///
 ///   expr-primary:
 ///     expr-literal
-///     expr-identifier
+///     expr-identifier expr-call-suffix?
 ///     expr-closure
 ///     expr-anon-closure-argument
 ///     expr-delayed-identifier
@@ -687,14 +687,14 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 ///     '.' identifier
 ///
 ///   expr-dot:
-///     expr-postfix '.' identifier generic-args?
+///     expr-postfix '.' identifier generic-args? expr-call-suffix?
 ///     expr-postfix '.' integer_literal
 ///
 ///   expr-subscript:
 ///     expr-postfix '[' expr ']'
 ///
 ///   expr-call:
-///     expr-postfix expr-call-suffix
+///     expr-postfix expr-paren
 ///
 ///   expr-force-value:
 ///     expr-postfix '!'
@@ -773,6 +773,20 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::kw_DynamicSelf:     // Self
   case tok::identifier:  // foo
     Result = makeParserResult(parseExprIdentifier());
+
+    // If there is an expr-call-suffix, parse it and form a call.
+    if (hasExprCallSuffix(isExprBasic)) {
+      ParserResult<Expr> Arg = parseExprCallSuffix();
+      if (Arg.isNull())
+        return Arg;
+
+      if (Result.isNonNull())
+        Result = makeParserResult(
+                   new (Context) CallExpr(Result.get(), Arg.get(), 
+                                          /*Implicit=*/false));
+      break;
+    }
+
     break;
   case tok::dollarident: // $1
     Result = makeParserResult(parseExprAnonClosureArg());
@@ -967,6 +981,19 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
               Result.get(), LAngleLoc, Context.AllocateCopy(locArgs),
               RAngleLoc));
         }
+
+        // If there is an expr-call-suffix, parse it and form a call.
+        if (hasExprCallSuffix(isExprBasic)) {
+          ParserResult<Expr> Arg = parseExprCallSuffix();
+          if (Arg.isNull())
+            return Arg;
+          
+          if (Result.isNonNull())
+            Result = makeParserResult(
+                       new (Context) CallExpr(Result.get(), Arg.get(), 
+                                              /*Implicit=*/false));
+          continue;
+        }
       } else {
         consumeToken(tok::integer_literal);
       }
@@ -977,7 +1004,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
-      ParserResult<Expr> Arg = parseExprCallSuffix();
+      ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
       if (Arg.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
 
@@ -1637,6 +1664,13 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
                               /*hasTrailingClosure=*/false,
                               /*Implicit=*/false));
+}
+
+/// Determine whether the parser is at an expr-call-suffix.
+///
+/// \param isExprBasic Whether we're in an expr-basic or not.
+bool Parser::hasExprCallSuffix(bool isExprBasic) {
+  return Tok.isFollowingLParen();
 }
 
 /// \brief Parse an expression call suffix.
