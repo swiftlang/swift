@@ -828,6 +828,10 @@ void ClangModuleUnit::getImportedModules(
 
     imports.push_back({Module::AccessPathTy(), actualMod});
   }
+
+  if (filter != Module::ImportFilter::Public)
+    imports.push_back({Module::AccessPathTy(),
+                       getASTContext().getStdlibModule()});
 }
 
 /// Returns true if the first selector piece matches the given identifier.

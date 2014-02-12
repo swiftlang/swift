@@ -491,7 +491,6 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     DC = DC->getParent();
   }
 
-  SmallVector<Module::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -504,13 +503,13 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
         return;
       }
     }
-
-    // Add private imports to the extra search list.
-    for (auto importPair : SF->getImports())
-      if (!importPair.second)
-        extraImports.push_back(importPair.first);
   }
-    
+
+  // Add private imports to the extra search list.
+  SmallVector<Module::ImportedModule, 8> extraImports;
+  if (auto FU = dyn_cast<FileUnit>(DC))
+    FU->getImportedModules(extraImports, Module::ImportFilter::Private);
+
   DebuggerClient *DebugClient = M.getDebugClient();
   if (DebugClient && DebugClient->lookupOverrides(Name, DC, Loc,
                                                   IsTypeLookup, Results))
