@@ -162,11 +162,19 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
     isImpliedNameArgument = true;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::equal))
     isImpliedNameArgument = true;
-  else if (P.Tok.is(tok::l_paren))
-    // Nested tuple values destructure the argument further, never parse them
-    // as an implied name.
-    isImpliedNameArgument = false;
-  else {
+  else if (P.Tok.is(tok::l_paren)) {
+    // Nested tuple values like "(a : Int, b: Int)" destructure the argument
+    // further, so never parse them as an implied name.  However, function types
+    // like "() -> Int" are implied name arguments.  Speculatively parse to
+    // disambiguate the cases.
+
+    // Otherwise, we do a full speculative parse to determine this.
+    Parser::BacktrackingScope backtrack(P);
+    P.consumeToken(tok::l_paren);
+    
+    isImpliedNameArgument = P.canParseTypeTupleBody() &&
+      P.Tok.isNot(tok::r_paren) && P.Tok.isNot(tok::colon);
+  } else {
     // Otherwise, we do a full speculative parse to determine this.
     Parser::BacktrackingScope backtrack(P);
 
@@ -185,13 +193,14 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
     return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
                                       LPLoc, /*DefArgs=*/defaultArgs);
 
+  SourceLoc ArgStartLoc = P.Tok.getLoc();
+  
   // Create the patterns for the identifier.
   Pattern *Name;
   if (leadingIdent.empty())
-    Name = new (P.Context) AnyPattern(P.Tok.getLoc(), /*Implicit=*/true);
+    Name = new (P.Context) AnyPattern(ArgStartLoc, /*Implicit=*/true);
   else
-    Name = P.createBindingFromPattern(P.Tok.getLoc(), leadingIdent,
-                                      /*isLet*/true);
+    Name = P.createBindingFromPattern(ArgStartLoc, leadingIdent, /*isLet*/true);
   Name->setImplicit();
 
 
@@ -207,12 +216,28 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
     return makeParserError();
   TuplePatternElt elt = elto.getValue();
 
-
-  // This was checked by the speculative parse above.
-  SourceLoc RPLoc = P.consumeToken(tok::r_paren);
-
-  auto *Res = TuplePattern::createSimple(P.Context, LPLoc, elt, RPLoc);
-  return makeParserResult(Res);
+  // If we found our r_paren, we're done.
+  SourceLoc RPLoc = P.Tok.getLoc();
+  if (P.consumeIf(tok::r_paren)) {
+    auto *Res = TuplePattern::createSimple(P.Context, LPLoc, elt, RPLoc);
+    return makeParserResult(Res);
+  }
+  
+  // If not, we must have a default value, and we haven't validated that there
+  // is a single argument above (because we don't have a "canParseExpr" to check
+  // that the default value is valid).
+  //
+  // If we have a ",", then reject the code with a specific error and recover.
+  // Otherwise, emit a generic error.
+  if (!P.consumeIf(tok::comma)) {
+    P.diagnose(P.Tok, diag::expected_rparen_parameter);
+    return makeParserError();
+  }
+  
+  P.diagnose(ArgStartLoc, diag::implied_name_multiple_parameters)
+    .fixItInsert(ArgStartLoc, "_: ");
+  return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
+                                    LPLoc, /*DefArgs=*/defaultArgs);
 }
 
 
@@ -773,13 +798,14 @@ Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
                                  DefaultArgumentInfo *defaults) {
   SourceLoc RPLoc, EllipsisLoc;
 
+  auto diagToUse = isArgumentList ? diag::expected_rparen_parameter
+                                  : diag::expected_rparen_tuple_pattern_list;
+  
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
-  ParserStatus ListStatus = parseList(tok::r_paren, LPLoc, RPLoc,
-                                      tok::comma, /*OptionalSep=*/false,
-                                      /*AllowSepAfterLast=*/false,
-                                      diag::expected_rparen_tuple_pattern_list,
-                                      [&] () -> ParserStatus {
+  ParserStatus ListStatus =
+    parseList(tok::r_paren, LPLoc, RPLoc, tok::comma, /*OptionalSep=*/false,
+              /*AllowSepAfterLast=*/false, diagToUse, [&] () -> ParserStatus {
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;

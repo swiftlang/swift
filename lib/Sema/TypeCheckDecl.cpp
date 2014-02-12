@@ -2009,8 +2009,7 @@ public:
       
       if (auto *NP = dyn_cast<NamedPattern>(BodyPattern))
         if (NP->getDecl()->getName() == FD->getName() && NP->isImplicit()) {
-          TC.diagnose(BodyPattern->getLoc(),
-                      diag::parameter_must_have_name_specified)
+          TC.diagnose(BodyPattern->getLoc(), diag::implied_name_no_argument)
             .fixItInsert(BodyPattern->getLoc(), "_: ");
           // Mark the decl as invalid to avoid inscrutable downstream errors.
           NP->getDecl()->setInvalid();

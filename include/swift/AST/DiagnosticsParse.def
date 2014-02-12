@@ -541,6 +541,10 @@ ERROR(inout_varpattern,pattern_parsing,none,
       "'inout' arguments may not also be marked 'var' or 'let'", ())
 ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
+ERROR(implied_name_multiple_parameters,pattern_parsing,none,
+      "no name specified for first parameter, name it '_' to ignore it", ())
+ERROR(expected_rparen_parameter,decl_parsing,none,
+      "expected ')' in parameter", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
