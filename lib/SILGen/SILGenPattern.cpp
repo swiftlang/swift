@@ -1037,6 +1037,8 @@ class ClauseMatrix {
   /// reference into slices of this vector to indicate which ExprPatterns form
   /// part of their guard.
   std::vector<const ExprPattern*> allExprGuards;
+  /// The location of the top-level CaseStmt.
+  SILLocation topLoc;
   
   // The memory layout of data is as follows:
   
@@ -1074,9 +1076,9 @@ public:
   /// given number of rows. The clause matrix will be initialized with zero rows
   /// and a column for every occurrence. Rows can be added using addRows.
   explicit ClauseMatrix(ArrayRef<SILValue> occurrences,
-                        unsigned rowCapacity)
+                        unsigned rowCapacity, SILLocation topLoc)
     : rowCapacity(rowCapacity), columnCapacity(occurrences.size()),
-      rowCount(0), columnCount(columnCapacity)
+      rowCount(0), columnCount(columnCapacity), topLoc(topLoc)
   {
     // Allocate the data buffer.
     data = malloc(getDataSize());
@@ -1096,7 +1098,7 @@ public:
   ClauseMatrix(ClauseMatrix &&m)
     : rowCapacity(m.rowCapacity), columnCapacity(m.columnCapacity),
       rowCount(m.rowCount), columnCount(m.columnCount),
-      data(m.data)
+      data(m.data), topLoc(m.topLoc)
   {
     m.data = nullptr;
   }
@@ -1204,7 +1206,8 @@ public:
     std::copy(getOccurrences().begin() + 1, getOccurrences().end(),
               std::back_inserter(newOccurrences));
 
-    ClauseMatrix specialized{newOccurrences, rowCount - specializer.row};
+    ClauseMatrix specialized{newOccurrences, rowCount - specializer.row,
+        topLoc};
     
     for (unsigned r = specializer.row; r < rowCount; ++r) {
       auto row = (*this)[r];
@@ -1310,14 +1313,14 @@ public:
       case PatternKind::Named:
         // Bind the named variable.
         addVar(cast<NamedPattern>(p)->getDecl(),
-                RegularLocation(const_cast<Pattern*>(p)));
+               RegularLocation(const_cast<Pattern*>(p)));
         break;
           
       case PatternKind::Expr:
         // Bind the ExprPattern's implicit match var.
         // TODO: It'd be nice not to need the temp var for expr patterns.
         addVar(cast<ExprPattern>(p)->getMatchVar(),
-                RegularLocation(const_cast<Pattern*>(p)));
+               RegularLocation(const_cast<Pattern*>(p)));
         break;
 
       case PatternKind::Paren:
@@ -1331,14 +1334,15 @@ public:
       return;
 
     VarDecl *vdToEmit = varToEmit->first;
+    // Why do we bother saving this when we only emit on copy anyway?
     SILLocation locToEmit = varToEmit->second;
     
     // Initialize the variable value.
     InitializationPtr init
-      = gen.emitInitializationForVarDecl(vdToEmit, /*isArgument*/ false, Type());
+      = gen.emitInitializationForVarDecl(vdToEmit, /*isArgument*/false, Type());
     auto mv = ManagedValue::forUnmanaged(v);
     RValue(gen, locToEmit, vdToEmit->getType()->getCanonicalType(), mv)
-      .copyInto(gen, init.get(), locToEmit);
+      .copyInto(gen, init.get(), topLoc);
     
     // Alias the variables to the value.
     for (auto var : varsToAlias) {
@@ -1809,7 +1813,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     SILBasicBlock *contBB = createBasicBlock();
     
     // Set up an initial clause matrix.
-    ClauseMatrix clauses(subject, S->getCases().size());
+    ClauseMatrix clauses(subject, S->getCases().size(),
+                         S->getCases()[0]);
     
     for (auto *caseBlock : S->getCases()) {
       caseMap[caseBlock] = {};
