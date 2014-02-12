@@ -2054,13 +2054,10 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   llvm::SmallString<64> selectorBuffer;
   if (auto fnDecl = dyn_cast<FuncDecl>(i->getMember().getDecl()))
     selector = fnDecl->getObjCSelector(selectorBuffer);
-  else if (auto var = dyn_cast<VarDecl>(i->getMember().getDecl()))
+  else if (auto var = dyn_cast<AbstractStorageDecl>(i->getMember().getDecl()))
     selector = var->getObjCGetterSelector(selectorBuffer);
-  else if (auto subscript = dyn_cast<SubscriptDecl>(i->getMember().getDecl())) {
-    selector = subscript->getObjCGetterSelector();
-  } else {
+  else
     llvm_unreachable("Unhandled dynamic method branch query");
-  }
 
   llvm::Value *object = getLoweredExplosion(i->getOperand()).claimNext();
   if (object->getType() != IGM.ObjCPtrTy)
