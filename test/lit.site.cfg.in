@@ -34,11 +34,6 @@ if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
 if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
   config.available_features.add("asan")
 
-if "@SWIFT_NEW_DRIVER@" != "ON" and "@SWIFT_NEW_DRIVER@" != "YES":
-  config.swift_new_driver = False
-else:
-  config.swift_new_driver = True
-
 if '@SWIFT_ASSERTS@' == 'ON':
   config.available_features.add('swift_stdlib_asserts')
 

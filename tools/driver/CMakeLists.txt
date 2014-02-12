@@ -1,10 +1,4 @@
-if(SWIFT_NEW_DRIVER)
-  set(name swift)
-else()
-  set(name swift_driver)
-endif()
-
-add_swift_executable(${name}
+add_swift_executable(swift
   driver.cpp
   frontend_main.cpp
   DEPENDS swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses swiftImmediate
@@ -15,7 +9,7 @@ add_swift_executable(${name}
 
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
-target_link_libraries(${name} edit ${CORE_FOUNDATION})
+target_link_libraries(swift edit ${CORE_FOUNDATION})
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
@@ -25,17 +19,15 @@ endif()
 install(TARGETS ${name}
   RUNTIME DESTINATION bin)
 
-if(SWIFT_NEW_DRIVER)
-  # Keep the name "swift_driver" around for a bit longer.
-  add_custom_command(TARGET swift POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E create_symlink swift swift_driver
-    WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+# Keep the name "swift_driver" around for a bit longer.
+add_custom_command(TARGET swift POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E create_symlink swift swift_driver
+  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
-  # Add a symlink to clang's includes so the built swift
-  # can find its resource dir when run in place.
-  add_custom_command(TARGET swift POST_BUILD
-    COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
-    COMMAND ln "-fns"
-      "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
-      "${SWIFTLIB_DIR}/swift/clang")
-endif()
+# Add a symlink to clang's includes so the built swift
+# can find its resource dir when run in place.
+add_custom_command(TARGET swift POST_BUILD
+  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
+  COMMAND ln "-fns"
+    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
+    "${SWIFTLIB_DIR}/swift/clang")

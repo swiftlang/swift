@@ -303,18 +303,13 @@ function(compile_swift_files)
     list(APPEND swift_flags "-O0")
   endif()
 
-  if(SWIFT_NEW_DRIVER)
-    # FIXME: We shouldn't /have/ to build things in a single process.
-    # <rdar://problem/15972329>
-    list(APPEND swift_flags "-force-single-frontend-invocation")
-  endif()
+  # FIXME: We shouldn't /have/ to build things in a single process.
+  # <rdar://problem/15972329>
+  list(APPEND swift_flags "-force-single-frontend-invocation")
 
   if(NOT SWIFT_RUNTIME_CHECKS)
-    if(SWIFT_NEW_DRIVER)
-      list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")
-    else()
-      list(APPEND swift_flags "-disable-all-runtime-checks")
-    endif()
+    # FIXME: Should this be exposed at the driver level?
+    list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")
   endif()
 
   # Allow import of other Swift modules we just built.
