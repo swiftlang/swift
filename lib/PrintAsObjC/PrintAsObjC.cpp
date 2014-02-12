@@ -917,7 +917,7 @@ public:
 
 static void writeImports(raw_ostream &os, Module &M) {
   SmallVector<Module::ImportedModule, 16> imports;
-  M.getImportedModules(imports, /*includePrivate=*/true);
+  M.getImportedModules(imports, Module::ImportFilter::All);
   for (auto import : imports)
     os << "@import " << import.second->Name << ";\n";
   os << '\n';

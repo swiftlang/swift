@@ -902,17 +902,18 @@ LOOKUP_OPERATOR(Postfix)
 #undef LOOKUP_OPERATOR
 
 void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
-                                bool includePrivate) const {
+                                Module::ImportFilter filter) const {
   // FIXME: Audit uses of this function and make sure they make sense in a
   // multi-file world.
-  FORWARD(getImportedModules, (modules, includePrivate));
+  FORWARD(getImportedModules, (modules, filter));
 }
 
 void
 SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
-                               bool includePrivate) const {
+                               Module::ImportFilter filter) const {
   for (auto importPair : getImports())
-    if (includePrivate || importPair.second)
+    if (filter == Module::ImportFilter::All ||
+        (filter == Module::ImportFilter::Private) ^ importPair.second)
       modules.push_back(importPair.first);
 }
 
@@ -971,8 +972,11 @@ static bool forAllImportedModules(Module *topLevel,
 
   // Even if we're processing the top-level module like any other, we may
   // still want to include non-exported modules.
-  includePrivateTopLevelImports |= !respectVisibility;
-  topLevel->getImportedModules(queue, includePrivateTopLevelImports);
+  Module::ImportFilter filter = respectVisibility ? Module::ImportFilter::Public
+                                                  : Module::ImportFilter::All;
+  Module::ImportFilter topLevelFilter =
+    includePrivateTopLevelImports ? Module::ImportFilter::All : filter;
+  topLevel->getImportedModules(queue, topLevelFilter);
 
   while (!queue.empty()) {
     auto next = queue.pop_back_val();
@@ -994,7 +998,7 @@ static bool forAllImportedModules(Module *topLevel,
 
     if (!fn(next))
       return false;
-    next.second->getImportedModules(queue, !respectVisibility);
+    next.second->getImportedModules(queue, filter);
   }
 
   return true;

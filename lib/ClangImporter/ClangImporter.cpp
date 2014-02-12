@@ -792,19 +792,32 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
 
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
-    bool includePrivate) const {
+    Module::ImportFilter filter) const {
 
   auto topLevelAdapter = getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
-  if (includePrivate) {
-    imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+  if (filter == Module::ImportFilter::Public) {
+    clangModule->getExportedModules(imported);
+  } else {
+    if (filter == Module::ImportFilter::All) {
+      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+    } else {
+      SmallVector<clang::Module *, 8> publicImports;
+      clangModule->getExportedModules(publicImports);
+      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                   std::back_inserter(imported), [&](clang::Module *mod) {
+        return publicImports.end() != std::find(publicImports.begin(),
+                                                publicImports.end(),
+                                                mod);
+      });
+    }
+
     // FIXME: The parent module isn't exactly a private import, but it is
     // needed for link dependencies.
     if (clangModule->Parent)
       imported.push_back(clangModule->Parent);
-  } else
-    clangModule->getExportedModules(imported);
+  }
 
   for (auto importMod : imported) {
     auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);

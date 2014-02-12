@@ -409,8 +409,8 @@ void Serializer::writeInputFiles(const Module *M,
   SmallVector<Module::ImportedModule, 8> publicImports;
   SmallVector<Module::ImportedModule, 8> allImports;
   for (auto file : M->getFiles()) {
-    file->getImportedModules(publicImports, false);
-    file->getImportedModules(allImports, true);
+    file->getImportedModules(publicImports, Module::ImportFilter::Public);
+    file->getImportedModules(allImports, Module::ImportFilter::All);
   }
 
   llvm::SmallSet<Module::ImportedModule, 8, Module::OrderImportedModules>

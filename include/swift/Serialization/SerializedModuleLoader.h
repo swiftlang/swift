@@ -166,7 +166,7 @@ public:
 
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     bool includePrivate) const override;
+                     Module::ImportFilter filter) const override;
 
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;

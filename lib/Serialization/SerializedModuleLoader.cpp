@@ -261,8 +261,8 @@ bool SerializedModuleLoader::isSerializedAST(StringRef data) {
 
 void SerializedASTFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
-    bool includePrivate) const {
-  File.getImportedModules(imports, includePrivate);
+    Module::ImportFilter filter) const {
+  File.getImportedModules(imports, filter);
 }
 
 void SerializedASTFile::collectLinkLibraries(

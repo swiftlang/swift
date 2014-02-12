@@ -268,12 +268,19 @@ public:
   LookupConformanceResult
   lookupConformance(Type type, ProtocolDecl *protocol, LazyResolver *resolver);
 
+  /// \sa getImportedModules
+  enum class ImportFilter {
+    All,
+    Public,
+    Private
+  };
+
   /// Looks up which modules are imported by this module.
   ///
-  /// Unless \p includePrivate is true, only publicly re-exported modules are
-  /// included in \p imports.
+  /// \p filter controls whether public, private, or any imports are included
+  /// in this list.
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
-                          bool includePrivate = false) const;
+                          ImportFilter filter = ImportFilter::Public) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -467,11 +474,11 @@ public:
 
   /// Looks up which modules are imported by this file.
   ///
-  /// Unless \p includePrivate is true, only modules that are publicly
-  /// re-exported are returned in \p imports.
+  /// \p filter controls whether public, private, or any imports are included
+  /// in this list.
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     bool includePrivate) const {}
+                     Module::ImportFilter filter) const {}
 
   /// Generates the list of libraries needed to link this file, based on its
   /// imports.
@@ -639,7 +646,7 @@ public:
 
   virtual void
   getImportedModules(SmallVectorImpl<Module::ImportedModule> &imports,
-                     bool includePrivate) const override;
+                     Module::ImportFilter filter) const override;
 
   virtual void
   collectLinkLibraries(Module::LinkLibraryCallback callback) const override;

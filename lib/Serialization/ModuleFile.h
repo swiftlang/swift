@@ -350,10 +350,8 @@ public:
   OperatorDecl *lookupOperator(Identifier name, DeclKind fixity);
 
   /// Adds any imported modules to the given vector.
-  ///
-  /// Unless \p includePrivate is true, only re-exported modules are included.
   void getImportedModules(SmallVectorImpl<Module::ImportedModule> &results,
-                          bool includePrivate);
+                          Module::ImportFilter filter);
 
   void getImportDecls(SmallVectorImpl<Decl *> &Results);
 

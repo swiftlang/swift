@@ -672,11 +672,12 @@ OperatorDecl *ModuleFile::lookupOperator(Identifier name, DeclKind fixity) {
 
 void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
-    bool includePrivate) {
+    Module::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (!includePrivate && !dep.IsExported)
+    if (filter != Module::ImportFilter::All &&
+        (filter == Module::ImportFilter::Public) ^ dep.IsExported)
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
