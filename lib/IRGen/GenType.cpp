@@ -547,8 +547,7 @@ void TypeConverter::pushGenericContext(GenericSignature *signature) {
   
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
-  IGM.SILMod->Types.pushGenericContext(signature->getGenericParams(),
-                                       signature->getRequirements());
+  IGM.SILMod->Types.pushGenericContext(signature);
 }
 
 void TypeConverter::popGenericContext(GenericSignature *signature) {
@@ -556,8 +555,7 @@ void TypeConverter::popGenericContext(GenericSignature *signature) {
     return;
 
   // Pop the SIL TypeConverter's generic context too.
-  IGM.SILMod->Types.popGenericContext(signature->getGenericParams(),
-                                      signature->getRequirements());
+  IGM.SILMod->Types.popGenericContext(signature);
   
   Types.DependentCache.clear();
 }

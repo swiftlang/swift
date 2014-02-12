@@ -2023,11 +2023,9 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   return silSubstType;
 }
 
-void TypeConverter::pushGenericContext(
-                               ArrayRef<GenericTypeParamType *> genericParams,
-                               ArrayRef<Requirement> requirements) {
+void TypeConverter::pushGenericContext(GenericSignature *sig) {
   // If the generic signature is empty, this is a no-op.
-  if (genericParams.empty() && requirements.empty())
+  if (!sig)
     return;
   
   // GenericFunctionTypes shouldn't nest.
@@ -2036,16 +2034,14 @@ void TypeConverter::pushGenericContext(
   
   // Prepare the ArchetypeBuilder with the generic signature.
   GenericArchetypes.emplace(*M.getSwiftModule(), M.getASTContext().Diags);
-  if (GenericArchetypes->addGenericSignature(genericParams, requirements))
+  if (GenericArchetypes->addGenericSignature(sig))
     llvm_unreachable("error adding generic signature to archetype builder?!");
   GenericArchetypes->assignArchetypes();
 }
 
-void TypeConverter::popGenericContext(
-                                ArrayRef<GenericTypeParamType *> genericParams,
-                                ArrayRef<Requirement> requirements) {
+void TypeConverter::popGenericContext(GenericSignature *sig) {
   // If the generic signature is empty, this is a no-op.
-  if (genericParams.empty() && requirements.empty())
+  if (!sig)
     return;
 
   assert(GenericArchetypes.hasValue() && "not in generic context?!");

@@ -673,13 +673,11 @@ public:
   /// Types containing generic parameter references must be lowered in a generic
   /// context. There can be at most one level of generic context active at any
   /// point in time.
-  void pushGenericContext(ArrayRef<GenericTypeParamType*> genericParams,
-                          ArrayRef<Requirement> requirements);
+  void pushGenericContext(GenericSignature *sig);
   
   /// Pop a generic function context. See GenericContextScope for an RAII
   /// interface to this function. There must be an active generic context.
-  void popGenericContext(ArrayRef<GenericTypeParamType*> genericParams,
-                         ArrayRef<Requirement> requirements);
+  void popGenericContext(GenericSignature *sig);
   
   /// Return the archetype builder for the current generic context. Fails if no
   /// generic context has been pushed.
@@ -716,28 +714,17 @@ TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
 /// RAII interface to push a generic context.
 class GenericContextScope {
   TypeConverter &TC;
-  ArrayRef<GenericTypeParamType*> genericParams;
-  ArrayRef<Requirement> requirements;
+  GenericSignature *Sig;
 public:
   GenericContextScope(TypeConverter &TC,
-                      ArrayRef<GenericTypeParamType*> genericParams,
-                      ArrayRef<Requirement> requirements)
-    : TC(TC), genericParams(genericParams), requirements(requirements)
+                      GenericSignature *Sig)
+    : TC(TC), Sig(Sig)
   {
-    TC.pushGenericContext(genericParams, requirements);
+    TC.pushGenericContext(Sig);
   }
   
-  GenericContextScope(TypeConverter &TC,
-                      GenericSignature *sig)
-    : GenericContextScope(TC,
-                          sig ? sig->getGenericParams()
-                              : ArrayRef<GenericTypeParamType*>{},
-                          sig ? sig->getRequirements()
-                              : ArrayRef<Requirement>{})
-  {}
-  
   ~GenericContextScope() {
-    TC.popGenericContext(genericParams, requirements);
+    TC.popGenericContext(Sig);
   }
   
 private:

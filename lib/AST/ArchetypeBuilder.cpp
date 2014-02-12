@@ -813,18 +813,11 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
 
 bool ArchetypeBuilder::addGenericSignature(GenericSignature *sig) {
   if (!sig) return false;
-  return addGenericSignature(sig->getGenericParams(),
-                             sig->getRequirements());
-}
-
-bool ArchetypeBuilder::addGenericSignature(
-                                       ArrayRef<GenericTypeParamType*> params,
-                                       ArrayRef<Requirement> reqts) {
-  for (auto param : params) {
+  for (auto param : sig->getGenericParams()) {
     if (addGenericParameter(param))
       return true;
   }
-  for (auto &reqt : reqts) {
+  for (auto &reqt : sig->getRequirements()) {
     addRequirement(reqt);
   }
   return false;
