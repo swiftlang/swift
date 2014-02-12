@@ -88,12 +88,12 @@ public:
     setStorageAlignment(alignment);
   }
 
-  /// Returns the known, fixed size required to store a value of this type.
+  /// Returns the known, fixed alignment of a stored value of this type.
   Alignment getFixedAlignment() const {
     return getBestKnownAlignment();
   }
 
-  /// Returns the known, fixed alignment of a stored value of this type.
+  /// Returns the known, fixed size required to store a value of this type.
   Size getFixedSize() const {
     return StorageSize;
   }
