@@ -136,8 +136,7 @@ Type ProtocolConformance::getInterfaceType() const {
   }
 }
 
-std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
-ProtocolConformance::getGenericSignature() const {
+GenericSignature *ProtocolConformance::getGenericSignature() const {
   // FIXME: Should be an independent property of the conformance.
   // Assuming a BoundGenericType conformance is always for the
   // DeclaredTypeInContext is unsound if we ever add constrained extensions.

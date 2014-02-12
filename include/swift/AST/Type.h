@@ -260,6 +260,9 @@ class CanGenericSignature {
   GenericSignature *Signature;
   
 public:
+  CanGenericSignature() : Signature(nullptr) {}
+  CanGenericSignature(std::nullptr_t) : Signature(nullptr) {}
+  
   // in Decl.h
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;

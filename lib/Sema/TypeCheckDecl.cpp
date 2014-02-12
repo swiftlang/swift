@@ -2588,8 +2588,7 @@ public:
     auto resultTy = TC.getInterfaceTypeFromInternalType(enumDecl,
                                                         funcTy->getResult());
     auto interfaceTy
-      = GenericFunctionType::get(enumDecl->getGenericParamTypes(),
-                                 enumDecl->getGenericRequirements(),
+      = GenericFunctionType::get(enumDecl->getGenericSignature(),
                                  inputTy, resultTy, funcTy->getExtInfo());
 
     // Record the interface type.

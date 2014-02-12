@@ -1951,20 +1951,7 @@ public:
       .get<ASTContext*>();
   }
   
-  CanGenericSignature getCanonicalSignature() {
-    if (CanonicalSignatureOrASTContext.is<ASTContext*>())
-      return CanGenericSignature(this);
-    
-    if (auto p = CanonicalSignatureOrASTContext.dyn_cast<GenericSignature*>())
-      return CanGenericSignature(p);
-    
-    CanGenericSignature canSig = getCanonical(getGenericParams(),
-                                              getRequirements(),
-                                              getASTContext());
-    
-    CanonicalSignatureOrASTContext = canSig;
-    return canSig;
-  }
+  CanGenericSignature getCanonicalSignature();
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -2106,6 +2093,11 @@ public:
       return { };
 
     return GenericSig->getRequirements();
+  }
+  
+  /// Retrieve the generic signature.
+  GenericSignature *getGenericSignature() const {
+    return GenericSig;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity.

@@ -1467,10 +1467,9 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
 
   auto selfType = classType;
   auto sig = dd->getDeclContext()->getGenericSignatureOfContext();
-  if (!sig.first.empty() || !sig.second.empty())
+  if (sig)
     return cast<GenericFunctionType>(
-      GenericFunctionType::get(sig.first, sig.second,
-                               selfType, resultTy, extInfo)
+      GenericFunctionType::get(sig, selfType, resultTy, extInfo)
       ->getCanonicalType());
   return CanFunctionType::get(selfType, resultTy, extInfo);
 }
@@ -1512,8 +1511,8 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                                           /*noreturn*/ false);
   resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
   auto sig = cd->getGenericSignatureOfContext();
-  if (!sig.first.empty() && !sig.second.empty())
-    return CanGenericFunctionType::get(sig.first, sig.second,
+  if (sig)
+    return CanGenericFunctionType::get(sig->getCanonicalSignature(),
                                        classType, resultType,
                                        extInfo);
   return CanFunctionType::get(classType, resultType, extInfo);
@@ -1535,27 +1534,22 @@ TypeConverter::getEffectiveGenericParamsForContext(DeclContext *dc) {
   return dc->getGenericParamsOfContext();
 }
 
-GenericSignature *
+CanGenericSignature
 TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
   // Find the innermost context that has a generic parameter list.
   // FIXME: This is wrong for generic local functions in generic contexts.
   // Their GenericParamList is not semantically a child of the context
   // GenericParamList because they "capture" their context's already-bound
   // archetypes.
-  ArrayRef<GenericTypeParamType*> genericParams;
-  ArrayRef<Requirement> requirements;
-  
-  while (std::tie(genericParams, requirements)
-           = dc->getGenericSignatureOfContext(),
-         genericParams.empty() && requirements.empty()) {
+  while (!dc->getGenericSignatureOfContext()) {
     dc = dc->getParent();
-    if (!dc) return nullptr;;
+    if (!dc) return nullptr;
   }
   
-  if (genericParams.empty() && requirements.empty())
+  auto sig = dc->getGenericSignatureOfContext();
+  if (!sig)
     return nullptr;
-  return GenericSignature::getCanonical(genericParams, requirements,
-                                        dc->getASTContext());
+  return sig->getCanonicalSignature();
 }
 
 CanAnyFunctionType
@@ -1645,7 +1639,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                  ArrayRef<CaptureInfo::LocalCaptureTy> captures,
                                            DeclContext *context) {
   // Capture generic parameters from the enclosing context.
-  GenericSignature *genericSig
+  CanGenericSignature genericSig
     = getEffectiveGenericSignatureForContext(context);
   
   if (captures.empty()) {
@@ -1656,8 +1650,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                             /*thin*/ true,
                                             /*noreturn*/ false);
 
-    return CanGenericFunctionType::get(genericSig->getGenericParams(),
-                                       genericSig->getRequirements(),
+    return CanGenericFunctionType::get(genericSig,
                                        funcType.getInput(),
                                        funcType.getResult(),
                                        extInfo);
@@ -1722,8 +1715,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                           /*noreturn*/ false);
 
   if (genericSig)
-    return CanGenericFunctionType::get(genericSig->getGenericParams(),
-                                       genericSig->getRequirements(),
+    return CanGenericFunctionType::get(genericSig,
                                        capturedInputs, funcType,
                                        extInfo);
   

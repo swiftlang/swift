@@ -665,7 +665,7 @@ public:
   GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
 
   /// Retrieve the set of generic parameters for the given context.
-  GenericSignature *getEffectiveGenericSignatureForContext(DeclContext *dc);
+  CanGenericSignature getEffectiveGenericSignatureForContext(DeclContext *dc);
 
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.

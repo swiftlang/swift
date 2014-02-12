@@ -1940,8 +1940,7 @@ namespace {
         });
 
       Type interfaceType = GenericFunctionType::get(
-                             proto->getGenericParamTypes(),
-                             proto->getGenericRequirements(),
+                             proto->getGenericSignature(),
                              interfaceInputTy,
                              interfaceResultTy,
                              AnyFunctionType::ExtInfo());

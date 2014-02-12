@@ -31,6 +31,7 @@ namespace swift {
   class DeclContext;
   class GenericParamList;
   class LazyResolver;
+  class GenericSignature;
   class GenericTypeParamType;
   class Requirement;
   class SourceFile;
@@ -166,8 +167,7 @@ public:
 
   /// \brief Retrieve the interface generic type parameters and requirements
   /// exposed by this context.
-  std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
-  getGenericSignatureOfContext() const;
+  GenericSignature *getGenericSignatureOfContext() const;
   
   /// Returns this or the first local parent context, or nullptr if it is not
   /// contained in one.

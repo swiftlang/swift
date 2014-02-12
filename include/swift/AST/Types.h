@@ -1793,25 +1793,10 @@ END_CAN_TYPE_WRAPPER(PolymorphicFunctionType, AnyFunctionType)
 class GenericFunctionType : public AnyFunctionType,
                             public llvm::FoldingSetNode
 {
-  unsigned NumGenericParams;
-  unsigned NumRequirements;
-
-  /// Retrieve a mutable version of the generic parameters.
-  MutableArrayRef<GenericTypeParamType *> getGenericParamsBuffer() {
-    return { reinterpret_cast<GenericTypeParamType **>(this + 1),
-             NumGenericParams };
-  }
-
-  /// Retrieve a mutable verison of the requirements.
-  MutableArrayRef<Requirement> getRequirementsBuffer() {
-    void *genericParams = getGenericParamsBuffer().end();
-    return { reinterpret_cast<Requirement *>(genericParams),
-             NumRequirements };
-  }
+  GenericSignature *Signature;
 
   /// Construct a new generic function type.
-  GenericFunctionType(ArrayRef<GenericTypeParamType *> genericParams,
-                      ArrayRef<Requirement> requirements,
+  GenericFunctionType(GenericSignature *sig,
                       Type input,
                       Type result,
                       const ExtInfo &info,
@@ -1819,24 +1804,21 @@ class GenericFunctionType : public AnyFunctionType,
                       RecursiveTypeProperties properties);
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(ArrayRef<GenericTypeParamType *> params,
-                                  ArrayRef<Requirement> requirements,
+  static GenericFunctionType *get(GenericSignature *sig,
                                   Type input,
                                   Type result,
                                   const ExtInfo &info);
 
-  /// Retrieve the generic parameters of this polymorphic function type.
-  ArrayRef<GenericTypeParamType *> getGenericParams() const {
-    return { reinterpret_cast<GenericTypeParamType * const *>(this + 1),
-             NumGenericParams };
+  /// Retrieve the generic signature of this function type.
+  GenericSignature *getGenericSignature() const {
+    return Signature;
   }
+  
+  /// Retrieve the generic parameters of this polymorphic function type.
+  ArrayRef<GenericTypeParamType *> getGenericParams() const;
 
   /// Retrieve the requirements of this polymorphic function type.
-  ArrayRef<Requirement> getRequirements() const {
-    const void *genericParams = getGenericParams().end();
-    return { reinterpret_cast<const Requirement *>(genericParams),
-             NumRequirements };
-  }
+  ArrayRef<Requirement> getRequirements() const;
                               
   /// Substitute all of the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
@@ -1854,12 +1836,11 @@ public:
   AnyFunctionType *partialSubstGenericArgs(Module *M, ArrayRef<Type> args) const;
                               
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericParams(), getRequirements(), getInput(), getResult(),
+    Profile(ID, getGenericSignature(), getInput(), getResult(),
             getExtInfo());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
-                      ArrayRef<GenericTypeParamType *> params,
-                      ArrayRef<Requirement> requirements,
+                      GenericSignature *sig,
                       Type input,
                       Type result,
                       const ExtInfo &info);
@@ -1871,12 +1852,19 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType get(ArrayRef<GenericTypeParamType*> params,
-                                    ArrayRef<Requirement> reqts,
+  static CanGenericFunctionType get(CanGenericSignature sig,
                                     CanType input, CanType result,
                                     const ExtInfo &info) {
     return CanGenericFunctionType(
-              GenericFunctionType::get(params, reqts, input, result, info));
+              GenericFunctionType::get(sig, input, result, info));
+  }
+  
+  CanGenericSignature getGenericSignature() const {
+    return CanGenericSignature(getPointer()->getGenericSignature());
+  }
+  
+  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const {
+    return getGenericSignature().getGenericParams();
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 

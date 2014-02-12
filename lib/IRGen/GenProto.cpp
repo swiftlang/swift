@@ -3047,12 +3047,9 @@ namespace {
       SILParameterInfo param(D->getDeclaredInterfaceType()->getCanonicalType(),
                               ParameterConvention::Direct_Owned);
       
-      GenericSignature *sig = nullptr;
-      auto sigArrays = D->getGenericSignatureOfContext();
-      if (!sigArrays.first.empty() || !sigArrays.second.empty())
-        sig = GenericSignature::getCanonical(sigArrays.first,
-                                             sigArrays.second,
-                                             ctx);
+      CanGenericSignature sig = D->getGenericSignatureOfContext()
+        ? D->getGenericSignatureOfContext()->getCanonicalSignature()
+        : nullptr;
       
       return SILFunctionType::get(sig, extInfo,
                                   ParameterConvention::Direct_Unowned,

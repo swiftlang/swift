@@ -37,8 +37,7 @@ CanAnyFunctionType Lowering::adjustFunctionType(CanAnyFunctionType t,
                                            extInfo);
 
   if (auto gft = dyn_cast<GenericFunctionType>(t))
-    return CanGenericFunctionType::get(gft->getGenericParams(),
-                                       gft->getRequirements(),
+    return CanGenericFunctionType::get(gft.getGenericSignature(),
                                        gft.getInput(), gft.getResult(),
                                        extInfo);
   
@@ -1010,11 +1009,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   Optional<GenericParamList *> genericParams;
 
   // The dependent generic signature.
-  ArrayRef<GenericTypeParamType*> genericSigParams;
-  ArrayRef<Requirement> genericSigReqts;
+  CanGenericSignature genericSig;
   if (auto gft = dyn_cast<GenericFunctionType>(t)) {
-    genericSigParams = gft->getGenericParams();
-    genericSigReqts = gft->getRequirements();
+    genericSig = gft.getGenericSignature();
   }
 
   // Merge inputs and generic parameters from the uncurry levels.
@@ -1064,9 +1061,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   CanType inputType = CanType(TupleType::get(inputs, Context));
   GenericParamList *innerGenericParams
     = genericParams ? *genericParams : nullptr;
-  if (!genericSigParams.empty() || !genericSigReqts.empty()) {
+  if (genericSig) {
     assert(!innerGenericParams && "got mix of Polymorphic/Generic FunctionType?!");
-    return CanGenericFunctionType::get(genericSigParams, genericSigReqts,
+    return CanGenericFunctionType::get(genericSig,
                                        inputType, resultType, extInfo);
   }
   

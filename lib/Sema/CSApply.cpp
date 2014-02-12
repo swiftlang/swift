@@ -413,8 +413,7 @@ namespace {
 
       // Produce the resulting function type.
       if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
-        return GenericFunctionType::get(genericFn->getGenericParams(),
-                                        genericFn->getRequirements(),
+        return GenericFunctionType::get(genericFn->getGenericSignature(),
                                         inputType, resultType,
                                         fnType->getExtInfo());
       }

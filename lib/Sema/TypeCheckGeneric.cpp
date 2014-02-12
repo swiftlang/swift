@@ -713,12 +713,11 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     auto info = AnyFunctionType::ExtInfo()
                   .withIsNoReturn(func->getAttrs().isNoReturn());
 
+    auto sig = GenericSignature::get(allGenericParams, requirements, Context);
     if (i == e-1) {
-      funcTy = GenericFunctionType::get(allGenericParams, requirements,
-                                        argTy, funcTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, funcTy, info);
       if (initFuncTy)
-        initFuncTy = GenericFunctionType::get(allGenericParams, requirements,
-                                              initArgTy, initFuncTy, info);
+        initFuncTy = GenericFunctionType::get(sig, initArgTy, initFuncTy, info);
     } else {
       funcTy = FunctionType::get(argTy, funcTy, info);
 

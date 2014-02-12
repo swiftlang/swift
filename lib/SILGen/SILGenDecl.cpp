@@ -2026,29 +2026,30 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                ->getCanonicalType());
   
   // If the conformance is generic, its generic parameters apply to the witness.
-  ArrayRef<GenericTypeParamType*> ifaceGenericParams;
-  ArrayRef<Requirement> ifaceReqts;
-  std::tie(ifaceGenericParams, ifaceReqts)
+  GenericSignature *sig
     = conformance->getGenericSignature();
-  if (!ifaceGenericParams.empty() && !ifaceReqts.empty()) {
+  if (sig) {
     if (auto gft = dyn_cast<GenericFunctionType>(witnessSubstIfaceTy)) {
-      SmallVector<GenericTypeParamType*, 4> allParams(ifaceGenericParams.begin(),
-                                                      ifaceGenericParams.end());
+      SmallVector<GenericTypeParamType*, 4> allParams(sig->getGenericParams().begin(),
+                                                      sig->getGenericParams().end());
       allParams.append(gft->getGenericParams().begin(),
                        gft->getGenericParams().end());
-      SmallVector<Requirement, 4> allReqts(ifaceReqts.begin(),
-                                           ifaceReqts.end());
+      SmallVector<Requirement, 4> allReqts(sig->getRequirements().begin(),
+                                           sig->getRequirements().end());
       allReqts.append(gft->getRequirements().begin(),
                       gft->getRequirements().end());
+      GenericSignature *witnessSig = GenericSignature::get(allParams, allReqts,
+                                                           getASTContext());
+      
       witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(allParams, allReqts,
+        GenericFunctionType::get(witnessSig,
                                  gft.getInput(), gft.getResult(),
                                  gft->getExtInfo())
           ->getCanonicalType());
     } else {
       assert(isa<FunctionType>(witnessSubstIfaceTy));
       witnessSubstIfaceTy = cast<GenericFunctionType>(
-        GenericFunctionType::get(ifaceGenericParams, ifaceReqts,
+        GenericFunctionType::get(sig,
                                  witnessSubstIfaceTy.getInput(),
                                  witnessSubstIfaceTy.getResult(),
                                  witnessSubstIfaceTy->getExtInfo())

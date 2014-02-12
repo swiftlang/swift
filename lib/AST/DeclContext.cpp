@@ -129,30 +129,26 @@ GenericParamList *DeclContext::getGenericParamsOfContext() const {
   }
 }
 
-std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
-DeclContext::getGenericSignatureOfContext()const {
+GenericSignature *DeclContext::getGenericSignatureOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::AbstractClosureExpr:
   case DeclContextKind::Initializer:
-    return {{}, {}};
+    return nullptr;
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>()) {
-      return {GFT->getGenericParams(), GFT->getRequirements()};
-    }
+    if (auto GFT = AFD->getInterfaceType()->getAs<GenericFunctionType>())
+      return GFT->getGenericSignature();
     return AFD->getDeclContext()->getGenericSignatureOfContext();
   }
 
   case DeclContextKind::NominalTypeDecl: {
     auto nominal = cast<NominalTypeDecl>(this);
-    auto genericParams = nominal->getGenericParamTypes();
-    auto reqts = nominal->getGenericRequirements();
-    if (!genericParams.empty() || !reqts.empty())
-      return {genericParams, reqts};
+    if (auto genericSig = nominal->getGenericSignature())
+      return genericSig;
     return nominal->getDeclContext()->getGenericSignatureOfContext();
   }
 

@@ -1451,35 +1451,25 @@ PolymorphicFunctionType::PolymorphicFunctionType(Type input, Type output,
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
-                                  ArrayRef<GenericTypeParamType *> params,
-                                  ArrayRef<Requirement> requirements,
+                                  GenericSignature *sig,
                                   Type input,
                                   Type result,
                                   const ExtInfo &info) {
-  ID.AddInteger(params.size());
-  for (auto param : params)
-    ID.AddPointer(param);
-  ID.AddInteger(requirements.size());
-  for (const auto &req : requirements) {
-    ID.AddInteger(static_cast<unsigned>(req.getKind()));
-    ID.AddPointer(req.getFirstType().getPointer());
-    ID.AddPointer(req.getSecondType().getPointer());
-  }
+  ID.AddPointer(sig);
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
   ID.AddInteger(info.getFuncAttrKey());
 }
 
 GenericFunctionType *
-GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
-                         ArrayRef<Requirement> requirements,
+GenericFunctionType::get(GenericSignature *sig,
                          Type input,
                          Type output,
                          const ExtInfo &info) {
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
-  GenericFunctionType::Profile(id, params, requirements, input, output, info);
+  GenericFunctionType::Profile(id, sig, input, output, info);
 
   const ASTContext &ctx = input->getASTContext();
 
@@ -1491,30 +1481,13 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
 
   // We have to construct this generic function type. Determine whether
   // it's canonical.
-  bool isCanonical = input->isCanonical() && output->isCanonical();
-  if (isCanonical) {
-    for (auto param : params) {
-      if (!param->isCanonical()) {
-        isCanonical = false;
-        break;
-      }
-    }
-  }
-  if (isCanonical) {
-    for (const auto &req : requirements) {
-      if (!req.getFirstType()->isCanonical() ||
-          (req.getSecondType() && !req.getSecondType()->isCanonical())) {
-        isCanonical = false;
-        break;
-      }
-    }
-  }
+  bool isCanonical = sig->isCanonical()
+    && input->isCanonical()
+    && output->isCanonical();
 
   // Allocate storage for the object.
-  size_t bytes = sizeof(GenericFunctionType)
-               + sizeof(GenericTypeParamType *) * params.size()
-               + sizeof(Requirement) * requirements.size();
-  void *mem = ctx.Allocate(bytes, alignof(GenericFunctionType));
+  void *mem = ctx.Allocate(sizeof(GenericFunctionType),
+                           alignof(GenericFunctionType));
 
   // For now, generic function types cannot be dependent (in fact,
   // they erase dependence) or contain type variables, and they're
@@ -1523,17 +1496,15 @@ GenericFunctionType::get(ArrayRef<GenericTypeParamType *> params,
   static_assert(RecursiveTypeProperties::BitWidth == 3,
                 "revisit this if you add new recursive type properties");
 
-  auto result = new (mem) GenericFunctionType(params, requirements, input,
-                                              output, info,
-                                              isCanonical? &ctx : nullptr,
+  auto result = new (mem) GenericFunctionType(sig, input, output, info,
+                                              isCanonical ? &ctx : nullptr,
                                               properties);
   ctx.Impl.GenericFunctionTypes.InsertNode(result, insertPos);
   return result;
 }
 
 GenericFunctionType::GenericFunctionType(
-                       ArrayRef<GenericTypeParamType *> genericParams,
-                       ArrayRef<Requirement> requirements,
+                       GenericSignature *sig,
                        Type input,
                        Type result,
                        const ExtInfo &info,
@@ -1541,14 +1512,8 @@ GenericFunctionType::GenericFunctionType(
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
                     properties, info),
-    NumGenericParams(genericParams.size()),
-    NumRequirements(requirements.size())
-{
-  std::copy(genericParams.begin(), genericParams.end(),
-            getGenericParamsBuffer().data());
-  std::copy(requirements.begin(), requirements.end(),
-            getRequirementsBuffer().data());
-}
+    Signature(sig)
+{}
 
 GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
                                                 const ASTContext &ctx) {
@@ -1560,6 +1525,15 @@ GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
                   GenericTypeParamType(depth, index, ctx);
   ctx.Impl.GenericParamTypes[{depth, index}] = result;
   return result;
+}
+
+ArrayRef<GenericTypeParamType *> GenericFunctionType::getGenericParams() const{
+  return Signature->getGenericParams();
+}
+
+/// Retrieve the requirements of this polymorphic function type.
+ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
+  return Signature->getRequirements();
 }
 
 void SILFunctionType::Profile(llvm::FoldingSetNodeID &id,

@@ -195,8 +195,7 @@ public:
   
   /// Get the generic signature containing the parameters open on the conforming
   /// interface type.
-  std::pair<ArrayRef<GenericTypeParamType*>, ArrayRef<Requirement>>
-  getGenericSignature() const;
+  GenericSignature *getGenericSignature() const;
 
   /// Get the underlying normal conformance.
   const NormalProtocolConformance *getRootNormalConformance() const;

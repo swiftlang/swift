@@ -1457,8 +1457,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                ->castTo<MetatypeType>()->getInstanceType();
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
-              GenericFunctionType::get(polyFn->getGenericParams(),
-                                       polyFn->getRequirements(),
+              GenericFunctionType::get(polyFn->getGenericSignature(),
                                        selfTy, polyFn->getResult(),
                                        polyFn->getExtInfo()));
     } else {
@@ -2595,8 +2594,8 @@ Type ModuleFile::getType(TypeID TID) {
                                              thin,
                                              noreturn);
 
-    typeOrOffset = GenericFunctionType::get(genericParams,
-                                            requirements,
+    auto sig = GenericSignature::get(genericParams, requirements, ctx);
+    typeOrOffset = GenericFunctionType::get(sig,
                                             getType(inputID),
                                             getType(resultID),
                                             info);

@@ -613,6 +613,26 @@ void ProtocolType::canonicalizeProtocols(
   llvm::array_pod_sort(protocols.begin(), protocols.end(), compareProtocols);
 }
 
+CanGenericSignature GenericSignature::getCanonicalSignature() {
+  if (CanonicalSignatureOrASTContext.is<ASTContext*>())
+    return CanGenericSignature(this);
+  
+  if (auto p = CanonicalSignatureOrASTContext.dyn_cast<GenericSignature*>())
+    return CanGenericSignature(p);
+  
+  ASTContext *C;
+  if (!getGenericParams().empty())
+    C = &getGenericParams().front()->getASTContext();
+  else
+    C = &getRequirements().front().getFirstType()->getASTContext();
+  
+  CanGenericSignature canSig = getCanonical(getGenericParams(),
+                                            getRequirements(), *C);
+  
+  CanonicalSignatureOrASTContext = canSig;
+  return canSig;
+}
+
 /// getCanonicalType - Return the canonical version of this type, which has
 /// sugar from all levels stripped off.
 CanType TypeBase::getCanonicalType() {
@@ -723,8 +743,13 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   case TypeKind::GenericFunction: {
-    // Canonicalize generic parameters.
     GenericFunctionType *function = cast<GenericFunctionType>(this);
+
+    // Canonicalize the signature.
+    GenericSignature *sig = function->getGenericSignature()
+      ->getCanonicalSignature();
+    
+    // Canonicalize generic parameters.
     SmallVector<GenericTypeParamType *, 4> genericParams;
     for (auto param : function->getGenericParams()) {
       auto newParam = param->getCanonicalType()->castTo<GenericTypeParamType>();
@@ -745,8 +770,8 @@ CanType TypeBase::getCanonicalType() {
     auto inputTy = function->getInput()->getCanonicalType();
     auto resultTy = function->getResult()->getCanonicalType();
 
-    Result = GenericFunctionType::get(genericParams, requirements, inputTy,
-                                      resultTy, function->getExtInfo());
+    Result = GenericFunctionType::get(sig, inputTy, resultTy,
+                                      function->getExtInfo());
     break;
   }
 
@@ -1589,11 +1614,12 @@ const {
     }
   }
   
+  GenericSignature *sig = GenericSignature::get(unappliedParams, unappliedReqts,
+                                                M->getASTContext());
+  
   Type input = getInput().subst(M, subs, true, nullptr);
   Type result = getResult().subst(M, subs, true, nullptr);
-  return GenericFunctionType::get(unappliedParams, unappliedReqts,
-                                  input, result,
-                                  getExtInfo());
+  return GenericFunctionType::get(sig, input, result, getExtInfo());
 }
 
 TypeSubstitutionMap
@@ -2214,6 +2240,9 @@ case TypeKind::Id:
       } else
         anyChanges = true;
     }
+    
+    auto sig = GenericSignature::get(genericParams, requirements,
+                                     Ptr->getASTContext());
 
     // Transform input type.
     auto inputTy = function->getInput().transform(fn);
@@ -2236,8 +2265,9 @@ case TypeKind::Id:
       return FunctionType::get(inputTy, resultTy, function->getExtInfo());
 
     // Produce the new generic function type.
-    return GenericFunctionType::get(genericParams, requirements, inputTy,
-                                    resultTy, function->getExtInfo());
+    
+    return GenericFunctionType::get(sig, inputTy, resultTy,
+                                    function->getExtInfo());
   }
 
   case TypeKind::Array: {
