@@ -1919,12 +1919,12 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                + sizeof(GenericTypeParamType *) * params.size()
                + sizeof(Requirement) * requirements.size();
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
-  auto newSig = new (mem) GenericSignature(params, requirements);
+  auto newSig = new (mem) GenericSignature(params, requirements, ctx);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
 
-GenericSignature *GenericSignature::getCanonical(
+CanGenericSignature GenericSignature::getCanonical(
                                         ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements,
                                         ASTContext &ctx) {
@@ -1942,5 +1942,5 @@ GenericSignature *GenericSignature::getCanonical(
                               reqt.getFirstType()->getCanonicalType(),
                               reqt.getSecondType().getCanonicalTypeOrNull()));
   }
-  return get(canonicalParams, canonicalRequirements, ctx);
+  return CanGenericSignature(get(canonicalParams, canonicalRequirements, ctx));
 }

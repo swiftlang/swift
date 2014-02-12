@@ -2087,7 +2087,7 @@ public:
     return !(*this == rhs);
   }
 };
-
+  
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -2116,7 +2116,7 @@ public:
   typedef AnyFunctionType::ExtInfo ExtInfo;
 
 private:
-  GenericSignature *GenericSig;
+  CanGenericSignature GenericSig;
 
   /// TODO: Permit an arbitrary number of results.
   SILResultInfo InterfaceResult;

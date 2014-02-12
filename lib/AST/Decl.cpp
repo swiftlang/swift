@@ -687,13 +687,29 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                                   ArrayRef<Requirement> requirements)
-  : NumGenericParams(params.size()), NumRequirements(requirements.size())
+                                   ArrayRef<Requirement> requirements,
+                                   ASTContext &ctx)
+  : NumGenericParams(params.size()), NumRequirements(requirements.size()),
+    CanonicalSignatureOrASTContext()
 {
-  std::copy(params.begin(), params.end(),
-            getGenericParamsBuffer().data());
-  std::copy(requirements.begin(), requirements.end(),
-            getRequirementsBuffer().data());
+  bool isCanonical = true;
+  
+  auto paramsBuffer = getGenericParamsBuffer();
+  for (unsigned i = 0; i < NumGenericParams; ++i) {
+    paramsBuffer[i] = params[i];
+    isCanonical &= params[i]->isCanonical();
+  }
+  
+  auto reqtsBuffer = getRequirementsBuffer();
+  for (unsigned i = 0; i < NumRequirements; ++i) {
+    reqtsBuffer[i] = requirements[i];
+    isCanonical &= requirements[i].getFirstType()->isCanonical();
+    isCanonical &= !requirements[i].getSecondType()
+                    || requirements[i].getSecondType()->isCanonical();
+  }
+  
+  if (isCanonical)
+    CanonicalSignatureOrASTContext = &ctx;
 }
 
 void NominalTypeDecl::setGenericSignature(

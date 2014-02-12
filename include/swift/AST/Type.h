@@ -29,6 +29,7 @@ namespace swift {
 class ASTPrinter;
 class ArchetypeType;
 class CanType;
+class GenericSignature;
 class LazyResolver;
 class Module;
 class TypeBase;
@@ -251,6 +252,30 @@ template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
+  
+class GenericTypeParamType;
+  
+/// A reference to a canonical generic signature.
+class CanGenericSignature {
+  GenericSignature *Signature;
+  
+public:
+  // in Decl.h
+  explicit CanGenericSignature(GenericSignature *Signature);
+  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
+  
+  GenericSignature *operator->() const {
+    return Signature;
+  }
+  
+  operator GenericSignature *() const {
+    return Signature;
+  }
+  
+  GenericSignature *getPointer() const {
+    return Signature;
+  }
+};
 } // end namespace swift
 
 namespace llvm {

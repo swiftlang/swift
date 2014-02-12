@@ -1846,6 +1846,8 @@ public:
   }
 };
 
+class GenericSignature;
+  
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
@@ -1871,8 +1873,12 @@ class GenericSignature : public llvm::FoldingSetNode {
   }
 
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                   ArrayRef<Requirement> requirements);
+                   ArrayRef<Requirement> requirements,
+                   ASTContext &ctx);
 
+  llvm::PointerUnion<GenericSignature *, ASTContext *>
+    CanonicalSignatureOrASTContext;
+  
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
@@ -1882,9 +1888,9 @@ public:
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
-  static GenericSignature *getCanonical(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements,
-                                        ASTContext &ctx);
+  static CanGenericSignature getCanonical(ArrayRef<GenericTypeParamType *> params,
+                                          ArrayRef<Requirement> requirements,
+                                          ASTContext &ctx);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -1931,6 +1937,34 @@ public:
   GenericSignatureWitnessIterator getAllDependentTypes() const {
     return GenericSignatureWitnessIterator(getRequirements());
   }
+  
+  bool isCanonical() const {
+    return CanonicalSignatureOrASTContext.is<ASTContext*>();
+  }
+  
+  ASTContext &getASTContext() {
+    if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext*>())
+      return *ctx;
+    
+    return *getCanonicalSignature()
+      ->CanonicalSignatureOrASTContext
+      .get<ASTContext*>();
+  }
+  
+  CanGenericSignature getCanonicalSignature() {
+    if (CanonicalSignatureOrASTContext.is<ASTContext*>())
+      return CanGenericSignature(this);
+    
+    if (auto p = CanonicalSignatureOrASTContext.dyn_cast<GenericSignature*>())
+      return CanGenericSignature(p);
+    
+    CanGenericSignature canSig = getCanonical(getGenericParams(),
+                                              getRequirements(),
+                                              getASTContext());
+    
+    CanonicalSignatureOrASTContext = canSig;
+    return canSig;
+  }
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -1941,6 +1975,22 @@ public:
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
 };
+  
+inline
+CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
+  : Signature(Signature)
+{
+  assert(!Signature || Signature->isCanonical());
+}
+  
+inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
+CanGenericSignature::getGenericParams() const{
+  ArrayRef<GenericTypeParamType*> params = Signature->getGenericParams();
+  auto base = reinterpret_cast<const CanTypeWrapper<GenericTypeParamType>*>(
+                                                                params.data());
+  return {base, params.size()};
+}
+
 
 /// Kinds of optional types.
 enum OptionalTypeKind : unsigned {
