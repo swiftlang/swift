@@ -817,6 +817,9 @@ ERROR(objc_protocol_not_class_protocol,sema_tcd,none,
       "only [class_protocol] protocols can be declared 'objc'", ())
 ERROR(objc_invalid_on_static_var,sema_tcd,none,
       "type properties cannot be declared '@objc'", ())
+ERROR(objc_in_generic_context,sema_objc,none,
+      "%select{method|initializer|variable}0 in a generic class cannot be "
+      "represented in Objective-C", (int))
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be marked %select{@objc|@IBOutlet}0 because its type "

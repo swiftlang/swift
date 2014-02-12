@@ -925,35 +925,9 @@ void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 }
 
-/// Determine whether this is a generic function that isn't generic simply
-/// because it's in a protocol.
-///
-/// FIXME: This whole thing is a hack. Sema should be properly
-/// annotating as [objc] only those functions that can have Objective-C
-/// entry points.
-static bool isNonProtocolGeneric(AbstractFunctionDecl *func) {
-  // If the function type is polymorphic and the context isn't a protocol
-  // (where everything has an implicit single level of genericity),
-  // it's generic.
-  if (func->getType()->is<PolymorphicFunctionType>() &&
-      !isa<ProtocolDecl>(func->getDeclContext()))
-    return true;
-
-  // Is this a polymorphic function within a non-generic type?
-  if (func->getType()->castTo<AnyFunctionType>()->getResult()
-        ->is<PolymorphicFunctionType>())
-    return true;
-
-  return false;
-}
-
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
   if (method->isGetterOrSetter())
-    return false;
-    
-  // We don't export generic methods or subclasses to Objective-C yet.
-  if (isNonProtocolGeneric(method))
     return false;
     
   if (method->isObjC() || method->getAttrs().isIBAction())
@@ -964,10 +938,6 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
-  // We don't export generic methods or subclasses to Objective-C yet.
-  if (isNonProtocolGeneric(constructor))
-    return false;
-
   return constructor->isObjC();
 }
 

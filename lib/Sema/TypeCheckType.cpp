@@ -1508,6 +1508,31 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
   return true;
 }
 
+/// Check whether the given declaration occurs within a generic context
+/// and, therefore, is not representable in Objective-C.
+static bool checkObjCInGenericContext(TypeChecker &tc,
+                                      const ValueDecl *value,
+                                      bool diagnose) {
+  // Non-generic contexts are okay.
+  auto dc = value->getDeclContext();
+  if (!dc->isGenericContext())
+    return false;
+
+  // Protocol contexts are okay.
+  if (isa<ProtocolDecl>(dc))
+    return false;
+
+  // Diagnose this problem, if asked to.
+  if (diagnose) {
+    int kind = isa<VarDecl>(value)? 2
+             : isa<ConstructorDecl>(value)? 1
+             : 0;
+    tc.diagnose(value->getLoc(), diag::objc_in_generic_context, kind);
+  }
+
+  return true;
+}
+
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         bool Diagnose) {
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
@@ -1545,11 +1570,18 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     }
   }
 
+  if (checkObjCInGenericContext(*this, AFD, Diagnose))
+    return false;
+
   return true;
 }
 
 bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
   bool Result = isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+
+  if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
+    return false;
+
   if (!Diagnose || Result)
     return Result;
 

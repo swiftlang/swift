@@ -2801,6 +2801,8 @@ public:
       CD->setInitializerType(InitFnTy);
     }
 
+    validateAttributes(TC, CD);
+
     // A initializer is ObjC-compatible if it's explicitly @objc or a member of
     // an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
@@ -2818,8 +2820,6 @@ public:
         isObjC = false;
       CD->setIsObjC(isObjC);
     }
-
-    validateAttributes(TC, CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
