@@ -508,7 +508,8 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///   expr-super-member:
 ///     'super' '.' identifier
 ///   expr-super-init:
-///     'super' '.' 'init' 
+///     'super' '.' 'init' expr-paren?
+///     'super' '.' 'init' identifier expr-call-suffix
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper() {
@@ -528,6 +529,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
     SourceLoc dotLoc = consumeToken(tok::period);
     
+    // FIXME: This code is copy-paste from the general handling for kw_init.
     if (Tok.is(tok::kw_init)) {
       // super.init
       SourceLoc ctorLoc = consumeToken();
@@ -556,6 +558,22 @@ ParserResult<Expr> Parser::parseExprSuper() {
           return makeParserError();
         
         result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
+      } else if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+                 (peekToken().isFollowingLParen() || 
+                  peekToken().isFollowingLBrace())) {
+        // Parse selector-style arguments.
+        // FIXME: Not checking for the start of a get/set accessor here.
+
+        // Parse the first selector name.
+        Identifier firstSelectorPiece = Context.getIdentifier(Tok.getText());
+        consumeToken(tok::identifier);
+
+        ParserResult<Expr> call = parseExprCallSuffix(makeParserResult(result), 
+                                                      firstSelectorPiece);
+        if (call.hasCodeCompletion() || call.isParseError())
+          return call;
+
+        result = call.get();
       } else {
         // It's invalid to refer to an uncalled initializer.
         diagnose(ctorLoc, diag::super_initializer_must_be_called);
@@ -917,7 +935,24 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                                                     selfDecl);
               }
             }
-
+          } else if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+                     (peekToken().isFollowingLParen() ||
+                      peekToken().isFollowingLBrace())) {
+            // Parse selector-style arguments.
+            // FIXME: Not checking for the start of a get/set accessor here.
+            
+            // Parse the first selector name.
+            Identifier firstSelectorPiece
+              = Context.getIdentifier(Tok.getText());
+            consumeToken(tok::identifier);
+            
+            ParserResult<Expr> call = parseExprCallSuffix(
+                                        makeParserResult(initRef),
+                                        firstSelectorPiece);
+            if (call.hasCodeCompletion() || call.isParseError())
+              return call;
+            
+            initRef = call.get();
           } else {
             // It's invalid to refer to an uncalled initializer.
             diagnose(initLoc, diag::init_ref_must_be_called);
@@ -1672,7 +1707,8 @@ bool Parser::hasExprCallSuffix(bool isExprBasic) {
 /// selector-arg:
 ///   identifier expr-paren
 ///   identifier expr-closure
-ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn) {
+ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
+                                              Identifier firstSelectorPiece) {
   assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) 
          && "Not a call suffix?");
 
@@ -1713,7 +1749,7 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn) {
     hadError = true;
   } else {
     selectorArgs.push_back(firstArg.get());
-    selectorPieces.push_back(Identifier());
+    selectorPieces.push_back(firstSelectorPiece);
   }
 
   // Parse the remaining selector arguments.
