@@ -111,7 +111,8 @@ enum CaptureException : unsigned {
 
 } // end anonymous namespace
 
-/// Is Inst an instruction whose operands escape only if Inst itself escapes?
+/// Is Inst an instruction which escapes if and only if one of its results
+/// escape?
 static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   case ValueKind::AllocArrayInst:
@@ -257,10 +258,8 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
     // memory in some manner?
     // TODO: Add in knowledge about how parameters work on swift to make this
     // more aggressive.
-    if (auto *AI = dyn_cast<ApplyInst>(Inst))
-      if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef()))
-        if (isReadNone(BI))
-          continue;
+    if (isNoReadApplyInst(Inst))
+      continue;
 
     // Loading from a pointer does not cause it to be captured.
     if (isa<LoadInst>(Inst))
