@@ -120,6 +120,7 @@ typedef signed char BOOL;
 @end
 
 typedef struct objc_selector    *SEL;
+SEL sel_registerName(const char *str);
 
 @interface AlmostSubscriptable
 - (A*) objectForKeyedSubscript:(id)key;
