@@ -73,6 +73,43 @@ public:
   /// respect to V.
   MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V);
 
+  /// Returns true if Inst may read from memory in a manner that affects V.
+  bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
+    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    return B == MemoryBehavior::MayRead ||
+      B == MemoryBehavior::MayReadWrite ||
+      B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if Inst may write to memory in a manner that affects V.
+  bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
+    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    return B == MemoryBehavior::MayWrite ||
+      B == MemoryBehavior::MayReadWrite ||
+      B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if Inst may read or write to memory in a manner that affects
+  /// V.
+  bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
+    return getMemoryBehavior(Inst, V) != MemoryBehavior::None;
+  }
+
+  /// Returns true if Inst may have side effects in a manner that affects V.
+  bool mayHaveSideEffects(SILInstruction *Inst, SILValue V) {
+    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    return B == MemoryBehavior::MayWrite ||
+      B == MemoryBehavior::MayReadWrite ||
+      B == MemoryBehavior::MayHaveSideEffects;
+  }
+
+  /// Returns true if Inst may have side effects in a manner that affects
+  /// V. This is independent of whether or not Inst may write to V and is meant
+  /// to encode notions such as ref count modifications.
+  bool mayHavePureSideEffects(SILInstruction *Inst, SILValue V) {
+    return getMemoryBehavior(Inst, V) == MemoryBehavior::MayHaveSideEffects;
+  }
+
   virtual void invalidate(InvalidationKind K) { AliasCache.clear(); }
 
   virtual void invalidate(SILFunction *, InvalidationKind K) { invalidate(K); }

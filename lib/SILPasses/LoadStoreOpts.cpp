@@ -35,18 +35,6 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
-static bool isWriteMemBehavior(SILInstruction::MemoryBehavior B) {
-  switch (B) {
-  case SILInstruction::MemoryBehavior::MayWrite:
-  case SILInstruction::MemoryBehavior::MayReadWrite:
-  case SILInstruction::MemoryBehavior::MayHaveSideEffects:
-    return true;
-  case SILInstruction::MemoryBehavior::None:
-  case SILInstruction::MemoryBehavior::MayRead:
-    return false;
-  }
-}
-
 /// Given the already emitted load PrevLI, see if we can find a projection
 /// address path to LI. If we can, emit the corresponding aggregate projection
 /// insts and return the last such inst.
@@ -98,7 +86,7 @@ invalidateAliasingLoads(SILInstruction *Inst,
                         AliasAnalysis *AA) {
   llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
   for (auto *LI : Loads)
-    if (isWriteMemBehavior(AA->getMemoryBehavior(Inst, LI->getOperand())))
+    if (AA->mayWriteToMemory(Inst, LI->getOperand()))
       InvalidatedLoadList.push_back(LI);
   for (auto *LI : InvalidatedLoadList) {
     DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
