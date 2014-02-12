@@ -293,8 +293,8 @@ extension ${Self} /* : FloatingPointNumber */ {
 
 @@transparent
 extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
-  type func _convertFromBuiltinIntegerLiteral(val: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
-    return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(val))
+  type func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+    return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
   type func convertFromIntegerLiteral(value: Int64) -> ${Self} {
