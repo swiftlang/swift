@@ -977,7 +977,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
-      ParserResult<Expr> Arg = parseExprCallSuffix(/*isConstructor=*/false);
+      ParserResult<Expr> Arg = parseExprCallSuffix();
       if (Arg.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
 
@@ -1647,7 +1647,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 /// selector-arg:
 ///   identifier expr-paren
 ///   identifier expr-closure
-ParserResult<Expr> Parser::parseExprCallSuffix(bool isConstructor) {
+ParserResult<Expr> Parser::parseExprCallSuffix() {
   assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
   // Parse the first argument.
