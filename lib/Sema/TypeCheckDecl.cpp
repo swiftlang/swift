@@ -1529,6 +1529,8 @@ public:
       }
     }
 
+    // Make sure the getter and setter have valid types, since they will be
+    // used by SILGen for any accesses to this subscript.
     if (auto getter = SD->getGetter())
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
@@ -3064,6 +3066,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
 
     auto VD = cast<VarDecl>(D);
+
+    // Make sure the getter and setter have valid types, since they will be
+    // used by SILGen for any accesses to this variable.
     if (auto getter = VD->getGetter())
       validateDecl(getter);
     if (auto setter = VD->getSetter())
