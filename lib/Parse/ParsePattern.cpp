@@ -149,20 +149,31 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
   // shorthand where the elements get the name of the selector chunk.  The
   // later includes the names are specified for each piece.
 
-  // Before doing a speculative parse, check for the common case of
-  // "identifier:" (always a tuple) or "identifier)" (always unnamed).
+  // Before doing a speculative parse, check for the common cases of
+  // "identifier:" (always named), "identifier)" (always unnamed), and
+  // "identifier =" (always unnamed).  We know to parse the second identifier in
+  // "identifier(identifier = ...)" as a type because all arguments are required
+  // to have types.
   bool isTypeOnlySelectorArg;
 
   if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
     isTypeOnlySelectorArg = false;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
     isTypeOnlySelectorArg = true;
+  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::equal))
+    isTypeOnlySelectorArg = true;
   else {
     // Otherwise, we do a full speculative parse to determine this.
     Parser::BacktrackingScope backtrack(P);
 
-    // This is type-only if it is a valid type followed by an r_paren.
-    isTypeOnlySelectorArg = P.canParseType() && P.Tok.is(tok::r_paren);
+    // Allow "identifier(inout Type)"
+    if (P.Tok.isContextualKeyword("inout"))
+      P.consumeToken(tok::identifier);
+
+    // This is type-only if it is a valid type followed by an r_paren or equal.
+    isTypeOnlySelectorArg = P.canParseType();
+    if (isTypeOnlySelectorArg)
+      isTypeOnlySelectorArg = P.Tok.is(tok::r_paren) || P.Tok.is(tok::equal);
   }
 
   // If this is a standard tuple, parse it.
@@ -170,28 +181,34 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
     return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
                                       LPLoc, /*DefArgs=*/defaultArgs);
 
-  // If this is a type-only selector chunk, parse the type and r_paren, then
-  // build this as if it were a parenpattern(typed_pattern(named_pattern)).
-  SourceLoc TypeLoc = P.Tok.getLoc();
+  // Create the patterns for the identifier.
+  Pattern *Name;
+  if (leadingIdent.empty())
+    Name = new (P.Context) AnyPattern(P.Tok.getLoc(), /*Implicit=*/true);
+  else
+    Name = P.createBindingFromPattern(P.Tok.getLoc(), leadingIdent,
+                                      /*isLet*/true);
+  Name->setImplicit();
 
-  ParserResult<TypeRepr> Ty = P.parseTypeAnnotation();
-  if (Ty.hasCodeCompletion())
+
+  ParserStatus EltStatus;
+  Optional<TuplePatternElt> elto;
+  std::tie(EltStatus, elto) =
+    P.parsePatternTupleElement(/*isLet*/true, /*isArgumentList*/true,
+                               Name, defaultArgs);
+
+  if (EltStatus.hasCodeCompletion())
     return makeParserCodeCompletionResult<Pattern>();
-  if (Ty.isNull())
-    Ty = makeParserResult(new (P.Context) ErrorTypeRepr(TypeLoc));
+  if (!elto)
+    return makeParserError();
+  TuplePatternElt elt = elto.getValue();
+
 
   // This was checked by the speculative parse above.
   SourceLoc RPLoc = P.consumeToken(tok::r_paren);
 
-  // Create the patterns for the identifier.
-  Pattern *Name;
-  if (leadingIdent.empty())
-    Name = new (P.Context) AnyPattern(TypeLoc, /*Implicit=*/true);
-  else
-    Name = P.createBindingFromPattern(TypeLoc, leadingIdent, /*isLet*/true);
-  Name->setImplicit();
-  auto TypedPat = new (P.Context) TypedPattern(Name, Ty.get());
-  return makeParserResult(new (P.Context) ParenPattern(LPLoc, TypedPat, RPLoc));
+  auto *Res = TuplePattern::createSimple(P.Context, LPLoc, elt, RPLoc);
+  return makeParserResult(Res);
 }
 
 
@@ -672,6 +689,7 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
 Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
+                                 Pattern *ImplicitName,
                                  DefaultArgumentInfo *defaultArgs) {
   
   // Function argument lists can have "inout" applied to TypedPatterns in their
@@ -683,12 +701,28 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
   unsigned defaultArgIndex = (defaultArgs ? defaultArgs->NextIndex++ : 0);
 
   // Parse the pattern.
-  ParserResult<Pattern> pattern = parsePattern(isLet);
-  if (pattern.hasCodeCompletion())
-    return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
+  ParserResult<Pattern> pattern;
 
-  if (pattern.isNull())
-    return std::make_pair(makeParserError(), Nothing);
+  // If this is a normal tuple value, parse it as a pattern.  If it is a "type
+  // only" case (e.g. an implicitly named selector argument) then parse a type
+  // and build the pattern around it.
+  if (!ImplicitName) {
+    pattern = parsePattern(isLet);
+    if (pattern.hasCodeCompletion())
+      return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
+    if (pattern.isNull())
+      return std::make_pair(makeParserError(), Nothing);
+  } else {
+    ParserResult<TypeRepr> Ty = parseTypeAnnotation();
+    if (Ty.hasCodeCompletion())
+      return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
+    if (Ty.isNull())
+      return std::make_pair(makeParserError(), Nothing);
+
+    // Build this as typed_pattern(name).
+    pattern = makeParserResult(new (Context) TypedPattern(ImplicitName,
+                                                          Ty.get()));
+  }
 
   // Parse the optional initializer.
   ExprHandle *init = nullptr;
@@ -746,7 +780,7 @@ Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
     std::tie(EltStatus, elt) = parsePatternTupleElement(isLet, isArgumentList,
-                                                        defaults);
+                                                        nullptr, defaults);
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
     if (!elt)

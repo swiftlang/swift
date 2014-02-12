@@ -699,7 +699,7 @@ public:
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
   parsePatternTupleElement(bool isLet, bool isArgumentList,
-                           DefaultArgumentInfo *args);
+                           Pattern *ImplicitName, DefaultArgumentInfo *args);
   ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList,
                                           DefaultArgumentInfo *args);
   ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,

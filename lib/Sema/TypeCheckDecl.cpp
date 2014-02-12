@@ -1998,8 +1998,16 @@ public:
     // this as "func f(_: Int)".
     if (FD->hasBody() && FD->getBodyParamPatterns().size() == 1) {
       Pattern *BodyPattern = FD->getBodyParamPatterns()[0];
-      if (auto *NP = dyn_cast<NamedPattern>(BodyPattern
-                                            ->getSemanticsProvidingPattern()))
+      
+      // Look through single-entry tuple elements, which can exist when there
+      // are default values.
+      if (auto *TP = dyn_cast<TuplePattern>(BodyPattern))
+        if (TP->getNumFields() == 1 && !TP->hasVararg())
+          BodyPattern =TP->getFields()[0].getPattern();
+      // Look through typedpatterns and parens.
+      BodyPattern = BodyPattern->getSemanticsProvidingPattern();
+      
+      if (auto *NP = dyn_cast<NamedPattern>(BodyPattern))
         if (NP->getDecl()->getName() == FD->getName() && NP->isImplicit()) {
           TC.diagnose(BodyPattern->getLoc(),
                       diag::parameter_must_have_name_specified)
