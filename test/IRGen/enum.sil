@@ -165,15 +165,15 @@ enum EmptySingleton {
 }
 
 enum Singleton {
-  case val(Builtin.Int64, Builtin.Int64)
+  case value(Builtin.Int64, Builtin.Int64)
 }
 
 enum SingletonRef {
-  case val(Builtin.ObjectPointer)
+  case value(Builtin.ObjectPointer)
 }
 
 enum DynamicSingleton<T> {
-  case val(T)
+  case value(T)
 }
 
 // CHECK: define void @singleton_switch(i64, i64) {
@@ -181,7 +181,7 @@ sil @singleton_switch : $(Singleton) -> () {
 // CHECK: entry:
 entry(%u : $Singleton):
 // CHECK:   br label %[[DEST:[0-9]+]]
-  switch_enum %u : $Singleton, case #Singleton.val!enumelt.1: dest
+  switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest
 
 // CHECK: ; <label>:[[DEST]]
 dest:
@@ -195,7 +195,7 @@ sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK: entry:
 entry(%u : $Singleton):
 // CHECK:   br label %[[PREDEST:[0-9]+]]
-  switch_enum %u : $Singleton, case #Singleton.val!enumelt.1: dest
+  switch_enum %u : $Singleton, case #Singleton.value!enumelt.1: dest
 
 // CHECK: ; <label>:[[PREDEST]]
 // CHECK:   br label %[[DEST:[0-9]+]]
@@ -217,9 +217,9 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
 // CHECK: }
 sil @singleton_switch_indirect : $(@inout Singleton) -> () {
 entry(%u : $*Singleton):
-  switch_enum_addr %u : $*Singleton, case #Singleton.val!enumelt.1: dest
+  switch_enum_addr %u : $*Singleton, case #Singleton.value!enumelt.1: dest
 dest:
-  %u2 = take_enum_data_addr %u : $*Singleton, #Singleton.val!enumelt.1
+  %u2 = take_enum_data_addr %u : $*Singleton, #Singleton.value!enumelt.1
   %x = tuple ()
   return %x : $()
 }
@@ -233,7 +233,7 @@ dest:
 sil @singleton_inject : $(Builtin.Int64, Builtin.Int64) -> Singleton {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %u = enum $Singleton, #Singleton.val!enumelt.1, %t : $(Builtin.Int64, Builtin.Int64)
+  %u = enum $Singleton, #Singleton.value!enumelt.1, %t : $(Builtin.Int64, Builtin.Int64)
   return %u : $Singleton
 }
 
@@ -249,9 +249,9 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, @inout Singleton) -> () {
 entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $*Singleton):
   %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %a = init_enum_data_addr %2 : $*Singleton, #Singleton.val!enumelt.1
+  %a = init_enum_data_addr %2 : $*Singleton, #Singleton.value!enumelt.1
   store %t to %a : $*(Builtin.Int64, Builtin.Int64)
-  inject_enum_addr %2 : $*Singleton, #Singleton.val!enumelt.1
+  inject_enum_addr %2 : $*Singleton, #Singleton.value!enumelt.1
   %v = tuple ()
   return %v : $()
 }
@@ -2214,10 +2214,10 @@ var x : AllConcreteTestEnums
 // CHECK: }
 sil @dynamic_singleton_switch_indirect : $<T> (@in DynamicSingleton<T>) -> () {
 entry(%0 : $*DynamicSingleton<T>):
-  switch_enum_addr %0 : $*DynamicSingleton<T>, case #DynamicSingleton.val!enumelt.1: dest
+  switch_enum_addr %0 : $*DynamicSingleton<T>, case #DynamicSingleton.value!enumelt.1: dest
 
 dest:
-  %1 = take_enum_data_addr %0 : $*DynamicSingleton<T>, #DynamicSingleton.val!enumelt.1
+  %1 = take_enum_data_addr %0 : $*DynamicSingleton<T>, #DynamicSingleton.value!enumelt.1
   %v = tuple ()
   return %v : $()
 }
