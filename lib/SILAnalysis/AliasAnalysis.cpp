@@ -132,7 +132,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::FloatLiteralInst:
   case ValueKind::FunctionRefInst:
   case ValueKind::GlobalAddrInst:
-  case ValueKind::InitExistentialInst:
   case ValueKind::IntegerLiteralInst:
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
@@ -174,6 +173,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
   case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::ObjectPointerToRefInst:
   case ValueKind::PartialApplyInst:
