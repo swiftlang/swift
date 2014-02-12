@@ -173,7 +173,8 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
     P.consumeToken(tok::l_paren);
     
     isImpliedNameArgument = P.canParseTypeTupleBody() &&
-      P.Tok.isNot(tok::r_paren) && P.Tok.isNot(tok::colon);
+        P.Tok.isNot(tok::r_paren) && P.Tok.isNot(tok::colon) &&
+        P.Tok.isNot(tok::comma);
   } else {
     // Otherwise, we do a full speculative parse to determine this.
     Parser::BacktrackingScope backtrack(P);
