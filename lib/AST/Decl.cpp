@@ -1141,78 +1141,6 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
   Set->makeAccessor(this, AccessorKind::IsSetter);
 }
 
-StringRef AbstractStorageDecl::
-getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
-  // If we override a property, use its getter selector.
-  if (auto overridden = getOverriddenDecl())
-    return overridden->getObjCGetterSelector(buffer);
-
-  llvm::raw_svector_ostream out(buffer);
-
-  // If there is an Objective-C @property declaration, use its getter
-  // name.
-  if (auto objc = dyn_cast_or_null<clang::ObjCPropertyDecl>(getClangDecl())) {
-    auto selector = objc->getGetterName();
-    if (!selector.isNull()) {
-      selector.print(out);
-      return out.str();
-    }
-  }
-
-  // Subscripts use a specific selector.
-  if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
-    case ObjCSubscriptKind::Indexed: return "objectAtIndexedSubscript:";
-    case ObjCSubscriptKind::Keyed:   return "objectForKeyedSubscript:";
-    }
-  }
-
-
-  // The getter selector is the property name itself.
-  // FIXME: 'is' prefix for boolean properties?
-  out << getName().str();
-  return out.str();
-}
-
-
-StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
-  // If we override a property, use its setter selector.
-  if (auto overridden = getOverriddenDecl())
-    return overridden->getObjCSetterSelector(buffer);
-
-  llvm::raw_svector_ostream out(buffer);
-
-  // If there is an Objective-C @property declaration, use its setter
-  // name.
-  if (auto objc = dyn_cast_or_null<clang::ObjCPropertyDecl>(getClangDecl())) {
-    auto selector = objc->getSetterName();
-    if (!selector.isNull()) {
-      selector.print(out);
-      return out.str();
-    }
-  }
-
-  // Subscripts use a specific selector.
-  if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("Not an Objective-C subscript");
-
-    case ObjCSubscriptKind::Indexed: return "setObject:atIndexedSubscript:";
-    case ObjCSubscriptKind::Keyed:  return "setObject:forKeyedSubscript:";
-    }
-  }
-
-  // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
-  // property name capitalized and preceded by 'set'.
-  StringRef name = getName().str();
-  assert(name.size() >= 1 && "empty var name?!");
-  
-  out << "set" << char(toupper(name[0])) << name.slice(1, name.size()) << ':';
-  return out.str();
-}
 
 
 /// \brief Returns whether the var is settable in the specified context: this
@@ -1381,6 +1309,32 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
     return ObjCSubscriptKind::Keyed;
 
   return ObjCSubscriptKind::None;
+}
+
+StringRef SubscriptDecl::getObjCGetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "objectAtIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "objectForKeyedSubscript:";
+  }
+}
+
+StringRef SubscriptDecl::getObjCSetterSelector() const {
+  switch (getObjCSubscriptKind()) {
+  case ObjCSubscriptKind::None:
+    llvm_unreachable("Not an Objective-C subscript");
+   
+  case ObjCSubscriptKind::Indexed:
+    return "setObject:atIndexedSubscript:";
+
+  case ObjCSubscriptKind::Keyed:
+    return "setObject:forKeyedSubscript:";
+  }
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
@@ -1751,13 +1705,69 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   return DynamicSelfType::get(extType, getASTContext());
 }
 
+StringRef VarDecl::getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If we override a property, use its getter selector.
+  if (auto overridden = getOverriddenDecl())
+    return overridden->getObjCGetterSelector(buffer);
+
+  llvm::raw_svector_ostream out(buffer);
+
+  // If there is an Objective-C @property declaration, use its getter
+  // name.
+  if (auto objcProperty = dyn_cast_or_null<clang::ObjCPropertyDecl>(
+                            getClangDecl())) {
+    auto selector = objcProperty->getGetterName();
+    if (!selector.isNull()) {
+      selector.print(out);
+      return out.str();
+    }
+  }
+  
+  // The getter selector is the property name itself.
+  // FIXME: 'is' prefix for boolean properties?
+  out << getName().str();
+  return out.str();
+}
+
+StringRef VarDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If we override a property, use its setter selector.
+  if (auto overridden = getOverriddenDecl())
+    return overridden->getObjCSetterSelector(buffer);
+
+  llvm::raw_svector_ostream out(buffer);
+
+  // If there is an Objective-C @property declaration, use its setter
+  // name.
+  if (auto objcProperty = dyn_cast_or_null<clang::ObjCPropertyDecl>(
+                            getClangDecl())) {
+    auto selector = objcProperty->getSetterName();
+    if (!selector.isNull()) {
+      selector.print(out);
+      return out.str();
+    }
+  }
+
+  // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
+  // property name capitalized and preceded by 'set'.
+  StringRef name = getName().str();
+  assert(name.size() >= 1 && "empty var name?!");
+    
+  out << "set" << char(toupper(name[0])) << name.slice(1, name.size()) << ':';
+  return out.str();
+}
+
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   // For a getter or setter, go through the variable or subscript decl.
   if (isGetterOrSetter()) {
-    auto asd = cast<AbstractStorageDecl>(getAccessorStorageDecl());
-    return isGetter() ? asd->getObjCGetterSelector(buffer)
-                      : asd->getObjCSetterSelector(buffer);
+    if (auto var = dyn_cast<VarDecl>(getAccessorStorageDecl())) {
+      return isGetter()? var->getObjCGetterSelector(buffer)
+                       : var->getObjCSetterSelector(buffer);
+    }
+
+    auto subscript = cast<SubscriptDecl>(getAccessorStorageDecl());
+    return isGetter()? subscript->getObjCGetterSelector()
+                     : subscript->getObjCSetterSelector();
   }
 
   assert(buffer.empty());

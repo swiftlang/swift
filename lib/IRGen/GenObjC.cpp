@@ -311,12 +311,20 @@ namespace {
       }
     }
     
-    Selector(AbstractStorageDecl *asd, ForGetter_t) {
-      asd->getObjCGetterSelector(Text);
+    Selector(VarDecl *property, ForGetter_t) {
+      property->getObjCGetterSelector(Text);
     }
 
-    Selector(AbstractStorageDecl *asd, ForSetter_t) {
-      asd->getObjCSetterSelector(Text);
+    Selector(VarDecl *property, ForSetter_t) {
+      property->getObjCSetterSelector(Text);
+    }
+
+    Selector(SubscriptDecl *subscript, ForGetter_t) {
+      Text = subscript->getObjCGetterSelector();
+    }
+
+    Selector(SubscriptDecl *subscript, ForSetter_t) {
+      Text = subscript->getObjCSetterSelector();
     }
 
     Selector(SILDeclRef ref) {
@@ -337,7 +345,10 @@ namespace {
         break;
 
       case SILDeclRef::Kind::Getter:
-        cast<AbstractStorageDecl>(ref.getDecl())->getObjCGetterSelector(Text);
+        if (auto var = dyn_cast<VarDecl>(ref.getDecl()))
+          var->getObjCGetterSelector(Text);
+        else
+          Text = cast<SubscriptDecl>(ref.getDecl())->getObjCGetterSelector();
         break;
 
       case SILDeclRef::Kind::Initializer:
@@ -353,7 +364,10 @@ namespace {
         break;
 
       case SILDeclRef::Kind::Setter:
-        cast<AbstractStorageDecl>(ref.getDecl())->getObjCSetterSelector(Text);
+        if (auto var = dyn_cast<VarDecl>(ref.getDecl()))
+          var->getObjCSetterSelector(Text);
+        else
+          Text = cast<SubscriptDecl>(ref.getDecl())->getObjCSetterSelector();
         break;
       }
     }

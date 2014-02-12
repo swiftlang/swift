@@ -2598,15 +2598,7 @@ public:
   /// Return true if this storage needs to be accessed with getters and
   /// setters for Objective-C.
   bool usesObjCGetterAndSetter() const;
-
-  /// Given that this is an Objective-C property or subscript declaration,
-  /// produce its getter selector in the given buffer (as UTF-8).
-  StringRef getObjCGetterSelector(SmallVectorImpl<char> &buffer) const;
-
-  /// Given that this is an Objective-C property or subscript declaration,
-  /// produce its setter selector in the given buffer (as UTF-8).
-  StringRef getObjCSetterSelector(SmallVectorImpl<char> &buffer) const;
-
+  
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl.getPointer();
   }
@@ -2664,6 +2656,14 @@ public:
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
 
+  /// Given that this is an Objective-C property declaration, produce
+  /// its getter selector in the given buffer (as UTF-8).
+  StringRef getObjCGetterSelector(SmallVectorImpl<char> &buffer) const;
+
+  /// Given that this is an Objective-C property declaration, produce
+  /// its setter selector in the given buffer (as UTF-8).
+  StringRef getObjCSetterSelector(SmallVectorImpl<char> &buffer) const;
+  
   /// Is this a type ('static') variable?
   bool isStatic() const { return VarDeclBits.Static; }
   void setStatic(bool IsStatic) { VarDeclBits.Static = IsStatic; }
@@ -2763,6 +2763,14 @@ public:
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its getter selector.
+  StringRef getObjCGetterSelector() const;
+
+  /// Given that this is an Objective-C subscript declaration, produce
+  /// its setter selector.
+  StringRef getObjCSetterSelector() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(

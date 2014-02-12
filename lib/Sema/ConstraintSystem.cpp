@@ -154,14 +154,17 @@ getDynamicResultSignature(ValueDecl *decl,
       buffer += '-';
     }
     selector = buffer.str();
-  } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
-    // Handle properties and subscripts. Only the getter matters.
-    selector = asd->getObjCGetterSelector(buffer);
-    type = asd->getType();
+  } else if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Handle properties. Only the getter matters.
+    selector = var->getObjCGetterSelector(buffer);
+    type = decl->getType();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     // Handle constructors.
     selector = ctor->getObjCSelector(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    selector = subscript->getObjCGetterSelector();
+    type = subscript->getType();
   } else {
     llvm_unreachable("Dynamic lookup found a non-[objc] result");
   }
