@@ -559,7 +559,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
           return makeParserError();
         
         result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
-      } else if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+      } else if (Tok.is(tok::identifier) && isContinuation(Tok) &&
                  (peekToken().isFollowingLParen() || 
                   peekToken().isFollowingLBrace())) {
         // Parse selector-style arguments.
@@ -936,7 +936,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                                                     selfDecl);
               }
             }
-          } else if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+          } else if (Tok.is(tok::identifier) && isContinuation(Tok) &&
                      (peekToken().isFollowingLParen() ||
                       peekToken().isFollowingLBrace())) {
             // Parse selector-style arguments.

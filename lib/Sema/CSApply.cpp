@@ -1441,11 +1441,26 @@ namespace {
       auto choice = selected.choice;
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
-      // The subexpression must be either 'self' or 'super'.
       auto arg = expr->getSubExpr()->getSemanticsProvidingExpr();
-      if (!isa<SuperRefExpr>(arg)) {
-        auto &tc = cs.getTypeChecker();
+      auto &tc = cs.getTypeChecker();
 
+      // If the subexpression is a metatype, build a direct reference to the
+      // constructor.
+      if (arg->getType()->is<MetatypeType>()) {
+        return buildMemberRef(expr->getSubExpr(),
+                              selected.openedFullType,
+                              expr->getDotLoc(),
+                              ctor,
+                              expr->getConstructorLoc(),
+                              expr->getType(),
+                              ConstraintLocatorBuilder(
+                                cs.getConstraintLocator(expr)),
+                              expr->isImplicit(),
+                              /*IsDirectPropertyAccess=*/false);
+      }
+
+      // The subexpression must be either 'self' or 'super'.
+      if (!isa<SuperRefExpr>(arg)) {
         // 'super' references have already been fully checked; handle the
         // 'self' case below.
         bool diagnoseBadInitRef = true;

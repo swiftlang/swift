@@ -253,7 +253,13 @@ namespace {
       ASTContext &C = CS.getASTContext();
       
       // Open a member constraint for constructors on the subexpr type.
-      auto baseTy = expr->getSubExpr()->getType()->getRValueType();
+      // FIXME: the getRValueInstanceType() here is a hack to make the
+      //   T.init withFoo(foo)
+      // syntax type-check. We shouldn't rely on any kinds of adjustments to
+      // the subexpression's type here, but dealing with this requires us to
+      // clarify when we can refer to constructors with ".init".
+      auto baseTy = expr->getSubExpr()->getType()
+                      ->getLValueOrInOutObjectType()->getRValueInstanceType();
       auto argsTy = CS.createTypeVariable(
                       CS.getConstraintLocator(expr),
                       TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
