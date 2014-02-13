@@ -901,7 +901,6 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   if (returnInfo.isIndirect() || returnInfo.isIgnore())
     return IGM.VoidTy;
 
-  // FIXME: Add extension attributes.
   return returnInfo.getCoerceToType();
 }
 

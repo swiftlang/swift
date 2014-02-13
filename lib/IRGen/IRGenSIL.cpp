@@ -968,8 +968,6 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend:
-      // FIXME: Add extension attributes.
-      SWIFT_FALLTHROUGH;
     case clang::CodeGen::ABIArgInfo::Direct: {
 
       // The ABI IR types for the entrypoint might differ from the
