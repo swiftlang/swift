@@ -16,9 +16,11 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swift_runtime
 SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp \
 	   Metadata.cpp Stubs.cpp SwiftObject.mm Enum.cpp BlockShims.mm \
-	   Once.cpp Init.cpp
+	   Once.cpp Init.cpp NSSwiftString.mm
 
 include $(SWIFT_LEVEL)/Makefile
+
+LDFLAGS += -framework Foundation
 
 $(ObjDir)/%.o: %.s $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_HEADER_DIR)
 	$(Echo) "Compiling $*.s for $(BuildMode) build" $(PIC_FLAG)

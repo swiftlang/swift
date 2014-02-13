@@ -19,6 +19,7 @@ add_swift_library(swift_runtime INSTALL
   Enum.cpp
   Once.cpp
   Init.cpp
+  NSSwiftString.mm
   BlockShims.mm)
 
 add_swift_optimization_flags(swift_runtime)
@@ -36,3 +37,6 @@ set(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
 if(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS)
   add_swift_compiler_flags(swift_runtime "-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=1")
 endif()
+
+target_link_libraries(swift_runtime
+  "-framework Foundation")
