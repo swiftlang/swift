@@ -74,6 +74,11 @@ namespace irgen {
                                   llvm::AttributeSet &attrs,
                                   unsigned argIndex,
                                   Alignment align);
+
+  /// Add signext or zeroext attribute set for an argument that needs
+  /// extending.
+  void addExtendAttribute(IRGenModule &IGM, llvm::AttributeSet &attrs,
+                          unsigned index, bool signExtend);
   
   /// Emit a call to a builtin function.
   void emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,

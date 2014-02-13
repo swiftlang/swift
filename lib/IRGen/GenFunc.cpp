@@ -712,6 +712,18 @@ void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
                               resultAttrs);
 }
 
+void irgen::addExtendAttribute(IRGenModule &IGM,
+                               llvm::AttributeSet &attrs,
+                               unsigned index, bool signExtend) {
+  llvm::AttrBuilder b;
+  if (signExtend)
+    b.addAttribute(llvm::Attribute::SExt);
+  else
+    b.addAttribute(llvm::Attribute::ZExt);
+  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, index, b);
+  attrs = attrs.addAttributes(IGM.LLVMContext, index, resultAttrs);
+}
+
 namespace {
   class SignatureExpansion {
     IRGenModule &IGM;
@@ -829,6 +841,15 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
          "Expected one ArgInfo for each parameter type!");
 
   auto &returnInfo = FI.getReturnInfo();
+
+  // Does the result need an extension attribute?
+  if (returnInfo.isExtend()) {
+    bool signExt = clangResultTy->hasSignedIntegerRepresentation();
+    assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
+           "Invalid attempt to add extension attribute to argument!");
+    addExtendAttribute(IGM, Attrs, llvm::AttributeSet::ReturnIndex, signExt);
+  }
+
   // If we return indirectly, that is the first parameter type.
   if (returnInfo.isIndirect())
     addIndirectResult();
@@ -837,9 +858,13 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     auto &AI = FI.arg_begin()[i].info;
 
     switch (AI.getKind()) {
-    case clang::CodeGen::ABIArgInfo::Extend:
-      // FIXME: Add extension attributes.
+    case clang::CodeGen::ABIArgInfo::Extend: {
+      bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
+      assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
+             "Invalid attempt to add extension attribute to argument!");
+      addExtendAttribute(IGM, Attrs, i+1, signExt);
       SWIFT_FALLTHROUGH;
+    }
     case clang::CodeGen::ABIArgInfo::Direct:
       ParamIRTypes.push_back(AI.getCoerceToType());
       break;
