@@ -43,6 +43,6 @@ benchmark() {
     set +e
 }
 
-benchmark RC4
-benchmark ObjInst
-benchmark Ackermann
+(cd RC4 && benchmark RC4)
+(cd ObjInst && benchmark ObjInst)
+(cd Ackermann && benchmark Ackermann)
