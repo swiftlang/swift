@@ -193,6 +193,7 @@ public:
 
   // Define the set of known identifiers.
 #define IDENTIFIER(Id) Identifier Id_##Id;
+#define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 
   // FIXME: Once DenseMap learns about move semantics, use std::unique_ptr

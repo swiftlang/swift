@@ -19,6 +19,10 @@
 #  error Must define IDENTIFIER(Id) before including this x-macro file
 #endif
 
+#ifndef IDENTIFIER_WITH_NAME
+#  error Must define IDENTIFIER_WITH_NAME(Name, IdStr) before including this x-macro file
+#endif
+
 IDENTIFIER(destructor)
 IDENTIFIER(DynamicSelf)
 IDENTIFIER(init)
@@ -26,4 +30,8 @@ IDENTIFIER(self)
 IDENTIFIER(Self)
 IDENTIFIER(subscript)
 
+IDENTIFIER_WITH_NAME(MatchOperator, "~=")
+IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
+
 #undef IDENTIFIER
+#undef IDENTIFIER_WITH_NAME

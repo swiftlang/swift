@@ -1135,8 +1135,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   EP->setMatchVar(matchVar);
   
   // Find '~=' operators for the match.
-  auto matchOperator = Context.getIdentifier("~=");
-  UnqualifiedLookup matchLookup(matchOperator, DC, this);
+  UnqualifiedLookup matchLookup(Context.Id_MatchOperator, DC, this);
 
   if (!matchLookup.isSuccess()) {
     diagnose(EP->getLoc(), diag::no_match_operator);

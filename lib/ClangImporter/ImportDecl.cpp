@@ -540,7 +540,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
 
   auto zero = new (C) IntegerLiteralExpr("0", SourceLoc(), /*implicit*/ true);
 
-  auto neRef = getOperatorRef(C, C.getIdentifier("!="));
+  auto neRef = getOperatorRef(C, C.Id_NotEqualsOperator);
   
   Expr *args[] = {valueRef, zero};
   auto argsTuple = new (C) TupleExpr(SourceLoc(),
