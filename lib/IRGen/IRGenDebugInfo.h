@@ -159,6 +159,7 @@ public:
                                      SILType SILTy = SILType()) {
     emitArtificialFunction(*IGF.IGM.SILMod, IGF.Builder, Fn, SILTy);
   }
+
   void emitArtificialFunction(SILModule &SILMod, IRBuilder &Builder,
                               llvm::Function *Fn, SILType SILTy = SILType());
 
