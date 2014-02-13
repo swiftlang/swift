@@ -962,6 +962,10 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
     auto AI = FI.arg_begin()[argTyIdx].info;
 
+    // Drop padding arguments.
+    if (AI.getPaddingType())
+      params.claimNext();
+
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend:
       // FIXME: Add extension attributes.

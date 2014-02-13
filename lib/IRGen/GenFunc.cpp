@@ -857,12 +857,16 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
   for (auto i : indices(paramTys)) {
     auto &AI = FI.arg_begin()[i].info;
 
+    // Add a padding argument if required.
+    if (auto *padType = AI.getPaddingType())
+      ParamIRTypes.push_back(padType);
+
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend: {
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
-      addExtendAttribute(IGM, Attrs, i+1, signExt);
+      addExtendAttribute(IGM, Attrs, getCurParamIndex()+1, signExt);
       SWIFT_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct:
@@ -2000,6 +2004,10 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   for (auto i : indices(paramTys)) {
     auto &AI = FI.arg_begin()[i].info;
+
+    // Add a padding argument if required.
+    if (auto *padType = AI.getPaddingType())
+      out.add(llvm::UndefValue::get(padType));
 
     switch (AI.getKind()) {
     case clang::CodeGen::ABIArgInfo::Extend:
