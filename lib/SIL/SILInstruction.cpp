@@ -827,6 +827,17 @@ ProjectExistentialRefInst::ProjectExistentialRefInst(SILLocation Loc,
   : UnaryInstructionBase(Loc, Operand, Ty)
 {}
 
+OpenExistentialInst::OpenExistentialInst(SILLocation Loc,
+                                         SILValue Operand,
+                                         SILType SelfTy)
+  : UnaryInstructionBase(Loc, Operand, SelfTy)
+{}
+
+OpenExistentialRefInst::OpenExistentialRefInst(SILLocation Loc,
+                                               SILValue Operand,
+                                               SILType Ty)
+  : UnaryInstructionBase(Loc, Operand, Ty)
+{}
 
 UpcastExistentialInst::UpcastExistentialInst(SILLocation Loc,
                                  SILValue SrcExistential,

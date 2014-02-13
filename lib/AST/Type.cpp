@@ -1370,8 +1370,7 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                         Superclass, Index);
 }
 
-ArchetypeType *
-ArchetypeType::getNew(Type existential) {
+ArchetypeType *ArchetypeType::getOpened(Type existential) {
   auto arena = AllocationArena::Permanent;
   llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
   assert(existential->isExistentialType() && "Not an existential type?");

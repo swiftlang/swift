@@ -981,6 +981,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
+    .Case("open_existential", ValueKind::OpenExistentialInst)
+    .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("peer_method", ValueKind::PeerMethodInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
@@ -1324,7 +1326,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::ProjectExistentialInst:
-  case ValueKind::ProjectExistentialRefInst: {
+  case ValueKind::ProjectExistentialRefInst:
+  case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialRefInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -1340,10 +1344,26 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
 
-    if (Opcode == ValueKind::ProjectExistentialInst)
+    switch (Opcode) {
+    case ValueKind::ProjectExistentialInst:
       ResultVal = B.createProjectExistential(InstLoc, Val, Ty);
-    else
+      break;
+
+    case ValueKind::ProjectExistentialRefInst:
       ResultVal = B.createProjectExistentialRef(InstLoc, Val, Ty);
+      break;
+
+    case ValueKind::OpenExistentialInst:
+      ResultVal = B.createOpenExistential(InstLoc, Val, Ty);
+      break;
+
+    case ValueKind::OpenExistentialRefInst:
+      ResultVal = B.createOpenExistentialRef(InstLoc, Val, Ty);
+      break;
+
+    default:
+      llvm_unreachable("Inner switch out of sync with outer switch");
+    }
     break;
   }
 #define UNARY_INSTRUCTION(ID) \

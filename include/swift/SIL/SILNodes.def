@@ -157,9 +157,11 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(UpcastExistentialInst, SILInstruction, MayWrite)
   INST(DeinitExistentialInst, SILInstruction, MayHaveSideEffects)
   INST(ProjectExistentialInst, SILInstruction, None)
+  INST(OpenExistentialInst, SILInstruction, None)
   INST(InitExistentialRefInst, SILInstruction, None)
   INST(UpcastExistentialRefInst, SILInstruction, None)
   INST(ProjectExistentialRefInst, SILInstruction, None)
+  INST(OpenExistentialRefInst, SILInstruction, None)
 
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)

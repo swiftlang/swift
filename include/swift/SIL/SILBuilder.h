@@ -569,7 +569,20 @@ public:
     return insert(new (F.getModule())
                     ProjectExistentialRefInst(Loc, Operand, Ty));
   }
+
+  OpenExistentialInst *createOpenExistential(SILLocation Loc, SILValue Operand,
+                                             SILType SelfTy) {
+    return insert(new (F.getModule())
+                    OpenExistentialInst(Loc, Operand, SelfTy));
+  }
   
+  OpenExistentialRefInst *createOpenExistentialRef(SILLocation Loc,
+                                                   SILValue Operand,
+                                                   SILType Ty) {
+    return insert(new (F.getModule())
+                    OpenExistentialRefInst(Loc, Operand, Ty));
+  }
+
   InitExistentialInst *createInitExistential(SILLocation Loc,
                                  SILValue Existential,
                                  SILType ConcreteType,

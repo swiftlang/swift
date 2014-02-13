@@ -785,6 +785,24 @@ SILCloner<ImplClass>::visitProjectExistentialRefInst(ProjectExistentialRefInst *
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createOpenExistential(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand()),
+                                  getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createOpenExistentialRef(getOpLocation(Inst->getLoc()),
+                                     getOpValue(Inst->getOperand()),
+                                     getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitInitExistentialInst(InitExistentialInst *Inst) {
   doPostProcess(Inst,
     Builder.createInitExistential(getOpLocation(Inst->getLoc()),

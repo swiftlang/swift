@@ -465,7 +465,7 @@ namespace {
       SmallVector<ProtocolDecl *, 4> protocols;
       auto &ctx = tc.Context;
       (void)baseTy->isExistentialType(protocols);
-      auto archetype = ArchetypeType::getNew(baseTy);
+      auto archetype = ArchetypeType::getOpened(baseTy);
 
       // Create the opaque opened value.
       auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(),

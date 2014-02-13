@@ -750,6 +750,32 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         PEI->getOperand().getResultNumber());
     break;
   }
+  case ValueKind::OpenExistentialInst: {
+    const OpenExistentialInst *OEI = cast<OpenExistentialInst>(&SI);
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(OEI->getType().getSwiftRValueType()),
+        (unsigned)OEI->getType().getCategory(),
+        S.addTypeRef(OEI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)OEI->getOperand().getType().getCategory(),
+        addValueRef(OEI->getOperand()),
+        OEI->getOperand().getResultNumber());
+    break;
+  }
+  case ValueKind::OpenExistentialRefInst: {
+    const OpenExistentialRefInst *OEI = cast<OpenExistentialRefInst>(&SI);
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(), 0,
+        S.addTypeRef(OEI->getType().getSwiftRValueType()),
+        (unsigned)OEI->getType().getCategory(),
+        S.addTypeRef(OEI->getOperand().getType().getSwiftRValueType()),
+        (unsigned)OEI->getOperand().getType().getCategory(),
+        addValueRef(OEI->getOperand()),
+        OEI->getOperand().getResultNumber());
+    break;
+  }
   // Conversion instructions.
   case ValueKind::RefToObjectPointerInst:
   case ValueKind::UpcastInst:

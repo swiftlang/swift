@@ -3664,18 +3664,16 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
   ManagedValue existentialValue
     = SGF.emitRValueAsSingleValue(E->getExistentialValue());
   
-  // Project the existential value into the opened archetype value.
-  // FIXME: Existential projection isn't quite right here; we need to
-  // indicate that we should also project out the conformances.
+  // Open the existential value into the opened archetype value.
   auto archetypeTy = E->getOpenedArchetype();
   SILValue archetypeValue;
   if (existentialValue.getValue().getType().isAddress()) {
-    archetypeValue = SGF.B.createProjectExistential(
+    archetypeValue = SGF.B.createOpenExistential(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(archetypeTy));
   } else {
     assert(existentialValue.getValue().getType().isObject());
-    archetypeValue = SGF.B.createProjectExistentialRef(
+    archetypeValue = SGF.B.createOpenExistentialRef(
                        E, existentialValue.forward(SGF),
                        SGF.getLoweredType(archetypeTy));
   }

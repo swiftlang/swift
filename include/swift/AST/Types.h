@@ -2591,9 +2591,9 @@ public:
                                Type Superclass,
                                Optional<unsigned> Index = Optional<unsigned>());
 
-  /// getNew - Create a new archetype that represents the opened type
+  /// Create a new archetype that represents the opened type
   /// of an existential value.
-  static ArchetypeType *getNew(Type existential);
+  static ArchetypeType *getOpened(Type existential);
 
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }

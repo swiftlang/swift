@@ -948,6 +948,14 @@ public:
     OS << "project_existential_ref " << getIDAndType(PI->getOperand())
        << " to " << PI->getType();
   }
+  void visitOpenExistentialInst(OpenExistentialInst *OI) {
+    OS << "open_existential " << getIDAndType(OI->getOperand())
+       << " to " << OI->getType();
+  }
+  void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
+    OS << "open_existential_ref " << getIDAndType(OI->getOperand())
+       << " to " << OI->getType();
+  }
   void visitInitExistentialInst(InitExistentialInst *AEI) {
     OS << "init_existential " << getIDAndType(AEI->getOperand()) << ", ";
     AEI->getConcreteType().print(OS);

@@ -521,7 +521,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   // project_existential instructions.
   if (isa<StructElementAddrInst>(U) || isa<TupleElementAddrInst>(U) ||
       isa<InitEnumDataAddrInst>(U) || isa<ProjectExistentialInst>(U) ||
-      isa<TakeEnumDataAddrInst>(U)) {
+      isa<OpenExistentialInst>(U) || isa<TakeEnumDataAddrInst>(U)) {
     // TakeEnumDataAddr is additionally a mutation.
     if (isa<TakeEnumDataAddrInst>(U))
       Mutations.push_back(U);

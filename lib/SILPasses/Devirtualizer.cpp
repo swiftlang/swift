@@ -1052,6 +1052,7 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
       Init = UI.getUser();
       continue;
     }
+    case ValueKind::OpenExistentialInst:
     case ValueKind::ProjectExistentialInst:
     case ValueKind::ProtocolMethodInst:
     case ValueKind::DeallocBoxInst:
@@ -1104,7 +1105,7 @@ CanType SILDevirtualizer::resolveObjectType(SILValue Obj) {
 }
 
 /// \brief Replaces a virtual ApplyInst instruction with a new ApplyInst
-/// instruction that does not use a project_existencial \p PEI and calls \p F
+/// instruction that does not use a project_existential \p PEI and calls \p F
 /// directly. See visitApplyInst.
 static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
                                                  InitExistentialInst *In,

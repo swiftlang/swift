@@ -198,7 +198,8 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
     // a way that escapes.  Recursively check that the uses of the instruction
     // don't escape and collect all of the uses of the value.
     if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
-        isa<ProjectExistentialInst>(User) || isa<MarkUninitializedInst>(User)) {
+        isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
+        isa<MarkUninitializedInst>(User)) {
       Users.push_back(User);
       if (checkAllocBoxUses(ABI, User, Users))
         return true;

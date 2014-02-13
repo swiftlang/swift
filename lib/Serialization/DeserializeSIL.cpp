@@ -634,6 +634,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   ONEOPERAND_ONETYPE_INST(ProjectExistential)
   ONEOPERAND_ONETYPE_INST(ProjectExistentialRef)
+  ONEOPERAND_ONETYPE_INST(OpenExistential)
+  ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(RefToObjectPointer)
   ONEOPERAND_ONETYPE_INST(Upcast)

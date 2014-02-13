@@ -365,6 +365,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::IsNonnullInst:
     case ValueKind::LoadInst:
     case ValueKind::LoadWeakInst:
+    case ValueKind::OpenExistentialInst:
+    case ValueKind::OpenExistentialRefInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::PeerMethodInst:
     case ValueKind::ProjectExistentialInst:

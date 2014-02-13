@@ -177,6 +177,8 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst:
   case ValueKind::ObjectPointerToRefInst:
+  case ValueKind::OpenExistentialInst:
+  case ValueKind::OpenExistentialRefInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::PeerMethodInst:
   case ValueKind::PointerToAddressInst:

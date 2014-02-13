@@ -872,13 +872,12 @@ public:
     return false;
   }
 
-  bool isSelfOrOpenedArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
+  bool isOpenedArchetype(CanType t) {
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
       return false;
 
-    return archetype->getOpenedExistentialType() || 
-           isSelfArchetype(t, protocols);
+    return !archetype->getOpenedExistentialType().isNull();
   }
 
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
@@ -1028,10 +1027,9 @@ public:
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
     
-    require(isSelfOrOpenedArchetype(PEI->getType().getSwiftRValueType(), 
-                                    protocols),
-            "project_existential result must be Self archetype of protocol or "
-            "an opened existential archetype");
+    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
+            "project_existential result must be Self archetype of one of "
+            "its protocols");
   }
   
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
@@ -1044,12 +1042,41 @@ public:
     require(operandType.isClassExistentialType(),
             "project_existential_ref operand must be class existential");
     
-    require(isSelfOrOpenedArchetype(PEI->getType().getSwiftRValueType(), 
-                                    protocols),
-            "project_existential_ref result must be Self archetype of protocol "
-            "or an opened existential archetype");
+    require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
+            "project_existential_ref result must be Self archetype of one of "
+            "its protocols");
+  }
+
+  void checkOpenExistentialInst(OpenExistentialInst *OEI) {
+    SILType operandType = OEI->getOperand().getType();
+    require(operandType.isAddress(),
+            "open_existential must be applied to address");
+    
+    SmallVector<ProtocolDecl*, 4> protocols;
+    require(operandType.getSwiftRValueType()->isExistentialType(protocols),
+            "open_existential must be applied to address of existential");
+    require(OEI->getType().isAddress(),
+            "open_existential result must be an address");
+    
+    require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
+            "open_existential result must be an opened existential archetype");
   }
   
+  void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
+    SILType operandType = OEI->getOperand().getType();
+    require(operandType.isObject(),
+            "open_existential_ref operand must not be address");
+    SmallVector<ProtocolDecl*, 4> protocols;
+    require(operandType.getSwiftType()->isExistentialType(protocols),
+            "open_existential must be applied to existential");
+    require(operandType.isClassExistentialType(),
+            "open_existential_ref operand must be class existential");
+    
+    require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
+            "open_existential_ref result must be an opened existential "
+            "archetype");
+  }
+
   void checkInitExistentialInst(InitExistentialInst *AEI) {
     SILType exType = AEI->getOperand().getType();
     require(exType.isAddress(),

@@ -641,6 +641,8 @@ public:
 
   void visitProjectExistentialInst(ProjectExistentialInst *i);
   void visitProjectExistentialRefInst(ProjectExistentialRefInst *i);
+  void visitOpenExistentialInst(OpenExistentialInst *i);
+  void visitOpenExistentialRefInst(OpenExistentialRefInst *i);
   void visitInitExistentialInst(InitExistentialInst *i);
   void visitInitExistentialRefInst(InitExistentialRefInst *i);
   void visitUpcastExistentialInst(UpcastExistentialInst *i);
@@ -2827,26 +2829,13 @@ void IRGenSILFunction::visitDeinitExistentialInst(
                                        i->getOperand().getType());
 }
 
-/// Retrieve the opened archetype type for the result of a projection
-/// instruction.
-static CanArchetypeType getOpenedArchetypeType(SILType projectResultTy) {
-  if (auto archetypeTy 
-        = projectResultTy.getSwiftRValueType()->getAs<ArchetypeType>()) {
-    if (archetypeTy->getOpenedExistentialType())
-      return CanArchetypeType(archetypeTy);
-  }
-
-  return CanArchetypeType();
-}
-
 void IRGenSILFunction::visitProjectExistentialInst(
                                              swift::ProjectExistentialInst *i) {
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
 
-  auto openedArchetype = getOpenedArchetypeType(i->getType());
   Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
-                                                   openedArchetype);
+                                                   CanArchetypeType());
   
   setLoweredAddress(SILValue(i, 0), object);
 }
@@ -2855,11 +2844,35 @@ void IRGenSILFunction::visitProjectExistentialRefInst(
                                           swift::ProjectExistentialRefInst *i) {
   SILType baseTy = i->getOperand().getType();
   Explosion base = getLoweredExplosion(i->getOperand());
-  auto openedArchetype = getOpenedArchetypeType(i->getType());
-  
+
   Explosion result(ResilienceExpansion::Maximal);
   llvm::Value *instance
-    = emitClassExistentialProjection(*this, base, baseTy, openedArchetype);
+    = emitClassExistentialProjection(*this, base, baseTy, CanArchetypeType());
+  result.add(instance);
+  setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitOpenExistentialInst(OpenExistentialInst *i) {
+  SILType baseTy = i->getOperand().getType();
+  Address base = getLoweredAddress(i->getOperand());
+
+  auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftType());
+  Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
+                                                   openedArchetype);
+
+  setLoweredAddress(SILValue(i, 0), object);
+}
+
+void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
+
+  SILType baseTy = i->getOperand().getType();
+  Explosion base = getLoweredExplosion(i->getOperand());
+  auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftType());
+
+  Explosion result(ResilienceExpansion::Maximal);
+  llvm::Value *instance
+    = emitClassExistentialProjection(*this, base, baseTy,
+                                     openedArchetype);
   result.add(instance);
   setLoweredExplosion(SILValue(i, 0), result);
 }

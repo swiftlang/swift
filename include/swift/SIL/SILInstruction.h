@@ -1746,6 +1746,26 @@ public:
   ProjectExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
 };
 
+/// OpenExistentialInst - Given the address of an existential, "opens" the
+/// existential by returning a pointer to a fresh archetype T, which also
+/// captures the (dynamic) conformances.
+class OpenExistentialInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialInst>
+{
+public:
+  OpenExistentialInst(SILLocation Loc, SILValue Operand, SILType SelfTy);
+};
+
+/// OpenExistentialRefInst - Given a class existential, "opens" the
+/// existential by returning a pointer to a fresh archetype T, which also
+/// captures the (dynamic) conformances.
+class OpenExistentialRefInst
+  : public UnaryInstructionBase<ValueKind::OpenExistentialRefInst>
+{
+public:
+  OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
+};
+
 /// InitExistentialInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
