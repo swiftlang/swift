@@ -167,7 +167,7 @@ class alignas(8) Decl {
     /// called 'static').
     unsigned Static : 1;
     
-    /// \brief Whether this is a 'let' property, which can only be initialized
+    /// \brief Whether this is a 'val' property, which can only be initialized
     /// in its declaration, and never assigned to, making it immutable.
     unsigned IsLet : 1;
 
@@ -2626,7 +2626,7 @@ public:
   }
 };
 
-/// VarDecl - 'var' and 'let' declarations.
+/// VarDecl - 'var' and 'val' declarations.
 class VarDecl : public AbstractStorageDecl {
   PatternBindingDecl *ParentPattern = nullptr;
 public:
@@ -2650,7 +2650,7 @@ public:
 
   /// \brief Returns whether the var is settable in the specified context: this
   /// is either because it is a stored var, because it has a custom setter, or
-  /// is a let member in an initializer.
+  /// is a val member in an initializer.
   ///
   /// Pass a null context to check if it's always settable.
   bool isSettable(DeclContext *UseDC) const;
@@ -2673,7 +2673,7 @@ public:
   bool isStatic() const { return VarDeclBits.Static; }
   void setStatic(bool IsStatic) { VarDeclBits.Static = IsStatic; }
 
-  /// Is this an immutable 'let' property?
+  /// Is this an immutable 'val' property?
   bool isLet() const { return VarDeclBits.IsLet; }
   void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
 
