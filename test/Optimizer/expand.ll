@@ -1,4 +1,4 @@
-; RUN: opt -load %libdir/SwiftARCPasses.so -swift-arc-expand -S %s | FileCheck %s
+; RUN: opt -load %libdir/SwiftARCPasses.dylib -swift-arc-expand -S %s | FileCheck %s
 ; XFAIL: asan
 target datalayout = "e-p:64:64:64-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
 target triple = "x86_64-apple-darwin11.3.0"
