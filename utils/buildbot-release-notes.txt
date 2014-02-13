@@ -1,6 +1,25 @@
 2014-02-12
 ----------
 
+* We are experimenting with a new message send syntax. For example:
+
+    SKAction.colorizeWithColor(SKColor.whiteColor()) colorBlendFactor(1.0) duration(0.0)
+
+  When the message send is too long to fit on a single line, subsequent lines 
+  must be indented from the start of the statement or declaration. For
+  example, this is a single message send:
+
+    SKAction.colorizeWithColor(SKColor.whiteColor()) 
+             colorBlendFactor(1.0) 
+             duration(0.0)
+
+  while this is a message send to colorizeWithColor: followed by calls
+  to 'colorBlendFactor' and 'duration' (on self or to a global function):
+
+    SKAction.colorizeWithColor(SKColor.whiteColor()) 
+    colorBlendFactor(1.0) // call to 'colorBlendFactor'
+    duration(0.0) // call to 'duration'
+
 * We are renaming the 'let' keyword to 'val'.  The 'let' keyword didn't work
   out primarily because it is not a noun, so "defining a let" never sounded 
   right.  We chose 'val' over 'const' and other options because 'var' and 'val
