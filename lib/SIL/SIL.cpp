@@ -64,8 +64,7 @@ static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
-                         unsigned atUncurryLevel,
-                         bool isForeign)
+                       unsigned atUncurryLevel, bool isForeign)
   : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0)
 {
   unsigned naturalUncurryLevel;
@@ -73,8 +72,6 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
   // FIXME: restructure to use a "switch".
 
   if (auto *func = dyn_cast<FuncDecl>(vd)) {
-    assert(!func->isGetterOrSetter() &&
-           "cannot create a Func SILDeclRef for a property accessor");
     assert(kind == Kind::Func &&
            "can only create a Func SILDeclRef for a func decl");
     naturalUncurryLevel = getFuncNaturalUncurryLevel(func);
@@ -150,23 +147,9 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, unsigned atUncurryLevel,
   unsigned naturalUncurryLevel;
   if (ValueDecl *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (FuncDecl *fd = dyn_cast<FuncDecl>(vd)) {
-      // Map getter or setter FuncDecls to Getter or Setter SILDeclRefs of the
-      // variable.
-      if (fd->isGetterOrSetter()) {
-        loc = fd->getAccessorStorageDecl();
-        if (fd->isGetter()) {
-          kind = Kind::Getter;
-        } else if (fd->isSetter()) {
-          kind = Kind::Setter;
-        } else {
-          llvm_unreachable("no getter or setter decl?!");
-        }
-      }
-      // Map other FuncDecls directly to Func SILDeclRefs.
-      else {
-        loc = fd;
-        kind = Kind::Func;
-      }
+      // Map FuncDecls directly to Func SILDeclRefs.
+      loc = fd;
+      kind = Kind::Func;
       naturalUncurryLevel = getFuncNaturalUncurryLevel(fd);
     }
     // Map ConstructorDecls to the Allocator SILDeclRef of the constructor.
@@ -302,20 +285,25 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     }
       
     if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
-      switch (FD->getAccessorKind()) {
-      default: assert(0 && "Unhandled accessor");
-      case AccessorKind::NotAccessor: break;
-      case AccessorKind::IsWillSet:
-        //   entity ::= declaration 'w'                 // willSet
-        buffer << introducer;
-        mangler.mangleAccessorEntity('w', FD->getAccessorStorageDecl(),
-                                     expansion);
-        return;
+      // Accessors are mangled specially.
 
-      case AccessorKind::IsDidSet:
-        //   entity ::= declaration 'W'                 // didSet
+      //   entity ::= declaration 'g'                 // getter
+      //   entity ::= declaration 's'                 // setter
+      //   entity ::= declaration 'w'                 // willSet
+      //   entity ::= declaration 'W'                 // didSet
+      char AccessorLetter;
+      switch (FD->getAccessorKind()) {
+      case AccessorKind::NotAccessor: AccessorLetter = '\0'; break;
+      case AccessorKind::IsGetter:    AccessorLetter = 'g'; break;
+      case AccessorKind::IsSetter:    AccessorLetter = 's'; break;
+      case AccessorKind::IsWillSet:   AccessorLetter = 'w'; break;
+      case AccessorKind::IsDidSet:    AccessorLetter = 'W'; break;
+      }
+
+      if (AccessorLetter) {
         buffer << introducer;
-        mangler.mangleAccessorEntity('W', FD->getAccessorStorageDecl(),
+        mangler.mangleAccessorEntity(AccessorLetter,
+                                     FD->getAccessorStorageDecl(),
                                      expansion);
         return;
       }

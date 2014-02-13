@@ -662,7 +662,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
-  SILDeclRef getter(prop, SILDeclRef::Kind::Getter,
+  SILDeclRef getter(prop->getGetter(), SILDeclRef::Kind::Func,
                      SILDeclRef::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
                      
@@ -684,7 +684,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
     return;
 
   // FIXME: Add proper location.
-  SILDeclRef setter(prop, SILDeclRef::Kind::Setter,
+  SILDeclRef setter(prop->getSetter(), SILDeclRef::Kind::Func,
                      SILDeclRef::ConstructAtNaturalUncurryLevel,
                      /*isObjC*/ true);
 

@@ -131,8 +131,8 @@ struct SILDeclRef {
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
-                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
-                       bool isForeign = false);
+                      unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                      bool isForeign = false);
   
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
@@ -151,8 +151,8 @@ struct SILDeclRef {
   /// then the SILDeclRef for the natural uncurry level of the definition is
   /// used.
   explicit SILDeclRef(Loc loc,
-                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
-                       bool isForeign = false);
+                      unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
+                      bool isForeign = false);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);

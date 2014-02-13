@@ -29,11 +29,12 @@ using namespace Lowering;
 /// Retrieve the type to use for a method found via dynamic lookup.
 static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
                                                SILValue proto,
+                                               ValueDecl *member,
                                                SILDeclRef methodName,
                                                Type memberType) {
   auto &ctx = SGM.getASTContext();
   CanType selfTy;
-  if (methodName.getDecl()->isInstanceMember()) {
+  if (member->isInstanceMember()) {
     selfTy = ctx.TheObjCPointerType;
   } else {
     selfTy = proto.getType().getSwiftType();
@@ -339,6 +340,7 @@ private:
     // Replace it with the dynamic self type.
     OrigFormalOldType = OrigFormalInterfaceType
       = getDynamicMethodType(SGM, method.selfValue,
+                             method.methodName.getDecl(),
                              method.methodName, methodType);
 
     // Add a self clause to the substituted type.
@@ -2532,7 +2534,7 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                 RValueSource &&subscripts,
                 SGFContext c) {
  
-  SILDeclRef get(decl, SILDeclRef::Kind::Getter,
+  SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
 
@@ -2565,7 +2567,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      bool isSuper,
                                      RValueSource &&subscripts,
                                      RValueSource &&setValue) {
-  SILDeclRef set(decl, SILDeclRef::Kind::Setter,
+  SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
 
@@ -2621,10 +2623,12 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   SILValue optTemp = emitTemporaryAllocation(e, loweredOptTy);
 
   // Create the branch.
-  SILDeclRef member(e->getMember().getDecl(),
-                    isa<VarDecl>(e->getMember().getDecl())
-                      ? SILDeclRef::Kind::Getter
-                      : SILDeclRef::Kind::Func,
+  FuncDecl *memberFunc;
+  if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl()))
+    memberFunc = VD->getGetter();
+  else
+    memberFunc = cast<FuncDecl>(e->getMember().getDecl());
+  SILDeclRef member(memberFunc, SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC=*/true);
   B.createDynamicMethodBranch(e, operand, member, hasMemberBB, noMemberBB);
@@ -2635,17 +2639,20 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
+/// FIXME: Can this just be looking at memberFunc->getType()->getCanonicalType?
+
     // The argument to the has-member block is the uncurried method.
     auto valueTy = e->getType()->getAnyOptionalObjectType()->getCanonicalType();
     auto methodTy = valueTy;
 
     // For a computed variable, we want the getter.
-    if (member.isAccessor())
+    if (isa<VarDecl>(e->getMember().getDecl()))
       methodTy = CanFunctionType::get(TupleType::getEmpty(getASTContext()),
                                       methodTy);
 
-    auto dynamicMethodTy = getDynamicMethodType(SGM, operand, member,
-                                                methodTy);
+    auto dynamicMethodTy = getDynamicMethodType(SGM, operand,
+                                                e->getMember().getDecl(),
+                                                member, methodTy);
     auto loweredMethodTy = getLoweredType(dynamicMethodTy, 1);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
@@ -2654,7 +2661,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
                                            {}, operand,
                                            getLoweredType(methodTy));
-    if (member.isAccessor()) {
+    if (isa<VarDecl>(e->getMember().getDecl())) {
       result = B.createApply(e, result, result.getType(),
                              getLoweredType(valueTy), {}, {});
     }
@@ -2715,8 +2722,9 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   SILValue optTemp = emitTemporaryAllocation(e, loweredOptTy);
 
   // Create the branch.
-  SILDeclRef member(e->getMember().getDecl(),
-                    SILDeclRef::Kind::Getter,
+  auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
+  SILDeclRef member(subscriptDecl->getGetter(),
+                    SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC=*/true);
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);
@@ -2729,11 +2737,12 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
     // The argument to the has-member block is the uncurried method.
     auto valueTy = e->getType()->getAnyOptionalObjectType()->getCanonicalType();
-    auto subscript = cast<SubscriptDecl>(e->getMember().getDecl());
-    auto methodTy = subscript->getGetter()->getType()->castTo<AnyFunctionType>()
+    auto methodTy =
+      subscriptDecl->getGetter()->getType()->castTo<AnyFunctionType>()
                       ->getResult();
-    auto dynamicMethodTy = getDynamicMethodType(SGM, base, member,
-                                                methodTy);
+    auto dynamicMethodTy =
+      getDynamicMethodType(SGM, base, e->getMember().getDecl(),
+                           member, methodTy);
     auto loweredMethodTy = getLoweredType(dynamicMethodTy, 2);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);

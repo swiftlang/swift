@@ -1842,15 +1842,17 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     }
     case CaptureKind::GetterSetter: {
       // Pass the setter and getter closure references on.
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(vd,
-                                               SILDeclRef::Kind::Setter));
+      auto *Setter = cast<AbstractStorageDecl>(vd)->getSetter();
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(Setter,
+                                                       SILDeclRef::Kind::Func));
       capturedArgs.push_back(v.forward(*this));
       SWIFT_FALLTHROUGH;
     }
     case CaptureKind::Getter: {
       // Pass the getter closure reference on.
-      ManagedValue v = emitFunctionRef(loc, SILDeclRef(vd,
-                                               SILDeclRef::Kind::Getter));
+      auto *Getter = cast<AbstractStorageDecl>(vd)->getGetter();
+      ManagedValue v = emitFunctionRef(loc, SILDeclRef(Getter,
+                                                       SILDeclRef::Kind::Func));
       capturedArgs.push_back(v.forward(*this));
       break;
     }

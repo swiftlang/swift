@@ -759,7 +759,7 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
-                                            ValueDecl *property) {
+                                            AbstractStorageDecl *property) {
   // Protocol properties have no impl.
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
@@ -767,7 +767,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   // FIXME: Explosion level
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
 
-  SILDeclRef getter = SILDeclRef(property, SILDeclRef::Kind::Getter,
+  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func,
                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                                  /*foreign*/ true);
 
@@ -779,7 +779,7 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
 ///
 /// Returns a value of type i8*.
 static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
-                                            ValueDecl *property) {
+                                            AbstractStorageDecl *property) {
   // Protocol properties have no impl.
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
@@ -788,7 +788,7 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
          "property is not settable?!");
   
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
-  SILDeclRef setter = SILDeclRef(property, SILDeclRef::Kind::Setter,
+  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func,
                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                                  /*foreign*/ true);
 

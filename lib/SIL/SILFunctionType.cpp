@@ -634,9 +634,25 @@ static SelectorFamily getSelectorFamily(Identifier name) {
 /// Get the ObjC selector family a SILDeclRef implicitly belongs to.
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
   switch (c.kind) {
-  case SILDeclRef::Kind::Func:
-    return getSelectorFamily(c.getDecl()->getName());
+  case SILDeclRef::Kind::Func: {
+    auto *FD = cast<FuncDecl>(c.getDecl());
+    switch (FD->getAccessorKind()) {
+    case AccessorKind::NotAccessor:
+      return getSelectorFamily(FD->getName());
+    case AccessorKind::IsGetter:
+      // Getter selectors can belong to families if their name begins with the
+      // wrong thing.
+      if (FD->getAccessorStorageDecl()->isObjC() || c.isForeign)
+        return getSelectorFamily(FD->getAccessorStorageDecl()->getName());
+      return SelectorFamily::None;
 
+      // Other accessors are never selector family members.
+    case AccessorKind::IsSetter:
+    case AccessorKind::IsWillSet:
+    case AccessorKind::IsDidSet:
+      return SelectorFamily::None;
+    }
+  }
   case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;

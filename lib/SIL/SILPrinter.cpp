@@ -205,12 +205,36 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<null>";
     return;
   }
-  
-  if (hasDecl()) {
+
+  bool isDot = true;
+  if (!hasDecl()) {
+    OS << "<anonymous function>";
+  } else if (kind == SILDeclRef::Kind::Func) {
+    auto *FD = cast<FuncDecl>(getDecl());
+    ValueDecl *decl = FD;
+    const char *Suffix;
+    switch (FD->getAccessorKind()) {
+    case AccessorKind::IsWillSet:
+    case AccessorKind::IsDidSet:  assert(0 && "Shouldn't reach here");
+    case AccessorKind::NotAccessor:
+      Suffix = "";
+      isDot = false;
+      break;
+    case AccessorKind::IsGetter:
+      Suffix = "!getter";
+      decl = FD->getAccessorStorageDecl();
+      break;
+    case AccessorKind::IsSetter:
+      Suffix = "!setter";
+      decl = FD->getAccessorStorageDecl();
+      break;
+    }
+
+    printFullContext(decl->getDeclContext(), OS);
+    OS << decl->getName() << Suffix;
+  } else {
     printFullContext(getDecl()->getDeclContext(), OS);
     OS << getDecl()->getName();
-  } else {
-    OS << "<anonymous function>";
   }
   switch (kind) {
   case SILDeclRef::Kind::Func:
@@ -249,18 +273,11 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "!defaultarg" << "." << defaultArgIndex;
     break;
   }
-  if (uncurryLevel != 0) {
-    if (kind != SILDeclRef::Kind::Func)
-      OS << "." << uncurryLevel;
-    else
-      OS << "!" << uncurryLevel;
-  }
-  if (isForeign) {
-    if (uncurryLevel != 0 || kind != SILDeclRef::Kind::Func)
-      OS << ".foreign";
-    else
-      OS << "!foreign";
-  }
+  if (uncurryLevel != 0)
+    OS << (isDot ? '.' : '!')  << uncurryLevel;
+
+  if (isForeign)
+    OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "foreign";
 }
 
 void SILDeclRef::dump() const {
