@@ -140,7 +140,7 @@ ERROR(decl_redefinition,decl_parsing,none,
       "%select{declaration|definition}0 conflicts with previous value", 
       (bool))
 ERROR(let_cannot_be_computed_property,decl_parsing,none,
-      "'val' declarations cannot be a computed property", ())
+      "'let' declarations cannot be a computed property", ())
 ERROR(disallowed_stored_var_decl,decl_parsing,none,
       "'var' declarations without getter/setter not allowed here", ())
 ERROR(disallowed_var_multiple_getset,decl_parsing,none,
@@ -535,10 +535,10 @@ ERROR(ellipsis_pattern_not_at_end,pattern_parsing,none,
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
 ERROR(var_pattern_in_var,pattern_parsing,none,
-      "'%select{var|val}0' cannot appear nested inside another 'var' or "
-      "'val' pattern", (unsigned))
+      "'%select{var|let}0' cannot appear nested inside another 'var' or "
+      "'let' pattern", (unsigned))
 ERROR(inout_varpattern,pattern_parsing,none,
-      "'inout' arguments may not also be marked 'var' or 'val'", ())
+      "'inout' arguments may not also be marked 'var' or 'let'", ())
 ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
 ERROR(implied_name_multiple_parameters,pattern_parsing,none,
@@ -583,7 +583,7 @@ ERROR(conditional_var_initializer_required,stmt_parsing,none,
 
 // If Statement
 ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
-      "expected expression, var, or val in 'if' condition", ())
+      "expected expression, var, or let in 'if' condition", ())
 ERROR(missing_condition_after_if,stmt_parsing,none,
       "missing condition in an 'if' statement", ())
 ERROR(expected_lbrace_after_if,stmt_parsing,PointsToFirstBadToken,
@@ -593,7 +593,7 @@ ERROR(expected_lbrace_after_else,stmt_parsing,PointsToFirstBadToken,
 
 // While Statement
 ERROR(expected_condition_while,stmt_parsing,PointsToFirstBadToken,
-      "expected expression, var, or val in 'while' condition", ())
+      "expected expression, var, or let in 'while' condition", ())
 ERROR(missing_condition_after_while,stmt_parsing,none,
       "missing condition in a 'while' statement", ())
 ERROR(expected_lbrace_after_while,stmt_parsing,PointsToFirstBadToken,
