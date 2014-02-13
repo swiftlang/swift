@@ -16,7 +16,7 @@ if(MODULES_SDK)
                    -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
-install(TARGETS ${name}
+install(TARGETS swift
   RUNTIME DESTINATION bin)
 
 # Keep the name "swift_driver" around for a bit longer.
