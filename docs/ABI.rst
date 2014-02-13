@@ -784,6 +784,7 @@ Types
   type ::= 'F' type type                     // function type
   type ::= 'f' type type                     // uncurried function type
   type ::= 'G' type <type>+ '_'              // generic type application
+  type ::= 'K' type type                     // @auto_closure function type
   type ::= 'M' type                          // metatype
   type ::= 'P' protocol-list '_'             // protocol type
   type ::= archetype

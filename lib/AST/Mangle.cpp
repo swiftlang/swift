@@ -1130,8 +1130,11 @@ void Mangler::mangleFunctionType(CanAnyFunctionType fn,
   // type ::= 'F' type type (curried)
   // type ::= 'f' type type (uncurried)
   // type ::= 'b' type type (objc block)
+  // type ::= 'K' type type (auto closure)
   if (fn->isBlock())
     Buffer << 'b';
+  else if (fn->isAutoClosure())
+    Buffer << 'K';
   else
     Buffer << (uncurryLevel > 0 ? 'f' : 'F');
   mangleType(fn.getInput(), explosion, 0);

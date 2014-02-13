@@ -1262,6 +1262,21 @@ private:
     return nodeType;
   }
   
+  NodePointer demangleFunctionType(Node::Kind kind) {
+    NodePointer in_args = demangleType();
+    if (!in_args)
+      return nullptr;
+    NodePointer out_args = demangleType();
+    if (!out_args)
+      return nullptr;
+    NodePointer block = Node::create(kind);
+    NodePointer in_node = Node::create(Node::Kind::ArgumentTuple);
+    block->addChild(in_node);
+    in_node->addChild(in_args);
+    block->addChild(postProcessReturnTypeNode(out_args));
+    return block;
+  }
+  
   NodePointer demangleTypeImpl() {
     if (!Mangled)
       return nullptr;
@@ -1377,18 +1392,7 @@ private:
       return Node::create(Node::Kind::ErrorType, std::string());
     }
     if (c == 'F') {
-      NodePointer in_args = demangleType();
-      if (!in_args)
-        return nullptr;
-      NodePointer out_args = demangleType();
-      if (!out_args)
-        return nullptr;
-      NodePointer block = Node::create(Node::Kind::FunctionType);
-      NodePointer in_node = Node::create(Node::Kind::ArgumentTuple);
-      block->addChild(in_node);
-      in_node->addChild(in_args);
-      block->addChild(postProcessReturnTypeNode(out_args));
-      return block;
+      return demangleFunctionType(Node::Kind::FunctionType);
     }
     if (c == 'f') {
       NodePointer in_args = demangleTypeImpl();
@@ -1438,6 +1442,9 @@ private:
       type_application->addChild(unboundType);
       type_application->addChild(type_list);
       return type_application;
+    }
+    if (c == 'K') {
+      return demangleFunctionType(Node::Kind::AutoClosureType);
     }
     if (c == 'M') {
       NodePointer type = demangleType();
@@ -2014,6 +2021,10 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::Module:
   case Node::Kind::Identifier:
     Printer << pointer->getText();
+    return;
+  case Node::Kind::AutoClosureType:
+    Printer << "@auto_closure ";
+    printChildren(pointer);
     return;
   case Node::Kind::FunctionType:
     printChildren(pointer);
