@@ -454,13 +454,12 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
   for (auto *UI : LI->getUses()) {
     if (auto *SEI = dyn_cast<StructExtractInst>(UI->getUser())) {
-      Projections.push_back({{SEI->getType(), SEI->getField(),
-                              Projection::NominalType::Struct}, SEI});
+      Projections.push_back({Projection(SEI), SEI});
       continue;
     }
 
     if (auto *TEI = dyn_cast<TupleExtractInst>(UI->getUser())) {
-      Projections.push_back({{TEI->getType(), TEI->getFieldNo()}, TEI});
+      Projections.push_back({Projection(TEI), TEI});
       continue;
     }
 

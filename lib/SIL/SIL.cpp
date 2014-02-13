@@ -496,14 +496,11 @@ findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
   auto Iter = V2;
   while (Projection::isAddressProjection(Iter) && V1 != Iter) {
     if (auto *SEA = dyn_cast<StructElementAddrInst>(Iter.getDef()))
-      Path.push_back(Projection(Iter.getType(), SEA->getField(),
-                                Projection::NominalType::Struct));
+      Path.push_back(Projection(SEA));
     else if (auto *TEA = dyn_cast<TupleElementAddrInst>(Iter.getDef()))
-      Path.push_back(Projection(Iter.getType(), TEA->getFieldNo()));
+      Path.push_back(Projection(TEA));
     else
-      Path.push_back(Projection(Iter.getType(),
-                                cast<RefElementAddrInst>(*Iter).getField(),
-                                Projection::NominalType::Class));
+      Path.push_back(Projection(cast<RefElementAddrInst>(&*Iter)));
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
   }
 

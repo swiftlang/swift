@@ -1522,6 +1522,17 @@ public:
 
   VarDecl *getField() const { return Field; }
 
+  unsigned getFieldNo() const {
+    unsigned i = 0;
+    for (auto *D : getStructDecl()->getStoredProperties()) {
+      if (Field == D)
+        return i;
+      ++i;
+    }
+    llvm_unreachable("A struct_extract's structdecl has at least 1 field, the "
+                     "field of the struct_extract.");
+  }
+
   StructDecl *getStructDecl() const {
     auto s = getOperand().getType().getStructOrBoundGenericStruct();
     assert(s);
@@ -1540,6 +1551,17 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
 
   VarDecl *getField() const { return Field; }
+
+  unsigned getFieldNo() const {
+    unsigned i = 0;
+    for (auto *D : getStructDecl()->getStoredProperties()) {
+      if (Field == D)
+        return i;
+      ++i;
+    }
+    llvm_unreachable("A struct_element_addr's structdecl has at least 1 field, "
+                     "the field of the struct_element_addr.");
+  }
 
   StructDecl *getStructDecl() const {
     auto s = getOperand().getType().getStructOrBoundGenericStruct();
@@ -1560,6 +1582,17 @@ public:
     : UnaryInstructionBase(Loc, Operand, ResultTy), Field(Field) {}
 
   VarDecl *getField() const { return Field; }
+
+  unsigned getFieldNo() const {
+    unsigned i = 0;
+    for (auto *D : getClassDecl()->getStoredProperties()) {
+      if (Field == D)
+        return i;
+      ++i;
+    }
+    llvm_unreachable("A ref_element_addr's classdecl has at least 1 field, the "
+                     "field of the ref_element_addr.");
+  }
 
   ClassDecl *getClassDecl() const {
     auto s = getOperand().getType().getClassOrBoundGenericClass();

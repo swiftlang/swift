@@ -52,10 +52,31 @@ private:
 
 public:
 
-  Projection(SILType T, VarDecl *D, NominalType NT) : Type(T),
-                                                      Decl(D, unsigned(NT)),
-                                                      Index(-1) {}
+  Projection(SILType T, VarDecl *D, NominalType NT,
+             unsigned I) : Type(T), Decl(D, unsigned(NT)), Index(-1) {}
+
   Projection(SILType T, unsigned I) : Type(T), Decl(), Index(I) {}
+
+  explicit Projection(StructElementAddrInst *SEA)
+    : Type(SEA->getType()), Decl(SEA->getField(),
+                                 unsigned(NominalType::Struct)),
+      Index(SEA->getFieldNo()) { }
+
+  explicit Projection(TupleElementAddrInst *TEA) : Type(TEA->getType()),
+                                                   Decl(nullptr),
+                                                   Index(TEA->getFieldNo()) { }
+  explicit Projection(RefElementAddrInst *REA)
+    : Type(REA->getType()), Decl(REA->getField(), unsigned(NominalType::Class)),
+      Index(REA->getFieldNo()) { }
+
+  explicit Projection(StructExtractInst *SEI)
+    : Type(SEI->getType()), Decl(SEI->getField(),
+                                 unsigned(NominalType::Struct)),
+      Index(SEI->getFieldNo()) { }
+
+  explicit Projection(TupleExtractInst *TEI) : Type(TEI->getType()),
+                                               Decl(nullptr),
+                                               Index(TEI->getFieldNo()) { }
 
   SILType getType() const { return Type; }
   VarDecl *getDecl() const { return Decl.getPointer(); }
@@ -74,18 +95,17 @@ public:
   }
 
   bool operator<(Projection Other) const {
-    // If Proj1 is a decl...
-    if (auto *D = getDecl()) {
-      // It should be sorted before Proj2 is Proj2 is not a decl. Otherwise
-      // compare the pointers.
-      if (auto OtherDecl = Other.getDecl())
-        return uintptr_t(D) < uintptr_t(OtherDecl);
-      return true;
-    }
+    auto *D1 = getDecl();
+    auto *D2 = Other.getDecl();
 
-    // If Proj1 is not a decl, then if Proj2 is a decl, Proj1 is not before
-    // Proj2. If Proj2 is not a decl, compare the indices.
-    return !Other.getDecl() && (Index < Other.Index);
+    // Decl is sorted before non-decl. If they are both the same, just compare
+    // the indices.
+    if (D1 && !D2)
+      return D1;
+    else if (!D1 && D2)
+      return D2;
+    else
+      return Index < Other.Index;
   }
 
   static bool isAddressProjection(SILValue V) {
