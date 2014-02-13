@@ -1232,10 +1232,15 @@ public:
   iterator end() const { return last; }
 };
 
-// PatternBindingDecl - This decl contains a pattern and optional initializer
-// for a set of one or more VarDecls declared together.  (For example, in
-// "var (a,b) = foo()", this contains the pattern "(a,b)" and the intializer
-// "foo()".  The same applies to simpler declarations like "var a = foo()".)
+/// \brief This decl contains a pattern and optional initializer for a set
+/// of one or more VarDecls declared together.
+///
+/// For example, in
+/// \code
+///   var (a, b) = foo()
+/// \endcode
+/// this contains the pattern "(a, b)" and the intializer "foo()".  The same
+/// applies to simpler declarations like "var a = foo()".
 class PatternBindingDecl : public Decl {
   SourceLoc StaticLoc; ///< Location of the 'static' keyword, if present.
   SourceLoc VarLoc; ///< Location of the 'var' keyword.
