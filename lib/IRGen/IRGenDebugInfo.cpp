@@ -179,7 +179,8 @@ Location getLoc(SourceManager &SM, WithLoc *S, bool End = false) {
 /// This returns a FullLocation, which contains the location that
 /// should be used for the linetable and the "true" AST location (used
 /// for, e.g., variable declarations).
-static FullLocation getLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
+static FullLocation
+getLocation(SourceManager &SM, Optional<SILLocation> OptLoc) {
   if (!OptLoc)
     return {};
 
@@ -599,14 +600,16 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
 // Create an imported module and import declarations for all functions
 // from that module.
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
-                                         llvm::DINameSpace Namespace, Location L) {
+                                          llvm::DINameSpace Namespace,
+                                          Location L) {
   llvm::DIScope File(TheCU);
   if (Name == IGM.Context.StdlibModuleName.str())
     // FIXME: This is a hack to anchor a reference to the stdlib
     // swiftmodule in the line table so LLDB can find it even if
     // nothing in the CU references it.
     // rdar://problem/15796201
-    File = getOrCreateFile(IGM.Context.TheStdlibModule->getModuleFilename().data());
+    File = getOrCreateFile(IGM.Context.TheStdlibModule->getModuleFilename()
+                           .data());
 
   auto Import = DBuilder.createImportedModule(File, Namespace, L.Line, Name);
 
@@ -1284,7 +1287,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // FIXME: Handling of generic parameters in SIL type lowering is in flux.
     // DebugInfo doesn't appear to care about the generic context, so just
     // throw it away before lowering.
-    else if (isa<GenericFunctionType>(BaseTy) || isa<PolymorphicFunctionType>(BaseTy)) {
+    else if (isa<GenericFunctionType>(BaseTy) ||
+             isa<PolymorphicFunctionType>(BaseTy)) {
       auto fTy = cast<AnyFunctionType>(BaseTy);
       auto nongenericTy = FunctionType::get(fTy->getInput(),
                                             fTy->getResult(),
@@ -1295,7 +1299,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     } else
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
                               .castTo<SILFunctionType>();
-    auto Params = createParameterTypes(FunctionTy, Scope, DbgTy.getDeclContext());
+    auto Params=createParameterTypes(FunctionTy, Scope, DbgTy.getDeclContext());
     auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
     return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
   }
@@ -1365,7 +1369,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       auto File = getOrCreateFile(L.Filename);
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
-      DebugTypeInfo DTI(AliasedTy, DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
+      DebugTypeInfo DTI(AliasedTy,
+                        DbgTy.size, DbgTy.align, DbgTy.getDeclContext());
       return DBuilder.createTypedef(getOrCreateType(DTI, Scope),
                                     Name, File, L.Line, File);
     }
@@ -1380,7 +1385,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto OrigTy = SubstitutedTy->getReplacementType();
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
-    return DBuilder.createTypedef(getOrCreateDesugaredType(OrigTy, DbgTy, Scope),
+    return DBuilder.createTypedef(getOrCreateDesugaredType(OrigTy,DbgTy,Scope),
                                   Name, File, L.Line, File);
   }
 
