@@ -2867,7 +2867,12 @@ namespace {
         = cast_or_null<FuncDecl>(Impl.importDecl(decl->getSetterMethodDecl()));
       if (!setter && decl->getSetterMethodDecl())
         return nullptr;
-      
+
+      // Check whether the property already got imported.
+      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+      if (known != Impl.ImportedDecls.end())
+        return known->second;
+
       auto result = new (Impl.SwiftContext)
       VarDecl(/*static*/ false, /*IsLet*/ false,
               Impl.importSourceLoc(decl->getLocation()),
