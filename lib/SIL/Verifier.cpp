@@ -1243,18 +1243,24 @@ public:
     auto resultFTy = requireObjectType(SILFunctionType, BBI,
                                        "bridge_to_block result");
 
-    requireSameFunctionComponents(operandFTy, resultFTy,
-                                  "operand and result of bridge_to_block");
     require(!operandFTy->isBlock(),
             "bridge_to_block operand cannot be @objc_block");
     require(resultFTy->isBlock(),
             "bridge_to_block result must be @objc_block");
+    
+    // FIXME: The mapping from a native function type to a block type is no
+    // longer trivial, since it involves bridging and ownership convention
+    // changes.
+#if 0
+    requireSameFunctionComponents(operandFTy, resultFTy,
+                                  "operand and result of bridge_to_block");
     require(!operandFTy->isThin(), "bridge_to_block operand cannot be [thin]");
     require(!resultFTy->isThin(), "bridge_to_block result cannot be [thin]");
 
     auto adjustedOperandExtInfo = operandFTy->getExtInfo().withIsBlock(true);
     require(adjustedOperandExtInfo == resultFTy->getExtInfo(),
             "operand and result of bridge_to_block must agree in particulars");
+#endif
   }
   
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {

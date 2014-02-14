@@ -393,6 +393,24 @@ namespace {
       return ResultConvention::Owned;
     }
   };
+  
+  /// The default conventions for ObjC blocks.
+  struct DefaultBlockConventions : Conventions {
+    ParameterConvention getIndirectParameter(unsigned index,
+                                             CanType type) const override {
+      llvm_unreachable("indirect block parameters unsupported");
+    }
+    ParameterConvention getDirectParameter(unsigned index,
+                                           CanType type) const override {
+      return ParameterConvention::Direct_Unowned;
+    }
+    ParameterConvention getCallee() const override {
+      return ParameterConvention::Direct_Unowned;
+    }
+    ResultConvention getResult(CanType type) const override {
+      return ResultConvention::Autoreleased;
+    }
+  };
 }
 
 static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
@@ -400,6 +418,10 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                            CanAnyFunctionType substType,
                                            CanAnyFunctionType substInterfaceType,
                                            AnyFunctionType::ExtInfo extInfo) {
+  if (extInfo.isBlock())
+    return getSILFunctionType(M, origType, substType, substInterfaceType,
+                              extInfo, DefaultBlockConventions());
+  
   return getSILFunctionType(M, origType, substType, substInterfaceType,
                             extInfo, DefaultConventions());
 }
@@ -952,6 +974,13 @@ static CanType getBridgedResultType(TypeConverter &tc,
 static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                                             CanAnyFunctionType t,
                                             AnyFunctionType::ExtInfo extInfo) {
+  // Blocks are always cdecl.
+  AbstractCC effectiveCC = t->getAbstractCC();
+  if (t->isBlock()) {
+    effectiveCC = AbstractCC::C;
+    extInfo = extInfo.withCallingConv(AbstractCC::C);
+  }
+  
   // Pull the innermost generic parameter list in the type out.
   Optional<GenericParamList *> genericParams;
   {
@@ -978,7 +1007,7 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
     }
   };
 
-  switch (t->getAbstractCC()) {
+  switch (effectiveCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
   case AbstractCC::WitnessMethod:
@@ -989,8 +1018,8 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    return rebuild(getBridgedInputType(tc, t->getAbstractCC(), t.getInput()),
-                   getBridgedResultType(tc, t->getAbstractCC(), t.getResult()));
+    return rebuild(getBridgedInputType(tc, effectiveCC, t.getInput()),
+                   getBridgedResultType(tc, effectiveCC, t.getResult()));
   }
   llvm_unreachable("bad calling convention");
 }
