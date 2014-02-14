@@ -47,13 +47,6 @@ public:
     getCaptureInfo().getLocalCaptures(FD, Result);
   }
 
-
-  ArrayRef<Pattern *> getArgParamPatterns() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getArgParamPatterns();
-    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
-  }
-
   ArrayRef<Pattern *> getBodyParamPatterns() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getBodyParamPatterns();
