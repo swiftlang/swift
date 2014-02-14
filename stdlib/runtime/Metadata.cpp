@@ -2084,16 +2084,59 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
 /// The protocol descriptor for Printable from the stdlib.
 extern "C" const ProtocolDescriptor _TMpSs9Printable;
 
+/// Default behavior for printAny.
+static void defaultPrint(OpaqueValue *value, const Metadata *type) {
+  switch (type->getKind()) {
+  case MetadataKind::Tuple: {
+    // Destructure the tuple and printAny its elements.
+    auto tupleBytes = reinterpret_cast<char *>(value);
+    auto tuple = static_cast<const TupleTypeMetadata *>(type);
+    auto elts = tuple->getElements();
+    printf("(");
+    for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
+      if (i > 0)
+        printf(", ");
+      auto &elt = elts[i];
+      swift_printAny(reinterpret_cast<OpaqueValue*>(tupleBytes + elt.Offset),
+                     elt.Type);
+    }
+    printf(")");
+    return;
+  }
+      
+  case MetadataKind::Class:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ObjCClassWrapper:
+    // TODO
+    printf("<something>");
+    type->getValueWitnesses()->destroy(value, type);
+    return;
+      
+  // Values should never use these metadata kinds.
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapArray:
+    assert(false);
+    // Consume the value.
+    type->getValueWitnesses()->destroy(value, type);
+  }
+}
+
 /// FIXME: This doesn't belong in the runtime.
+///
+/// func printAny<T>(x: T)
 void swift::swift_printAny(OpaqueValue *value,
                            const Metadata *type) {
   const void *witnessTable = swift_conformsToProtocol(type, &_TMpSs9Printable,
                                                       nullptr);
   
   if (!witnessTable) {
-    // Fall back to a stupid default implementation.
-    printf("<something>");
-    return;
+    return defaultPrint(value, type);
   }
   
   // Take some liberties in assuming the layout of witness tables to extract
