@@ -1541,7 +1541,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;
-      if (FD->getArgParamPatterns().size() != ExpectedParamPatterns) {
+      if (FD->getBodyParamPatterns().size() != ExpectedParamPatterns) {
         if (Diagnose)
           diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried);
         return false;
@@ -1550,7 +1550,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
   }
 
   if (!isParamPatternRepresentableInObjC(*this, AFD,
-                                         AFD->getArgParamPatterns()[1],
+                                         AFD->getBodyParamPatterns()[1],
                                          Diagnose)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.

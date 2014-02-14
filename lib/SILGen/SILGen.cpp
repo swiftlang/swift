@@ -372,7 +372,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit any default argument generators.
   {
-    auto patterns = AFD->getArgParamPatterns();
+    auto patterns = AFD->getBodyParamPatterns();
     if (AFD->getDeclContext()->isTypeContext())
       patterns = patterns.slice(1);
     emitDefaultArgGenerators(AFD, patterns);
