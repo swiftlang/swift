@@ -2842,6 +2842,25 @@ a different existential container. It is also undefined behavior if the
 ``OpaquePointer`` value is dereferenced, cast, or passed to a method after
 the originating existential container has been mutated.
 
+open_existential
+````````````````
+::
+
+  sil-instruction ::= 'open_existential' sil-operand 'to' sil-type
+
+  %1 = open_existential %0 : $*P to $*@opened P
+  // %0 must be of a $*P type for non-class protocol or protocol composition
+  //   type P
+  // $*@opened P must be a unique archetype that refers to an opened 
+  // existential type P. 
+  // %1 will be of type $*P
+
+Obtains the address of the concrete value inside the existential
+container referenced by ``%0``. The protocol conformances associated
+with this existential container are associated directly with the
+archetype ``$*@opened P``. This pointer can be used with any operation
+on archetypes, such as ``archetype_method``.
+
 init_existential_ref
 ````````````````````
 ::
@@ -2908,6 +2927,25 @@ It is undefined behavior for the ``Self``-typed value to be passed as the
 a different existential container. It is also undefined behavior if the
 ``ObjCPointer`` value is dereferenced, cast, or passed to a method after the
 originating existential container has been mutated.
+
+open_existential_ref
+````````````````````
+::
+
+  sil-instruction ::= 'open_existential_ref' sil-operand 'to' sil-type
+
+  %1 = open_existential %0 : $P to $@opened P
+  // %0 must be of a $*P type for aclass protocol or protocol composition
+  //   type P
+  // $@opened P must be a unique archetype that refers to an opened 
+  // existential type P. 
+  // %1 will be of type $P
+
+Extracts the class instance refernece from a class existential
+container. The protocol conformances associated with this existential
+container are associated directly with the archetype ``@opened P``. This 
+pointer can be used with any operation on archetypes, such as 
+``archetype_method``.
 
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
