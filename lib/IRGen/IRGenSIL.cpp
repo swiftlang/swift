@@ -2856,7 +2856,8 @@ void IRGenSILFunction::visitOpenExistentialInst(OpenExistentialInst *i) {
   SILType baseTy = i->getOperand().getType();
   Address base = getLoweredAddress(i->getOperand());
 
-  auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftType());
+  auto openedArchetype = cast<ArchetypeType>(
+                           i->getType().getSwiftRValueType());
   Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
                                                    openedArchetype);
 
@@ -2867,7 +2868,8 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 
   SILType baseTy = i->getOperand().getType();
   Explosion base = getLoweredExplosion(i->getOperand());
-  auto openedArchetype = cast<ArchetypeType>(i->getType().getSwiftType());
+  auto openedArchetype = cast<ArchetypeType>(
+                           i->getType().getSwiftRValueType());
 
   Explosion result(ResilienceExpansion::Maximal);
   llvm::Value *instance
