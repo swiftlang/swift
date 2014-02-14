@@ -54,6 +54,12 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
   }
 
+  ArrayRef<Pattern *> getBodyParamPatterns() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getBodyParamPatterns();
+    return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
+  }
+
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getType();

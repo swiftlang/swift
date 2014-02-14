@@ -54,8 +54,8 @@ SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
 
 
 static unsigned getFuncNaturalUncurryLevel(AnyFunctionRef AFR) {
-  assert(AFR.getArgParamPatterns().size() >= 1 && "no arguments for func?!");
-  unsigned Level = AFR.getArgParamPatterns().size() - 1;
+  assert(AFR.getBodyParamPatterns().size() >= 1 && "no arguments for func?!");
+  unsigned Level = AFR.getBodyParamPatterns().size() - 1;
   // Functions with captures have an extra uncurry level for the capture
   // context.
   if (AFR.getCaptureInfo().hasLocalCaptures())

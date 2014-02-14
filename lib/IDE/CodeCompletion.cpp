@@ -1109,7 +1109,6 @@ public:
 
     llvm::SmallString<32> TypeStr;
 
-    auto Patterns = FD->getArgParamPatterns();
     unsigned FirstIndex = 0;
     if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
@@ -1143,7 +1142,8 @@ public:
     // Build type annotation.
     {
       llvm::raw_svector_ostream OS(TypeStr);
-      for (unsigned i = FirstIndex + 1, e = Patterns.size(); i != e; ++i) {
+      for (unsigned i = FirstIndex + 1, e = FD->getBodyParamPatterns().size();
+           i != e; ++i) {
         FunctionType->castTo<AnyFunctionType>()->getInput()->print(OS);
         FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
         OS << " -> ";

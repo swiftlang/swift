@@ -1517,12 +1517,12 @@ Type AbstractFunctionDecl::computeInterfaceSelfType(bool isInitializingCtor) {
 /// Note that some functions don't have an implicit 'self' decl, for example,
 /// free functions.  In this case nullptr is returned.
 VarDecl *AbstractFunctionDecl::getImplicitSelfDecl() const {
-  ArrayRef<const Pattern *> ArgParamPatterns = getArgParamPatterns();
-  if (ArgParamPatterns.empty())
+  ArrayRef<const Pattern *> ParamPatterns = getBodyParamPatterns();
+  if (ParamPatterns.empty())
     return nullptr;
 
   // "self" is represented as (typed_pattern (named_pattern (var_decl 'self')).
-  const Pattern *P = ArgParamPatterns[0]->getSemanticsProvidingPattern();
+  const Pattern *P = ParamPatterns[0]->getSemanticsProvidingPattern();
 
   // The decl should be named 'self' and be implicit.
   auto NP = dyn_cast<NamedPattern>(P);
@@ -1678,7 +1678,7 @@ bool FuncDecl::isUnaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
   if (!argTuple)
     return true;
 
@@ -1691,7 +1691,7 @@ bool FuncDecl::isBinaryOperator() const {
   
   unsigned opArgIndex = isa<ProtocolDecl>(getDeclContext()) ? 1 : 0;
   
-  auto *argTuple = dyn_cast<TuplePattern>(getArgParamPatterns()[opArgIndex]);
+  auto *argTuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[opArgIndex]);
   if (!argTuple)
     return false;
   
