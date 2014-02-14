@@ -21,6 +21,7 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree"
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
     cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
+    distcc                      ""               "use distcc in pump mode"
     config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
     incremental                 ""               "when build directories already exist, skip configuration"
@@ -291,10 +292,25 @@ if [ ! -e "${WORKSPACE}/clang" ]; then
 fi
 ln -sf  "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
 
+CLANG="$TOOLCHAIN/usr/bin/clang"
+if [[ "$DISTCC" ]] ; then
+    DISTCC_PUMP="$(which pump)"
+    CMAKE_COMPILER_OPTIONS=(
+        -DCMAKE_C_COMPILER="$(which distcc)"
+        -DCMAKE_C_COMPILER_ARG1="${CLANG}"
+        -DCMAKE_CXX_COMPILER="$(which distcc)"
+        -DCMAKE_CXX_COMPILER_ARG1="${CLANG}++"
+    )
+else
+    CMAKE_COMPILER_OPTIONS=(
+        -DCMAKE_C_COMPILER="${CLANG}"
+        -DCMAKE_CXX_COMPILER="${CLANG}++"
+    )
+fi
+
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
-    -DCMAKE_C_COMPILER="$TOOLCHAIN/usr/bin/clang"
-    -DCMAKE_CXX_COMPILER="$TOOLCHAIN/usr/bin/clang++"
+    "${CMAKE_COMPILER_OPTIONS[@]}"
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
@@ -335,7 +351,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               ${CONFIG_ARGS} \
               "${LLVM_SOURCE_DIR}" || exit 1)
   fi
-  "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
+  $DISTCC_PUMP "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
 fi
 
 #
@@ -446,7 +462,7 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
         fi
 
         # Build.
-        "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
+        $DISTCC_PUMP "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS}
     fi
 done
 
@@ -462,7 +478,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
         _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
     
-        build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
+        build_cmd=($DISTCC_PUMP "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
         "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
 
@@ -519,7 +535,7 @@ fi
 
 if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
   echo "--- Building Swift Package ---"
-  "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} ${BUILD_TARGET_FLAG} package
+  $DISTCC_PUMP "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} ${BUILD_TARGET_FLAG} package
 
   saw_package=
   for package in "${SWIFT_BUILD_DIR}"/swift-*.tar.gz; do
