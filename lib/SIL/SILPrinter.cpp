@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -1293,7 +1294,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport swift\n\n";
+  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME << "\n\n";
 
   // Print the declarations and types from the origin module.
   // FIXME: What about multi-file modules?
