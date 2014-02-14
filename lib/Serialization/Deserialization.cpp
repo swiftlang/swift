@@ -2420,6 +2420,16 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::OPENED_EXISTENTIAL_TYPE: {
+    TypeID existentialID;
+    
+    decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
+                                                         existentialID);
+    
+    typeOrOffset = ArchetypeType::getOpened(getType(existentialID));
+    break;
+  }
+      
   case decls_block::GENERIC_TYPE_PARAM_TYPE: {
     DeclID declIDOrDepth;
     unsigned indexPlusOne;

@@ -395,6 +395,11 @@ namespace decls_block {
     // Trailed by the nested types record.
   >;
 
+  using OpenedExistentialTypeLayout = BCRecordLayout<
+    OPENED_EXISTENTIAL_TYPE,
+    TypeIDField         // the existential type
+  >;
+
   using DynamicSelfTypeLayout = BCRecordLayout<
     DYNAMIC_SELF_TYPE,
     TypeIDField          // self type

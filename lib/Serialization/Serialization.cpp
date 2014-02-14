@@ -1685,8 +1685,14 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
-    assert(!archetypeTy->getOpenedExistentialType() &&
-           "Opened existential type cannot be serialized");
+    
+    // Opened existential types use a separate layout.
+    if (auto existentialTy = archetypeTy->getOpenedExistentialType()) {
+      unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
+      OpenedExistentialTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              addTypeRef(existentialTy));
+      break;
+    }
 
     TypeID indexOrParentID;
     if (archetypeTy->isPrimary())
@@ -2024,6 +2030,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<OptionalTypeLayout>();
     registerDeclTypeAbbr<UncheckedOptionalTypeLayout>();
     registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+    registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 
     registerDeclTypeAbbr<TypeAliasLayout>();
     registerDeclTypeAbbr<GenericTypeParamTypeLayout>();

@@ -286,7 +286,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILValue operand;
     SILType Ty;
     ArrayRef<ProtocolConformance*> conformances;
-
+    SmallVector<ProtocolDecl *, 4> protocols;
+    
+    CanType existentialType;
     switch (SI.getKind()) {
     default: assert(0 && "out of sync with parent");
     case ValueKind::InitExistentialInst: {
@@ -294,6 +296,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = IEI.getOperand();
       Ty = IEI.getConcreteType();
       conformances = IEI.getConformances();
+      existentialType = IEI.getOperand().getType().getSwiftRValueType();
       break;
     }
     case ValueKind::InitExistentialRefInst: {
@@ -301,9 +304,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = IERI.getOperand();
       Ty = IERI.getType();
       conformances = IERI.getConformances();
+      existentialType = IERI.getType().getSwiftRValueType();
       break;
     }
     }
+    
+    // Retrieve the protocols.
+    assert(existentialType->isExistentialType() && "Not an existential type?");
+    existentialType->isExistentialType(protocols);
+    
     unsigned abbrCode = SILAbbrCodes[SILInitExistentialLayout::Code];
     SILInitExistentialLayout::emitRecord(Out, ScratchRecord, abbrCode,
        (unsigned)SI.getKind(),
@@ -315,8 +324,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
        operand.getResultNumber(),
        conformances.size());
 
-    for (auto *c : conformances)
-      S.writeConformance(c->getProtocol(), c, nullptr, SILAbbrCodes);
+    for (unsigned i = 0, n = conformances.size(); i != n; ++i) {
+      S.writeConformance(protocols[i], conformances[i], nullptr, SILAbbrCodes);
+    }
     break;
   }
   case ValueKind::DeallocBoxInst:
