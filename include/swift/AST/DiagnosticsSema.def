@@ -855,6 +855,8 @@ NOTE(not_objc_function_type_param,sema_objc,none,
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
       "method cannot be marked @objc because curried functions cannot be "
       "represented in Objective-C", ())
+ERROR(objc_observing_accessor,sema_objc, none,
+      "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_invalid_on_tuple_style,sema_objc,none,
       "method cannot be marked @objc because it is not using selector-style "
       "declaration syntax", ())

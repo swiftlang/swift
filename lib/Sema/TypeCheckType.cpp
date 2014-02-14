@@ -1547,6 +1547,14 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
         return false;
       }
     }
+
+    // willSet/didSet implementations are never exposed to objc, they are always
+    // directly dispatched from the synthesized setter.
+    if (FD->isObservingAccessor()) {
+      if (Diagnose)
+        diagnose(AFD->getLoc(), diag::objc_observing_accessor);
+      return false;
+    }
   }
 
   if (!isParamPatternRepresentableInObjC(*this, AFD,
