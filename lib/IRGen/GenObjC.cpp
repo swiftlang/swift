@@ -336,11 +336,7 @@ namespace {
         cast<FuncDecl>(ref.getDecl())->getObjCSelector(Text);
         break;
 
-      case SILDeclRef::Kind::Getter:
-        cast<AbstractStorageDecl>(ref.getDecl())->getObjCGetterSelector(Text);
-        break;
-
-      case SILDeclRef::Kind::Initializer:
+        case SILDeclRef::Kind::Initializer:
         cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Text);
         break;
 
@@ -350,10 +346,6 @@ namespace {
 
       case SILDeclRef::Kind::IVarDestroyer:
         Text = ".cxx_destruct";
-        break;
-
-      case SILDeclRef::Kind::Setter:
-        cast<AbstractStorageDecl>(ref.getDecl())->getObjCSetterSelector(Text);
         break;
       }
     }
@@ -457,11 +449,9 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
           || method.kind == SILDeclRef::Kind::Func
-          || method.kind == SILDeclRef::Kind::Getter
-          || method.kind == SILDeclRef::Kind::Setter
           || method.kind == SILDeclRef::Kind::Destroyer
-          || method.kind == SILDeclRef::Kind::Deallocator)
-         && "objc method call must be to a func/initializer/getter/setter/dtor");
+          || method.kind == SILDeclRef::Kind::Deallocator) &&
+         "objc method call must be to a func/initializer/getter/setter/dtor");
 
   ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
 

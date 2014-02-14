@@ -48,8 +48,7 @@ namespace swift {
 /// reference, there are discriminators for referencing different
 /// implementation-level entities associated with a single language-level
 /// declaration, such as uncurry levels of a function, the allocating and
-/// initializing entry points of a constructor, the getter and setter for
-/// a computed variable, etc.
+/// initializing entry points of a constructor, etc.
 struct SILDeclRef {
   typedef llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *> Loc;
   
@@ -59,12 +58,7 @@ struct SILDeclRef {
     /// \brief This constant references the FuncDecl or AbstractClosureExpr
     /// in loc.
     Func,
-    
-    /// Getter - this constant references the getter for the ValueDecl in loc.
-    Getter,
-    /// Setter - this constant references the setter for the ValueDecl in loc.
-    Setter,
-    
+
     /// Allocator - this constant references the allocating constructor
     /// entry point of a class ConstructorDecl or the constructor of a value
     /// ConstructorDecl.
@@ -137,8 +131,6 @@ struct SILDeclRef {
   /// Produces the 'natural' SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
-  /// - If 'loc' is a getter or setter FuncDecl, this returns the Getter or
-  ///   Setter SILDeclRef for the computed VarDecl.
   /// - If 'loc' is a ConstructorDecl, this returns the Allocator SILDeclRef
   ///   for the constructor.
   /// - If 'loc' is an EnumElementDecl, this returns the EnumElement
@@ -188,10 +180,6 @@ struct SILDeclRef {
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
     return kind == Kind::Func;
-  }
-  /// True if the SILDeclRef references a variable accessor.
-  bool isAccessor() const {
-    return kind == Kind::Getter || kind == Kind::Setter;
   }
   /// True if the SILDeclRef references a constructor entry point.
   bool isConstructor() const {

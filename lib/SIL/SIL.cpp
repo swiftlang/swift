@@ -92,41 +92,13 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
            "can only create ivar initializer/destroyer SILDeclRef for class");
     naturalUncurryLevel = 1;
   } else if (auto *var = dyn_cast<VarDecl>(vd)) {
-    assert((kind == Kind::Getter || kind == Kind::Setter ||
-            kind == Kind::GlobalAccessor) &&
-           "can only create Getter, Setter, GlobalAccessor, or GlobalAddress "
-           "SILDeclRef for var");
+    assert(kind == Kind::GlobalAccessor &&
+           "can only create GlobalAccessor SILDeclRef for var");
 
-    if (kind == Kind::GlobalAccessor) {
-      naturalUncurryLevel = 0;
-      assert(!var->getDeclContext()->isLocalContext() &&
-             "can't reference local var as global var");
-      assert(var->hasStorage() && "can't reference computed var as global var");
-
-    } else {
-      // Member computed vars have a 'self' curry.
-      // FIXME: What about static vars?
-      if (var->isInstanceMember())
-        naturalUncurryLevel = 1;
-      // Local computed vars may have captures that affect the natural uncurry
-      // level.
-      else if (kind == Kind::Getter && var->getGetter())
-        naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getGetter());
-      else if (kind == Kind::Setter && var->getSetter())
-        naturalUncurryLevel = getFuncNaturalUncurryLevel(var->getSetter());
-      // An accessor for a non-instance variable without getters and
-      // setters must be a resilient variable, so it can't have context.
-      else
-        naturalUncurryLevel = 0;
-    }
-    
-  } else if (isa<SubscriptDecl>(vd)) {
-    assert((kind == Kind::Getter || kind == Kind::Setter)
-           && "can only create Getter or Setter SILDeclRef for subscript");
-    // Subscript accessors have
-    //   getter type (T)(Index)() -> U and
-    //   setter type (T)(Index)(U) -> ()
-    naturalUncurryLevel = 2;
+    naturalUncurryLevel = 0;
+    assert(!var->getDeclContext()->isLocalContext() &&
+           "can't reference local var as global var");
+    assert(var->hasStorage() && "can't reference computed var as global var");
   } else {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
@@ -216,27 +188,7 @@ bool SILDeclRef::isTransparent() const {
   if (isEnumElement())
     return true;
 
-  if (hasDecl()) {
-    const ValueDecl *D = getDecl();
-    if (isAccessor()) {
-      if (kind == Kind::Getter) {
-        if (const SubscriptDecl *SD = dyn_cast<SubscriptDecl>(getDecl()))
-          D = SD->getGetter();
-        else
-          D = cast<VarDecl>(getDecl())->getGetter();
-      } else if (kind == Kind::Setter) {
-        if (const SubscriptDecl *SD = dyn_cast<SubscriptDecl>(getDecl()))
-          D = SD->getSetter();
-        else
-          D = cast<VarDecl>(getDecl())->getSetter();
-      } else {
-        llvm_unreachable("Accessor is neither a getter nor a setter.");
-      }
-    }
-    
-    return D ? D->isTransparent() : false;
-  }
-  return false;
+  return hasDecl() ? getDecl()->isTransparent() : false;
 }
 
 bool SILDeclRef::isForeignThunk() const {
@@ -372,18 +324,6 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
     mangler.mangleIVarInitDestroyEntity(
       cast<ClassDecl>(c.getDecl()),
       c.kind == SILDeclRef::Kind::IVarDestroyer);
-    return;
-
-  //   entity ::= declaration 'g'                 // getter
-  case SILDeclRef::Kind::Getter:
-    buffer << introducer;
-    mangler.mangleAccessorEntity('g', c.getDecl(), expansion);
-    return;
-
-  //   entity ::= declaration 's'                 // setter
-  case SILDeclRef::Kind::Setter:
-    buffer << introducer;
-    mangler.mangleAccessorEntity('s', c.getDecl(), expansion);
     return;
 
   //   entity ::= declaration 'a'                 // addressor

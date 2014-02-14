@@ -265,10 +265,7 @@ SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
   // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
   if (isa<ClangModuleUnit>(dc)) {
-    if (isa<ConstructorDecl>(d) ||
-        isa<EnumElementDecl>(d) ||
-        (isa<AbstractStorageDecl>(d) &&
-         cast<AbstractStorageDecl>(d)->hasAccessorFunctions()))
+    if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
       return SILLinkage::Shared;
 
     if (auto *FD = dyn_cast<FuncDecl>(d))

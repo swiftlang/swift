@@ -2639,8 +2639,6 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     FullExpr hasMemberScope(Cleanups, CleanupLocation(e));
 
-/// FIXME: Can this just be looking at memberFunc->getType()->getCanonicalType?
-
     // The argument to the has-member block is the uncurried method.
     auto valueTy = e->getType()->getAnyOptionalObjectType()->getCanonicalType();
     auto methodTy = valueTy;

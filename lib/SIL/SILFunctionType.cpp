@@ -656,16 +656,7 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
-
-  case SILDeclRef::Kind::Getter:
-    // Getter selectors can belong to families if their name begins with the
-    // wrong thing.
-    if (c.getDecl()->isObjC() || c.isForeign)
-      return getSelectorFamily(c.getDecl()->getName());
-    return SelectorFamily::None;
-
-  // Setter selectors shouldn't belong to any family we care about.
-  case SILDeclRef::Kind::Setter:
+      
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:

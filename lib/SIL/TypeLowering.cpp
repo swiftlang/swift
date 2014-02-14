@@ -1773,27 +1773,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
                                                 func);
   }
 
-  case SILDeclRef::Kind::Getter:
-  case SILDeclRef::Kind::Setter: {
-    auto *asd = cast<AbstractStorageDecl>(vd);
-    assert(asd->hasAccessorFunctions() &&
-           "Can't get the getter or setter of something that isn't computed");
-    FuncDecl *accessor =
-      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
-    auto fnType = accessor->getInterfaceType();
-    auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
-    if (!withCaptures) return accessorMethodType;
-    
-    // If this is a local variable, its property methods may be closures.
-    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
-    accessor->getLocalCaptures(LocalCaptures);
-    auto fnTy = getFunctionInterfaceTypeWithCaptures(accessorMethodType,
-                                                     LocalCaptures,
-                                                     asd->getDeclContext());
-    return cast<AnyFunctionType>(
-      getInterfaceTypeInContext(fnTy, asd->getDeclContext()));
-  }
-      
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
     return cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
@@ -1854,13 +1833,6 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c,
     FuncDecl *func = cast<FuncDecl>(vd);
     return {getLocalFuncParams(func), func->getGenericParams()};
   }
-  case SILDeclRef::Kind::Getter:
-  case SILDeclRef::Kind::Setter: {
-    auto *asd = cast<AbstractStorageDecl>(vd);
-    FuncDecl *accessor =
-      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
-    return {getLocalFuncParams(accessor), accessor->getGenericParams()};
-  }
   case SILDeclRef::Kind::EnumElement: {
     auto eltDecl = cast<EnumElementDecl>(vd);
     return {
@@ -1914,25 +1886,6 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
                                        func->getDeclContext());
   }
 
-  case SILDeclRef::Kind::Getter:
-  case SILDeclRef::Kind::Setter: {
-    auto *asd = cast<AbstractStorageDecl>(vd);
-    assert(asd->hasAccessorFunctions() &&
-           "Can't get the getter or setter of something that isn't computed");
-    FuncDecl *accessor =
-      c.kind == SILDeclRef::Kind::Getter ? asd->getGetter() : asd->getSetter();
-    auto fnType = accessor->getType();
-    auto accessorMethodType = cast<AnyFunctionType>(fnType->getCanonicalType());
-
-    if (!withCaptures) return accessorMethodType;
-    
-    // If this is a local variable, its property methods may be closures.
-    SmallVector<CaptureInfo::LocalCaptureTy, 4> LocalCaptures;
-    accessor->getLocalCaptures(LocalCaptures);
-    return getFunctionTypeWithCaptures(accessorMethodType, LocalCaptures,
-                                       asd->getDeclContext());
-  }
-      
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::EnumElement:
     return cast<AnyFunctionType>(vd->getType()->getCanonicalType());
@@ -1950,8 +1903,7 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
   
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
-    assert(var->hasStorage() &&
-           "constant ref to computed global var");
+    assert(var->hasStorage() && "constant ref to computed global var");
     return getGlobalAccessorType(var->getType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
