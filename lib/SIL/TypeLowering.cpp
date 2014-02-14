@@ -75,10 +75,8 @@ static bool hasTrivialMetatype(CanType instanceType) {
   return HasTrivialMetatype().visit(instanceType);
 }
 
-static CanType getKnownType(Optional<CanType> &cacheSlot,
-                            ASTContext &C,
-                            StringRef moduleName,
-                            StringRef typeName) {
+static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
+                            StringRef moduleName, StringRef typeName) {
   CanType t = cacheSlot.cache([&] {
     Optional<UnqualifiedLookup> lookup
       = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
@@ -92,15 +90,17 @@ static CanType getKnownType(Optional<CanType> &cacheSlot,
     return CanType();
   });
 
-  assert(t && "bridging type not found but we got past the clang importer?!");
-  
-  DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
-          << " mapped to ";
-        if (t)
-          t->print(llvm::dbgs());
-        else
-          llvm::dbgs() << "<null>";
-        llvm::dbgs() << '\n');
+  // It is possible that we won't find a briding type (e.g. String) when we're
+  // parsing the stdlib itself.
+  if (t) {
+    DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
+            << " mapped to ";
+          if (t)
+            t->print(llvm::dbgs());
+          else
+            llvm::dbgs() << "<null>";
+          llvm::dbgs() << '\n');
+  }
   return t;
 }
 
@@ -1929,8 +1929,10 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   case AbstractCC::ObjCMethod:
     // Map native types back to bridged types.
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
-    if (t->isEqual(get##NativeType##Type()))                         \
-      return get##BridgedType##Type();
+    { auto nativeType = get##NativeType##Type();                        \
+      if (nativeType && t->isEqual(nativeType))                         \
+        return get##BridgedType##Type();                                \
+    }
 #include "swift/SIL/BridgedTypes.def"
     return t;
   }
