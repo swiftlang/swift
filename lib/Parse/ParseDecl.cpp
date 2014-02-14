@@ -480,9 +480,16 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
 
 static bool isStartOfModifiedDecl(const Token &Tok, const Token &Tok2,
                                   bool &IsMutating) {
-  if (Tok.isContextualKeyword("type"))
+  if (Tok.is(tok::kw_static)) {
     IsMutating = false;
-  else if (Tok.isContextualKeyword("mutating"))
+    // Declarations beginning with 'static' are always modified decls.
+    return true;
+  }
+  if (Tok.is(tok::kw_class)) {
+    IsMutating = false;
+    // By looking at 'Tok' only, we don't know yet if it is a class function or
+    // property, or a class decl.
+  } else if (Tok.isContextualKeyword("mutating"))
     IsMutating = true;
   else
     return false;
@@ -588,28 +595,28 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   DeclAttributes Attributes;
   parseDeclAttributeList(Attributes);
 
-  // If we see the contextual 'type' keyword followed by a declaration
+  // If we see the 'static', 'class' or 'mutating' followed by a declaration
   // keyword, parse it now.
   SourceLoc StaticLoc, MutatingLoc;
   bool UnhandledStatic = false, UnhandledMutating = false;
+  StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   bool IsMutating = false;
   if (isStartOfModifiedDecl(Tok, peekToken(), IsMutating)) {
     if (IsMutating) {
       MutatingLoc = consumeToken(tok::identifier);
       UnhandledMutating = true;
     } else {
-      StaticLoc = consumeToken(tok::identifier);
+      assert(Tok.is(tok::kw_static) || Tok.is(tok::kw_class));
+      if (Tok.is(tok::kw_static))
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+      else
+        StaticSpelling = StaticSpellingKind::KeywordClass;
+
+      StaticLoc = consumeToken();
       UnhandledStatic = true;
     }
-  } else if (Tok.is(tok::kw_static)) {
-    // If we see 'static', provide a Fix-It to 'type'.
-    StaticLoc = consumeToken();
-    UnhandledStatic = true;
-
-    diagnose(StaticLoc, diag::static_is_type)
-      .fixItReplace(SourceRange(StaticLoc), "type");
   }
-  
+
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
   switch (Tok.getKind()) {
@@ -623,7 +630,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
   case tok::kw_val:
   case tok::kw_var:
-    Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc);
+    Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
+                          StaticSpelling);
     UnhandledStatic = false;
     break;
   case tok::kw_typealias:
@@ -660,7 +668,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
 
   case tok::kw_func:
-    DeclResult = parseDeclFunc(StaticLoc, MutatingLoc, Flags, Attributes);
+    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, MutatingLoc, Flags,
+                               Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
     UnhandledMutating = false;
@@ -668,7 +677,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
   case tok::kw_subscript:
     if (StaticLoc.isValid()) {
-      diagnose(Tok, diag::subscript_static)
+      diagnose(Tok, diag::subscript_static, StaticSpelling)
         .fixItRemove(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
@@ -706,9 +715,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
 
   if (Status.isSuccess()) {
-    // If we parsed 'type' but didn't handle it above, complain about it.
+    // If we parsed 'class' or 'static', but didn't handle it above, complain
+    // about it.
     if (UnhandledStatic)
-      diagnose(Entries.back()->getLoc(), diag::decl_not_type)
+      diagnose(Entries.back()->getLoc(), diag::decl_not_static,
+               StaticSpelling)
         .fixItRemove(SourceRange(StaticLoc));
     // If we parsed 'mutating' but didn't handle it above, complain about it.
     if (UnhandledMutating)
@@ -996,7 +1007,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(ParseDeclOptions Flags,
                   /*AllowSepAfterLast=*/false, diag::expected_rbrace_extension,
                   [&]() -> ParserStatus {
       ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowStoredInstanceVar);
+                               PD_DisallowStoredInstanceVar |
+                               PD_InExtension);
 
       return parseDecl(MemberDecls, Options);
     });
@@ -1114,10 +1126,10 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
     ReturnType = TypeLoc::withoutLoc(TupleType::getEmpty(P->Context));
 
   // Start the function.
-  auto *D = FuncDecl::create(P->Context, StaticLoc, DeclLoc,
-                             Identifier(), DeclLoc, /*GenericParams=*/nullptr,
-                             Type(), Params, Params, ReturnType,
-                             P->CurDeclContext);
+  auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
+                             /* FIXME(gribozavr)*/DeclLoc, Identifier(),
+                             DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
+                             Params, ReturnType, P->CurDeclContext);
 
   // non-static set:/willSet:/didSet: default to @mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
@@ -1507,7 +1519,26 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
-                                  SourceLoc StaticLoc) {
+                                  SourceLoc StaticLoc,
+                                  StaticSpellingKind StaticSpelling) {
+  assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
+
+  if (StaticLoc.isValid()) {
+    if (!Flags.contains(PD_HasContainerType)) {
+      diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
+          .fixItRemoveChars(StaticLoc, Tok.getLoc());
+      StaticLoc = SourceLoc();
+    } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
+      if (StaticSpelling == StaticSpellingKind::KeywordStatic)
+        diagnose(Tok, diag::static_var_in_class)
+            .fixItReplace(StaticLoc, "class");
+    } else if (!Flags.contains(PD_InExtension)) {
+      if (StaticSpelling == StaticSpellingKind::KeywordClass)
+        diagnose(Tok, diag::class_var_in_struct)
+            .fixItReplace(StaticLoc, "static");
+    }
+  }
+
   bool isLet = Tok.is(tok::kw_val);
   assert(Tok.getKind() == tok::kw_val || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
@@ -1570,12 +1601,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
 
     // In the normal case, just add PatternBindingDecls to our DeclContext.
-    auto PBD = new (Context) PatternBindingDecl(StaticLoc, VarLoc,
-                                                pattern.get(),
-                                                nullptr,
-                                                hasStorage,
-                                                /*conditional*/ false,
-                                                CurDeclContext);
+    auto PBD = new (Context) PatternBindingDecl(
+        StaticLoc, StaticSpelling, VarLoc, pattern.get(), nullptr, hasStorage,
+        /*conditional*/ false, CurDeclContext);
 
     Bindings.All.push_back({PBD, topLevelDecl});
 
@@ -1764,17 +1792,30 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
-Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
+Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                      SourceLoc MutatingLoc,
                       ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  bool HasContainerType = Flags.contains(PD_HasContainerType);
   assert((StaticLoc.isInvalid() || MutatingLoc.isInvalid()) &&
-         "Parser should only parse one of mutating or type");
+         "Parser should only parse one of 'mutating' or 'class'/'static'");
+  assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
-  // Reject 'type' functions at global scope.
-  if (StaticLoc.isValid() && !HasContainerType) {
-    diagnose(Tok, diag::static_func_decl_global_scope)
-      .fixItRemoveChars(StaticLoc, Tok.getLoc());
-    StaticLoc = SourceLoc();
+  bool HasContainerType = Flags.contains(PD_HasContainerType);
+
+  if (StaticLoc.isValid()) {
+    if (!HasContainerType) {
+      // Reject static functions at global scope.
+      diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
+          .fixItRemoveChars(StaticLoc, Tok.getLoc());
+      StaticLoc = SourceLoc();
+    } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
+      if (StaticSpelling == StaticSpellingKind::KeywordStatic)
+        diagnose(Tok, diag::static_func_in_class)
+            .fixItReplace(StaticLoc, "class");
+    } else if (!Flags.contains(PD_InExtension)) {
+      if (StaticSpelling == StaticSpellingKind::KeywordClass)
+        diagnose(Tok, diag::class_func_in_struct)
+            .fixItReplace(StaticLoc, "static");
+    }
   }
 
   // If the 'mutating' modifier was applied to the func, model it as if the
@@ -1866,9 +1907,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, SourceLoc MutatingLoc,
     Scope S(this, ScopeKind::FunctionBody);
 
     // Create the decl for the func and add it to the parent scope.
-    FD = FuncDecl::create(Context, StaticLoc, FuncLoc, Name, NameLoc,
-                          GenericParams, Type(), ArgParams, BodyParams,
-                          FuncRetTy, CurDeclContext);
+    FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
+                          FuncLoc, Name, NameLoc, GenericParams,
+                          Type(), ArgParams, BodyParams, FuncRetTy,
+                          CurDeclContext);
 
     if (HasSelectorStyleSignature)
       FD->setHasSelectorStyleSignature();
@@ -2346,7 +2388,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     // Parse the body.
     ContextChange CC(*this, CD);
     Scope S(this, ScopeKind::ClassBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor);
+    ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
+                             PD_InClass);
     if (parseNominalDeclMembers(MemberDecls, LBLoc, RBLoc,
                                 diag::expected_rbrace_class,
                                 Options))

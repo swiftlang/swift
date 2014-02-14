@@ -786,7 +786,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-var        ::= <a href="#attribute-list">attribute-list</a> 'type'? var' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
+    decl-var        ::= <a href="#attribute-list">attribute-list</a> ('static' | 'class')? var' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
 
     decl-var        ::= <a href="#attribute-list">attribute-list</a> 'var' <a href="#identifier">identifier</a> ':' <a href="#type">type-annotation</a> <a href="#brace-item-list">brace-item-list</a>
 
@@ -869,13 +869,17 @@ an lvalue unless it has a <code>var-get</code> clause but not
   </pre>
 
   <p>Note that both 'get' and 'set' are context-sensitive keywords.</p>
-    
+
+  <p>'static' keyword is allowed inside structs and enums, and extensions of those.</p>
+
+  <p>'class' keyword is allowed inside classes, class extensions, and protocols.</p>
+
   <!-- ===================================================================== -->
   <h3 id="decl-func">func Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-func        ::= <a href="#attribute-list">attribute-list</a> 'type'? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
+    decl-func        ::= <a href="#attribute-list">attribute-list</a> ('static' | 'class')? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
   </pre>
   
   <p>'func' is a declaration for a function.  The argument list and
@@ -892,13 +896,17 @@ an lvalue unless it has a <code>var-get</code> clause but not
   in other places that are semantically equivalent to an extension) implicitly
   get a 'self' argument with these rules ... [todo]</p>
   
-  <p>'type' functions are only allowed in an <a 
+  <p>'static' and 'class' functions are only allowed in an <a 
      href="#decl-extension">extension</a> of some type (or in other places
      that are semantically equivalent to an extension).  They indicate that
      the function is actually defined on the <a href="#metatype">metatype</a>
      for the type, not on the 
      type itself.  Thus its implicit 'self' argument is actually of
      metatype type.</p>
+
+  <p>'static' keyword is allowed inside structs and enums, and extensions of those.</p>
+
+  <p>'class' keyword is allowed inside classes, class extensions, and protocols.</p>
   
   <p>TODO: Func should be an immutable name binding, it should implicitly add
      an attribute immutable when it exists.</p>
@@ -987,14 +995,14 @@ an lvalue unless it has a <code>var-get</code> clause but not
     struct bankaccount { 
       amount : Int
     
-     type func bankaccount() -> bankaccount {
+     static func bankaccount() -> bankaccount {
         // Custom 'constructor' logic goes here.
       }
       func deposit(arg : Int) {
         amount = amount + arg
       }
     
-     type func someMetatypeMethod() {}
+      static func someMetatypeMethod() {}
     }
     
     <i>// Dot syntax on metatype.</i>
@@ -1692,19 +1700,19 @@ if vec[3] {
   <p id="metatype">Each type has a corresponding <i>metatype</i>, with the same
     name as the type, that is injected into the standard name lookup scope when
     a type is <a href="#decl">declared</a>.  This allows access to '<a 
-    href="#decl-func">type functions</a>' through dot syntax.  For example:</p>
+    href="#decl-func">static functions</a>' through dot syntax.  For example:</p>
   
   <pre class="example">
     // Declares a type 'foo' as well as its metatype.
     struct foo {
-     type func bar() {}
+      static func bar() {}
     }
     
     // Declares x to be of type foo.  A reference to a name in type context
     // refers to the type itself.
     var x : foo
     
-    // Accesses a type function on the foo metatype.  In a value context, the
+    // Accesses a static function on the foo metatype.  In a value context, the
     // name of its type refers to its metatype.
     foo.bar()
   </pre>
@@ -2824,7 +2832,7 @@ ill-formed if the type does not conform to the protocol.</p>
     <i>// A generic struct.</i>
     struct Dict&lt;K,V&gt; {
       init() {}
-      type func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
+      static func fromKeysAndValues(keys:K[], values:T[]) -&gt; Dict&lt;K,V&gt; {}
     }
 
     <i>// Construct an instance of the generic struct.</i>

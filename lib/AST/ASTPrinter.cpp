@@ -116,6 +116,19 @@ namespace {
       Printer << "/* @objc(inferred) */ ";
     }
 
+    void printStaticKeyword(StaticSpellingKind StaticSpelling) {
+      switch (StaticSpelling) {
+      case StaticSpellingKind::None:
+        llvm_unreachable("should not be called for non-static decls");
+      case StaticSpellingKind::KeywordStatic:
+        Printer << "static ";
+        break;
+      case StaticSpellingKind::KeywordClass:
+        Printer<< "class ";
+        break;
+      }
+    }
+
     void printTypeLoc(const TypeLoc &TL) {
       // Print a TypeRepr if instructed to do so by options, or if the type
       // is null.
@@ -505,7 +518,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   recordDeclLoc(decl);
   if (decl->isStatic())
-    Printer << "type ";
+    printStaticKeyword(decl->getCorrectStaticSpelling());
   Printer << "var ";
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
@@ -597,7 +610,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
   if (decl->isStatic())
-    Printer << "type ";
+    printStaticKeyword(decl->getCorrectStaticSpelling());
   Printer << "var ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
@@ -729,7 +742,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printAttributes(decl->getAttrs());
     printImplicitObjCNote(decl);
     if (decl->isStatic() && !decl->isOperator())
-      Printer << "type ";
+      printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << "func ";
     recordDeclLoc(decl);
     if (decl->getName().empty())

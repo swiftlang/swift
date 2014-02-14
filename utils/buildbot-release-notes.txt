@@ -5,6 +5,39 @@
   precedented in other languages and causes less confusion with I/O
   streaming.
 
+* The "type" keyword was split into two: "static" and "class".  One can define
+  static functions and static properties in structs and enums like this:
+
+    struct S {
+      static func foo() {}
+      static var bar: Int = 0
+    }
+    enum E {
+      static func foo() {}
+    }
+
+  "class" keyword allows one to define class properties and class methods in
+  classes and protocols:
+
+    class C {
+      class func foo() {}
+      class var bar: Int = 0
+    }
+    protocol P {
+      class func foo() {}
+      class var bar: Int = 0
+    }
+
+  When using "class" and "static" in the extension, the choice of keyword
+  depends on the type being extended:
+
+    extension S {
+      static func baz() {}
+    }
+    extension C {
+      class func baz() {}
+    }
+
 2014-02-12
 ----------
 

@@ -34,7 +34,7 @@ protocol AnyProtocol {
   typealias AssocType
   typealias AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
-  type func staticMethod(x: Self)
+  class func staticMethod(x: Self)
 }
 class SomeAssoc {
 }
@@ -45,7 +45,7 @@ struct InheritedConformance : InheritedProtocol1 {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   func assocTypesMethod(x: SomeAssoc, y: ConformingAssoc)
-  type func staticMethod(x: InheritedConformance)
+  static func staticMethod(x: InheritedConformance)
   func inheritedMethod()
 }
 

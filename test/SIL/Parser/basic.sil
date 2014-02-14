@@ -235,7 +235,7 @@ protocol Runcible {
 
   func free_method() -> Int
   func associated_method() -> U.metatype
-  type func static_method()
+  class func static_method()
 }
 
 /* SIL parsing of substitutions in apply insts is totally busted.

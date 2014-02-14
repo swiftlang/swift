@@ -32,7 +32,7 @@
 #include <limits.h>
 #include "llvm/ADT/StringExtras.h"
 
-// type func String(v : Int64, radix : Int) -> String
+// static func String(v : Int64, radix : Int) -> String
 extern "C"
 uint64_t
 print_int(char* TmpBuffer, intptr_t buf_len, int64_t X, intptr_t Radix,
@@ -63,7 +63,7 @@ print_int(char* TmpBuffer, intptr_t buf_len, int64_t X, intptr_t Radix,
   return size_t(P - TmpBuffer);
 }
 
-// type func String(v : UInt64, radix : Int) -> String
+// static func String(v : UInt64, radix : Int) -> String
 extern "C"
 uint64_t
 print_uint(char* TmpBuffer, intptr_t buf_len, uint64_t Y, intptr_t Radix,
@@ -90,7 +90,7 @@ print_uint(char* TmpBuffer, intptr_t buf_len, uint64_t Y, intptr_t Radix,
   return size_t(P - TmpBuffer);
 }
 
-// type func String(v : Double) -> String
+// static func String(v : Double) -> String
 extern "C"
 uint64_t
 print_double(char* Buffer, double X) {

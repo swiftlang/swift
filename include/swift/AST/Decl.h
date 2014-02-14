@@ -111,6 +111,17 @@ enum class CircularityCheck {
   Checked
 };
 
+/// Describes which spelling was used in the source for the 'static' or 'class'
+/// keyword.
+enum class StaticSpellingKind : uint8_t {
+  None,
+  KeywordStatic,
+  KeywordClass,
+};
+
+/// Diagnostic printing of \c StaticSpellingKind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(8) Decl {
   // alignas(8) because we use three tag bits on Decl*.
@@ -142,13 +153,16 @@ class alignas(8) Decl {
     /// \brief Whether this pattern binding declares static variables.
     unsigned IsStatic : 1;
 
+    /// \brief Whether 'static' or 'class' was used.
+    unsigned StaticSpelling : 2;
+
     /// \brief Whether this pattern binding declares a variable with storage.
     unsigned HasStorage : 1;
     
     /// \brief Whether this pattern binding appears in a conditional statement.
     unsigned Conditional : 1;
   };
-  enum { NumPatternBindingDeclBits = NumDeclBits + 3 };
+  enum { NumPatternBindingDeclBits = NumDeclBits + 5 };
   static_assert(NumPatternBindingDeclBits <= 32, "fits in an unsigned");
   
   class ValueDeclBitfields {
@@ -165,8 +179,8 @@ class alignas(8) Decl {
     
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
-    unsigned Static : 1;
-    
+    unsigned IsStatic : 1;
+
     /// \brief Whether this is a 'let' property, which can only be initialized
     /// in its declaration, and never assigned to, making it immutable.
     unsigned IsLet : 1;
@@ -200,13 +214,17 @@ class alignas(8) Decl {
     unsigned : NumAbstractFunctionDeclBits;
 
     /// Whether this function is a 'static' method.
-    unsigned Static : 1;
+    unsigned IsStatic : 1;
+
+    /// \brief Whether 'static' or 'class' was used.
+    unsigned StaticSpelling : 2;
+
     /// Whether this function is a 'mutating' method.
     unsigned Mutating : 1;
     /// Whether this function has a \c DynamicSelf return type.
     unsigned HasDynamicSelf : 1;
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 3 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -1252,8 +1270,9 @@ class PatternBindingDecl : public Decl {
   friend class Decl;
   
 public:
-  PatternBindingDecl(SourceLoc StaticLoc,
-                     SourceLoc VarLoc, Pattern *Pat, Expr *E,
+  PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+                     SourceLoc VarLoc,
+                     Pattern *Pat, Expr *E,
                      bool hasStorage,
                      bool isConditional,
                      DeclContext *Parent)
@@ -1261,6 +1280,8 @@ public:
       StaticLoc(StaticLoc), VarLoc(VarLoc), Pat(Pat),
       InitAndChecked(E, false) {
     PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
+    PatternBindingDeclBits.StaticSpelling =
+        static_cast<unsigned>(StaticSpelling);
     PatternBindingDeclBits.HasStorage = hasStorage;
     PatternBindingDeclBits.Conditional = isConditional;
   }
@@ -1292,6 +1313,13 @@ public:
   bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
   void setStatic(bool s) { PatternBindingDeclBits.IsStatic = s; }
   SourceLoc getStaticLoc() const { return StaticLoc; }
+  /// \returns the way 'static'/'class' was spelled in the source.
+  StaticSpellingKind getStaticSpelling() const {
+    return static_cast<StaticSpellingKind>(
+        PatternBindingDeclBits.StaticSpelling);
+  }
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
@@ -2633,7 +2661,7 @@ public:
   VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
     : AbstractStorageDecl(DeclKind::Var, DC, Name, NameLoc) {
-    VarDeclBits.Static = IsStatic;
+    VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
     setType(Ty);
@@ -2670,8 +2698,11 @@ public:
   bool isAnonClosureParam() const;
 
   /// Is this a type ('static') variable?
-  bool isStatic() const { return VarDeclBits.Static; }
-  void setStatic(bool IsStatic) { VarDeclBits.Static = IsStatic; }
+  bool isStatic() const { return VarDeclBits.IsStatic; }
+  void setStatic(bool IsStatic) { VarDeclBits.IsStatic = IsStatic; }
+
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
 
   /// Is this an immutable 'let' property?
   bool isLet() const { return VarDeclBits.IsLet; }
@@ -3053,14 +3084,16 @@ class FuncDecl : public AbstractFunctionDecl {
   FuncDecl *OverriddenDecl;
   OperatorDecl *Operator;
 
-  FuncDecl(SourceLoc StaticLoc, SourceLoc FuncLoc, Identifier Name,
+  FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
+           SourceLoc FuncLoc, Identifier Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
                            NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
       OverriddenDecl(nullptr), Operator(nullptr) {
-    FuncDeclBits.Static = StaticLoc.isValid() || getName().isOperator();
+    FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
+    FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParamPatterns > 0 && "Must have at least an empty tuple arg");
     setType(Ty);
     FuncDeclBits.Mutating = false;
@@ -3070,6 +3103,7 @@ class FuncDecl : public AbstractFunctionDecl {
 public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
+                                      StaticSpellingKind StaticSpelling,
                                       SourceLoc FuncLoc, Identifier Name,
                                       SourceLoc NameLoc,
                                       GenericParamList *GenericParams, Type Ty,
@@ -3077,6 +3111,7 @@ public:
                                       DeclContext *Parent);
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
+                          StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
@@ -3084,13 +3119,19 @@ public:
                           TypeLoc FnRetType, DeclContext *Parent);
 
   bool isStatic() const {
-    return FuncDeclBits.Static;
+    return FuncDeclBits.IsStatic;
   }
+  /// \returns the way 'static'/'class' was spelled in the source.
+  StaticSpellingKind getStaticSpelling() const {
+    return static_cast<StaticSpellingKind>(FuncDeclBits.StaticSpelling);
+  }
+  /// \returns the way 'static'/'class' should be spelled for this declaration.
+  StaticSpellingKind getCorrectStaticSpelling() const;
   bool isMutating() const {
     return FuncDeclBits.Mutating;
   }
-  void setStatic(bool Static = true) {
-    FuncDeclBits.Static = Static;
+  void setStatic(bool IsStatic = true) {
+    FuncDeclBits.IsStatic = IsStatic;
   }
   void setMutating(bool Mutating = true) {
     FuncDeclBits.Mutating = Mutating;

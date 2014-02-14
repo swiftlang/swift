@@ -18,7 +18,7 @@ Syntax overview
     func f(x : Int) -> Int {
       return MyVar + x
     }
-    type func getAMyclass() -> MyClass {
+    class func getAMyclass() -> MyClass {
       return new MyClass
     }
     constructor() {

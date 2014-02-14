@@ -153,7 +153,7 @@ struct ${Self} : ReplPrintable {
 extension ${Self} : FloatingPointNumber {
   typealias _BitsType = UInt${bits}
 
-  type func _fromBitPattern(bits: _BitsType) -> ${Self} {
+  static func _fromBitPattern(bits: _BitsType) -> ${Self} {
     return ${Self}(Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
   }
 
@@ -174,19 +174,19 @@ extension ${Self} : FloatingPointNumber {
     return _toBitPattern() & mask
   }
 
-  type func inf() -> ${Self} {
+  static func inf() -> ${Self} {
     return _fromBitPattern(${getInfBitPattern(bits)})
   }
 
-  type func NaN() -> ${Self} {
+  static func NaN() -> ${Self} {
     return quietNaN()
   }
 
-  type func quietNaN() -> ${Self} {
+  static func quietNaN() -> ${Self} {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  type func signalingNaN() -> ${Self} {
+  static func signalingNaN() -> ${Self} {
     return _fromBitPattern(${getSignalingNanBitPattern(bits)})
   }
 
@@ -293,18 +293,18 @@ extension ${Self} /* : FloatingPointNumber */ {
 
 @@transparent
 extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
-  type func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
 
-  type func convertFromIntegerLiteral(value: Int64) -> ${Self} {
+  static func convertFromIntegerLiteral(value: Int64) -> ${Self} {
     return ${Self}(Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
   }
 }
 
 @@transparent
 extension ${Self} : BuiltinFloatLiteralConvertible {
-  type func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
 @   if bits == builtinFloatLiteralBits:
     return ${Self}(value)
 @   elif bits < builtinFloatLiteralBits:
@@ -318,7 +318,7 @@ extension ${Self} : BuiltinFloatLiteralConvertible {
 
 @@transparent
 extension ${Self} : FloatLiteralConvertible {
-  type func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
+  static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 }
@@ -352,11 +352,11 @@ extension ${Self} : Hashable {
 
 extension ${Self} : SignedNumber {
   @@transparent
-  type func negate(rhs: ${Self}) -> (${Self}, Bool) {
+  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.fneg_FPIEEE${bits}(rhs.value)), false)
   }
   @@transparent
-  type func abs(rhs: ${Self}) -> (${Self}, Bool) {
+  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
     return (${Self}(Builtin.int_fabs_FPIEEE${bits}(rhs.value)), false)
   }
   @@transparent

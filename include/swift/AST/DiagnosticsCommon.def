@@ -63,6 +63,19 @@ NOTE(while_parsing_as_less_operator,common,none,
 ERROR(super_not_in_class_method,common,none,
       "'super' members cannot be referenced in a non-class type", ())
 
+ERROR(static_func_in_class,common,none,
+      "static functions are only allowed within structs and enums; "
+      "use 'class' to declare a class method", ())
+ERROR(class_func_in_struct,common,none,
+      "class methods are only allowed within classes and protocols; "
+      "use 'static' to declare a static function", ())
+ERROR(static_var_in_class,common,none,
+      "static properties are only allowed within structs and enums; "
+      "use 'class' to declare a class property", ())
+ERROR(class_var_in_struct,common,none,
+      "class properties are only allowed within classes and protocols; "
+      "use 'static' to declare a static property", ())
+
 // FIXME: This is used by the parser to reject "operator postfix !" and by
 // the type-checker to reject "@postfix func !".
 ERROR(custom_operator_postfix_exclaim,common,none,

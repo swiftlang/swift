@@ -93,12 +93,12 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
   }
 
   @@transparent
-  type func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
+  static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
 
   @@transparent
-  type func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
+  static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 @ if ArrayBound:
@@ -129,9 +129,9 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
 @ max = maskBits((bits - 1) if signed else bits)
   @@transparent
-  type var max: ${Self} { return ${max} }
+  static var max: ${Self} { return ${max} }
   @@transparent
-  type var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
+  static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
 }
 
 extension ${Self} : Hashable {
@@ -164,22 +164,22 @@ extension ${Self} : RandomAccessIndex {
   }
   typealias DistanceType = ${Self}
   @@transparent
-  type func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
+  static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
     var tmp = Builtin.${sign}sub_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
-  type func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
+  static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}add_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
-  type func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+  static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     var tmp = Builtin.${sign}mul_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
   @@transparent
-  type func div(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+  static func div(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     if rhs == 0 {
       return (0, true)
     }
@@ -192,7 +192,7 @@ extension ${Self} : RandomAccessIndex {
     return (${Self}(tmp), false)
   }
   @@transparent
-  type func rem(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
+  static func rem(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
     if rhs == 0 {
       return (0, true)
     }
@@ -206,23 +206,23 @@ extension ${Self} : RandomAccessIndex {
   }
 
   @@transparent
-  type func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
+  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
     return sub(lhs, rhs, true)
   }
   @@transparent
-  type func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
+  static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
     return add(lhs, rhs, true)
   }
   @@transparent
-  type func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+  static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return mul(lhs, rhs, true)
   }
   @@transparent
-  type func div(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+  static func div(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return div(lhs, rhs, true)
   }
   @@transparent
-  type func rem(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
+  static func rem(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return rem(lhs, rhs, true)
   }
 }
@@ -231,11 +231,11 @@ extension ${Self} : RandomAccessIndex {
 @@transparent
 extension ${Self} : SignedNumber {
   @@transparent
-  type func negate(rhs: ${Self}) -> (${Self}, Bool) {
+  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
     return ${Self}.sub(0, rhs)
   }
   @@transparent
-  type func abs(rhs: ${Self}) -> (${Self}, Bool) {
+  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
     return rhs.isNegative() ? ${Self}.negate(rhs) : (rhs, false)
   }
   @@transparent
@@ -349,7 +349,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // bitwise operations
 @@transparent
 extension ${Self} : BitwiseOperations {
-  type func allZeros() -> ${Self} { return 0 }
+  static func allZeros() -> ${Self} { return 0 }
 }
 
 // Compound assignments

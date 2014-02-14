@@ -386,12 +386,11 @@ public:
       // Create a pattern binding to initialize the generator.
       auto GenPat = new (TC.Context) NamedPattern(Generator);
       GenPat->setImplicit();
-      auto GenBinding = new (TC.Context) PatternBindingDecl(SourceLoc(),
-                                                          S->getForLoc(),
-                                                          GenPat, GetGenerator,
-                                                          /*storage*/ true,
-                                                          /*conditional*/ false,
-                                                          DC);
+      auto GenBinding = new (TC.Context)
+          PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
+                             S->getForLoc(), GenPat, GetGenerator,
+                             /*storage*/ true,
+                             /*conditional*/ false, DC);
       GenBinding->setImplicit();
       S->setGenerator(GenBinding);
     }

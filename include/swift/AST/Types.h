@@ -1465,7 +1465,7 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
 /// Example:
 /// \code
 /// class X {
-///   type func factory() -> DynamicSelf { ... }
+///   class func factory() -> DynamicSelf { ... }
 /// };
 /// \endcode
 ///

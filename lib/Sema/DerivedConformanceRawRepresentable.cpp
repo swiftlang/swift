@@ -114,11 +114,10 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   Pattern *params[] = {selfParam, methodParam};
   
-  FuncDecl *toRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
-                               C.getIdentifier("toRaw"),
-                               SourceLoc(), nullptr, Type(),
-                               params, params,
-                               TypeLoc::withoutLoc(rawType), enumDecl);
+  FuncDecl *toRawDecl =
+      FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+                       C.getIdentifier("toRaw"), SourceLoc(), nullptr, Type(),
+                       params, params, TypeLoc::withoutLoc(rawType), enumDecl);
   toRawDecl->setImplicit();
   
   SmallVector<CaseStmt*, 4> cases;
@@ -157,7 +156,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                                 EnumDecl *enumDecl) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
-  //   type func [derived] fromRaw(raw: SomeType) -> SomeEnum? {
+  //   static func [derived] fromRaw(raw: SomeType) -> SomeEnum? {
   //     switch raw {
   //     case 111:
   //       return A
@@ -201,13 +200,10 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                           rawParam->clone(C, /*Implicit=*/true)};
   Pattern *bodyParams[] = {selfParam, rawParam};
   auto retTy = OptionalType::get(enumType);
-  auto fromRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
-                                 C.getIdentifier("fromRaw"),
-                                 SourceLoc(), nullptr, Type(),
-                                 argParams,
-                                 bodyParams,
-                                 TypeLoc::withoutLoc(retTy),
-                                 enumDecl);
+  auto fromRawDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      C.getIdentifier("fromRaw"), SourceLoc(), nullptr, Type(), argParams,
+      bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
 

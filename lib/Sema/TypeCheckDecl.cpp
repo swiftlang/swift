@@ -948,6 +948,27 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   if (binding->getPattern()->hasType())
     return;
 
+  // Validate 'static'/'class' on properties in extensions.
+  auto StaticSpelling = binding->getStaticSpelling();
+  if (StaticSpelling != StaticSpellingKind::None &&
+      binding->getDeclContext()->isExtensionContext()) {
+    if (Type T = binding->getDeclContext()->getDeclaredTypeInContext()) {
+      if (auto NTD = T->getAnyNominal()) {
+        if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)) {
+          if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
+            tc.diagnose(binding, diag::static_var_in_class)
+                .fixItReplace(binding->getStaticLoc(), "class");
+            tc.diagnose(NTD, diag::extended_type_declared_here);
+          }
+        } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+          tc.diagnose(binding, diag::class_var_in_struct)
+              .fixItReplace(binding->getStaticLoc(), "static");
+          tc.diagnose(NTD, diag::extended_type_declared_here);
+        }
+      }
+    }
+  }
+
   // Check the pattern.
   // If we have an initializer, we can also have unknown types.
   TypeResolutionOptions options;
@@ -1087,11 +1108,10 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
   
   SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
   
-  auto Get = FuncDecl::create(Context, StaticLoc, Loc,
-                          Identifier(), Loc, /*GenericParams=*/nullptr,
-                          Type(), GetterParams, GetterParams,
-                          TypeLoc::withoutLoc(VD->getType()),
-                          VD->getDeclContext());
+  auto Get = FuncDecl::create(
+      Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
+      /*GenericParams=*/nullptr, Type(), GetterParams, GetterParams,
+      TypeLoc::withoutLoc(VD->getType()), VD -> getDeclContext());
   Get->setImplicit();
   return Get;
 }
@@ -1110,11 +1130,10 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
     buildSetterValueArgumentPattern(VD, &ValueDecl)
   };
   Type SetterRetTy = TupleType::getEmpty(Context);
-  auto *Set = FuncDecl::create(Context, /*StaticLoc=*/SourceLoc(), Loc,
-                               Identifier(), Loc, /*generic=*/nullptr,Type(),
-                               SetterParams, SetterParams,
-                               TypeLoc::withoutLoc(SetterRetTy),
-                               VD->getDeclContext());
+  auto *Set = FuncDecl::create(
+      Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, Loc,
+      Identifier(), Loc, /*generic=*/nullptr, Type(), SetterParams,
+      SetterParams, TypeLoc::withoutLoc(SetterRetTy), VD->getDeclContext());
   Set->setImplicit();
   
   // Setters default to mutating.
@@ -1458,10 +1477,11 @@ public:
           return;
         }
 
-        // Static/type declarations require an initializer unless in a
+        // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
-          TC.diagnose(var->getLoc(), diag::static_requires_initializer);
+          TC.diagnose(var->getLoc(), diag::static_requires_initializer,
+                      var->getCorrectStaticSpelling());
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));
@@ -2284,6 +2304,27 @@ public:
     // Bind operator functions to the corresponding operator declaration.
     if (FD->isOperator())
       bindFuncDeclToOperator(FD);
+
+    // Validate 'static'/'class' on functions in extensions.
+    auto StaticSpelling = FD->getStaticSpelling();
+    if (StaticSpelling != StaticSpellingKind::None &&
+        FD->getDeclContext()->isExtensionContext()) {
+      if (Type T = FD->getDeclContext()->getDeclaredTypeInContext()) {
+        if (auto NTD = T->getAnyNominal()) {
+          if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD)) {
+            if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
+              TC.diagnose(FD, diag::static_func_in_class)
+                  .fixItReplace(FD->getStaticLoc(), "class");
+              TC.diagnose(NTD, diag::extended_type_declared_here);
+            }
+          } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+            TC.diagnose(FD, diag::class_func_in_struct)
+                .fixItReplace(FD->getStaticLoc(), "static");
+            TC.diagnose(NTD, diag::extended_type_declared_here);
+          }
+        }
+      }
+    }
 
     // Validate the @mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being in DeclAttrs).

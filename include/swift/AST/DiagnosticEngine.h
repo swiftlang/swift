@@ -37,6 +37,7 @@ namespace swift {
   class SourceManager;
   
   enum class PatternKind : uint8_t;
+  enum class StaticSpellingKind : uint8_t;
   
   /// \brief Enumeration describing all of possible diagnostics.
   ///
@@ -77,7 +78,8 @@ namespace swift {
     Identifier,
     Type,
     TypeRepr,
-    PatternKind
+    PatternKind,
+    StaticSpellingKind,
   };
 
   /// \brief Variant type that holds a single diagnostic argument of a known
@@ -94,6 +96,7 @@ namespace swift {
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
+      StaticSpellingKind StaticSpellingKindVal;
     };
     
   public:
@@ -130,10 +133,13 @@ namespace swift {
         TypeVal = TL.getType();
       }
     }
-    
+
     DiagnosticArgument(PatternKind K)
-      : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {      
-    }
+        : Kind(DiagnosticArgumentKind::PatternKind), PatternKindVal(K) {}
+
+    DiagnosticArgument(StaticSpellingKind SSK)
+        : Kind(DiagnosticArgumentKind::StaticSpellingKind),
+          StaticSpellingKindVal(SSK) {}
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 
@@ -170,6 +176,11 @@ namespace swift {
     PatternKind getAsPatternKind() const {
       assert(Kind == DiagnosticArgumentKind::PatternKind);
       return PatternKindVal;
+    }
+
+    StaticSpellingKind getAsStaticSpellingKind() const {
+      assert(Kind == DiagnosticArgumentKind::StaticSpellingKind);
+      return StaticSpellingKindVal;
     }
   };
   

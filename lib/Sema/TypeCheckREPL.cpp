@@ -256,6 +256,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     Expr *init = TC.buildCheckedRefExpr(trueDecl, DC, Loc, /*Implicit=*/true);
     addToBody(new (Context) PatternBindingDecl(SourceLoc(),
+                                               StaticSpellingKind::None,
                                                Loc, pattern, init,
                                                /*storage*/ true,
                                                /*conditional*/ false,
@@ -660,6 +661,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   metavarPat->setType(E->getType());
   PatternBindingDecl *metavarBinding
     = new (Context) PatternBindingDecl(SourceLoc(),
+                                       StaticSpellingKind::None,
                                        E->getStartLoc(), metavarPat, E,
                                        /*storage*/ true,
                                        /*conditional*/ false,
@@ -722,6 +724,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   metavarPat->setType(vd->getType());
   PatternBindingDecl *metavarBinding
     = new (Context) PatternBindingDecl(SourceLoc(),
+                                       StaticSpellingKind::None,
                                        PBD->getStartLoc(), metavarPat,
                                        PBD->getInit(), /*storage*/ true,
                                        /*conditional*/ false,

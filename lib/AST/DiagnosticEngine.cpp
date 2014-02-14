@@ -232,6 +232,17 @@ static void formatDiagnosticArgument(StringRef Modifier,
   case DiagnosticArgumentKind::PatternKind:
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
+    break;
+  case DiagnosticArgumentKind::StaticSpellingKind:
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              unsigned(Arg.getAsStaticSpellingKind()), Out);
+    } else {
+      assert(Modifier.empty() &&
+             "Improper modifier for StaticSpellingKind argument");
+      Out << Arg.getAsStaticSpellingKind();
+    }
+    break;
   }
 }
 

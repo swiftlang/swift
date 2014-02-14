@@ -494,6 +494,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     }
     
     Condition = new (Context) PatternBindingDecl(SourceLoc(),
+                                                 StaticSpellingKind::None,
                                                  VarLoc, Pattern.get(),
                                                  Init,
                                                  /*hasStorage*/ true,
@@ -720,8 +721,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
-    ParserStatus VarDeclStatus = parseDeclVar(None, Attributes, FirstDecls,
-                                              SourceLoc());
+    ParserStatus VarDeclStatus = parseDeclVar(
+        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None);
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {

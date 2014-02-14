@@ -12,7 +12,7 @@ struct Z {}
 
 protocol P {
   func concrete_method()
-  type func concrete_static_method()
+  class func concrete_static_method()
   func generic_method<Z>(x: Z)
 }
 

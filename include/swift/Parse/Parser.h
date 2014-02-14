@@ -570,6 +570,8 @@ public:
     PD_AllowDestructor      = 1 << 7,
     PD_AllowEnumElement     = 1 << 8,
     PD_InProtocol           = 1 << 9,
+    PD_InClass              = 1 << 10,
+    PD_InExtension          = 1 << 11,
   };
 
   /// Options that control the parsing of declarations.
@@ -626,7 +628,8 @@ public:
   parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
-                            SourceLoc StaticLoc);
+                            SourceLoc StaticLoc,
+                            StaticSpellingKind StaticSpelling);
   bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
@@ -639,6 +642,7 @@ public:
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
+                                       StaticSpellingKind StaticSpelling,
                                        SourceLoc MutatingLoc,
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);

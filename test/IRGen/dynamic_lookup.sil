@@ -5,7 +5,7 @@ import Builtin
 
 class X {
   @objc func f() { }
-  @objc type func g() { }
+  @objc class func g() { }
   @objc var value : Int { get }
   @objc subscript (i : Int) -> Int { get }
 }

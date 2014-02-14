@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 1;
+const uint16_t VERSION_MINOR = 2;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -66,6 +66,14 @@ enum class VarDeclStorageKind : uint8_t {
 };
 using VarDeclStorageKindField = BCFixed<2>;
 
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class StaticSpellingKind : uint8_t {
+  None = 0,
+  KeywordStatic,
+  KeywordClass,
+};
+using StaticSpellingKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -625,7 +633,8 @@ namespace decls_block {
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // has selector-style signature?
-    BCFixed<1>,   // class method?
+    BCFixed<1>,   // is 'static' or 'class'?
+    StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // IBAction?
@@ -649,6 +658,7 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
+    StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>   // storage?
     // The pattern trails the record.
   >;

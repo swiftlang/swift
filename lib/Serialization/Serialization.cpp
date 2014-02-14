@@ -1030,6 +1030,18 @@ static uint8_t getRawStableAssociativity(swift::Associativity assoc) {
   }
 }
 
+static serialization::StaticSpellingKind
+getStableStaticSpelling(swift::StaticSpellingKind SS) {
+  switch (SS) {
+  case swift::StaticSpellingKind::None:
+    return serialization::StaticSpellingKind::None;
+  case swift::StaticSpellingKind::KeywordStatic:
+    return serialization::StaticSpellingKind::KeywordStatic;
+  case swift::StaticSpellingKind::KeywordClass:
+    return serialization::StaticSpellingKind::KeywordClass;
+  }
+}
+
 /// Asserts if the declaration has any attributes other than the ones
 /// specified in the template parameters.
 ///
@@ -1110,10 +1122,11 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(binding->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PatternBindingLayout::Code];
-    PatternBindingLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addDeclRef(DC), binding->isImplicit(),
-                                     binding->isStatic(),
-                                     binding->hasStorage());
+    PatternBindingLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, addDeclRef(DC), binding->isImplicit(),
+        binding->isStatic(),
+        uint8_t(getStableStaticSpelling(binding->getStaticSpelling())),
+        binding->hasStorage());
 
     writePattern(binding->getPattern());
     // Ignore initializer; external clients don't need to know about it.
@@ -1398,6 +1411,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isImplicit(),
                            fn->hasSelectorStyleSignature(),
                            fn->isStatic(),
+                           uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
                            fn->getAttrs().isAssignment() ||
                              fn->getAttrs().isConversion(),
                            fn->isObjC(),

@@ -321,10 +321,10 @@ namespace {
 /// Build the 'fromMask' or 'fromRaw' method for an option set.
 /// struct NSSomeOptionSet : RawOptionSet {
 ///   var value : RawType
-///   type func fromMask(value: RawType) -> NSSomeOptionSet {
+///   static func fromMask(value: RawType) -> NSSomeOptionSet {
 ///     return NSSomeOptionSet(value)
 ///   }
-///   type func fromRaw(value: RawType) -> NSSomeOptionSet? {
+///   static func fromRaw(value: RawType) -> NSSomeOptionSet? {
 ///     return NSSomeOptionSet(value)
 ///   }
 /// }
@@ -374,7 +374,8 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
     break;
   }
   
-  auto factoryDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
+  auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                      SourceLoc(),
                                       name,
                                       SourceLoc(), nullptr, Type(),
                                       argParams,
@@ -433,12 +434,11 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
-  
-  FuncDecl *toRawDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
-                               C.getIdentifier("toRaw"),
-                               SourceLoc(), nullptr, Type(),
-                               params, params,
-                               TypeLoc::withoutLoc(rawType), optionSetDecl);
+
+  FuncDecl *toRawDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      C.getIdentifier("toRaw"), SourceLoc(), nullptr, Type(), params, params,
+      TypeLoc::withoutLoc(rawType), optionSetDecl);
   toRawDecl->setImplicit();
   
   auto toRawArgType = TupleType::getEmpty(C);
@@ -517,11 +517,10 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
   
-  FuncDecl *getLVDecl = FuncDecl::create(C, SourceLoc(), SourceLoc(),
-                                         C.getIdentifier("getLogicValue"),
-                                         SourceLoc(), nullptr, Type(),
-                                         params, params,
-                                         TypeLoc::withoutLoc(boolType), optionSetDecl);
+  FuncDecl *getLVDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      C.getIdentifier("getLogicValue"), SourceLoc(), nullptr, Type(), params,
+      params, TypeLoc::withoutLoc(boolType), optionSetDecl);
   getLVDecl->setImplicit();
   
   auto toRawArgType = TupleType::getEmpty(C);
@@ -966,14 +965,11 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
 
-        auto patternBinding
-          = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
-                                                       SourceLoc(),
-                                                       varPattern,
-                                                       nullptr,
-                                                       /*storage*/ true,
-                                                       /*conditional*/ false,
-                                                       structDecl);
+        auto patternBinding = new (Impl.SwiftContext)
+            PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
+                               SourceLoc(), varPattern, nullptr,
+                               /*storage*/ true,
+                               /*conditional*/ false, structDecl);
 
         // Create a constructor to initialize that value from a value of the
         // underlying type.
@@ -1043,14 +1039,11 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(var);
 
-        auto patternBinding
-          = new (Impl.SwiftContext) PatternBindingDecl(SourceLoc(),
-                                                       SourceLoc(),
-                                                       varPattern,
-                                                       nullptr,
-                                                       /*storage*/ true,
-                                                       /*conditional*/ false,
-                                                       structDecl);
+        auto patternBinding = new (Impl.SwiftContext)
+            PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
+                               SourceLoc(), varPattern, nullptr,
+                               /*storage*/ true,
+                               /*conditional*/ false, structDecl);
 
         // Create a default initializer to get the value with no options set.
         auto defaultConstructor = makeOptionSetDefaultConstructor(structDecl,
@@ -1403,7 +1396,8 @@ namespace {
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
       auto result = FuncDecl::create(
-          Impl.SwiftContext, SourceLoc(), loc, name, nameLoc,
+          Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
+          name, nameLoc,
           /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
 
@@ -1589,9 +1583,9 @@ namespace {
       }
 
       auto result = FuncDecl::create(
-                      Impl.SwiftContext, SourceLoc(), SourceLoc(), name, 
-                      SourceLoc(), /*GenericParams=*/nullptr, Type(), 
-                      argPatterns, bodyPatterns, TypeLoc(), dc);
+          Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
+          SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
+          argPatterns, bodyPatterns, TypeLoc(), dc);
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;
@@ -2005,11 +1999,10 @@ namespace {
       }
 
       // Create the getter thunk.
-      auto thunk = FuncDecl::create(context, SourceLoc(), getter->getLoc(),
-                                    Identifier(), SourceLoc(), nullptr,
-                                    getterType, getterArgs, getterArgs,
-                                    TypeLoc::withoutLoc(elementTy),
-                                    dc);
+      auto thunk = FuncDecl::create(
+          context, SourceLoc(), StaticSpellingKind::None, getter->getLoc(),
+          Identifier(), SourceLoc(), nullptr, getterType, getterArgs,
+          getterArgs, TypeLoc::withoutLoc(elementTy), dc);
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
 
@@ -2091,7 +2084,8 @@ namespace {
 
       // Create the setter thunk.
       auto thunk = FuncDecl::create(
-          context, SourceLoc(), setter->getLoc(), Identifier(), SourceLoc(),
+          context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
+          Identifier(), SourceLoc(),
           nullptr, setterType, setterArgs, setterArgs,
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
@@ -3260,7 +3254,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   // Create the getter function declaration.
-  auto func = FuncDecl::create(context, SourceLoc(), SourceLoc(), Identifier(),
+  auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
+                               SourceLoc(), Identifier(),
                                SourceLoc(), nullptr, getterType, getterArgs,
                                getterArgs, TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);

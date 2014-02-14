@@ -50,6 +50,18 @@ StringRef Decl::getKindName(DeclKind K) {
 }
 
 
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     StaticSpellingKind SSK) {
+  switch (SSK) {
+  case StaticSpellingKind::None:
+    return OS << "<none>";
+  case StaticSpellingKind::KeywordStatic:
+    return OS << "'static'";
+  case StaticSpellingKind::KeywordClass:
+    return OS << "'class'";
+  }
+}
+
 DeclContext *Decl::getInnermostDeclContext() {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func;
@@ -425,6 +437,21 @@ SourceRange PatternBindingDecl::getSourceRange() const {
       return { startLoc, EndLoc };
   }
   return { startLoc, Pat->getSourceRange().End };
+}
+
+static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
+  auto StaticSpelling = StaticSpellingKind::KeywordStatic;
+  if (Type T = D->getDeclContext()->getDeclaredTypeInContext()) {
+    if (auto NTD = T->getAnyNominal()) {
+      if (isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD))
+        StaticSpelling = StaticSpellingKind::KeywordClass;
+    }
+  }
+  return StaticSpelling;
+}
+
+StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
+  return getCorrectStaticSpellingForDecl(this);
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
@@ -1301,6 +1328,9 @@ bool VarDecl::isAnonClosureParam() const {
   return nameStr[0] == '$';
 }
 
+StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
+  return getCorrectStaticSpellingForDecl(this);
+}
 
 /// Determine whether the given type is (or bridges to) an
 /// Objective-C object type.
@@ -1602,7 +1632,9 @@ static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
 }
 
 FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
-                                       SourceLoc StaticLoc, SourceLoc FuncLoc,
+                                       SourceLoc StaticLoc,
+                                       StaticSpellingKind StaticSpelling,
+                                       SourceLoc FuncLoc,
                                        Identifier Name, SourceLoc NameLoc,
                                        GenericParamList *GenericParams,
                                        Type Ty, unsigned NumParamPatterns,
@@ -1612,11 +1644,12 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
       sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
       alignof(FuncDecl));
   return ::new (Mem)
-      FuncDecl(StaticLoc, FuncLoc, Name, NameLoc, NumParamPatterns,
-               GenericParams, Ty, Parent);
+      FuncDecl(StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc,
+               NumParamPatterns, GenericParams, Ty, Parent);
 }
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
+                           StaticSpellingKind StaticSpelling,
                            SourceLoc FuncLoc, Identifier Name,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
@@ -1625,10 +1658,14 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   assert(ArgParams.size() == BodyParams.size());
   const unsigned NumParamPatterns = ArgParams.size();
   auto *FD = FuncDecl::createDeserialized(
-      Context, StaticLoc, FuncLoc, Name, NameLoc, GenericParams, Ty,
-      NumParamPatterns, Parent);
+      Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc,
+      GenericParams, Ty, NumParamPatterns, Parent);
   FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
   return FD;
+}
+
+StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
+  return getCorrectStaticSpellingForDecl(this);
 }
 
 void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,

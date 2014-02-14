@@ -1187,6 +1187,19 @@ static Optional<swift::Associativity> getActualAssociativity(uint8_t assoc) {
   }
 }
 
+static Optional<swift::StaticSpellingKind>
+getActualStaticSpellingKind(uint8_t raw) {
+  switch (serialization::StaticSpellingKind(raw)) {
+  case serialization::StaticSpellingKind::None:
+    return swift::StaticSpellingKind::None;
+  case serialization::StaticSpellingKind::KeywordStatic:
+    return swift::StaticSpellingKind::KeywordStatic;
+  case serialization::StaticSpellingKind::KeywordClass:
+    return swift::StaticSpellingKind::KeywordClass;
+  }
+  return Nothing;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                           std::function<void(Decl*)> DidRecord) {
   if (DID == 0)
@@ -1544,7 +1557,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     bool isImplicit;
     bool hasSelectorStyleSignature;
-    bool isClassMethod;
+    bool isStatic;
+    uint8_t RawStaticSpelling;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent, isMutating, hasDynamicSelf;
     bool isOptional;
@@ -1557,7 +1571,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         hasSelectorStyleSignature,
-                                        isClassMethod, isAssignmentOrConversion,
+                                        isStatic, RawStaticSpelling,
+                                        isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
                                         isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
@@ -1573,8 +1588,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // DeclContext for now.
     GenericParamList *genericParams = maybeReadGenericParams(DC);
 
+    auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
+    if (!StaticSpelling.hasValue()) {
+      error();
+      return nullptr;
+    }
+
     auto fn = FuncDecl::createDeserialized(
-        ctx, SourceLoc(), SourceLoc(), getIdentifier(nameID), SourceLoc(),
+        ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(),
+        getIdentifier(nameID), SourceLoc(),
         genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
 
@@ -1607,7 +1629,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
 
-    fn->setStatic(isClassMethod);
+    fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
     if (hasSelectorStyleSignature)
@@ -1653,21 +1675,28 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     bool isImplicit;
     bool isStatic;
+    uint8_t RawStaticSpelling;
     bool hasStorage;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
                                                   isImplicit,
                                                   isStatic,
+                                                  RawStaticSpelling,
                                                   hasStorage);
     Pattern *pattern = maybeReadPattern();
     assert(pattern);
 
-    auto binding = new (ctx) PatternBindingDecl(SourceLoc(),
-                                                SourceLoc(), pattern,
-                                                /*init=*/nullptr,
-                                                /*storage=*/hasStorage,
-                                                /*conditional=*/false,
-                                                getDeclContext(contextID));
+    auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
+    if (!StaticSpelling.hasValue()) {
+      error();
+      return nullptr;
+    }
+
+    auto binding = new (ctx) PatternBindingDecl(
+        SourceLoc(), StaticSpelling.getValue(), SourceLoc(), pattern,
+        /*init=*/nullptr,
+        /*storage=*/hasStorage,
+        /*conditional=*/false, getDeclContext(contextID));
     binding->setStatic(isStatic);
     declOrOffset = binding;
 

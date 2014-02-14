@@ -148,7 +148,8 @@ getBuiltinFunction(Identifier Id,
       Context, SourceLoc(), ArgPatternElts, SourceLoc());
   Module *M = Context.TheBuiltinModule;
 
-  return FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id, SourceLoc(),
+  return FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
+                          SourceLoc(), Id, SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ArgPattern,
                           ArgPattern, TypeLoc::withoutLoc(ResType),
                           &M->getMainFile(FileUnitKind::Builtin));
@@ -199,7 +200,8 @@ getBuiltinGenericFunction(Identifier Id,
   Pattern *ArgPattern = TuplePattern::createSimple(
                           Context, SourceLoc(), ArgPatternElts, SourceLoc());
   Module *M = Context.TheBuiltinModule;
-  auto func = FuncDecl::create(Context, SourceLoc(), SourceLoc(), Id,
+  auto func = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
+                               SourceLoc(), Id,
                                SourceLoc(), GenericParams, FnType, ArgPattern,
                                ArgPattern, TypeLoc::withoutLoc(ResBodyType),
                                &M->getMainFile(FileUnitKind::Builtin));

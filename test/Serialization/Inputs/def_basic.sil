@@ -199,7 +199,7 @@ protocol Runcible {
 
   func free_method() -> Int
   func associated_method() -> U.metatype
-  type func static_method()
+  class func static_method()
 }
 
 //sil @_TF4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {
@@ -1007,7 +1007,7 @@ protocol AnyProtocol {
   typealias AssocType
   typealias AssocWithReqt : AssocReqt
   func assocTypesMethod(x: AssocType, y: AssocWithReqt)
-  type func staticMethod(x: Self)
+  class func staticMethod(x: Self)
 }
 class SomeAssoc {
 }
@@ -1018,7 +1018,7 @@ struct InheritedConformance : InheritedProtocol1 {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   func assocTypesMethod(x: SomeAssoc, y: ConformingAssoc)
-  type func staticMethod(x: InheritedConformance)
+  static func staticMethod(x: InheritedConformance)
   func inheritedMethod()
 }
 
