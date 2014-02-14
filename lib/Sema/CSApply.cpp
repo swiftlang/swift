@@ -1823,8 +1823,8 @@ namespace {
       ProtocolConformance *conformance = nullptr;
       bool conforms = tc.conformsToProtocol(dictionaryTy, dictionaryProto,
                                             cs.DC, &conformance);
-      (void)conforms;
-      assert(conforms && "Type does not conform to protocol?");
+      if (!conforms)
+        return nullptr;
 
       // Call the witness that builds the dictionary literal.
       // FIXME: callWitness() may end up re-doing some work we already did
