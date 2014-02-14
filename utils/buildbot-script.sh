@@ -21,6 +21,7 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree"
     build-type                  Debug            "the CMake build variant: Debug, RelWithDebInfo, Release, etc."
     cmake                       "$CMAKE_DEFAULT" "path to the cmake binary"
+    config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
     incremental                 ""               "when build directories already exist, skip configuration"
     package                     ""               "set to build packages"
@@ -331,6 +332,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
               -DLLVM_IMPLICIT_PROJECT_IGNORE="${LLVM_SOURCE_DIR}/tools/swift" \
               -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
+              ${CONFIG_ARGS} \
               "${LLVM_SOURCE_DIR}" || exit 1)
   fi
   "$CMAKE" --build "${LLVM_BUILD_DIR}" -- ${BUILD_ARGS}
@@ -439,6 +441,7 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
                     -D${var_prefix}_PATH_TO_CLANG_BUILD="${CLANG_BUILD_DIR}" \
                     -D${var_prefix}_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}" \
                     -D${var_prefix}_PATH_TO_LLVM_BUILD="${LLVM_BUILD_DIR}" \
+                    ${CONFIG_ARGS} \
                     "${!_PRODUCT_SOURCE_DIR}" || exit 1)
         fi
 
