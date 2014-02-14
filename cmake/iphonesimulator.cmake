@@ -2,6 +2,7 @@
 include(CMakeForceCompiler)
 
 set(CMAKE_SYSTEM_NAME Darwin)
+set(CMAKE_SYSTEM_VERSION 13.0) # Pretend to be OS X 10.9
 
 execute_process(COMMAND xcrun -sdk iphonesimulator -toolchain XcodeDefault -find clang
                 OUTPUT_VARIABLE cc_path
