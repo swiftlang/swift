@@ -80,23 +80,23 @@ Our Solution
 We need to prevent lvalues created in an ``inout`` context from
 forcing a copy-on-write.  To accomplish that:
 
-* We give COW buffers a property ``TOP`` that can store the address of
-  some reference to the buffer.
+* In the class instance header, we reserve a bit ``INOUT``.
   
-* When a unique reference ``r`` to a COW buffer ``b`` is copied into
-  an ``inout`` lvalue, we store ``r``\ 's address in ``b.TOP``.
+* When a unique reference to a COW buffer ``b`` is copied into
+  an ``inout`` lvalue, we save the value of the ``b.INOUT`` bit and set it.
 
-* When ``b`` is written (but not written-back) into a non-``inout``
-  lvalue, ``b.TOP`` is cleared.
+* When a reference to ``b`` is taken that is not part of an ``inout``
+  value, ``b.INOUT`` is cleared.
 
-* When ``b`` is written-back into ``r``, ``b.TOP`` is cleared.
+* When ``b`` is written-back into ``r``, ``b.INOUT`` is restored to the saved
+  value.
 
 * A COW buffer can be modified in-place when it is uniquely referenced
-  *or* when its ``TOP`` is non-null.
+  *or* when ``INOUT`` is set.
 
 We believe this can be done with little user-facing change; the author
-of a COW type would add an attribute to the property that storing the
-buffer, and would use a slightly different check for in-place
+of a COW type would add an attribute to the property that stores the
+buffer, and we would use a slightly different check for in-place
 writability.
   
 Other Considered Solutions
@@ -129,110 +129,88 @@ for the following reasons:
   store.
 - Move optimization requires unique referencing and would fail when there are
   multiple concurrent, non-overlapping ``inout`` slices. ``swap(&x.a, &x.b)``
-  is well-defined if ``x.a`` and ``x.b`` do not access overlapping state, and
-  so should ``swap(&x[0...50], &x[50...100])``.  More generally, we would like to
-  use inout slicing to implement divide-and- conquer parallel algorithms, as
-  in::
+  should be well-defined if ``x.a`` and ``x.b`` do not access overlapping
+  state, and so should be ``swap(&x[0...50], &x[50...100])``.  More
+  generally, we would like to use inout slicing to implement
+  divide-and-conquer parallel algorithms, as in::
 
     async { mutate(&arr[0...50]) }
     async { mutate(&arr[50...100]) }
 
-enter_inout and exit_inout
-==========================
+Language Changes
+================
 
-We propose making an optional pair of labels to computed property definitions,
-``enter_inout`` and ``exit_inout``. When a property has these labels defined
-and is referenced in a context that requires writeback, the ``enter_inout``
-method is applied immediately after ``get``, and the ``exit_inout`` method is
-applied **to the value at the time of get** immediately before ``set``.
-This operation::
+Builtin.isUniquelyReferenced
+----------------------------
 
-  mutate(&arr[a...b])
+A mechanism needs to be exposed to library writers to allow them to check
+whether a buffer is uniquely referenced. This check requires primitive access
+to the layout of the heap object, and can also potentially be reasoned about
+by optimizations, so it makes sense to expose it as a ``Builtin`` which lowers
+to a SIL ``is_uniquely_referenced`` instruction.
 
-thus behaves as if by the following sequence of calls when
-``enter_inout`` and ``exit_inout`` are present for the property::
+The ``@cow`` attribute
+----------------------
 
-  var slice = arr.subscript(a...b).get()
-  var arr_orig = arr
-  arr_orig.subscript(a...b).enter_inout()
-  mutate(&slice)
-  arr_orig.subscript(a...b).exit_inout()
-  arr.subscript(a...b).set(slice)
+A type may declare a stored property as being ``@cow``::
 
-TODO: Copying the original value ``arr`` to ``arr_orig`` creates another strong
-reference to the backing store!
+  class ArrayBuffer { /* ... */ }
 
-``enter_inout`` and ``exit_inout`` are only applied when the computed property
-is used in a writeback context, such as when used as an ``inout`` parameter or
-when a ``mutating`` method or property of the value is accessed. In cases where
-the property is simply loaded or stored to, such as when reading or assigning
-the property, they are not applied.
-
-``enter_inout`` and ``exit_inout`` must appear together. They are
-non-\ ``@mutating`` by default.
-
-Using enter_inout and exit_inout to Optimize Slice Mutation
-===========================================================
-
-``enter_inout`` and ``exit_inout`` expose enough mechanism for a container
-author to maintain an inout reference count for the container's
-backing store object. For example::
-
-  /// Backing store for a copy-on-write Array type.
-  class ArrayBuffer<T> {
-    /// The number of inout references to this backing store. Includes a count
-    /// for the originating non-inout value.
-    var inoutRefcount: Word = 1
-
-    func _getStrongReferenceCount() -> Word {
-      // Use a (currently nonexistent) builtin to access the strong reference
-      // count.
-      return Word(Builtin.getStrongReferenceCount(self))
-    }
-
-    func _needsToBeCopied() -> Bool {
-      // Compare the strong reference count to the inout reference count.
-      return _getStrongReferenceCount(self) <= inoutRefcount
-    }
+  struct Array {
+    @cow var buffer : ArrayBuffer
   }
 
-  struct Array<T> {
-    var buffer: ArrayBuffer<T>
-    var start, count: Int
-    
-    subscript(indexes: Range<Int>) -> Array<T> {
-    get:
-      return slice(indexes)
-    enter_inout:
-      buffer.inoutRefcount++
-    exit_inout:
-      buffer.inoutRefcount--
-    set(value: Array<T>):
-      // If the slice remains in-place, we're done.
-      if (value.start === start && value.count == count) {
-        return
-      }
+The property must meet the following criteria:
 
-      // Otherwise, we need to splice it in.
-      setSliceSlow(indexes, value)
-    }
-  }
-  
+- It must be a stored property.
+- It must be of a pure Swift class type. (More specifically, at the
+  implementation level, it must have a Swift refcount.)
+- It must be mutable. A ``@cow val`` property would not be useful.
 
-The backing store object ``ArrayBuffer`` carries the inout reference count and
-uses it to decide whether it needs to be copied, and the ``enter_inout`` and
-``exit_inout`` methods of the property update the reference count to allow
-slices to mutate the backing store in-place for the duration of an ``inout``
-reference to the slice. The setter for the slice can then short-circuit out
-in the case when the mutation happens completely in-place.
+Values with ``@cow`` properties have special implicit behavior when they are
+used in ``inout`` contexts, described below.
 
-Thread Safety
-=============
+Implementation of @cow properties
+=================================
 
-In our current uniqueness-based COW model, thread safety falls out naturally:
-if you have a singly-referenced backing store, the value itself must also be
-unique, and the backing store cannot be written concurrently without there
-being a race on that value. This also holds for the case of multiple inout
-references. If the inout reference count matches the strong reference count,
-the active inout slices cannot observe each other's referenced slices without
-fundamentally racing.
+inout SIL operations
+--------------------
+
+To maintain the ``INOUT`` bit of a class instance, we need new SIL operations
+that update the ``INOUT`` bit. Because the state of the bit needs to be
+saved and restored through every writeback scope, we can have::
+
+  %former = inout_retain %b : $ClassType
+
+increase the retain count, save the current value of ``INOUT``, set ``INOUT``,
+and produce the ``%former`` value as its ``Int1`` result. To release,
+we have::
+
+  inout_release %b : $ClassType, %former : $Builtin.Int1
+
+both reduce the retain count and change the value of ``INOUT`` back to the
+value saved in ``%former``. Furthermore::
+
+  strong_retain %b : $ClassType
+
+must always clear the ``INOUT`` bit.
+
+To work with opaque types, ``copy_addr`` must also be able to perform an
+``inout`` initialization of a writeback buffer as well as reassignment to
+an original value. This can be an additional attribute on the source, mutually
+exclusive with ``[take]``::
+
+  copy_addr [inout] %a to [initialization] %b
+
+This implies that value witness tables will need witnesses for
+inout-initialization and inout-reassignment.
+
+Copying of @cow properties for writeback
+----------------------------------------
+
+When a value is copied into a writeback buffer, its ``@cow`` properties must
+be retained for the new value using ``inout_retain`` instead of
+``strong_retain`` (or ``copy_addr [inout] [initialization]`` instead of plain
+``copy_addr [initialization]``). When the value is written back, the
+property values should be ``inout_release``\ d, or the value should be
+written back using ``copy_addr [inout]`` reassignment.
