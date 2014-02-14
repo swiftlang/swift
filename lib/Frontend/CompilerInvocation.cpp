@@ -789,5 +789,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
+  updateRuntimeLibraryPath();
+
   return false;
 }
