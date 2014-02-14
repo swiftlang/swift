@@ -2081,6 +2081,32 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   return dlsym(RTLD_DEFAULT, mangledName.c_str());
 }
 
+/// The protocol descriptor for Printable from the stdlib.
+extern "C" const ProtocolDescriptor _TMpSs9Printable;
+
+/// FIXME: This doesn't belong in the runtime.
+void swift::swift_printAny(OpaqueValue *value,
+                           const Metadata *type) {
+  const void *witnessTable = swift_conformsToProtocol(type, &_TMpSs9Printable,
+                                                      nullptr);
+  
+  if (!witnessTable) {
+    // Fall back to a stupid default implementation.
+    printf("<something>");
+    return;
+  }
+  
+  // Take some liberties in assuming the layout of witness tables to extract
+  // the print() method.
+  const void *printPtr = ((const void * const *)witnessTable)[0];
+  auto print = (void (*)(const OpaqueValue *, const Metadata *))
+    (uintptr_t)printPtr;
+  
+  print(value, type);
+  
+  // 'self' of witnesses is passed at +0, so we still need to consume the
+  // value.
+  type->getValueWitnesses()->destroy(value, type);
 }
 
 namespace llvm {

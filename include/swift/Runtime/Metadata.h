@@ -1528,6 +1528,9 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
     : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
 }
   
+/// FIXME: This doesn't belong in the runtime.
+extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
+  
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */
