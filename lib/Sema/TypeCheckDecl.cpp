@@ -1952,18 +1952,38 @@ public:
     // PatternBindingDecl.
   }
 
-  bool semaFuncParamPatterns(DeclContext *dc,
-                             ArrayRef<Pattern*> paramPatterns,
+  bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
                              GenericTypeResolver *resolver = nullptr) {
+    // Type check the argument patterns.
     bool badType = false;
-    for (Pattern *P : paramPatterns) {
+    auto argPatterns = fd->getArgParamPatterns();
+    for (Pattern *P : argPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, dc, TR_FunctionInput, resolver)) {
+      if (TC.typeCheckPattern(P, fd, TR_FunctionInput, resolver))
         badType = true;
-        continue;
-      }
     }
+
+    // If we had a type error in the argument patterns, mark the corresponding
+    // body patterns as invalid, otherwise type check it.  We don't want to
+    // just type check all body patterns since we'd output redundant
+    // diagnostics about the same problem.  Arg patterns need to die.
+    auto bodyPatterns = fd->getBodyParamPatterns();
+    for (unsigned i = 0, e = bodyPatterns.size(); i != e; ++i) {
+      auto *bodyPat = bodyPatterns[i], *argPat = argPatterns[i];
+
+      if (bodyPat->hasType())
+        continue;
+
+      if (argPat->getType()->is<ErrorType>()) {
+        auto errorType = ErrorType::get(fd->getASTContext());
+        bodyPat->forEachNode([&](Pattern *P) {
+          P->setType(errorType);
+        });
+      } else if (TC.typeCheckPattern(bodyPat, fd, TR_FunctionInput, resolver))
+        badType = true;
+    }
+
     return badType;
   }
 
@@ -1999,9 +2019,7 @@ public:
     }
 
     if (!badType)
-      badType = semaFuncParamPatterns(FD, FD->getArgParamPatterns(), resolver)||
-                semaFuncParamPatterns(FD, FD->getBodyParamPatterns(), resolver);
-
+      badType = semaFuncParamPatterns(FD, resolver);
 
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
@@ -2797,8 +2815,7 @@ public:
         checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.
-        if (semaFuncParamPatterns(CD, CD->getArgParamPatterns()) ||
-            semaFuncParamPatterns(CD, CD->getBodyParamPatterns())) {
+        if (semaFuncParamPatterns(CD)) {
           CD->overwriteType(ErrorType::get(TC.Context));
           CD->setInvalid();
         }
@@ -2824,9 +2841,7 @@ public:
     }
 
     // Type check the constructor parameters.
-    if (CD->isInvalid() ||
-        semaFuncParamPatterns(CD, CD->getArgParamPatterns()) ||
-        semaFuncParamPatterns(CD, CD->getBodyParamPatterns())) {
+    if (CD->isInvalid() || semaFuncParamPatterns(CD)) {
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
@@ -2901,8 +2916,7 @@ public:
     if (outerGenericParams)
       TC.validateGenericFuncSignature(DD);
 
-    if (semaFuncParamPatterns(DD, DD->getArgParamPatterns()) ||
-        semaFuncParamPatterns(DD, DD->getBodyParamPatterns())) {
+    if (semaFuncParamPatterns(DD)) {
       DD->overwriteType(ErrorType::get(TC.Context));
       DD->setInvalid();
     }
