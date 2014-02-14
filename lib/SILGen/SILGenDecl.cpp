@@ -1031,8 +1031,8 @@ public:
   void visitDecl(Decl*) {}
   
   void visitFuncDecl(FuncDecl *fd) {
-    // ObjC decls don't go in vtables.
-    if (fd->hasClangNode())
+    // ObjC decls and observing accessors don't go in vtables.
+    if (fd->hasClangNode() || fd->isObservingAccessor())
       return;
     
     addEntry(SILDeclRef(fd));
