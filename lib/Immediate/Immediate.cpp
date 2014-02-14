@@ -71,10 +71,6 @@
 #include <histedit.h>
 #include <dlfcn.h>
 
-#ifndef SWIFT_TOOLCHAIN_SUBDIR
-#define SWIFT_TOOLCHAIN_SUBDIR "swift"
-#endif
-
 using namespace swift;
 
 namespace {
@@ -169,24 +165,18 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
 
 } // end anonymous namespace
 
-static bool loadRuntimeLib(StringRef sharedLibName,
-                           const ProcessCmdLine &CmdLine) {
+static bool loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
   // FIXME: Need error-checking.
-  llvm::SmallString<128> Path(
-      llvm::sys::fs::getMainExecutable(CmdLine[0].data(),
-                                       (void*)&swift::RunImmediately));
-  llvm::sys::path::remove_filename(Path); // Remove /executable
-  llvm::sys::path::remove_filename(Path); // Remove /bin
-  llvm::sys::path::append(Path, "lib", SWIFT_TOOLCHAIN_SUBDIR, sharedLibName);
+  llvm::SmallString<128> Path = runtimeLibPath;
+  llvm::sys::path::append(Path, sharedLibName);
   return dlopen(Path.c_str(), 0);
 }
 
-static bool loadSwiftRuntime(const ProcessCmdLine &CmdLine) {
-  // We rely on @rpath to find the core Swift stdlib.
-  return dlopen("libswift_stdlib_core.dylib", 0);
+static bool loadSwiftRuntime(StringRef runtimeLibPath) {
+  return loadRuntimeLib("libswift_stdlib_core.dylib", runtimeLibPath);
 }
 
-static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
+static bool tryLoadLibrary(LinkLibrary linkLib, StringRef runtimeLibPath,
                            DiagnosticEngine &diags) {
   // If we have an absolute path, just try to load it now.
   llvm::SmallString<128> path = linkLib.getName();
@@ -216,7 +206,7 @@ static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
     success = dlopen(path.c_str(), 0);
     if (!success && linkLib.getKind() == LibraryKind::Library) {
       // Try our runtime library path.
-      success = loadRuntimeLib(path, CmdLine);
+      success = loadRuntimeLib(path, runtimeLibPath);
     }
   }
 
@@ -230,7 +220,6 @@ static bool tryLoadLibrary(LinkLibrary linkLib, const ProcessCmdLine &CmdLine,
 
 static bool IRGenImportedModules(CompilerInstance &CI,
                                  llvm::Module &Module,
-                                 const ProcessCmdLine &CmdLine,
                                  llvm::SmallPtrSet<swift::Module *, 8>
                                      &ImportedModules,
                                  SmallVectorImpl<llvm::Function*> &InitFns,
@@ -242,7 +231,9 @@ static bool IRGenImportedModules(CompilerInstance &CI,
 
   // Perform autolinking.
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
-    if (!tryLoadLibrary(linkLib, CmdLine, CI.getDiags()))
+    if (!tryLoadLibrary(linkLib,
+                        CI.getASTContext().SearchPathOpts.RuntimeLibraryPath,
+                        CI.getDiags()))
       hadError = true;
   };
   std::for_each(IRGenOpts.LinkLibraries.begin(), IRGenOpts.LinkLibraries.end(),
@@ -328,8 +319,8 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
 
   SmallVector<llvm::Function*, 8> InitFns;
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
-  if (IRGenImportedModules(CI, *Module, CmdLine, ImportedModules,
-                           InitFns, IRGenOpts, SILOpts, /*IsREPL*/false))
+  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
+                           IRGenOpts, SILOpts, /*IsREPL*/false))
     return;
 
   llvm::PassManagerBuilder PMBuilder;
@@ -340,7 +331,7 @@ void swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   PMBuilder.populateModulePassManager(ModulePasses);
   ModulePasses.run(*Module);
 
-  if (!loadSwiftRuntime(CmdLine)) {
+  if (!loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPath)) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);
     return;
@@ -1012,7 +1003,7 @@ private:
     llvm::Function *DumpModuleMain = DumpModule.getFunction("main");
     DumpModuleMain->setName("repl.line");
     
-    if (IRGenImportedModules(CI, Module, CmdLine, ImportedModules, InitFns,
+    if (IRGenImportedModules(CI, Module, ImportedModules, InitFns,
                              IRGenOpts, SILOpts, sil.get()))
       return false;
     
@@ -1056,14 +1047,16 @@ public:
         /*RanREPLApplicationMain*/ false
       }
   {
-    if (!loadSwiftRuntime(CmdLine)) {
+    ASTContext &Ctx = CI.getASTContext();
+    if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
       CI.getDiags().diagnose(SourceLoc(),
                              diag::error_immediate_mode_missing_stdlib);
       return;
     }
     std::for_each(CI.getLinkLibraries().begin(), CI.getLinkLibraries().end(),
                   [&](LinkLibrary linkLib) {
-      tryLoadLibrary(linkLib, CmdLine, CI.getDiags());
+      tryLoadLibrary(linkLib, Ctx.SearchPathOpts.RuntimeLibraryPath,
+                     CI.getDiags());
     });
 
     llvm::EngineBuilder builder(&Module);
@@ -1092,7 +1085,7 @@ public:
         REPLInputFile, PersistentState, RC,
         llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
                                              "<REPL Initialization>"));
-    if (CI.getASTContext().hadError())
+    if (Ctx.hadError())
       return;
     
     RC.CurElem = RC.CurIRGenElem = REPLInputFile.Decls.size();

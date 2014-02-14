@@ -550,6 +550,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.SDKPath = A->getValue();
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_resource_dir)) {
+    Opts.RuntimeResourcePath = A->getValue();
+  }
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

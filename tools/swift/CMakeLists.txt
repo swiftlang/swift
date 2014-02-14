@@ -11,8 +11,7 @@ target_link_libraries(swift_old edit ${CORE_FOUNDATION})
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
-                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" 
-                   -DSWIFT_TOOLCHAIN_SUBDIR="${SWIFTLIB_SUBDIR}" )
+                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
 endif()
 
 if (SWIFT_SUBMIT_VERSION)

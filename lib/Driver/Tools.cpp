@@ -110,6 +110,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
 
   inputArgs.AddLastArg(arguments, options::OPT_g);
+  inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
 
   // Pass through any -Xllvm flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
@@ -431,10 +432,16 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
   // library link path and the standard library module import path don't
   // need to be the same.
-  llvm::SmallString<128> RuntimeLibPath(D.getSwiftProgramPath());
-  llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
-  llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
-  llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  llvm::SmallString<128> RuntimeLibPath;
+
+  if (const Arg *A = Args.getLastArg(options::OPT_resource_dir)) {
+    RuntimeLibPath = A->getValue();
+  } else {
+    RuntimeLibPath = D.getSwiftProgramPath();
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /swift
+    llvm::sys::path::remove_filename(RuntimeLibPath); // remove /bin
+    llvm::sys::path::append(RuntimeLibPath, "lib", "swift");
+  }
   llvm::sys::path::append(RuntimeLibPath,
                           getPlatformNameForTriple(TC.getTriple()));
   Arguments.push_back("-L");

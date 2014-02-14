@@ -247,6 +247,11 @@ def Xllvm : Separate<["-"], "Xllvm">, Flags<[DriverOption, FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to llvm.">;
 
+def resource_dir : Separate<["-"], "resource-dir">,
+  Flags<[DriverOption, FrontendOption, HelpHidden]>,
+  MetaVarName<"</usr/lib/swift>">,
+  HelpText<"The directory that holds the compiler resource files">;
+
 def target : Joined<["--"], "target=">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Separate<["-"], "target">,
