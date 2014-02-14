@@ -1,3 +1,4 @@
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
@@ -10,10 +11,12 @@ using namespace llvm;
 // The test fixture.
 class LexerTest : public ::testing::Test {
 public:
+  LangOptions LangOpts;
   SourceManager SourceMgr;
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
-    Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+    Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
+            /*InSILMode=*/false);
     std::vector<Token> Tokens;
     do {
       Tokens.emplace_back();
@@ -33,7 +36,7 @@ public:
     if (KeepEOF)
       Toks = tokenizeAndKeepEOF(BufID);
     else
-      Toks = tokenize(SourceMgr, BufID, 0, 0, KeepComments);
+      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
       EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind());
@@ -87,10 +90,11 @@ TEST_F(LexerTest, CharacterLiterals) {
       '\'', '\"' };
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
+  LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
-  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
   std::vector<Token> Tokens;
   do {
@@ -111,10 +115,11 @@ TEST_F(LexerTest, RestoreBasic) {
   const char *Source = "aaa \t\0 bbb ccc";
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 14));
+  LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
-  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
   Token Tok;
 
@@ -158,10 +163,11 @@ TEST_F(LexerTest, RestoreNewlineFlag) {
   const char *Source = "aaa \n \0\tbbb \nccc";
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
+  LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 
-  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
   Token Tok;
 
@@ -205,11 +211,12 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   const char *Source = "aaa \n \0\tbbb \nccc";
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(StringRef(Source, 16));
+  LangOptions LangOpts;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
   SourceMgr.setCodeCompletionPoint(BufferID, 6);
 
-  Lexer L(SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
 
   Token Tok;
 

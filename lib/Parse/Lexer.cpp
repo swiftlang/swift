@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -159,9 +160,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
 
-Lexer::Lexer(const SourceManager &SourceMgr, DiagnosticEngine *Diags,
+Lexer::Lexer(const LangOptions &Options,
+             const SourceManager &SourceMgr, DiagnosticEngine *Diags,
              unsigned BufferID, bool InSILMode, bool KeepComments)
-    : SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
+    : LangOpts(Options), SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
       InSILMode(InSILMode), KeepComments(KeepComments) {
   // Initialize buffer pointers.
   auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
@@ -216,7 +218,8 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
                          SourceMgr.findBufferContainingLoc(Loc)) &&
          "location from the wrong buffer");
 
-  Lexer L(SourceMgr, BufferID, Diags, InSILMode, /*KeepComments=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
+          /*KeepComments=*/false);
   L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
@@ -655,18 +658,38 @@ void Lexer::lexOperatorIdentifier() {
 
 /// lexDollarIdent - Match $[0-9a-zA-Z_$]*
 void Lexer::lexDollarIdent() {
-  const char *TokStart = CurPtr-1;
-  assert(*TokStart == '$');
+  const char *tokStart = CurPtr-1;
+  assert(*tokStart == '$');
 
   // In a SIL function body, '$' is a token by itself.
   if (InSILBody)
-    return formToken(tok::sil_dollar, TokStart);
+    return formToken(tok::sil_dollar, tokStart);
 
-  // Lex [a-zA-Z_$0-9]*
-  while (isalnum(*CurPtr) || *CurPtr == '_' || *CurPtr == '$')
-    ++CurPtr;
-  
-  return formToken(tok::dollarident, TokStart);
+  bool isAllDigits = true;
+  for (;; ++CurPtr) {
+    if (isdigit(*CurPtr)) {
+      // continue
+    } else if (isalpha(*CurPtr) || *CurPtr == '_' || *CurPtr == '$') {
+      isAllDigits = false;
+      // continue
+    } else {
+      break;
+    }
+  }
+
+  // It's always an error to see a standalone $, and we reserve
+  // $nonNumeric for persistent bindings in the debugger.
+  if (CurPtr == tokStart + 1 || !isAllDigits) {
+    if (!isAllDigits && !LangOpts.DebuggerSupport)
+      diagnose(tokStart, diag::expected_dollar_numeric);
+
+    // Even if we diagnose, we go ahead and form an identifier token,
+    // in part to ensure that the basic behavior of the lexer is
+    // independent of language mode.
+    return formToken(tok::identifier, tokStart);
+  } else {
+    return formToken(tok::dollarident, tokStart);
+  }
 }
 
 void Lexer::lexHexNumber() {
@@ -1472,12 +1495,17 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufferID);
   if (!Buffer)
     return SourceLoc();
+
+  // Use fake language options; language options only affect validity
+  // and the exact token produced.
+  LangOptions fakeLangOpts;
   
   // KeepComments is true because either the caller skipped comments and
   // normally we won't be at the beginning of a comment token (making
   // KeepComments irrelevant), or the caller lexed comments and KeepComments
   // must be true.
-  Lexer L(SM, BufferID, nullptr, /*InSILMode=*/ false, /*KeepComments=*/true);
+  Lexer L(fakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
+          /*KeepComments=*/true);
   L.restoreState(State(Loc));
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
@@ -1489,8 +1517,12 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferStart,
                                             unsigned BufferEnd,
                                             bool InInterpolatedString) {
-  Lexer L(SM, BufferID, nullptr, /*InSILMode=*/false, /*KeepComments=*/false,
-          BufferStart, BufferEnd);
+  // Use fake language options; language options only affect validity
+  // and the exact token produced.
+  LangOptions fakeLangOptions;
+
+  Lexer L(fakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
+          /*KeepComments=*/false, BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
   Token Tok;

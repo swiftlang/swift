@@ -1117,7 +1117,8 @@ public:
           llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
         unsigned BufferID =
           CI.getSourceMgr().addNewSourceBuffer(Buffer);
-        Lexer L(CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
+        Lexer L(CI.getASTContext().LangOpts,
+                CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
         Token Tok;
         L.lex(Tok);
         assert(Tok.is(tok::colon));

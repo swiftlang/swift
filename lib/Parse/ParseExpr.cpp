@@ -1498,22 +1498,9 @@ Expr *Parser::parseExprAnonClosureArg() {
   StringRef Name = Tok.getText();
   SourceLoc Loc = consumeToken(tok::dollarident);
   assert(Name[0] == '$' && "Not a dollarident");
-  bool AllNumeric = true;
 
-  for (unsigned i = 1, e = Name.size(); i != e; ++i)
-    AllNumeric &= bool(isdigit(Name[i]));
-  
-  if (Name.size() == 1 || !AllNumeric) {
-    // Allow $xyz123 as a special case in the debugger, but only as an
-    // atomic expression, not in every place we would otherwise take
-    // an identifier.
-    if (Name.size() != 1 && Context.LangOpts.DebuggerSupport)
-      return actOnIdentifierExpr(Context.getIdentifier(Name), Loc);
+  // We know from the lexer that this is all-numeric.
 
-    diagnose(Loc.getAdvancedLoc(1), diag::expected_dollar_numeric);
-    return new (Context) ErrorExpr(Loc);
-  }
-  
   unsigned ArgNo = 0;
   if (Name.substr(1).getAsInteger(10, ArgNo)) {
     diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);

@@ -31,18 +31,20 @@ void SyntaxModelWalker::anchor() {}
 
 struct SyntaxModelContext::Implementation {
   SourceFile &SrcFile;
+  const LangOptions &LangOpts;
   const SourceManager &SrcMgr;
   std::vector<SyntaxNode> TokenNodes;
 
   Implementation(SourceFile &SrcFile)
     : SrcFile(SrcFile),
+      LangOpts(SrcFile.getASTContext().LangOpts),
       SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const SourceManager &SM = Impl.SrcMgr;
-  std::vector<Token> Tokens = swift::tokenize(SM,
+  std::vector<Token> Tokens = swift::tokenize(Impl.LangOpts, SM,
                                               *Impl.SrcFile.getBufferID(),
                                               /*Offset=*/0,
                                               /*EndOffset=*/0,
@@ -120,6 +122,7 @@ SyntaxModelContext::~SyntaxModelContext() {
 namespace {
 
 class ModelASTWalker : public ASTWalker {
+  const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
   std::vector<SyntaxStructureNode> SubStructureStack;
@@ -129,9 +132,9 @@ public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
 
-  ModelASTWalker(const SourceManager &SM, unsigned BufferID,
-                 SyntaxModelWalker &Walker)
-      : SM(SM), BufferID(BufferID), Walker(Walker) { }
+  ModelASTWalker(const LangOptions &LangOpts, const SourceManager &SM,
+                 unsigned BufferID, SyntaxModelWalker &Walker)
+      : LangOpts(LangOpts), SM(SM), BufferID(BufferID), Walker(Walker) { }
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
@@ -182,7 +185,8 @@ CharSourceRange charSourceRangeFromSourceRange(const SourceManager &SM,
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
-  ModelASTWalker ASTWalk(Impl.SrcMgr, *Impl.SrcFile.getBufferID(), Walker);
+  ModelASTWalker ASTWalk(Impl.LangOpts, Impl.SrcMgr,
+                         *Impl.SrcFile.getBufferID(), Walker);
   ASTWalk.visitSourceFile(Impl.SrcFile, Impl.TokenNodes);
   return true;
 }
@@ -344,7 +348,7 @@ bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
   Locs = SortedLocs;
 
   std::vector<Token> Toks =
-      swift::tokenize(SM, BufferID,
+      swift::tokenize(LangOpts, SM, BufferID,
                       SM.getLocOffsetInBuffer(BeginLoc, BufferID),
                       SM.getLocOffsetInBuffer(SortedLocs.back(), BufferID),
                       /*KeepComments=*/true,

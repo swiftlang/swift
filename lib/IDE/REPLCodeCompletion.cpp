@@ -166,7 +166,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
                    CompletionCallbacksFactory.get());
 
   ASTContext &Ctx = SF.getASTContext();
-  std::vector<Token> Tokens = tokenize(Ctx.SourceMgr, BufferID);
+  std::vector<Token> Tokens = tokenize(Ctx.LangOpts, Ctx.SourceMgr, BufferID);
 
   if (!Tokens.empty() && Tokens.back().is(tok::code_complete))
     Tokens.pop_back();

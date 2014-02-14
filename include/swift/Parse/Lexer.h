@@ -25,10 +25,12 @@
 namespace swift {
   class DiagnosticEngine;
   class InFlightDiagnostic;
+  class LangOptions;
 
   template<typename ...T> struct Diag;
 
 class Lexer {
+  const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
   DiagnosticEngine *Diags;
   const unsigned BufferID;
@@ -93,7 +95,8 @@ private:
   /// The principal constructor used by public constructors below.
   /// Don't use this constructor for other purposes, it does not initialize
   /// everything.
-  Lexer(const SourceManager &SourceMgr, DiagnosticEngine *Diags,
+  Lexer(const LangOptions &Options,
+        const SourceManager &SourceMgr, DiagnosticEngine *Diags,
         unsigned BufferID, bool InSILMode, bool KeepComments);
 
   /// @{
@@ -104,17 +107,31 @@ private:
 
 public:
   /// \brief Create a normal lexer that scans the whole source buffer.
-  Lexer(const SourceManager &SourceMgr, unsigned BufferID,
+  ///
+  /// \param Options - the language options under which to lex.  By
+  ///   design, language options only affect whether a token is valid
+  ///   and/or the exact token kind produced (e.g. keyword or
+  ///   identifier), but not things like how many characters are
+  ///   consumed.  If that changes, APIs like getLocForEndOfToken will
+  ///   need to take a LangOptions explicitly.
+  /// \param InSILMode - whether we're parsing a SIL source file.
+  ///   Unlike language options, this does affect primitive lexing, which
+  ///   means that APIs like getLofForEndOfToken really ought to take
+  ///   this flag; it's just that we don't care that much about fidelity
+  ///   when parsing SIL files.
+  Lexer(const LangOptions &Options,
+        const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
-      : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
     primeLexer();
   }
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
-  Lexer(const SourceManager &SourceMgr, unsigned BufferID,
+  Lexer(const LangOptions &Options,
+        const SourceManager &SourceMgr, unsigned BufferID,
         DiagnosticEngine *Diags, bool InSILMode, bool KeepComments,
         unsigned Offset, unsigned EndOffset)
-      : Lexer(SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
     assert(Offset <= EndOffset && "invalid range");
     initSubLexer(
         *this,
@@ -129,7 +146,7 @@ public:
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState)
-      : Lexer(Parent.SourceMgr, Parent.Diags, Parent.BufferID,
+      : Lexer(Parent.LangOpts, Parent.SourceMgr, Parent.Diags, Parent.BufferID,
               Parent.InSILMode, Parent.isKeepingComments()) {
     initSubLexer(Parent, BeginState, EndState);
   }

@@ -36,6 +36,7 @@ namespace swift {
   class DeclContext;
   class DelayedParsingCallbacks;
   class IRGenOptions;
+  class LangOptions;
   class Module;
   class Parser;
   class PersistentParserState;
@@ -102,7 +103,8 @@ namespace swift {
                              CodeCompletionCallbacksFactory *Factory);
 
   /// \brief Lex and return a vector of tokens for the given buffer.
-  std::vector<Token> tokenize(const SourceManager &SM, unsigned BufferID,
+  std::vector<Token> tokenize(const LangOptions &LangOpts,
+                              const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
                               bool KeepComments = true,
                               bool TokenizeInterpolatedString = true);

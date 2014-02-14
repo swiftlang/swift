@@ -152,7 +152,8 @@ void swift::performDelayedParsing(
 }
 
 /// \brief Tokenizes a string literal, taking into account string interpolation.
-static void getStringPartTokens(const Token &Tok, const SourceManager &SM,
+static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
+                                const SourceManager &SM,
                                 int BufID, const llvm::MemoryBuffer *Buffer,
                                 std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
@@ -195,7 +196,7 @@ static void getStringPartTokens(const Token &Tok, const SourceManager &SM,
         Toks.push_back(NewTok);
       }
 
-      std::vector<Token> NewTokens = swift::tokenize(SM, BufID, Offset,
+      std::vector<Token> NewTokens = swift::tokenize(LangOpts, SM, BufID, Offset,
                                                      EndOffset,
                                                      /*KeepComments=*/true);
       Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
@@ -211,7 +212,8 @@ static void getStringPartTokens(const Token &Tok, const SourceManager &SM,
   }
 }
 
-std::vector<Token> swift::tokenize(const SourceManager &SM, unsigned BufferID,
+std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
+                                   const SourceManager &SM, unsigned BufferID,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString) {
@@ -219,8 +221,8 @@ std::vector<Token> swift::tokenize(const SourceManager &SM, unsigned BufferID,
   if (Offset == 0 && EndOffset == 0)
     EndOffset = Buffer->getBufferSize();
 
-  Lexer L(SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false, KeepComments,
-          Offset, EndOffset);
+  Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
+          KeepComments, Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
@@ -228,7 +230,7 @@ std::vector<Token> swift::tokenize(const SourceManager &SM, unsigned BufferID,
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();
-      getStringPartTokens(StrTok, SM, BufferID, Buffer, Tokens);
+      getStringPartTokens(StrTok, LangOpts, SM, BufferID, Buffer, Tokens);
     }
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.
@@ -245,8 +247,8 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
     BufferID(BufferID),
     Diags(SF.getASTContext().Diags),
     SF(SF),
-    L(new Lexer(SF.getASTContext().SourceMgr, BufferID,
-                &SF.getASTContext().Diags,
+    L(new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
+                BufferID, &SF.getASTContext().Diags,
                 /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false)),
     SIL(SIL),
     Context(SF.getASTContext()) {
