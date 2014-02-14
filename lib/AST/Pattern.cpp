@@ -75,12 +75,6 @@ template<typename Class>
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Pattern::*)() const);
 
-
-void Pattern::setType(Type ty) {
-  Ty = ty;
-}
-
-
 /// getSourceRange - Return the full source range of the pattern.
 SourceRange Pattern::getSourceRange() const {
   switch (getKind()) {
@@ -118,6 +112,8 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
   switch (getKind()) {
   case PatternKind::Any:
+  case PatternKind::Isa:
+  case PatternKind::Expr:
     return;
 
   case PatternKind::Named:
@@ -134,9 +130,6 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
       elt.getPattern()->forEachVariable(fn);
     return;
 
-  case PatternKind::Isa:
-    return;
-  
   case PatternKind::NominalType:
     for (auto elt : cast<NominalTypePattern>(this)->getElements())
       elt.getSubPattern()->forEachVariable(fn);
@@ -148,11 +141,49 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
       OP->getSubPattern()->forEachVariable(fn);
     return;
   }
-  
-  case PatternKind::Expr:
-    return;
   }
 }
+
+/// \brief apply the specified function to all pattern nodes recursively in
+/// this pattern.  This is a pre-order traversal.
+void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
+  f(this);
+
+  switch (getKind()) {
+  // Leaf patterns have no recursion.
+  case PatternKind::Any:
+  case PatternKind::Named:
+  case PatternKind::Isa:
+  case PatternKind::Expr:// FIXME: expr nodes are not modeled right in general.
+    return;
+
+  case PatternKind::Paren:
+    return cast<ParenPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Typed:
+    return cast<TypedPattern>(this)->getSubPattern()->forEachNode(f);
+  case PatternKind::Var:
+    return cast<VarPattern>(this)->getSubPattern()->forEachNode(f);
+
+  case PatternKind::Tuple:
+    for (auto elt : cast<TuplePattern>(this)->getFields())
+      elt.getPattern()->forEachNode(f);
+    return;
+
+  case PatternKind::NominalType:
+    for (auto elt : cast<NominalTypePattern>(this)->getElements())
+      elt.getSubPattern()->forEachNode(f);
+    return;
+
+  case PatternKind::EnumElement: {
+    auto *OP = cast<EnumElementPattern>(this);
+    if (OP->hasSubPattern())
+      OP->getSubPattern()->forEachNode(f);
+    return;
+  }
+  }
+}
+
+
 
 Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
   Pattern *result;

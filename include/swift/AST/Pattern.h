@@ -104,7 +104,7 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty);
+  void setType(Type ty) { Ty = ty; }
 
   /// Overwrite the type of this pattern.
   void overwriteType(Type ty) { assert(hasType()); Ty = ty; }
@@ -124,6 +124,10 @@ public:
   /// \brief apply the specified function to all variables referenced in this
   /// pattern.
   void forEachVariable(const std::function<void(VarDecl*)> &f) const;
+
+  /// \brief apply the specified function to all pattern nodes recursively in
+  /// this pattern.  This is a pre-order traversal.
+  void forEachNode(const std::function<void(Pattern*)> &f);
 
 
   Pattern *clone(ASTContext &context, bool Implicit = false) const;
