@@ -172,8 +172,8 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
   // Find the member used to satisfy the named requirement.
   ProtocolConformance *conformance = 0;
   bool conforms = tc.conformsToProtocol(type, proto, dc, &conformance);
-  (void)conforms;
-  assert(conforms && "Protocol conformance broken?");
+  if (!conforms)
+    return nullptr;
 
   // For an archetype, just return the requirement from the protocol. There
   // are no protocol conformance tables.
