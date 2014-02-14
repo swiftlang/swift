@@ -230,7 +230,20 @@ IRGenModule::IRGenModule(ASTContext &Context,
     ObjCClassPtrTy
   };
   ObjCSuperStructTy->setBody(objcSuperElts);
-      
+  
+  ObjCBlockStructTy = llvm::StructType::create(LLVMContext, "objc_block");
+  ObjCBlockPtrTy = ObjCBlockStructTy->getPointerTo(DefaultAS);
+  llvm::Type *objcBlockElts[] = {
+    ObjCClassPtrTy, // isa
+    Int32Ty,        // flags
+    Int32Ty,        // reserved
+    FunctionPtrTy,  // invoke function pointer
+    Int8PtrTy,      // TODO: block descriptor pointer.
+                    // We will probably need a struct type for that at some
+                    // point too.
+  };
+  ObjCBlockStructTy->setBody(objcBlockElts);
+  
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 

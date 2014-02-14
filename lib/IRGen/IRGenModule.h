@@ -175,6 +175,8 @@ public:
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
   llvm::StructType *ObjCSuperStructTy; /// %objc_super
   llvm::PointerType *ObjCSuperPtrTy;   /// %objc_super*
+  llvm::StructType *ObjCBlockStructTy; /// %objc_block
+  llvm::PointerType *ObjCBlockPtrTy;   /// %objc_block*
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 
   /// Get the bit width of an integer type for the target platform.
