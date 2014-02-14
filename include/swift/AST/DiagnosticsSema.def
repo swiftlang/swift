@@ -695,7 +695,7 @@ ERROR(non_optional_in_conditional_binding,sema_tcs,none,
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "Sequence protocol definition is broken", ())
 ERROR(generator_protocol_broken,sema_tcs,none,
-      "Stream protocol definition is broken", ())
+      "Generator protocol definition is broken", ())
 
 ERROR(break_outside_loop,sema_tcs,none,
       "'break' is only allowed inside a loop", ())

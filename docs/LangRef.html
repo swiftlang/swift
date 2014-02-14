@@ -1320,8 +1320,8 @@ an lvalue unless it has a <code>var-get</code> clause but not
 
   <pre class="example">
     protocol Sequence {
-      typename StreamType : Stream
-      func generate() -> StreamType
+      typename GeneratorType : Generator
+      func generate() -> GeneratorType
     }
   </pre>
 

@@ -346,17 +346,17 @@ public:
       return nullptr;
     }
 
-    // Retrieve the 'Stream' protocol.
-    ProtocolDecl *StreamProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Stream);
-    if (!StreamProto) {
+    // Retrieve the 'Generator' protocol.
+    ProtocolDecl *GeneratorProto
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::Generator);
+    if (!GeneratorProto) {
       return nullptr;
     }
     
     // Verify that the container conforms to the Sequence protocol, and
     // invoke getElements() on it container to retrieve the range of elements.
-    Type StreamTy;
-    VarDecl *Stream;
+    Type GeneratorTy;
+    VarDecl *Generator;
     {
       Type SequenceType = Sequence->getType()->getRValueType();
 
@@ -365,52 +365,52 @@ public:
                                  &Conformance, Sequence->getLoc()))
         return nullptr;
 
-      StreamTy = TC.getWitnessType(SequenceType, SequenceProto,
+      GeneratorTy = TC.getWitnessType(SequenceType, SequenceProto,
                                       Conformance,
-                                      TC.Context.getIdentifier("StreamType"),
+                                      TC.Context.getIdentifier("GeneratorType"),
                                       diag::sequence_protocol_broken);
       
-      Expr *GetStream
+      Expr *GetGenerator
         = TC.callWitness(Sequence, DC, SequenceProto, Conformance,
                          TC.Context.getIdentifier("generate"),
                          {}, diag::sequence_protocol_broken);
-      if (!GetStream) return nullptr;
+      if (!GetGenerator) return nullptr;
       
       // Create a local variable to capture the generator.
-      Stream = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
+      Generator = new (TC.Context) VarDecl(/*static*/ false, /*IsLet*/ false,
                                            S->getInLoc(),
                                      TC.Context.getIdentifier("$generator"),
-                                     StreamTy, DC);
-      Stream->setImplicit();
+                                     GeneratorTy, DC);
+      Generator->setImplicit();
       
       // Create a pattern binding to initialize the generator.
-      auto GenPat = new (TC.Context) NamedPattern(Stream);
+      auto GenPat = new (TC.Context) NamedPattern(Generator);
       GenPat->setImplicit();
       auto GenBinding = new (TC.Context) PatternBindingDecl(SourceLoc(),
                                                           S->getForLoc(),
-                                                          GenPat, GetStream,
+                                                          GenPat, GetGenerator,
                                                           /*storage*/ true,
                                                           /*conditional*/ false,
                                                           DC);
       GenBinding->setImplicit();
-      S->setStream(GenBinding);
+      S->setGenerator(GenBinding);
     }
     
     // Working with generators requires Optional.
     if (TC.requireOptionalIntrinsics(S->getForLoc()))
       return nullptr;
     
-    // Gather the witnesses from the Stream protocol conformance, which
+    // Gather the witnesses from the Generator protocol conformance, which
     // we'll use to drive the loop.
     
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     ProtocolConformance *GenConformance = nullptr;
-    if (!TC.conformsToProtocol(StreamTy, StreamProto, DC, &GenConformance,
+    if (!TC.conformsToProtocol(GeneratorTy, GeneratorProto, DC, &GenConformance,
                                Sequence->getLoc()))
       return nullptr;
     
-    Type ElementTy = TC.getWitnessType(StreamTy, StreamProto,
+    Type ElementTy = TC.getWitnessType(GeneratorTy, GeneratorProto,
                                        GenConformance,
                                        TC.Context.getIdentifier("Element"),
                                        diag::generator_protocol_broken);
@@ -419,9 +419,9 @@ public:
     
     // Compute the expression that advances the generator.
     Expr *GenNext
-      = TC.callWitness(TC.buildCheckedRefExpr(Stream, DC, S->getInLoc(),
+      = TC.callWitness(TC.buildCheckedRefExpr(Generator, DC, S->getInLoc(),
                                               /*implicit*/true),
-                       DC, StreamProto, GenConformance,
+                       DC, GeneratorProto, GenConformance,
                        TC.Context.getIdentifier("next"),
                        {}, diag::generator_protocol_broken);
     if (!GenNext) return nullptr;
@@ -431,7 +431,7 @@ public:
       TC.diagnose(S->getForLoc(), diag::generator_protocol_broken);
       return nullptr;
     }
-    S->setStreamNext(GenNext);
+    S->setGeneratorNext(GenNext);
     
     // Coerce the pattern to the element type, now that we know the element
     // type.

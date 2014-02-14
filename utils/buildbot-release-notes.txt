@@ -1,3 +1,10 @@
+2014-02-19
+----------
+
+* The "Stream" protocol has been renamed back to "Generator," which is
+  precedented in other languages and causes less confusion with I/O
+  streaming.
+
 2014-02-12
 ----------
 

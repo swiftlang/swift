@@ -38,7 +38,7 @@
 
 PROTOCOL(ArrayBound)
 PROTOCOL(Sequence)
-PROTOCOL(Stream)
+PROTOCOL(Generator)
 PROTOCOL(LogicValue)
 PROTOCOL(DynamicLookup)
 PROTOCOL(RawRepresentable)

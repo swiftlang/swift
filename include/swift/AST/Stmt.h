@@ -319,10 +319,10 @@ class ForEachStmt : public Stmt {
   BraceStmt *Body;
   
   /// The generator variable along with its initializer.
-  PatternBindingDecl *Stream = nullptr;
+  PatternBindingDecl *Generator = nullptr;
   /// The expression that advances the generator and returns an Optional with
   /// the next value or None to signal end-of-stream.
-  Expr *StreamNext = nullptr;
+  Expr *GeneratorNext = nullptr;
 
 public:
   ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
@@ -352,12 +352,12 @@ public:
   
   /// Retrieve the pattern binding that contains the (implicit) generator
   /// variable and its initialization from the container.
-  PatternBindingDecl *getStream() const { return Stream; }
-  void setStream(PatternBindingDecl *S) { Stream = S; }
+  PatternBindingDecl *getGenerator() const { return Generator; }
+  void setGenerator(PatternBindingDecl *G) { Generator = G; }
   
   /// Retrieve the expression that advances the generator.
-  Expr *getStreamNext() const { return StreamNext; }
-  void setStreamNext(Expr *E) { StreamNext = E; }
+  Expr *getGeneratorNext() const { return GeneratorNext; }
+  void setGeneratorNext(Expr *E) { GeneratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }
