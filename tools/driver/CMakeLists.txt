@@ -23,11 +23,3 @@ install(TARGETS swift
 add_custom_command(TARGET swift POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E create_symlink swift swift_driver
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-
-# Add a symlink to clang's includes so the built swift
-# can find its resource dir when run in place.
-add_custom_command(TARGET swift POST_BUILD
-  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/swift"
-  COMMAND ln "-fns"
-    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
-    "${SWIFTLIB_DIR}/swift/clang")

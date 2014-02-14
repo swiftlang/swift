@@ -313,11 +313,7 @@ function(compile_swift_files)
   endif()
 
   # Allow import of other Swift modules we just built.
-  set(arch_subdir "")
-  if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
-    set(arch_subdir "/32")
-  endif()
-  list(APPEND swift_flags "-I" "${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir}")
+  list(APPEND swift_flags "-resource-dir" "${SWIFTLIB_DIR}")
 
   # Turn on debug symbols in debug builds.
   if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -362,6 +358,11 @@ function(compile_swift_files)
   else()
     # FIXME: We can control the module output path now.
     get_filename_component(module_source_name ${objfile} NAME_WE)
+
+    set(arch_subdir "")
+    if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
+      set(arch_subdir "/32")
+    endif()
 
     set(module_source_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
@@ -462,16 +463,16 @@ function(handle_swift_sources sourcesvar externalvar target)
   set(${externalvar} ${swift_sources} ${asm_sources} PARENT_SCOPE)
 endfunction()
 
-# Set SWIFTLIB_DIR to the directory in the build tree where Swift source files
+# Set SWIFTLIB_DIR to the directory in the build tree where Swift resource files
 # should be placed. Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
-set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib")
+set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
 
 # Set SWIFTLIB_SUBDIR to the subdirectory inside SWIFTLIB_DIR 
 # where Swift .swiftmodules and libraries should be placed.
 # This is changed later based on SWIFT_DEPLOYMENT_OS.
 # The OS is currently needed in lieu of proper SDK support.
-set(SWIFTLIB_SUBDIR "swift")
+set(SWIFTLIB_SUBDIR ".")
 
 
 # Add a new Swift library.
@@ -517,6 +518,7 @@ macro(add_swift_library name)
   
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
     ${IS_STDLIB_CORE_arg})
+
   add_library( ${name} ${libkind}
     ${SWIFTLIB_SOURCES}
     ${SWIFTLIB_EXTERNAL_SOURCES})
@@ -639,17 +641,17 @@ macro(add_swift_executable name)
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
   # ASan does not play well with exported_symbol option. This should be fixed soon.
-  if(${SWIFT_ASAN_BUILD} MATCHES OFF OR ${SWIFT_ASAN_BUILD} MATCHES NO) 
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  if(NOT SWIFT_ASAN_BUILD)
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       set_target_properties(${name}
         PROPERTIES
-        LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main    -Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+        LINK_FLAGS "-Xlinker -exported_symbol -Xlinker _main -Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR} ")
     endif()
   else()
-    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
       set_target_properties(${name}
         PROPERTIES
-        LINK_FLAGS "-Xlinker -rpath -Xlinker @executable_path/../lib/${SWIFTLIB_SUBDIR} ")
+        LINK_FLAGS "-Xlinker -rpath -Xlinker @executable_path/../lib/swift/${SWIFTLIB_SUBDIR} ")
     endif()
   endif()
 
@@ -765,7 +767,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   endif()
 
   # Add OS name to stdlib install directory
-  set(SWIFTLIB_SUBDIR "swift/${SWIFT_DEPLOYMENT_OS}")
+  set(SWIFTLIB_SUBDIR "${SWIFT_DEPLOYMENT_OS}")
 endif()
 
 # We'll need this once we have generated headers
