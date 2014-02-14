@@ -19,6 +19,7 @@
 #include "swift/Runtime/Alloc.h"
 #include "swift/Runtime/Metadata.h"
 #include <algorithm>
+#include <dlfcn.h>
 #include <new>
 #include <string.h>
 #include "llvm/ADT/DenseMap.h"
@@ -2003,6 +2004,83 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
       ::assignWithCopy(destVal, srcVal, type);
 
   return reinterpret_cast<OpaqueValue*>(result);
+}
+
+const NominalTypeDescriptor *
+Metadata::getNominalTypeDescriptor() const {
+  switch (getKind()) {
+  case MetadataKind::Class:
+    return static_cast<const ClassMetadata *>(this)->Description;
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+    return static_cast<const StructMetadata *>(this)->Description;
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Existential:
+  case MetadataKind::Metatype:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+    return nullptr;
+  }
+}
+
+/// \brief Check whether a type conforms to a given native Swift protocol,
+/// visible from the named module.
+///
+/// If so, returns a pointer to the witness table for its conformance.
+/// Returns void if the type does not conform to the protocol.
+///
+/// \param type The metadata for the type for which to do the conformance
+///             check.
+/// \param protocol The protocol descriptor for the protocol to check
+///                 conformance for.
+/// \param module The mangled name of the module from which to determine
+///               conformance visibility.
+const void *swift::swift_conformsToProtocol(const Metadata *type,
+                                            const ProtocolDescriptor *protocol,
+                                            const char *module) {
+  // FIXME: This is an unconscionable hack that only works for 1.0 because
+  // we brazenly assume that:
+  // - witness tables never require runtime instantiation
+  // - witness tables have external visibility
+  // - we in practice only have one module per program
+  // - all conformances are public, and defined in the same module as the
+  //   conforming type
+  // - only nominal types conform to protocols
+  
+  // FIXME: Only check nominal types for now.
+  auto *descriptor = type->getNominalTypeDescriptor();
+  if (!descriptor)
+    return nullptr;
+  
+  // Derive the symbol name that the witness table ought to have.
+  // _TWP <protocol conformance>
+  // protocol conformance ::= <type> <protocol> <module>
+  
+  std::string mangledName = "_TWP";
+  mangledName += descriptor->Name;
+  // The name in the protocol descriptor gets mangled as a protocol type
+  // P <name> _
+  const char *begin = protocol->Name + 1;
+  const char *end = protocol->Name + strlen(protocol->Name) - 1;
+  mangledName.append(begin, end);
+  
+  // FIXME: Assume the conformance was declared in the same module as the type,
+  // so it will be mangled either as the stdlib module 'Ss' or the first
+  // substitution 'S_'.
+  if (descriptor->Name[0] == 'S'
+      || (descriptor->Name[1] == 'S' && descriptor->Name[2] == 's'))
+    mangledName += "Ss";
+  else
+    mangledName += "S_";
+  
+  // Look up the symbol for the conformance everywhere.
+  return dlsym(RTLD_DEFAULT, mangledName.c_str());
+}
+
 }
 
 namespace llvm {

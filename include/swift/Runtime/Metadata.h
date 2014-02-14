@@ -623,6 +623,8 @@ static const unsigned ObjCReservedLowBits = 0U;
 
 }
   
+struct NominalTypeDescriptor;
+  
 /// The common structure of all type metadata.
 struct Metadata {
   constexpr Metadata() : Kind(MetadataKind::Class) {}
@@ -672,6 +674,10 @@ public:
     }
   FOR_ALL_FUNCTION_VALUE_WITNESSES(FORWARD_WITNESS)
   #undef FORWARD_WITNESS
+  
+  /// Get the nominal type descriptor if this metadata describes a nominal type,
+  /// or return null if it does not.
+  const NominalTypeDescriptor *getNominalTypeDescriptor() const;
   
 protected:
   friend struct OpaqueMetadata;
@@ -1489,6 +1495,24 @@ int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
 void swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
                                           int index,
                                           const Metadata *self);
+  
+  
+/// \brief Check whether a type conforms to a given native Swift protocol,
+/// visible from the named module.
+///
+/// If so, returns a pointer to the witness table for its conformance.
+/// Returns void if the type does not conform to the protocol.
+///
+/// \param type The metadata for the type for which to do the conformance
+///             check.
+/// \param protocol The protocol descriptor for the protocol to check
+///                 conformance for.
+/// \param module The mangled name of the module from which to determine
+///               conformance visibility.
+extern "C"
+const void *swift_conformsToProtocol(const Metadata *type,
+                                     const ProtocolDescriptor *protocol,
+                                     const char *module);
   
 /// Return the number of extra inhabitants in a heap object pointer.
 extern "C"

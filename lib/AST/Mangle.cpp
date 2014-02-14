@@ -1247,17 +1247,26 @@ void Mangler::mangleProtocolConformance(ProtocolConformance *conformance) {
   // protocol-conformance ::= ('U' generic-parameter+ '_')?
   //                          type protocol module
   // FIXME: explosion level?
-
+  
+  CanType type = conformance->getType()->getCanonicalType();
+  // FIXME: Assume that all generic conformances add no additional constraints
+  // to the conforming type's generic parameters and swallow them. This makes
+  // it easier for our hacked-up implementation of swift_conformsToProtocol
+  // to find them.
+  if (conformance->getGenericParams())
+    type = UnboundGenericType::get(type->getNominalOrBoundGenericNominal(),
+                                   nullptr,
+                                   type->getASTContext())->getCanonicalType();
+#if 0
   ContextStack context(*this);
-
   // If the conformance is generic, mangle its generic parameters.
   if (auto gp = conformance->getGenericParams()) {
     Buffer << 'U';
     bindGenericParameters(gp, /*mangle*/ true);
   }
+#endif
   
-  mangleType(conformance->getType()->getCanonicalType(),
-             ResilienceExpansion::Minimal, 0);
+  mangleType(type, ResilienceExpansion::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
   mangleModule(conformance->getDeclContext()->getParentModule());
 }
