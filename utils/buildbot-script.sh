@@ -478,7 +478,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
         _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
     
-        build_cmd=($DISTCC_PUMP "$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
+        build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
         "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
 
