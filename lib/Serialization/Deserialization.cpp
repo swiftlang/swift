@@ -1553,6 +1553,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     TypeID interfaceTypeID;
     DeclID associatedDeclID;
     DeclID overriddenID;
+    DeclID accessorStorageDeclID;
 
     decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                         hasSelectorStyleSignature,
@@ -1561,7 +1562,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
-                                        overriddenID);
+                                        overriddenID, accessorStorageDeclID);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1637,11 +1638,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
           fn->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
         else if (isa<PostfixOperatorDecl>(op))
           fn->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
-        // Note that an explicit [infix] is not required.
+        // Note that an explicit @infix is not required.
       }
       // Otherwise, unknown associated decl kind.
     }
 
+    // If we are an accessor on a var or subscript, make sure it is deserialized
+    // too.
+    getDecl(accessorStorageDeclID);
     break;
   }
 
@@ -1962,7 +1966,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              overriddenID);
-
+    auto Getter = cast_or_null<FuncDecl>(getDecl(getterID));
+    auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       break;
@@ -1975,9 +1980,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
                                              SourceLoc(), indices, SourceLoc(),
                                              elemTy, DC);
-    subscript->setAccessors(SourceRange(),
-                            cast_or_null<FuncDecl>(getDecl(getterID)),
-                            cast_or_null<FuncDecl>(getDecl(setterID)));
+    subscript->setAccessors(SourceRange(), Getter, Setter);
     declOrOffset = subscript;
 
     subscript->setType(getType(declTypeID));

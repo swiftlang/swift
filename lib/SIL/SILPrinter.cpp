@@ -231,6 +231,8 @@ void SILDeclRef::print(raw_ostream &OS) const {
     }
 
     printFullContext(decl->getDeclContext(), OS);
+    assert(!decl->getName().empty());
+
     OS << decl->getName() << Suffix;
   } else {
     printFullContext(getDecl()->getDeclContext(), OS);

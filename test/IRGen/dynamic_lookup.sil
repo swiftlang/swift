@@ -6,14 +6,8 @@ import Builtin
 class X {
   @objc func f() { }
   @objc type func g() { }
-  @objc var value : Int { 
-    return 17
-  }
-
-  @objc subscript (i : Int) -> Int {
-  get:
-    return i
-  }
+  @objc var value : Int { get }
+  @objc subscript (i : Int) -> Int { get }
 }
 
 sil @_TFC14dynamic_lookup1XD : $@cc(method) @thin (X) -> ()

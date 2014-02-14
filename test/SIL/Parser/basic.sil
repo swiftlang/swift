@@ -947,7 +947,7 @@ entry(%0 : $GenericStruct<Int>):
 }
 
 class Foo {
-  subscript (x: Int, y: Int) -> Int
+  subscript (x: Int, y: Int) -> Int { get set }
   var x: Int
   var y: Int
 }

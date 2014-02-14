@@ -789,22 +789,35 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   // Handle sil-constant-kind-and-uncurry-level.
   // ParseState indicates the value we just handled.
   // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
-  // We accept func|getter|setter|...|foreign or an integer when ParseState is 0;
-  // accept foreign or an integer when ParseState is 1; accept foreign when ParseState
-  // is 2.
+  // We accept func|getter|setter|...|foreign or an integer when ParseState is
+  // 0; accept foreign or an integer when ParseState is 1; accept foreign when
+  // ParseState is 2.
   unsigned ParseState = 0;
   do {
     if (P.Tok.is(tok::identifier)) {
+      auto IdLoc = P.Tok.getLoc();
       if (parseSILIdentifier(Id, diag::expected_sil_constant))
         return true;
       if (!ParseState && Id.str() == "func") {
         Kind = SILDeclRef::Kind::Func;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "getter") {
-        Kind = SILDeclRef::Kind::Getter;
+        if (!isa<AbstractStorageDecl>(VD) ||
+            !cast<AbstractStorageDecl>(VD)->getGetter()) {
+          P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
+          return true;
+        }
+        Kind = SILDeclRef::Kind::Func;
+        VD = cast<AbstractStorageDecl>(VD)->getGetter();
         ParseState = 1;
       } else if (!ParseState && Id.str() == "setter") {
-        Kind = SILDeclRef::Kind::Setter;
+        if (!isa<AbstractStorageDecl>(VD) ||
+            !cast<AbstractStorageDecl>(VD)->getSetter()) {
+          P.diagnose(IdLoc, diag::referenced_value_no_accessor, 1);
+          return true;
+        }
+        Kind = SILDeclRef::Kind::Func;
+        VD = cast<AbstractStorageDecl>(VD)->getSetter();
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
         Kind = SILDeclRef::Kind::Allocator;

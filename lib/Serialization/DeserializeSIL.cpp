@@ -520,8 +520,8 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
 }
 
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
-                          unsigned RecordKind,
-                          SmallVectorImpl<uint64_t> &scratch) {
+                                         unsigned RecordKind,
+                                         SmallVectorImpl<uint64_t> &scratch) {
   // Return error if Basic Block is null.
   if (!BB)
     return true;

@@ -606,20 +606,28 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     decl->getType().print(Printer, Options);
   }
 
-  if (decl->hasAccessorFunctions() && Options.FunctionDefinitions) {
+  if (decl->hasAccessorFunctions()) {
     Printer << " {";
     {
       if (auto getter = decl->getGetter()) {
-        Printer << "\n";
-        indent();
-        visit(getter);
-        Printer << "\n";
+        if (!Options.FunctionDefinitions)
+          Printer << " get";
+        else {
+          Printer << "\n";
+          indent();
+          visit(getter);
+          Printer << "\n";
+        }
       }
       if (auto setter = decl->getSetter()) {
-        Printer << "\n";
-        indent();
-        visit(setter);
-        Printer << "\n";
+        if (!Options.FunctionDefinitions)
+          Printer << " set";
+        else {
+          Printer << "\n";
+          indent();
+          visit(setter);
+          Printer << "\n";
+        }
       }
     }
     indent();
@@ -788,23 +796,28 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer << " -> ";
   decl->getElementType().print(Printer, Options);
 
-  if (!Options.FunctionDefinitions)
-    return;
-
   Printer << " {";
   {
     IndentRAII indentMore(*this);
     if (auto getter = decl->getGetter()) {
-      Printer << "\n";
-      indent();
-      visit(getter);
-      Printer << "\n";
+      if (!Options.FunctionDefinitions)
+        Printer << " get";
+      else {
+        Printer << "\n";
+        indent();
+        visit(getter);
+        Printer << "\n";
+      }
     }
     if (auto setter = decl->getSetter()) {
-      Printer << "\n";
-      indent();
-      visit(setter);
-      Printer << "\n";
+      if (!Options.FunctionDefinitions)
+        Printer << " set";
+      else {
+        Printer << "\n";
+        indent();
+        visit(setter);
+        Printer << "\n";
+      }
     }
   }
   indent();

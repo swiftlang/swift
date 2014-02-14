@@ -1411,6 +1411,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
+                           addDeclRef(fn->getAccessorStorageDecl()),
                            fn->getAttrs().AsmName);
 
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);

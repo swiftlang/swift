@@ -633,6 +633,7 @@ namespace decls_block {
     TypeIDField,  // interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
+    DeclIDField,  // AccessorStorageDecl
     BCBlob        // asmname, if any
     // The record is trailed by its generic parameters, if any, followed by its
     // argument and body parameter patterns.

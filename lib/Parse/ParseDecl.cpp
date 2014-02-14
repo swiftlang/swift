@@ -1226,8 +1226,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
   Get = Set = WillSet = DidSet = nullptr;
 
   // Properties in protocols use sufficiently limited syntax that we have a
-  // special parsing loop for them.
-  if (Flags.contains(PD_InProtocol)) {
+  // special parsing loop for them.  SIL mode uses the same syntax.
+  if (Flags.contains(PD_InProtocol) || isInSILMode()) {
     while (Tok.isNot(tok::r_brace)) {
       if (Tok.is(tok::eof))
         return true;
@@ -2506,11 +2506,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   if (Tok.isNot(tok::l_brace))  {
     // Subscript declarations must always have at least a getter, so they need
     // to be followed by a {.
-    if (!isInSILMode()) {
-      diagnose(Tok, diag::expected_lbrace_subscript);
-      Status.setIsParseError();
-    }
-    
+    diagnose(Tok, diag::expected_lbrace_subscript);
+    Status.setIsParseError();
   } else {
     SourceLoc LBLoc = consumeToken();
     
@@ -2560,10 +2557,8 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                              Indices.get(), /*StaticLoc*/ SourceLoc(),
                              Flags, AccessorKind::IsGetter, this);
     
-    if (!isInSILMode()) {
-      Get->setInvalid();
-      Get->setType(ErrorType::get(Context));
-    }
+    Get->setInvalid();
+    Get->setType(ErrorType::get(Context));
     Decls.push_back(Get);
   }
 
