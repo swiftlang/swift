@@ -1226,7 +1226,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   auto *Set = VD->getSetter();
   auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = nullptr;
-  Set->getArgParamPatterns().back()->forEachVariable([&](VarDecl *VD) {
+  Set->getBodyParamPatterns().back()->forEachVariable([&](VarDecl *VD) {
     assert(!ValueDecl && "Already found 'value'?");
     ValueDecl = VD;
   });
