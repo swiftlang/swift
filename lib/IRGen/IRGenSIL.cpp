@@ -2238,8 +2238,13 @@ void IRGenSILFunction::visitStructElementAddrInst(
 void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   llvm::Value *value = base.claimNext();
-  
+
   SILType baseTy = i->getOperand().getType();
+
+  // FIXME: rdar://16075395 - We emit a bitcast here in case the exposion's
+  // value type is incorrect.  This should not be necessary.
+  value = Builder.CreateBitCast(value, getTypeInfo(baseTy).StorageType);
+
   Address field = projectPhysicalClassMemberAddress(*this,
                                                     value,
                                                     baseTy,
