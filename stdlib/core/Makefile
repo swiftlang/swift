@@ -66,7 +66,8 @@ NO_BUILD_ARCHIVE := 1
 include $(SWIFT_LEVEL)/Makefile
 
 LDFLAGS += -Xlinker -reexport-lobjc \
-	   -Xlinker -force_load -Xlinker $(LibDir)/libswift_runtime.a
+	   -Xlinker -force_load -Xlinker $(LibDir)/libswift_runtime.a \
+	   -framework Foundation
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 
