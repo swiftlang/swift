@@ -1,3 +1,5 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
 sil_stage canonical
 
 import swift
