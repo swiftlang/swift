@@ -2567,7 +2567,7 @@ private:
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
-  unsigned IndexIfPrimary;
+  unsigned IndexIfPrimaryOrExistentialID;
   ArrayRef<std::pair<Identifier, ArchetypeType *>> NestedTypes;
   
 public:
@@ -2593,7 +2593,13 @@ public:
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
-  static ArchetypeType *getOpened(Type existential);
+  ///
+  /// \param existential The existential type to open.
+  ///
+  /// \param knownID When non-empty, the known ID of the archetype. When empty,
+  /// a fresh archetype with a unique ID will be opened.
+  static ArchetypeType *getOpened(Type existential, 
+                                  Optional<unsigned> knownID = Nothing);
 
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }
@@ -2663,12 +2669,21 @@ public:
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 
-  bool isPrimary() const { return IndexIfPrimary > 0; }
+  bool isPrimary() const { 
+    return IndexIfPrimaryOrExistentialID > 0 && 
+           getOpenedExistentialType().isNull();
+  }
 
   // getPrimaryIndex - For a primary archetype, return the zero-based index.
   unsigned getPrimaryIndex() const {
     assert(isPrimary() && "Non-primary archetype does not have index");
-    return IndexIfPrimary - 1;
+    return IndexIfPrimaryOrExistentialID - 1;
+  }
+
+  /// Retrieve the ID number of this opened existential.
+  unsigned getOpenedExistentialID() const {
+    assert(getOpenedExistentialType() && "Not an opened existential archetype");
+    return IndexIfPrimaryOrExistentialID;
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -2690,16 +2705,18 @@ private:
                         RecursiveTypeProperties(),
                         ConformsTo, Superclass),
       ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
-      IndexIfPrimary(Index? *Index + 1 : 0) { }
+      IndexIfPrimaryOrExistentialID(Index? *Index + 1 : 0) { }
 
   ArchetypeType(const ASTContext &Ctx, 
                 Type Existential,
+                unsigned ID,
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
                         RecursiveTypeProperties(),
                         ConformsTo, Superclass),
-      ParentOrOpened(Existential.getPointer()), IndexIfPrimary(0) { }
+      ParentOrOpened(Existential.getPointer()), 
+      IndexIfPrimaryOrExistentialID(ID) { }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 

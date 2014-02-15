@@ -1038,6 +1038,16 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_sil_self);
   }
 
+  // In SIL, handle @opened (n), which creates an existential archetype.
+  if (attrs.has(TAK_opened)) {
+    if (!ty->isExistentialType()) {
+      TC.diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
+    } else {
+      ty = ArchetypeType::getOpened(ty, attrs.OpenedID);
+    }
+    attrs.clearAttribute(TAK_opened);
+  }
+
   // In SIL files *only*, permit @weak and @unowned to apply directly to types.
   if (attrs.hasOwnership() && ty->hasReferenceSemantics()) {
     if (auto SF = DC->getParentSourceFile()) {

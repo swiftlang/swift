@@ -829,6 +829,14 @@ ERROR(cc_attribute_unknown_cc_name,attribute_parsing,none,
 ERROR(cc_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' after calling convention name for 'cc' attribute", ())
 
+// opened
+ERROR(opened_attribute_expected_lparen,attribute_parsing,none,
+      "expected '(' after 'opened' attribute", ())
+ERROR(opened_attribute_id_value,attribute_parsing,none,
+      "known id for 'opened' attribute must be a non-negative integer", ())
+ERROR(opened_attribute_expected_rparen,attribute_parsing,none,
+      "expected ')' after id value for 'opened' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

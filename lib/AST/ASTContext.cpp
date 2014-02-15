@@ -172,7 +172,8 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
-  
+  std::vector<ArchetypeType *> OpenedExistentialArchetypes;
+
   /// \brief The permanent arena.
   Arena Permanent;
 
@@ -1809,6 +1810,44 @@ DependentMemberType *DependentMemberType::get(Type base,
                                                  properties);
   }
   return known;
+}
+
+ArchetypeType *ArchetypeType::getOpened(Type existential,
+                                        Optional<unsigned> knownID) {
+  auto &ctx = existential->getASTContext();
+  auto &openedExistentialArchetypes = ctx.Impl.OpenedExistentialArchetypes;
+  // If we know the ID already...
+  if (knownID) {
+    // ... and we already have an archetype for that ID, return it.
+    if (*knownID < openedExistentialArchetypes.size()) {
+      if (auto result = openedExistentialArchetypes[*knownID]) {
+        assert(result->getOpenedExistentialType()->isEqual(existential) &&
+               "Retrieved the wrong opened existential type?");
+        return result;
+      }
+
+      // No archetype exists, but we've allocated the slot for it.
+    } else {
+      // Allocate enough space for this ID.
+      openedExistentialArchetypes.resize(*knownID + 1);
+    }
+  } else {
+    // Allocate a new ID at the end.
+    knownID = openedExistentialArchetypes.size();
+    openedExistentialArchetypes.push_back(nullptr);
+  }
+
+  auto arena = AllocationArena::Permanent;
+  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
+  assert(existential->isExistentialType() && "Not an existential type?");
+  existential->isExistentialType(conformsTo);
+  ProtocolType::canonicalizeProtocols(conformsTo);
+  
+  auto result = new (ctx, arena) ArchetypeType(ctx, existential, *knownID,
+                                               ctx.AllocateCopy(conformsTo),
+                                        existential->getSuperclass(nullptr));
+  openedExistentialArchetypes[*knownID] = result;
+  return result;
 }
 
 void *ExprHandle::operator new(size_t Bytes, ASTContext &C,

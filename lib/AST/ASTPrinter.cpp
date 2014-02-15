@@ -1603,7 +1603,7 @@ public:
 
   void visitArchetypeType(ArchetypeType *T) {
     if (auto existentialTy = T->getOpenedExistentialType()) {
-      Printer << "opened ";
+      Printer << "@opened(" << T->getOpenedExistentialID() << ") ";
       visit(existentialTy);
     } else {
       Printer << T->getFullName();

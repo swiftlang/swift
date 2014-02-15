@@ -1370,18 +1370,6 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                                         Superclass, Index);
 }
 
-ArchetypeType *ArchetypeType::getOpened(Type existential) {
-  auto arena = AllocationArena::Permanent;
-  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
-  assert(existential->isExistentialType() && "Not an existential type?");
-  existential->isExistentialType(conformsTo);
-  ProtocolType::canonicalizeProtocols(conformsTo);
-  auto &ctx = existential->getASTContext();
-  return new (ctx, arena) ArchetypeType(ctx, existential, 
-                                        ctx.AllocateCopy(conformsTo),
-                                        existential->getSuperclass(nullptr));
-}
-
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {

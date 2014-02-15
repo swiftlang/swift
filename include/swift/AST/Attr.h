@@ -147,7 +147,10 @@ public:
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
   Optional<AbstractCC> cc = Nothing;
-  
+
+  // For an opened existential type, the known ID.
+  Optional<unsigned> OpenedID;
+
   TypeAttributes() {}
   
   bool isValid() const { return AtLoc.isValid(); }
@@ -183,6 +186,7 @@ public:
   bool empty() const {
     for (SourceLoc elt : AttrLocs)
       if (elt.isValid()) return false;
+    
     return true;
   }
   
@@ -200,6 +204,9 @@ public:
     clearAttribute(TAK_sil_weak);
     clearAttribute(TAK_sil_unowned);
   }
+
+  bool hasOpenedID() const { return OpenedID.hasValue(); }
+  unsigned getOpenedID() const { return *OpenedID; }
 };
 
   

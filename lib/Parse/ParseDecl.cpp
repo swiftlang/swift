@@ -380,6 +380,38 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
     }
     break;
       
+  case TAK_opened: {
+    // Parse the opened existential ID in parents
+    SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
+    Attributes.setAttr(TAK_opened, beginLoc);
+    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (Tok.is(tok::integer_literal)) {
+        unsigned openedID = 0;
+        idLoc = Tok.getLoc();
+        if (Tok.getText().getAsInteger(0, openedID)) {
+          diagnose(Tok, diag::opened_attribute_id_value);
+        } else {
+          Attributes.OpenedID = openedID;
+        }
+        consumeToken();
+      } else {
+        diagnose(Tok, diag::opened_attribute_id_value);
+      }
+      parseMatchingToken(tok::r_paren, endLoc,
+                         diag::opened_attribute_expected_rparen,
+                         beginLoc);
+    } else {
+      diagnose(Tok, diag::opened_attribute_expected_lparen);
+    }
+
+    if (!isInSILMode()) {
+      diagnose(Loc, diag::only_allowed_in_sil, "opened");
+      Attributes.clearAttribute(TAK_opened);
+    }
+
+    break;
+  }
+
     // 'cc' attribute.
   case TAK_cc: {
     // Parse the cc name in parens.

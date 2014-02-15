@@ -1,0 +1,24 @@
+// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import swift
+
+protocol P {
+  func f() -> DynamicSelf
+}
+
+// CHECK-LABEL: define void @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_
+sil @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_ : $@thin (@in P) -> () {
+bb0(%0 : $*P):
+  debug_value_addr %0 : $*P  // let p             // id: %1
+  %2 = alloc_stack $P                             // users: %3, %4, %12
+  copy_addr %0 to [initialization] %2#1 : $*P     // id: %3
+  // CHECK: call %swift.opaque*
+  // CHECK: call %swift.opaque*
+  %4 = open_existential %2#1 : $*P to $*@opened(0) P // users: %8, %10
+  dealloc_stack %2#0 : $*@local_storage P         // id: %12
+  destroy_addr %0 : $*P                           // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()                                // id: %15
+}
