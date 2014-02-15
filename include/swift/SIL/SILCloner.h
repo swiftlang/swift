@@ -81,6 +81,15 @@ protected:
     return static_cast<ImplClass*>(this)->remapLocation(Loc);
   }
   SILType getOpType(SILType Ty) {
+    // Substitute opened existential types, if we have any.
+    if (!OpenedExistentialSubs.empty()) {
+      auto &F = getBuilder().getFunction();
+      Ty = SILType::substType(F.getModule(), 
+                              F.getModule().getSwiftModule(),
+                              OpenedExistentialSubs,
+                              Ty);
+    }
+
     return static_cast<ImplClass*>(this)->remapType(Ty);
   }
   ProtocolConformance *getOpConformance(SILType Ty,
@@ -112,6 +121,7 @@ protected:
   llvm::DenseMap<ValueBase*, SILValue> ValueMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
+  TypeSubstitutionMap OpenedExistentialSubs;
 };
 
 template<typename ImplClass>
@@ -786,6 +796,14 @@ SILCloner<ImplClass>::visitProjectExistentialRefInst(ProjectExistentialRefInst *
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy
+    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  assert(OpenedExistentialSubs.count(archetypeTy) == 0 && 
+         "Already substituted opened existential archetype?");
+  OpenedExistentialSubs[archetypeTy] 
+    = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
+
   doPostProcess(Inst,
     Builder.createOpenExistential(getOpLocation(Inst->getLoc()),
                                   getOpValue(Inst->getOperand()),
@@ -795,6 +813,12 @@ SILCloner<ImplClass>::visitOpenExistentialInst(OpenExistentialInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
+  // Create a new archetype for this opened existential type.
+  auto archetypeTy
+    = Inst->getType().getSwiftRValueType()->castTo<ArchetypeType>();
+  OpenedExistentialSubs[archetypeTy] 
+    = ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType());
+
   doPostProcess(Inst,
     Builder.createOpenExistentialRef(getOpLocation(Inst->getLoc()),
                                      getOpValue(Inst->getOperand()),
