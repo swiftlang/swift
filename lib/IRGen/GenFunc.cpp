@@ -315,14 +315,13 @@ namespace {
     }
   }
   
-  /// The type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo> {
+  /// Information about the IR-level signature of a function type.
+  class FuncSignatureInfo {
+  private:
     /// Each possible currying of a function type has different function
     /// type variants along each of three orthogonal axes:
     ///   - the explosion kind desired
     ///   - whether a data pointer argument is required
-    /// TODO: The ExtraData bit will be fully dependent on the formal type when
-    /// we enable SIL witness tables.
     struct Currying {
       Signature Signatures[unsigned(ResilienceExpansion::Last_ResilienceExpansion) + 1]
                           [unsigned(ExtraData::Last_ExtraData) + 1];
@@ -339,15 +338,45 @@ namespace {
     ExtraData ExtraDataKind;
 
     mutable Currying TheSignatures;
+    
+  public:
+    FuncSignatureInfo(CanSILFunctionType formalType,
+                      ExtraData extraDataKind)
+      : FormalType(formalType), ExtraDataKind(extraDataKind) {}
+    
+    ExtraData getExtraDataKind() const {
+      return ExtraDataKind;
+    }
+    
+    Signature getSignature(IRGenModule &IGM,
+                           ResilienceExpansion explosionKind,
+                           ExtraData extraData) const;
 
+  };
+  
+  /// The type-info class.
+  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
+                       public FuncSignatureInfo {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::Type *storageType,
-                 Size size, Alignment align, ExtraData ExtraDataKind)
+                 Size size, Alignment align, ExtraData extraDataKind)
       // FIXME: Spare bits.
       : ScalarTypeInfo(storageType, size, llvm::BitVector{}, align),
-        FormalType(formalType), ExtraDataKind(ExtraDataKind)
+        FuncSignatureInfo(formalType, extraDataKind)
     {
     }
 
+    bool hasExtraData() const {
+      switch (getExtraDataKind()) {
+      case ExtraData::None:
+        return false;
+      case ExtraData::Metatype:
+      case ExtraData::Retainable:
+        return true;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+      }
+    }
+    
   public:
     static const FuncTypeInfo *create(CanSILFunctionType formalType,
                                       llvm::Type *storageType,
@@ -367,24 +396,6 @@ namespace {
       llvm_unreachable("[unowned] function type");
     }
 
-    ExtraData getExtraDataKind() const {
-      return ExtraDataKind;
-    }
-    
-    Signature getSignature(IRGenModule &IGM,
-                           ResilienceExpansion explosionKind,
-                           ExtraData extraData) const;
-
-    bool hasExtraData() const {
-      switch (ExtraDataKind) {
-      case ExtraData::None:
-        return false;
-      case ExtraData::Metatype:
-      case ExtraData::Retainable:
-        return true;
-      }
-    }
-    
     unsigned getExplosionSize(ResilienceExpansion kind) const {
       return hasExtraData() ? 2 : 1;
     }
@@ -422,7 +433,7 @@ namespace {
       e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
 
       // Load the data, if any.
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable: {
@@ -435,6 +446,8 @@ namespace {
         e.add(IGF.Builder.CreateLoad(dataAddr));
         break;
       }
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
@@ -456,7 +469,7 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       // Store the data pointer, if any.
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable: {
@@ -469,6 +482,8 @@ namespace {
         IGF.Builder.CreateStore(e.claimNext(), dataAddr);
         break;
       }
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
@@ -478,7 +493,7 @@ namespace {
       IGF.Builder.CreateStore(e.claimNext(), fnAddr);
 
       // Store the data pointer, if any, transferring the +1.
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable: {
@@ -491,6 +506,8 @@ namespace {
         IGF.Builder.CreateStore(e.claimNext(), dataAddr);
         break;
       }
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
@@ -498,7 +515,7 @@ namespace {
               Explosion &dest) const override {
       src.transferInto(dest, 1);
       
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -507,13 +524,16 @@ namespace {
       case ExtraData::Metatype:
         src.transferInto(dest, 1);
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+          
       }
     }
     
     void consume(IRGenFunction &IGF, Explosion &src) const override {
       src.claimNext();
       
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -522,13 +542,15 @@ namespace {
       case ExtraData::Metatype:
         src.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
     void retain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
       
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -537,12 +559,14 @@ namespace {
       case ExtraData::Metatype:
         e.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
     
     void release(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -551,12 +575,14 @@ namespace {
       case ExtraData::Metatype:
         e.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
     void retainUnowned(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -565,12 +591,14 @@ namespace {
       case ExtraData::Metatype:
         e.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
     
     void unownedRetain(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -579,12 +607,14 @@ namespace {
       case ExtraData::Metatype:
         e.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
 
     void unownedRelease(IRGenFunction &IGF, Explosion &e) const {
       e.claimNext();
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -593,11 +623,13 @@ namespace {
       case ExtraData::Metatype:
         e.claimNext();
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
     
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
-      switch (ExtraDataKind) {
+      switch (getExtraDataKind()) {
       case ExtraData::None:
         break;
       case ExtraData::Retainable:
@@ -605,6 +637,8 @@ namespace {
         break;
       case ExtraData::Metatype:
         break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
       }
     }
     
@@ -638,11 +672,16 @@ namespace {
 
   /// The type-info class for ObjC blocks, which are represented by an ObjC
   /// heap pointer.
-  class BlockTypeInfo : public HeapTypeInfo<BlockTypeInfo> {
+  class BlockTypeInfo : public HeapTypeInfo<BlockTypeInfo>,
+                        public FuncSignatureInfo
+  {
   public:
-    BlockTypeInfo(llvm::PointerType *storageType,
+    BlockTypeInfo(CanSILFunctionType ty,
+                  llvm::PointerType *storageType,
                   Size size, llvm::BitVector spareBits, Alignment align)
-      : HeapTypeInfo(storageType, size, spareBits, align) {
+      : HeapTypeInfo(storageType, size, spareBits, align),
+        FuncSignatureInfo(ty, ExtraData::Block)
+    {
     }
 
     bool hasSwiftRefcount() const { return false; }
@@ -651,7 +690,8 @@ namespace {
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   if (T->isBlock())
-    return new BlockTypeInfo(IGM.ObjCPtrTy,
+    return new BlockTypeInfo(CanSILFunctionType(T),
+                             IGM.ObjCBlockPtrTy,
                              IGM.getPointerSize(),
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
@@ -669,6 +709,8 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case ExtraData::Metatype:
     ty = IGM.WitnessFunctionPairTy;
     break;
+    case ExtraData::Block:
+      llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
   }
   
   return FuncTypeInfo::create(ct, ty,
@@ -828,8 +870,11 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     paramTys.push_back(clangTy);
   }
 
-  // We shouldn't have any LLVM parameter types yet.
-  assert(ParamIRTypes.empty() && "Expected empty ParamIRTypes");
+  // We shouldn't have any LLVM parameter types yet, aside from a block context
+  // pointer.
+  assert((FnType->isBlock() ? ParamIRTypes.size() == 1
+                            : ParamIRTypes.empty())
+         && "Expected empty ParamIRTypes");
 
   // Generate function info for this signature.
   auto extInfo = clang::FunctionType::ExtInfo();
@@ -995,9 +1040,9 @@ llvm::Type *SignatureExpansion::expandSignatureTypes() {
   }
 }
 
-Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
-                                     ResilienceExpansion explosionLevel,
-                                     ExtraData extraData) const {
+Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
+                                          ResilienceExpansion explosionLevel,
+                                          ExtraData extraData) const {
   // Compute a reference to the appropriate signature cache.
   Signature &signature = TheSignatures.select(explosionLevel, extraData);
 
@@ -1007,12 +1052,19 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
 
   GenericContextScope scope(IGM, FormalType->getGenericSignature());
   SignatureExpansion expansion(IGM, FormalType, explosionLevel);
+  
+  // Blocks are passed into themselves as their first argument.
+  if (FormalType->isBlock())
+    expansion.ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
+  
   llvm::Type *resultType = expansion.expandSignatureTypes();
 
-  // Data arguments are last.
+  // Non-block data arguments are last.
   // See the comment in this file's header comment.
   switch (extraData) {
-  case ExtraData::None: break;
+  case ExtraData::Block:
+  case ExtraData::None:
+    break;
   case ExtraData::Retainable:
     expansion.ParamIRTypes.push_back(IGM.RefCountedPtrTy);
     break;
@@ -1031,13 +1083,21 @@ Signature FuncTypeInfo::getSignature(IRGenModule &IGM,
   return signature;
 }
 
+static const FuncSignatureInfo &
+getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
+  auto &ti = IGM.getTypeInfoForLowered(type);
+  if (type->isBlock())
+    return ti.as<BlockTypeInfo>();
+  return ti.as<FuncTypeInfo>();
+}
+
 llvm::FunctionType *
 IRGenModule::getFunctionType(CanSILFunctionType type,
                              ResilienceExpansion explosionKind,
                              ExtraData extraData,
                              llvm::AttributeSet &attrs) {
-  auto &fnTypeInfo = getTypeInfoForLowered(type).as<FuncTypeInfo>();
-  Signature sig = fnTypeInfo.getSignature(*this, explosionKind, extraData);
+  auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
+  Signature sig = sigInfo.getSignature(*this, explosionKind, extraData);
   attrs = sig.getAttributes();
   return sig.getType();
 }
@@ -1926,7 +1986,9 @@ void CallEmission::setFromCallee() {
   LastArgWritten = numArgs;
 
   // Add the data pointer if we have one.
-  if (CurCallee.hasDataPointer()) {
+  // For blocks we emit this after all the arguments have been applied.
+  if (!CurCallee.getOrigFunctionType()->isBlock()
+      && CurCallee.hasDataPointer()) {
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
   }
@@ -2115,6 +2177,12 @@ void CallEmission::addArg(Explosion &arg) {
   size_t targetIndex = LastArgWritten - arg.size();
   assert(targetIndex <= 1);
   LastArgWritten = targetIndex;
+  
+  // If this is a block, add the block pointer before the written arguments.
+  if (CurCallee.getOrigFunctionType()->isBlock()) {
+    assert(CurCallee.hasDataPointer());
+    Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
+  }
   
   // Add byval attributes.
   // FIXME: These should in theory be moved around with the arguments when

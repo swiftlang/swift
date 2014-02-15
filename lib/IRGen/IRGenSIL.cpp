@@ -1520,12 +1520,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   ExtraData extraData;
   ResilienceExpansion explosionLevel;
   
-  if (origCalleeType->isBlock()) {
-    IGF.unimplemented(AI->getLoc().getSourceLoc(),
-                      "calling Objective-C block");
-    exit(1);
-  }
-
   switch (lv.kind) {
   case LoweredValue::Kind::StaticFunction:
     calleeFn = lv.getStaticFunction().getFunction();
@@ -1551,23 +1545,32 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::Explosion: {
     Explosion calleeValues = lv.getExplosion(IGF);
     
-    calleeFn = calleeValues.claimNext();
-    
-    if (!origCalleeType->isThin())
+    if (origCalleeType->isBlock()) {
+      // Extract the invocation pointer for blocks.
       calleeData = calleeValues.claimNext();
-    else
-      calleeData = nullptr;
-
-    // Guess the "ExtraData" kind from the type of CalleeData.
-    // FIXME: Should get from the type info.
-    if (!calleeData)
-      extraData = ExtraData::None;
-    else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)
-      extraData = ExtraData::Retainable;
-    else if (calleeData->getType() == IGF.IGM.TypeMetadataPtrTy)
-      extraData = ExtraData::Metatype;
-    else
-      llvm_unreachable("unexpected extra data for function value");
+      calleeData = IGF.Builder.CreateBitCast(calleeData, IGF.IGM.ObjCBlockPtrTy);
+      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(calleeData, 3);
+      calleeFn = IGF.Builder.CreateLoad(invokeAddr, IGF.IGM.getPointerAlignment());
+      extraData = ExtraData::Block;
+    } else {
+      calleeFn = calleeValues.claimNext();
+      
+      if (origCalleeType->isThin())
+        calleeData = nullptr;
+      else
+        calleeData = calleeValues.claimNext();
+      
+      // Guess the "ExtraData" kind from the type of CalleeData.
+      // FIXME: Should get from the type info.
+      if (!calleeData)
+        extraData = ExtraData::None;
+      else if (calleeData->getType() == IGF.IGM.RefCountedPtrTy)
+        extraData = ExtraData::Retainable;
+      else if (calleeData->getType() == IGF.IGM.TypeMetadataPtrTy)
+        extraData = ExtraData::Metatype;
+      else
+        llvm_unreachable("unexpected extra data for function value");
+    }
 
     // Indirect functions are always minimal.
     explosionLevel = ResilienceExpansion::Minimal;
