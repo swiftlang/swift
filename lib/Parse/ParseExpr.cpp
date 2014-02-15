@@ -653,12 +653,14 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
   
   // The only case this can happen is if the accessor label is immediately after
-  // a brace.  "get" is implicit, so it can't be checked for.  Conveniently
-  // however, get/set properties are not allowed to have initializers, so we
-  // don't have an ambiguity, we just have to check for observing accessors.
+  // a brace (possibly preceeded by attributes).  "get" is implicit, so it can't
+  // be checked for.  Conveniently however, get/set properties are not allowed
+  // to have initializers, so we don't have an ambiguity, we just have to check
+  // for observing accessors.
   Token NextToken = P.peekToken();
   if (!NextToken.isContextualKeyword("didSet") &&
-      !NextToken.isContextualKeyword("willSet"))
+      !NextToken.isContextualKeyword("willSet") &&
+      NextToken.isNot(tok::at_sign))
     return false;
   
   // If it does start with didSet/willSet, check to see if the token after it is
@@ -667,15 +669,21 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   // this, we have to speculatively parse.
   Parser::BacktrackingScope backtrack(P);
 
-  // Eat the "{ identifier".
+  // Eat the "{".
   P.consumeToken(tok::l_brace);
+
+  // Check any arguments if present.
+  if (!P.canParseAttributes())
+    return false;
+
+  // Verify that we have the didSet/willSet after attributes.
+  if (P.Tok.getText() != "didSet" && P.Tok.getText() != "willSet")
+    return false;
   P.consumeToken(tok::identifier);
 
   // If this is "{ didSet:" then it is the start of a get/set accessor.
   if (P.Tok.is(tok::colon)) return true;
-
   // If this is "{ willSet(v):" then it is the start of a get/set accessor.
-  if (P.Tok.is(tok::colon)) return true;
   return P.consumeIf(tok::l_paren) &&
          P.consumeIf(tok::identifier) &&
          P.consumeIf(tok::r_paren) &&

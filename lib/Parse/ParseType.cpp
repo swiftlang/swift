@@ -804,22 +804,22 @@ bool Parser::canParseTypeComposition() {
   return true;
 }
 
-static bool canParseAttributes(Parser &P) {
-  while (P.consumeIf(tok::at_sign)) {
-    if (!P.consumeIf(tok::identifier)) return false;
+bool Parser::canParseAttributes() {
+  while (consumeIf(tok::at_sign)) {
+    if (!consumeIf(tok::identifier)) return false;
     
-    if (P.consumeIf(tok::equal)) {
-      if (P.Tok.isNot(tok::identifier) &&
-          P.Tok.isNot(tok::integer_literal) &&
-          P.Tok.isNot(tok::floating_literal))
+    if (consumeIf(tok::equal)) {
+      if (Tok.isNot(tok::identifier) &&
+          Tok.isNot(tok::integer_literal) &&
+          Tok.isNot(tok::floating_literal))
         return false;
-      P.consumeToken();
-    } else if (P.Tok.is(tok::l_paren)) {
+      consumeToken();
+    } else if (Tok.is(tok::l_paren)) {
       // Attributes like cc(x,y,z)
-      P.skipSingle();
+      skipSingle();
     }
     
-    P.consumeIf(tok::comma);
+    consumeIf(tok::comma);
   }
   return true;
 }
@@ -839,7 +839,7 @@ bool Parser::canParseTypeTupleBody() {
         consumeToken(tok::colon);
 
         // Parse attributes then a type.
-        if (!canParseAttributes(*this) ||
+        if (!canParseAttributes() ||
             !canParseType())
           return false;
 
@@ -860,7 +860,7 @@ bool Parser::canParseTypeTupleBody() {
       // Otherwise, this has to be a type.
 
       // Parse attributes.
-      if (!canParseAttributes(*this))
+      if (!canParseAttributes())
         return false;
  
       if (!canParseType())
