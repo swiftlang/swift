@@ -1205,7 +1205,8 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
-  // Handle accessors specially.
+  // Handle accessors specially, they are mangled as modifiers on the accessed
+  // declaration.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
     char Code = '\0';
     switch (func->getAccessorKind()) {

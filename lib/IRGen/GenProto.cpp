@@ -231,7 +231,13 @@ namespace {
       case DeclKind::Func:
         return visitFunc(cast<FuncDecl>(member));
 
-      case DeclKind::Subscript:
+      case DeclKind::Subscript: {
+        auto *SD = cast<SubscriptDecl>(member);
+        emitFunc(SD->getGetter());
+        if (SD->isSettable())
+          emitFunc(SD->getSetter());
+        break;
+      }
       case DeclKind::Var:
         // FIXME: To be implemented.
         return;
@@ -246,7 +252,10 @@ namespace {
       if (func->isAccessor())
         // FIXME: To be implemented.
         return;
-      
+      emitFunc(func);
+    }
+    
+    void emitFunc(FuncDecl *func) {
       if (func->isStatic()) {
         asDerived().addStaticMethod(func);
       } else {

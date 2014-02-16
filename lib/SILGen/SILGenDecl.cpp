@@ -1811,24 +1811,39 @@ public:
     
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(fd, nullptr);
+    emitFuncEntry(fd, witness.getDecl(), witness.getSubstitutions());
+  }
+  
+  void emitFuncEntry(FuncDecl *fd, ValueDecl *witnessDecl,
+                     ArrayRef<Substitution> WitnessSubstitutions) {
 
     // Emit the witness thunk and add it to the table.
     SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
-    auto isFree = isFreeFunctionWitness(fd, witness.getDecl());
+    auto isFree = isFreeFunctionWitness(fd, witnessDecl);
     unsigned witnessUncurryLevel = isFree ? requirementRef.uncurryLevel - 1
                                           : requirementRef.uncurryLevel;
   
-    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Func,
+    SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
                           witnessUncurryLevel);
 
-    SILFunction *witnessFn = SGM.emitProtocolWitness(Conformance,
-                                                   requirementRef, witnessRef,
-                                                   isFree,
-                                                   witness.getSubstitutions());
+    SILFunction *witnessFn =
+      SGM.emitProtocolWitness(Conformance, requirementRef, witnessRef,
+                              isFree, WitnessSubstitutions);
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
+  }
+  
+  void visitSubscriptDecl(SubscriptDecl *d) {
+    // Find the witness in the conformance.
+    ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
+    auto *witnessSD = cast<SubscriptDecl>(witness.getDecl());
+    emitFuncEntry(d->getGetter(), witnessSD->getGetter(),
+                  witness.getSubstitutions());
+    if (d->isSettable())
+      emitFuncEntry(d->getSetter(), witnessSD->getSetter(),
+                    witness.getSubstitutions());
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
