@@ -83,7 +83,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
   @@transparent
   init() {
-    var maxWidthZero: Int${str(maxBits)} = 0
+    var maxWidthZero: Int${maxBits} = 0
     value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
   }
 
