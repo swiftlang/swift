@@ -2165,6 +2165,6 @@ SILGenModule::getOrCreateReabstractionThunk(SILLocation loc,
   }
 
   return M.getOrCreateSharedFunction(loc, buffer.str(),
-                                     thunkType, thunkContextParams,
+                                     thunkType,
                                      IsBare, IsTransparent);
 }

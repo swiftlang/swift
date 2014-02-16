@@ -917,6 +917,8 @@ static ManagedValue createThunk(SILGenFunction &gen,
 
   // Build it if necessary.
   if (thunk->empty()) {
+    // Borrow the context archetypes from the enclosing function.
+    thunk->setContextGenericParams(gen.F.getContextGenericParams());
     SILGenFunction thunkSGF(gen.SGM, *thunk);
     buildThunkBody(thunkSGF, loc, kind, origFormalType, substFormalType);
   }

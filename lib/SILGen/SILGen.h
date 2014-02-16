@@ -126,11 +126,11 @@ public:
   /// Get or create the declaration of a reabstraction thunk with the
   /// given signature.
   SILFunction *getOrCreateReabstractionThunk(SILLocation loc,
-                                             GenericParamList *thunkContextParams,
-                                             CanSILFunctionType thunkType,
-                                             CanSILFunctionType fromType,
-                                             CanSILFunctionType toType);
-
+                                           GenericParamList *thunkContextParams,
+                                           CanSILFunctionType thunkType,
+                                           CanSILFunctionType fromType,
+                                           CanSILFunctionType toType);
+  
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
