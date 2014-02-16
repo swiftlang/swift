@@ -70,6 +70,9 @@ def otherIntName(name, signed):
     return ('U' if signed else '') + baseIntName(name)
 }@
 
+typealias IntMax = Int${maxBits}
+typealias UIntMax = UInt${maxBits}
+
 @ for (name, bits, signed) in allInts():
 @   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
 @   BuiltinName = builtinIntName(name)
@@ -83,7 +86,7 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
 
   @@transparent
   init() {
-    var maxWidthZero: Int${maxBits} = 0
+    var maxWidthZero: IntMax = 0
     value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
   }
 
