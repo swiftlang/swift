@@ -229,6 +229,10 @@ extension ${Self} : RandomAccessIndex {
   static func rem(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
     return rem(lhs, rhs, true)
   }
+  @@transparent
+  func toIntMax() -> IntMax {
+    return ${'self' if Self == 'Int%s' % maxBits else 'IntMax(self)'}
+  }
 }
 
 @ if signed:
