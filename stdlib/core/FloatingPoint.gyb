@@ -13,10 +13,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-//// Automatically Generated From FloatingPoint.gyb.  Do Not Edit Directly ////
-//// To regenerate:                                                        ////
-////     ../../utils/gyb FloatingPoint.gyb -DwithExtendedPrecision=1 -o FloatAll.swift    ////
-////     ../../utils/gyb FloatingPoint.gyb -DwithExtendedPrecision=0 -o FloatDouble.swift ////
+//// Automatically Generated From FloatingPoint.gyb.  Do Not Edit Directly
+//// To regenerate:
+////     bash -c 'for x in 1All 0Double ; do ../../utils/gyb FloatingPoint.gyb -DwithExtendedPrecision=$''{x:0:1} -o Float$''{x:1}.swift ; done'
 @{
 #
 # Utility code for later in this template
