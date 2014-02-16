@@ -280,19 +280,6 @@ void Mangler::mangleContext(DeclContext *ctx, BindGenerics shouldBind) {
     if (auto dtor = dyn_cast<DestructorDecl>(fn))
       return mangleDestructorEntity(dtor, /*deallocating*/ false);
     
-    if (auto func = dyn_cast<FuncDecl>(fn)) {
-      char Code = '\0';
-      switch (func->getAccessorKind()) {
-      case AccessorKind::IsGetter: Code = 'g'; break;
-      case AccessorKind::IsSetter: Code = 's'; break;
-      case AccessorKind::IsWillSet: Code = 'w'; break;
-      case AccessorKind::IsDidSet: Code = 'W'; break;
-      case AccessorKind::NotAccessor: break;
-      }
-      if (Code)
-        return mangleAccessorEntity(Code, func->getAccessorStorageDecl(),
-                                    ResilienceExpansion::Minimal);
-    }
     return mangleEntity(fn, ResilienceExpansion::Minimal, /*uncurry*/ 0);
   }
 
@@ -1217,8 +1204,24 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
                            unsigned uncurryLevel) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
-  assert(!isa<FuncDecl>(decl) || !cast<FuncDecl>(decl)->isAccessor());
-
+  
+  // Handle accessors specially.
+  if (auto func = dyn_cast<FuncDecl>(decl)) {
+    char Code = '\0';
+    switch (func->getAccessorKind()) {
+    case AccessorKind::IsGetter:  Code = 'g'; break;
+    case AccessorKind::IsSetter:  Code = 's'; break;
+    case AccessorKind::IsWillSet: Code = 'w'; break;
+    case AccessorKind::IsDidSet:  Code = 'W'; break;
+    case AccessorKind::NotAccessor: break;
+    }
+    if (Code) {
+      assert(uncurryLevel == 0 && "Unhandled uncurry level for accessors");
+      return mangleAccessorEntity(Code, func->getAccessorStorageDecl(),
+                                  explosion);
+    }
+  }
+  
   BindGenerics shouldBindParent = BindGenerics::All;
 
   // entity ::= entity-kind context entity-name
