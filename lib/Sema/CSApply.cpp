@@ -1220,11 +1220,11 @@ namespace {
                tc.Context.getIdentifier("CharacterLiteralType"),
                tc.Context.getIdentifier("convertFromCharacterLiteral"),
                builtinProtocol,
-               Type(BuiltinIntegerType::get(21, tc.Context)),
+               Type(BuiltinIntegerType::get(32, tc.Context)),
                tc.Context.getIdentifier("_convertFromBuiltinCharacterLiteral"),
                [] (Type type) -> bool {
                  if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
-                   return builtinInt->isFixedWidth(21);
+                   return builtinInt->isFixedWidth(32);
                  }
                  return false;
                },
