@@ -13,10 +13,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly ////
-//// To regenerate:                                                     ////
-//// ../../utils/gyb -DWORD=32 FixedPoint.gyb -o FixedPoint32.swift ////
-//// ../../utils/gyb -DWORD=64 FixedPoint.gyb -o FixedPoint64.swift ////
+//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly!
+//// To regenerate, execute the following command:
+////
+////   for bits in 32 64; do ../../utils/gyb -DWORD=$bits FixedPoint.gyb -o FixedPoint$bits.swift ; done
+////
 @{
 #
 # Utility code for later in this template
