@@ -81,13 +81,34 @@ static bool performCompile(CompilerInstance &Instance,
     LLVM_BUILTIN_TRAP;
 
   ASTContext &Context = Instance.getASTContext();
-  if (Context.hadError())
-    return true;
 
   if (Action == FrontendOptions::REPL) {
     REPLRunLoop(Instance, ProcessCmdLine(Args.begin(), Args.end()));
     return false;
   }
+
+  SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
+
+  // We've been told to dump the AST (either after parsing or type-checking,
+  // which is already differentiated in CompilerInstance::performParse()),
+  // so dump or print the main source file and return.
+  if (Action == FrontendOptions::DumpParse ||
+      Action == FrontendOptions::DumpAST ||
+      Action == FrontendOptions::PrintAST) {
+    SourceFile *SF = PrimarySourceFile;
+    if (!SF) {
+      SourceFileKind Kind = Invocation.getInputKind();
+      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
+    }
+    if (Action == FrontendOptions::PrintAST)
+      SF->print(llvm::outs(), PrintOptions::printEverything());
+    else
+      SF->dump();
+    return false;
+  }
+
+  if (Context.hadError())
+    return true;
 
   // Write an Objective-C header for the module if requested.
   // This should work with -parse.
@@ -110,26 +131,6 @@ static bool performCompile(CompilerInstance &Instance,
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse)
     return false;
-
-  SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
-
-  // We've been told to dump the AST (either after parsing or type-checking,
-  // which is already differentiated in CompilerInstance::performParse()),
-  // so dump or print the main source file and return.
-  if (Action == FrontendOptions::DumpParse ||
-      Action == FrontendOptions::DumpAST ||
-      Action == FrontendOptions::PrintAST) {
-    SourceFile *SF = PrimarySourceFile;
-    if (!SF) {
-      SourceFileKind Kind = Invocation.getInputKind();
-      SF = &Instance.getMainModule()->getMainSourceFile(Kind);
-    }
-    if (Action == FrontendOptions::PrintAST)
-      SF->print(llvm::outs(), PrintOptions::printEverything());
-    else
-      SF->dump();
-    return false;
-  }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
