@@ -603,14 +603,12 @@ public:
                                ArrayRef<Substitution> substitutions,
                                RValueSource &&optionalSelfValue,
                                bool isSuper,
-                               RValueSource &&optionalSubscripts,
-                               SGFContext C);
+                               RValue &&optionalSubscripts, SGFContext C);
   void emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                        ArrayRef<Substitution> substitutions,
                        RValueSource &&optionalSelfValue,
                        bool isSuper,
-                       RValueSource &&optionalSubscripts,
-                       RValue &&value);
+                       RValue &&optionalSubscripts, RValue &&value);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,

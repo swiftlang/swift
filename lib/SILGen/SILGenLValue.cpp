@@ -347,7 +347,7 @@ namespace {
     
     struct AccessorArgs {
       RValueSource base;
-      RValueSource subscripts;
+      RValue subscripts;
     };
     
     /// Returns a tuple of RValues holding the accessor value, base (retained if
@@ -365,7 +365,7 @@ namespace {
           origSubscripts = gen.emitRValue(subscriptIndexExpr);
         // TODO: use the subscript expression as the source if we're
         // only using this l-value once.
-        result.subscripts = RValueSource(loc, origSubscripts.copy(gen, loc));
+        result.subscripts = origSubscripts.copy(gen, loc);
       }
       
       return result;

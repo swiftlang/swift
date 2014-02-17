@@ -470,7 +470,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // Global properties have no base or subscript.
     return emitGetAccessor(loc, var,
                            ArrayRef<Substitution>(), RValueSource(),
-                           /*isSuper=*/false, RValueSource(), C);
+                           /*isSuper=*/false, RValue(), C);
   }
   
   // If the referenced decl isn't a VarDecl, it should be a constant of some
@@ -561,7 +561,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     RValueSource baseRV = prepareAccessorBaseArg(loc, base,
                                                  FieldDecl->getGetter());
     return emitGetAccessor(loc, FieldDecl, substitutions,
-                           std::move(baseRV), isSuper, RValueSource(), C);
+                           std::move(baseRV), isSuper, RValue(), C);
   }
 
   assert(FieldDecl->hasStorage() &&
@@ -1410,7 +1410,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, decl->getGetter());
 
   // Emit the indices.
-  RValueSource subscriptRV = RValueSource(E, SGF.emitRValue(E->getIndex()));
+  RValue subscriptRV = SGF.emitRValue(E->getIndex());
 
   ManagedValue MV =
     SGF.emitGetAccessor(E, decl, E->getDecl().getSubstitutions(),

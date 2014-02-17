@@ -2600,11 +2600,8 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 /// Emit a call to a getter.
 ManagedValue SILGenFunction::
 emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
-                ArrayRef<Substitution> substitutions,
-                RValueSource &&selfValue,
-                bool isSuper,
-                RValueSource &&subscripts,
-                SGFContext c) {
+                ArrayRef<Substitution> substitutions, RValueSource &&selfValue,
+                bool isSuper, RValue &&subscripts, SGFContext c) {
  
   SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
@@ -2623,7 +2620,8 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   }
   // Index ->
   if (subscripts) {
-    emission.addCallSite(loc, std::move(subscripts), accessType.getResult());
+    emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
+                         accessType.getResult());
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // () ->
@@ -2637,8 +2635,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      ArrayRef<Substitution> substitutions,
                                      RValueSource &&selfValue,
                                      bool isSuper,
-                                     RValueSource &&subscripts,
-                                     RValue &&setValue) {
+                                     RValue &&subscripts, RValue &&setValue) {
   SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
@@ -2656,7 +2653,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   }
   // Index ->
   if (subscripts) {
-    emission.addCallSite(loc, std::move(subscripts), accessType.getResult());
+    emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
+                         accessType.getResult());
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // T ->
