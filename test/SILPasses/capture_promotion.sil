@@ -8,7 +8,7 @@
 sil_stage raw
 
 import Builtin
-import swift
+import Swift
 
 class Foo {
   func foo() -> Int
@@ -110,7 +110,7 @@ bb0:
 sil private @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Foo, @owned Builtin.ObjectPointer, @inout Baz, @owned Builtin.ObjectPointer, @inout Int) -> Int {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Foo, %2 : $Builtin.ObjectPointer, %3 : $*Baz, %4 : $Builtin.ObjectPointer, %5 : $*Int):
   %6 = tuple ()
-  // function_ref test14.plus (a : swift.Int, b : swift.Int, c : swift.Int) -> swift.Int
+  // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
   %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo
@@ -150,7 +150,7 @@ sil @mutate_foo : $@thin (@inout Foo) -> ()
 sil private @closure1 : $@thin (Builtin.ObjectPointer, @inout Foo) -> Int {
 bb0(%0 : $Builtin.ObjectPointer, %1 : $*Foo):
   %6 = tuple ()
-  // function_ref test14.plus (a : swift.Int, b : swift.Int, c : swift.Int) -> swift.Int
+  // function_ref test14.plus (a : Swift.Int, b : Swift.Int, c : Swift.Int) -> Swift.Int
   %7 = function_ref @dummy_func : $@thin (Int, Int, Int) -> Int
   %8 = load %1 : $*Foo
   strong_retain %8 : $Foo

@@ -2,7 +2,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 sil_global private @globalinit_token11 : $Builtin.Word
 

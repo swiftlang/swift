@@ -1012,17 +1012,17 @@ Predefined Substitutions
 ::
 
   known-module ::= 'So'                      // Objective-C
-  known-module ::= 'Ss'                      // swift
-  known-nominal-type ::= 'Sa'                // swift.Array
-  known-nominal-type ::= 'Sb'                // swift.Bool
-  known-nominal-type ::= 'Sc'                // swift.UnicodeScalar
-  known-nominal-type ::= 'Sd'                // swift.Float64
-  known-nominal-type ::= 'Sf'                // swift.Float32
-  known-nominal-type ::= 'Si'                // swift.Int64
-  known-nominal-type ::= 'SQ'                // swift.UncheckedOptional
-  known-nominal-type ::= 'Sq'                // swift.Optional
-  known-nominal-type ::= 'SS'                // swift.String
-  known-nominal-type ::= 'Su'                // swift.UInt64
+  known-module ::= 'Ss'                      // Swift
+  known-nominal-type ::= 'Sa'                // Swift.Array
+  known-nominal-type ::= 'Sb'                // Swift.Bool
+  known-nominal-type ::= 'Sc'                // Swift.UnicodeScalar
+  known-nominal-type ::= 'Sd'                // Swift.Float64
+  known-nominal-type ::= 'Sf'                // Swift.Float32
+  known-nominal-type ::= 'Si'                // Swift.Int
+  known-nominal-type ::= 'SQ'                // Swift.UncheckedOptional
+  known-nominal-type ::= 'Sq'                // Swift.Optional
+  known-nominal-type ::= 'SS'                // Swift.String
+  known-nominal-type ::= 'Su'                // Swift.UInt
 
 ``<known-module>`` and ``<known-nominal-type>`` are built-in substitutions for
 certain common entities.  Like any other substitution, they all start

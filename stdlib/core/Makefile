@@ -59,7 +59,7 @@ endif
 # Done with SWIFT_SOURCES
 #
 
-SOURCES := swift.o
+SOURCES := Swift.o
 NO_BUILD_ARCHIVE := 1
 #USEDLIBS := swift_runtime.a
 
@@ -71,11 +71,11 @@ LDFLAGS += -Xlinker -reexport-lobjc \
 
 PATH_TO_SWIFT_SOURCES := $(addprefix $(PROJ_SRC_DIR)/, $(SWIFT_SOURCES))
 
-$(SWIFT_HEADER_DIR)/swift.swiftmodule: $(ObjDir)/swift.o $(SWIFT_HEADER_DIR)
+$(SWIFT_HEADER_DIR)/Swift.swiftmodule: $(ObjDir)/Swift.o $(SWIFT_HEADER_DIR)
 
-$(ObjDir)/swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
+$(ObjDir)/Swift.o: $(PATH_TO_SWIFT_SOURCES) $(ObjDir)/.dir $(BUILT_SOURCES) $(PROJ_MAKEFILE) $(SWIFT_COMPILER) $(LibDir)/libswift_runtime.a
 	$(Echo) "Compiling $(notdir $@) for $(BuildMode) build"
-	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -module-name swift -emit-module -module-link-name $(LIBRARYNAME) -force-single-frontend-invocation -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) -c -o $@ 
+	$(Verb) $(SWIFT_COMPILER) $(SWIFT_FLAGS) -module-name Swift -emit-module -module-link-name $(LIBRARYNAME) -force-single-frontend-invocation -parse-stdlib -parse-as-library $(PATH_TO_SWIFT_SOURCES) -c -o $@ 
 	@mv $(ObjDir)/swift.swiftmodule $(SWIFT_HEADER_DIR)
 
 
@@ -84,4 +84,4 @@ $(SharedLibDir)/swift/%.$(SHLIBEXT): $(SharedLibDir)/swift/.dir
 
 $(SharedLibDir)/%.$(SHLIBEXT): $(SharedLibDir)/swift/%.$(SHLIBEXT)
 
-all-local:: $(SWIFT_HEADER_DIR)/swift.swiftmodule 
+all-local:: $(SWIFT_HEADER_DIR)/Swift.swiftmodule 

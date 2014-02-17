@@ -226,7 +226,7 @@ private:
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
 
-  /// The \c swift.UnsafePointer<T> declaration.
+  /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> UnsafePointerDecl;
 
   /// A set of types that can be trivially mapped to Objective-C types.
@@ -687,7 +687,7 @@ public:
   /// this protocol.
   Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
 
-  /// \brief Retrieve the \c swift.UnsafePointer<T> declaration.
+  /// \brief Retrieve the \c Swift.UnsafePointer<T> declaration.
   NominalTypeDecl *getUnsafePointerDecl(const DeclContext *DC);
 
   /// \brief Convert the given expression to the given type.
@@ -884,7 +884,7 @@ public:
 
   /// Get the module appropriate for looking up standard library types.
   ///
-  /// This is "swift", if that module is imported, or the current module if
+  /// This is "Swift", if that module is imported, or the current module if
   /// we're parsing the standard library.
   Module *getStdlibModule(const DeclContext *dc);
 

@@ -181,7 +181,7 @@ void SourceLookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
                                     SmallVectorImpl<ValueDecl*> &Result) {
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
-  // If this import is specific to some named type or decl ("import swift.int")
+  // If this import is specific to some named type or decl ("import Swift.int")
   // then filter out any lookups that don't match.
   if (AccessPath.size() == 1 && AccessPath.front().first != Name)
     return;

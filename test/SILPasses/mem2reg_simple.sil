@@ -2,7 +2,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 // func foo(v : Int) -> Int {
 //   var x : Int = 0

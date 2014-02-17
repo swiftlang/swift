@@ -259,7 +259,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
 
   Module *M;
   if (IsSwiftModule)
-    M = Impl.getSwiftModule();
+    M = Impl.getStdlibModule();
   else
     M = Impl.getNamedModule(SwiftModuleName);
   if (!M) {
@@ -3068,7 +3068,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   // Note that the decl was imported from Clang.  Don't mark stdlib decls as
   // imported.
   if (!Result->getDeclContext()->isModuleScopeContext() ||
-      (Result->getModuleContext() != getSwiftModule() &&
+      (Result->getModuleContext() != getStdlibModule() &&
        Result->getModuleContext() != getNamedModule(OBJC_MODULE_NAME))) {
     assert(
         // Either the Swift declaration was from stdlib,

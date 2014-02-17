@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -mem2reg -verify | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 sil @_TSs5printFT3valSi_T_ : $@thin (Int64) -> ()
 

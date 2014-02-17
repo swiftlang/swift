@@ -1,6 +1,6 @@
 // RUN: %sil-opt -allocref-elim -verify %s | FileCheck %s
 
-import swift
+import Swift
 import Builtin
 
 //////////

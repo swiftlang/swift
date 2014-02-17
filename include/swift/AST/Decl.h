@@ -1016,8 +1016,8 @@ enum class ImportKind : uint8_t {
 };
 
 /// ImportDecl - This represents a single import declaration, e.g.:
-///   import swift
-///   import typealias swift.Int
+///   import Swift
+///   import typealias Swift.Int
 class ImportDecl : public Decl {
 public:
   typedef std::pair<Identifier, SourceLoc> AccessPathElement;

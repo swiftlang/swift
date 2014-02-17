@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -definite-init -verify | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 
 sil @takes_Int_inout : $@thin (@inout Int) -> ()

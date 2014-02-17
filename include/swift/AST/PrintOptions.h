@@ -47,7 +47,7 @@ namespace swift {
     /// type might be ambiguous.
     bool FullyQualifiedTypesIfAmbiguous = false;
 
-    /// \brief Print swift.Array and swift.Optional with sugared syntax
+    /// \brief Print Swift.Array and Swift.Optional with sugared syntax
     /// ([] and ?), even if there are no sugar type nodes.
     bool SynthesizeSugarOnTypes = false;
 

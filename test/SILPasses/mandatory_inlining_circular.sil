@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -mandatory-inlining -verify
 
 import Builtin
-import swift
+import Swift
 
 sil @test_circular_foo : $@thin (Float32) -> Float32 {
 bb0(%0 : $Float32):

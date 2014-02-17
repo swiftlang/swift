@@ -1817,7 +1817,7 @@ private:
     auto typeArgs = pointer->getChild(1);
     
     if (pointer->getKind() == Node::Kind::BoundGenericEnum) {
-      // swift.Optional
+      // Swift.Optional
       if (isIdentifier(unboundType->getChild(1), "Optional") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
@@ -1828,7 +1828,7 @@ private:
     }
     else /*if (pointer->getKind() == Node::Kind::BoundGenericStructure)*/
     {
-      // swift.Array
+      // Swift.Array
       if (isIdentifier(unboundType->getChild(1), "Array") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {

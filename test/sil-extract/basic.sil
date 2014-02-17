@@ -1,7 +1,7 @@
 // RUN: %sil-extract %s -func=use_before_init | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 // For now we do not remove dead functions so update this when that functionality is added.
 

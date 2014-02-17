@@ -319,9 +319,9 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     = llvm::FunctionType::get(Int8PtrTy, {}, /*varArg*/ false);
   
   for (auto varNames : {
-    // global accessor for swift.C_ARGC : CInt
+    // global accessor for Swift.C_ARGC : CInt
     std::make_pair("argc", "_TFSsa6C_ARGCVSs5Int32"),
-    // global accessor for swift.C_ARGV : UnsafePointer<CString>
+    // global accessor for Swift.C_ARGV : UnsafePointer<CString>
     std::make_pair("argv", "_TFSsa6C_ARGVGVSs13UnsafePointerVSs7CString_")
   }) {
     StringRef fnParameterName;

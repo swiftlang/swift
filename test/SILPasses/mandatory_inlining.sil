@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -mandatory-inlining -verify | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 @class_protocol protocol CP {
   func f() -> DynamicSelf

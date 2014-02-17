@@ -2,7 +2,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 class X {
  var x : Int64 

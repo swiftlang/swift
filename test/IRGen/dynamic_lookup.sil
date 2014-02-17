@@ -1,6 +1,6 @@
 // RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
 
-import swift
+import Swift
 import Builtin 
 
 class X {
@@ -37,7 +37,7 @@ bb0(%0 : $Int64, %1 : $X):
 
 sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int64.metatype) -> Int64
 
-// [objc] dynamic_lookup.X.value.getter : swift.Int64
+// [objc] dynamic_lookup.X.value.getter : Swift.Int64
 sil @_TToFC14dynamic_lookup1Xg5valueSi : $@cc(objc_method) @thin (X) -> Int64 {
 bb0(%0 : $X):
   %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int64.metatype) -> Int64 // user: %7

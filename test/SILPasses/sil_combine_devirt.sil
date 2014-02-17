@@ -3,7 +3,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 /*
 class Foo {
@@ -41,7 +41,7 @@ bb0:
 
 sil @_TSs5printFT3valSi_T_ : $@thin (Int) -> ()
 
-// main.Foo.get (main.Foo)() -> swift.Int
+// main.Foo.get (main.Foo)() -> Swift.Int
 sil @_TFC4main3Foo3getfS0_FT_Si : $@cc(method) @thin (@owned Foo) -> Int {
 bb0(%0 : $Foo):
   %1 = ref_element_addr %0 : $Foo, #m_val         // user: %2

@@ -10,7 +10,7 @@
 
 sil_stage canonical
 
-import swift
+import Swift
 
 class C {}
 sil @_TFC4weak1CD : $@cc(method) @thin (C) -> ()

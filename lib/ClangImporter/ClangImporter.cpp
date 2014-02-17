@@ -507,7 +507,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
           // If the importer gave us a declaration from the stdlib, make sure
           // it does not show up in the lookup results for the imported module.
           if (valueDecl->getDeclContext()->isModuleScopeContext() &&
-              valueDecl->getModuleContext() == Impl.getSwiftModule())
+              valueDecl->getModuleContext() == Impl.getStdlibModule())
             continue;
 
           consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);

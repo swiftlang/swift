@@ -7,7 +7,7 @@
 sil_stage raw
 
 import Builtin
-import swift
+import Swift
 import gizmo
 
 class X { }

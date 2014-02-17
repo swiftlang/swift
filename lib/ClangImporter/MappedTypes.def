@@ -35,7 +35,7 @@
 #define MAP_STDLIB_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,  \
                         SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING) \
     MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,             \
-             "swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING,   \
+             "Swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING,   \
              true)
 
 // MacTypes.h defines typedefs UIntXX, SIntXX, FloatXX.
@@ -81,8 +81,8 @@ MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false)
 // Objective-C types.
 MAP_TYPE("BOOL",  ObjCBool,  8, "ObjectiveC", "ObjCBool",  ObjC1, false, false)
 MAP_TYPE("SEL",   ObjCSel,   0, "ObjectiveC", "Selector",  ObjC1, false, false)
-MAP_TYPE("id",    ObjCId,    0, "swift",      "AnyObject", ObjC1, false, false)
-MAP_TYPE("Class", ObjCClass, 0, "swift",      "AnyClass",  ObjC1, false, false)
+MAP_TYPE("id",    ObjCId,    0, "Swift",      "AnyObject", ObjC1, false, false)
+MAP_TYPE("Class", ObjCClass, 0, "Swift",      "AnyClass",  ObjC1, false, false)
 MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", ObjC1, false)
 MAP_STDLIB_TYPE("NSInteger",  SignedWord,   0, "Int", ObjC1, false)
 

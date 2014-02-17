@@ -23,8 +23,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-BRIDGE_TYPE(Foundation,NSString, swift,String)
-BRIDGE_TYPE(ObjectiveC,ObjCBool, swift,Bool)
+BRIDGE_TYPE(Foundation,NSString, Swift,String)
+BRIDGE_TYPE(ObjectiveC,ObjCBool, Swift,Bool)
 
 #undef BRIDGE_TYPE
 

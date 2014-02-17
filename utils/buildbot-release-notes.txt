@@ -40,6 +40,9 @@
 
  * The 'let' keyword is no longer recognized.  Please move to 'val'.
 
+ * The standard library has been renamed to 'Swift' (instead of 'swift') to be
+   more consistent with other modules on our platforms.
+
 2014-02-12
 ----------
 

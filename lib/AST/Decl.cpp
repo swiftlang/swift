@@ -1368,7 +1368,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
 static bool isIntegralType(Type type) {
-  // Consider structs in the "swift" module that wrap a builtin
+  // Consider structs in the standard library module that wrap a builtin
   // integer type to be integral types.
   if (auto structTy = type->getAs<StructType>()) {
     auto structDecl = structTy->getDecl();

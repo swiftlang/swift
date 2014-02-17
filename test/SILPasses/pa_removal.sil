@@ -2,7 +2,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 //CHECK: sil @a_function1
 //CHECK-NOT: partial_apply

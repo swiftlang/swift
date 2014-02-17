@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -allocbox-to-stack | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 
 // CHECK-LABEL: sil @simple_promotion

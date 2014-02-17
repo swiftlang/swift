@@ -138,16 +138,13 @@
   
   <pre class="example">
     <i>// Import all of the top level symbols and types in a module.</i>
-    import swift
+    import Swift
 
-    <i>// Import all of the symbols within a submodule.</i>
-    import swift.io
-
-    <i>// Import a single variable, function, type, etc.</i>
-    import typealias swift.io.BufferedStream
+    <i>// Import a single type.</i>
+    import typealias Swift.BufferedStream
 
     <i>// Import all addition overloads.</i>
-    import func swift.+
+    import func Swift.+
   </pre>
 
   <!-- ===================================================================== -->
@@ -1196,7 +1193,7 @@ if vec[3] {
   
   <pre class="example">
     <i>// Direct reference to a member of another module.</i>
-    var x : swift.Int
+    var x : Swift.Int
   </pre>
 
   <p>Each component of a named type may be followed by a list of generic
@@ -1971,7 +1968,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <div class="commentary">
     Should this use the expr-identifier production to allow qualified
-    identifiers?  This would allow "foo swift.+ bar".  Is ADL or something
+    identifiers?  This would allow "foo Swift.+ bar".  Is ADL or something
     like it enough?<br><br>
   </div>
   

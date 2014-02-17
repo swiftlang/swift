@@ -130,7 +130,7 @@ are:
 
 * Linking: runtime libraries and referenced modules are linked in.
 
-FIXME: "import swift" implicitly added as the last import in a source file.
+FIXME: "import Swift" implicitly added as the last import in a source file.
 
 .. _langref.lexical:
 

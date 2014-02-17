@@ -3,7 +3,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 /////////////////////
 // CallGraph Tests //
@@ -550,9 +550,9 @@ bb0(%0 : $UWord, %1 : $UWord):
 
 sil @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord {
 bb0(%0 : $UWord):
-  // function_ref swift.^ [infix] (lhs : swift.UWord, rhs : swift.UWord) -> swift.UWord
+  // function_ref Swift.^ [infix] (lhs : Swift.UWord, rhs : Swift.UWord) -> Swift.UWord
   %1 = function_ref @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord // user: %6
-  // function_ref swift.~ [prefix] (a : swift.UWord) -> swift.UWord
+  // function_ref Swift.~ [prefix] (a : Swift.UWord) -> Swift.UWord
   %2 = function_ref @_TFSsop1tFT1aVSs5UWord_S_ : $@thin (UWord) -> UWord // user: %5
   %3 = integer_literal $Builtin.Word, 0           // user: %4
   %4 = struct $UWord (%3 : $Builtin.Word)         // user: %5

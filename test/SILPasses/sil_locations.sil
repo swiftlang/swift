@@ -1,7 +1,7 @@
 // RUN: %sil-opt -mandatory-inlining -emit-verbose-sil %s | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 sil @plus : $@thin (Int64, Int64) -> Int64
 sil @fromLiteral : $@thin (Builtin.Int128, @thin Int64.metatype) -> Int64

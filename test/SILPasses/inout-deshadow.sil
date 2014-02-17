@@ -3,7 +3,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 protocol P {
   func foo()

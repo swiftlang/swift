@@ -3,7 +3,7 @@
 sil_stage raw
 
 import Builtin
-import swift
+import Swift
 
 // top_level_code
 sil private @top_level_code : $() -> () {

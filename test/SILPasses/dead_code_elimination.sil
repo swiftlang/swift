@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -dead-code-elimination | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 sil private @test1 : $() -> () {
 bb0:

@@ -59,16 +59,16 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
-  /// The declaration of swift.Slice<T>.
+  /// The declaration of Swift.Slice<T>.
   NominalTypeDecl *SliceDecl = nullptr;
 
-  /// The declaration of swift.Optional<T>.
+  /// The declaration of Swift.Optional<T>.
   EnumDecl *OptionalDecl = nullptr;
 
-  /// The declaration of swift.Optional<T>.Some.
+  /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
   
-  /// The declaration of swift.Optional<T>.None.
+  /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
   
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
@@ -83,7 +83,7 @@ struct ASTContext::Implementation {
   /// func _injectNothingIntoOptional<T>() -> Optional<T>
   FuncDecl *InjectNothingIntoOptionalDecls[NumOptionalTypeKinds] = {};
 
-  /// The declaration of swift.UncheckedOptional<T>.
+  /// The declaration of Swift.UncheckedOptional<T>.
   StructDecl *UncheckedOptionalDecl = nullptr;
 
   /// func _getBool(Builtin.Int1) -> Bool

@@ -1,6 +1,6 @@
 // RUN: %sil-opt %s -constant-propagation | FileCheck %s
 import Builtin
-import swift
+import Swift
 
 // Compute an expression using a chain of arithmetic with overflow instructions: 2 * (2 + 3) - 3
 sil @fold_arithmetic_with_overflow : $@thin () -> Builtin.Int64 {

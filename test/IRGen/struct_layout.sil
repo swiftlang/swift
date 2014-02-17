@@ -1,7 +1,7 @@
 // RUN: %target-build-swift %s -emit-ir -o - | FileCheck -check-prefix=%target-cpu %s
 
 import Builtin
-import swift
+import Swift
 
 // x86_64: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
 // x86_64: %V4main14Rdar15410780_B = type <{ %Sq }>

@@ -331,34 +331,34 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
-  /// Retrieve the declaration of swift.Slice<T>.
+  /// Retrieve the declaration of Swift.Slice<T>.
   NominalTypeDecl *getSliceDecl() const;
 
-  /// Retrieve the declaration of swift.Optional<T>.
+  /// Retrieve the declaration of Swift.Optional<T>.
   EnumDecl *getOptionalDecl() const;
 
-  /// Retrieve the declaration of swift.UncheckedOptional<T>.
+  /// Retrieve the declaration of Swift.UncheckedOptional<T>.
   StructDecl *getUncheckedOptionalDecl() const;
   
-  /// Retrieve the declaration of swift.Optional<T>.Some.
+  /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   
-  /// Retrieve the declaration of swift.Optional<T>.None.
+  /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
-  /// Retrieve the declaration of swift._does{,Unchecked}OptionalHaveValue.
+  /// Retrieve the declaration of Swift._does{,Unchecked}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                          OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._get{,Unchecked}OptionalValue.
+  /// Retrieve the declaration of Swift._get{,Unchecked}OptionalValue.
   FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
                                     OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._injectValueInto{,Unchecked}Optional.
+  /// Retrieve the declaration of Swift._injectValueInto{,Unchecked}Optional.
   FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver,
                                            OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of swift._injectNothingInto{,Unchecked}Optional.
+  /// Retrieve the declaration of Swift._injectNothingInto{,Unchecked}Optional.
   FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
                                              OptionalTypeKind kind) const;
 
@@ -369,7 +369,7 @@ public:
   /// non-null.
   bool hasOptionalIntrinsics(LazyResolver *resolver) const;
 
-  /// Retrieve the declaration of swift._getBool.
+  /// Retrieve the declaration of Swift._getBool.
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 
   /// \brief Look for the declaration with the given name within the

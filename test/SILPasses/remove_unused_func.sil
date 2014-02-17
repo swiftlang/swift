@@ -3,7 +3,7 @@
 sil_stage canonical
 
 import Builtin
-import swift
+import Swift
 
 // This function needs to be removed.
 // CHECK-NOT: @remove_me

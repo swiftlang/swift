@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -codemotion -verify | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 class B { }
 class E : B { }

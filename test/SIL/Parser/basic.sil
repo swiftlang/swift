@@ -3,7 +3,7 @@
 sil_stage raw // CHECK: sil_stage raw
 
 import Builtin
-import swift
+import Swift
 
 // CHECK: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word

@@ -118,7 +118,7 @@ Here is an example of a ``.sil`` file::
 
   sil_stage canonical
 
-  import swift
+  import Swift
 
   // Define types used by the SIL function.
 
@@ -143,7 +143,7 @@ Here is an example of a ``.sil`` file::
   // of the taxicabNorm Swift function.
   sil @_T5norms11taxicabNormfT1aV5norms5Point_Sd : $(Point) -> Double {
   bb0(%0 : $Point):
-    // func swift.+(Double, Double) -> Double
+    // func Swift.+(Double, Double) -> Double
     %1 = function_ref @_TSsoi1pfTSdSd_Sd
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
@@ -2157,7 +2157,7 @@ dynamic_method
 
   %1 = dynamic_method %0 : $P, #X.method!1 : $@thin U -> V
   // %0 must be of a protocol or protocol composition type $P,
-  // where $P contains the swift.DynamicLookup protocol
+  // where $P contains the Swift.DynamicLookup protocol
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
   //
@@ -3456,7 +3456,7 @@ dynamic_method_br
 
   dynamic_method_br %0 : $P, #X.method!1, bb1, bb2
   // %0 must be of type Builtin.ObjCPointer 
-  // where $P contains the swift.DynamicLookup protocol
+  // where $P contains the Swift.DynamicLookup protocol
   // #X.method!1 must be a reference to an @objc method of any class
   // or protocol type
 

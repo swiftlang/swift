@@ -2,7 +2,7 @@
 
 sil_stage canonical
 
-import swift
+import Swift
 import Builtin
 
 class C1 {

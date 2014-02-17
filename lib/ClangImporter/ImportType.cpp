@@ -66,13 +66,13 @@ namespace {
       case clang::BuiltinType::Void:
         // 'void' can only be imported as a function result type.
         if (kind == ImportTypeKind::Result)
-          return Impl.getNamedSwiftType(Impl.getSwiftModule(), "Void");
+          return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
 
         return nullptr;
 
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
       case clang::BuiltinType::CLANG_BUILTIN_KIND:            \
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(),  \
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(),  \
                                       #SWIFT_TYPE_NAME);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
@@ -128,12 +128,12 @@ namespace {
       clang::ASTContext &clangContext = Impl.getClangASTContext();
       if (clangContext.hasSameType(type->getPointeeType(),
                                    clangContext.CharTy.withConst())) {
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "CString");
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
       }
 
       // Import void* as COpaquePointer.
       if (type->isVoidPointerType()) {
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
       }
 
       // Special case for NSZone*, which has its own Swift wrapper.
@@ -153,13 +153,13 @@ namespace {
       auto pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Normal);
       if (pointeeType)
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getSwiftModule(),
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                     "UnsafePointer", pointeeType);
       
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.
       // FIXME: Should use something with a stronger type.
-      return Impl.getNamedSwiftType(Impl.getSwiftModule(), "COpaquePointer");
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
     }
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -288,7 +288,7 @@ namespace {
       // When BOOL is the type of a function parameter or a function
       // result type, map it to swift's Bool.
       if (canBridgeTypes() && type->getDecl()->getName() == "BOOL") {
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "Bool");
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Bool");
       }
       
       // Import the underlying declaration.
@@ -356,7 +356,7 @@ namespace {
       case ClangImporter::Implementation::EnumKind::Constants:
         // Map 64-bit enumeration types to Int.
         if (clangContext.getTypeSize(clangDecl->getIntegerType()) == 64)
-          return Impl.getNamedSwiftType(Impl.getSwiftModule(), "Int");
+          return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");
 
         // Import the underlying integer type.
         return Impl.importType(clangDecl->getIntegerType(), kind);
@@ -428,7 +428,7 @@ namespace {
           !imported->getName().empty() &&
           imported->getName().str() == "NSString" &&
           Impl.hasFoundationModule()) {
-        return Impl.getNamedSwiftType(Impl.getSwiftModule(), "String");
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
       }
 
       return imported->getDeclaredType();
@@ -715,7 +715,7 @@ Type ClangImporter::Implementation::importFunctionType(
   return FunctionType::get(argParamsTy, swiftResultTy);
 }
 
-Module *ClangImporter::Implementation::getSwiftModule() {
+Module *ClangImporter::Implementation::getStdlibModule() {
   return SwiftContext.getStdlibModule();
 }
 

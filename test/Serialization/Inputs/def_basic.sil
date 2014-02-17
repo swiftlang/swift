@@ -1,7 +1,7 @@
 sil_stage raw // CHECK: sil_stage raw
 
 import Builtin
-import swift
+import Swift
 import Foundation
 
 // Test SIL Global variable.

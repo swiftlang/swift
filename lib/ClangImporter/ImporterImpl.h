@@ -451,10 +451,8 @@ public:
                             ConstantConvertKind convertKind,
                             bool isStatic);
 
-  /// \brief Retrieve the 'swift' module.
-  ///
-  /// \returns The 'swift' module, or null if the module has not been imported.
-  Module *getSwiftModule();
+  /// \brief Retrieve the standard library module.
+  Module *getStdlibModule();
 
   /// \brief Retrieve the named module.
   ///

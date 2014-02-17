@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -predictable-memopt  | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 
 // CHECK-LABEL: sil @simple_reg_promotion

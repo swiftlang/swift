@@ -343,7 +343,7 @@ function(compile_swift_files)
     list(APPEND swift_flags -parse-as-library)
   endif()
   if(SWIFTFILE_IS_STDLIB_CORE)
-    list(APPEND swift_flags -parse-stdlib -module-name swift)
+    list(APPEND swift_flags -parse-stdlib -module-name "Swift")
   endif()
 
   set(objfile ${SWIFTFILE_OUTPUT})
@@ -442,7 +442,7 @@ function(handle_swift_sources sourcesvar externalvar target)
 
     # Special-case hack to create swift.o for the swift_stdlib_* targets
     if(target STREQUAL swift_stdlib_core)
-      set(swift_obj_base "swift")
+      set(swift_obj_base "Swift")
     else()
       # Otherwise, get the name from the first swift input file.  Also
       # a hack!

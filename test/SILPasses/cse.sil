@@ -1,7 +1,7 @@
 // RUN: %sil-opt %s -cse -verify | FileCheck %s
 
 import Builtin
-import swift
+import Swift
 
 //////////////////////
 // Simple DCE Tests //

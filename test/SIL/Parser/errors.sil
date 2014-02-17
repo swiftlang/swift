@@ -3,7 +3,7 @@
 sil_stage canonical
 sil_stage raw // expected-error {{sil_stage declared multiple times}}
 
-import swift
+import Swift
 
 sil @block_errors : $() -> () {
 bb0:
