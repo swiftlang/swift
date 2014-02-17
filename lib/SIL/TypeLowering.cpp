@@ -41,6 +41,9 @@ namespace {
     bool visitBoundGenericClassType(CanBoundGenericClassType type) {
       return false;
     }
+    bool visitDynamicSelfType(CanDynamicSelfType type) {
+      return false;
+    }
 
     /// Dependent types have non-trivial representation in case they
     /// instantiate to a class metatype.
@@ -1147,9 +1150,16 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
           && hasTrivialMetatype(origMeta.getInstanceType());
       }
       
+      CanType instanceType = substMeta.getInstanceType();
+      // If this is a DynamicSelf metatype, turn it into a metatype of the
+      // underlying self type.
+      if (auto dynamicSelf = dyn_cast<DynamicSelfType>(instanceType)) {
+        instanceType = dynamicSelf.getSelfType();
+      }
+      
       // Regardless of thinness, metatypes are always trivial.
-      auto thinnedTy = CanMetatypeType::get(substMeta.getInstanceType(),
-                                            isThin, substMeta->getASTContext());
+      auto thinnedTy = CanMetatypeType::get(instanceType, isThin,
+                                            substMeta->getASTContext());
       loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
     }
     

@@ -846,9 +846,16 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
                                              SGFContext C) {
   ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  SILValue converted = SGF.B.createUpcast(E,
-                                   original.getValue(),
-                                   SGF.getLoweredType(E->getType()));
+
+  // Derived-to-base casts in the AST might not be reflected as such
+  // in the SIL type system, for example, a cast from DynamicSelf
+  // directly to its own Self type.
+  auto loweredResultTy = SGF.getLoweredType(E->getType());
+  if (original.getType() == loweredResultTy)
+    return RValue(SGF, E, original);
+
+  SILValue converted = SGF.B.createUpcast(E, original.getValue(), 
+                                          loweredResultTy);
   return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
 }
 
@@ -856,8 +863,15 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                   SGFContext C) {
   SILValue metaBase =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
-  auto upcast = SGF.B.createUpcast(E, metaBase,
-                                   SGF.getLoweredLoadableType(E->getType()));
+
+  // Metatype conversion casts in the AST might not be reflected as
+  // such in the SIL type system, for example, a cast from DynamicSelf.metatype
+  // directly to its own Self.metatype.
+  auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
+  if (metaBase.getType() == loweredResultTy)
+    return RValue(SGF, E, ManagedValue::forUnmanaged(metaBase));
+
+  auto upcast = SGF.B.createUpcast(E, metaBase, loweredResultTy);
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
