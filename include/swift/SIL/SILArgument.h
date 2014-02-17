@@ -14,10 +14,10 @@
 #define SWIFT_SIL_SILARGUMENT_H
 
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/SILFunction.h"
 
 namespace swift {
   class SILBasicBlock;
-  class SILFunction;
   class SILModule;
 
 class SILArgument : public ValueBase {
@@ -42,6 +42,11 @@ public:
   SILModule &getModule() const;
 
   const ValueDecl *getDecl() const { return Decl; }
+
+  /// Returns true if this is a SILArgument of the entry BB of a function.
+  bool isFunctionArg() const {
+    return getParent() == &*getFunction()->begin();
+  }
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::SILArgument;

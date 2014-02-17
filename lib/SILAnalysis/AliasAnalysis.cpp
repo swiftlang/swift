@@ -55,7 +55,7 @@ static bool isFunctionArgument(SILValue V) {
   auto *Arg = dyn_cast<SILArgument>(V.getDef());
   if (!Arg)
     return false;
-  return Arg->getParent() == &*Arg->getFunction()->begin();
+  return Arg->isFunctionArg();
 }
 
 /// A no alias argument is an argument that is an address type of the entry
