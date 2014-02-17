@@ -1541,9 +1541,9 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 ///
 /// \verbatim
 ///   decl-var:
-///      'type'? 'let' attribute-list pattern initializer
+///      ('static' | 'class')? 'let' attribute-list pattern initializer
 ///              (',' pattern initializer )*
-///      'type'? 'var' attribute-list pattern initializer?
+///      ('static' | 'class')? 'var' attribute-list pattern initializer?
 ///              (',' pattern initializer? )*
 ///      'var' attribute-list identifier : type-annotation
 ///            initializer? { get-set }
@@ -1818,8 +1818,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \verbatim
 ///   decl-func:
-///     'type'? 'mutating'? 'func' attribute-list any-identifier generic-params?
-///               func-signature stmt-brace?
+///     ('static' | 'class')? 'mutating'? 'func' attribute-list
+///               any-identifier generic-params? func-signature stmt-brace?
 /// \endverbatim
 ///
 /// \note The caller of this method must ensure that the next token is 'func'.
