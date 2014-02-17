@@ -10,6 +10,7 @@ Contents
    :maxdepth: 1
 
    DesignDecisions
+   LangRefNew
    Generics
    Pattern Matching
    Resilience
