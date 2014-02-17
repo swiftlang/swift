@@ -694,7 +694,8 @@ struct ASTNodeBase {};
       }
 
       if (!destTy->getClassOrBoundGenericClass() ||
-          !srcTy->getClassOrBoundGenericClass()) {
+          !(srcTy->getClassOrBoundGenericClass() ||
+            srcTy->is<DynamicSelfType>())) {
         Out << "DerivedToBaseExpr does not involve class types:\n";
         E->print(Out);
         Out << "\n";
@@ -1669,34 +1670,22 @@ struct ASTNodeBase {};
         goto fail;
       }
 
-      {
-        ClassDecl *srcClass = srcTy->getClassOrBoundGenericClass();
-        ClassDecl *destClass = destTy->getClassOrBoundGenericClass();
-
-        if (!srcClass || !destClass) {
-          Out << "subtype conversion in " << what
-              << " doesn't involve class types: ";
+      // If the destination is a class, walk the supertypes of the source.
+      if (destTy->getClassOrBoundGenericClass()) {
+        if (!destTy->isSuperclassOf(srcTy, nullptr)) {
           srcTy.print(Out);
-          Out << " to ";
+          Out << " is not a superclass of ";
           destTy.print(Out);
-          Out << "\n";
+          Out << " for " << what << "\n";
           abort();
         }
 
-        for (Type srcSuperTy = srcTy->getSuperclass(nullptr);
-             srcSuperTy;
-             srcSuperTy = srcSuperTy->getSuperclass(nullptr)) {
-          if (srcSuperTy->isEqual(destTy))
-            return;
-        }
-
-        Out << "subtype conversion in " << what << " is not to super class: ";
-        srcTy.print(Out);
-        Out << " to ";
-        destTy.print(Out);
-        Out << "\n";
-        abort();
+        return;
       }
+
+      // FIXME: Tighten up checking for conversions to protocol types.
+      if (destTy->isExistentialType())
+        return;
 
     fail:
       Out << "subtype conversion in " << what << " is invalid: ";

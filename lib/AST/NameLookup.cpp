@@ -772,13 +772,16 @@ bool DeclContext::lookupQualified(Type type,
   if (type->is<ErrorType>())
     return false;
 
-  
   // Look through lvalue and inout types.
   type = type->getLValueOrInOutObjectType();
 
   // Look through metatypes.
   if (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
+
+  // Look through DynamicSelf.
+  if (auto dynamicSelf = type->getAs<DynamicSelfType>())
+    type = dynamicSelf->getSelfType();
 
   // Look for module references.
   if (auto moduleTy = type->getAs<ModuleType>()) {
