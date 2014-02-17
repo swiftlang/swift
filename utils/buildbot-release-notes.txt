@@ -38,6 +38,8 @@
       class func baz() {}
     }
 
+ * The 'let' keyword is no longer recognized.  Please move to 'val'.
+
 2014-02-12
 ----------
 
