@@ -570,6 +570,24 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
                                    ResultTy, BodyResultTy, ParamList);
 }
 
+static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
+                                          Identifier Id) {
+  // <T> T.metatype -> Builtin.Int1
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
+  
+  GenericTy = MetatypeType::get(GenericTy, Context);
+  ArchetypeTy = MetatypeType::get(ArchetypeTy, Context);
+  
+  TupleTypeElt ArgParamElts[] = { GenericTy };
+  TupleTypeElt ArgBodyElts[] = { ArchetypeTy };
+  Type ResultTy = BuiltinIntegerType::get(1, Context);
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
+}
+
 static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
@@ -709,6 +727,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_MISC_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
+   OverloadedBuiltinKind::Special,
 #include "swift/AST/Builtins.def"
 };
 
@@ -1086,6 +1106,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
+      
+  case BuiltinValueKind::CanBeObjCClass:
+    return getCanBeObjCClassOperation(Context, Id);
 
   case BuiltinValueKind::Once:
     return getOnceOperation(Context, Id);
@@ -1120,3 +1143,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
   llvm_unreachable("bad builtin value!");
 }
+
+StringRef swift::getBuiltinName(BuiltinValueKind ID) {
+  switch (ID) {
+  case BuiltinValueKind::None:
+    llvm_unreachable("no builtin kind");
+#define BUILTIN(Id, Name, Attrs) \
+  case BuiltinValueKind::Id: \
+    return Name;
+#include "swift/AST/Builtins.def"
+  }
+}
+

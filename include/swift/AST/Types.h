@@ -150,6 +150,15 @@ public:
   }
 };
   
+/// The result of a type trait check.
+enum class TypeTraitResult {
+  /// The type cannot have the trait.
+  IsNot,
+  /// The generic type can be bound to a type that has the trait.
+  CanBe,
+  /// The type has the trait irrespective of generic substitutions.
+  Is,
+};
 
 /// TypeBase - Base class for all types in Swift.
 class alignas(8) TypeBase {
@@ -520,7 +529,9 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
-
+  
+  /// Return whether this type is or can be substituted for an @objc class type.
+  TypeTraitResult canBeObjCClass();
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;

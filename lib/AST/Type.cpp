@@ -2458,3 +2458,28 @@ found_conformance:;
 
   return Substitution{Archetype, substReplacement, substConformanceRef};
 }
+
+TypeTraitResult TypeBase::canBeObjCClass() {
+  CanType self = getCanonicalType();
+  // Classes either definitely are or are not ObjC.
+  if (auto c = self->getClassOrBoundGenericClass()) {
+    return c->isObjC() ? TypeTraitResult::Is : TypeTraitResult::IsNot;
+  }
+  // Protocol types are objc if all their protocols are.
+  SmallVector<ProtocolDecl*, 2> protocols;
+  if (self->isExistentialType(protocols)) {
+    for (auto p : protocols) {
+      if (!p->isObjC())
+        return TypeTraitResult::IsNot;
+    }
+    return TypeTraitResult::Is;
+  }
+  
+  // Dependent types might be bound to @objc classes.
+  if (isa<SubstitutableType>(self))
+    return TypeTraitResult::CanBe;
+  if (isa<DependentMemberType>(self))
+    return TypeTraitResult::CanBe;
+  
+  return TypeTraitResult::IsNot;
+}

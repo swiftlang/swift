@@ -1246,6 +1246,31 @@ static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
     .Case("seqcst", SequentiallyConsistent);
 }
 
+static void emitTypeTraitBuiltin(IRGenFunction &IGF,
+                                 Explosion &out,
+                                 Explosion &args,
+                                 ArrayRef<Substitution> substitutions,
+                                 TypeTraitResult (TypeBase::*trait)()) {
+  assert(substitutions.size() == 1
+         && "type trait should have gotten single type parameter");
+  args.claimNext();
+  
+  // Lower away the trait to false if it's never true, or to true if it can
+  // possibly be true.
+  bool result;
+  switch ((substitutions[0].Replacement.getPointer()->*trait)()) {
+  case TypeTraitResult::IsNot:
+    result = false;
+    break;
+  case TypeTraitResult::Is:
+  case TypeTraitResult::CanBe:
+    result = true;
+    break;
+  }
+  
+  out.add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, result));
+}
+
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                             CanSILFunctionType substFnType,
@@ -1374,6 +1399,11 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCompareBuiltin(IGF, *out, args, llvm::CmpInst::id);
+  
+#define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
+  if (Builtin.ID == BuiltinValueKind::id) \
+    return emitTypeTraitBuiltin(IGF, *out, args, substitutions, &TypeBase::name);
+  
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 

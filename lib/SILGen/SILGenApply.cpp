@@ -2292,7 +2292,75 @@ namespace {
     gen.B.createCondFail(loc, args[0].getUnmanagedValue());
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
   }
-
+  
+  /// The type of trait builtins.
+  static SILType getTypeTraitSILType(ASTContext &C) {
+    auto param = CanGenericTypeParamType::get(0, 0, C);
+    auto metaTy = CanMetatypeType::get(param, /*thin*/ false, C);
+    auto sig = GenericSignature::get(param.getPointer(), {})
+      ->getCanonicalSignature();
+    auto boolTy = BuiltinIntegerType::get(1, C)
+      ->getCanonicalType();
+    auto fnTy = SILFunctionType::get(sig,
+                 AnyFunctionType::ExtInfo().withIsThin(true),
+                 ParameterConvention::Direct_Unowned,
+                 SILParameterInfo(metaTy, ParameterConvention::Direct_Unowned),
+                 SILResultInfo(boolTy, ResultConvention::Unowned), C);
+    return SILType::getPrimitiveObjectType(fnTy);
+  }
+  
+  /// Specialized emitter for type traits.
+  template<TypeTraitResult (TypeBase::*Trait)(),
+           BuiltinValueKind Kind>
+  static ManagedValue emitBuiltinTypeTrait(SILGenFunction &gen,
+                                          SILLocation loc,
+                                          ArrayRef<Substitution> substitutions,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+    assert(substitutions.size() == 1
+           && "type trait should take a single type parameter");
+    assert(args.size() == 1
+           && "type trait should take a single argument");
+    
+    bool result;
+    
+    auto traitTy = substitutions[0].Replacement->getCanonicalType();
+    
+    switch ((traitTy.getPointer()->*Trait)()) {
+    // If the type obvious has or lacks the trait, emit a constant result.
+    case TypeTraitResult::IsNot:
+      result = false;
+      break;
+    case TypeTraitResult::Is:
+      result = true;
+      break;
+        
+    // If not, emit the builtin call normally. Specialization may be able to
+    // eliminate it later, or we'll lower it away at IRGen time.
+    case TypeTraitResult::CanBe: {
+      auto &C = gen.getASTContext();
+      auto builtin = gen.B.createBuiltinFunctionRef(loc,
+                                          C.getIdentifier(getBuiltinName(Kind)),
+                                          getTypeTraitSILType(C));
+      auto builtinTy = builtin->getType().castTo<SILFunctionType>();
+      auto substTy = builtinTy->substInterfaceGenericArgs(gen.SGM.M,
+                                    gen.SGM.M.getSwiftModule(), substitutions);
+      
+      auto apply = gen.B.createApply(loc, builtin,
+                                 SILType::getPrimitiveObjectType(substTy),
+                                 builtinTy->getInterfaceResult().getSILType(),
+                                 substitutions, args[0].getValue());
+      return ManagedValue::forUnmanaged(apply);
+    }
+    }
+    
+    // Produce the result as an integer literal constant.
+    auto val = gen.B.createIntegerLiteral(loc,
+                        SILType::getBuiltinIntegerType(1, gen.getASTContext()),
+                        (uintmax_t)result);
+    return ManagedValue::forUnmanaged(val);
+  }
+  
   Callee::SpecializedEmitter
   Callee::getSpecializedEmitterForSILBuiltin(SILDeclRef function,
                                              SILModule &SILM) {
@@ -2315,7 +2383,12 @@ namespace {
     #define BUILTIN_SIL_OPERATION(Id, Name, Overload) \
       if (Builtin.ID == BuiltinValueKind::Id) \
         return &emitBuiltin##Id;
-
+    
+    // Lower away type trait builtins when they're trivially solvable.
+    #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) \
+      if (Builtin.ID == BuiltinValueKind::Id) \
+        return &emitBuiltinTypeTrait<&TypeBase::Name, BuiltinValueKind::Id>;
+    
     #include "swift/AST/Builtins.def"
     
     return nullptr;

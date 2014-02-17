@@ -55,6 +55,7 @@ public:
   bool isNull() const { return Ptr == 0; }
   
   TypeBase *operator->() const { return Ptr; }
+  
   explicit operator bool() const { return Ptr != 0; }
 
   /// Walk this type.

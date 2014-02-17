@@ -204,13 +204,13 @@ BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
           BUILTIN(Id, Name, Attrs)
 #endif
                        
-/// Sizeof has type (metatype<T>) -> Int
+/// Sizeof has type T.metatype -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
-/// Strideof has type (metatype<T>) -> Int
+/// Strideof has type T.metatype -> Int
 BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 
-/// Alignof has type (metatype<T>) -> Int
+/// Alignof has type T.metatype -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -266,5 +266,18 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
+
+// BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
+#ifndef BUILTIN_TYPE_TRAIT_OPERATION
+#define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) \
+  BUILTIN(Id, #Name, "n")
+#endif
+
+/// canBeObjCClass(T.metatype) -> Builtin.Int1
+/// At compile time, evaluate whether T is or can be bound to an @objc class or
+/// protocol type.
+BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeObjCClass)
+
+#undef BUILTIN_TYPE_TRAIT_OPERATION
 
 #undef BUILTIN
