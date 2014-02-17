@@ -73,11 +73,11 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
   if (isStaticMethod)
     selfType = MetatypeType::get(selfType, C);
 
-  bool isLet = true;
+  bool isVal = true;
   if (auto *ND = selfType->getAnyNominal())
-    isLet = !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
+    isVal = !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/isLet,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/isVal,
                                       SourceLoc(), C.Id_self, selfType, DC);
   selfDecl->setImplicit();
   return selfDecl;
@@ -337,7 +337,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
+  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
                                      SourceLoc(), C.getIdentifier("raw"),
                                      Type(), optionSetDecl);
   rawDecl->setImplicit();
@@ -747,7 +747,7 @@ namespace {
           if (!var->hasStorage())
             continue;
           
-          auto param = new (context) VarDecl(/*static*/ false, /*IsLet*/ true,
+          auto param = new (context) VarDecl(/*static*/ false, /*IsVal*/ true,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
           params.push_back(param);
@@ -957,7 +957,7 @@ namespace {
         // Create a variable to store the underlying value.
         auto varName = Impl.SwiftContext.getIdentifier("value");
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
+                                                   /*IsVal*/ false,
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
@@ -1031,7 +1031,7 @@ namespace {
         // Create a field to store the underlying value.
         auto varName = Impl.SwiftContext.getIdentifier("value");
         auto var = new (Impl.SwiftContext) VarDecl(/*static*/ false,
-                                                   /*IsLet*/ false,
+                                                   /*IsVal*/ false,
                                                    SourceLoc(), varName,
                                                    underlyingType,
                                                    structDecl);
@@ -1362,7 +1362,7 @@ namespace {
 
       // Map this indirect field to a Swift variable.
       return new (Impl.SwiftContext)
-               VarDecl(/*static*/ false, /*IsLet*/ false,
+               VarDecl(/*static*/ false, /*IsVal*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
     }
@@ -1443,7 +1443,7 @@ namespace {
         return nullptr;
 
       auto result =
-        new (Impl.SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
+        new (Impl.SwiftContext) VarDecl(/*static*/ false, /*IsVal*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
@@ -1483,10 +1483,10 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // FIXME: Should 'const' vardecl's be imported as 'let' decls?
+      // FIXME: Should 'const' vardecl's be imported as 'val' decls?
       return new (Impl.SwiftContext)
                VarDecl(/*static*/ false,
-                       /*IsLet*/ false,
+                       /*IsVal*/ false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
     }
@@ -2868,7 +2868,7 @@ namespace {
         return known->second;
 
       auto result = new (Impl.SwiftContext)
-      VarDecl(/*static*/ false, /*IsLet*/ false,
+      VarDecl(/*static*/ false, /*IsVal*/ false,
               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
 
@@ -3225,7 +3225,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               bool isStatic) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(isStatic, /*IsLet*/ false,
+  auto var = new (context) VarDecl(isStatic, /*IsVal*/ false,
                                    SourceLoc(), name, type, dc);
 
   // Form the argument patterns.

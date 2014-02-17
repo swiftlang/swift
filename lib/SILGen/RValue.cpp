@@ -256,11 +256,11 @@ public:
     }
 
     case Initialization::Kind::LetValue:
-      // If this is a non-address-only let, just bind the value.
+      // If this is a non-address-only 'val', just bind the value.
       if (!I->hasAddress()) {
-        // Disable the expression cleanup of the copy, since the let value
+        // Disable the expression cleanup of the copy, since the 'val'
         // initialization has a cleanup that lives for the entire scope of the
-        // let declaration.
+        // 'val' declaration.
         I->bindValue(orig.copyUnmanaged(gen, loc).forward(gen), gen);
         I->finishInitialization(gen);
         return;
@@ -336,11 +336,11 @@ public:
       return;
 
     case Initialization::Kind::LetValue:
-      // If this is a non-address-only let, just bind the value.
+      // If this is a non-address-only 'val', just bind the value.
       if (!I->hasAddress()) {
-        // Disable the rvalue expression cleanup, since the let value
+        // Disable the rvalue expression cleanup, since the 'val' value
         // initialization has a cleanup that lives for the entire scope of the
-        // let declaration.
+        // 'val' declaration.
         I->bindValue(result.forward(gen), gen);
         I->finishInitialization(gen);
         return;

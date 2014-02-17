@@ -195,7 +195,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(this);
     VarDecl *var = new (context) VarDecl(!named->getDecl()->isInstanceMember(),
-                                         named->getDecl()->isLet(),
+                                         named->getDecl()->isVal(),
                                          named->getLoc(),
                                          named->getBoundName(),
                                          named->getDecl()->hasType()

@@ -50,7 +50,7 @@ public:
     /// This Initialization is for an inout or address-only argument binding,
     /// which is initialized using bindAddress().
     AddressBinding,
-    /// This Initialization is to bind a 'let' declaration into VarLocs
+    /// This Initialization is to bind a 'val' declaration into VarLocs
     /// directly.
     LetValue,
     /// This Initialization is for a single buffer with a physical address,

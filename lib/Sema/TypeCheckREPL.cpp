@@ -245,7 +245,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
   // first walk through the loop and initialize it to "true".
   VarDecl *firstVar = nullptr;
   if (boolTy && trueDecl && falseDecl) {
-    firstVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+    firstVar = new (Context) VarDecl(/*static*/ false, /*IsVal*/false,
                                      Loc,
                                      Context.getIdentifier("first"),
                                      boolTy, DC);
@@ -268,7 +268,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
 
   // Create the "value" variable and its pattern.
   auto valueId = Context.getIdentifier("value");
-  VarDecl *valueVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+  VarDecl *valueVar = new (Context) VarDecl(/*static*/ false, /*IsVal*/false,
                                             Loc, valueId, ValueTy, DC);
   Pattern *valuePattern = new (Context) NamedPattern(valueVar);
   valuePattern->setType(ValueTy);
@@ -284,7 +284,7 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
 
     // Form the key variable and its pattern.
     auto keyId = Context.getIdentifier("key");
-    keyVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+    keyVar = new (Context) VarDecl(/*static*/ false, /*IsVal*/false,
                                    Loc, keyId, KeyTy, DC);
     Pattern *keyPattern = new (Context) NamedPattern(keyVar);
     keyPattern->setType(KeyTy);
@@ -564,7 +564,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
     return;
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
+  VarDecl *Arg = new (Context) VarDecl(/*static*/ false, /*IsVal*/false,
                                        Loc,
                                        Context.getIdentifier("arg"),
                                        E->getType(), /*DC*/ nullptr);
@@ -651,7 +651,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsVal*/true,
                                       E->getStartLoc(), name,
                                       E->getType(), &SF);
   SF.Decls.push_back(vd);
@@ -713,7 +713,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
 
   // Create the meta-variable, let the typechecker name it.
   Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
-  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
+  VarDecl *vd = new (Context) VarDecl(/*static*/ false, /*IsVal*/true,
                                       PBD->getStartLoc(), name,
                                       PBD->getPattern()->getType(), &SF);
   SF.Decls.push_back(vd);

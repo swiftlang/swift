@@ -192,7 +192,7 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
 
   // If this is a standard tuple, parse it.
   if (!isImpliedNameArgument)
-    return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
+    return P.parsePatternTupleAfterLP(/*IsVal*/true, /*IsArgList*/true,
                                       LPLoc, /*DefArgs=*/defaultArgs);
 
   SourceLoc ArgStartLoc = P.Tok.getLoc();
@@ -202,14 +202,14 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
   if (leadingIdent.empty())
     Name = new (P.Context) AnyPattern(ArgStartLoc, /*Implicit=*/true);
   else
-    Name = P.createBindingFromPattern(ArgStartLoc, leadingIdent, /*isLet*/true);
+    Name = P.createBindingFromPattern(ArgStartLoc, leadingIdent, /*isVal*/true);
   Name->setImplicit();
 
 
   ParserStatus EltStatus;
   Optional<TuplePatternElt> elto;
   std::tie(EltStatus, elto) =
-    P.parsePatternTupleElement(/*isLet*/true, /*isArgumentList*/true,
+    P.parsePatternTupleElement(/*isVal*/true, /*isArgumentList*/true,
                                Name, defaultArgs);
 
   if (EltStatus.hasCodeCompletion())
@@ -238,7 +238,7 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
   
   P.diagnose(ArgStartLoc, diag::implied_name_multiple_parameters)
     .fixItInsert(ArgStartLoc, "_: ");
-  return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
+  return P.parsePatternTupleAfterLP(/*IsVal*/true, /*IsArgList*/true,
                                     LPLoc, /*DefArgs=*/defaultArgs);
 }
 
@@ -448,7 +448,7 @@ Parser::parseFunctionArguments(Identifier functionName,
     if (Tok.isNot(tok::l_paren))
       break;
 
-    ArgPattern = parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, nullptr);
+    ArgPattern = parsePatternTuple(/*IsVal*/true, /*IsArgList*/true, nullptr);
 
     if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
       return ArgPattern;
@@ -534,7 +534,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
     ParserResult<Pattern> Params =
-      parsePatternTuple(/*IsLet*/ true, /*IsArgList*/ true, &DefaultArgs);
+      parsePatternTuple(/*IsVal*/ true, /*IsArgList*/ true, &DefaultArgs);
 
     // If we failed to parse the pattern, create an empty tuple to recover.
     if (Params.isNull()) {
@@ -602,14 +602,14 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 ///   pattern ::= pattern-atom
 ///   pattern ::= pattern-atom ':' type-annotation
 ///   pattern ::= 'var' pattern
-///   pattern ::= 'let' pattern
-ParserResult<Pattern> Parser::parsePattern(bool isLet) {
-  // If this is a let or var pattern parse it.
+///   pattern ::= 'val' pattern
+ParserResult<Pattern> Parser::parsePattern(bool isVal) {
+  // If this is a val or var pattern parse it.
   if (Tok.is(tok::kw_val) || Tok.is(tok::kw_var))
-    return parsePatternVarOrLet();
+    return parsePatternVarOrVal();
   
   // First, parse the pattern atom.
-  ParserResult<Pattern> Result = parsePatternAtom(isLet);
+  ParserResult<Pattern> Result = parsePatternAtom(isVal);
 
   // Now parse an optional type annotation.
   if (consumeIf(tok::colon)) {
@@ -632,20 +632,20 @@ ParserResult<Pattern> Parser::parsePattern(bool isLet) {
   return Result;
 }
 
-ParserResult<Pattern> Parser::parsePatternVarOrLet() {
-  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects let or var");
-  bool isLet = Tok.is(tok::kw_val);
+ParserResult<Pattern> Parser::parsePatternVarOrVal() {
+  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects val or var");
+  bool isVal = Tok.is(tok::kw_val);
   SourceLoc varLoc = consumeToken();
 
-  // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern)
-    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+  // 'var' and 'val' patterns shouldn't nest.
+  if (InVarOrValPattern)
+    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isVal));
 
-  // In our recursive parse, remember that we're in a var/let pattern.
-  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+  // In our recursive parse, remember that we're in a var/val pattern.
+  llvm::SaveAndRestore<decltype(InVarOrValPattern)>
+    T(InVarOrValPattern, isVal ? IVOLP_InVal : IVOLP_InVar);
 
-  ParserResult<Pattern> subPattern = parsePattern(isLet);
+  ParserResult<Pattern> subPattern = parsePattern(isVal);
   if (subPattern.hasCodeCompletion())
     return makeParserCodeCompletionResult<Pattern>();
   if (subPattern.isNull())
@@ -661,14 +661,14 @@ bool Parser::isAtStartOfBindingName() {
 }
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
-                                          bool isLet) {
-  auto *var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
+                                          bool isVal) {
+  auto *var = new (Context) VarDecl(/*static*/ false, /*IsVal*/ isVal,
                                     loc, name, Type(), CurDeclContext);
   return new (Context) NamedPattern(var);
 }
 
 /// Parse an identifier as a pattern.
-ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
+ParserResult<Pattern> Parser::parsePatternIdentifier(bool isVal) {
   SourceLoc loc = Tok.getLoc();
   if (consumeIf(tok::kw__)) {
     return makeParserResult(new (Context) AnyPattern(loc));
@@ -677,7 +677,7 @@ ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {
     Identifier ident = Context.getIdentifier(text);
-    return makeParserResult(createBindingFromPattern(loc, ident, isLet));
+    return makeParserResult(createBindingFromPattern(loc, ident, isVal));
   }
 
   return nullptr;
@@ -689,14 +689,14 @@ ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
 ///   pattern-atom ::= identifier
 ///   pattern-atom ::= '_'
 ///   pattern-atom ::= pattern-tuple
-ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
+ParserResult<Pattern> Parser::parsePatternAtom(bool isVal) {
   switch (Tok.getKind()) {
   case tok::l_paren:
-    return parsePatternTuple(isLet, /*IsArgList*/false,/*DefaultArgs*/nullptr);
+    return parsePatternTuple(isVal, /*IsArgList*/false,/*DefaultArgs*/nullptr);
 
   case tok::identifier:
   case tok::kw__:
-    return parsePatternIdentifier(isLet);
+    return parsePatternIdentifier(isVal);
 
   case tok::code_complete:
     // Just eat the token and return an error status, *not* the code completion
@@ -719,7 +719,7 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
 }
 
 std::pair<ParserStatus, Optional<TuplePatternElt>>
-Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
+Parser::parsePatternTupleElement(bool isVal, bool isArgumentList,
                                  Pattern *ImplicitName,
                                  DefaultArgumentInfo *defaultArgs) {
   
@@ -738,7 +738,7 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
   // only" case (e.g. an implicitly named selector argument) then parse a type
   // and build the pattern around it.
   if (!ImplicitName) {
-    pattern = parsePattern(isLet);
+    pattern = parsePattern(isVal);
     if (pattern.hasCodeCompletion())
       return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
     if (pattern.isNull())
@@ -781,11 +781,11 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
       TuplePatternElt(pattern.get(), init, getDefaultArgKind(init)));
 }
 
-ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
+ParserResult<Pattern> Parser::parsePatternTuple(bool isVal, bool isArgumentList,
                                                 DefaultArgumentInfo *defaults) {
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
-  return parsePatternTupleAfterLP(isLet, isArgumentList, LPLoc, defaults);
+  return parsePatternTupleAfterLP(isVal, isArgumentList, LPLoc, defaults);
 }
 
 /// Parse a tuple pattern.  The leading left paren has already been consumed and
@@ -796,7 +796,7 @@ ParserResult<Pattern> Parser::parsePatternTuple(bool isLet, bool isArgumentList,
 ///   pattern-tuple-body:
 ///     pattern-tuple-element (',' pattern-tuple-body)*
 ParserResult<Pattern>
-Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
+Parser::parsePatternTupleAfterLP(bool isVal, bool isArgumentList,
                                  SourceLoc LPLoc,
                                  DefaultArgumentInfo *defaults) {
   SourceLoc RPLoc, EllipsisLoc;
@@ -812,7 +812,7 @@ Parser::parsePatternTupleAfterLP(bool isLet, bool isArgumentList,
     // Parse the pattern tuple element.
     ParserStatus EltStatus;
     Optional<TuplePatternElt> elt;
-    std::tie(EltStatus, elt) = parsePatternTupleElement(isLet, isArgumentList,
+    std::tie(EltStatus, elt) = parsePatternTupleElement(isVal, isArgumentList,
                                                         nullptr, defaults);
     if (EltStatus.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
@@ -892,17 +892,17 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
-  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects let or var");
-  bool isLet = Tok.is(tok::kw_val);
+  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects val or var");
+  bool isVal = Tok.is(tok::kw_val);
   SourceLoc varLoc = consumeToken();
 
-  // 'var' and 'let' patterns shouldn't nest.
-  if (InVarOrLetPattern)
-    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
+  // 'var' and 'val' patterns shouldn't nest.
+  if (InVarOrValPattern)
+    diagnose(varLoc, diag::var_pattern_in_var, unsigned(isVal));
 
-  // In our recursive parse, remember that we're in a var/let pattern.
-  llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+  // In our recursive parse, remember that we're in a var/val pattern.
+  llvm::SaveAndRestore<decltype(InVarOrValPattern)>
+    T(InVarOrValPattern, isVal ? IVOLP_InVal : IVOLP_InVar);
 
   ParserResult<Pattern> subPattern = parseMatchingPattern();
   if (subPattern.isNull())

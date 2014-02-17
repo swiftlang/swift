@@ -111,19 +111,19 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   //
   // TODO: We could check for a bare identifier followed by a non-postfix
   // token first thing with a lookahead.
-  if (InVarOrLetPattern) {
+  if (InVarOrValPattern) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(expr.get())) {
       // This is ill-formed, but the problem will be caught later by scope
       // resolution.
       auto pattern = createBindingFromPattern(declRef->getLoc(),
                                               declRef->getDecl()->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
+                                              InVarOrValPattern == IVOLP_InVal);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
     if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
       auto pattern = createBindingFromPattern(udre->getLoc(),
                                               udre->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
+                                              InVarOrValPattern == IVOLP_InVal);
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
   }
@@ -1312,7 +1312,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
     // Parse the pattern-tuple.
-    auto pattern = parsePatternTuple(/*IsLet*/ true, /*IsArgList*/true,
+    auto pattern = parsePatternTuple(/*IsVal*/ true, /*IsArgList*/true,
                                      /*DefaultArgs=*/nullptr);
     if (pattern.isNonNull())
       params = pattern.get();
@@ -1324,7 +1324,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     do {
       if (Tok.is(tok::identifier)) {
         auto var = new (Context) VarDecl(/*static*/ false,
-                                         /*IsLet*/ true,
+                                         /*IsVal*/ true,
                                          Tok.getLoc(),
                                          Context.getIdentifier(Tok.getText()),
                                          Type(), nullptr);
@@ -1535,7 +1535,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = Loc;
     VarDecl *var = new (Context) VarDecl(/*static*/ false,
-                                         /*IsLet*/ true,
+                                         /*IsVal*/ true,
                                          varLoc, ident, Type(), closure);
     decls.push_back(var);
   }

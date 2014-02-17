@@ -660,7 +660,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     NP->getDecl()->overwriteType(type);
 
     if (type->is<InOutType>())
-      NP->getDecl()->setLet(false);
+      NP->getDecl()->setVal(false);
 
     P->setType(type);
     return false;

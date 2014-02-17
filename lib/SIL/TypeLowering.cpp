@@ -134,7 +134,7 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
     case VarDecl::Observing:
       return CaptureKind::GetterSetter;
     case VarDecl::Stored:
-      if (var->isLet())
+      if (var->isVal())
         return CaptureKind::Constant;
 
       return CaptureKind::Box;

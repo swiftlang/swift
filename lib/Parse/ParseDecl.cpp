@@ -35,7 +35,7 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
                                            DeclContext *CurDeclContext,
                                            VarDecl **SelfDeclRet = nullptr) {
   ASTContext &Ctx = CurDeclContext->getASTContext();
-  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
+  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsVal*/ true,
                                      Loc, Ctx.Id_self,
                                      Type(), CurDeclContext);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
@@ -605,7 +605,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
 ///   decl:
 ///     decl-typealias
 ///     decl-extension
-///     decl-let
+///     decl-val
 ///     decl-var
 ///     decl-class
 ///     decl-func
@@ -1222,7 +1222,7 @@ static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
     StartLoc = SourceLoc();
   }
 
-  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
+  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsVal*/true,
                                          NameLoc, Name,
                                          Type(), P.CurDeclContext);
   Pattern *ValuePattern
@@ -1537,11 +1537,11 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   return nullptr;
 }
 
-/// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
+/// \brief Parse a 'var' or 'val' declaration, doing no token skipping on error.
 ///
 /// \verbatim
 ///   decl-var:
-///      ('static' | 'class')? 'let' attribute-list pattern initializer
+///      ('static' | 'class')? 'val' attribute-list pattern initializer
 ///              (',' pattern initializer )*
 ///      ('static' | 'class')? 'var' attribute-list pattern initializer?
 ///              (',' pattern initializer? )*
@@ -1571,7 +1571,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
   }
 
-  bool isLet = Tok.is(tok::kw_val);
+  bool isVal = Tok.is(tok::kw_val);
   assert(Tok.getKind() == tok::kw_val || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
 
@@ -1604,11 +1604,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   do {
     ParserResult<Pattern> pattern;
 
-    { // In our recursive parse, remember that we're in a var/let pattern.
-      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-        T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+    { // In our recursive parse, remember that we're in a var/val pattern.
+      llvm::SaveAndRestore<decltype(InVarOrValPattern)>
+        T(InVarOrValPattern, isVal ? IVOLP_InVal : IVOLP_InVar);
 
-      pattern = parsePattern(isLet);
+      pattern = parsePattern(isVal);
     }
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
@@ -1697,7 +1697,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (Tok.is(tok::l_brace)) {
       // Reject getters and setters for lets, but parse them for better
       // recovery.
-      if (isLet)
+      if (isVal)
         diagnose(Tok, diag::val_cannot_be_computed_property);
 
       if (auto *boundVar =
@@ -1711,7 +1711,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         }
       }
 
-      if (isLet)
+      if (isVal)
         return makeParserError();
 
       HasGetSet = true;
@@ -2544,7 +2544,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   }
 
   ParserResult<Pattern> Indices =
-    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
+    parsePatternTuple(/*IsVal*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   
@@ -2749,7 +2749,7 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SourceLoc LParenLoc = Tok.getLoc();
     DefaultArgumentInfo DefaultArgs; // ignored in valid code
     ParserResult<Pattern> Params =
-      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
+      parsePatternTuple(/*IsVal*/true, /*IsArgList*/true, &DefaultArgs);
     if (!Params.isParseError()) {
       // Check that the destructor has zero parameters.
       SourceRange ElementsRange;

@@ -39,7 +39,7 @@
     decl ::= <a href="#decl-protocol">decl-protocol</a>
     decl ::= <a href="#decl-struct">decl-struct</a>
     decl ::= <a href="#decl-typealias">decl-typealias</a>
-    decl ::= <a href="#decl-let">decl-let</a>
+    decl ::= <a href="#decl-val">decl-val</a>
     decl ::= <a href="#decl-var">decl-var</a>
     decl ::= <a href="#decl-subscript">decl-subscript</a>
  </pre>
@@ -171,39 +171,39 @@
   <p>FIXME: Write this section.</p>
   
   <!-- ===================================================================== -->
-  <h3 id="decl-let">let Declarations</h3>
+  <h3 id="decl-val">val Declarations</h3>
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    decl-let    ::= <a href="#attribute-list">attribute-list</a> 'let' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
+    decl-val    ::= <a href="#attribute-list">attribute-list</a> 'val' <a href="#pattern">pattern</a> initializer?  (',' pattern initializer?)*
     initializer ::= '=' <a href="#expr">expr</a>
   </pre>
 
 
-  <p>'let' declarations define an immutable binding between an initializer value
+  <p>'val' declarations define an immutable binding between an initializer value
   and a name.</p>
 
-<p>Here are some examples of 'let' declarations:</p>
+<p>Here are some examples of 'val' declarations:</p>
 
 <pre class="example">
   <i>// Simple examples.</i>
-  let a = 4
-  let c : Int = 42
+  val a = 4
+  val c : Int = 42
 
   <i>// This decodes the tuple return value into independently named parts</i>
   <i>// and both 'val' and 'err' are in scope after this line.</i>
-  let (val, err) = foo()
+  val (val, err) = foo()
 
-  // let declarations require an initializer (though the type is optional).
-  let b : Int        <i>// error: let requires an initializer</i>
+  // val declarations require an initializer (though the type is optional).
+  val b : Int        <i>// error: val requires an initializer</i>
 
-  // Let bindings of classes make the binding immutable, not the object.
+  // val bindings of classes make the binding immutable, not the object.
   class Rocket {
     func blastOff() { ... }
   }
-  let rocket = Rocket()
+  val rocket = Rocket()
   rocket.blastOff()      // okay
-  rocket = Rocket()   <i>// error, cannot change a let binding</i>
+  rocket = Rocket()   <i>// error, cannot change a val binding</i>
 </pre>
 
   <!-- ===================================================================== -->
@@ -1700,18 +1700,18 @@ ill-formed if the type does not conform to the protocol.</p>
   is irrefutable.</p>
 
   <!-- ********************************************************************* -->
-  <h3 id="pattern-var">'var' and 'let' Patterns</h3>
+  <h3 id="pattern-var">'var' and 'val' Patterns</h3>
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
-    pattern-var ::= 'let' pattern
+    pattern-var ::= 'val' pattern
     pattern-var ::= 'var' pattern
   </pre>
 
-  <p>The <tt>var</tt> and <tt>let</tt> keywords within a pattern introduces 
+  <p>The <tt>var</tt> and <tt>val</tt> keywords within a pattern introduces
     variable bindings.  Any identifiers within the subpattern bind new named 
     variables to their matching values.  'var' bindings are mutable within
-    the bound scope, and 'let' bindings are immutable.<p>
+    the bound scope, and 'val' bindings are immutable.<p>
 
   <pre class="example">
     var point = (0, 0, 0)

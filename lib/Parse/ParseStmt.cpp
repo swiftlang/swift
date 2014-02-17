@@ -458,7 +458,7 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
-///     ('var' | 'let') pattern '=' expr-basic
+///     ('var' | 'val') pattern '=' expr-basic
 ///     expr-basic
 ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                         Diag<> ID) {
@@ -469,10 +469,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     assert(CurDeclContext->isLocalContext()
            && "conditional binding in non-local context?!");
     
-    bool IsLet = Tok.is(tok::kw_val);
+    bool IsVal = Tok.is(tok::kw_val);
     SourceLoc VarLoc = consumeToken();
     
-    auto Pattern = parsePattern(IsLet);
+    auto Pattern = parsePattern(IsVal);
     Status |= Pattern;
     if (Pattern.isNull() || Pattern.hasCodeCompletion())
       return Status;
@@ -717,7 +717,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     LPLoc = consumeToken();
     LPLocConsumed = true;
   }
-  // Parse the first part, either a var, let, expr, or stmt-assign.
+  // Parse the first part, either a var, val, expr, or stmt-assign.
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
@@ -916,7 +916,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 ///   stmt-for-each:
 ///     'for' pattern 'in' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
-  ParserResult<Pattern> Pattern = parsePattern(/*isLet*/true);
+  ParserResult<Pattern> Pattern = parsePattern(/*isVal*/true);
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
     Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));

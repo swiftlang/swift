@@ -403,8 +403,8 @@ namespace {
       printCommon(VD, "var_decl");
       if (VD->isStatic())
         OS << " type";
-      if (VD->isLet())
-        OS << " let";
+      if (VD->isVal())
+        OS << " val";
       OS << " storage_kind=";
       switch (VD->getStorageKind()) {
       case VarDecl::Computed:
