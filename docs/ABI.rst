@@ -679,7 +679,7 @@ Globals
   entity ::= nominal-type                // named type declaration
   entity ::= entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
-  entity-kind ::= 'v'                    // variable (let/var)
+  entity-kind ::= 'v'                    // variable (val/var)
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
   entity-name ::= 'A' index              // default argument generator

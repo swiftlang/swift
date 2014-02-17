@@ -81,7 +81,7 @@ are **value types**.
 Mutating and Read-Only Methods
 ------------------------------
 
-A method attributed with ``inout`` is considered **mutating**.
+A method attributed with ``mutating`` is considered **mutating**.
 Otherwise, it is considered **read-only**.
 
 .. parsed-literal::
@@ -140,15 +140,15 @@ implicitly:
 Binding for Rvalues
 -------------------
 
-Just as ``var`` declares a name for an lvalue, ``let`` now gives a
+Just as ``var`` declares a name for an lvalue, ``val`` now gives a
 name to an rvalue:
 
 .. parsed-literal::
 
    var clay = 42
-   **let** stone = clay + 100 // stone can now be used as an rvalue
+   **val** stone = clay + 100 // stone can now be used as an rvalue
 
-The grammar rules for ``let`` are identical to those for ``var``.
+The grammar rules for ``val`` are identical to those for ``var``.
 
 Properties and Subscripts
 -------------------------
@@ -224,7 +224,7 @@ For example:
    **stone +=** 3          // **Error:** += is declared inout, @assignment and thus
                        // implicitly takes the address of 'stone'
 
-   **let** x = Number(42)  // x is an rvalue
+   **val** x = Number(42)  // x is an rvalue
    x.getValue()        // ok, read-only method
    x.increment()       // **Error:** calling mutating method on rvalue
    x.readOnlyValue     // ok, read-only property

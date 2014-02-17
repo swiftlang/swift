@@ -1469,7 +1469,7 @@ Debug Information
 Debug information is generally associated with allocations (alloc_stack or
 alloc_box) by having a Decl node attached to the allocation with a SILLocation.
 For declarations that have no allocation we have explicit instructions for
-doing this.  This is used by 'let' declarations, which bind a value to a name
+doing this.  This is used by 'val' declarations, which bind a value to a name
 and for var decls who are promoted into registers.  The decl they refer to is
 attached to the instruction with a SILLocation.
 
