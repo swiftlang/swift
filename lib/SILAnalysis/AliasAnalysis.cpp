@@ -35,7 +35,7 @@ DisableAliasAnalysis("disable-aa", llvm::cl::init(false),
 #endif
 
 //===----------------------------------------------------------------------===//
-//                             Utility Functions
+//                                 Utilities
 //===----------------------------------------------------------------------===//
 
 /// Strip off casts/indexing insts/address projections from V until there is
@@ -48,6 +48,22 @@ static SILValue getUnderlyingObject(SILValue V) {
     V = V2;
   }
 }
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     AliasAnalysis::AliasResult R) {
+  switch (R) {
+  case AliasAnalysis::AliasResult::NoAlias:
+    return OS << "NoAlias";
+  case AliasAnalysis::AliasResult::MayAlias:
+    return OS << "MayAlias";
+  case AliasAnalysis::AliasResult::MustAlias:
+    return OS << "MustAlias";
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                           Unequal Base Object AA
+//===----------------------------------------------------------------------===//
 
 /// Return true if the given SILArgument is an argument to the first BB of a
 /// function.
@@ -71,6 +87,9 @@ static bool isIdentifiableObject(SILValue V) {
     isa<LiteralInst>(*V);
 }
 
+/// Is this a literal which we know can not refer to a global object?
+///
+/// FIXME: function_ref?, builtin_function_ref?
 static bool isLocalLiteral(SILValue V) {
   switch (V->getKind()) {
   case ValueKind::IntegerLiteralInst:
@@ -82,11 +101,13 @@ static bool isLocalLiteral(SILValue V) {
   }
 }
 
+/// Is this a value that can be unambiguously identified as being defined at the
+/// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
   return isa<AllocationInst>(*V) || isNoAliasArgument(V) || isLocalLiteral(V);
 }
 
-/// Returns true if the ValueBase inside V is an apply whose calle is a no read
+/// Returns true if the ValueBase inside V is an apply whose callee is a no read
 /// builtin_function_ref.
 static bool isNoReadApplyInst(SILValue V) {
   auto *AI = dyn_cast<ApplyInst>(V.getDef());
@@ -356,7 +377,6 @@ static bool isEscapeSource(SILValue V) {
   return false;
 }
 
-
 /// Returns true if we can prove that the two input SILValues which do not equal
 /// can not alias.
 static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
@@ -392,6 +412,10 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   // We failed to prove that the two objects are different.
   return false;
 }
+
+//===----------------------------------------------------------------------===//
+//                           Projection Address AA
+//===----------------------------------------------------------------------===//
 
 /// Returns true if every projection in V1Path and V2Path equal. Returns false
 /// otherwise.
@@ -460,6 +484,8 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 //                                Entry Points
 //===----------------------------------------------------------------------===//
 
+/// The main AA entry point. Performs various analyses on V1, V2 in an attempt
+/// to disambiguate the two values.
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 #ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
@@ -613,16 +639,4 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysis(M);
-}
-
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
-                                     AliasAnalysis::AliasResult R) {
-  switch (R) {
-  case AliasAnalysis::AliasResult::NoAlias:
-    return OS << "NoAlias";
-  case AliasAnalysis::AliasResult::MayAlias:
-    return OS << "MayAlias";
-  case AliasAnalysis::AliasResult::MustAlias:
-    return OS << "MustAlias";
-  }
 }
