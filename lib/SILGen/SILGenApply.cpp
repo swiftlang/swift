@@ -2638,7 +2638,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      RValueSource &&selfValue,
                                      bool isSuper,
                                      RValueSource &&subscripts,
-                                     RValueSource &&setValue) {
+                                     RValue &&setValue) {
   SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
@@ -2661,7 +2661,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
   }
   // T ->
   setValue.rewriteType(accessType.getInput());
-  emission.addCallSite(loc, std::move(setValue), accessType.getResult());
+  emission.addCallSite(loc, RValueSource(loc, std::move(setValue)),
+                       accessType.getResult());
   // ()
   emission.apply();
 }

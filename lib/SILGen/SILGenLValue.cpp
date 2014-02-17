@@ -227,8 +227,7 @@ WritebackScope::~WritebackScope() {
   while (i-- > deepest) {
     ManagedValue mv = i->temp.claim(*gen, i->loc);
     auto formalTy = i->component->getSubstFormalType();
-    i->component->set(*gen, i->loc,
-                      RValueSource(i->loc, RValue(*gen, i->loc, formalTy, mv)),
+    i->component->set(*gen, i->loc, RValue(*gen, i->loc, formalTy, mv),
                       i->base);
   }
   
@@ -399,14 +398,14 @@ namespace {
     }
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValueSource &&rvalue, ManagedValue base) const override {
+             RValue &&value, ManagedValue base) const override {
       // Pass in just the setter.
       auto args = prepareAccessorArgs(gen, loc, base, decl->getSetter());
       
       return gen.emitSetAccessor(loc, decl, substitutions,
                                  std::move(args.base), IsSuper,
                                  std::move(args.subscripts),
-                                 std::move(rvalue));
+                                 std::move(value));
     }
     
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
@@ -439,9 +438,9 @@ namespace {
     {}
     
     void set(SILGenFunction &gen, SILLocation loc,
-             RValueSource &&rvalue, ManagedValue base) const override {
+             RValue &&value, ManagedValue base) const override {
       // Map the value to the original abstraction level.
-      ManagedValue mv = std::move(rvalue).getAsSingleValue(gen);
+      ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
       mv = gen.emitSubstToOrigValue(loc, mv, origType, substType);
       // Store to the base.
       mv.assignInto(gen, loc, base.getValue());
@@ -1146,8 +1145,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
   return addr;
 }
 
-void SILGenFunction::emitAssignToLValue(SILLocation loc,
-                                        RValueSource &&src,
+void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
                                         const LValue &dest) {
   WritebackScope scope(*this);
   
@@ -1160,7 +1158,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   if (component.isPhysical()) {
     auto finalDestAddr = component.asPhysical().offset(*this, loc, destAddr);
     
-    std::move(src).getAsSingleValue(*this)
+    std::move(src).getAsSingleValue(*this, loc)
       .assignInto(*this, loc, finalDestAddr.getValue());
   } else {
     component.asLogical().set(*this, loc, std::move(src), destAddr);
@@ -1201,10 +1199,8 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
                                               const LValue &dest) {
   auto skipPeephole = [&]{
     ManagedValue loaded = emitLoadOfLValue(loc, src, SGFContext());
-    emitAssignToLValue(loc, RValueSource(loc, RValue(*this, loc,
-                                                     src.getSubstFormalType(),
-                                                     loaded)),
-                       dest);
+    emitAssignToLValue(loc, RValue(*this, loc, src.getSubstFormalType(),
+                                   loaded), dest);
   };
   
   // Only perform the peephole if both operands are physical and there's no

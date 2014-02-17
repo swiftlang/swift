@@ -610,7 +610,7 @@ public:
                        RValueSource &&optionalSelfValue,
                        bool isSuper,
                        RValueSource &&optionalSubscripts,
-                       RValueSource &&value);
+                       RValue &&value);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
@@ -647,7 +647,7 @@ public:
                         const TypeLowering &rvalueTL,
                         SGFContext C, IsTake_t isTake);
   
-  void emitAssignToLValue(SILLocation loc, RValueSource &&src,
+  void emitAssignToLValue(SILLocation loc, RValue &&src,
                           const LValue &dest);
   void emitAssignLValueToLValue(SILLocation loc,
                                 const LValue &src, const LValue &dest);

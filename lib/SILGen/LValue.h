@@ -145,7 +145,7 @@ public:
   
   /// Set the property.
   virtual void set(SILGenFunction &gen, SILLocation loc,
-                   RValueSource &&rvalue, ManagedValue base) const = 0;
+                   RValue &&value, ManagedValue base) const = 0;
 
   /// Get the property.
   virtual ManagedValue get(SILGenFunction &gen, SILLocation loc,

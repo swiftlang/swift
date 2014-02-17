@@ -2784,7 +2784,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     LValue memberRef = SGF.emitDirectIVarLValue(loc, self, named->getDecl());
 
     // Assign to it.
-    SGF.emitAssignToLValue(loc, {loc, std::move(src)}, memberRef);
+    SGF.emitAssignToLValue(loc, std::move(src), memberRef);
     return;
   }
     
@@ -3514,7 +3514,7 @@ static void emitAssignExprRecursive(AssignExpr *S, RValue &&Src,
   
   // Otherwise, emit the scalar assignment.
   LValue DstLV = Gen.emitLValue(Dest);
-  Gen.emitAssignToLValue(S, {S, std::move(Src)}, DstLV);
+  Gen.emitAssignToLValue(S, std::move(Src), DstLV);
 }
 
 RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
