@@ -210,10 +210,9 @@ public:
 };
 
   
-/// DeclAttributes - These are attributes that may be applied to declarations.
+/// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
-  // Get a SourceLoc for every possible attribute that can be parsed in source.
-  // the presence of the attribute is indicated by its location being set.
+  /// Source locations for every possible attribute that can be parsed in source.
   SourceLoc AttrLocs[AK_Count];
   bool HasAttr[AK_Count] = { false };
 public:
