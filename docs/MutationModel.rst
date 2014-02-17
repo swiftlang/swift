@@ -38,7 +38,7 @@ Consider::
   var w = Window()
   w.title += " (parenthesized remark)”
 
-What do we do with this?  Since ``+=`` has an ``@inout`` first
+What do we do with this?  Since ``+=`` has an ``inout`` first
 argument, we detect this situation statically (hopefully one day we’ll
 have a better error message): 
 
@@ -81,7 +81,7 @@ are **value types**.
 Mutating and Read-Only Methods
 ------------------------------
 
-A method attributed with ``@inout`` is considered **mutating**.
+A method attributed with ``inout`` is considered **mutating**.
 Otherwise, it is considered **read-only**.
 
 .. parsed-literal::
@@ -92,18 +92,18 @@ Otherwise, it is considered **read-only**.
      func getValue() {              // read-only method
        return Int(name)
      }
-     **@inout** func increment() {  // mutating method
+     **mutating** func increment() {  // mutating method
        name = (Int(name)+1).toString()
      }
      var name: String
    }
 
-The implicit ``self`` parameter of a method is semantically an
-``@inout`` parameter if and only if the method is attributed with
-``@inout``.  Read-only methods do not “write back” onto their target
+The implicit ``self`` parameter of a struct or enum method is semantically an
+``inout`` parameter if and only if the method is attributed with
+``mutating``.  Read-only methods do not “write back” onto their target
 objects.
 
-A program that applies the ``@inout`` attribute to a method of a
+A program that applies the ``mutating`` to a method of a
 class—or of a protocol attributed with ``@class_protocol``—is
 ill-formed.  [Note: it is logically consistent to think of all methods
 of classes as read-only, even though they may in fact modify instance
@@ -120,7 +120,7 @@ The following are considered **mutating operations** on an lvalue
 Remember that the following operations all take an lvalue's address
 implicitly:
 
-* passing it to a mutating (``@inout``) method::
+* passing it to a mutating method::
 
     var x = Number(42)
     x.increment()         // mutating operation
@@ -184,8 +184,8 @@ following table holds:
 |          Declaration:|::                                |                        |
 |                      |                                  |::                      |
 |Expression            |   var x = Number(42)  // this    |                        |
-|                      |   var x = CNumber(42) // or this |  let x = Number(42)    |
-|                      |   let x = CNumber(42) // or this |                        |
+|                      |   var x = CNumber(42) // or this |  val x = Number(42)    |
+|                      |   val x = CNumber(42) // or this |                        |
 +======================+==================================+========================+
 | ``x.readOnlyValue``  |**rvalue** (no ``set:`` clause)   |**rvalue** (target is an|
 |                      |                                  |rvalue of value type)   |
@@ -221,7 +221,7 @@ For example:
 
    swap(&clay, **&stone**) // **Error:** 'stone' is an rvalue; can't take its address
 
-   **stone +=** 3          // **Error:** += is declared @inout, @assignment and thus
+   **stone +=** 3          // **Error:** += is declared inout, @assignment and thus
                        // implicitly takes the address of 'stone'
 
    **let** x = Number(42)  // x is an rvalue
@@ -231,18 +231,18 @@ For example:
    x.writableValue     // ok, there's no assignment to writableValue
    x.writableValue++   // **Error:** assigning into a property of an immutable value
 
-Non-``@inout`` Function Parameters are RValues
+Non-``inout`` Function Parameters are RValues
 ----------------------------------------------
 
 A function that performs a mutating operation on a parameter is
-ill-formed unless that parameter was attributed with ``@inout``.  A
+ill-formed unless that parameter was marked with ``inout``.  A
 method that performs a mutating operation on ``self`` is ill-formed
-unless the method is attributed with ``@inout``:
+unless the method is attributed with ``mutating``:
 
 .. parsed-literal::
 
-  func f(x: Int, y: @inout Int) {
-    y = x         // ok, y is an @inout parameter
+  func f(x: Int, inout y: Int) {
+    y = x         // ok, y is an inout parameter
     x = y         // **Error:** function parameter 'x' is immutable
   }
 
