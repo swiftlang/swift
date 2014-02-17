@@ -295,12 +295,12 @@ ERROR(implied_name_no_argument,sema_tcd,none,
 
 
 
-// Variables (var and let).
+// Variables (var and val).
 ERROR(unimplemented_type_var,decl_parsing,none,
      "static variables not yet supported in "
      "%select{this context|generic types|classes|protocols}0", (unsigned))
-ERROR(let_requires_initializer,decl_parsing,none,
-     "'let' declarations require an initializer expression", ())
+ERROR(val_requires_initializer,decl_parsing,none,
+     "'val' declarations require an initializer expression", ())
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,decl_parsing,none,
@@ -680,8 +680,8 @@ ERROR(expression_unused_lvalue,sema_tcs,none,
       "expression resolves to an unused l-value", ())
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to the result of this expression", ())
-ERROR(assignment_lhs_is_let,sema_tcs,none,
-      "cannot assign to 'let' value %0", (Identifier))
+ERROR(assignment_lhs_is_val,sema_tcs,none,
+      "cannot assign to 'val' value %0", (Identifier))
 ERROR(assignment_get_only_property,sema_tcs,none,
       "cannot assign to a get-only property %0", (Identifier))
 ERROR(assignment_to_self,sema_tcs,none,

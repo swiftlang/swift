@@ -1460,7 +1460,7 @@ public:
         // (in which case they get set during the init method of the enclosing
         // type).
         if (var->isLet() && !varDC->isTypeContext()) {
-          TC.diagnose(var->getLoc(), diag::let_requires_initializer);
+          TC.diagnose(var->getLoc(), diag::val_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
           var->overwriteType(ErrorType::get(TC.Context));

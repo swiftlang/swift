@@ -1698,7 +1698,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       // Reject getters and setters for lets, but parse them for better
       // recovery.
       if (isLet)
-        diagnose(Tok, diag::let_cannot_be_computed_property);
+        diagnose(Tok, diag::val_cannot_be_computed_property);
 
       if (auto *boundVar =
             parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, Decls)) {
