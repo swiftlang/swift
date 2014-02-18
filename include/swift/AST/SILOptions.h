@@ -57,7 +57,6 @@ public:
   bool TimeTransforms = false;
   
   /// Stop optimizing after the Nth pass. For debugging purposes.
-  /// 0=infinity.
   unsigned NumOptPassesToRun = UINT_MAX;
 };
 
