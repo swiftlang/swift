@@ -62,6 +62,20 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   return false;
 }
 
+static bool printAsObjC(const std::string &path, Module *M) {
+  std::string errorInfo;
+  llvm::raw_fd_ostream out(path.c_str(), errorInfo, llvm::sys::fs::F_Binary);
+
+  if (out.has_error() || !errorInfo.empty()) {
+    M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                      path, errorInfo);
+    out.clear_error();
+    return true;
+  }
+
+  return printAsObjC(out, M);
+}
+
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
@@ -110,27 +124,12 @@ static bool performCompile(CompilerInstance &Instance,
   if (Context.hadError())
     return true;
 
-  // Write an Objective-C header for the module if requested.
-  // This should work with -parse.
-  if (!opts.ObjCHeaderOutputPath.empty()) {
-    std::string errorInfo;
-    llvm::raw_fd_ostream out(opts.ObjCHeaderOutputPath.c_str(), errorInfo,
-                             llvm::sys::fs::F_Binary);
-
-    if (out.has_error() || !errorInfo.empty()) {
-      Context.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                             opts.ObjCHeaderOutputPath, errorInfo);
-      out.clear_error();
-    }
-
-    bool hadError = printAsObjC(out, Instance.getMainModule());
-    assert(!hadError && "no known error cases");
-    (void)hadError;
-  }
-
   // We've just been told to perform a parse, so we can return now.
-  if (Action == FrontendOptions::Parse)
+  if (Action == FrontendOptions::Parse) {
+    if (!opts.ObjCHeaderOutputPath.empty())
+      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule());
     return false;
+  }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
@@ -167,6 +166,9 @@ static bool performCompile(CompilerInstance &Instance,
     runSILOptimizationPasses(*SM, Invocation.getSILOptions());
     SM->verify();
   }
+
+  if (!opts.ObjCHeaderOutputPath.empty())
+    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule());
 
   if (!opts.ModuleOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
