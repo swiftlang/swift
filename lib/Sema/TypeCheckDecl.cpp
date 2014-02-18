@@ -129,7 +129,6 @@ public:
       // equal.
     case RawValueKey::Kind::Int:
       return DenseMapInfo<int64_t>::getHashValue(k.intValue);
-      return DenseMapInfo<int64_t>::getHashValue(k.intValue);
     case RawValueKey::Kind::UnicodeScalar:
       return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
     case RawValueKey::Kind::String:
