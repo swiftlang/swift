@@ -236,7 +236,7 @@ namespace {
         emitFunc(SD->getGetter());
         if (SD->isSettable())
           emitFunc(SD->getSetter());
-        break;
+        return;
       }
       case DeclKind::Var:
         // FIXME: To be implemented.
