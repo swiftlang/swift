@@ -1375,7 +1375,7 @@ namespace {
   struct OrderArchetypeByName {
     bool operator()(std::pair<Identifier, ArchetypeType *> X,
                     std::pair<Identifier, ArchetypeType *> Y) const {
-      return X.first.str() < Y.second->getName().str();
+      return X.first.str() < Y.first.str();
     }
 
     bool operator()(std::pair<Identifier, ArchetypeType *> X,
