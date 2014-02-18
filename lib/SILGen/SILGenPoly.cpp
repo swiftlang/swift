@@ -1328,8 +1328,6 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
   CanAnyFunctionType witnessFormalTy = witnessInfo.LoweredType;
-  assert(witness.uncurryLevel == (isFree ? 0 : 1)
-         && "curried requirement?!");
   CanAnyFunctionType witnessSubstTy = witnessFormalTy;
   if (!witnessSubs.empty()) {
     witnessSubstTy = cast<FunctionType>(
