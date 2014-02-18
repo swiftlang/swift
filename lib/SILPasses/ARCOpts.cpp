@@ -494,6 +494,13 @@ performCodeMotion(llvm::DenseMap<SILInstruction *,
 //===----------------------------------------------------------------------===//
 
 static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
+  // ARCOpts seems to be taking up a lot of compile time when running on
+  // globalinit_func. Since that is not *that* interesting from an ARC
+  // perspective (i.e. no ref count operations in a loop), disable it on such
+  // functions temporarily in order to unblock others. This should be removed.
+  if (F.getName().startswith("globalinit_func"))
+    return false;
+
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   llvm::MapVector<SILValue, ReferenceCountState> BBState;
