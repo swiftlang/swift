@@ -592,7 +592,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // but we still have an lvalue, fail.
         if (!typeVar1->getImpl().canBindToLValue()) {
           if (type2->is<LValueType>()) {
-            if (false && shouldRecordFailures()) {
+            if (shouldRecordFailures()) {
               recordFailure(getConstraintLocator(locator),
                             Failure::IsForbiddenLValue, type1, type2);
             }
@@ -612,7 +612,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
       if (!typeVar2->getImpl().canBindToLValue()) {
         if (type1->is<LValueType>()) {
-          if (false && shouldRecordFailures()) {
+          if (shouldRecordFailures()) {
             recordFailure(getConstraintLocator(locator),
                           Failure::IsForbiddenLValue, type1, type2);
           }
