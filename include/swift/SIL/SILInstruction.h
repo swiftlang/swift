@@ -846,8 +846,8 @@ public:
     /// DerivedSelf designates "self" in a derived (non-root) class.
     DerivedSelf,
 
-    /// Designates "self" in a derived (non-root) class whose stored properties
-    /// have already been initialized.
+    /// DerivedSelfOnly designates "self" in a derived (non-root)
+    /// class whose stored properties have already been initialized.
     DerivedSelfOnly,
 
     /// DelegatingSelf designates "self" on a struct, enum, or class
