@@ -1568,16 +1568,28 @@ mark_uninitialized
 ::
 
   sil-instruction ::= 'mark_uninitialized' '[' mu_kind ']' sil-operand
-  mu_kind ::= 'globalvar'
+  mu_kind ::= 'var'
   mu_kind ::= 'rootself'
+  mu_kind ::= 'derivedself'
+  mu_kind ::= 'derivedselfonly'
+  mu_kind ::= 'delegatingself'
 
-  %2 = mark_uninitialized 'globalvar' %1 : $*T
+  %2 = mark_uninitialized [var] %1 : $*T
   // $T must be an address
 
 Indicates that a symbolic memory location is uninitialized, and must be
 explicitly initialized before it escapes or before the current function returns.
 This instruction returns its operands, and all accesses within the function must
 be performed against the return value of the mark_uninitialized instruction.
+
+The kind of mark_uninitialized instruction specifies the type of data
+the mark_uninitialized instruction refers to:
+
+- ``var``: designates the start of a normal variable live range
+- ``rootself``: designates ``self`` in a struct, enum, or root class
+- ``derivedself``: designates ``self`` in a derived (non-root) class
+- ``derivedselfonly``: designates ``self`` in a derived (non-root) class whose stored properties have already been initialized
+- ``delegatingself``: designates ``self`` on a struct, enum, or class in a delegating constructor (one that calls self.init)
 
 The purpose of the ``mark_uninitialized`` instruction is to enable
 definitive initialization analysis for global variables (when marked as
