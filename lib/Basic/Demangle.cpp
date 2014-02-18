@@ -1823,23 +1823,17 @@ private:
           isSwiftModule(unboundType->getChild(0))) {
         return SugarType::Optional;
       }
-      
-      return SugarType::None;
     }
-    else /*if (pointer->getKind() == Node::Kind::BoundGenericStructure)*/
-    {
+    else { /*if (pointer->getKind() == Node::Kind::BoundGenericStructure)*/
       // Swift.Array
       if (isIdentifier(unboundType->getChild(1), "Array") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
         return SugarType::Slice;
       }
-
-      return SugarType::None;
     }
 
     return SugarType::None;
-    
   }
   
   void printBoundGeneric(Node *pointer) {
