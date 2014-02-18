@@ -1786,14 +1786,14 @@ void SILVTable::verify(const SILModule &M) const {
 
 /// Verify that a witness table follows invariants.
 void SILWitnessTable::verify(const SILModule &M) const {
-#ifndef DEBUG
+#ifndef NDEBUG
   // TODO
 #endif
 }
 
 /// Verify that a global variable follows invariants.
 void SILGlobalVariable::verify() const {
-#ifndef DEBUG
+#ifndef NDEBUG
   assert(getLoweredType().isObject()
          && "global variable cannot have address type");
 #endif
