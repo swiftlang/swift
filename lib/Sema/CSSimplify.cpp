@@ -1288,7 +1288,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     return SolutionKind::Solved;
 
   case CheckedCastKind::ExistentialToConcrete:
-    addConstraint(ConstraintKind::Conversion, toType, fromType);
+    addConstraint(ConstraintKind::Subtype, toType, fromType);
     return SolutionKind::Solved;
 
   case CheckedCastKind::Coercion:
