@@ -64,13 +64,14 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     size = payloadSize + getNumTagBytes(payloadSize,
                                       emptyCases - payloadNumExtraInhabitants);
   }
-
+  
+  size_t align = payloadWitnesses->getAlignment();
   vwtable->size = size;
   vwtable->flags = payloadWitnesses->flags
-    .withExtraInhabitants(unusedExtraInhabitants > 0);
-  vwtable->stride = llvm::RoundUpToAlignment(size,
-                                             payloadWitnesses->getAlignment());
-  
+    .withExtraInhabitants(unusedExtraInhabitants > 0)
+    .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
+  vwtable->stride = llvm::RoundUpToAlignment(size, align);
+                       
   // If the payload has extra inhabitants left over after the ones we used,
   // forward them as our own.
   if (unusedExtraInhabitants > 0) {
