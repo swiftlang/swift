@@ -176,8 +176,9 @@ static bool useCaptured(Operand *UI) {
   return true;
 }
 
-/// checkAllocBoxUses - Scan all of the uses (recursively) of the specified
-/// alloc_box, validating that they don't allow the ABI to escape.
+/// checkAllocBoxUses - Recursively scan all of the uses of the
+/// specified alloc_box, returning true if a use escapes, or false
+/// otherwise.
 static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
                               SmallVectorImpl<SILInstruction*> &Users) {
   for (auto UI : V.getUses()) {
