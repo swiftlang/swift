@@ -560,8 +560,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
 static std::pair<llvm::GlobalValue::LinkageTypes,
                  llvm::GlobalValue::VisibilityTypes>
-getIRLinkage(IRGenModule &IGM,
-             SILLinkage linkage, ForDefinition_t isDefinition) {
+getIRLinkage(SILLinkage linkage, ForDefinition_t isDefinition) {
   switch (linkage) {
 #define RESULT(LINKAGE, VISIBILITY)        \
     { llvm::GlobalValue::LINKAGE##Linkage, \
@@ -572,22 +571,10 @@ getIRLinkage(IRGenModule &IGM,
   case SILLinkage::Hidden: return RESULT(External, Hidden);
   case SILLinkage::Private: return RESULT(Internal, Default);
   case SILLinkage::PublicExternal:
-    if (isDefinition) {
-      // FIXME: Work around problems linking available_externally symbols in the
-      // REPL. <rdar://problem/16094902>
-      if (IGM.Opts.UseJIT)
-        return RESULT(LinkOnceODR, Default);
-      return RESULT(AvailableExternally, Default);
-    }
+    if (isDefinition) return RESULT(AvailableExternally, Default);
     return RESULT(External, Default);
   case SILLinkage::HiddenExternal:
-    if (isDefinition) {
-      // FIXME: Work around problems linking available_externally symbols in the
-      // REPL. <rdar://problem/16094902>
-      if (IGM.Opts.UseJIT)
-        return RESULT(LinkOnceODR, Hidden);
-      return RESULT(AvailableExternally, Hidden);
-    }
+    if (isDefinition) return RESULT(AvailableExternally, Hidden);
     return RESULT(External, Hidden);
   }
   llvm_unreachable("bad SIL linkage");
@@ -595,13 +582,11 @@ getIRLinkage(IRGenModule &IGM,
 
 /// Given that we're going to define a global value but already have a
 /// forward-declaration of it, update its linkage.
-static void updateLinkageForDefinition(IRGenModule &IGM,
-                                       llvm::GlobalValue *global,
+static void updateLinkageForDefinition(llvm::GlobalValue *global,
                                        const LinkEntity &entity) {
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
-  auto linkage = getIRLinkage(IGM,
-                              entity.getLinkage(ForDefinition), ForDefinition);
+  auto linkage = getIRLinkage(entity.getLinkage(ForDefinition), ForDefinition);
   global->setLinkage(linkage.first);
   global->setVisibility(linkage.second);
 }
@@ -613,7 +598,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   entity.mangle(result.Name);
 
   llvm::tie(result.Linkage, result.Visibility) =
-    getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition);
+    getIRLinkage(entity.getLinkage(isDefinition), isDefinition);
 
   return result;
 }
@@ -804,7 +789,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
   if (gvar) {
-    if (forDefinition) updateLinkageForDefinition(*this, gvar, entity);
+    if (forDefinition) updateLinkageForDefinition(gvar, entity);
     return Address(gvar, Alignment(gvar->getAlignment()));
   }
 
@@ -835,7 +820,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
   llvm::GlobalVariable *&entry = GlobalVars[entity];
   if (entry) {
     llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
-    if (forDefinition) updateLinkageForDefinition(*this, gv, entity);
+    if (forDefinition) updateLinkageForDefinition(gv, entity);
     return Address(gv, Alignment(gv->getAlignment()));
   }
 
@@ -884,7 +869,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   llvm::Function *fn = Module.getFunction(f->getName());
   if (fn) {
-    if (forDefinition) updateLinkageForDefinition(*this, fn, entity);
+    if (forDefinition) updateLinkageForDefinition(fn, entity);
     return fn;
   }
     
@@ -919,7 +904,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    if (forDefinition) updateLinkageForDefinition(entry, entity);
     return entry;
   }
 
@@ -961,7 +946,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
     // forward declaration.
     if (definitionType) {
       assert(entry->getType() == pointerToDefaultType);
-      updateLinkageForDefinition(IGM, entry, entity);
+      updateLinkageForDefinition(entry, entity);
 
       // If the type is right, we're done.
       if (definitionType == defaultType)
@@ -1188,7 +1173,7 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
   // Check whether we've cached this.
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    if (forDefinition) updateLinkageForDefinition(entry, entity);
     return entry;
   }
   
@@ -1245,7 +1230,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
 
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    if (forDefinition) updateLinkageForDefinition(entry, entity);
     return entry;
   }
 
@@ -1282,7 +1267,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   llvm::GlobalVariable *&entry = cache[entity];
   if (entry) {
     assert(alignment == Alignment(entry->getAlignment()));
-    if (forDefinition) updateLinkageForDefinition(IGM, entry, entity);
+    if (forDefinition) updateLinkageForDefinition(entry, entity);
     return Address(entry, alignment);
   }
 

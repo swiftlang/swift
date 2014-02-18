@@ -352,6 +352,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   unsigned rawLinkage, isTransparent;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, funcTyID);
 
+  // FIXME: DeclContext for generic params?!
+  GenericParamList *contextParams
+    = MF->maybeReadGenericParams(MF->getAssociatedModule());
+  
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
     return nullptr;
@@ -383,7 +387,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       return nullptr;
     }
-    
+
     // Don't override the transparency or linkage of a function with
     // an existing declaration.
 
@@ -391,28 +395,22 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   } else {
     fn = SILFunction::create(SILMod, linkage.getValue(), name.str(),
                              ty.castTo<SILFunctionType>(),
-                             nullptr, loc);
+                             contextParams, loc);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
-  
+
   assert(fn->empty() &&
          "SILFunction to be deserialized starts being empty.");
 
   fn->setBare(IsBare);
   if (!fn->hasLocation()) fn->setLocation(loc);
 
-  GenericParamList *contextParams = nullptr;
-  if (!declarationOnly)
-    contextParams = MF->maybeReadGenericParams(MF->getAssociatedModule(),
-                                               SILCursor);
-  
   // If the next entry is the end of the block, then this function has
   // no contents.
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::EndBlock) {
-    assert(!contextParams && "context params without body?!");
     cacheEntry.set(fn, /*fully deserialized*/ true);
     return fn;
   }
@@ -422,18 +420,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     cacheEntry.set(fn, /*fully deserialized*/ false);
     return fn;
   }
-  
+
   // Set the cache entry now in order to properly handle both forward
   // declarations and deserialization errors.
   cacheEntry.set(fn, /*fully deserialized*/ true);
 
   scratch.clear();
-  
-  assert(!fn->getContextGenericParams()
-         && "function already has context generic params?!");
-  if (contextParams)
-    fn->setContextGenericParams(contextParams);
-  
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   SILBasicBlock *CurrentBB = nullptr;

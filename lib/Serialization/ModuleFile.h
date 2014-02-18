@@ -275,8 +275,7 @@ private:
                             llvm::BitstreamCursor &Cursor);
 
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
-                                                DeclContext *DC,
-                                                llvm::BitstreamCursor &Cursor);
+                                                DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements);
@@ -456,8 +455,7 @@ public:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                           llvm::BitstreamCursor &Cursor);
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
   
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;

@@ -202,11 +202,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   if (DeclOnly)
     return;
   
-  // Write the body's context archetypes, unless we don't actually have a body.
-  if (!F.isExternalDeclaration()) {
-    if (auto gp = F.getContextGenericParams()) {
-      S.writeGenericParams(gp, SILAbbrCodes);
-    }
+  if (auto gp = F.getContextGenericParams()) {
+    S.writeGenericParams(gp, SILAbbrCodes);
   }
   
   // Assign a unique ID to each basic block of the SILFunction.
