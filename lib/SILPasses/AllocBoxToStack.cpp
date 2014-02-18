@@ -188,11 +188,6 @@ static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
       Users.push_back(User);
       continue;
     }
-    
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(User)) {
-      Users.push_back(MUI);
-      return checkAllocBoxUses(ABI, SILValue(MUI, 0), Users);
-    }
 
     // These instructions only cause the alloc_box to escape if they are used in
     // a way that escapes.  Recursively check that the uses of the instruction
