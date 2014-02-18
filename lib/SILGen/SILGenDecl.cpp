@@ -2093,10 +2093,19 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     nameStream << "_TTW";
     Mangler mangler(nameStream);
     mangler.mangleProtocolConformance(conformance);
+
     assert(isa<FuncDecl>(requirement.getDecl())
            && "need to handle mangling of non-Func SILDeclRefs here");
-    mangler.mangleEntity(requirement.getDecl(), ResilienceExpansion::Minimal,
-                         requirement.uncurryLevel);
+    auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
+    auto accessorKind = requiredDecl->getAccessorKind();
+    if (accessorKind != AccessorKind::NotAccessor) {
+      mangler.mangleAccessorEntity(accessorKind,
+                                   requiredDecl->getAccessorStorageDecl(),
+                                   ResilienceExpansion::Minimal);
+    } else {
+      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
+                           requirement.uncurryLevel);
+    }
   }
   
   // Collect the context generic parameters for the witness.

@@ -238,23 +238,10 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
       
     if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
       // Accessors are mangled specially.
-
-      //   entity ::= declaration 'g'                 // getter
-      //   entity ::= declaration 's'                 // setter
-      //   entity ::= declaration 'w'                 // willSet
-      //   entity ::= declaration 'W'                 // didSet
-      char AccessorLetter;
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::NotAccessor: AccessorLetter = '\0'; break;
-      case AccessorKind::IsGetter:    AccessorLetter = 'g'; break;
-      case AccessorKind::IsSetter:    AccessorLetter = 's'; break;
-      case AccessorKind::IsWillSet:   AccessorLetter = 'w'; break;
-      case AccessorKind::IsDidSet:    AccessorLetter = 'W'; break;
-      }
-
-      if (AccessorLetter) {
+      auto accessorKind = FD->getAccessorKind();
+      if (accessorKind != AccessorKind::NotAccessor) {
         buffer << introducer;
-        mangler.mangleAccessorEntity(AccessorLetter,
+        mangler.mangleAccessorEntity(accessorKind,
                                      FD->getAccessorStorageDecl(),
                                      expansion);
         return;
