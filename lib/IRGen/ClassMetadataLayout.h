@@ -202,7 +202,7 @@ private:
     // TODO: consider emitting at different explosion levels and
     // uncurryings.
     auto explosionLevel = ResilienceExpansion::Minimal;
-    unsigned uncurryLevel = 1; // whether static or not
+    unsigned uncurryLevel = fn->getNaturalArgumentCount() - 1;
     
     maybeAddMethod(fn, explosionLevel, uncurryLevel);
   }

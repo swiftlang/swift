@@ -7,6 +7,7 @@ import Builtin
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[C_CLASS:%C5class1C]] = type
 // CHECK: [[REF:%swift.refcounted]] = type
+// CHECK: [[D_CLASS:%C5class1D]] = type
 // CHECK: [[OBJCOBJ:%objc_object]] = type
 
 class C {}
@@ -36,6 +37,20 @@ class C {}
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_C to i64), i64 1)
+// \ CHECK: }
+
+//   CHECK: @_TMdC5class1D = global { {{.*}} } {
+// \ CHECK:   void ([[D_CLASS]]*)* @_TFC5class1DD,
+// \ CHECK:   i8** @_TWVBo,
+// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1D to i64),
+// \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",
+// \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
+// \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
+// \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_D to i64), i64 1),
+// \ CHECK:   {{.*}}* @_TMnC5class1D,
+// \ CHECK:   i64 16,
+// \ CHECK:   i64 7,
+// \ CHECK:   i32 (i16, i8, [[D_CLASS]]*)* @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_
 // \ CHECK: }
 
 // Destroying destructor
@@ -81,4 +96,16 @@ sil @ref_to_objc_pointer_cast : $@thin C -> Builtin.ObjCPointer {
 entry(%c : $C):
   %r = ref_to_object_pointer %c : $C to $Builtin.ObjCPointer
   return %r : $Builtin.ObjCPointer
+}
+
+// Part of rdar://16079147
+// vtable tested above
+class D {
+  func multiply(x : Builtin.Int8)(y : Builtin.Int16) -> Builtin.Int32
+}
+
+sil @_TFC5class1DD : $@cc(method) @thin (@owned D) -> () {
+bb0(%0 : $D):
+  %1 = tuple ()
+  return %1 : $()
 }
