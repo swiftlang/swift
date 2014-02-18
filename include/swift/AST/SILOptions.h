@@ -52,9 +52,13 @@ public:
 
   /// Dump SIL after each transform.
   bool PrintAll = false;
-
+  
   /// Time each transform invocation in the pass manager.
   bool TimeTransforms = false;
+  
+  /// Stop optimizing after the Nth pass. For debugging purposes.
+  /// 0=infinity.
+  unsigned NumOptPassesToRun = UINT_MAX;
 };
 
 } // end namespace swift

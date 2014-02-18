@@ -87,7 +87,7 @@ def emit_verbose_sil : Flag<["-"], "emit-verbose-sil">,
 
 def enable_dynamic_value_type_layout :
   Flag<["-"], "enable-dynamic-value-type-layout">,
-  HelpText<"Enable experimental dynamic generic struct/enum type layout">;
+  HelpText<"Enable experimental dynamic generic struct/enum/class type layout">;
 
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
@@ -114,10 +114,14 @@ def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
-
+  
+def sil_opt_pass_count : Separate<["-"], "sil-opt-pass-count">,
+  MetaVarName<"<N>">,
+  HelpText<"Stop optimizing after <N> optimization passes">;
+  
 def sil_print_all : Flag<["-"], "sil-print-all">,
   HelpText<"Print SIL after each transform">;
-
+  
 def sil_time_transforms : Flag<["-"], "sil-time-transforms">,
   HelpText<"Time each SIL transform invocation">;
 

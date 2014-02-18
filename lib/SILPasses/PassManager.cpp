@@ -65,6 +65,13 @@ void SILPassManager::runOneIteration() {
 
   // For each transformation:
   for (SILTransform *ST : Transformations) {
+    // Bail out if we've hit the optimization pass limit.
+    if (Mod->getStage() == SILStage::Canonical
+        && NumPassesRun >= Options.NumOptPassesToRun)
+      break;
+    
+    ++NumPassesRun;
+      
     // Run module transformations on the module.
     if (SILModuleTransform *SMT = llvm::dyn_cast<SILModuleTransform>(ST)) {
       // Run all function passes that we've seen since the last module pass.
@@ -93,12 +100,14 @@ void SILPassManager::runOneIteration() {
           DEBUG(Mod->verify());
         }
       }
+      
       continue;
     }
 
     // Run function transformation on all functions.
     if (SILFunctionTransform *SFT = llvm::dyn_cast<SILFunctionTransform>(ST)) {
       PendingFuncTransforms.push_back(SFT);
+      
       continue;
     }
 

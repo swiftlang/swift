@@ -41,6 +41,9 @@ namespace swift {
 
     /// A list of registered analysis.
     llvm::SmallVector<SILAnalysis*, 4> Analysis;
+    
+    /// The number of passes run so far.
+    unsigned NumPassesRun = 0;
 
   public:
     /// C'tor
