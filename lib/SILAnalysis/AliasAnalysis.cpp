@@ -241,17 +241,26 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   }
 }
 
+/// Maximum amount of ValueCapture queries.
+static unsigned const Threshold = 32;
+
 /// Returns true if V is a value that is used in a manner such that we know its
 /// captured or we don't understand whether or not it was captured. In such a
 /// case to be conservative, we must assume it is captured.
 static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
-  llvm::SmallVector<Operand *, 16> Worklist;
-  llvm::SmallPtrSet<Operand *, 16> Visited;
+  llvm::SmallVector<Operand *, Threshold> Worklist;
+  llvm::SmallPtrSet<Operand *, Threshold> Visited;
+  unsigned Count = 0;
 
   DEBUG(llvm::dbgs() << "        Checking for capture.\n");
+  
 
   // All all uses of V to the worklist.
   for (auto *UI : V.getUses()) {
+    // If we have more uses than the threshold, be conservative and bail so we
+    // don't use too much compile time.
+    if (Count++ >= Threshold)
+      return true;
     Visited.insert(UI);
     Worklist.push_back(UI);
   }
@@ -269,9 +278,16 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
     if (isTransitiveEscapeInst(Inst)) {
       DEBUG(llvm::dbgs() << "                Found transitive escape "
             "instruction!");
-      for (auto *UI : Inst->getUses())
-        if (Visited.insert(UI))
+      for (auto *UI : Inst->getUses()) {
+        // If we have more uses than the threshold, be conservative and bail
+        // so we don't use too much compile time.
+        if (Count++ >= Threshold)
+          return true;
+
+        if (Visited.insert(UI)) {
           Worklist.push_back(UI);
+        }
+      }
       continue;
     }
 
