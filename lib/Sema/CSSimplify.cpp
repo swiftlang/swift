@@ -879,10 +879,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // a class existential type, or a conversion from any type to an
   // existential type, check whether the first type conforms to each of the
   // protocols in the second type.
-  if (type2->isExistentialType() &&
-      (kind >= TypeMatchKind::Conversion ||
-      (kind == TypeMatchKind::Subtype &&
-       (type1->isExistentialType() || type2->isClassExistentialType())))) {
+  if (type2->isExistentialType() && kind >= TypeMatchKind::Subtype) {
     potentialConversions.push_back(ConversionRestrictionKind::Existential);
   }
 
