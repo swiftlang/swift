@@ -40,7 +40,7 @@ void DeclAttributes::print(llvm::raw_ostream &OS) const {
 }
 
 void DeclAttributes::print(ASTPrinter &Printer) const {
-    if (empty())
+  if (NumAttrsSet == 0)
     return;
 
   if (isAssignment())

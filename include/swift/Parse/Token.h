@@ -57,13 +57,18 @@ class Token {
   tok Kind;
 
   /// \brief Whether this token is the first token on the line.
-  bool AtStartOfLine;
+  unsigned AtStartOfLine : 1;
+
+  /// \brief The length of the comment that precedes the token.
+  ///
+  /// Hopefully 64 Kib is enough.
+  unsigned CommentLength : 16;
 
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
   
 public:
-  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false) {}
+  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -133,16 +138,26 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
   }
 
+  bool hasComment() const {
+    return CommentLength != 0;
+  }
+
+  CharSourceRange getCommentRange() const {
+    return CharSourceRange(
+        SourceLoc(llvm::SMLoc::getFromPointer(Text.begin() - CommentLength)),
+        CommentLength);
+  }
+
   StringRef getText() const { return Text; }
   void setText(StringRef T) { Text = T; }
   
   unsigned getLength() const { return Text.size(); }
   
-  /// setToken - Set the token to the specified kind and source range.
-  ///
-  void setToken(tok K, StringRef T) {
+  /// \brief Set the token to the specified kind and source range.
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;
     Text = T;
+    this->CommentLength = CommentLength;
   }
 };
   

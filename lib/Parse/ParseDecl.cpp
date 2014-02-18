@@ -115,7 +115,9 @@ bool Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsed;
   verify(SF);
 
-  State->markParserPosition(Tok.getLoc(), PreviousLoc);
+  // Next time start relexing from the beginning of the comment so that we can
+  // attach it to the token.
+  State->markParserPosition(Tok.getCommentRange().getStart(), PreviousLoc);
 
   return FoundTopLevelCodeToExecute;
 }
@@ -170,6 +172,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   // Determine which attribute it is, and diagnose it if unknown.
   AttrKind attr = llvm::StringSwitch<AttrKind>(Tok.getText())
 #define ATTR(X) .Case(#X, AK_##X)
+#define VIRTUAL_ATTR(X)
 #include "swift/AST/Attr.def"
                .Default(AK_Count);
   
@@ -307,6 +310,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
     StringRef Text = Tok.getText();
     bool isDeclAttribute = false
 #define ATTR(X) || Text == #X
+#define VIRTUAL_ATTR(X)
 #include "swift/AST/Attr.def"
     ;
     
@@ -625,6 +629,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                   StructureMarkerKind::Declaration);
 
   DeclAttributes Attributes;
+  if (Tok.hasComment()) {
+    Attributes.CommentRange = Tok.getCommentRange();
+    Attributes.setAttr(AK_raw_doc_comment, SourceLoc());
+  }
   parseDeclAttributeList(Attributes);
 
   // If we see the 'static', 'class' or 'mutating' followed by a declaration
@@ -815,7 +823,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   
   bool Exported = Attributes.isExported();
   Attributes.clearAttribute(AK_exported);
-  if (!Attributes.empty())
+  if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::import_attributes);
 
   if (!(Flags & PD_AllowTopLevel)) {
@@ -986,8 +994,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///   extension:
 ///    'extension' attribute-list type-identifier inheritance? '{' decl* '}'
 /// \endverbatim
-ParserResult<ExtensionDecl> Parser::parseDeclExtension(ParseDeclOptions Flags,
-                                                       DeclAttributes &Attr) {
+ParserResult<ExtensionDecl>
+Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
@@ -1020,8 +1028,8 @@ ParserResult<ExtensionDecl> Parser::parseDeclExtension(ParseDeclOptions Flags,
     = new (Context) ExtensionDecl(ExtensionLoc, Ty.get(),
                                   Context.AllocateCopy(Inherited),
                                   CurDeclContext);
-  if (Attr.isValid())
-    ED->getMutableAttrs() = Attr;
+  if (Attributes.shouldSaveInAST())
+    ED->getMutableAttrs() = Attributes;
 
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
@@ -1082,7 +1090,7 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   SourceLoc IdLoc;
   ParserStatus Status;
   
-  if (!Attributes.empty())
+  if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::typealias_attributes);
   
 
@@ -1115,6 +1123,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                                      CurDeclContext,
                                      TypeAliasLoc, Id, IdLoc,
                                      UnderlyingTy.getPtrOrNull());
+    if (Attributes.shouldSaveInAST())
+      assocType->getMutableAttrs() = Attributes;
     if (!Inherited.empty())
       assocType->setInherited(Context.AllocateCopy(Inherited));
     addToScope(assocType);
@@ -1126,6 +1136,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
     new (Context) TypeAliasDecl(TypeAliasLoc, Id, IdLoc,
                                 UnderlyingTy.getPtrOrNull(),
                                 CurDeclContext);
+  if (Attributes.shouldSaveInAST())
+    TAD->getMutableAttrs() = Attributes;
   addToScope(TAD);
   return makeParserResult(Status, TAD);
 }
@@ -1314,7 +1326,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
       // Set up a function declaration.
       TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                    StaticLoc, Flags, Kind, this);
-      if (Attributes.isValid())
+      if (Attributes.shouldSaveInAST())
         TheDecl->getMutableAttrs() = Attributes;
       
       Decls.push_back(TheDecl);
@@ -1392,7 +1404,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     TheDecl = createAccessorFunc(Loc, ValueNamePattern, ElementTy, Indices,
                                  StaticLoc, Flags, Kind, this);
 
-    if (Attributes.isValid())
+    if (Attributes.shouldSaveInAST())
       TheDecl->getMutableAttrs() = Attributes;
 
     // Parse the body.
@@ -1726,7 +1738,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern.get()->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->setParentPattern(PBD);
-      if (Attributes.isValid())
+      if (Attributes.shouldSaveInAST())
         VD->getMutableAttrs() = Attributes;
       
       Decls.push_back(VD);
@@ -1853,7 +1865,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // If the 'mutating' modifier was applied to the func, model it as if the
   // @mutating attribute were specified.
   if (MutatingLoc.isValid()) {
-    if (!Attributes.isValid()) Attributes.AtLoc = MutatingLoc;
+    if (!Attributes.AtLoc.isValid())
+      Attributes.AtLoc = MutatingLoc;
     Attributes.setAttr(AK_mutating, MutatingLoc);
   }
 
@@ -1982,7 +1995,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     FD->getMutableAttrs() = Attributes;
   addToScope(FD);
   return makeParserResult(FD);
@@ -2067,7 +2080,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                                         { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(UD);
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     UD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the enum.
@@ -2321,7 +2334,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     SD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the struct.
@@ -2399,7 +2412,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   setLocalDiscriminator(CD);
 
   // Attach attributes.
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     CD->getMutableAttrs() = Attributes;
 
   // Parse optional inheritance clause within the context of the class.
@@ -2479,7 +2492,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                  Context.AllocateCopy(InheritedProtocols));
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     Proto->getMutableAttrs() = Attributes;
 
   ContextChange CC(*this, Proto);
@@ -2567,7 +2580,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext);
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     Subscript->getMutableAttrs() = Attributes;
   
   Decls.push_back(Subscript);
@@ -2733,7 +2746,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
     }
   }
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     CD->getMutableAttrs() = Attributes;
 
   return makeParserResult(CD);
@@ -2815,7 +2828,7 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  if (Attributes.isValid())
+  if (Attributes.shouldSaveInAST())
     DD->getMutableAttrs() = Attributes;
 
   // Reject 'destructor' functions outside of classes
@@ -2836,7 +2849,7 @@ ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
 
   SourceLoc OperatorLoc = consumeToken(tok::identifier);
 
-  if (!Attributes.empty())
+  if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::operator_attributes);
   
   auto kind = llvm::StringSwitch<Optional<DeclKind>>(Tok.getText())

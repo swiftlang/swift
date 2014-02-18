@@ -212,13 +212,25 @@ public:
   
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
-  /// Source locations for every possible attribute that can be parsed in source.
+  /// Source locations for every possible attribute that can be parsed in
+  /// source.
   SourceLoc AttrLocs[AK_Count];
   bool HasAttr[AK_Count] = { false };
+
+  unsigned NumAttrsSet : 8;
+  unsigned NumVirtualAttrsSet : 8;
+
 public:
-  /// AtLoc - This is the location of the first '@' in the attribute specifier.
-  /// If this is an empty attribute specifier, then this will be an invalid loc.
+  /// The location of the first '@' in the attribute specifier.
+  ///
+  /// This is an invalid location if the declaration does not have any or has
+  /// only virtual attributes.
+  ///
+  /// This could be a valid location even if none of the attributes are set.
+  /// This can happen when the attributes were parsed, but then cleared because
+  /// they are not allowed in that context.
   SourceLoc AtLoc;
+
   StringRef AsmName;
 
   /// When the mutating attribute is present (i.e., we have a location for it),
@@ -226,13 +238,43 @@ public:
   /// Clients should generally use the getMutating() accessor.
   bool MutatingInverted = false;
 
-  DeclAttributes() {}
+  /// Source range of the attached comment.  The comment could be located
+  /// before or after the declaration).
+  CharSourceRange CommentRange;
 
-  bool isValid() const { return AtLoc.isValid(); }
+  DeclAttributes() : NumAttrsSet(0), NumVirtualAttrsSet(0) {}
+
+  bool shouldSaveInAST() const {
+    return AtLoc.isValid() || NumAttrsSet != 0;
+  }
+
+  bool isEmpty() const {
+    return NumAttrsSet == 0;
+  }
+
+  bool hasNonVirtualAttributes() const {
+    return NumAttrsSet - NumVirtualAttrsSet != 0;
+  }
 
   void clearAttribute(AttrKind A) {
+    if (!has(A))
+      return;
+
     AttrLocs[A] = SourceLoc();
     HasAttr[A] = false;
+
+    // Update counters.
+    NumAttrsSet--;
+    switch (A) {
+#define ATTR(X)
+#define VIRTUAL_ATTR(X) case AK_ ## X:
+      NumVirtualAttrsSet--;
+      break;
+#include "swift/AST/Attr.def"
+
+    default:
+      break;
+    }
   }
   
   bool has(AttrKind A) const {
@@ -244,8 +286,26 @@ public:
   }
   
   void setAttr(AttrKind A, SourceLoc L) {
+    bool HadAttribute = has(A);
+
     AttrLocs[A] = L;
     HasAttr[A] = true;
+
+    if (HadAttribute)
+      return;
+
+    // Update counters.
+    NumAttrsSet++;
+    switch (A) {
+#define ATTR(X)
+#define VIRTUAL_ATTR(X) case AK_ ## X:
+#include "swift/AST/Attr.def"
+      NumVirtualAttrsSet++;
+      break;
+
+    default:
+      break;
+    }
   }
 
   void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
@@ -253,16 +313,6 @@ public:
       if (Loc.isValid())
         Locs.push_back(Loc);
     }
-  }
-  
-  // This attribute list is empty if no attributes are specified.  Note that
-  // the presence of the leading @ is not enough to tell, because we want
-  // clients to be able to remove attributes they process until they get to
-  // an empty list.
-  bool empty() const {
-    for (bool elt : HasAttr)
-      if (elt) return false;
-    return true;
   }
 
   bool isNoReturn() const { return has(AK_noreturn); }
@@ -314,6 +364,10 @@ public:
   void clearOwnership() {
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
+  }
+
+  bool hasRawDocComment() const {
+    return CommentRange.isValid();
   }
 
   void print(llvm::raw_ostream &OS) const;

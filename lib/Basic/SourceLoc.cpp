@@ -63,6 +63,15 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
   return End.Value.getPointer() - Start.Value.getPointer();
 }
 
+StringRef SourceManager::extractText(CharSourceRange Range) const {
+  assert(Range.isValid() && "range should be valid");
+
+  unsigned BufferID = findBufferContainingLoc(Range.getStart());
+  StringRef Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID)->getBuffer();
+  return Buffer.substr(getLocOffsetInBuffer(Range.getStart(), BufferID),
+                       Range.getByteLength());
+}
+
 void SourceLoc::printLineAndColumn(raw_ostream &OS,
                                    const SourceManager &SM) const {
   if (isInvalid()) {

@@ -222,7 +222,9 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
     EndOffset = Buffer->getBufferSize();
 
   Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          KeepComments, Offset, EndOffset);
+          KeepComments ? CommentRetentionMode::ReturnAsTokens
+                       : CommentRetentionMode::AttachToNextToken,
+          Offset, EndOffset);
   std::vector<Token> Tokens;
   do {
     Tokens.emplace_back();
@@ -249,7 +251,10 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserState *SIL,
     SF(SF),
     L(new Lexer(SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
                 BufferID, &SF.getASTContext().Diags,
-                /*InSILMode=*/SIL != nullptr, /*KeepComments=*/false)),
+                /*InSILMode=*/SIL != nullptr,
+                SF.getASTContext().LangOpts.AttachCommentsToDecls
+                    ? CommentRetentionMode::AttachToNextToken
+                    : CommentRetentionMode::None)),
     SIL(SIL),
     Context(SF.getASTContext()) {
 

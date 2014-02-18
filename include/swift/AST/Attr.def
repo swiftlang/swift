@@ -26,6 +26,10 @@
 #define IB_ATTR(X) ATTR(X)
 #endif
 
+#ifndef VIRTUAL_ATTR
+#define VIRTUAL_ATTR(X) ATTR(X)
+#endif
+
 // Type attributes
 TYPE_ATTR(auto_closure)
 TYPE_ATTR(cc)
@@ -75,6 +79,10 @@ IB_ATTR(IBAction)
 IB_ATTR(IBLiveView)
 IB_ATTR(IBInspectable)
 
+// "Virtual" attributes can not be spelled in the source code.
+VIRTUAL_ATTR(raw_doc_comment)
+
+#undef VIRTUAL_ATTR
 #undef IB_ATTR
 #undef TYPE_ATTR
 #undef ATTR

@@ -29,6 +29,12 @@ namespace swift {
 
   template<typename ...T> struct Diag;
 
+enum class CommentRetentionMode {
+  None,
+  AttachToNextToken,
+  ReturnAsTokens,
+};
+
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
@@ -55,14 +61,29 @@ class Lexer {
   /// Pointer to the next not consumed character.
   const char *CurPtr;
 
+  /// @{
+  /// Members that are *not* permanent lexer state.  The values only make sense
+  /// during the lexImpl() invocation.  These variables are declared as members
+  /// rather than locals so that we don't have to thread them through to all
+  /// lexing helpers.
+
+  /// Points to the point in the source buffer where we started scanning for
+  /// the current token.  Thus, the range [LastCommentBlockStart, CurPtr)
+  /// covers all comments and whitespace that we skipped, and the token itself.
+  const char *LastCommentBlockStart = nullptr;
+
+  /// True if we have seen a comment while scanning for the current token.
+  bool SeenComment = false;
+
+  /// @}
+
   Token NextToken;
   
   /// \brief This is true if we're lexing a .sil file instead of a .swift
   /// file.  This enables the 'sil' keyword.
   const bool InSILMode;
 
-  /// \brief Set to true to return comment tokens, instead of skipping them.
-  const bool KeepComments;
+  const CommentRetentionMode RetainComments;
 
   /// InSILBody - This is true when we're lexing the body of a SIL declaration
   /// in a SIL file.  This enables some context-sensitive lexing.
@@ -97,10 +118,11 @@ private:
   /// everything.
   Lexer(const LangOptions &Options,
         const SourceManager &SourceMgr, DiagnosticEngine *Diags,
-        unsigned BufferID, bool InSILMode, bool KeepComments);
+        unsigned BufferID, bool InSILMode,
+        CommentRetentionMode RetainComments);
 
   /// @{
-  /// Helper routines used in Lexer constructors.
+  /// Helper routines used in \c Lexer constructors.
   void primeLexer();
   void initSubLexer(Lexer &Parent, State BeginState, State EndState);
   /// @}
@@ -121,17 +143,19 @@ public:
   ///   when parsing SIL files.
   Lexer(const LangOptions &Options,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments = false)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+        DiagnosticEngine *Diags, bool InSILMode,
+        CommentRetentionMode RetainComments = CommentRetentionMode::None)
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments) {
     primeLexer();
   }
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode, bool KeepComments,
+        DiagnosticEngine *Diags, bool InSILMode,
+        CommentRetentionMode RetainComments,
         unsigned Offset, unsigned EndOffset)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, KeepComments) {
+      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments) {
     assert(Offset <= EndOffset && "invalid range");
     initSubLexer(
         *this,
@@ -147,11 +171,9 @@ public:
   /// \param EndState end of the subrange
   Lexer(Lexer &Parent, State BeginState, State EndState)
       : Lexer(Parent.LangOpts, Parent.SourceMgr, Parent.Diags, Parent.BufferID,
-              Parent.InSILMode, Parent.isKeepingComments()) {
+              Parent.InSILMode, Parent.RetainComments) {
     initSubLexer(Parent, BeginState, EndState);
   }
-
-  bool isKeepingComments() const { return KeepComments; }
 
   /// \brief Returns true if this lexer will produce a code completion token.
   bool isCodeCompletion() const {
@@ -162,6 +184,10 @@ public:
     Result = NextToken;
     if (Result.isNot(tok::eof))
       lexImpl();
+  }
+
+  bool isKeepingComments() const {
+    return RetainComments == CommentRetentionMode::ReturnAsTokens;
   }
 
   /// peekNextToken - Return the next token to be returned by Lex without

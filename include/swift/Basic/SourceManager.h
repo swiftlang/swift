@@ -127,6 +127,8 @@ public:
     assert(Loc.isValid());
     return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
   }
+
+  StringRef extractText(CharSourceRange Range) const;
 };
 
 } // namespace swift

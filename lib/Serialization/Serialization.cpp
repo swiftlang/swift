@@ -1050,21 +1050,20 @@ template <AttrKind ...KINDS>
 static void checkAllowedAttributes(const Decl *D) {
 #ifndef NDEBUG
   DeclAttributes attrs = D->getAttrs();
-  for (AttrKind AK : { KINDS... })
+  for (AttrKind AK : {
+#define ATTR(X)
+#define VIRTUAL_ATTR(X) AK_ ## X,
+#include "swift/AST/Attr.def"
+      KINDS... })
     attrs.clearAttribute(AK);
 
-  if (!attrs.empty()) {
+  if (!attrs.isEmpty()) {
     llvm::errs() << "Serialization: unhandled attributes ";
     attrs.print(llvm::errs());
     llvm::errs() << "\n";
     llvm_unreachable("TODO: handle the above attributes");
   }
 #endif
-}
-
-template<>
-void checkAllowedAttributes(const Decl *D) {
-  assert(D->getAttrs().empty());
 }
 
 void Serializer::writeDecl(const Decl *D) {

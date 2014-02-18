@@ -162,9 +162,10 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 
 Lexer::Lexer(const LangOptions &Options,
              const SourceManager &SourceMgr, DiagnosticEngine *Diags,
-             unsigned BufferID, bool InSILMode, bool KeepComments)
+             unsigned BufferID, bool InSILMode,
+             CommentRetentionMode RetainComments)
     : LangOpts(Options), SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
-      InSILMode(InSILMode), KeepComments(KeepComments) {
+      InSILMode(InSILMode), RetainComments(RetainComments) {
   // Initialize buffer pointers.
   auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
   BufferStart = Buffer->getBufferStart();
@@ -219,7 +220,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
          "location from the wrong buffer");
 
   Lexer L(LangOpts, SourceMgr, BufferID, Diags, InSILMode,
-          /*KeepComments=*/false);
+          CommentRetentionMode::None);
   L.restoreState(State(Loc));
   Token Result;
   L.lex(Result);
@@ -233,7 +234,12 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   if (Kind != tok::eof && ArtificialEOF && TokStart >= ArtificialEOF) {
     Kind = tok::eof;
   }
-  NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart));
+  unsigned CommentLength = 0;
+  if (RetainComments == CommentRetentionMode::AttachToNextToken && SeenComment)
+    CommentLength = TokStart - LastCommentBlockStart;
+
+  NextToken.setToken(Kind, StringRef(TokStart, CurPtr-TokStart),
+                     CommentLength);
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
@@ -1316,6 +1322,10 @@ void Lexer::lexImpl() {
 
   NextToken.setAtStartOfLine(CurPtr == BufferStart);
 
+  // Remember where we started so that we can find the comment range.
+  LastCommentBlockStart = CurPtr;
+  SeenComment = false;
+
 Restart:
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -1419,13 +1429,15 @@ Restart:
   case '/':
     if (CurPtr[0] == '/') {  // "//"
       skipSlashSlashComment();
-      if (KeepComments)
+      SeenComment = true;
+      if (isKeepingComments())
         return formToken(tok::comment, TokStart);
       goto Restart;
     }
     if (CurPtr[0] == '*') { // "/*"
       skipSlashStarComment();
-      if (KeepComments)
+      SeenComment = true;
+      if (isKeepingComments())
         return formToken(tok::comment, TokStart);
       goto Restart;
     }
@@ -1496,14 +1508,14 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
 
   // Use fake language options; language options only affect validity
   // and the exact token produced.
-  LangOptions fakeLangOpts;
-  
-  // KeepComments is true because either the caller skipped comments and
-  // normally we won't be at the beginning of a comment token (making
-  // KeepComments irrelevant), or the caller lexed comments and KeepComments
-  // must be true.
-  Lexer L(fakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
-          /*KeepComments=*/true);
+  LangOptions FakeLangOpts;
+
+  // Here we return comments as tokens because either the caller skipped
+  // comments and normally we won't be at the beginning of a comment token
+  // (making this option irrelevant), or the caller lexed comments and
+  // we need to lex just the comment token.
+  Lexer L(FakeLangOpts, SM, BufferID, nullptr, /*InSILMode=*/ false,
+          CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   unsigned Length = L.peekNextToken().getLength();
   return Loc.getAdvancedLoc(Length);
@@ -1517,10 +1529,10 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             bool InInterpolatedString) {
   // Use fake language options; language options only affect validity
   // and the exact token produced.
-  LangOptions fakeLangOptions;
+  LangOptions FakeLangOptions;
 
-  Lexer L(fakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
-          /*KeepComments=*/false, BufferStart, BufferEnd);
+  Lexer L(FakeLangOptions, SM, BufferID, nullptr, /*InSILMode=*/false,
+          CommentRetentionMode::None, BufferStart, BufferEnd);
 
   // Lex tokens until we find the token that contains the source location.
   Token Tok;

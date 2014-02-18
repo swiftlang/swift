@@ -43,6 +43,9 @@ namespace swift {
 
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
+
+    /// \brief Keep comments during lexing and attach them to declarations.
+    bool AttachCommentsToDecls = false;
   };
 }
 
