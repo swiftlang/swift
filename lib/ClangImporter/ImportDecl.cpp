@@ -1978,11 +1978,11 @@ namespace {
                                                  indices->getBoundName()),
                                     context));
         getterArgs.push_back(pat);
+      } else {
+        // Otherwise, an empty tuple
+        getterArgs.push_back(TuplePattern::create(context, loc, { }, loc));
+        getterArgs.back()->setType(TupleType::getEmpty(context));
       }
-
-      // empty tuple
-      getterArgs.push_back(TuplePattern::create(context, loc, { }, loc));
-      getterArgs.back()->setType(TupleType::getEmpty(context));
 
       // Form the type of the getter.
       auto getterType = elementTy;
@@ -2031,42 +2031,38 @@ namespace {
       //
       //   (self) -> (value, index) -> ()
       //
-      // while Swift subscript setters are curried as
-      //
-      //   (self) -> (index)(value) -> ()
-      //
       // Build a setter thunk with the latter signature that maps to the
       // former.
       //
       // Property setters are similar, but don't have indices.
 
       // Form the argument patterns.
-      SmallVector<Pattern *, 3> setterArgs;
+      SmallVector<Pattern *, 2> setterArgs;
 
       // 'self'
       setterArgs.push_back(createTypedNamedPattern(createSelfDecl(dc, false)));
 
+      
+      SmallVector<TuplePatternElt, 2> ValueElts;
+      SmallVector<TupleTypeElt, 2> ValueEltTys;
+      
+      auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
+      ValueElts.push_back(TuplePatternElt(valuePattern));
+      ValueEltTys.push_back(TupleTypeElt(valuePattern->getType(),
+                                         valuePattern->getBoundName()));
+      
       // index, for subscript operations.
       if (indices) {
         // Clone the indices for the thunk.
         indices = indices->clone(context);
-        auto pat = TuplePattern::create(context, loc, TuplePatternElt(indices),
-                                        loc);
-        pat->setType(TupleType::get(TupleTypeElt(indices->getType(),
-                                                 indices->getBoundName()),
-                                    context));
-        setterArgs.push_back(pat);
+        ValueElts.push_back(TuplePatternElt(indices));
+        ValueEltTys.push_back(TupleTypeElt(indices->getType(),
+                                           indices->getBoundName()));
       }
-
+      
       // value
-      auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
-      setterArgs.push_back(TuplePattern::create(context, loc,
-                                                TuplePatternElt(valuePattern),
-                                                loc));
-      setterArgs.back()->setType(
-        TupleType::get(TupleTypeElt(valuePattern->getType(),
-                                    valuePattern->getBoundName()),
-                       context));
+      setterArgs.push_back(TuplePattern::create(context, loc, ValueElts, loc));
+      setterArgs.back()->setType(TupleType::get(ValueEltTys, context));
 
       // Form the type of the setter.
       Type setterType = TupleType::getEmpty(context);

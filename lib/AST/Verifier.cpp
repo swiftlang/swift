@@ -1489,14 +1489,12 @@ struct ASTNodeBase {};
         abort();
       }
 
-      if (FD->isGetterOrSetter()) {
+      if (FD->isAccessor()) {
         unsigned NumExpectedParamPatterns = 1;
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
-        if (isa<SubscriptDecl>(FD->getAccessorStorageDecl()))
-          NumExpectedParamPatterns++;
         if (FD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
-          Out << "getters and setters should not be curried";
+          Out << "accessors should not be curried";
           abort();
         }
       }

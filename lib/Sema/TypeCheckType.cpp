@@ -1486,7 +1486,15 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     if (NumParams == 0)
       return true;
 
-    if (NumParams != 1 && !AFD->hasSelectorStyleSignature()) {
+    // Setters on subscripts are allowed to have two arguments, the index and
+    // the set value.
+    bool isOK = false;
+    if (auto *FD = dyn_cast<FuncDecl>(AFD))
+      if (NumParams == 2 && FD->getAccessorKind() == AccessorKind::IsSetter &&
+          isa<SubscriptDecl>(FD->getAccessorStorageDecl()))
+      isOK = true;
+    
+    if (!isOK && NumParams != 1 && !AFD->hasSelectorStyleSignature()) {
       // If the function has two or more parameters, it should have a
       // selector-style declaration.
       if (Diagnose)

@@ -2618,15 +2618,13 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
-  // Index ->
-  if (subscripts) {
-    emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
-                         accessType.getResult());
-    accessType = cast<AnyFunctionType>(accessType.getResult());
-  }
-  // () ->
-  emission.addCallSite(loc, RValueSource(loc, emitEmptyTupleRValue(loc)),
+  // Index or () if none.
+  if (!subscripts)
+    subscripts = emitEmptyTupleRValue(loc);
+
+  emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
                        accessType.getResult());
+
   // T
   return emission.apply(c);
 }
@@ -2651,14 +2649,18 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
     emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
-  // Index ->
+
+  // (value)  or (value, indices)
   if (subscripts) {
-    emission.addCallSite(loc, RValueSource(loc, std::move(subscripts)),
-                         accessType.getResult());
-    accessType = cast<AnyFunctionType>(accessType.getResult());
+    // If we have a value and index list, create a new rvalue to represent the
+    // both of them together.  The value goes first.
+    SmallVector<ManagedValue, 4> Elts;
+    std::move(setValue).getAll(Elts);
+    std::move(subscripts).getAll(Elts);
+    setValue = RValue(Elts, accessType.getInput());
+  } else {
+    setValue.rewriteType(accessType.getInput());
   }
-  // T ->
-  setValue.rewriteType(accessType.getInput());
   emission.addCallSite(loc, RValueSource(loc, std::move(setValue)),
                        accessType.getResult());
   // ()
@@ -2812,13 +2814,13 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto dynamicMethodTy =
       getDynamicMethodType(SGM, base, e->getMember().getDecl(),
                            member, methodTy);
-    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 2);
+    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 1);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
     // Emit the application of 'self'.
     SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
                                            {}, base,
-                                           getLoweredType(methodTy, 1));
+                                           getLoweredType(methodTy, 0));
 
     // Emit the index.
     llvm::SmallVector<SILValue, 1> indexArgs;

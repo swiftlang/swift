@@ -65,13 +65,12 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
                                       SmallVectorImpl<InitializationPtr> &buf,
                                       SILLocation Loc) {
   assert(canSplitIntoSubelementAddresses() && "Client shouldn't call this");
-  auto tupleTy = cast<TupleType>(type);
   switch (kind) {
   case Kind::Tuple:
     return getSubInitializations();
   case Kind::Ignored:
     // "Destructure" an ignored binding into multiple ignored bindings.
-    for (auto fieldType : tupleTy->getElementTypes()) {
+    for (auto fieldType : cast<TupleType>(type)->getElementTypes()) {
       (void) fieldType;
       buf.push_back(InitializationPtr(new BlackHoleInitialization()));
     }
@@ -79,6 +78,7 @@ Initialization::getSubInitializationsForTuple(SILGenFunction &gen, CanType type,
   case Kind::LetValue:
   case Kind::SingleBuffer: {
     // Destructure the buffer into per-element buffers.
+    auto tupleTy = cast<TupleType>(type);
     SILValue baseAddr = getAddress();
     for (unsigned i = 0, size = tupleTy->getNumElements(); i < size; ++i) {
       auto fieldType = tupleTy.getElementType(i);

@@ -1144,11 +1144,53 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
 
 /// createGetterFunc - This function creates the getter function (with no body)
 /// for a computed property or subscript.
-static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
+static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
+                                    TypedPattern *NamePattern,
                                     TypeLoc ElementTy,
                                     Pattern *Indices, SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind, Parser *P) {
+  // First task, set up the value argument pattern.  This is the NamePattern
+  // (for setters) followed by the index list (for subscripts).  For
+  // non-subscript getters, this degenerates down to "()".
+  //
+  // We put the 'value' argument before the subscript index list as a
+  // micro-optimization for Objective-C thunk generation.
+  Pattern *ValueArg;
+  {
+    SmallVector<TuplePatternElt, 2> ValueArgElements;
+    SourceLoc StartLoc, EndLoc;
+    if (NamePattern) {
+      ValueArgElements.push_back(TuplePatternElt(NamePattern));
+      StartLoc = NamePattern->getStartLoc();
+      EndLoc = NamePattern->getEndLoc();
+    }
+
+    if (Indices) {
+      Indices = Indices->clone(P->Context, /*Implicit=*/true);
+      if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
+        ValueArgElements.push_back(TuplePatternElt(PP->getSubPattern()));
+      } else {
+        auto *TP = cast<TuplePattern>(Indices);
+        ValueArgElements.append(TP->getFields().begin(), TP->getFields().end());
+      }
+
+      StartLoc = Indices->getStartLoc();
+      EndLoc = Indices->getEndLoc();
+    }
+
+    if (NamePattern && Indices) {
+      StartLoc = Indices->getStartLoc();
+      EndLoc = NamePattern->getEndLoc();
+    }
+
+    ValueArg = TuplePattern::create(P->Context, StartLoc,
+                                    ValueArgElements, EndLoc);
+    if (NamePattern && !NamePattern->isImplicit())
+      ValueArg->setImplicit();
+  }
+
+
   // Create the parameter list(s) for the getter.
   SmallVector<Pattern *, 4> Params;
   
@@ -1156,12 +1198,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
   if (Flags & Parser::PD_HasContainerType)
     Params.push_back(buildImplicitSelfParameter(DeclLoc, P->CurDeclContext));
   
-  // Add the index clause if necessary.
-  if (Indices)
-    Params.push_back(Indices->clone(P->Context, /*Implicit=*/true));
-
-  // Add the (value) or () parameter clause.
-  Params.push_back(NamePattern);
+  // Add the "(value)" and subscript indices parameter clause.
+  Params.push_back(ValueArg);
 
   TypeLoc ReturnType;
   if (Kind == AccessorKind::IsGetter) // Getters return something
@@ -1171,7 +1209,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
 
   // Start the function.
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
-                             /* FIXME(gribozavr)*/DeclLoc, Identifier(),
+                             /* FIXME*/DeclLoc, Identifier(),
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
                              Params, ReturnType, P->CurDeclContext);
 
@@ -1185,17 +1223,13 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc, Pattern *NamePattern,
 /// Parse a "(value)" specifier for "set:" or "willSet:" if present.  Create a
 /// pattern to represent the spelled argument or the implicit one if it is
 /// missing.
-static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
-                                              TypeLoc ElementTy,
-                                              Parser &P, AccessorKind Kind) {
+static TypedPattern *
+parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
+                              Parser &P, AccessorKind Kind) {
   // Only set: and willSet: have a (value) parameter.  get: and didSet: take a
   // () parameter always.
   if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet)
-    return TuplePattern::create(P.Context, SourceLoc(),
-                                ArrayRef<TuplePatternElt>(),
-                                SourceLoc(), /*hasVararg=*/false,
-                                SourceLoc(), /*Implicit=*/true);
-
+    return nullptr;
 
   SourceLoc StartLoc, NameLoc, EndLoc;
   Identifier Name;
@@ -1237,28 +1271,17 @@ static Pattern *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsVal*/true,
                                          NameLoc, Name,
                                          Type(), P.CurDeclContext);
-  Pattern *ValuePattern
-    = new (Context) TypedPattern(new (Context) NamedPattern(Value),
-                                 ElementTy.clone(Context));
-
-  TuplePatternElt ValueElt(ValuePattern);
-  Pattern *ValueParamsPattern
-    = TuplePattern::create(Context, StartLoc, ValueElt, EndLoc);
-  if (IsNameImplicit) {
+  if (IsNameImplicit)
     Value->setImplicit();
-    ValueParamsPattern->setImplicit();
-  }
-
-  // The TypedPattern is always implicit because the ElementTy is not
-  // spelled inside the parameter list.  It comes from elsewhere, and its
-  // source location should be ignored.
-  ValuePattern->setImplicit();
-  return ValueParamsPattern;
+  auto *namedPat = new (Context) NamedPattern(Value, IsNameImplicit);
+  return new (Context) TypedPattern(namedPat, ElementTy.clone(Context),
+                                    /*Implicit*/true);
 }
 
 
-/// \brief Parse a get-set clause, containing a getter and (optionally)
-/// a setter.
+/// \brief Parse a get-set clause, optionally containing a getter, setter,
+/// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
+/// specifying the index list for a subscript.
 ///
 /// \verbatim
 ///   get-set:
@@ -1320,7 +1343,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
       if (Tok.is(tok::l_paren))
         diagnose(Loc, diag::protocol_setter_name);
 
-      Pattern *ValueNamePattern
+      auto *ValueNamePattern
         = parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
       // Set up a function declaration.
@@ -1391,7 +1414,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     // set: and willSet: can have an optional name.
 
     //   var-set-name    ::= '(' identifier ')'
-    Pattern *ValueNamePattern =
+    auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
     SourceLoc ColonLoc = Tok.getLoc();
@@ -1514,15 +1537,13 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 
     // Observing properties will have getters and setters synthesized by sema.
     // Create their prototypes now.
-    auto *ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
-                                                     AccessorKind::IsGetter);
-    Get = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
+    Get = createAccessorFunc(SourceLoc(), /*ArgPattern*/nullptr, TyLoc, nullptr,
                              StaticLoc, Flags, AccessorKind::IsGetter, this);
     Get->setImplicit();
     Decls.push_back(Get);
 
-    ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
-                                               AccessorKind::IsSetter);
+    auto ArgPattern = parseOptionalAccessorArgument(SourceLoc(), TyLoc, *this,
+                                                    AccessorKind::IsSetter);
     Set = createAccessorFunc(SourceLoc(), ArgPattern, TyLoc, nullptr,
                              StaticLoc, Flags, AccessorKind::IsSetter, this);
     Set->setImplicit();
@@ -2601,7 +2622,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     
     SourceLoc LastValidLoc = LBLoc;
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
-    if (parseGetSet(Flags, Indices.get(),ElementTy.get(),
+    if (parseGetSet(Flags, Indices.get(), ElementTy.get(),
                     Get, Set, WillSet, DidSet, LastValidLoc,
                     /*StaticLoc*/ SourceLoc(), Decls))
       Status.setIsParseError();
@@ -2638,12 +2659,10 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   // If we had no getter (e.g., because we're in SIL mode or because the
   // program isn't valid) create a stub here.
   if (!Get) {
-    auto ArgPattern =
-      parseOptionalAccessorArgument(SubscriptLoc, ElementTy.get(), *this,
-                                    AccessorKind::IsGetter);
-    Get = createAccessorFunc(SubscriptLoc, ArgPattern, ElementTy.get(),
-                             Indices.get(), /*StaticLoc*/ SourceLoc(),
-                             Flags, AccessorKind::IsGetter, this);
+    Get = createAccessorFunc(SubscriptLoc, /*ArgPattern*/ nullptr,
+                             ElementTy.get(), Indices.get(),
+                             /*StaticLoc*/ SourceLoc(), Flags,
+                             AccessorKind::IsGetter, this);
     
     Get->setInvalid();
     Get->setType(ErrorType::get(Context));
