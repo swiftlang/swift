@@ -118,6 +118,9 @@ def sil_verify_all : Flag<["-"], "sil-verify-all">,
 def sil_print_all : Flag<["-"], "sil-print-all">,
   HelpText<"Print SIL after each transform">;
 
+def sil_time_transforms : Flag<["-"], "sil-time-transforms">,
+  HelpText<"Time each SIL transform invocation">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

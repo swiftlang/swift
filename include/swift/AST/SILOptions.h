@@ -52,6 +52,9 @@ public:
 
   /// Dump SIL after each transform.
   bool PrintAll = false;
+
+  /// Time each transform invocation in the pass manager.
+  bool TimeTransforms = false;
 };
 
 } // end namespace swift

@@ -18,6 +18,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/TimeValue.h"
 
 using namespace swift;
 
@@ -34,7 +35,12 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       CompleteFuncs->resetChanged();
       SFT->injectPassManager(this);
       SFT->injectFunction(&F);
+      llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
+      if (Options.TimeTransforms) {
+        auto Delta = llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F.getName() << ")\n";
+      }
 
       // If this pass invalidated anything, print and verify.
       if (CompleteFuncs->hasChanged()) {
@@ -68,7 +74,13 @@ void SILPassManager::runOneIteration() {
       CompleteFuncs->resetChanged();
       SMT->injectPassManager(this);
       SMT->injectModule(Mod);
+
+      llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
+      if (Options.TimeTransforms) {
+        auto Delta = llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+        llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
+      }
 
       // If this pass invalidated anything, print and verify.
       if (CompleteFuncs->hasChanged()) {
