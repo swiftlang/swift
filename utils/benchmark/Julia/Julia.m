@@ -7,17 +7,7 @@
 #define WIDTH 500
 #define HEIGHT 500
 
-#ifdef LARGE_PROBLEM_SIZE
-#define MAX_C 10000
-#else
-#  ifdef NORMAL_PROBLEM_SIZE
-#    define MAX_C 1000
-#  else
-#    define MAX_C 100
-#  endif
-#endif
-
-void drawJulia(CGContextRef context, CGRect frame) {
+void drawJulia(CGContextRef context, CGRect frame, int maxc) {
 
   NSRect rRect = NSMakeRect(10, 10, 4, 4);
   NSColor *color = [NSColor blueColor];
@@ -64,7 +54,6 @@ void drawJulia(CGContextRef context, CGRect frame) {
   }
 
   int loopCountForPerf = 0;
-  int maxc = MAX_C;
   double at1 = 0.15;
   double at2 = 0.35;
   double rat = 0.01*0.01;
@@ -121,6 +110,24 @@ void drawJulia(CGContextRef context, CGRect frame) {
 }
 
 int main(int argc, char *argv[]) {
+
+  if (argc != 2) {
+    fprintf(stderr, "Invalid Argument!\n%s {small, normal, large}!\n", argv[0]);
+    exit(-1);
+  }
+
+  int maxc;
+  if (!strcmp(argv[1], "small")) {
+    maxc = 100;
+  } else if (!strcmp(argv[1], "normal")) {
+    maxc = 1000;
+  } else if (!strcmp(argv[1], "large")) {
+    maxc = 10000;
+  } else {
+    fprintf(stderr, "Invalid Argument!\n%s {small, normal, large}!\n", argv[0]);
+    exit(-1);
+  }
+
   CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
   size_t width = WIDTH;
   size_t height = HEIGHT;
@@ -135,7 +142,7 @@ int main(int argc, char *argv[]) {
   CGContextSetRGBFillColor(context, 0, 0, 0, 1);
   CGContextFillRect(context, Rect);
 
-  drawJulia(context, Rect);
+  drawJulia(context, Rect, maxc);
 
   CGImageRef image = CGBitmapContextCreateImage(context);
   NSURL *URL = [[NSURL fileURLWithPath:@"out.png"] absoluteURL];  
