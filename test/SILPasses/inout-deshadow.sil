@@ -81,3 +81,20 @@ bb0(%0 : $*NontrivialStruct):
   return %9 : $()
 }
 
+// Inout deshadowing should *not* deshadow inouts that are copied to temporaries for use by
+// @in arguments. <rdar://problem/16105449>
+
+sil @in_argument : $@thin (@in protocol<>) -> ()
+
+// CHECK-LABEL: sil @inout_argument_passed_to_in_argument
+sil @inout_argument_passed_to_in_argument : $@thin (@inout protocol<>) -> () {
+// CHECK:       bb0([[INOUT:%.*]] : $*protocol<>):
+entry(%0 : $*protocol<>):
+  %f = function_ref @in_argument : $@thin (@in protocol<>) -> ()
+  %x = alloc_stack $protocol<>
+  // CHECK:       copy_addr [[INOUT]] to [initialization]
+  copy_addr %0 to [initialization] %x#1 : $*protocol<>
+  %z = apply %f(%x#1) : $@thin (@in protocol<>) -> ()
+  dealloc_stack %x#0 : $*@local_storage protocol<>
+  return %z : $()
+}
