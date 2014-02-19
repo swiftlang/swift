@@ -9,6 +9,11 @@ enum {
   AnonConst2
 };
 
+enum {
+  AnonConstSmall1 = 16,
+  AnonConstSmall2
+};
+
 struct Point {
   float x;
   float y;

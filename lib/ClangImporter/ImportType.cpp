@@ -351,16 +351,20 @@ namespace {
 
     Type VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
-      auto &clangContext = Impl.getClangASTContext();
       switch (Impl.classifyEnum(clangDecl)) {
-      case ClangImporter::Implementation::EnumKind::Constants:
-        // Map 64-bit enumeration types to Int.
-        if (clangContext.getTypeSize(clangDecl->getIntegerType()) == 64)
+      case ClangImporter::Implementation::EnumKind::Constants: {
+        auto clangDef = clangDecl->getDefinition();
+        // Map anonymous enums with no fixed underlying type to Int /if/
+        // they fit in an Int32. If not, this mapping isn't guaranteed to be
+        // consistent for all platforms we care about.
+        if (!clangDef->isFixed() &&
+            clangDef->getNumPositiveBits() < 32 &&
+            clangDef->getNumNegativeBits() <= 32)
           return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");
 
         // Import the underlying integer type.
         return Impl.importType(clangDecl->getIntegerType(), kind);
-
+      }
       case ClangImporter::Implementation::EnumKind::Enum:
       case ClangImporter::Implementation::EnumKind::Unknown:
       case ClangImporter::Implementation::EnumKind::Options: {
