@@ -70,7 +70,7 @@ import gizmo
 // CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
-// CHECK:   %swift.type* @"OBJC_CLASS_$_SwiftObject",
+// CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
 // CHECK:   @_DATA_RootNonGeneric

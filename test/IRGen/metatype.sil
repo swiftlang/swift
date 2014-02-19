@@ -24,8 +24,7 @@ bb0(%0 : $@thick X.metatype):
 // CHECK-LABEL: define %swift.type* @_TF8metatype22objc_to_thick_metatypeFT2xmMCS_1X_T_(%objc_class*)
 sil @_TF8metatype22objc_to_thick_metatypeFT2xmMCS_1X_T_ : $@thin (@objc_metatype X.metatype) -> @thick X.metatype {
 bb0(%0 : $@objc_metatype X.metatype):
-  // CHECK: [[ARG:%[0-9a-zA-Z_-]+]] = bitcast %objc_class* %0 to %swift.type*
-  // CHECK-NEXT: [[RESULT:%[0-9a-zA-Z_-]+]] = call %swift.type* @swift_getObjCClassMetadata(%swift.type* [[ARG]]) #0
+  // CHECK: [[RESULT:%[0-9a-zA-Z_-]+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* %0) #0
   %1 = objc_to_thick_metatype %0 : $@objc_metatype X.metatype to $@thick X.metatype
   // CHECK-NEXT: ret %swift.type* [[RESULT]]
   return %1 : $@thick X.metatype

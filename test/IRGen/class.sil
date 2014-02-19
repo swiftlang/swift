@@ -4,9 +4,9 @@ import Builtin
 
 // CHECK: [[OBJCCLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[C_CLASS:%C5class1C]] = type
 // CHECK: [[REF:%swift.refcounted]] = type
+// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[D_CLASS:%C5class1D]] = type
 // CHECK: [[OBJCOBJ:%objc_object]] = type
 
@@ -33,7 +33,7 @@ class C {}
 // \ CHECK:   void ([[C_CLASS]]*)* @_TFC5class1CD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
-// \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",
+// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_C to i64), i64 1)
@@ -43,7 +43,7 @@ class C {}
 // \ CHECK:   void ([[D_CLASS]]*)* @_TFC5class1DD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1D to i64),
-// \ CHECK:   [[TYPE]]* @"OBJC_CLASS_$_SwiftObject",
+// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA_D to i64), i64 1),

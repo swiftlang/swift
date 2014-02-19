@@ -119,6 +119,7 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 
   // We can't do this for any types with generic parameters, either
   // directly or inherited from the context.
+  // FIXME: Should be an isSpecialized check here.
   if (isa<BoundGenericType>(type))
     return nullptr;
   auto theDecl = cast<NominalType>(type)->getDecl();

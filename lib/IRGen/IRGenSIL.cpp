@@ -2563,8 +2563,7 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
 
   // Fetch the metadata for that class.
   Explosion to(ResilienceExpansion::Maximal);
-  auto arg = Builder.CreateBitCast(classPtr, IGM.TypeMetadataPtrTy);
-  auto call = Builder.CreateCall(IGM.getGetObjCClassMetadataFn(), arg);
+  auto call = Builder.CreateCall(IGM.getGetObjCClassMetadataFn(), classPtr);
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();
   call->setCallingConv(IGM.RuntimeCC);

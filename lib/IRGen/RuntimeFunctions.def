@@ -299,7 +299,7 @@ FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
 // type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
 FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
-         ARGS(TypeMetadataPtrTy),
+         ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // _Bool swift_objcRespondsToSelector(id, void*);

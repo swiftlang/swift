@@ -998,16 +998,15 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 }
 
 /// Fetch a global reference to the given Objective-C class.  The
-/// result is always a TypeMetadataPtrTy, but it may not be compatible
-/// with IR-generation.
+/// result is of type ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
   DebugTypeInfo DbgTy(theClass, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
-                                    forDefinition, TypeMetadataStructTy,
-                                    TypeMetadataPtrTy, DbgTy);
+                                    forDefinition, ObjCClassStructTy,
+                                    ObjCClassPtrTy, DbgTy);
   return addr;
 }
 
