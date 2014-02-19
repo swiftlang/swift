@@ -460,6 +460,10 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
 #endif
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
+  // FIXME: swift_slowAlloc never uses the allocation cache yet.
+  return free(ptr);
+  
+#if 0
   AllocIndex idx;
 
   if (bytes == 0) {
@@ -491,9 +495,15 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   }
 
   swift_dealloc(ptr, idx);
+#endif
 }
 
 void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
+  // FIXME: swift_slowAlloc never uses the allocation cache yet.
+  return free(ptr);
+  
+#if 0
+  
   AllocIndex idx;
 
   if (bytes == 0) {
@@ -525,6 +535,7 @@ void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   }
 
   swift_rawDealloc(ptr, idx);
+#endif
 }
 
 /// This is a function that is opaque to the optimizer.  It is called to ensure
