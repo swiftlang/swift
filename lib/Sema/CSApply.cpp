@@ -966,6 +966,20 @@ namespace {
         return subscriptExpr;
       }
 
+      // Handle subscripting of existential types.
+      if (baseTy->isExistentialType()) {
+        // Materialize if we need to.
+        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
+                                          locator);
+        if (!base)
+        return nullptr;
+        
+        auto subscriptExpr
+        = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
+        subscriptExpr->setType(resultTy);
+        return subscriptExpr;
+      }
+
       // Handle subscripting of generics.
       if (subscript->getDeclContext()->isGenericContext()) {
         auto dc = subscript->getDeclContext();
@@ -995,20 +1009,6 @@ namespace {
                                                            substitutions));
         subscriptExpr->setType(resultTy);
         subscriptExpr->setIsSuper(isSuper);
-        return subscriptExpr;
-      }
-
-      // Handle subscripting of existential types.
-      if (baseTy->isExistentialType()) {
-        // Materialize if we need to.
-        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
-                                          locator);
-        if (!base)
-          return nullptr;
-
-        auto subscriptExpr
-          = new (tc.Context) ExistentialSubscriptExpr(base, index, subscript);
-        subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }
 
