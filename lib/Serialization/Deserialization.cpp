@@ -616,7 +616,8 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution(
 
 GenericParamList *
 ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
-                                        DeclContext *DC) {
+                                        DeclContext *DC,
+                                        llvm::BitstreamCursor &Cursor) {
   if (genericContextID) {
     Decl *genericContext = getDecl(genericContextID);
     assert(genericContext && "loading PolymorphicFunctionType before its decl");
@@ -635,24 +636,25 @@ ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
       return nullptr;
     }
   } else {
-    return maybeReadGenericParams(DC);
+    return maybeReadGenericParams(DC, Cursor);
   }
 }
 
-GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
+GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
+                                               llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
 
-  BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+  BCOffsetRAII lastRecordOffset(Cursor);
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
-  auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  auto next = Cursor.advance(AF_DontPopBlockAtEnd);
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
-  unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  unsigned kind = Cursor.readRecord(next.ID, scratch, &blobData);
 
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
@@ -670,12 +672,12 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
     scratch.clear();
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
+    unsigned recordID = Cursor.readRecord(entry.ID, scratch,
                                                   &blobData);
     switch (recordID) {
     case GENERIC_PARAM: {
@@ -1368,7 +1370,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto genericParams = maybeReadGenericParams(DC);
+    auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), { }, genericParams, DC);
@@ -1423,7 +1425,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto genericParams = maybeReadGenericParams(parent);
+    auto genericParams = maybeReadGenericParams(parent, DeclTypeCursor);
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
                                           /*argParams=*/nullptr, nullptr,
@@ -1586,7 +1588,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
     // DeclContext for now.
-    GenericParamList *genericParams = maybeReadGenericParams(DC);
+    GenericParamList *genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
     if (!StaticSpelling.hasValue()) {
@@ -1729,7 +1731,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DidRecord = nullptr;
     }
 
-    if (auto genericParams = maybeReadGenericParams(DC)) {
+    if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
       proto->setGenericParams(genericParams);
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *proto->getGenericParams()) {
@@ -1837,7 +1839,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto genericParams = maybeReadGenericParams(DC);
+    auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
     auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
                                         SourceLoc(), { }, genericParams, DC);
@@ -1907,7 +1909,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto genericParams = maybeReadGenericParams(DC);
+    auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
 
     auto theEnum = new (ctx) EnumDecl(SourceLoc(), getIdentifier(nameID),
                                       SourceLoc(), { }, genericParams, DC);
@@ -2608,7 +2610,7 @@ Type ModuleFile::getType(TypeID TID) {
     }
 
     GenericParamList *paramList =
-      maybeGetOrReadGenericParams(genericContextID, FileContext);
+      maybeGetOrReadGenericParams(genericContextID, FileContext, DeclTypeCursor);
     assert(paramList && "missing generic params for polymorphic function");
 
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
