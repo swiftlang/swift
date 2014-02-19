@@ -235,18 +235,6 @@ static void mangleConstant(SILDeclRef c, llvm::raw_ostream &buffer,
       buffer << c.getDecl()->getAttrs().AsmName;
       return;
     }
-      
-    if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
-      // Accessors are mangled specially.
-      auto accessorKind = FD->getAccessorKind();
-      if (accessorKind != AccessorKind::NotAccessor) {
-        buffer << introducer;
-        mangler.mangleAccessorEntity(accessorKind,
-                                     FD->getAccessorStorageDecl(),
-                                     expansion);
-        return;
-      }
-    }
 
     // Otherwise, fall through into the 'other decl' case.
     SWIFT_FALLTHROUGH;

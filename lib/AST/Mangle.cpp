@@ -1221,11 +1221,9 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
   // declaration.
   if (auto func = dyn_cast<FuncDecl>(decl)) {
     auto accessorKind = func->getAccessorKind();
-    if (accessorKind != AccessorKind::NotAccessor) {
-      assert(uncurryLevel == 0 && "Unhandled uncurry level for accessors");
+    if (accessorKind != AccessorKind::NotAccessor)
       return mangleAccessorEntity(accessorKind, func->getAccessorStorageDecl(),
                                   explosion);
-    }
   }
   
   BindGenerics shouldBindParent = BindGenerics::All;
