@@ -164,6 +164,8 @@ public:
   
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
+  LValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *e);
+  LValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
   // Expressions that wrap lvalues
@@ -601,6 +603,14 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
                                 typeData, e->getIndex());
   return std::move(lv);
 }
+
+LValue SILGenLValue::visitExistentialSubscriptExpr(ExistentialSubscriptExpr *e){
+  llvm_unreachable("subscripts in protocols not implemented yet");
+}
+LValue SILGenLValue::visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *e) {
+  llvm_unreachable("subscripts in archetypes not implemented yet");
+}
+
 
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   unsigned index = e->getFieldNumber();
