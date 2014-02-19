@@ -37,28 +37,29 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   SILLocation FLoc = F->getLocation();
 
   Type ResTy;
+  AnyFunctionType *T = 0;
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
     ResTy = FD->getResultType();
-    if (ResTy->isVoid())
-      return;
-
-    if (AnyFunctionType *T = FD->getType()->castTo<AnyFunctionType>()) {
-      if (T->isNoReturn())
-        return;
-    }
+    T = FD->getType()->castTo<AnyFunctionType>();
+  } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
+    ResTy = CE->getResultType();
+    T = CE->getType()->castTo<AnyFunctionType>();
   } else {
-    // FIXME: Not all closure types have the result type getter right
-    // now.
-    return;
+    llvm_unreachable("unhandled case in MissingReturn");
   }
 
-  // If the function does not return void, issue the diagnostic.
+  // No action required if the function returns 'Void' or that the
+  // function is marked 'noreturn'.
+  if (ResTy->isVoid() || (T && T->isNoReturn()))
+    return;
+
   SILLocation L = UI->getLoc();
   assert(L && ResTy);
   diagnose(Context,
            L.getEndSourceLoc(),
-           diag::missing_return, ResTy);
+           diag::missing_return, ResTy,
+           FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
 }
 
 static void diagnoseNonExhaustiveSwitch(const UnreachableInst *UI,
@@ -84,7 +85,9 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // The most common case of getting an unreachable instruction is a
     // missing return statement. In this case, we know that the instruction
     // location will be the enclosing function.
-    if (L.isASTNode<AbstractFunctionDecl>()) {
+    L.dump(Context.SourceMgr);
+
+    if (L.isASTNode<AbstractFunctionDecl>() || L.isASTNode<ClosureExpr>()) {
       diagnoseMissingReturn(UI, Context);
       return;
     }
