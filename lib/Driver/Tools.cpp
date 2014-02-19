@@ -108,9 +108,14 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   }
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
+  inputArgs.AddAllArgs(arguments, options::OPT_F);
 
   inputArgs.AddLastArg(arguments, options::OPT_g);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
+  inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
+
+  // Pass through the values passed to -Xfrontend.
+  inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
   // Pass through any -Xllvm flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
@@ -241,9 +246,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
 
-  // Pass through the values passed to -Xfrontend.
-  Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
-
   if (Args.hasArg(options::OPT_parse_as_library) ||
       Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
@@ -261,8 +263,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back("-emit-module-path");
     Arguments.push_back(ModuleOutputPath.c_str());
   }
-
-  Args.AddLastArg(Arguments, options::OPT_module_cache_path);
 
   const std::string &SerializedDiagnosticsPath =
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
@@ -317,11 +317,6 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-parse-as-library");
 
   addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
-
-  // Pass through the values passed to -Xfrontend.
-  // FIXME: This is kind of nasty, but necessary if we need these options to
-  // load the partial ASTs.
-  Args.AddAllArgValues(Arguments, options::OPT_Xfrontend);
 
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");
