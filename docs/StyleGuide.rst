@@ -1,6 +1,8 @@
 Swift Style Guide
 =================
 
+.. Warning:: This document is a work in progress.
+             
 This document defines a consistent and considered style for Swift code.
 This style should be used for all externally-facing code written by Apple.
 Its overriding aim is to help the developer community
