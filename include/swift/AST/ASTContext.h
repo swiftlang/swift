@@ -567,14 +567,11 @@ public:
   /// Returns the protocol requirement decls for a conforming decl.
   ArrayRef<ValueDecl *> getConformances(ValueDecl *D);
 
-  /// Returns the raw comment attached to the given decl.
-  Optional<RawComment> getRawComment(const Decl *D);
-
-  /// Attaches a raw comment to the decl.
-  void setRawComment(const Decl *D, RawComment RC);
-
 private:
   friend class Decl;
+  Optional<RawComment> getRawComment(const Decl *D);
+  void setRawComment(const Decl *D, RawComment RC);
+
   ClangNode getClangNode(const Decl *decl);
   void setClangNode(const Decl *decl, ClangNode node);
 
