@@ -85,7 +85,6 @@ static void diagnoseUnreachable(const SILInstruction *I,
     // The most common case of getting an unreachable instruction is a
     // missing return statement. In this case, we know that the instruction
     // location will be the enclosing function.
-    L.dump(Context.SourceMgr);
 
     if (L.isASTNode<AbstractFunctionDecl>() || L.isASTNode<ClosureExpr>()) {
       diagnoseMissingReturn(UI, Context);
