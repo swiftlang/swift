@@ -900,25 +900,25 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
+          MetatypeRepresentation storedRepr;
           auto instanceTy = resolveType(metatypeRepr->getBase(), options);
-          bool isThin;
           if (attrs.has(TAK_thin) && attrs.has(TAK_thick)) {
             TC.diagnose(repr->getStartLoc(),
                         diag::sil_metatype_thin_and_thick);
-            isThin = false;
+            storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thin);
             attrs.clearAttribute(TAK_thick);
           } else if (attrs.has(TAK_thin)) {
-            isThin = true;
+            storedRepr = MetatypeRepresentation::Thin;
             attrs.clearAttribute(TAK_thin);
           } else if (attrs.has(TAK_thick)) {
-            isThin = false;
+            storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           } else {
             llvm_unreachable("neither thin nor thick");
           }
           
-          ty = MetatypeType::get(instanceTy, /*thin*/ isThin, Context);
+          ty = MetatypeType::get(instanceTy, storedRepr, Context);
         }
       }
     }
@@ -1364,7 +1364,8 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   if (options & TR_SILType) {
     TC.diagnose(repr->getStartLoc(),
                 diag::sil_metatype_without_thinness_attribute);
-    return MetatypeType::get(ty, /*isThin*/ false, Context);
+    return MetatypeType::get(ty, MetatypeRepresentation::Thick,
+                            Context);
   }
   
   return MetatypeType::get(ty, Context);
@@ -1841,7 +1842,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
         DynamicLookup->getDeclaredType()->getCanonicalType();
     ObjCMappedTypes.insert(DynamicLookupType);
     ObjCMappedTypes.insert(
-        MetatypeType::get(DynamicLookupType, Context)->getCanonicalType());
+      MetatypeType::get(DynamicLookupType, Context)->getCanonicalType());
   }
 }
 

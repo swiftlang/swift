@@ -1397,11 +1397,11 @@ public:
   }
 
   void visitMetatypeType(MetatypeType *T) {
-    if (T->hasThin()) {
-      if (T->isThin())
-        Printer << "@thin ";
-      else
-        Printer << "@thick ";
+    if (T->hasRepresentation()) {
+      switch (T->getRepresentation()) {
+      case MetatypeRepresentation::Thin:  Printer << "@thin ";  break;
+      case MetatypeRepresentation::Thick: Printer << "@thick "; break;
+      }
     }
     printWithParensIfNotSimple(T->getInstanceType());
     Printer << ".metatype";

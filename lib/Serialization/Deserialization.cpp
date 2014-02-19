@@ -2312,13 +2312,30 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::METATYPE_TYPE: {
     TypeID instanceID;
-    bool hasThin, isThin;
-    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID,
-                                                hasThin, isThin);
-    if (hasThin)
-      typeOrOffset = MetatypeType::get(getType(instanceID), isThin, ctx);
-    else
+    uint8_t repr;
+    decls_block::MetatypeTypeLayout::readRecord(scratch, instanceID, repr);
+
+    switch (repr) {
+    case serialization::MetatypeRepresentation::MR_None:
       typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
+      break;
+
+    case serialization::MetatypeRepresentation::MR_Thin:
+      typeOrOffset = MetatypeType::get(getType(instanceID), 
+                                       MetatypeRepresentation::Thin,
+                                       ctx);
+      break;
+
+    case serialization::MetatypeRepresentation::MR_Thick:
+      typeOrOffset = MetatypeType::get(getType(instanceID), 
+                                       MetatypeRepresentation::Thick,
+                                       ctx);
+      break;
+
+    default:
+      error();
+      break;
+    }
     break;
   }
 

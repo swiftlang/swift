@@ -212,10 +212,11 @@ protected:
 
   struct MetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
-    /// \brief Is the 'thin' bit set?
-    unsigned HasThin : 1;
-    /// \brief Does the metatype use a 'thin' representation?
-    unsigned Thin : 1;
+    /// The representation of the metatype.
+    ///
+    /// Zero indicates that no representation has been set; otherwise,
+    /// the value is the representation + 1
+    unsigned Representation : 2;
   };
   enum { NumMetatypeTypeBits = NumTypeBaseBits + 2 };
   static_assert(NumMetatypeTypeBits <= 32, "fits in an unsigned");
@@ -1377,6 +1378,30 @@ private:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 
+/// Describes the representation of a metatype.
+///
+/// There are several potential representations for metatypes within
+/// SIL, which are distinguished by the metatype representation. This
+/// enumeration captures the different representations. Some
+/// conversions between representations are possible: for example, one
+/// can convert a thin representation to a thick one (but not
+/// vice-versa), and different representations are required in
+/// different places.
+enum class MetatypeRepresentation : char {
+  /// A thin metatype requires no runtime information, because the
+  /// type itself provides no dynamic behavior.
+  ///
+  /// Struct and enum metatypes are thin, because dispatch to static
+  /// struct and enum members is completely static.
+  Thin,
+  /// A thick metatype refers to a complete metatype representation
+  /// that allows introspection and dynamic dispatch. 
+  ///
+  /// Thick metatypes are used for class and existential metatypes,
+  /// which permit dynamic behavior.
+  Thick
+};
+
 /// MetatypeType - This is the type given to a metatype value.  When a type is
 /// declared, a 'metatype' value is injected into the value namespace to
 /// resolve references to the type.  An example:
@@ -1386,42 +1411,45 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 class MetatypeType : public TypeBase {
   Type InstanceType;
 
-  static MetatypeType *get(Type T, Optional<bool> IsThin, const ASTContext &C);
+  static MetatypeType *get(Type T, Optional<MetatypeRepresentation> Repr,
+                           const ASTContext &Ctx);
 
 public:
   /// \brief Return the MetatypeType for the specified type declaration.
   ///
-  /// This leaves the 'thin' property unavailable.
-  static MetatypeType *get(Type T, const ASTContext &C) {
-    return get(T, Optional<bool>(), C);
+  /// This leaves the 'representation' property unavailable.
+  static MetatypeType *get(Type T, const ASTContext &Ctx) {
+    return get(T, Nothing, Ctx);
   }
   
   /// Return the MetatypeType for the specified type declaration with
-  /// the given thinness.
+  /// the given representation.
   ///
-  /// Metatype thinness is a SIL-only property. Unitary metatypes can be
-  /// lowered away to empty types in IR.
-  static MetatypeType *get(Type T, bool IsThin, const ASTContext &C) {
-    return get(T, Optional<bool>(IsThin), C);
+  /// Metatype representation is a SIL-only property. Thin metatypes
+  /// can be lowered away to empty types in IR.
+  static MetatypeType *get(Type T, MetatypeRepresentation repr, 
+                           const ASTContext &Ctx) {
+    return get(T, Optional<MetatypeRepresentation>(repr), Ctx);
   }
 
   Type getInstanceType() const { return InstanceType; }
 
-  /// Does this metatype have a 'thin' property?
+  /// Does this metatype have a representation?
   ///
-  /// Only SIL metatype types have a 'thin' bit.
-  bool hasThin() const {
-    return MetatypeTypeBits.HasThin;
+  /// Only SIL metatype types have a representation.
+  bool hasRepresentation() const {
+    return MetatypeTypeBits.Representation > 0;
   }
   
-  /// Is this a thin metatype type?
+  /// Retrieve the metatype representation.
   ///
-  /// Metatype thinness is a SIL-only property. Unitary metatypes can be
-  /// lowered away to empty types in IR, unless a metatype value is required
-  /// at an abstraction level.
-  bool isThin() const {
-    assert(MetatypeTypeBits.HasThin && "metatype has no thinness");
-    return MetatypeTypeBits.Thin;
+  /// The metatype representation is a SIL-only property. Thin
+  /// metatypes can be lowered away to empty types in IR, unless a
+  /// metatype value is required at an abstraction level.
+  MetatypeRepresentation getRepresentation() const {
+    assert(MetatypeTypeBits.Representation && "metatype has no representation");
+    return static_cast<MetatypeRepresentation>(
+             MetatypeTypeBits.Representation - 1);
   }
   
   // Implement isa/cast/dyncast/etc.
@@ -1432,16 +1460,17 @@ public:
 private:
   MetatypeType(Type T, const ASTContext *Ctx,
                RecursiveTypeProperties properties,
-               Optional<bool> IsThin);
+               Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
-  static CanMetatypeType get(CanType type, const ASTContext &C) {
-    return CanMetatypeType(MetatypeType::get(type, C));
+  static CanMetatypeType get(CanType type, const ASTContext &ctx) {
+    return CanMetatypeType(MetatypeType::get(type, ctx));
   }
-  static CanMetatypeType get(CanType type, bool isThin, const ASTContext &C) {
-    return CanMetatypeType(MetatypeType::get(type, isThin, C));
+  static CanMetatypeType get(CanType type, MetatypeRepresentation repr, 
+                             const ASTContext &ctx) {
+    return CanMetatypeType(MetatypeType::get(type, repr, ctx));
   }
 END_CAN_TYPE_WRAPPER(MetatypeType, Type)
   

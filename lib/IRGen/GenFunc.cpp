@@ -1948,8 +1948,9 @@ void CallEmission::emitToExplosion(Explosion &out) {
       // If we got here, it's because the substituted metatype is trivial.
       // Remapping is easy--the substituted type is empty, so we drop the
       // nontrivial representation of the original type.
-      assert(cast<MetatypeType>(substResultType)->isThin()
-             && "remapping to thick metatype?!");
+      assert(cast<MetatypeType>(substResultType)->getRepresentation()
+               == MetatypeRepresentation::Thin
+             && "remapping to non-thin metatype?!");
       
       Explosion temp(getCallee().getExplosionLevel());
       emitToUnmappedExplosion(temp);

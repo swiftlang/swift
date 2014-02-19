@@ -335,7 +335,7 @@ static bool isLegalSILType(CanType type) {
   if (isa<LValueType>(type) || isa<InOutType>(type)) return false;
   if (isa<AnyFunctionType>(type)) return false;
   if (auto meta = dyn_cast<MetatypeType>(type))
-    return meta->hasThin();
+    return meta->hasRepresentation();
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
       if (!isLegalSILType(eltType)) return false;
@@ -809,8 +809,8 @@ CanType TypeBase::getCanonicalType() {
   case TypeKind::Metatype: {
     MetatypeType *MT = cast<MetatypeType>(this);
     Type InstanceTy = MT->getInstanceType()->getCanonicalType();
-    if (MT->hasThin())
-      Result = MetatypeType::get(InstanceTy, MT->isThin(),
+    if (MT->hasRepresentation())
+      Result = MetatypeType::get(InstanceTy, MT->getRepresentation(),
                                  InstanceTy->getASTContext());
     else
       Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
@@ -2061,10 +2061,10 @@ case TypeKind::Id:
     if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
       return *this;
 
-    if (meta->hasThin())
-      return MetatypeType::get(instanceTy, meta->isThin(),
-                               Ptr->getASTContext());
-    return MetatypeType::get(instanceTy, Ptr->getASTContext());
+    if (meta->hasRepresentation())
+      return MetatypeType::get(instanceTy, meta->getRepresentation(), 
+                               instanceTy->getASTContext());
+    return MetatypeType::get(instanceTy, instanceTy->getASTContext());
   }
 
   case TypeKind::DynamicSelf: {

@@ -1677,11 +1677,24 @@ void Serializer::writeType(Type ty) {
     auto metatypeTy = cast<MetatypeType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
-    bool hasThin = metatypeTy->hasThin();
-    bool isThin = hasThin ? metatypeTy->isThin() : false;
+
+    // Map the metatype representation.
+    auto repr = serialization::MetatypeRepresentation::MR_None;
+    if (metatypeTy->hasRepresentation()) {
+      switch (metatypeTy->getRepresentation()) {
+      case swift::MetatypeRepresentation::Thin:
+        repr = serialization::MetatypeRepresentation::MR_Thin;
+        break;
+
+      case swift::MetatypeRepresentation::Thick:
+        repr = serialization::MetatypeRepresentation::MR_Thick;
+        break;
+      }
+    }
+
     MetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(metatypeTy->getInstanceType()),
-                                   hasThin, isThin);
+                                   static_cast<uint8_t>(repr));
     break;
   }
 

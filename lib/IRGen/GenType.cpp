@@ -1143,11 +1143,11 @@ const TypeInfo *TypeConverter::convertModuleType(ModuleType *T) {
 }
 
 const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
-  assert(T->hasThin() &&
-         "metatype should have been assigned a thinness by SIL");
+  assert(T->hasRepresentation() &&
+         "metatype should have been assigned a representation by SIL");
   
   // Thin metatypes are empty.
-  if (T->isThin())
+  if (T->getRepresentation() == MetatypeRepresentation::Thin)
     return new EmptyTypeInfo(IGM.Int8Ty);
 
   // Thick metatypes are represented with a metadata pointer.

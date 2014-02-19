@@ -1334,34 +1334,33 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   llvm_unreachable("bad ownership");
 }
 
-MetatypeType *MetatypeType::get(Type T, Optional<bool> IsThin,
-                                const ASTContext &C) {
+MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
+                                const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
 
-  char thinKey;
-  if (IsThin.hasValue())
-    thinKey = *IsThin ? 1 : 0;
+  char reprKey;
+  if (Repr.hasValue())
+    reprKey = static_cast<char>(*Repr) + 1;
   else
-    thinKey = 2;
+    reprKey = 0;
   
-  MetatypeType *&Entry = C.Impl.getArena(arena)
-    .MetatypeTypes[{T, thinKey}];
+  MetatypeType *&Entry = Ctx.Impl.getArena(arena).MetatypeTypes[{T, reprKey}];
   if (Entry) return Entry;
 
-  return Entry = new (C, arena) MetatypeType(T, T->isCanonical() ? &C : 0,
-                                             properties,
-                                             IsThin);
+  return Entry = new (Ctx, arena) MetatypeType(T, 
+                                               T->isCanonical() ? &Ctx : 0,
+                                               properties, Repr);
 }
 
 MetatypeType::MetatypeType(Type T, const ASTContext *C,
                            RecursiveTypeProperties properties,
-                           Optional<bool> IsThin)
+                           Optional<MetatypeRepresentation> repr)
   : TypeBase(TypeKind::Metatype, C, properties),
     InstanceType(T) {
-  MetatypeTypeBits.HasThin = IsThin.hasValue();
-  if (IsThin.hasValue())
-    MetatypeTypeBits.Thin = *IsThin;
+  MetatypeTypeBits.Representation = 0;
+  if (repr)
+    MetatypeTypeBits.Representation = static_cast<char>(*repr) + 1;
 }
 
 ModuleType *ModuleType::get(Module *M) {

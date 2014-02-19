@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 3;
+const uint16_t VERSION_MINOR = 4;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -115,6 +115,13 @@ enum class ResultConvention : uint8_t {
   Autoreleased,
 };
 using ResultConventionField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum MetatypeRepresentation : uint8_t {
+  MR_None, MR_Thin, MR_Thick
+};
+using MetatypeRepresentationField = BCFixed<2>;
 
 /// Translates an operator DeclKind to a Serialization fixity, whose values are
 /// guaranteed to be stable.
@@ -377,9 +384,8 @@ namespace decls_block {
 
   using MetatypeTypeLayout = BCRecordLayout<
     METATYPE_TYPE,
-    TypeIDField,  // instance type
-    BCFixed<1>,   // has thin?
-    BCFixed<1>    // is thin?
+    TypeIDField,                       // instance type
+    MetatypeRepresentationField        // representation
   >;
 
   using LValueTypeLayout = BCRecordLayout<

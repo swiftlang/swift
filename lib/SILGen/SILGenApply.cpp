@@ -2296,7 +2296,7 @@ namespace {
   /// The type of trait builtins.
   static SILType getTypeTraitSILType(ASTContext &C) {
     auto param = CanGenericTypeParamType::get(0, 0, C);
-    auto metaTy = CanMetatypeType::get(param, /*thin*/ false, C);
+    auto metaTy = CanMetatypeType::get(param, MetatypeRepresentation::Thick, C);
     auto sig = GenericSignature::get(param.getPointer(), {})
       ->getCanonicalSignature();
     auto boolTy = BuiltinIntegerType::get(1, C)

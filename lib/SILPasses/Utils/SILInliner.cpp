@@ -307,7 +307,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
 
     case ValueKind::MetatypeInst:
       // Thin metatypes are always free.
-      if (I.getType(0).castTo<MetatypeType>()->isThin())
+      if (I.getType(0).castTo<MetatypeType>()->getRepresentation()
+            == MetatypeRepresentation::Thin)
         return InlineCost::Free;
       // TODO: Thick metatypes are free if they don't require generic or lazy
       // instantiation.

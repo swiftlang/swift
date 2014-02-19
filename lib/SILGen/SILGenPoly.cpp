@@ -1011,8 +1011,7 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   return fn;
 }
 
-// Convert a metatype to 'thin' if it is naturally a thin metatype in
-// substituted context.
+// Convert a metatype to the appropriate representation.
 static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
                                             SILLocation loc,
                                             ManagedValue meta,
@@ -1021,19 +1020,35 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
   assert(!meta.hasCleanup() && "metatype with cleanup?!");
 
   auto substSILType = gen.getLoweredLoadableType(substType);
+
+  auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
+  auto willBeRepr = substSILType.castTo<MetatypeType>()->getRepresentation();
   
-  bool wasThin = meta.getType().castTo<MetatypeType>()->isThin();
-  bool willBeThin = substSILType.castTo<MetatypeType>()->isThin();
-  
-  // If the value is already of the right thinness, we're done.
-  if (wasThin == willBeThin)
-    return meta;
-  
-  // Otherwise, create a thin metatype. If it can be thin, the metatype is
-  // unitary, so we can just create an equivalent thin value from thin air.
-  assert(willBeThin && "substituting thin to thick metatype?!");
-  auto metaTy = gen.B.createMetatype(loc, substSILType);
-  return ManagedValue::forUnmanaged(metaTy);
+  // Convert the representation appropriately.
+  switch (wasRepr) {
+  case MetatypeRepresentation::Thick:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin: {
+      // Thin -> thick conversion.
+      auto metaTy = gen.B.createMetatype(loc, substSILType);
+      return ManagedValue::forUnmanaged(metaTy);
+    }
+
+    case MetatypeRepresentation::Thick:
+      // No conversion necessary.
+      return meta;
+    }
+
+  case MetatypeRepresentation::Thin:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin:
+      // No conversion necessary.
+      return meta;
+
+    case MetatypeRepresentation::Thick:
+      llvm_unreachable("abstracting thick to thin metatype?!");
+    }
+  }
 }
 
 // Convert a metatype to 'thick' if its abstraction pattern requires it.
@@ -1046,18 +1061,34 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
   
   auto loweredTy = gen.getLoweredType(origType, substType);
 
-  bool wasThin = meta.getType().castTo<MetatypeType>()->isThin();
-  bool willBeThin = loweredTy.castTo<MetatypeType>()->isThin();
+  auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
+  auto willBeRepr = loweredTy.castTo<MetatypeType>()->getRepresentation();
   
-  // If the value is already of the right thinness, we're done.
-  if (wasThin == willBeThin)
-    return meta;
-  
-  // Otherwise, create a thick metatype. If it can be thin, the metatype is
-  // unitary, so we can just create an equivalent thick value from thin air.
-  assert(wasThin && "abstracting thick to thin metatype?!");
-  auto metaTy = gen.B.createMetatype(loc, loweredTy);
-  return ManagedValue::forUnmanaged(metaTy);
+  // Convert the representation appropriately.
+  switch (wasRepr) {
+  case MetatypeRepresentation::Thick:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("Cannot convert thick to thin metatype");
+
+    case MetatypeRepresentation::Thick:
+      // No conversion necessary.
+      return meta;
+    }
+
+  case MetatypeRepresentation::Thin:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin:
+      // No conversion necessary.
+      return meta;
+
+    case MetatypeRepresentation::Thick: {
+      // Thin -> thick conversion.
+      auto metaTy = gen.B.createMetatype(loc, loweredTy);
+      return ManagedValue::forUnmanaged(metaTy);
+    }
+    }
+  }
 }
 
 namespace {
