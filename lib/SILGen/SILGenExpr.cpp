@@ -2067,7 +2067,9 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // If we have a superclass, invoke its destructor.
   SILValue resultSelfValue;
   SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
-  if (Type superclassTy = cd->getSuperclass()) {
+  if (cd->hasSuperclass()) {
+    Type superclassTy
+      = ArchetypeBuilder::mapTypeIntoContext(dd, cd->getSuperclass());
     ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =

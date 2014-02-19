@@ -256,6 +256,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     if (inheritedTy->is<ErrorType>())
       continue;
 
+    // Retrieve the interface type for this inherited type.
+    if (DC->isGenericContext() && DC->isTypeContext()) {
+      inheritedTy = getInterfaceTypeFromInternalType(DC, inheritedTy);
+    }
+
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
     auto knownType = inheritedTypes.find(inheritedCanTy);
@@ -1670,7 +1675,9 @@ public:
 
     if (!IsFirstPass) {
       // If we have a raw type, check it and the cases' raw values.
-      if (auto rawTy = ED->getRawType()) {
+      if (ED->hasRawType()) {
+        auto rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+
         // Check that the raw type is convertible from one of the primitive
         // literal protocols.
         bool literalConvertible = false;
@@ -2680,8 +2687,10 @@ public:
 
     // Check the raw value, if we have one.
     if (auto *rawValue = EED->getRawValueExpr()) {
-      auto rawTy = ED->getRawType();
-      if (!rawTy) {
+      Type rawTy;
+      if (ED->hasRawType()) {
+        rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+      } else {
         TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
         // Recover by setting the raw type as this element's type.
       }
@@ -3325,8 +3334,8 @@ void TypeChecker::addRawRepresentableConformance(EnumDecl *ED) {
   for (auto elt : ED->getAllElements()) {
     assert(elt->hasRawValueExpr());
     Expr *typeChecked = elt->getRawValueExpr();
-    bool error = typeCheckExpression(typeChecked, ED,
-                                     ED->getRawType(), false);
+    Type rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+    bool error = typeCheckExpression(typeChecked, ED, rawTy, false);
     assert(!error); (void)error;
     elt->setTypeCheckedRawValueExpr(typeChecked);
   }

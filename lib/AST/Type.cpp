@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -1150,9 +1151,14 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     }
   } else if (auto boundTy = getAs<BoundGenericType>()) {
     if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
-      superclassTy = classDecl->getSuperclass();
-      module = classDecl->getModuleContext();
-      specializedTy = this;
+      if (classDecl->hasSuperclass()) {
+        // FIXME: Lame to rely on archetypes in the substitution below.
+        superclassTy = ArchetypeBuilder::mapTypeIntoContext(
+                         classDecl,
+                         classDecl->getSuperclass());
+        module = classDecl->getModuleContext();
+        specializedTy = this;
+      }
     }
   } else if (auto substitutableTy = getAs<SubstitutableType>()) {
     return substitutableTy->getSuperclass();

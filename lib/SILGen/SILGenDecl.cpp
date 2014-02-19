@@ -1591,7 +1591,8 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // instance variables before the object is actually deallocated.
 
   // Form a reference to the superclass -dealloc.
-  Type superclassTy = cd->getSuperclass();
+  Type superclassTy = ArchetypeBuilder::mapTypeIntoContext(dd,
+                                                           cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
   ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
   auto superclassDtorDecl = superclass->getDestructor();

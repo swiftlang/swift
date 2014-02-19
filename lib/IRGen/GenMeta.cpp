@@ -17,6 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
@@ -1357,7 +1358,10 @@ namespace {
         return;
       }
 
-      addReferenceToType(TargetClass->getSuperclass()->getCanonicalType());
+      Type superclassTy
+        = ArchetypeBuilder::mapTypeIntoContext(TargetClass,
+                                               TargetClass->getSuperclass());
+      addReferenceToType(superclassTy->getCanonicalType());
     }
     
     void addReferenceToType(CanType type) {
@@ -1650,8 +1654,12 @@ namespace {
       // Get the superclass metadata.
       llvm::Value *superMetadata;
       if (TargetClass->hasSuperclass()) {
+        Type superclassTy
+          = ArchetypeBuilder::mapTypeIntoContext(TargetClass,
+                                                 TargetClass->getSuperclass());
+
         superMetadata = IGF.emitTypeMetadataRef(
-                            TargetClass->getSuperclass()->getCanonicalType());
+                          superclassTy->getCanonicalType());
       } else {
         assert(!HasDependentSuperclass
                && "dependent superclass without superclass?!");

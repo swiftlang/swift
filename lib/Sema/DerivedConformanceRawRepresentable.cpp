@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -73,14 +74,17 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   // }
   ASTContext &C = tc.Context;
 
+  auto rawInterfaceType = enumDecl->getRawType();
+  auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
+                                                      rawInterfaceType);
   auto rawTypeDecl = new (C) TypeAliasDecl(SourceLoc(),
                                    C.getIdentifier("RawType"),
                                    SourceLoc(),
-                                   TypeLoc::withoutLoc(enumDecl->getRawType()),
+                                   TypeLoc::withoutLoc(rawType),
                                    enumDecl);
   rawTypeDecl->setImplicit();
-  tc.typeCheckDecl(rawTypeDecl, /*FirstPass*/ true);
-  
+  rawTypeDecl->setType(rawType);
+  rawTypeDecl->setInterfaceType(rawInterfaceType);
   return insertDecl(enumDecl, rawTypeDecl);
 }
 
@@ -99,19 +103,23 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   // }
   ASTContext &C = tc.Context;
   
-  Type rawType = enumDecl->getRawType();
+  auto rawInterfaceType = enumDecl->getRawType();
+  auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
+                                                      rawInterfaceType);
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
                                       SourceLoc(),
                                       C.Id_self,
-                                      Type(),
+                                      enumType,
                                       enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam = new (C) TypedPattern(selfParam,
-                     TypeLoc::withoutLoc(enumDecl->getDeclaredTypeInContext()));
+  selfParam->setType(enumType);
+  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(enumType));
+  selfParam->setType(enumType);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(tc.Context));
   Pattern *params[] = {selfParam, methodParam};
   
   FuncDecl *toRawDecl =
@@ -145,8 +153,30 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                                 ASTNode(switchStmt),
                                 SourceLoc());
   toRawDecl->setBody(body);
-  
-  tc.typeCheckDecl(toRawDecl, /*FirstPass*/ true);
+
+  // Compute the type of toRaw().
+  GenericParamList *genericParams = nullptr;
+  Type type = FunctionType::get(TupleType::getEmpty(tc.Context), rawType);
+  Type selfType = toRawDecl->computeSelfType(&genericParams);
+  if (genericParams)
+    type = PolymorphicFunctionType::get(selfType, type, genericParams);
+  else
+    type = FunctionType::get(selfType, type);
+  toRawDecl->setType(type);
+  toRawDecl->setBodyResultType(rawType);
+
+  // Compute the interface type of toRaw();
+  Type interfaceType = FunctionType::get(TupleType::getEmpty(tc.Context),
+                                         rawInterfaceType);
+  Type selfInterfaceType = toRawDecl->computeInterfaceSelfType(false);
+  if (auto sig = enumDecl->getGenericSignatureOfContext())
+    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+                                             interfaceType,
+                                             FunctionType::ExtInfo());
+  else
+    interfaceType = type;
+  toRawDecl->setInterfaceType(interfaceType);
+
   tc.implicitlyDefinedFunctions.push_back(toRawDecl);
 
   return insertDecl(enumDecl, toRawDecl);
@@ -170,30 +200,38 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
 
   ASTContext &C = tc.Context;
   
-  Type rawType = enumDecl->getRawType();
+  auto rawInterfaceType = enumDecl->getRawType();
+  auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
+                                                      rawInterfaceType);
   Type enumType = enumDecl->getDeclaredTypeInContext();
-  
+  Type enumMetaType = MetatypeType::get(enumType, tc.Context);
+
   VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
                                       SourceLoc(),
                                       C.Id_self,
-                                      Type(),
+                                      enumMetaType,
                                       enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
+  selfParam->setType(enumMetaType);
   auto metaTy = MetatypeType::get(enumType, C);
   selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
+  selfParam->setType(enumMetaType);
   selfParam->setImplicit();
-  
+
   VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
                                      SourceLoc(),
                                      C.getIdentifier("raw"),
-                                     Type(),
+                                     rawType,
                                      enumDecl);
   rawDecl->setImplicit();
   Pattern *rawParam = new (C) NamedPattern(rawDecl, /*implicit*/ true);
+  rawParam->setType(rawType);
   rawParam = new (C) TypedPattern(rawParam, TypeLoc::withoutLoc(rawType));
+  rawParam->setType(rawType);
   rawParam->setImplicit();
   rawParam = new (C) ParenPattern(SourceLoc(), rawParam, SourceLoc());
+  rawParam->setType(rawType);
   rawParam->setImplicit();
   
   Pattern *argParams[] = {selfParam->clone(C, /*Implicit=*/true),
@@ -255,8 +293,31 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                 ASTNode(switchStmt),
                                 SourceLoc());
   fromRawDecl->setBody(body);
-  
-  tc.typeCheckDecl(fromRawDecl, /*FirstPass*/ true);
+
+  // Compute the type of fromRaw().
+  GenericParamList *genericParams = nullptr;
+  Type type = FunctionType::get(rawType, retTy);
+  Type selfType = fromRawDecl->computeSelfType(&genericParams);
+  if (genericParams)
+    type = PolymorphicFunctionType::get(selfType, type, genericParams);
+  else
+    type = FunctionType::get(selfType, type);
+  fromRawDecl->setType(type);
+  fromRawDecl->setBodyResultType(retTy);
+
+  // Compute the interface type of fromRaw();
+  Type retInterfaceType
+    = OptionalType::get(enumDecl->getDeclaredInterfaceType());
+  Type interfaceType = FunctionType::get(rawInterfaceType, retInterfaceType);
+  Type selfInterfaceType = fromRawDecl->computeInterfaceSelfType(false);
+  if (auto sig = enumDecl->getGenericSignatureOfContext())
+    interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
+                                             interfaceType,
+                                             FunctionType::ExtInfo());
+  else
+    interfaceType = type;
+  fromRawDecl->setInterfaceType(interfaceType);
+
   tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
 
   return insertDecl(enumDecl, fromRawDecl);
@@ -282,6 +343,9 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   // values.
   if (enumDecl->getAllElements().empty())
     return nullptr;
+
+  // Map the interface type into the context of the enum.
+  rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl, rawType);
 
   for (auto elt : enumDecl->getAllElements()) {
     if (!elt->getTypeCheckedRawValueExpr()
