@@ -36,7 +36,8 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask) {
-  auto size = llvm::RoundUpToAlignment(requiredSize, requiredAlignmentMask + 1);
+  // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
+  auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
   auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size,
                                                                SWIFT_RAWALLOC));
   object->metadata = metadata;
@@ -74,7 +75,8 @@ namespace {
     /// Returns the offset in bytes from the address of the header of a POD
     /// allocation with the given size and alignment.
     static size_t getValueOffset(size_t size, size_t alignMask) {
-      return llvm::RoundUpToAlignment(sizeof(PODBox), alignMask+1);
+      // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
+      return (sizeof(PODBox) + alignMask) & ~alignMask;
     }
   };
 }
