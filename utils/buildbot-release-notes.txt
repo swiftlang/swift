@@ -43,20 +43,8 @@
 * The standard library has been renamed to 'Swift' (instead of 'swift') to be
   more consistent with other modules on our platforms.
 
-* 'NSInteger', 'NSUInteger', and other types that are layout-compatible with
-  Swift standard library types are now treated directly as those standard
-  library types, rather than as typealiases. Use 'Int' directly from now on.
-
-  Aside: Why is 'NSUInteger' treated as 'Int' instead of 'UInt'? Because Swift
-  doesn't allow 'Int' and 'UInt' values to freely convert to one another, and
-  Cocoa makes heavy use of both 'NSInteger' and 'NSUInteger'. We very strongly
-  believe that Swift should have a single go-to integer type--'Int'--and
-  therefore decided to import 'NSUInteger' as 'Int'.
-  
-  This has already been true for several months, so it seems to be working; the
-  only change in this build is the removal of the names 'NSInteger' and
-  'NSUInteger'. See <rdar://problem/15368372> and <rdar://problem/15368372> for
-  more information about the current plan.
+* 'NSInteger' and other types that are layout-compatible with Swift standard
+  library types are now imported directly as those standard library types.
 
 2014-02-12
 ----------
