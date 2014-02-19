@@ -2,12 +2,13 @@
 BUILD_DIR = $(HOME)/work/solon/llvm/build
 SWIFT = $(BUILD_DIR)/bin/swift
 CLANG = $(BUILD_DIR)/bin/clang
+#MODULE_CACHE_PATH = -module-cache-path /tmp/module-cache-dyDnLRn22
 
 SDK := $(shell xcrun --show-sdk-path --sdk macosx)
 OPTS = -O0 -g
 
 %-swift.o: %.swift
-	$(SWIFT) -sdk $(SDK) $(OUTPUT_OPTION) $< $(OPTS)
+	$(SWIFT) -sdk $(SDK) $(OUTPUT_OPTION) $< $(OPTS) $(MODULE_CACHE_PATH) -c
 
 %.sil: %.swift
 	$(SWIFT) -sdk $(SDK) $(OUTPUT_OPTION) $< $(OPTS) -emit-sil
@@ -18,8 +19,8 @@ OPTS = -O0 -g
 %.s: %.swift
 	$(SWIFT) -sdk $(SDK) $(OUTPUT_OPTION) $< $(OPTS) -S
 
-%-swift: %-swift.o
-	$(CLANG) $(OUTPUT_OPTION) -Wl,-rpath -Wl,"$(BUILD_DIR)/lib/swift/macosx" -L "$(BUILD_DIR)/lib/swift/macosx" $^
+%-swift: %.swift
+	$(SWIFT) -sdk $(SDK) $(OUTPUT_OPTION) $< $(OPTS) $(MODULE_CACHE_PATH)
 
 %-objc.o: %.m
 	$(CLANG) $(OUTPUT_OPTION) $< $(OPTS) -isysroot $(SDK) -c
@@ -27,7 +28,7 @@ OPTS = -O0 -g
 %-objc: %-objc.o
 	$(CLANG) $(OUTPUT_OPTION) $< $(OPTS) -isysroot $(SDK) -framework Cocoa
 
-Julia-swift: Julia-swift.o
+Julia-swift: Julia.swift
 Julia-objc: Julia-objc.o
 
 .DEFAULT_GOAL = run
