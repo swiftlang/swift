@@ -374,7 +374,7 @@ function(compile_swift_files)
       COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
 
     install(FILES ${module_source_file}
-      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR}${arch_subdir})
+      DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}${arch_subdir})
   endif()
 
   set(stdlib_dep)
@@ -568,13 +568,13 @@ macro(add_swift_library name)
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
       set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift/${SWIFTLIB_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift/${SWIFTLIB_SUBDIR})
     endforeach()
 
     install(TARGETS ${name}
-      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR}
-      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/${SWIFTLIB_SUBDIR})
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR})
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
