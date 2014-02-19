@@ -1379,6 +1379,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       methodWitness.Requirement.print(OS);
       OS << ": ";
       methodWitness.Witness->printName(OS);
+      OS << "\t// "
+         << demangleSymbolAsString(methodWitness.Witness->getName());
       break;
     }
     case AssociatedType: {
