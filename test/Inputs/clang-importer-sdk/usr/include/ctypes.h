@@ -110,36 +110,39 @@ struct funcOrStruct { int i; };
 
 // Names from MacTypes.h that conflict with swift's library types.
 // rdar://14175675
-typedef unsigned __INT8_TYPE__ UInt8;
-typedef unsigned __INT16_TYPE__ UInt16;
-typedef unsigned __INT32_TYPE__ UInt32;
-typedef unsigned __INT64_TYPE__ UInt64;
-typedef float Float32;
-typedef double Float64;
-typedef long double Float80;
+#define STDLIB_TYPEDEF(TYPE, NAME) \
+  typedef TYPE NAME; \
+  extern NAME NAME##_test
+STDLIB_TYPEDEF(unsigned __INT8_TYPE__, UInt8);
+STDLIB_TYPEDEF(unsigned __INT16_TYPE__, UInt16);
+STDLIB_TYPEDEF(unsigned __INT32_TYPE__, UInt32);
+STDLIB_TYPEDEF(unsigned __INT64_TYPE__, UInt64);
+STDLIB_TYPEDEF(float, Float32);
+STDLIB_TYPEDEF(double, Float64);
+STDLIB_TYPEDEF(long double, Float80);
 
 // Other types from MacTypes.h.
-typedef __INT8_TYPE__ SInt8;
-typedef __INT16_TYPE__ SInt16;
-typedef __INT32_TYPE__ SInt32;
-typedef __INT64_TYPE__ SInt64;
+STDLIB_TYPEDEF(__INT8_TYPE__, SInt8);
+STDLIB_TYPEDEF(__INT16_TYPE__, SInt16);
+STDLIB_TYPEDEF(__INT32_TYPE__, SInt32);
+STDLIB_TYPEDEF(__INT64_TYPE__, SInt64);
 
 // Types from stdint.h.
-typedef unsigned __INT8_TYPE__ uint8_t;
-typedef unsigned __INT16_TYPE__ uint16_t;
-typedef unsigned __INT32_TYPE__ uint32_t;
-typedef unsigned __INT64_TYPE__ uint64_t;
-typedef __INT8_TYPE__ int8_t;
-typedef __INT16_TYPE__ int16_t;
-typedef __INT32_TYPE__ int32_t;
-typedef __INT64_TYPE__ int64_t;
-typedef __INTPTR_TYPE__ intptr_t;
-typedef unsigned __INTPTR_TYPE__ uintptr_t;
+STDLIB_TYPEDEF(unsigned __INT8_TYPE__, uint8_t);
+STDLIB_TYPEDEF(unsigned __INT16_TYPE__, uint16_t);
+STDLIB_TYPEDEF(unsigned __INT32_TYPE__, uint32_t);
+STDLIB_TYPEDEF(unsigned __INT64_TYPE__, uint64_t);
+STDLIB_TYPEDEF(__INT8_TYPE__, int8_t);
+STDLIB_TYPEDEF(__INT16_TYPE__, int16_t);
+STDLIB_TYPEDEF(__INT32_TYPE__, int32_t);
+STDLIB_TYPEDEF(__INT64_TYPE__, int64_t);
+STDLIB_TYPEDEF(__INTPTR_TYPE__, intptr_t);
+STDLIB_TYPEDEF(unsigned __INTPTR_TYPE__, uintptr_t);
 
 // Types from stddef.h.
-typedef __PTRDIFF_TYPE__ ptrdiff_t;
-typedef __SIZE_TYPE__ size_t;
+STDLIB_TYPEDEF(__PTRDIFF_TYPE__, ptrdiff_t);
+STDLIB_TYPEDEF(__SIZE_TYPE__, size_t);
 
 // Types from sys/types.h (POSIX).
-typedef long ssize_t;
+STDLIB_TYPEDEF(long, ssize_t);
 
