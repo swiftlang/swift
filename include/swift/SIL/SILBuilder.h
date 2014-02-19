@@ -359,6 +359,16 @@ public:
     return insert(new (F.getModule()) ThinToThickFunctionInst(Loc, Op, Ty));
   }
 
+  ThickToObjCMetatypeInst *createThickToObjCMetatype(SILLocation Loc,
+                                                     SILValue Op, SILType Ty) {
+    return insert(new (F.getModule()) ThickToObjCMetatypeInst(Loc, Op, Ty));
+  }
+
+  ObjCToThickMetatypeInst *createObjCToThickMetatype(SILLocation Loc,
+                                                     SILValue Op, SILType Ty) {
+    return insert(new (F.getModule()) ObjCToThickMetatypeInst(Loc, Op, Ty));
+  }
+
   BridgeToBlockInst *createBridgeToBlock(SILLocation Loc,
                                          SILValue Op, SILType Ty) {
     return insert(new (F.getModule()) BridgeToBlockInst(Loc, Op, Ty));

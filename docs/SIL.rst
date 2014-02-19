@@ -3136,6 +3136,34 @@ bridge_to_block
 Converts a function value from Swift representation to Objective-C block
 representation.
 
+thick_to_objc_metatype
+``````````````````````
+::
+
+  sil-instruction ::= 'thick_to_objc_metatype' sil-operand 'to' sil-type
+
+  %1 = thick_to_objc_metatype %0 : $@thick T.metatype to $@objc_metatype T.metatype
+  // %0 must be of a thick metatype type $@thick T.metatype
+  // The destination type must be the corresponding Objective-C metatype type
+  // %1 will be of type $@objc_metatype T.metatype
+
+Converts a thick metatype to an Objective-C class metatype. ``T`` must
+be of class, class protocol, or class protocol composition type.
+
+objc_to_thick_metatype
+``````````````````````
+::
+
+  sil-instruction ::= 'objc_to_thick_metatype' sil-operand 'to' sil-type
+
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.metatype to $@thick T.metatype
+  // %0 must be of an Objective-C metatype type $@objc_metatype T.metatype
+  // The destination type must be the corresponding thick metatype type
+  // %1 will be of type $@thick T.metatype
+
+Converts an Objective-C class metatype to a thick metatype. ``T`` must
+be of class, class protocol, or class protocol composition type.
+
 thin_to_thick_function
 ``````````````````````
 ::

@@ -513,6 +513,26 @@ SILCloner<ImplClass>::visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitThickToObjCMetatypeInst(
+                        ThickToObjCMetatypeInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createThickToObjCMetatype(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitObjCToThickMetatypeInst(
+                        ObjCToThickMetatypeInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createObjCToThickMetatype(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitBridgeToBlockInst(BridgeToBlockInst *Inst) {
   doPostProcess(Inst,
     Builder.createBridgeToBlock(getOpLocation(Inst->getLoc()),

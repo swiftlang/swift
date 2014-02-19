@@ -1176,6 +1176,28 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// Given a thick metatype value, produces an Objective-C metatype
+/// value.
+class ThickToObjCMetatypeInst
+  : public UnaryInstructionBase<ValueKind::ThickToObjCMetatypeInst,
+                                ConversionInst>
+{
+public:
+  ThickToObjCMetatypeInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// Given an Objective-C metatype value, produces a thick metatype
+/// value.
+class ObjCToThickMetatypeInst
+  : public UnaryInstructionBase<ValueKind::ObjCToThickMetatypeInst,
+                                ConversionInst>
+{
+public:
+  ObjCToThickMetatypeInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// BridgeToBlockInst - Converts a Swift function value to an ObjC-compatible
 /// block.
 class BridgeToBlockInst

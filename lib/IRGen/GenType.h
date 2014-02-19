@@ -86,7 +86,8 @@ private:
   const ProtocolInfo *FirstProtocol;
   const TypeInfo *WitnessTablePtrTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
-
+  const TypeInfo *ObjCClassPtrTI = nullptr;
+  
   const TypeInfo *createPrimitive(llvm::Type *T,
                                   Size size, Alignment align);
 
@@ -119,6 +120,7 @@ public:
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const TypeInfo &getTypeInfo(ClassDecl *D);
   const TypeInfo &getTypeMetadataPtrTypeInfo();
+  const TypeInfo &getObjCClassPtrTypeInfo();
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
 

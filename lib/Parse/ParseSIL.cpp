@@ -993,6 +993,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
+    .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
     .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
     .Case("open_existential", ValueKind::OpenExistentialInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
@@ -1024,6 +1025,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
     .Case("take_enum_data_addr", ValueKind::TakeEnumDataAddrInst)
+    .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
@@ -1421,6 +1423,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RefToUnownedInst:
   case ValueKind::UnownedToRefInst:
   case ValueKind::ThinToThickFunctionInst:
+  case ValueKind::ThickToObjCMetatypeInst:
+  case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ArchetypeRefToSuperInst:
   case ValueKind::ConvertFunctionInst:
@@ -1473,6 +1477,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::ThinToThickFunctionInst:
       ResultVal = B.createThinToThickFunction(InstLoc, Val, Ty);
+      break;
+    case ValueKind::ThickToObjCMetatypeInst:
+      ResultVal = B.createThickToObjCMetatype(InstLoc, Val, Ty);
+      break;
+    case ValueKind::ObjCToThickMetatypeInst:
+      ResultVal = B.createObjCToThickMetatype(InstLoc, Val, Ty);
       break;
     case ValueKind::BridgeToBlockInst:
       ResultVal = B.createBridgeToBlock(InstLoc, Val, Ty);

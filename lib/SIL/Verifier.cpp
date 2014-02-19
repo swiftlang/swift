@@ -1282,6 +1282,36 @@ public:
             "operand and result of thin_to_think_function must agree in particulars");
   }
   
+  void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {
+    auto opTy = requireObjectType(MetatypeType, TTOCI->getOperand(),
+                                  "thick_to_objc_metatype operand");
+    auto resTy = requireObjectType(MetatypeType, TTOCI,
+                                   "thick_to_objc_metatype result");
+    
+    require(opTy->getRepresentation() == MetatypeRepresentation::Thick,
+            "operand of thick_to_objc_metatype must be thick");
+    require(resTy->getRepresentation() == MetatypeRepresentation::ObjC,
+            "operand of thick_to_objc_metatype must be ObjC");
+
+    require(opTy->getInstanceType()->isEqual(resTy->getInstanceType()),
+            "thick_to_objc_metatype instance types do not match");
+  }
+
+  void checkObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTI) {
+    auto opTy = requireObjectType(MetatypeType, OCTTI->getOperand(),
+                                  "objc_to_thick_metatype operand");
+    auto resTy = requireObjectType(MetatypeType, OCTTI,
+                                   "objc_to_thick_metatype result");
+    
+    require(opTy->getRepresentation() == MetatypeRepresentation::ObjC,
+            "operand of objc_to_thick_metatype must be ObjC");
+    require(resTy->getRepresentation() == MetatypeRepresentation::Thick,
+            "operand of objc_to_thick_metatype must be thick");
+
+    require(opTy->getInstanceType()->isEqual(resTy->getInstanceType()),
+            "objc_to_thick_metatype instance types do not match");
+  }
+
   void checkRefToUnownedInst(RefToUnownedInst *I) {
     requireReferenceValue(I->getOperand(), "Operand of ref_to_unowned");
     auto operandType = I->getOperand().getType().getSwiftRValueType();

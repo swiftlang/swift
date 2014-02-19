@@ -142,6 +142,20 @@ const TypeInfo *TypeConverter::convertBuiltinObjCPointer() {
                           IGM.getPointerAlignment());
 }
 
+const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
+  return Types.getObjCClassPtrTypeInfo();
+}
+
+const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+  if (ObjCClassPtrTI) return *ObjCClassPtrTI;
+  ObjCClassPtrTI = createPrimitive(IGM.ObjCClassPtrTy,
+                                   IGM.getPointerSize(),
+                                   IGM.getPointerAlignment());
+  ObjCClassPtrTI->NextConverted = FirstType;
+  FirstType = ObjCClassPtrTI;
+  return *ObjCClassPtrTI;
+}
+
 /// Get or create a global Objective-C method name.  Always returns an i8*.
 llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
   // Check whether this selector already exists.

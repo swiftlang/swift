@@ -1146,12 +1146,19 @@ const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
   assert(T->hasRepresentation() &&
          "metatype should have been assigned a representation by SIL");
   
-  // Thin metatypes are empty.
-  if (T->getRepresentation() == MetatypeRepresentation::Thin)
+  switch (T->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    // Thin metatypes are empty.
     return new EmptyTypeInfo(IGM.Int8Ty);
 
-  // Thick metatypes are represented with a metadata pointer.
-  return &getTypeMetadataPtrTypeInfo();
+  case MetatypeRepresentation::Thick:
+    // Thick metatypes are represented with a metadata pointer.
+    return &getTypeMetadataPtrTypeInfo();
+
+  case MetatypeRepresentation::ObjC:
+    // ObjC metatypes are represented with an objc_class pointer.
+    return &getObjCClassPtrTypeInfo();
+  }
 }
 
 /// createNominalType - Create a new nominal type.

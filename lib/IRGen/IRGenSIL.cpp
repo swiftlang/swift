@@ -675,6 +675,8 @@ public:
   void visitRefToUnownedInst(RefToUnownedInst *i);
   void visitUnownedToRefInst(UnownedToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
+  void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
+  void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
@@ -2543,6 +2545,31 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   to.add(from.claimNext());
   to.add(IGM.RefCountedNull);
   setLoweredExplosion(SILValue(i, 0), to);
+}
+
+void IRGenSILFunction::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i){
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *swiftMeta = from.claimNext();
+  CanType instanceType(i->getType().castTo<MetatypeType>()->getInstanceType());
+  Explosion to(ResilienceExpansion::Maximal);
+  to.add(emitClassHeapMetadataRefForMetatype(*this, swiftMeta, instanceType));
+  setLoweredExplosion(SILValue(i, 0), to);
+}
+
+void IRGenSILFunction::visitObjCToThickMetatypeInst(
+                         ObjCToThickMetatypeInst *i) {
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *classPtr = from.claimNext();
+
+  // Fetch the metadata for that class.
+  Explosion to(ResilienceExpansion::Maximal);
+  auto arg = Builder.CreateBitCast(classPtr, IGM.TypeMetadataPtrTy);
+  auto call = Builder.CreateCall(IGM.getGetObjCClassMetadataFn(), arg);
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
+  call->setCallingConv(IGM.RuntimeCC);
+  to.add(call);
+  setLoweredExplosion(SILValue(i, 0), to);  
 }
 
 void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {

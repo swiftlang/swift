@@ -792,6 +792,12 @@ public:
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"thin_to_thick_function");
   }
+  void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),"thick_to_objc_metatype");
+  }
+  void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),"objc_to_thick_metatype");
+  }
   void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "bridge_to_block");
   }

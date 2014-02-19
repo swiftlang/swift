@@ -303,6 +303,9 @@ static InlineCost instructionInlineCost(SILInstruction &I,
 
     case ValueKind::ThinToThickFunctionInst:
     case ValueKind::ConvertFunctionInst:
+
+    case ValueKind::ThickToObjCMetatypeInst:
+    case ValueKind::ObjCToThickMetatypeInst:
       return InlineCost::Free;
 
     case ValueKind::MetatypeInst:
