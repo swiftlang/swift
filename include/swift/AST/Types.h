@@ -1399,7 +1399,9 @@ enum class MetatypeRepresentation : char {
   ///
   /// Thick metatypes are used for class and existential metatypes,
   /// which permit dynamic behavior.
-  Thick
+  Thick,
+  /// An Objective-C metatype refers to an Objective-C class object.
+  ObjC
 };
 
 /// MetatypeType - This is the type given to a metatype value.  When a type is

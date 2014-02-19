@@ -1037,6 +1037,10 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
     case MetatypeRepresentation::Thick:
       // No conversion necessary.
       return meta;
+
+    case MetatypeRepresentation::ObjC:
+      // FIXME: Thick -> ObjC.
+      llvm_unreachable("Unhandled thick -> ObjC metatype conversion");
     }
 
   case MetatypeRepresentation::Thin:
@@ -1047,6 +1051,26 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
 
     case MetatypeRepresentation::Thick:
       llvm_unreachable("abstracting thick to thin metatype?!");
+
+    case MetatypeRepresentation::ObjC:
+      llvm_unreachable("abstracting ObjC to thin metatype?!");
+    }
+
+  case MetatypeRepresentation::ObjC:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin: {
+      // Thin -> thick conversion.
+      auto metaTy = gen.B.createMetatype(loc, substSILType);
+      return ManagedValue::forUnmanaged(metaTy);
+    }
+
+    case MetatypeRepresentation::Thick:
+      // FIXME: Thick -> ObjC.
+      llvm_unreachable("Unhandled ObjC -> thick metatype conversion");
+
+    case MetatypeRepresentation::ObjC:
+      // No conversion necessary.
+      return meta;
     }
   }
 }
@@ -1074,6 +1098,9 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
     case MetatypeRepresentation::Thick:
       // No conversion necessary.
       return meta;
+
+    case MetatypeRepresentation::ObjC:
+      llvm_unreachable("Cannot convert ObjC to thin metatype");
     }
 
   case MetatypeRepresentation::Thin:
@@ -1087,6 +1114,24 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
       auto metaTy = gen.B.createMetatype(loc, loweredTy);
       return ManagedValue::forUnmanaged(metaTy);
     }
+
+    case MetatypeRepresentation::ObjC:
+      // FIXME: Thin -> ObjC.
+      llvm_unreachable("Unhandled Thin -> ObjC");
+    }
+
+  case MetatypeRepresentation::ObjC:
+    switch (willBeRepr) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("Cannot convert ObjC to thin metatype");
+
+    case MetatypeRepresentation::Thick:
+      // FIXME: Objc -> Thick.
+      llvm_unreachable("Unhandled ObjC -> thick");
+
+    case MetatypeRepresentation::ObjC:
+      // No conversion necessary.
+      return meta;
     }
   }
 }

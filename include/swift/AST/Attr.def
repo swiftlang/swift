@@ -52,6 +52,7 @@ TYPE_ATTR(guaranteed)
 TYPE_ATTR(autoreleased)
 TYPE_ATTR(callee_owned)
 TYPE_ATTR(callee_guaranteed)
+TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 
 ATTR(assignment)

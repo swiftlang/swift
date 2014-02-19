@@ -2332,6 +2332,12 @@ Type ModuleFile::getType(TypeID TID) {
                                        ctx);
       break;
 
+    case serialization::MetatypeRepresentation::MR_ObjC:
+      typeOrOffset = MetatypeType::get(getType(instanceID), 
+                                       MetatypeRepresentation::ObjC,
+                                       ctx);
+      break;
+
     default:
       error();
       break;

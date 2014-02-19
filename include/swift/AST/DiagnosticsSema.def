@@ -809,10 +809,12 @@ ERROR(sil_function_repeat_convention,type_parsing,PointsToFirstBadToken,
       (unsigned))
 
 // SIL Metatypes
-ERROR(sil_metatype_without_thinness_attribute,type_parsing,none,
-      "metatypes in SIL must have @thin or @thick attribute", ())
-ERROR(sil_metatype_thin_and_thick,type_parsing,none,
-      "metatypes in SIL cannot be both @thin and @thick", ())
+ERROR(sil_metatype_without_repr,type_parsing,none,
+      "metatypes in SIL must have @thin, @thick, or @objc_metatype attribute",
+      ())
+ERROR(sil_metatype_multiple_reprs,type_parsing,none,
+      "metatypes in SIL can only be one of @thin, @thick, or @objc_metatype", 
+      ())
 
 //------------------------------------------------------------------------------
 // @objc

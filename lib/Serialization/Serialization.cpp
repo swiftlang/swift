@@ -1689,6 +1689,10 @@ void Serializer::writeType(Type ty) {
       case swift::MetatypeRepresentation::Thick:
         repr = serialization::MetatypeRepresentation::MR_Thick;
         break;
+
+      case swift::MetatypeRepresentation::ObjC:
+        repr = serialization::MetatypeRepresentation::MR_ObjC;
+        break;
       }
     }
 

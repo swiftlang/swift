@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 4;
+const uint16_t VERSION_MINOR = 5;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -119,7 +119,7 @@ using ResultConventionField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum MetatypeRepresentation : uint8_t {
-  MR_None, MR_Thin, MR_Thick
+  MR_None, MR_Thin, MR_Thick, MR_ObjC
 };
 using MetatypeRepresentationField = BCFixed<2>;
 

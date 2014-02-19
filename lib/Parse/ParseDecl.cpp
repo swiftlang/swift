@@ -354,7 +354,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   case TAK_autoreleased:
   case TAK_callee_owned:
   case TAK_callee_guaranteed:
-    if (!isInSILMode()) {   // SIL's 'local_storage' type attribute.
+  case TAK_objc_metatype:
+    if (!isInSILMode()) {
       diagnose(Loc, diag::only_allowed_in_sil, Text);
       Attributes.clearAttribute(attr);
     }

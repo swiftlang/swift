@@ -895,30 +895,43 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // based on the attributes we see.
   Type ty;
 
-  // In SIL *only*, allow @thin or @thick to apply to a metatype.
-  if (attrs.has(TAK_thin) || attrs.has(TAK_thick)) {
+  // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
+  // a metatype.
+  if (attrs.has(TAK_thin) || attrs.has(TAK_thick) || 
+      attrs.has(TAK_objc_metatype)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
-          MetatypeRepresentation storedRepr;
+          Optional<MetatypeRepresentation> storedRepr;
           auto instanceTy = resolveType(metatypeRepr->getBase(), options);
-          if (attrs.has(TAK_thin) && attrs.has(TAK_thick)) {
-            TC.diagnose(repr->getStartLoc(),
-                        diag::sil_metatype_thin_and_thick);
-            storedRepr = MetatypeRepresentation::Thick;
-            attrs.clearAttribute(TAK_thin);
-            attrs.clearAttribute(TAK_thick);
-          } else if (attrs.has(TAK_thin)) {
+
+          // Check for @thin.
+          if (attrs.has(TAK_thin)) {
             storedRepr = MetatypeRepresentation::Thin;
             attrs.clearAttribute(TAK_thin);
-          } else if (attrs.has(TAK_thick)) {
+          }
+
+          // Check for @thick.
+          if (attrs.has(TAK_thick)) {
+            if (storedRepr)
+              TC.diagnose(repr->getStartLoc(), 
+                          diag::sil_metatype_multiple_reprs);
+              
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
-          } else {
-            llvm_unreachable("neither thin nor thick");
           }
-          
-          ty = MetatypeType::get(instanceTy, storedRepr, Context);
+
+          // Check for @objc_metatype.
+          if (attrs.has(TAK_objc_metatype)) {
+            if (storedRepr)
+              TC.diagnose(repr->getStartLoc(), 
+                          diag::sil_metatype_multiple_reprs);
+              
+            storedRepr = MetatypeRepresentation::ObjC;
+            attrs.clearAttribute(TAK_objc_metatype);
+          }
+
+          ty = MetatypeType::get(instanceTy, *storedRepr, Context);
         }
       }
     }
@@ -1359,13 +1372,12 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   if (ty->is<ErrorType>())
     return ty;
   
-  // In SIL mode, a metatype must have a @thin or @!thin attribute, so metatypes
-  // should have been lowered in resolveAttributedType.
+  // In SIL mode, a metatype must have a @thin, @thick, or
+  // @objc_metatype attribute, so metatypes should have been lowered
+  // in resolveAttributedType.
   if (options & TR_SILType) {
-    TC.diagnose(repr->getStartLoc(),
-                diag::sil_metatype_without_thinness_attribute);
-    return MetatypeType::get(ty, MetatypeRepresentation::Thick,
-                            Context);
+    TC.diagnose(repr->getStartLoc(), diag::sil_metatype_without_repr);
+    return MetatypeType::get(ty, MetatypeRepresentation::Thick, Context);
   }
   
   return MetatypeType::get(ty, Context);

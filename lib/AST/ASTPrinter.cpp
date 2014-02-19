@@ -1401,6 +1401,7 @@ public:
       switch (T->getRepresentation()) {
       case MetatypeRepresentation::Thin:  Printer << "@thin ";  break;
       case MetatypeRepresentation::Thick: Printer << "@thick "; break;
+      case MetatypeRepresentation::ObjC: Printer << "@objc_metatype "; break;
       }
     }
     printWithParensIfNotSimple(T->getInstanceType());
