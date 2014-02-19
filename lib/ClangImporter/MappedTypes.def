@@ -15,7 +15,7 @@
 //
 // MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,
 //          SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES,
-//          CAN_BE_MISSING, CREATE_TYPEALIAS)
+//          CAN_BE_MISSING, C_NAME_MAPPING)
 //  - C_TYPE_NAME is the name of the C type.
 //  - C_TYPE_KIND is the expected kind of the C type (see MappedCTypeKind
 //    enum).
@@ -27,68 +27,78 @@
 //    is applicable (see MappedLanguages enum).
 //  - CAN_BE_MISSING is true if it is OK for swift type to be missing in the
 //    stdlib.
-//  - CREATE_TYPEALIAS specifies if we should create a typealias in the
-//    imported Clang module.
+//  - C_NAME_MAPPING specifies if we should create a typealias in the
+//    imported Clang module (see MappedTypeNameKind enum).
 //
 //===----------------------------------------------------------------------===//
 
 #define MAP_STDLIB_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,  \
-                        SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING) \
+                        SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING, \
+                        C_NAME_MAPPING)                             \
     MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,             \
              "Swift", SWIFT_TYPE_NAME, LANGUAGES, CAN_BE_MISSING,   \
-             false)
+             C_NAME_MAPPING)
 
 // MacTypes.h defines typedefs UIntXX, SIntXX, FloatXX.
-MAP_STDLIB_TYPE("UInt8",  UnsignedInt, 8,  "UInt8",  All, false)
-MAP_STDLIB_TYPE("UInt16", UnsignedInt, 16, "UInt16", All, false)
-MAP_STDLIB_TYPE("UInt32", UnsignedInt, 32, "UInt32", All, false)
-MAP_STDLIB_TYPE("UInt64", UnsignedInt, 64, "UInt64", All, false)
+MAP_STDLIB_TYPE("UInt8",  UnsignedInt, 8,  "UInt8",  All, false, DoNothing)
+MAP_STDLIB_TYPE("UInt16", UnsignedInt, 16, "UInt16", All, false, DoNothing)
+MAP_STDLIB_TYPE("UInt32", UnsignedInt, 32, "UInt32", All, false, DoNothing)
+MAP_STDLIB_TYPE("UInt64", UnsignedInt, 64, "UInt64", All, false, DoNothing)
 
-MAP_STDLIB_TYPE("SInt8",  SignedInt, 8,  "Int8",  All, false)
-MAP_STDLIB_TYPE("SInt16", SignedInt, 16, "Int16", All, false)
-MAP_STDLIB_TYPE("SInt32", SignedInt, 32, "Int32", All, false)
-MAP_STDLIB_TYPE("SInt64", SignedInt, 64, "Int64", All, false)
+MAP_STDLIB_TYPE("SInt8",  SignedInt, 8,  "Int8",  All, false, DoNothing)
+MAP_STDLIB_TYPE("SInt16", SignedInt, 16, "Int16", All, false, DoNothing)
+MAP_STDLIB_TYPE("SInt32", SignedInt, 32, "Int32", All, false, DoNothing)
+MAP_STDLIB_TYPE("SInt64", SignedInt, 64, "Int64", All, false, DoNothing)
 
-MAP_STDLIB_TYPE("Float32", FloatIEEEsingle,        32, "Float32", All, false)
-MAP_STDLIB_TYPE("Float64", FloatIEEEdouble,        64, "Float64", All, false)
-MAP_STDLIB_TYPE("Float80", FloatX87DoubleExtended, 80, "Float80", All, true)
+MAP_STDLIB_TYPE("Float32", FloatIEEEsingle,        32, "Float32", All, false,
+                DoNothing)
+MAP_STDLIB_TYPE("Float64", FloatIEEEdouble,        64, "Float64", All, false,
+                DoNothing)
+MAP_STDLIB_TYPE("Float80", FloatX87DoubleExtended, 80, "Float80", All, true,
+                DoNothing)
 
 // stdint.h types.
-MAP_STDLIB_TYPE("uint8_t",  UnsignedInt, 8,  "UInt8",  All, false)
-MAP_STDLIB_TYPE("uint16_t", UnsignedInt, 16, "UInt16", All, false)
-MAP_STDLIB_TYPE("uint32_t", UnsignedInt, 32, "UInt32", All, false)
-MAP_STDLIB_TYPE("uint64_t", UnsignedInt, 64, "UInt64", All, false)
+MAP_STDLIB_TYPE("uint8_t",  UnsignedInt, 8,  "UInt8",  All, false, DoNothing)
+MAP_STDLIB_TYPE("uint16_t", UnsignedInt, 16, "UInt16", All, false, DoNothing)
+MAP_STDLIB_TYPE("uint32_t", UnsignedInt, 32, "UInt32", All, false, DoNothing)
+MAP_STDLIB_TYPE("uint64_t", UnsignedInt, 64, "UInt64", All, false, DoNothing)
 
-MAP_STDLIB_TYPE("int8_t",  SignedInt, 8,  "Int8",  All, false)
-MAP_STDLIB_TYPE("int16_t", SignedInt, 16, "Int16", All, false)
-MAP_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false)
-MAP_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false)
+MAP_STDLIB_TYPE("int8_t",  SignedInt, 8,  "Int8",  All, false, DoNothing)
+MAP_STDLIB_TYPE("int16_t", SignedInt, 16, "Int16", All, false, DoNothing)
+MAP_STDLIB_TYPE("int32_t", SignedInt, 32, "Int32", All, false, DoNothing)
+MAP_STDLIB_TYPE("int64_t", SignedInt, 64, "Int64", All, false, DoNothing)
 
-MAP_STDLIB_TYPE("intptr_t",  SignedWord,   0, "Int",  All, false)
-MAP_STDLIB_TYPE("uintptr_t", UnsignedWord, 0, "UInt", All, false)
+MAP_STDLIB_TYPE("intptr_t",  SignedWord,   0, "Int",  All, false, DefineOnly)
+MAP_STDLIB_TYPE("uintptr_t", UnsignedWord, 0, "UInt", All, false, DefineOnly)
 
 // stddef.h types.
-MAP_STDLIB_TYPE("ptrdiff_t", SignedWord,   0, "Int",  All, false)
-MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "UInt", All, false)
+MAP_STDLIB_TYPE("ptrdiff_t", SignedWord,   0, "Int",  All, false, DefineOnly)
+MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "UInt", All, false, DefineOnly)
 
 // POSIX sys/types.h.
-MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false)
+MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false, DefineOnly)
 
 // stdarg.h types.
 // FIXME: why does this not catch va_list on x86_64?
-MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false)
+MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false, DoNothing)
 
 // Objective-C types.
-MAP_TYPE("BOOL",  ObjCBool,  8, "ObjectiveC", "ObjCBool",  ObjC1, false, false)
-MAP_TYPE("SEL",   ObjCSel,   0, "ObjectiveC", "Selector",  ObjC1, false, false)
-MAP_STDLIB_TYPE("id",         ObjCId,       0, "AnyObject", ObjC1, false)
-MAP_STDLIB_TYPE("Class",      ObjCClass,    0, "AnyClass",  ObjC1, false)
-MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int",       ObjC1, false)
-MAP_STDLIB_TYPE("NSInteger",  SignedWord,   0, "Int",       ObjC1, false)
+MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", ObjC1, false,
+         DoNothing)
+MAP_TYPE("SEL",  ObjCSel,  0, "ObjectiveC", "Selector", ObjC1, false,
+         DoNothing)
+MAP_STDLIB_TYPE("id",    ObjCId,    0, "AnyObject", ObjC1, false, DoNothing)
+MAP_STDLIB_TYPE("Class", ObjCClass, 0, "AnyClass",  ObjC1, false, DoNothing)
+MAP_STDLIB_TYPE("NSInteger", SignedWord, 0, "Int",  ObjC1, false, DefineOnly)
+
+// Treat NSUInteger specially: exposing it as a typealias for "Int" would be
+// confusing.
+MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", ObjC1, false, DoNothing)
+
 
 // CoreFoundation types.
 // Note that we're preserving the typealias for CFIndex.
-MAP_TYPE("CFIndex", SignedWord, 0, "Swift", "Int", All, false, true)
+MAP_TYPE("CFIndex", SignedWord, 0, "Swift", "Int", All, false, DefineAndUse)
 
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE

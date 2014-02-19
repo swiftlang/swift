@@ -303,9 +303,19 @@ namespace {
       // type. If we're asked to import a normal type, or if the typedef is
       // one of the special set of typedefs for which we provide a special
       // mapping, just return the type of the imported declaration.
-      if (kind == ImportTypeKind::Normal ||
-          Impl.isSpecialTypedefName(type->getDecl()))
-        return decl? decl->getDeclaredType() : nullptr;
+      if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
+        if (!decl)
+          return nullptr;
+        switch (specialKind.getValue()) {
+        case MappedTypeNameKind::DoNothing:
+        case MappedTypeNameKind::DefineAndUse:
+          return decl->getDeclaredType();
+        case MappedTypeNameKind::DefineOnly:
+          return cast<TypeAliasDecl>(decl)->getUnderlyingType();
+        }
+      }
+      if (kind == ImportTypeKind::Normal)
+        return decl ? decl->getDeclaredType() : nullptr;
 
       // For non-normal type imports 
 

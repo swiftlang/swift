@@ -115,6 +115,14 @@ enum class MappedCTypeKind {
   ObjCClass,
 };
 
+/// \brief Describes what to do with the C name of a type that can be mapped to
+/// a Swift standard library type.
+enum class MappedTypeNameKind {
+  DoNothing,
+  DefineOnly,
+  DefineAndUse
+};
+
 /// \brief Bitmask constants for language dialects where a certain C to Swift
 /// type mapping applies.
 enum class MappedLanguages {
@@ -198,7 +206,8 @@ public:
   /// when this is not the case, e.g., Objective-C's "BOOL" has an underlying
   /// type of "signed char", but is mapped to a special Swift struct type
   /// ObjCBool.
-  llvm::SmallPtrSet<const clang::TypedefNameDecl *, 8> SpecialTypedefNames;
+  llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
+    SpecialTypedefNames;
 
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
@@ -551,8 +560,12 @@ public:
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
   /// based on the name of the typedef.
-  bool isSpecialTypedefName(clang::TypedefNameDecl *decl) {
-    return SpecialTypedefNames.count(decl) > 0;
+  Optional<MappedTypeNameKind>
+  getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
+    auto iter = SpecialTypedefNames.find(decl);
+    if (iter == SpecialTypedefNames.end())
+      return {};
+    return iter->second;
   }
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,

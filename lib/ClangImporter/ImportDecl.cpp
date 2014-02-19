@@ -98,6 +98,12 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
   return P;
 }
 
+template <size_t A, size_t B>
+static bool verifyNameMapping(MappedTypeNameKind NameMappping,
+                              const char (&left)[A], const char (&right)[B]) {
+  return NameMappping == MappedTypeNameKind::DoNothing ||
+         strcmp(left, right) != 0;
+}
 
 /// \brief Map a well-known C type to a swift type from the standard library.
 ///
@@ -112,7 +118,7 @@ static std::pair<Type, StringRef>
 getSwiftStdlibType(const clang::TypedefNameDecl *D,
                    Identifier Name,
                    ClangImporter::Implementation &Impl,
-                   bool *IsError, bool *ShouldCreateTypealias) {
+                   bool *IsError, MappedTypeNameKind &NameMapping) {
   *IsError = false;
 
   MappedCTypeKind CTypeKind;
@@ -126,7 +132,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
   do {
 #define MAP_TYPE(C_TYPE_NAME, C_TYPE_KIND, C_TYPE_BITWIDTH,     \
                  SWIFT_MODULE_NAME, SWIFT_TYPE_NAME, LANGUAGES, \
-                 CAN_BE_MISSING, CREATE_TYPEALIAS)              \
+                 CAN_BE_MISSING, C_NAME_MAPPING)                \
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
@@ -139,7 +145,10 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
       SwiftTypeName = SWIFT_TYPE_NAME;                             \
       Languages = MappedLanguages::LANGUAGES;                      \
       CanBeMissing = CAN_BE_MISSING;                               \
-      *ShouldCreateTypealias = CREATE_TYPEALIAS;                   \
+      NameMapping = MappedTypeNameKind::C_NAME_MAPPING;            \
+      assert(verifyNameMapping(MappedTypeNameKind::C_NAME_MAPPING, \
+                               C_TYPE_NAME, SWIFT_TYPE_NAME) &&    \
+             "MappedTypes.def: Identical names must use DoNothing"); \
       break;                                                       \
     }
 #include "MappedTypes.def"
@@ -671,22 +680,22 @@ namespace {
       if (Decl->getDeclContext()->getRedeclContext()->isTranslationUnit()) {
         bool IsError;
         StringRef StdlibTypeName;
-        bool ShouldCreateTypealias;
+        MappedTypeNameKind NameMapping;
         std::tie(SwiftType, StdlibTypeName) =
-            getSwiftStdlibType(Decl, Name, Impl, &IsError,
-                               &ShouldCreateTypealias);
+            getSwiftStdlibType(Decl, Name, Impl, &IsError, NameMapping);
 
         if (IsError)
           return nullptr;
 
         if (SwiftType) {
           // Note that this typedef-name is special.
-          Impl.SpecialTypedefNames.insert(Decl);
+          Impl.SpecialTypedefNames[Decl] = NameMapping;
 
-          if (!ShouldCreateTypealias || Name.str() == StdlibTypeName) {
+          if (NameMapping == MappedTypeNameKind::DoNothing) {
             // Don't create an extra typealias in the imported module because
-            // doing so will cause ambiguity between the name in the imported
-            // module and the same name in the 'swift' module.
+            // doing so will cause confusion (or even lookup ambiguity) between
+            // the name in the imported module and the same name in the
+            // standard library.
             if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
