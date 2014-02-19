@@ -425,7 +425,7 @@ FUNCTION(ObjCTypeof, swift_objcTypeof, RuntimeCC,
 // This is readonly instead of readnone because isa-rewriting can have
 // a noticeable effect.
 FUNCTION(GetObjectClass, object_getClass, C_CC,
-         RETURNS(TypeMetadataPtrTy),
+         RETURNS(ObjCClassPtrTy),
          ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
@@ -533,11 +533,11 @@ FUNCTION(ObjCSelRegisterName, sel_registerName, C_CC,
          RETURNS(ObjCSELTy), ARGS(Int8PtrTy), ATTRS(NoUnwind, ReadNone))
 FUNCTION(ClassReplaceMethod, class_replaceMethod, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ARGS(ObjCClassPtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 FUNCTION(ClassAddProtocol, class_addProtocol, C_CC,
          RETURNS(VoidTy),
-         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ARGS(ObjCClassPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 #undef RETURNS

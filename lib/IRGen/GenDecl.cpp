@@ -113,12 +113,12 @@ public:
     assert(classMetadata &&
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
-                                                   IGF.IGM.TypeMetadataPtrTy);
+                                                   IGF.IGM.ObjCClassPtrTy);
     metaclassMetadata = IGF.IGM.getAddrOfMetaclassObject(
                                        origTy->getClassOrBoundGenericClass(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
-                                                   IGF.IGM.TypeMetadataPtrTy);
+                                                   IGF.IGM.ObjCClassPtrTy);
 
     // Register ObjC protocol conformances.
     for (auto *p : ext->getProtocols()) {

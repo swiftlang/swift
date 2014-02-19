@@ -2464,7 +2464,7 @@ static bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
 }
 
 /// Given an object of class type, produce the heap metadata reference
-/// as a %type*.
+/// as an %objc_class*.
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
