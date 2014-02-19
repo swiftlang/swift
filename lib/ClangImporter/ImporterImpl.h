@@ -71,22 +71,31 @@ enum class ConstantConvertKind {
 
 /// \brief Describes the kind of type import we're performing.
 enum class ImportTypeKind {
-  /// \brief A "normal' type import, with no special rules.
+  /// \brief A "normal" type import, with no special rules.
   Normal,
+
   /// \brief Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
   /// enables the conversion of bridged types.
   Result,
+
   /// \brief Import the type of a function parameter.
   ///
   /// This provides special treatment for C++ references (which become
   /// [inout] parameters), among other things, and enables the conversion of
   /// bridged types.
   Parameter,
-  /// \brief Import the type of an ObjC property. This enables the conversion
-  /// of bridged types.
-  Property
+
+  /// \brief Import the type of an ObjC property.
+  ///
+  /// This enables the conversion of bridged types.
+  Property,
+
+  /// \brief Import the underlying type of an enum.
+  ///
+  /// This provides special treatment for 'NSUInteger'.
+  Enum
 };
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib

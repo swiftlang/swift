@@ -950,7 +950,7 @@ namespace {
 
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Normal);
+                                              ImportTypeKind::Enum);
         if (!underlyingType)
           return nullptr;
 
@@ -989,7 +989,7 @@ namespace {
       case EnumKind::Enum: {
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Normal);
+                                              ImportTypeKind::Enum);
         if (!underlyingType)
           return nullptr;
         
@@ -1017,7 +1017,7 @@ namespace {
       case EnumKind::Options: {
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
-                                              ImportTypeKind::Normal);
+                                              ImportTypeKind::Enum);
         if (!underlyingType)
           return nullptr;
 

@@ -287,9 +287,14 @@ namespace {
     Type VisitTypedefType(const clang::TypedefType *type) {
       // When BOOL is the type of a function parameter or a function
       // result type, map it to swift's Bool.
-      if (canBridgeTypes() && type->getDecl()->getName() == "BOOL") {
+      if (canBridgeTypes() && type->getDecl()->getName() == "BOOL")
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Bool");
-      }
+
+      // When NSUInteger is used as an enum's underlying type, make sure it
+      // stays unsigned.
+      if (kind == ImportTypeKind::Enum &&
+          type->getDecl()->getName() == "NSUInteger")
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "UInt");
       
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
