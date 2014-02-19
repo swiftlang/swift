@@ -238,8 +238,8 @@ public:
   /// Clients should generally use the getMutating() accessor.
   bool MutatingInverted = false;
 
-  /// Source range of the attached comment.  The comment could be located
-  /// before or after the declaration).
+  /// Source range of the attached comment.  This comment is located before
+  /// the declaration.
   CharSourceRange CommentRange;
 
   DeclAttributes() : NumAttrsSet(0), NumVirtualAttrsSet(0) {}

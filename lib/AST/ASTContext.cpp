@@ -26,6 +26,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/Allocator.h"
@@ -106,6 +107,9 @@ struct ASTContext::Implementation {
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
   llvm::DenseMap<const Decl *, ClangNode> ClangNodes;
+
+  /// \brief Map from Swift declarations to raw comments.
+  llvm::DenseMap<const Decl *, RawComment> RawComments;
 
   /// \brief Map from local declarations to their discriminators.
   /// Missing entries implicitly have value 0.
@@ -834,6 +838,18 @@ ClangNode ASTContext::getClangNode(const Decl *decl) {
 
 void ASTContext::setClangNode(const Decl *decl, ClangNode node) {
   Impl.ClangNodes[decl] = node;
+}
+
+Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+  auto Known = Impl.RawComments.find(D);
+  if (Known == Impl.RawComments.end())
+    return Nothing;
+
+  return Known->second;
+}
+
+void ASTContext::setRawComment(const Decl *D, RawComment RC) {
+  Impl.RawComments[D] = RC;
 }
 
 unsigned ValueDecl::getLocalDiscriminator() const {

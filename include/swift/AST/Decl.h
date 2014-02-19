@@ -67,6 +67,7 @@ namespace swift {
   struct PrintOptions;
   class ProtocolDecl;
   class ProtocolType;
+  struct RawComment;
   enum class Resilience : unsigned char;
   class TypeAliasDecl;
   class Stmt;
@@ -462,6 +463,9 @@ public:
 
   /// \brief Mark this declaration as implicit.
   void setImplicit() { DeclBits.Implicit = true; }
+
+  /// \returns the unparsed comment attached to this declaration.
+  RawComment getRawComment() const;
 
   /// \brief Returns true if there is a Clang AST node associated
   /// with self.

@@ -138,6 +138,12 @@ public:
     return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin()));
   }
 
+  unsigned getLength() const { return Text.size(); }
+
+  CharSourceRange getRange() const {
+    return CharSourceRange(getLoc(), getLength());
+  }
+
   bool hasComment() const {
     return CommentLength != 0;
   }
@@ -150,9 +156,7 @@ public:
 
   StringRef getText() const { return Text; }
   void setText(StringRef T) { Text = T; }
-  
-  unsigned getLength() const { return Text.size(); }
-  
+
   /// \brief Set the token to the specified kind and source range.
   void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;

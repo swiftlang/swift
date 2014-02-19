@@ -128,6 +128,11 @@ public:
     return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
   }
 
+  unsigned getLineNumber(SourceLoc Loc, int BufferID = -1) const {
+    assert(Loc.isValid());
+    return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
+  }
+
   StringRef extractText(CharSourceRange Range) const;
 };
 

@@ -23,6 +23,7 @@ add_swift_library(swiftAST
   Pattern.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
+  RawComment.cpp
   Stmt.cpp
   Type.cpp
   TypeRepr.cpp
