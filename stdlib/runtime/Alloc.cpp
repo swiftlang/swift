@@ -18,6 +18,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/MathExtras.h"
 #include "Private.h"
+#include <malloc/malloc.h>
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -35,17 +36,9 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask) {
-  HeapObject *object;
-
-  for (;;) {
-    object = reinterpret_cast<HeapObject *>(
-      malloc(llvm::RoundUpToAlignment(requiredSize,
-                                      requiredAlignmentMask + 1)));
-    if (object) {
-      break;
-    }
-    abort(); // FIXME -- switch to a wait queue iff concurrent
-  }
+  auto size = llvm::RoundUpToAlignment(requiredSize, requiredAlignmentMask + 1);
+  auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size,
+                                                               SWIFT_RAWALLOC));
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
   object->weakRefCount = WRC_INTERVAL;
@@ -307,7 +300,7 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
 
 __attribute__((noinline,used))
 static void *
-_swift_slowAlloc_fixup(AllocIndex idx, uintptr_t flags)
+_swift_alloc_slow(AllocIndex idx, uintptr_t flags)
 {
   size_t sz;
 
@@ -334,12 +327,21 @@ _swift_slowAlloc_fixup(AllocIndex idx, uintptr_t flags)
     __builtin_trap();
   }
 
-  return swift_slowAlloc(sz, flags);
+  void *r;
+  do {
+    if (flags & SWIFT_RAWALLOC) {
+      r = malloc(sz);
+    } else {
+      r = calloc(1, sz);
+    }
+  } while (!r && !(flags & SWIFT_TRYALLOC));
+
+  return r;
 }
 
 extern "C" LLVM_LIBRARY_VISIBILITY
 void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
-  void *tmp = _swift_slowAlloc_fixup(idx, flags);
+  void *tmp = _swift_alloc_slow(idx, flags);
   if (!tmp) {
     return;
   }
@@ -350,14 +352,33 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   }
 }
 
-void *swift::swift_slowAlloc(size_t bytes, uintptr_t flags) {
-  void *r;
+void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
+  if (size == 0) return _swift_alloc_slow(0, flags);
+  --size;
+  // we could do a table based lookup if we think it worthwhile
+#ifdef __LP64__
+  if      (size <   0x80) return _swift_alloc_slow((size >> 3) +  0x0, flags);
+  else if (size <  0x100) return _swift_alloc_slow((size >> 4) +  0x8, flags);
+  else if (size <  0x200) return _swift_alloc_slow((size >> 5) + 0x10, flags);
+  else if (size <  0x400) return _swift_alloc_slow((size >> 6) + 0x18, flags);
+  else if (size <  0x800) return _swift_alloc_slow((size >> 7) + 0x20, flags);
+  else if (size < 0x1000) return _swift_alloc_slow((size >> 8) + 0x28, flags);
+#else
+  if      (size <   0x40) return _swift_alloc_slow((size >> 2) +  0x0, flags);
+  else if (size <   0x80) return _swift_alloc_slow((size >> 3) +  0x8, flags);
+  else if (size <  0x100) return _swift_alloc_slow((size >> 4) + 0x10, flags);
+  else if (size <  0x200) return _swift_alloc_slow((size >> 5) + 0x18, flags);
+  else if (size <  0x400) return _swift_alloc_slow((size >> 6) + 0x20, flags);
+  else if (size <  0x800) return _swift_alloc_slow((size >> 7) + 0x28, flags);
+  else if (size < 0x1000) return _swift_alloc_slow((size >> 8) + 0x30, flags);
+#endif
 
+  void *r;
   do {
     if (flags & SWIFT_RAWALLOC) {
-      r = malloc(bytes);
+      r = malloc(size);
     } else {
-      r = calloc(1, bytes);
+      r = calloc(1, size);
     }
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
@@ -406,7 +427,7 @@ void *swift::swift_alloc(AllocIndex idx) {
     setAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_slowAlloc_fixup(idx, 0);
+  return _swift_alloc_slow(idx, 0);
 }
 
 void *swift::swift_rawAlloc(AllocIndex idx) {
@@ -415,7 +436,7 @@ void *swift::swift_rawAlloc(AllocIndex idx) {
     setRawAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_slowAlloc_fixup(idx, SWIFT_RAWALLOC);
+  return _swift_alloc_slow(idx, SWIFT_RAWALLOC);
 }
 
 void *swift::swift_tryAlloc(AllocIndex idx) {
@@ -424,7 +445,7 @@ void *swift::swift_tryAlloc(AllocIndex idx) {
     setAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC);
+  return _swift_alloc_slow(idx, SWIFT_TRYALLOC);
 }
 
 void *swift::swift_tryRawAlloc(AllocIndex idx) {
@@ -433,7 +454,7 @@ void *swift::swift_tryRawAlloc(AllocIndex idx) {
     setRawAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_slowAlloc_fixup(idx, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
+  return _swift_alloc_slow(idx, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
 }
 
 void swift::swift_dealloc(void *ptr, AllocIndex idx) {
@@ -460,21 +481,13 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
 #endif
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
-  // FIXME: swift_slowAlloc never uses the allocation cache yet.
-  return free(ptr);
-  
-#if 0
-  AllocIndex idx;
-
   if (bytes == 0) {
-    // the caller either doesn't know the size
-    // or the caller really does think the size is zero
-    // in any case, punt!
-    return free(ptr);
+    bytes = malloc_size(ptr);
   }
 
   bytes--;
 
+  AllocIndex idx;
 #ifdef __LP64__
   if        (bytes < 0x80)   { idx = (bytes >> 3);
   } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
@@ -495,15 +508,9 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   }
 
   swift_dealloc(ptr, idx);
-#endif
 }
 
 void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
-  // FIXME: swift_slowAlloc never uses the allocation cache yet.
-  return free(ptr);
-  
-#if 0
-  
   AllocIndex idx;
 
   if (bytes == 0) {
@@ -535,7 +542,6 @@ void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   }
 
   swift_rawDealloc(ptr, idx);
-#endif
 }
 
 /// This is a function that is opaque to the optimizer.  It is called to ensure
