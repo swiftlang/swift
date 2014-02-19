@@ -88,7 +88,7 @@ MAP_STDLIB_TYPE("NSInteger",  SignedWord,   0, "Int",       ObjC1, false)
 
 // CoreFoundation types.
 // Note that we're preserving the typealias for CFIndex.
-MAP_TYPE("CFIndex", SignedWord, 0, "Swift", "Int", All, false, false)
+MAP_TYPE("CFIndex", SignedWord, 0, "Swift", "Int", All, false, true)
 
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE
