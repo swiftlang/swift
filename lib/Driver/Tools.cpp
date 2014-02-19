@@ -466,6 +466,8 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     Arguments.push_back("10.8.0");
   }
 
+  Arguments.push_back("-no_objc_category_merging");
+
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
