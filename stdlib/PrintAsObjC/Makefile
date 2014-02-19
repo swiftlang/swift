@@ -1,4 +1,4 @@
-##===- stdlib/swift2objc/Makefile --------------------------*- Makefile -*-===##
+##===- stdlib/PrintAsObjC/Makefile -------------------------*- Makefile -*-===##
 #
 # This source file is part of the Swift.org open source project
 #

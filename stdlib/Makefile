@@ -14,6 +14,6 @@ SWIFT_LEVEL := ..
 include $(SWIFT_LEVEL)/../../Makefile.config
 
 DIRS := runtime core objc
-PARALLEL_DIRS := swift2objc
+PARALLEL_DIRS := PrintAsObjC
 
 include $(SWIFT_LEVEL)/Makefile
