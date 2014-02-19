@@ -366,6 +366,7 @@ private:
       MAP(Float64, "double");
 
       MAP(Int, "NSInteger");
+      MAP(UInt, "NSUInteger");
       MAP(Bool, "BOOL");
       MAP(String, "NSString *");
       MAP(COpaquePointer, "void *");
