@@ -117,12 +117,16 @@ int main(int argc, char *argv[]) {
   }
 
   int maxc;
+  char *out_name;
   if (!strcmp(argv[1], "small")) {
     maxc = 100;
+    out_name = "small.png";
   } else if (!strcmp(argv[1], "normal")) {
     maxc = 1000;
+    out_name = "normal.png";
   } else if (!strcmp(argv[1], "large")) {
     maxc = 10000;
+    out_name = "large.png";
   } else {
     fprintf(stderr, "Invalid Argument!\n%s {small, normal, large}!\n", argv[0]);
     exit(-1);
@@ -145,7 +149,7 @@ int main(int argc, char *argv[]) {
   drawJulia(context, Rect, maxc);
 
   CGImageRef image = CGBitmapContextCreateImage(context);
-  NSURL *URL = [[NSURL fileURLWithPath:@"out.png"] absoluteURL];  
+  NSURL *URL = [[NSURL fileURLWithPath:[NSString stringWithCString:out_name encoding:NSASCIIStringEncoding]] absoluteURL];  
   NSLog(@"%@", URL);
   assert(image);
   assert(URL);
