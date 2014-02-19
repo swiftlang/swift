@@ -43,6 +43,7 @@ PROTOCOL(LogicValue)
 PROTOCOL(DynamicLookup)
 PROTOCOL(RawRepresentable)
 PROTOCOL(RawOptionSet)
+PROTOCOL(Equatable)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)

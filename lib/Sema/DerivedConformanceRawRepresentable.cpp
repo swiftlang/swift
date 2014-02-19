@@ -203,6 +203,20 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   auto rawInterfaceType = enumDecl->getRawType();
   auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
                                                       rawInterfaceType);
+
+  // Make sure that the raw type is Equatable. We need it to ensure that we have
+  // a suitable ~= for the switch.
+  auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
+                                       KnownProtocolKind::Equatable);
+  if (!equatableProto)
+    return nullptr;
+
+  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl)) {
+    SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
+    tc.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
+    return nullptr;
+  }
+
   Type enumType = enumDecl->getDeclaredTypeInContext();
   Type enumMetaType = MetatypeType::get(enumType, tc.Context);
 
