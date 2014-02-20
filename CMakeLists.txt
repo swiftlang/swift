@@ -335,7 +335,7 @@ function(compile_swift_files)
     list(APPEND swift_flags "-module-cache-path" "${SWIFT_MODULE_CACHE_PATH}")
   endif()
 
-  list(APPEND swift_flags "${SWIFT_EXTRA_FLAGS}")
+  list(APPEND swift_flags ${SWIFT_EXTRA_FLAGS})
 
   # FIXME: Cleaner way to do this?
 
