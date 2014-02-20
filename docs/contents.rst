@@ -20,6 +20,5 @@ Contents
    SIL
    TypeChecker
    DriverInternals
-   StyleGuide
 
 
