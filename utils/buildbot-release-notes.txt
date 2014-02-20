@@ -157,7 +157,7 @@
 
      class MyAwesomeView : UIView {
       var enabled : Bool = false {       // Initial value.
-      didSet: self.setNeedsDisplay(true)
+      didSet: self.needsDisplay = true
       }
       ...
     }
@@ -210,7 +210,7 @@
 
     func doSomethingOnViews(views: NSArray) {
       for view in views {
-          view.setNeedsDisplay() // no '!' needed
+          view.updateLayer() // no '!' needed
       }
     }
 
@@ -250,7 +250,7 @@
         return _enabled
       set: 
         _enabled = value
-        self.setNeedsDisplay(true)
+        self.needDisplay = true
       }
       ...
     }
@@ -259,7 +259,7 @@
 
     class MyAwesomeView : UIView {
       var enabled : Bool {  // Has storage & observing methods
-      didSet: self.setNeedsDisplay(true)
+      didSet: self.needDisplay = true
       }
       ...
     }
