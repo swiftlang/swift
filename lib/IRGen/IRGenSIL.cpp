@@ -106,30 +106,6 @@ public:
   }
 };
   
-/// Represents a metatype value. May be produced as a Swift metatype,
-/// Objective-C Class, or both, based on use.
-class MetatypeValue {
-  /// The Swift metatype, or null if the value is not used as a swift metatype.
-  llvm::Value *swiftMetatype;
-  /// The Objective-C Class, or null if the value is not used as an ObjC class.
-  llvm::Value *objcClass;
-
-public:
-  MetatypeValue(llvm::Value *swiftMetatype, llvm::Value *objcClass)
-    : swiftMetatype(swiftMetatype), objcClass(objcClass)
-  {}
-  
-  llvm::Value *getSwiftMetatype() const {
-    assert(swiftMetatype && "not used as swift metatype?!");
-    return swiftMetatype;
-  }
-  
-  llvm::Value *getObjCClass() const {
-    assert(objcClass && "not used as objc class?!");
-    return objcClass;
-  }
-};
-
 /// Represents a builtin function.
 class BuiltinValue {
   Identifier Id;
@@ -162,9 +138,6 @@ public:
       /// a form of objc_msgSend.
       ObjCMethod,
     
-      /// A value that represents a metatype.
-      MetatypeValue,
-    
       /// A builtin function.
       BuiltinValue,
     Value_Last = BuiltinValue
@@ -183,7 +156,6 @@ private:
     } explosion;
     StaticFunction staticFunction;
     ObjCMethod objcMethod;
-    MetatypeValue metatypeValue;
     BuiltinValue builtinValue;
   };
 
@@ -198,10 +170,6 @@ public:
 
   LoweredValue(ObjCMethod &&objcMethod)
     : kind(Kind::ObjCMethod), objcMethod(std::move(objcMethod))
-  {}
-  
-  LoweredValue(MetatypeValue &&metatypeValue)
-    : kind(Kind::MetatypeValue), metatypeValue(std::move(metatypeValue))
   {}
   
   LoweredValue(BuiltinValue &&builtinValue)
@@ -231,9 +199,6 @@ public:
       break;
     case Kind::ObjCMethod:
       ::new (&objcMethod) ObjCMethod(std::move(lv.objcMethod));
-      break;
-    case Kind::MetatypeValue:
-      ::new (&metatypeValue) MetatypeValue(std::move(lv.metatypeValue));
       break;
     case Kind::BuiltinValue:
       ::new (&builtinValue) BuiltinValue(std::move(lv.builtinValue));
@@ -271,11 +236,6 @@ public:
     return objcMethod;
   }
   
-  const MetatypeValue &getMetatypeValue() const {
-    assert(kind == Kind::MetatypeValue && "not a metatype value");
-    return metatypeValue;
-  }
-  
   const BuiltinValue &getBuiltinValue() const {
     assert(kind == Kind::BuiltinValue && "not a builtin");
     return builtinValue;
@@ -294,9 +254,6 @@ public:
       break;
     case Kind::ObjCMethod:
       objcMethod.~ObjCMethod();
-      break;
-    case Kind::MetatypeValue:
-      metatypeValue.~MetatypeValue();
       break;
     case Kind::BuiltinValue:
       builtinValue.~BuiltinValue();
@@ -407,12 +364,6 @@ public:
     setLoweredValue(v, ObjCMethod{method, searchType, startAtSuper});
   }
 
-  void setLoweredMetatypeValue(SILValue v,
-                               llvm::Value /*nullable*/ *swiftMetatype,
-                               llvm::Value /*nullable*/ *objcMetatype) {
-    setLoweredValue(v, MetatypeValue{swiftMetatype, objcMetatype});
-  }
-  
   void setLoweredBuiltinValue(SILValue v, Identifier builtin) {
     setLoweredValue(v, BuiltinValue{builtin});
   }
@@ -724,10 +675,6 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
     ex.add(objcMethod.getExplosionValue(IGF));
     break;
   
-  case Kind::MetatypeValue:
-    ex.add(metatypeValue.getSwiftMetatype());
-    break;
-  
   case Kind::BuiltinValue:
     llvm_unreachable("reifying builtin function not yet supported");
   }
@@ -741,7 +688,6 @@ ResilienceExpansion LoweredValue::getResilienceExpansion() const {
     return explosion.kind;
   case Kind::StaticFunction:
   case Kind::ObjCMethod:
-  case Kind::MetatypeValue:
   case Kind::BuiltinValue:
     return ResilienceExpansion::Minimal;
   }
@@ -1350,93 +1296,33 @@ void IRGenSILFunction::visitSILGlobalAddrInst(SILGlobalAddrInst *i) {
   setLoweredAddress(SILValue(i, 0), addr);
 }
 
-/// Determine whether a metatype value is used as a Swift metatype, ObjC class,
-/// or both.
-static void getMetatypeUses(ValueBase *i,
-                            bool &isUsedAsSwiftMetatype,
-                            bool &isUsedAsObjCClass) {
-  isUsedAsSwiftMetatype = isUsedAsObjCClass = false;
-  for (auto *use : i->getUses()) {
-    // Ignore retains or releases of metatypes.
-    if (isa<RefCountingInst>(use->getUser()))
-      continue;
-    
-    // If a class_method lookup of an ObjC method is done on us, we'll need the
-    // objc class.
-    if (auto *cm = dyn_cast<ClassMethodInst>(use->getUser())) {
-      if (cm->getMember().getDecl()->isObjC()) {
-        isUsedAsObjCClass = true;
-        continue;
-      }
-    }
-    
-    // If we're applied as the 'self' argument to a class_method of an objc
-    // method, we'll need the objc class.
-    // FIXME: Metatypes as other arguments should probably also pass the
-    // Class too.
-    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
-      if (auto *method = dyn_cast<ClassMethodInst>(apply->getCallee())) {
-        if (method->getMember().getDecl()->isObjC()
-            && apply->getArguments().size() >= 1
-            && apply->getArguments()[0].getDef() == i) {
-          isUsedAsObjCClass = true;
-          continue;
-        }
-      }
-    }
-    
-    // All other uses are as Swift metatypes.
-    isUsedAsSwiftMetatype = true;
-  }
-  
-  // If there were no uses, assume it's used as a Swift metatype.
-  isUsedAsSwiftMetatype = true;
-}
-
-static void emitMetatypeInst(IRGenSILFunction &IGF,
-                             SILInstruction *i, CanMetatypeType metatype) {
-  llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
-  
-  bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
-  getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
-  
-  if (isUsedAsSwiftMetatype) {
-    Explosion e(ResilienceExpansion::Maximal);
-    emitMetatypeRef(IGF, metatype, e);
-    if (!isUsedAsObjCClass) {
-      IGF.setLoweredExplosion(SILValue(i, 0), e);
-      return;
-    }
-    swiftMetatype = e.claimNext();
-  }
-  if (isUsedAsObjCClass) {
-    objcClass = emitClassHeapMetadataRef(IGF, metatype.getInstanceType());
-  }
-  IGF.setLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
-}
-
 void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
-  emitMetatypeInst(*this, i, i->getType().castTo<MetatypeType>());
+  auto metaTy = i->getType().castTo<MetatypeType>();
+  Explosion e(ResilienceExpansion::Maximal);
+  emitMetatypeRef(*this, metaTy, e);
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
   auto baseValue = base.claimNext();
-  
-  bool isUsedAsSwiftMetatype, isUsedAsObjCClass;
-  getMetatypeUses(i, isUsedAsSwiftMetatype, isUsedAsObjCClass);
-  
+
+  auto metaTy = i->getType().castTo<MetatypeType>();
   SILType instanceType = i->getOperand().getType();
-  
-  llvm::Value *swiftMetatype = nullptr, *objcClass = nullptr;
-  if (isUsedAsSwiftMetatype)
-    swiftMetatype = emitTypeMetadataRefForHeapObject(*this, baseValue,
-                                                     instanceType);
-  
-  if (isUsedAsObjCClass)
-    objcClass = emitHeapMetadataRefForHeapObject(*this, baseValue, instanceType);
-  
-  setLoweredMetatypeValue(SILValue(i,0), swiftMetatype, objcClass);
+  Explosion e(ResilienceExpansion::Maximal);
+  switch (metaTy->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("Class metatypes are never thin");
+
+  case MetatypeRepresentation::Thick:
+    e.add(emitTypeMetadataRefForHeapObject(*this, baseValue, instanceType));
+    break;
+
+  case MetatypeRepresentation::ObjC:
+    e.add(emitHeapMetadataRefForHeapObject(*this, baseValue, instanceType));
+    break;
+  }
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitArchetypeMetatypeInst(
@@ -1585,9 +1471,6 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     break;
   }
       
-  case LoweredValue::Kind::MetatypeValue:
-    llvm_unreachable("metatype isn't a valid callee");
-    
   case LoweredValue::Kind::Address:
     llvm_unreachable("sil address isn't a valid callee");
   
@@ -1613,16 +1496,24 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::BuiltinValue:
     llvm_unreachable("function isn't a valid metatype");
   
-  case LoweredValue::Kind::MetatypeValue:
-    return lv.getMetatypeValue().getObjCClass();
-
-  // Map a Swift metatype value back to the heap metadata, which will be the
-  // Class for an ObjC type.
+  // If we have a Swift metatype, map it to the heap metadata, which will be
+  // the Class for an ObjC type.
   case LoweredValue::Kind::Explosion: {
     Explosion e = lv.getExplosion(IGF);
-    llvm::Value *swiftMeta = e.claimNext();
-    CanType instanceType(v.getType().castTo<MetatypeType>()->getInstanceType());
-    return emitClassHeapMetadataRefForMetatype(IGF, swiftMeta, instanceType);
+    llvm::Value *meta = e.claimNext();
+    auto metaType = v.getType().castTo<MetatypeType>();
+    switch (metaType->getRepresentation()) {
+    case swift::MetatypeRepresentation::ObjC:
+      return meta;
+
+    case swift::MetatypeRepresentation::Thick:
+      // Convert thick metatype to Objective-C metatype.
+      return emitClassHeapMetadataRefForMetatype(IGF, meta,
+                                                 metaType.getInstanceType());
+
+    case swift::MetatypeRepresentation::Thin:
+      llvm_unreachable("Cannot convert Thin metatype to ObjC metatype");
+    }
   }
   }
 }
@@ -1778,7 +1669,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     return std::make_tuple(lv.getStaticFunction().getFunction(),
                            nullptr, v.getType().castTo<SILFunctionType>());
   case LoweredValue::Kind::Explosion:
-  case LoweredValue::Kind::MetatypeValue:
   case LoweredValue::Kind::BuiltinValue: {
     Explosion ex = lv.getExplosion(IGF);
     llvm::Value *fn = ex.claimNext();

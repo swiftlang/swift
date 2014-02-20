@@ -679,13 +679,19 @@ bool IRGenModule::isTrivialMetatype(CanMetatypeType metaTy) {
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
-  // Some metatypes have trivial representation.
-  if (type->getRepresentation() == MetatypeRepresentation::Thin)
-    return;
+  switch (type->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    // Thin types have a trivial representation.
+    break;
 
-  // Otherwise, emit a metadata reference.
-  llvm::Value *metadata = IGF.emitTypeMetadataRef(type.getInstanceType());
-  explosion.add(metadata);
+  case MetatypeRepresentation::Thick:
+    explosion.add(IGF.emitTypeMetadataRef(type.getInstanceType()));
+    break;
+
+  case MetatypeRepresentation::ObjC:
+    explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType()));
+    break;
+  }
 }
 
 /*****************************************************************************/
