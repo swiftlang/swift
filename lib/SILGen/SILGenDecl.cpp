@@ -1836,17 +1836,17 @@ public:
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
   
-  void visitSubscriptDecl(SubscriptDecl *d) {
+  void visitAbstractStorageDecl(AbstractStorageDecl *d) {
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
-    auto *witnessSD = cast<SubscriptDecl>(witness.getDecl());
+    auto *witnessSD = cast<AbstractStorageDecl>(witness.getDecl());
     emitFuncEntry(d->getGetter(), witnessSD->getGetter(),
                   witness.getSubstitutions());
-    if (d->isSettable())
+    if (d->isSettable(d->getDeclContext()))
       emitFuncEntry(d->getSetter(), witnessSD->getSetter(),
                     witness.getSubstitutions());
   }
-  
+
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
     const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
@@ -1901,11 +1901,6 @@ public:
   
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
-  }
-
-  void visitVarDecl(VarDecl *vd) {
-    // FIXME: Emit getter and setter (if settable) witnesses.
-    // For now we ignore them, like the IRGen witness table builder did.
   }
 };
   

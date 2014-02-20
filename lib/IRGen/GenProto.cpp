@@ -231,16 +231,14 @@ namespace {
       case DeclKind::Func:
         return visitFunc(cast<FuncDecl>(member));
 
-      case DeclKind::Subscript: {
-        auto *SD = cast<SubscriptDecl>(member);
+      case DeclKind::Subscript:
+      case DeclKind::Var: {
+        auto *SD = cast<AbstractStorageDecl>(member);
         emitFunc(SD->getGetter());
-        if (SD->isSettable())
+        if (SD->isSettable(member->getDeclContext()))
           emitFunc(SD->getSetter());
         return;
       }
-      case DeclKind::Var:
-        // FIXME: To be implemented.
-        return;
 
       case DeclKind::AssociatedType:
         return visitAssociatedType(cast<AssociatedTypeDecl>(member));
