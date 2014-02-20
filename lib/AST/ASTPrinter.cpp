@@ -621,29 +621,30 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 
   if (decl->hasAccessorFunctions()) {
     Printer << " {";
-    {
-      if (auto getter = decl->getGetter()) {
-        if (!Options.FunctionDefinitions)
-          Printer << " get";
-        else {
-          Printer << "\n";
-          indent();
-          visit(getter);
-          Printer << "\n";
-        }
-      }
-      if (auto setter = decl->getSetter()) {
-        if (!Options.FunctionDefinitions)
-          Printer << " set";
-        else {
-          Printer << "\n";
-          indent();
-          visit(setter);
-          Printer << "\n";
-        }
+    if (auto getter = decl->getGetter()) {
+      if (!Options.FunctionDefinitions)
+        Printer << " get";
+      else {
+        Printer << "\n";
+        indent();
+        visit(getter);
+        Printer << "\n";
       }
     }
-    indent();
+    if (auto setter = decl->getSetter()) {
+      if (!Options.FunctionDefinitions)
+        Printer << " set";
+      else {
+        Printer << "\n";
+        indent();
+        visit(setter);
+        Printer << "\n";
+      }
+    }
+    if (Options.FunctionDefinitions)
+      indent();
+    else
+      Printer << " ";
     Printer << "}";
   }
 }
