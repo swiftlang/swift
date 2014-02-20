@@ -185,9 +185,9 @@ extension ${Self} : FloatingPointNumber {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  static func signalingNaN() -> ${Self} {
-    return _fromBitPattern(${getSignalingNanBitPattern(bits)})
-  }
+//  static func signalingNaN() -> ${Self} {
+//    return _fromBitPattern(${getSignalingNanBitPattern(bits)})
+//  }
 
   func isSignMinus() -> Bool {
     return __getSignBit() == 1
@@ -409,9 +409,9 @@ func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
 @@transparent @@prefix @@assignment
 func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
 @@transparent @@postfix @@assignment
-func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
+func ++ (inout lhs: ${Self}) -> ${Self} { val tmp = lhs; lhs += 1.0; return tmp }
 @@transparent @@postfix @@assignment
-func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
+func -- (inout lhs: ${Self}) -> ${Self} { val tmp = lhs; lhs -= 1.0; return tmp }
 
 @ for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @@transparent
