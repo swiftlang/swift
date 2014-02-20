@@ -20,10 +20,10 @@
 namespace swift {
 struct SingleRawComment {
   enum class CommentKind {
-    OrdinaryBCPL,      ///< Any normal BCPL comments
-    OrdinaryC,         ///< Any normal C comment
-    BCPLSlash,         ///< \code /// stuff \endcode
-    JavaDoc,           ///< \code /** stuff */ \endcode
+    OrdinaryLine,  ///< Any normal // comments
+    OrdinaryBlock, ///< Any normal /* */ comment
+    LineDoc,       ///< \code /// stuff \endcode
+    BlockDoc,      ///< \code /** stuff */ \endcode
   };
 
   const CharSourceRange Range;
@@ -39,8 +39,8 @@ struct SingleRawComment {
   SingleRawComment &operator=(const SingleRawComment &) = default;
 
   bool isOrdinary() const LLVM_READONLY {
-    return Kind == CommentKind::OrdinaryBCPL ||
-           Kind == CommentKind::OrdinaryC;
+    return Kind == CommentKind::OrdinaryLine ||
+           Kind == CommentKind::OrdinaryBlock;
   }
 };
 

@@ -30,19 +30,19 @@ static SingleRawComment::CommentKind getCommentKind(StringRef Comment) {
 
   if (Comment[1] == '/') {
     if (Comment.size() < 3)
-      return SingleRawComment::CommentKind::OrdinaryBCPL;
+      return SingleRawComment::CommentKind::OrdinaryLine;
 
     if (Comment[2] == '/') {
-      return SingleRawComment::CommentKind::BCPLSlash;
+      return SingleRawComment::CommentKind::LineDoc;
     }
-    return SingleRawComment::CommentKind::OrdinaryBCPL;
+    return SingleRawComment::CommentKind::OrdinaryLine;
   } else {
     assert(Comment[1] == '*');
     assert(Comment.size() >= 4);
     if (Comment[2] == '*') {
-      return SingleRawComment::CommentKind::JavaDoc;
+      return SingleRawComment::CommentKind::BlockDoc;
     }
-    return SingleRawComment::CommentKind::OrdinaryC;
+    return SingleRawComment::CommentKind::OrdinaryBlock;
   }
 }
 
