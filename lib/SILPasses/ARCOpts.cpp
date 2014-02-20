@@ -78,8 +78,8 @@ enum class SequenceState {
 };
 
 class ReferenceCountState {
-  /// The increment instruction that we are tracking.
-  SILInstruction *Instruction = nullptr;
+  /// The increment that we are tracking.
+  llvm::PointerUnion<SILInstruction *, SILArgument *> Increment;
 
   /// Was the pointer we are tracking known incremented when we visited the
   /// current increment we are tracking? In that case we know that it is safe
@@ -102,12 +102,20 @@ public:
   /// Can we gaurantee that the given reference counted value is incremented?
   bool isIncremented() const { return SequenceState::Incremented == SeqState; }
 
-  /// Are we tracking an instruction currently? This returns false when given
-  /// an uninitialized ReferenceCountState.
-  bool isTrackingInstruction() const { return Instruction != nullptr; }
+  /// Are we tracking an instruction currently? This returns false when given an
+  /// uninitialized ReferenceCountState or one tracking a SILArgument.
+  bool isTrackingInstruction() const {
+    return isTrackingIncrement() && Increment.is<SILInstruction *>();
+  }
+
+  /// Are we tracking an increment currently? This returns false when given an
+  /// uninitialized ReferenceCountState.
+  bool isTrackingIncrement() const { return !Increment.isNull(); }
 
   /// Return the increment we are tracking.
-  SILInstruction *getInstruction() const { return Instruction; }
+  SILInstruction *getInstruction() const {
+    return Increment.get<SILInstruction *>();
+  }
 
   /// Return the value with reference semantics that is the operand of our
   /// increment.
@@ -124,7 +132,7 @@ public:
 
   /// Is this an increment that we can perform code motion for. This is true
   /// for strong_retain and false for copy_value.
-  bool canBeMoved() const { return isa<StrongRetainInst>(Instruction); }
+  bool canBeMoved() const { return isa<StrongRetainInst>(getInstruction()); }
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
@@ -132,7 +140,7 @@ public:
 
   /// Initializes the state for a function parameter with the given
   /// SILParameterInfo.
-  void initWithArg();
+  void initWithArg(SILArgument *A);
 
   /// Uninitialize the current state.
   void clear();
@@ -156,7 +164,7 @@ public:
 } // end anonymous namespace
 
 bool ReferenceCountState::initWithInst(SILInstruction *I) {
-  bool Nested = isTrackingInstruction();
+  bool Nested = isTrackingIncrement();
 
   // This retain is known safe if the operand we are tracking was already
   // known incremented previously. This occurs when you have nested increments.
@@ -166,7 +174,7 @@ bool ReferenceCountState::initWithInst(SILInstruction *I) {
   SeqState = SequenceState::Incremented;
 
   // Stash the incrementing instruction we are tracking.
-  Instruction = I;
+  Increment = I;
 
   // Reset our insertion point to null.
   InsertPt = nullptr;
@@ -174,16 +182,16 @@ bool ReferenceCountState::initWithInst(SILInstruction *I) {
   return Nested;
 }
 
-void ReferenceCountState::initWithArg() {
+void ReferenceCountState::initWithArg(SILArgument *Arg) {
   SeqState = SequenceState::Incremented;
-  Instruction = nullptr;
+  Increment = Arg;
   InsertPt = nullptr;
   KnownSafe = false;
 }
 
 void ReferenceCountState::clear() {
   SeqState = SequenceState::None;
-  Instruction = nullptr;
+  Increment = static_cast<SILInstruction *>(nullptr);
   InsertPt = nullptr;
   KnownSafe = false;
 }
@@ -245,7 +253,7 @@ ReferenceCountState::doesDecrementMatchInstruction(SILInstruction *Decrement) {
   // anything. If the ValueKind of our increments, decrement do not match, we
   // can not eliminate the pair so return false.
   if (!isTrackingInstruction() ||
-      !matchingRefCountPairType(Instruction, Decrement))
+      !matchingRefCountPairType(getInstruction(), Decrement))
     return false;
 
   // Otherwise modify the state appropriately in preparation for removing the
@@ -326,7 +334,7 @@ processBBTopDown(SILBasicBlock &BB,
 
       if (P != ParameterConvention::Direct_Owned)
         continue;
-      BBState[SILValue(Args[i])].initWithArg();
+      BBState[SILValue(Args[i])].initWithArg(Args[i]);
     }
   }
 
@@ -408,10 +416,13 @@ processBBTopDown(SILBasicBlock &BB,
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : BBState) {
-      // First check if the instruction we are visiting could potentially
-      // decrement the reference counted value we are tracking... in a
-      // manner that could cause us to change states. If we do change states
-      // continue...
+      // If we are tracking an argument, skip it.
+      if (!OtherState.second.isTrackingInstruction())
+        continue;
+
+      // Check if the instruction we are visiting could potentially decrement
+      // the reference counted value we are tracking... in a manner that could
+      // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
               << *OtherState.second.getInstruction());

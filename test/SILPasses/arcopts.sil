@@ -281,3 +281,21 @@ bb0(%0 : $*Builtin.Int32):
   %4 = tuple()
   return %4: $()
 }
+
+// CHECK-LABEL: sil @silargument_retain_iterated : $@thin (@owned Builtin.ObjectPointer) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @silargument_retain_iterated : $@thin (@owned Builtin.ObjectPointer) -> () {
+bb0(%0 : $Builtin.ObjectPointer):
+  %1 = function_ref @user : $@thin (Builtin.ObjectPointer) -> ()
+  strong_retain %0 : $Builtin.ObjectPointer
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  strong_release %0 : $Builtin.ObjectPointer
+  strong_retain %0 : $Builtin.ObjectPointer
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %1 (%0) : $@thin (Builtin.ObjectPointer) -> ()
+  strong_release %0 : $Builtin.ObjectPointer
+  %2 = tuple()
+  return %2 : $()
+}
