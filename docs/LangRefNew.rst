@@ -584,6 +584,128 @@ Declarations
 Import Declarations
 -------------------
 
+...
+
+.. _langref.decl.var:
+
+``var`` Declarations
+--------------------
+
+.. code-block:: none
+
+    decl-var        ::= attribute-list ('static' | 'class')? 'var' pattern initializer?  (',' pattern initializer?)*
+
+    decl-var        ::= attribute-list 'var' identifier ':' type-annotation brace-item-list
+
+    decl-var        ::= attribute-list 'var' identifier ':' type-annotation '{' get-set '}'
+
+    get-set         ::= get set?
+    get-set         ::= set get
+
+    get             ::= 'get:' brace-item*
+
+    set             ::= 'set' set-name? ':' brace-item*
+
+    set-name        ::= '(' identifier ')'
+
+``var`` declarations form the backbone of value declarations in Swift. A
+``var`` declaration takes a pattern and an optional initializer, and declares
+all the pattern-identifiers in the pattern as variables. If there is an
+initializer and the pattern is :ref:`fully-typed <langref.types.fully_typed>`,
+the initializer is converted to the type of the pattern. If there is an
+initializer and the pattern is not fully-typed, the type of initializer is
+computed independently of the pattern, and the type of the pattern is derived
+from the initializer. If no initializer is specified, the pattern must be
+fully-typed, and the values are default-initialized.
+
+If there is more than one pattern in a ``var`` declaration, they are each
+considered independently, as if there were multiple declarations.  The initial
+``attribute-list`` is shared between all the declared variables.
+
+A var declaration may contain a getter and (optionally) a setter, which will
+be used when reading or writing the variable, respectively.  Such a variable
+does not have any associated storage.  A ``var`` declaration with a getter or
+setter must have a type (call it ``T``). The getter function, whose
+body is provided as part of the ``var-get`` clause, has type ``() -> T``.
+Similarly, the setter function, whose body is part of the ``var-set`` clause
+(if provided), has type ``(T) -> ()``. If the ``var-set`` clause contains a
+``var-set-name`` clause, the identifier of that clause is used as the name of
+the parameter to the setter. Otherwise, the parameter name is ``value``.
+
+FIXME: Should the type of a pattern which isn't fully typed affect the
+type-checking of the expression (i.e. should we compute a structured dependent
+type)?
+
+Like all other declarations, ``var``\ s can optionally have a list of
+:ref:`attributes <langref.decl.attribute_list>` applied to them.
+
+The type of a variable must be :ref:`materializable
+<langref.types.materializable>`. A variable is an lvalue unless it has a
+``var-get`` clause but not ``var-set`` clause.
+
+Here are some examples of ``var`` declarations:
+
+::
+
+  // Simple examples.
+  var a = 4
+  var b: Int
+  var c: Int = 42
+
+  // This decodes the tuple return value into independently named parts
+  // and both 'val' and 'err' are in scope after this line.
+  var (val, err) = foo()
+
+  // Variable getter/setter
+  var _x: Int = 0
+  var x_modify_count: Int = 0
+  var x1: Int {
+    return _x
+  }
+  var x2: Int {
+  get:
+    return _x
+  set:
+    x_modify_count = x_modify_count + 1
+    _x = value
+  }
+
+Note that both ``get`` and ``set`` are context-sensitive keywords.
+
+``static`` keyword is allowed inside structs and enums, and extensions of
+those.
+
+``class`` keyword is allowed inside classes, class extensions, and
+protocols.
+
+.. _langref.decl.attribute_list:
+
+Attribute Lists
+---------------
+
+...
+
+.. _langref.types:
+
+Types
+=====
+
+...
+
+.. _langref.types.fully_typed:
+
+Fully-Typed Types
+-----------------
+
+...
+
+.. _langref.types.materializable:
+
+Materializable Types
+--------------------
+
+...
+
 .. _langref.expr:
 
 Expressions
