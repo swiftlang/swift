@@ -49,13 +49,12 @@
 * Optional types now support a convenience method named "cache" to cache the
   result of a closure. For example:
 
-  var x: Int? = .None
-  x.cache { return 123 }
-  x.cache { return 789 }
-  println(x) // prints 123
-  x = .None
-  x.cache { return 789 }
-  println(x) // prints 789
+  class Foo {
+    var _lazyProperty: Int?
+    var property: Int {
+      return _lazyProperty.cache { computeLazyProperty() }
+    }
+  }
 
 2014-02-12
 ----------
