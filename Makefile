@@ -66,8 +66,7 @@ ifndef MODULES_SDK
   else ifneq ($(findstring -darwin_sim,$(TARGET_TRIPLE)),)
     MODULES_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path)
   else ifneq ($(findstring -darwin,$(TARGET_TRIPLE)),)
-    MODULES_SDK := $(shell xcrun --sdk macosx --show-sdk-path)
-    MODULES_SDK := $(subst 10.9,10.10,$(MODULES_SDK))
+    MODULES_SDK := $(shell xcrun --sdk macosx10.10 --show-sdk-path)
   else
     MODULES_SDK := 
   endif
