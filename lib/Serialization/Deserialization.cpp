@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleFile.h"
-#include "ModuleFormat.h"
+#include "swift/Serialization/ModuleFile.h"
+#include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/BCReadingExtras.h"
@@ -37,7 +37,7 @@ namespace {
     static const char *getRecordKindString(decls_block::RecordKind Kind) {
       switch (Kind) {
 #define RECORD(Id) case decls_block::Id: return #Id;
-#include "DeclTypeRecordNodes.def"
+#include "swift/Serialization/DeclTypeRecordNodes.def"
       }
     }
 

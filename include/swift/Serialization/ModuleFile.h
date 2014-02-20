@@ -13,7 +13,6 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
-#include "ModuleFormat.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
@@ -22,6 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ModuleFormat.h"
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -370,7 +370,7 @@ public:
   ///
   /// Note that this may cause other decls to load as well.
   void loadDeclsConformingTo(KnownProtocolKind kind);
-  
+
   /// Reports all class members in the module to the given consumer.
   ///
   /// This is intended for use with id-style lookup and code completion.
@@ -386,7 +386,7 @@ public:
 
   /// Reports all link-time dependencies.
   void collectLinkLibraries(Module::LinkLibraryCallback callback) const;
-  
+
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
 
@@ -441,7 +441,7 @@ public:
   ///
   /// If the record at the cursor is not a substitution, returns Nothing.
   Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor);
-  
+
   /// Recursively reads a protocol conformance from \c DeclTypeCursor.
   ///
   /// The conformance will be newly-created; it's likely that it already exists
@@ -458,7 +458,7 @@ public:
   /// without moving the cursor.
   GenericParamList *maybeReadGenericParams(DeclContext *DC,
                                            llvm::BitstreamCursor &Cursor);
-  
+
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;
 };

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleFile.h"
+#include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedSILLoader.h"

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DeserializeSIL.h"
-#include "ModuleFile.h"
+#include "swift/Serialization/ModuleFile.h"
 #include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"

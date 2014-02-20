@@ -17,7 +17,7 @@
 #ifndef SWIFT_SERIALIZATION_SERIALIZATION_H
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
-#include "ModuleFormat.h"
+#include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"

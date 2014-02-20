@@ -1,5 +1,4 @@
 add_swift_library(swiftSerialization
-  DeclTypeRecordNodes.def
   Deserialization.cpp
   DeserializeSIL.cpp
   ModuleFile.cpp

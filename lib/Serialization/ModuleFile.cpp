@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleFile.h"
-#include "ModuleFormat.h"
+#include "swift/Serialization/ModuleFile.h"
+#include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"

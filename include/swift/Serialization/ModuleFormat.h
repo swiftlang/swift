@@ -324,7 +324,7 @@ namespace decls_block {
   enum RecordKind : uint8_t {
 #define RECORD(Id) Id,
 #define RECORD_VAL(Id, Value) Id = Value,
-#include "DeclTypeRecordNodes.def"
+#include "swift/Serialization/DeclTypeRecordNodes.def"
   };
 
   using NameAliasTypeLayout = BCRecordLayout<
@@ -729,7 +729,7 @@ namespace decls_block {
     // Trailed by a pattern for self.
   >;
 
-  
+
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN,
     BCFixed<1> // implicit?
@@ -770,13 +770,13 @@ namespace decls_block {
     BCFixed<1>   // implicit?
     // The sub-pattern trails the record.
   >;
-  
+
   using IsaPatternLayout = BCRecordLayout<
     ISA_PATTERN,
     TypeIDField, // type
     BCFixed<1>   // implicit?
   >;
-  
+
   using NominalTypePatternLayout = BCRecordLayout<
     NOMINAL_TYPE_PATTERN,
     TypeIDField, // type
@@ -784,7 +784,7 @@ namespace decls_block {
     BCFixed<1>  // implicit?
     // The elements trail the record.
   >;
-  
+
   using NominalTypePatternEltLayout = BCRecordLayout<
     NOMINAL_TYPE_PATTERN_ELT,
     DeclIDField // property

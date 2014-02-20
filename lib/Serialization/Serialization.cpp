@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ModuleFormat.h"
+#include "swift/Serialization/ModuleFormat.h"
 #include "Serialization.h"
 #include "SILFormat.h"
 #include "swift/AST/AST.h"
@@ -247,7 +247,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
-#include "DeclTypeRecordNodes.def"
+#include "swift/Serialization/DeclTypeRecordNodes.def"
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
