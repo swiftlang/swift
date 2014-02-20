@@ -1392,6 +1392,8 @@ public:
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
         VD->getStorageKind() == VarDecl::Stored &&
         !VD->isVal()) {
+      TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
+      
       convertStoredVarInProtocolToComputed(VD);
 
       // Type check the getter declaration.

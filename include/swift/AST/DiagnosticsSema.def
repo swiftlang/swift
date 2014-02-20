@@ -324,6 +324,9 @@ ERROR(type_does_not_inherit,sema_tcd,none,
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
+ERROR(protocol_property_must_be_computed,sema_tcd,none,
+      "property in protocol must have explicit { get } or { get set } specifier",
+      ())
 NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,sema_tcd,none,
