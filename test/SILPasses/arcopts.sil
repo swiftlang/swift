@@ -299,3 +299,24 @@ bb0(%0 : $Builtin.ObjectPointer):
   %2 = tuple()
   return %2 : $()
 }
+
+class Cls {
+  var random : Builtin.Int32
+}
+
+// CHECK-LABEL: sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> () {
+bb0(%0 : $Cls):
+  %1 = alloc_ref $Cls
+  %2 = function_ref @user : $@thin (Builtin.ObjectPointer) -> ()
+  %3 = ref_to_object_pointer %0 : $Cls to $Builtin.ObjectPointer
+  strong_retain %1 : $Cls
+  apply %2(%3) : $@thin (Builtin.ObjectPointer) -> ()
+  apply %2(%3) : $@thin (Builtin.ObjectPointer) -> ()
+  strong_release %1 : $Cls  
+  %4 = tuple()
+  return %4 : $()
+}
+

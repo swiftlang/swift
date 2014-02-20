@@ -26,7 +26,8 @@ using namespace swift;
 
 /// Could Inst decrement the ref count associated with target?
 bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
-                                         SILValue Target) {
+                                         SILValue Target,
+                                         AliasAnalysis *AA) {
   // Clear up some small cases where MayHaveSideEffects is too broad for our
   // purposes and the instruction does not decrement ref counts.
   switch (Inst->getKind()) {
@@ -61,7 +62,14 @@ bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
       if (isSideEffectFree(BI))
         return true;
 
-    return false;
+    // Ok, this apply *MAY* decrement ref counts. Attempt to prove that it
+    // cannot decrement Target using alias analysis and knowledge about our
+    // calling convention.
+    for (auto Op : AI->getArgumentsWithoutIndirectResult())
+      if (!AA->isNoAlias(Op, Target))
+        return false;
+
+    return true;
   }
 
   // Just make sure that we do not have side effects.

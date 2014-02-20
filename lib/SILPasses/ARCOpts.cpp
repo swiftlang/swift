@@ -148,7 +148,8 @@ public:
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
-  bool handlePotentialDecrement(SILInstruction *PotentialDecrement);
+  bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
+                                AliasAnalysis *AA);
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
@@ -196,7 +197,8 @@ void ReferenceCountState::clear() {
   KnownSafe = false;
 }
 
-bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
+bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other,
+                                                   AliasAnalysis *AA) {
   // If our state is not initialized, return false since we are not tracking
   // anything.
   if (!isTrackingInstruction())
@@ -204,7 +206,7 @@ bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other) {
 
   // If we can prove that Other can not decrement the reference counted
   // instruction we are tracking, return false.
-  if (cannotDecrementRefCount(Other, getValue()))
+  if (cannotDecrementRefCount(Other, getValue(), AA))
     return false;
 
   // Otherwise Other could potentially decrement the value we are tracking.
@@ -423,7 +425,7 @@ processBBTopDown(SILBasicBlock &BB,
       // Check if the instruction we are visiting could potentially decrement
       // the reference counted value we are tracking... in a manner that could
       // cause us to change states. If we do change states continue...
-      if (OtherState.second.handlePotentialDecrement(&I)) {
+      if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
               << *OtherState.second.getInstruction());
         continue;

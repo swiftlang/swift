@@ -25,7 +25,8 @@ namespace swift {
 namespace arc {
 
 /// Can Inst decrement the ref count of Target?
-bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target);
+bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target,
+                             AliasAnalysis *AA);
 
 /// Can Inst use Target in a manner that requires Target to be alive
 /// before Inst?
