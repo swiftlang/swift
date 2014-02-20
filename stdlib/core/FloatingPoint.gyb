@@ -185,10 +185,6 @@ extension ${Self} : FloatingPointNumber {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-//  static func signalingNaN() -> ${Self} {
-//    return _fromBitPattern(${getSignalingNanBitPattern(bits)})
-//  }
-
   func isSignMinus() -> Bool {
     return __getSignBit() == 1
   }
