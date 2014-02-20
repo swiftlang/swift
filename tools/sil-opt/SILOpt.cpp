@@ -52,7 +52,7 @@ enum class PassKind {
   SROA,
   ARCOpts,
   StripDebugInfo,
-  AllocRefElimination,
+  DeadObjectElimination,
   InstCount,
   AADumper,
   LoadStoreOpts,
@@ -141,10 +141,10 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::StripDebugInfo,
                                    "strip-debug-info",
                                    "Strip debug info."),
-                        clEnumValN(PassKind::AllocRefElimination,
-                                   "allocref-elim",
-                                   "Eliminate alloc refs with no side effect "
-                                   "destructors that are only stored into."),
+                        clEnumValN(PassKind::DeadObjectElimination,
+                                   "deadobject-elim",
+                                   "Eliminate unused object allocation with no "
+                                   "side effect destructors."),
                         clEnumValN(PassKind::InstCount,
                                    "inst-count",
                                    "Count all instructions in the given "
@@ -324,8 +324,8 @@ int main(int argc, char **argv) {
     case PassKind::StripDebugInfo:
       PM.add(createStripDebug());
       break;
-    case PassKind::AllocRefElimination:
-      PM.add(createAllocRefElimination());
+    case PassKind::DeadObjectElimination:
+      PM.add(createDeadObjectElimination());
       break;
     case PassKind::InstCount:
       PM.add(createSILInstCount());

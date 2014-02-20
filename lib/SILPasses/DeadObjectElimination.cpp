@@ -1,4 +1,4 @@
-//===-- AllocRefElimination.h - Remove unused well-behaved AllocRefInsts --===//
+//===-- DeadObjectElimination.h - Remove unused objects  ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -339,7 +339,7 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-class AllocRefElimination : public SILFunctionTransform {
+class DeadObjectElimination : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
@@ -351,6 +351,6 @@ class AllocRefElimination : public SILFunctionTransform {
   StringRef getName() override { return "AllocRef Elimination"; }
 };
 
-SILTransform *swift::createAllocRefElimination() {
-  return new AllocRefElimination();
+SILTransform *swift::createDeadObjectElimination() {
+  return new DeadObjectElimination();
 }

@@ -1,4 +1,4 @@
-// RUN: %sil-opt -allocref-elim -verify %s | FileCheck %s
+// RUN: %sil-opt -deadobject-elim -verify %s | FileCheck %s
 
 import Swift
 import Builtin

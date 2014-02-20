@@ -26,7 +26,7 @@ add_swift_library(swiftSILPasses
   SILSROA.cpp
   ARCOpts.cpp
   StripDebugInfo.cpp
-  AllocRefElimination.cpp
+  DeadObjectElimination.cpp
   InstCount.cpp
   AADumper.cpp
   LoadStoreOpts.cpp
