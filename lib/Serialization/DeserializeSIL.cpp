@@ -56,12 +56,12 @@ fromStableSILLinkage(unsigned value) {
 class SILDeserializer::FuncTableInfo {
 public:
   using internal_key_type = StringRef;
-  using external_key_type = Identifier;
+  using external_key_type = StringRef;
   using data_type = DeclID;
 
-  internal_key_type GetInternalKey(external_key_type ID) {
-    return ID.str();
-  }
+  internal_key_type GetInternalKey(external_key_type ID) { return ID; }
+
+  external_key_type GetExternalKey(internal_key_type ID) { return ID; }
 
   uint32_t ComputeHash(internal_key_type key) {
     return llvm::HashString(key);
@@ -303,7 +303,7 @@ SILFunction *SILDeserializer::getFuncForReference(Identifier name,
   SILFunction *fn = SILMod.lookUpFunction(name.str());
   if (!fn) {
     // Otherwise, look for a function with this name in the module.
-    auto iter = FuncTable->find(name);
+    auto iter = FuncTable->find(name.str());
     if (iter != FuncTable->end()) {
       fn = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
     }
@@ -1369,7 +1369,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   Identifier name = Ctx.getIdentifier(InFunc->getName());
   if (!FuncTable)
     return nullptr;
-  auto iter = FuncTable->find(name);
+  auto iter = FuncTable->find(name.str());
   if (iter == FuncTable->end())
     return nullptr;
 
@@ -1383,7 +1383,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
   if (!FuncTable)
     return nullptr;
-  auto iter = FuncTable->find(name);
+  auto iter = FuncTable->find(name.str());
   if (iter == FuncTable->end())
     return nullptr;
 
@@ -1399,7 +1399,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
     return nullptr;
 
   // Find Id for the given name.
-  auto iter = GlobalVarList->find(Name);
+  auto iter = GlobalVarList->find(Name.str());
   if (iter == GlobalVarList->end())
     return nullptr;
   auto VId = *iter;
@@ -1520,7 +1520,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 SILVTable *SILDeserializer::lookupVTable(Identifier Name) {
   if (!VTableList)
     return nullptr;
-  auto iter = VTableList->find(Name);
+  auto iter = VTableList->find(Name.str());
   if (iter == VTableList->end())
     return nullptr;
 
