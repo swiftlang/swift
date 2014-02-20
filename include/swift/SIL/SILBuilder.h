@@ -887,6 +887,9 @@ public:
     return emitStructExtract(Loc, Operand, Field, type);
   }
 
+  SILValue emitThickToObjCMetatype(SILLocation Loc, SILValue Op, SILType Ty);
+  SILValue emitObjCToThickMetatype(SILLocation Loc, SILValue Op, SILType Ty);
+
   //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//

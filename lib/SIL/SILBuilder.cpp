@@ -203,4 +203,40 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
   return createStrongRelease(Loc, Operand);
 }
 
+SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
+                                             SILType Ty) {
+  // If the operand is an otherwise-unused 'metatype' instruction in the
+  // same basic block, zap it and create a 'metatype' instruction that
+  // directly produces an Objective-C metatype.
+  if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
+    if (metatypeInst->use_empty() &&
+        metatypeInst->getParent() == getInsertionBB()) {
+      auto origLoc = metatypeInst->getLoc();
+      metatypeInst->removeFromParent();
+      return createMetatype(origLoc, Ty);
+    }
+  }
+
+  // Just create the thick_to_objc_metatype instruction.
+  return createThickToObjCMetatype(Loc, Op, Ty);
+}
+
+SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
+                                             SILType Ty) {
+  // If the operand is an otherwise-unused 'metatype' instruction in the
+  // same basic block, zap it and create a 'metatype' instruction that
+  // directly produces a thick metatype.
+  if (auto metatypeInst = dyn_cast<MetatypeInst>(Op)) {
+    if (metatypeInst->use_empty() &&
+        metatypeInst->getParent() == getInsertionBB()) {
+      auto origLoc = metatypeInst->getLoc();
+      metatypeInst->removeFromParent();
+      return createMetatype(origLoc, Ty);
+    }
+  }
+
+  // Just create the objc_to_thick_metatype instruction.
+  return createObjCToThickMetatype(Loc, Op, Ty);
+}
+
 
