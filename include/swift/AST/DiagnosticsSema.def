@@ -552,6 +552,10 @@ ERROR(non_delegating_init_outside_module,sema_tce,none,
       "initializer for %0 defined outside module %1 must delegate "
       "(with 'self.init')", (Type, Identifier))
 
+ERROR(dynamic_construct_class,sema_tce,none,
+      "cannot construct an object of class type %0 with a metatype value",
+      (Type))
+
 // Operators
 ERROR(unknown_binop,sema_tce,none,
        "operator is not a known binary operator", ())

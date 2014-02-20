@@ -3360,6 +3360,53 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   return literal;
 }
 
+/// Determine whether the given expression, which has metatype type, is
+/// statically derived from references to type declarations rather than
+/// computed as a metatype value.
+static bool isStaticallyDerivedMetatype(Expr *expr) {
+  do {
+    // Skip syntax.
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Direct reference to a type.
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+      return isa<TypeDecl>(declRef->getDecl());
+    }
+
+    // A "." expression that refers to a member.
+    if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+      return isa<TypeDecl>(memberRef->getMember().getDecl());
+    }
+
+    // When the base of a "." expression is ignored, look at the member.
+    if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
+      expr = ignoredDot->getRHS();
+      continue;
+    }
+
+    // Direct reference to a type within an archetype.
+    if (auto archetypeMemberRef = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
+      return isa<TypeDecl>(archetypeMemberRef->getDecl());
+    }
+
+    // A synthesized metatype.
+    if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
+      // Recurse into the base, if there is one.
+      if (auto base = metatype->getBase()) {
+        expr = base;
+        continue;
+      }
+
+      // Either a reference to a type, or an expression that synthesizes a
+      // metatype from thin air. Either way, it's statically-derived.
+      return true;
+    }
+
+    // Anything else is not statically derived.
+    return false;
+  } while (true);
+}
+
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -3467,10 +3514,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
-  // We're constructing a struct or enum. Look for the constructor or enum
-  // element to use.
-  // Note: we also allow class types here, for now, because T(x) is still
-  // allowed to use coercion syntax.
+  // We're constructing a value of nominal type. Look for the constructor or
+  // enum element to use.
   assert(ty->getNominalOrBoundGenericNominal());
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
@@ -3491,6 +3536,13 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  /*Implicit=*/true, /*direct ivar*/false);
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
+
+  // If we're constructing a class object, the metatype must be statically
+  // derived (rather than an arbitrary value of metatype type).
+  if (ty->getClassOrBoundGenericClass() && !isStaticallyDerivedMetatype(fn)) {
+    tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
+      .highlight(fn->getSourceRange());
+  }
 
   // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator);
