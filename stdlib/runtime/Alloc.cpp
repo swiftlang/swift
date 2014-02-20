@@ -355,27 +355,37 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
 }
 
 void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
-  if (size == 0) return _swift_alloc_slow(0, flags);
+  size_t idx = SIZE_MAX;
+  if (size == 0) idx = 0;
   --size;
   // we could do a table based lookup if we think it worthwhile
 #ifdef __LP64__
-  if      (size <   0x80) return _swift_alloc_slow((size >> 3) +  0x0, flags);
-  else if (size <  0x100) return _swift_alloc_slow((size >> 4) +  0x8, flags);
-  else if (size <  0x200) return _swift_alloc_slow((size >> 5) + 0x10, flags);
-  else if (size <  0x400) return _swift_alloc_slow((size >> 6) + 0x18, flags);
-  else if (size <  0x800) return _swift_alloc_slow((size >> 7) + 0x20, flags);
-  else if (size < 0x1000) return _swift_alloc_slow((size >> 8) + 0x28, flags);
+  if      (size <   0x80) idx = (size >> 3) +  0x0;
+  else if (size <  0x100) idx = (size >> 4) +  0x8;
+  else if (size <  0x200) idx = (size >> 5) + 0x10;
+  else if (size <  0x400) idx = (size >> 6) + 0x18;
+  else if (size <  0x800) idx = (size >> 7) + 0x20;
+  else if (size < 0x1000) idx = (size >> 8) + 0x28;
 #else
-  if      (size <   0x40) return _swift_alloc_slow((size >> 2) +  0x0, flags);
-  else if (size <   0x80) return _swift_alloc_slow((size >> 3) +  0x8, flags);
-  else if (size <  0x100) return _swift_alloc_slow((size >> 4) + 0x10, flags);
-  else if (size <  0x200) return _swift_alloc_slow((size >> 5) + 0x18, flags);
-  else if (size <  0x400) return _swift_alloc_slow((size >> 6) + 0x20, flags);
-  else if (size <  0x800) return _swift_alloc_slow((size >> 7) + 0x28, flags);
-  else if (size < 0x1000) return _swift_alloc_slow((size >> 8) + 0x30, flags);
+  if      (size <   0x40) idx = (size >> 2) +  0x0;
+  else if (size <   0x80) idx = (size >> 3) +  0x8;
+  else if (size <  0x100) idx = (size >> 4) + 0x10;
+  else if (size <  0x200) idx = (size >> 5) + 0x18;
+  else if (size <  0x400) idx = (size >> 6) + 0x20;
+  else if (size <  0x800) idx = (size >> 7) + 0x28;
+  else if (size < 0x1000) idx = (size >> 8) + 0x30;
 #endif
 
   void *r;
+  if (idx != SIZE_MAX) {
+    if (flags & SWIFT_RAWALLOC) {
+      r = swift_tryRawAlloc(idx);
+    } else {
+      r = swift_tryAlloc(idx);
+    }
+    if (r) return r;
+  }
+
   do {
     if (flags & SWIFT_RAWALLOC) {
       r = malloc(size);
