@@ -606,10 +606,14 @@ public:
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType(0).is<MetatypeType>(),
             "metatype instruction must be of metatype type");
+    require(MI->getType(0).castTo<MetatypeType>()->hasRepresentation(),
+            "metatype instruction must have a metatype representation");
   }
   void checkClassMetatypeInst(ClassMetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
             "class_metatype instruction must be of metatype type");
+    require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
+            "class_metatype instruction must have a metatype representation");
     require(MI->getOperand().getType().getSwiftType()
             ->getClassOrBoundGenericClass(),
             "class_metatype base must be of class type");

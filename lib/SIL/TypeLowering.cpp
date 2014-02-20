@@ -1947,6 +1947,17 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
         return get##BridgedType##Type();                                \
     }
 #include "swift/SIL/BridgedTypes.def"
+
+    // Class metatypes bridge to ObjC metatypes.
+    // FIXME: @objc protocol metatypes.
+    if (auto metaTy = t->getAs<MetatypeType>()) {
+      if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
+        return MetatypeType::get(metaTy->getInstanceType(),
+                                 MetatypeRepresentation::ObjC,
+                                 metaTy->getASTContext());
+      }
+    }
+
     return t;
   }
 }

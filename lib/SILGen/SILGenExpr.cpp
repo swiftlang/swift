@@ -3461,6 +3461,17 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
       return emitBridge##NativeType##To##BridgedType(*this, loc, v);    \
     }
 #include "swift/SIL/BridgedTypes.def"
+
+    // Bridge thick to Objective-C metatypes.
+    if (auto bridgedMetaTy = bridgedTy->getAs<MetatypeType>()) {
+      if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
+        SILValue native = B.createThickToObjCMetatype(
+                            loc, v.getValue(),
+                            getLoweredType(bridgedTy));
+        return ManagedValue(native, v.getCleanup());
+      }
+    }
+
     return v;
   }
 }
@@ -3485,6 +3496,16 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
       return emitBridge##BridgedType##To##NativeType(*this, loc, v);        \
     }
 #include "swift/SIL/BridgedTypes.def"
+
+    // Bridge Objective-C to thick metatypes.
+    if (auto bridgedMetaTy = v.getType().getSwiftType()->getAs<MetatypeType>()){
+      if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
+        SILValue native = B.createObjCToThickMetatype(loc, v.getValue(),
+                                                      getLoweredType(nativeTy));
+        return ManagedValue(native, v.getCleanup());
+      }
+    }
+
     return v;
   }
 }
