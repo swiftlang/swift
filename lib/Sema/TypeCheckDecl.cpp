@@ -1390,7 +1390,8 @@ public:
     // In a protocol context, variables written as "var x : Int" are really
     // computed properties with just a getter.  Create the getter decl now.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
-        VD->getStorageKind() == VarDecl::Stored) {
+        VD->getStorageKind() == VarDecl::Stored &&
+        !VD->isVal()) {
       convertStoredVarInProtocolToComputed(VD);
 
       // Type check the getter declaration.

@@ -1477,10 +1477,19 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     }
   }
 
-  if (!PrimaryVar)
+  if (!PrimaryVar) {
     diagnose(pattern.getLoc(), diag::getset_nontrivial_pattern);
-  else
+    Invalid = true;
+  } else {
     setLocalDiscriminator(PrimaryVar);
+   
+    // Reject getters and setters for lets, but keep parsing them, for better
+    // recovery.
+    if (PrimaryVar->isVal()) {
+      diagnose(Tok, diag::val_cannot_be_computed_property);
+      Invalid = true;
+    }
+  }
 
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
@@ -1558,8 +1567,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   if (Set && !Get) {
     if (!Invalid)
       diagnose(Set->getLoc(), diag::var_set_without_get);
-    
-    Set = nullptr;
     Invalid = true;
   }
 
@@ -1568,6 +1575,20 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
     PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
     return PrimaryVar;
   }
+  
+  // If this decl is invalid, mark any parsed accessors as invalid to avoid
+  // tripping up later invariants.
+  if (Invalid) {
+    if (Get) {
+      Get->setType(ErrorType::get(Context));
+      Get->setInvalid();
+    }
+    if (Set) {
+      Set->setType(ErrorType::get(Context));
+      Set->setInvalid();
+    }
+  }
+  
   return nullptr;
 }
 
@@ -1729,11 +1750,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // If we syntactically match the second decl-var production, with a
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
-      // Reject getters and setters for lets, but parse them for better
-      // recovery.
-      if (isVal)
-        diagnose(Tok, diag::val_cannot_be_computed_property);
-
       if (auto *boundVar =
             parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, Decls)) {
         hasStorage = boundVar->hasStorage();
