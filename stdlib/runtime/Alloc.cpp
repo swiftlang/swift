@@ -564,24 +564,35 @@ extern "C" void swift_keepAlive(HeapObject *object) {
   swift_release(object);
 }
 
-/// \brief Lets us know whether the given Object is referenced
-/// more than once.  This information is useful for implementing
-/// copy-on-write in Swift.
-extern "C" bool swift_isUniquelyReferenced(HeapObject *object) {
+/// \brief Return the amount a strong refcount is incremented when a
+/// reference is acquired.
+///
+/// Used by an assertion in Swift.isUniquelyReferenced to check that
+/// the standard library knows the reference count interval.  When the
+/// isUnique check becomes part of a Builtin.xxx primitive, we can get
+/// rid of this function.
+extern "C" intptr_t swift_refCountInterval() {
+  return RC_INTERVAL;
+}
 
-  // Sometimes we have a NULL "owner" object, e.g. because the data
-  // being referenced (usually via UnsafePointer<T>) has infinite
-  // lifetime, or lifetime managed outside the Swift object system.
-  // In these cases we have to assume the data is shared among
-  // multiple references, and needs to be copied before modification.
-  if (object == nullptr) {
-    return false;
-  }
-  
-  bool result = (object->refCount <= 2 * RC_INTERVAL);
-  swift_release(object);
+/// \brief Return the offset of the refCount in a Swift heap object.
+///
+/// Used by an assertion in Swift.isUniquelyReferenced to check that
+/// the standard library knows where to find the reference count.
+/// When the isUnique check becomes part of a Builtin.xxx primitive,
+/// we can get rid of this function.
+extern "C" intptr_t swift_refCountOffset() {
+  return offsetof(HeapObject, refCount);
+}
 
-  return result;
+/// \brief Return the size of the refCount in a Swift heap object.
+///
+/// Used by an assertion in Swift.isUniquelyReferenced to check that
+/// the standard library knows the size of the reference count.
+/// When the isUnique check becomes part of a Builtin.xxx primitive,
+/// we can get rid of this function.
+extern "C" intptr_t swift_refCountSize() {
+  return sizeof(HeapObject().refCount);
 }
 
 void swift::swift_weakInit(WeakReference *ref, HeapObject *value) {
