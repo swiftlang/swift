@@ -1450,6 +1450,18 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
   return v;
 }
 
+void SILDeserializer::getAllSILFunctions() {
+  if (!FuncTable)
+    return;
+
+  for (auto KI = FuncTable->key_begin(), KE = FuncTable->key_end(); KI != KE;
+       ++KI) {
+    auto DI = FuncTable->find(*KI);
+    assert(DI != FuncTable->end() && "There should never be a key without data.");
+    readSILFunction(*DI, nullptr, Ctx.getIdentifier(*KI), false);
+  }
+}
+
 SILVTable *SILDeserializer::readVTable(DeclID VId) {
   if (VId == 0)
     return nullptr;

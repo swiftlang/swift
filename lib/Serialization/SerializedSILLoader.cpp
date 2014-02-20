@@ -54,6 +54,16 @@ SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
   return nullptr;
 }
 
+void SerializedSILLoader::getAll() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAll();
+}
+
+void SerializedSILLoader::getAllSILFunctions() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllSILFunctions();
+}
+
 /// Deserialize all VTables in all SILModules.
 void SerializedSILLoader::getAllVTables() {
   for (auto &Des : LoadedSILSections)

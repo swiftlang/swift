@@ -68,8 +68,17 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILVTable *lookupVTable(Identifier Name);
+
+  /// Deserialize all SILFunctions, VTables, and WitnessTables in all
+  /// SILModules.
+  void getAll();
+
+  /// Deserialize all SILFunctions in all SILModules.
+  void getAllSILFunctions();
+
   /// Deserialize all VTables in all SILModules.
   void getAllVTables();
+
   /// Deserialize all WitnessTables in all SILModules.
   void getAllWitnessTables();
 

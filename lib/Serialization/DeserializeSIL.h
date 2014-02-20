@@ -94,10 +94,26 @@ namespace swift {
 public:
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILVTable *lookupVTable(Identifier Name);
+
+    /// Deserialize all SILFunctions, VTables, and WitnessTables inside the
+    /// module and add them to SILMod.
+    ///
+    /// TODO: Globals.
+    void getAll() {
+      getAllSILFunctions();
+      getAllVTables();
+      getAllWitnessTables();
+    }
+
+    /// Deserialize all SILFunctions inside the module and add them to SILMod.
+    void getAllSILFunctions();
+
     /// Deserialize all VTables inside the module and add them to SILMod.
     void getAllVTables();
+
     /// Deserialize all WitnessTables inside the module and add them to SILMod.
     void getAllWitnessTables();
+
     SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx,
                     SerializedSILLoader::Callback *callback);
 
