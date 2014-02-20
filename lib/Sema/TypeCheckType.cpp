@@ -435,22 +435,6 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (!comp->isBound()) {
     auto parentComps = components.slice(0, components.size()-1);
     if (parentComps.empty()) {
-      // Within the body of a method with a DynamicSelf return type,
-      // 'DynamicSelf' refers to the dynamic type of a 'self' instance.
-      if (comp->getIdentifier() == TC.Context.Id_DynamicSelf) {
-        if (auto func = dyn_cast<FuncDecl>(DC)) {
-          if (auto dynamicSelfTy = func->getDynamicSelf()) {
-            SourceRange bodyRange = func->getBodySourceRange();
-            if (bodyRange.isValid() && comp->getIdLoc().isValid() &&
-                TC.Context.SourceMgr.rangeContainsTokenLoc(bodyRange,
-                                                           comp->getIdLoc())) {
-              comp->setValue(dynamicSelfTy);
-              return Type(dynamicSelfTy);
-            }
-          }
-        }
-      }
-
       // Resolve the first component, which is the only one that requires
       // unqualified name lookup.
       UnqualifiedLookup Globals(comp->getIdentifier(), DC, &TC,comp->getIdLoc(),

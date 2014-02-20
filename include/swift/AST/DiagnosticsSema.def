@@ -495,9 +495,9 @@ ERROR(dynamic_self_struct_enum,sema_tcd,none,
       "did you mean to use the %select{struct|enum}0 type %1?",
       (int, Identifier))
 ERROR(dynamic_self_not_result_type,sema_tcd,none,
-      "'DynamicSelf' can only be introduced in the return type of a method", ())
+      "'DynamicSelf' can only be used in the return type of a method", ())
 ERROR(dynamic_self_not_result_type_suggest,sema_tcd,none,
-      "'DynamicSelf' can only be introduced in the return type of a method; "
+      "'DynamicSelf' can only be used in the return type of a method; "
       "did you mean %0?", (Identifier))
 ERROR(dynamic_self_requirement,sema_tcd,none,
       "candidate result type is not 'DynamicSelf'", ())
