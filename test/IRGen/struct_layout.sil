@@ -4,36 +4,47 @@ import Builtin
 import Swift
 
 // x86_64: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
-// x86_64: %V4main14Rdar15410780_B = type <{ %Sq }>
-// x86_64: %Sq = type <{ [257 x i8], [1 x i8] }>
+// x86_64: %V4main14Rdar15410780_B = type <{ %Sq[[B:(\.[0-9]+)?]] }>
+// x86_64: %Sq[[B]] = type <{ [257 x i8], [1 x i8] }>
+// x86_64: %V4main14Rdar15410780_C = type <{ %Sq[[C:(\.[0-9]+)?]] }>
+// x86_64: %Sq[[C]] = type <{ [24 x i8], [1 x i8] }>
 
 // x86_64: @_TWVV4main14Rdar15410780_A = constant {{.*}} (i64 257
 // x86_64: @_TWVV4main14Rdar15410780_B = constant {{.*}} (i64 258
+// x86_64: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i64 25
 
-// armv7: %V4main14Rdar15410780_C = type <{ %Sq.0 }>
-// armv7: %Sq.0 = type <{ [20 x i8], [1 x i8] }>
-// armv7: %SS = type <{ %VSs14StringByteData }>
-// armv7: %VSs14StringByteData = type <{ %VSs13UnsafePointer, [4 x i8], %Si, %swift.refcounted* }>
-// armv7: %VSs13UnsafePointer = type <{ i8* }>
-// armv7: %Si = type <{ i64 }>
 
-// armv7: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i32 21
+// armv7: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
+// armv7: %V4main14Rdar15410780_B = type <{ %Sq[[B:(\.[0-9]+)?]] }>
+// armv7: %Sq[[B]] = type <{ [257 x i8], [1 x i8] }>
+// armv7: %V4main14Rdar15410780_C = type <{ %Sq[[C:(\.[0-9]+)?]] }>
+// armv7: %Sq[[C]] = type <{ [13 x i8], [1 x i8] }>
+
+// armv7: @_TWVV4main14Rdar15410780_A = constant {{.*}} (i32 257
+// armv7: @_TWVV4main14Rdar15410780_B = constant {{.*}} (i32 258
+// armv7: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i32 14
+
 
 // arm64: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
 // arm64: %V4main14Rdar15410780_B = type <{ %Sq[[B:(\.[0-9]+)?]] }>
 // arm64: %Sq[[B]] = type <{ [257 x i8], [1 x i8] }>
 // arm64: %V4main14Rdar15410780_C = type <{ %Sq[[C:(\.[0-9]+)?]] }>
 // arm64: %Sq[[C]] = type <{ [24 x i8], [1 x i8] }>
+
 // arm64: @_TWVV4main14Rdar15410780_A = constant {{.*}} (i64 257
 // arm64: @_TWVV4main14Rdar15410780_B = constant {{.*}} (i64 258
+// arm64: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i64 25
+
 
 // i386: %V4main14Rdar15410780_A = type <{ i2048, %VSs4Int8 }>
 // i386: %V4main14Rdar15410780_B = type <{ %Sq[[B:(\.[0-9]+)?]] }>
 // i386: %Sq[[B]] = type <{ [257 x i8], [1 x i8] }>
 // i386: %V4main14Rdar15410780_C = type <{ %Sq[[C:(\.[0-9]+)?]] }>
 // i386: %Sq[[C]] = type <{ [13 x i8], [1 x i8] }>
+
 // i386: @_TWVV4main14Rdar15410780_A = constant {{.*}} (i32 257
 // i386: @_TWVV4main14Rdar15410780_B = constant {{.*}} (i32 258
+// i386: @_TWVV4main14Rdar15410780_C = constant {{.*}} (i32 14
 
 
 // <rdar://problem/15410780>
