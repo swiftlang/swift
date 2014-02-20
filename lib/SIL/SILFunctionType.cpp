@@ -1080,13 +1080,18 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
                getBridgedInputType(*this, cc, CanType(input.getType())));
     resultType = getBridgedResultType(*this, cc, resultType);
     break;
-  case AbstractCC::ObjCMethod:
-    // The "self" parameter should not get bridged.
-    for (auto &input : make_range(inputs.begin() + 1, inputs.end()))
+  case AbstractCC::ObjCMethod: {
+    // The "self" parameter should not get bridged unless it's a metatype.
+    unsigned skip = 1;
+    if (inputs.front().getType()->is<MetatypeType>())
+      skip = 0;
+
+    for (auto &input : make_range(inputs.begin() + skip, inputs.end()))
       input = input.getWithType(
                 getBridgedInputType(*this, cc, CanType(input.getType())));
     resultType = getBridgedResultType(*this, cc, resultType);
     break;
+  }
   }
   
   // Put the inputs in the order expected by the calling convention.

@@ -2450,7 +2450,11 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
                          ObjCToThickMetatypeInst *i) {
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *classPtr = from.claimNext();
-
+  
+  // Clang uses i8* for Class types; bitcast to the more-precise objc_class*.
+  if (classPtr->getType() == IGM.Int8PtrTy)
+    classPtr = Builder.CreateBitCast(classPtr, IGM.ObjCClassPtrTy);
+  
   // Fetch the metadata for that class.
   Explosion to(ResilienceExpansion::Maximal);
   auto call = Builder.CreateCall(IGM.getGetObjCClassMetadataFn(), classPtr);
