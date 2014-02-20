@@ -568,8 +568,8 @@ macro(add_swift_library name)
       string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
         ${SWIFTLIB_DIR})
       set_target_properties(${name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/swift/${SWIFTLIB_SUBDIR})
+        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
     endforeach()
 
     install(TARGETS ${name}
