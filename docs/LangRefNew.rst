@@ -678,6 +678,68 @@ those.
 ``class`` keyword is allowed inside classes, class extensions, and
 protocols.
 
+...
+
+.. _langref.decl.subscript:
+
+``subscript`` Declarations
+---------------------------
+
+.. code-block:: none
+
+  decl-subscript ::= subscript-head '{' get-set '}'
+  subscript-head ::= attribute-list 'subscript' pattern-tuple '->' type
+
+A subscript declaration provides support for <a href="#expr-subscript">
+subscripting</a> an object of a particular type via a getter and (optional)
+setter. Therefore, subscript declarations can only appear within a type
+definition or extension.
+
+The ``pattern-tuple`` of a subscript declaration provides the indices that
+will be used in the subscript expression, e.g., the ``i`` in ``a[i]``.  This
+pattern must be fully-typed. The ``type`` following the arrow provides the
+type of element being accessed, which must be materializable. Subscript
+declarations can be overloaded, so long as either the ``pattern-tuple`` or
+``type`` differs from other declarations.
+
+The ``get-set`` clause specifies the getter and setter used for subscripting.
+The getter is a function whose input is the type of the ``pattern-tuple`` and
+whose result is the element type.  Similarly, the setter is a function whose
+result type is ``()`` and whose input is the type of the ``pattern-tuple``
+with a parameter of the element type added to the end of the tuple; the name
+of the parameter is the ``set-name``, if provided, or ``value`` otherwise.
+
+::
+
+  // Simple bit vector with storage for 64 boolean values
+  struct BitVector64 {
+    var bits: Int64
+
+    // Allow subscripting with integer subscripts and a boolean result.
+    subscript (bit : Int) -> Bool {
+      // Getter tests the given bit
+      get {
+        return bits & (1 << bit)) != 0
+      }
+
+      // Setter sets the given bit to the provided value.
+      set {
+        var mask = 1 << bit
+        if value {
+          bits = bits | mask
+        } else {
+          bits = bits & ~mask
+        }
+      }
+    }
+  }
+
+  var vec = BitVector64()
+  vec[2] = true
+  if vec[3] {
+    println("third bit is set")
+  }
+
 .. _langref.decl.attribute_list:
 
 Attribute Lists

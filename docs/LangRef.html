@@ -664,71 +664,7 @@
     }
   </pre>
 
-  <!-- ===================================================================== -->
-  <h3 id="decl-subscript">subscript Declarations</h3>
-  <!-- ===================================================================== -->
-  
-  <pre class="grammar">
-    decl-subscript        ::= subscript-head '{' <a href="#get-set">get-set<a/> '}'
-    <a id="subscript-head"></a>subscript-head        ::= <a href="#attribute-list">attribute-list</a> 'subscript' <a href="#pattern-tuple">pattern-tuple</a> '->' <a href="#type">type</a>
-  </pre>
-
-  <p>A subscript declaration provides support for <a
- href="#expr-subscript"> subscripting</a> an object of a particular
-type via a getter and (optional) setter. Therefore, subscript
-declarations can only appear within a type definition or
-extension.</p>
-
-  <p> The <tt>pattern-tuple</tt> of a subscript declaration provides
-the indices that will be used in the subscript expression, e.g., the
-<tt>i</tt> in <tt>a[i]</tt>. This pattern must be fully-typed. The
-<tt>type</tt> following the arrow provides the type of element being
-accessed, which must be materializable. Subscript declarations can be
-overloaded, so long as either the <tt>pattern-tuple</tt> or
-<tt>type</tt> differs from other declarations.</p>
-
-  <p>The <tt>get-set</tt> clause specifies the getter and setter used
-for subscripting. The getter is a function whose input is the type of
-the <tt>pattern-tuple</tt> and whose result is the element type.
-Similarly, the setter is a function whose result type is <tt>()</tt>
-and whose input is the type of the <tt>pattern-tuple</tt> with a
-parameter of the element type added to the end of the tuple; the name
-of the parameter is the <tt>set-name</tt>, if provided, or
-<tt>value</tt> otherwise.
-
-  <pre class="example">
-<i>// Simple bit vector with storage for 64 boolean values</i>
-struct BitVector64 {
-  bits : Int64
-
-  <i>// Allow subscripting with integer subscripts and a boolean result.</i>
-  subscript (bit : Int) -&gt; Bool {
-    <i>// Getter tests the given bit</i>
-    get {
-      if (bits & (1 &lt;&lt; bit)) != 0 {
-        return true
-      }
-      return false;
-    }
-
-    <i>// Setter sets the given bit to the provided value</i>
-    set {
-      var mask = 1 &lt;&lt; bit
-      if value {
-        bits = bits | mask
-      } else {
-        bits = bits & ~mask
-      }  
-    }
-  }
-}
-
-var vec : BitVector64
-vec[2] = true
-if vec[3] {
-  print("third bit is set\n");
-}
-  </pre>
+  <!-- "subscript Declarations" was converted to ReST -->
 
   <!-- ===================================================================== -->
   <h3 id="decl-constructor">constructor Declarations</h3>
