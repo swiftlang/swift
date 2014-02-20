@@ -69,8 +69,48 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   }
 
   // Look for the member.
-  if (!dc->lookupQualified(type, name, options, this, result.Results))
-    return result;
+  if (!dc->lookupQualified(type, name, options, this, result.Results)) {
+    // If we didn't find anything, /and/ this is a nominal type, check to see
+    // if any of the nominal's protocols are derivable and contain the
+    // name we're looking for. (Note that we are not including extensions
+    // here -- default derivation doesn't apply in extensions.)
+    bool isMetatype = false;
+    NominalTypeDecl *nominalDecl;
+    if (auto metatypeType = type->getAs<MetatypeType>()) {
+      isMetatype = true;
+      nominalDecl = metatypeType->getInstanceType()->getAnyNominal();
+    } else {
+      nominalDecl = type->getAnyNominal();
+    }
+    if (!nominalDecl)
+      return result;
+
+    bool anyChange = false;
+    for (auto proto : nominalDecl->getProtocols()) {
+      if (!nominalDecl->derivesProtocolConformance(proto))
+        continue;
+
+      Type protoType = proto->getDeclaredType();
+      if (isMetatype)
+        protoType = MetatypeType::get(protoType, Context);
+
+      SmallVector<ValueDecl *, 4> requirements;
+      if (dc->lookupQualified(protoType, name, options, this, requirements)) {
+        // If the protocol contains the member we're looking for, force the
+        // conformance to be derived.
+        // FIXME: We don't actually need to emit the definitions here.
+        if (conformsToProtocol(nominalDecl->getDeclaredType(), proto, dc))
+          anyChange = true;
+
+        // Don't just break out of the loop, though...it's possible (though
+        // unlikely) that two protocols with derivable conformances both have
+        // functions with the same name but different types.
+      }
+    }
+
+    if (anyChange)
+      dc->lookupQualified(type, name, options, this, result.Results);
+  }
 
   return result;
 }

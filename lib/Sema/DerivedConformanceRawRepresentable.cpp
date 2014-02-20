@@ -362,6 +362,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl, rawType);
 
   for (auto elt : enumDecl->getAllElements()) {
+    tc.validateDecl(elt);
     if (!elt->getTypeCheckedRawValueExpr()
         || !elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawType))
       return nullptr;
