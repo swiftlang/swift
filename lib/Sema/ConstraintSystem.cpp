@@ -940,6 +940,17 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         });
     }
   }
+  // Alternatively, if this is a constructor referenced from a DynamicSelf base
+  // object, replace the result type with DynamicSelf.
+  else if (baseObjTy->is<DynamicSelfType>() && isa<ConstructorDecl>(value)) {
+    auto outerFnType = openedType->castTo<FunctionType>();
+    auto innerFnType = outerFnType->getResult()->castTo<FunctionType>();
+
+    openedType = FunctionType::get(innerFnType->getInput(), baseObjTy,
+                                   innerFnType->getExtInfo());
+    openedType = FunctionType::get(outerFnType->getInput(), openedType,
+                                   outerFnType->getExtInfo());
+  }
 
   // Constrain the 'self' object type.
   auto openedFnType = openedType->castTo<FunctionType>();

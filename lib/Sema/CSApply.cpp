@@ -397,7 +397,7 @@ namespace {
     /// \param type The function type to transform.
     /// \param newResultType The replacement result type.
     /// \param uncurried The number of levels that have already been uncurried.
-    static Type replaceFunctionResultType(FuncDecl *func,
+    static Type replaceFunctionResultType(AbstractFunctionDecl *func,
                                           Type type,
                                           Type newResultType,
                                           unsigned uncurried = 0) {
@@ -542,10 +542,12 @@ namespace {
                                               /*wantInterfaceType=*/true);
       }
 
-      // If this is a method whose result type is DynamicSelf, replace
-      // DynamicSelf with the actual object type.
-      if (auto func = dyn_cast<FuncDecl>(member)) {
-        if (func->hasDynamicSelf()) {
+      // If this is a method whose result type is DynamicSelf, or a construction
+      // of a DynamicSelf value, replace DynamicSelf with the actual object
+      // type.
+      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+        if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
+            (baseTy->is<DynamicSelfType>() && isa<ConstructorDecl>(func))) {
           // For a DynamicSelf method on an existential, open up the
           // existential.
           if (func->getExtensionType()->is<ProtocolType>() &&
@@ -3516,7 +3518,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
-  assert(ty->getNominalOrBoundGenericNominal());
+  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>());
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
                       locator.withPathElement(
@@ -3539,7 +3541,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // If we're constructing a class object, the metatype must be statically
   // derived (rather than an arbitrary value of metatype type).
-  if (ty->getClassOrBoundGenericClass() && !isStaticallyDerivedMetatype(fn)) {
+  if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
+      !isStaticallyDerivedMetatype(fn)) {
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());
   }
