@@ -51,3 +51,10 @@ enum RawEnum {
   Intergalactic,
   Planetary
 };
+
+typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
+  NSByteCountFormatterCountStyleFile    = 0,
+  NSByteCountFormatterCountStyleMemory  = 1,
+  NSByteCountFormatterCountStyleDecimal = 2,
+  NSByteCountFormatterCountStyleBinary  = 3
+};
