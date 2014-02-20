@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstring>
 #include <new>
+#include <string>
 
 using namespace swift;
 
@@ -44,9 +45,24 @@ struct String {
   intptr_t countAndFlags;
   HeapObject *owner;
   
+  String() = default;
+  
+  /// Wrap a string literal in a swift String.
   template<size_t N>
-  explicit String(char const (&s)[N])
+  explicit String(const char (&s)[N])
     : data(s), countAndFlags(N-1), owner(nullptr) {}
+  
+  /// Copy an ASCII string into a swift String on the heap.
+  explicit String(const char *ptr, size_t size)
+    // FIXME: leaks
+    : data(malloc(size)), countAndFlags(size), owner(nullptr)
+  {
+    memcpy(const_cast<void*>(data), ptr, size);
+  }
+  
+  String(const void *data, intptr_t countAndFlags, HeapObject *owner)
+    : data(data), countAndFlags(countAndFlags), owner(owner) {
+  }
 };
   
 struct StringMirrorTuple {
@@ -123,6 +139,10 @@ public:
   /// Build a new MagicMirror for type T by taking ownership of the referenced
   /// value.
   MagicMirror(OpaqueValue *value, const Metadata *T);
+  
+  /// Build a new MagicMirror for type T, sharing ownership with an existing
+  /// heap object, which is retained.
+  MagicMirror(HeapObject *owner, const OpaqueValue *value, const Metadata *T);
 };
     
 static_assert(alignof(MagicMirror) == alignof(Mirror),
@@ -170,7 +190,7 @@ OptionalIDERepresentable Opaque_getIDERepresentation(MagicMirrorData *self,
   result.isNone = true;
   return result;
 }
-static const MirrorWitnessTable MagicMirrorWitnessTableForOpaque{
+static const MirrorWitnessTable OpaqueMirrorWitness{
   Opaque_getValue,
   Opaque_getType,
   Opaque_getObjectIdentifier,
@@ -180,30 +200,77 @@ static const MirrorWitnessTable MagicMirrorWitnessTableForOpaque{
   Opaque_getIDERepresentation,
 };
   
-// MagicMirror constructor.
+// Mirror witnesses for a tuple type.
+intptr_t Tuple_getCount(MagicMirrorData *self, const Metadata *Self) {
+  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
+  return Tuple->NumElements;
+}
   
-MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
+Mirror reflectInnerValue(HeapObject *owner,
+                         const OpaqueValue *value, const Metadata *T);
+    
+    
+StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
+                                 const Metadata *Self) {
+  StringMirrorTuple result;
+  
+  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
+  
+  if (i < 0 || (size_t)i > Tuple->NumElements)
+    abort();
+  
+  // The name is the stringized element number '.0'.
+  char buf[32];
+  snprintf(buf, 31, ".%td", i);
+  buf[31] = 0;
+  result.first = String(buf, strlen(buf));
+  
+  // Get a Mirror for the nth element.
+  auto &elt = Tuple->getElements()[i];
+  auto bytes = reinterpret_cast<const char*>(self->Value);
+  auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
+  
+  result.second = reflectInnerValue(self->Owner, eltData, elt.Type);
+  return result;
+}
+  
+StringReturn Tuple_getString(MagicMirrorData *self, const Metadata *Self) {
+  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
+  
+  auto buf = reinterpret_cast<char*>(malloc(128));
+  snprintf(buf, 127, "(%td elements)", Tuple->NumElements);
+  buf[127] = 0;
+  
+  String s{buf, intptr_t(strlen(buf)), nullptr};
+  return _TFSs13_returnStringFT1sRSS_SS(&s);
+}
+  
+static const MirrorWitnessTable TupleMirrorWitness{
+  Opaque_getValue,
+  Opaque_getType,
+  Opaque_getObjectIdentifier,
+  Tuple_getCount,
+  Tuple_getChild,
+  Tuple_getString,
+  Opaque_getIDERepresentation,
+};
+  
+/// Get the magic mirror witnesses appropriate to a particular type.
+static const MirrorWitnessTable *getWitnessForType(const Metadata *T) {
   switch (T->getKind()) {
-  // Put value types into a box so we can take stable interior pointers.
-  // TODO: Specialize behavior here. If the value is a swift-refcounted class
-  // we don't need to put it in a box to point into it.
+  case MetadataKind::Tuple:
+    return &TupleMirrorWitness;
+      
+  /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::Tuple:
   case MetadataKind::Struct:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::Function:
   case MetadataKind::Existential:
-  case MetadataKind::Metatype: {
-    auto box = swift_allocBox(T);
-    T->vw_initializeWithTake(box.value, value);
-    
-    /// FIXME: Choose a more specific witness appropriate to the kind.
-    MirrorWitness = &MagicMirrorWitnessTableForOpaque;
-    Data = {box.heapObject, box.value, T};
-    return;
-  }
+  case MetadataKind::Metatype:
+    return &OpaqueMirrorWitness;
       
   // Types can't have these kinds.
   case MetadataKind::PolyFunction:
@@ -212,18 +279,63 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
     abort();
   }
 }
-    
+
+  
+/// MagicMirror ownership-taking constructor.
+MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
+  // Put value types into a box so we can take stable interior pointers.
+  // TODO: Specialize behavior here. If the value is a swift-refcounted class
+  // we don't need to put it in a box to point into it.
+  auto box = swift_allocBox(T);
+  T->vw_initializeWithTake(box.value, value);
+  
+  MirrorWitness = getWitnessForType(T);
+  Data = {box.heapObject, box.value, T};
+}
+  
+/// MagicMirror ownership-sharing constructor.
+MagicMirror::MagicMirror(HeapObject *owner,
+                         const OpaqueValue *value, const Metadata *T) {
+  swift_retain(owner);
+  
+  MirrorWitness = getWitnessForType(T);
+  Data = {owner, value, T};
+}
+  
+const ReflectableWitnessTable *getReflectableConformance(const Metadata *T) {
+  return reinterpret_cast<const ReflectableWitnessTable*>(
+    swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr));
+}
+  
+/// Produce a mirror for any value, like swift_reflectAny, but do not consume
+/// the value, so we can produce a mirror for a subobject of a value already
+/// owned by a mirror.
+Mirror reflectInnerValue(HeapObject *owner,
+                         const OpaqueValue *value, const Metadata *T) {
+  auto witness = getReflectableConformance(T);
+  // Use the Reflectable conformance if the object has one.
+  if (witness) {
+    return witness->getMirror(const_cast<OpaqueValue*>(value), T);
+  }
+  // Otherwise, fall back to MagicMirror.
+  Mirror result;
+  ::new (&result) MagicMirror(owner, value, T);
+  return result;
+}
+  
 } // end anonymous namespace
-              
+
 /// func reflect<T>(x: T) -> Mirror
 ///
 /// Produce a mirror for any value. If the value's type conforms to Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
+///
+/// This function consumes 'value', following Swift's +1 convention for in
+/// arguments.
 Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
-  auto witness = reinterpret_cast<const ReflectableWitnessTable*>(
-                    swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr));
-  
+  auto witness = getReflectableConformance(T);
+                                                                  
   // Use the Reflectable conformance if the object has one.
   if (witness) {
     auto result = witness->getMirror(value, T);
