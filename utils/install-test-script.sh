@@ -3,7 +3,7 @@
 # Smoke tests a Swift installation package.
 # Set these to the paths of the OS X SDK and toolchain.
 SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.10.sdk
-TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.10.xctoolchain
+TOOLCHAIN=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain
 
 # FIXME: OSX 10.9 bug <rdar://problem/13228632>: TMPDIR doesn't get set sometimes.
 if [ ! "$TMPDIR" ]; then
