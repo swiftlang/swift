@@ -873,7 +873,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
   if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val))
-    return parseMatchingPatternVarOrLet();
+    return parseMatchingPatternVarOrVal();
 
   // matching-pattern ::= 'is' type
   if (Tok.is(tok::kw_is))
@@ -891,7 +891,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
   return makeParserResult(new (Context) ExprPattern(subExpr.get()));
 }
 
-ParserResult<Pattern> Parser::parseMatchingPatternVarOrLet() {
+ParserResult<Pattern> Parser::parseMatchingPatternVarOrVal() {
   assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects val or var");
   bool isVal = Tok.is(tok::kw_val);
   SourceLoc varLoc = consumeToken();
