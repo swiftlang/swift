@@ -2515,6 +2515,15 @@ namespace {
       }
     }
 
+    static bool
+    classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
+                            const clang::ObjCProtocolDecl *constProto,
+                            bool checkCategories) {
+      auto interface = const_cast<clang::ObjCInterfaceDecl *>(constInterface);
+      auto proto = const_cast<clang::ObjCProtocolDecl *>(constProto);
+      return interface->ClassImplementsProtocol(proto, checkCategories);
+    }
+
     /// \brief Import the members of all of the protocols to which the given
     /// Objective-C class, category, or extension explicitly conforms into
     /// the given list of members, so long as the the method was not already
@@ -2536,7 +2545,27 @@ namespace {
       bool isRoot = swiftClass && !swiftClass->getSuperclass();
 
       for (auto proto : protocols) {
+        auto clangProto =
+          cast_or_null<clang::ObjCProtocolDecl>(proto->getClangDecl());
+        if (!clangProto)
+          continue;
+
+        // Don't import a protocol's members if the superclass already adopts
+        // the protocol, or (for categories) if the class itself adopts it
+        // in its main @interface.
+        auto interfaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(decl);
+        if (!interfaceDecl) {
+          auto category = cast<clang::ObjCCategoryDecl>(decl);
+          interfaceDecl = category->getClassInterface();
+          if (classImplementsProtocol(interfaceDecl, clangProto, false))
+            continue;
+        }
+        if (auto superInterface = interfaceDecl->getSuperClass())
+          if (classImplementsProtocol(superInterface, clangProto, true))
+            continue;
+
         for (auto member : proto->getMembers()) {
+          // FIXME: Import properties.
           auto func = dyn_cast<FuncDecl>(member);
           if (!func)
             continue;

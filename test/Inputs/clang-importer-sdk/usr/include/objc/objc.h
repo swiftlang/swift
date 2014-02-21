@@ -12,7 +12,6 @@ typedef long NSInteger;
 - performSelector:(SEL)selector withObject:(id)obj;
 - (Class)myClass;
 + description;
-- description;
 @end
 
 @interface A : NSObject
