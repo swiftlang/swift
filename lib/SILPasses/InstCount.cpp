@@ -71,6 +71,8 @@ class SILInstCount : public SILFunctionTransform {
 
   InstCountVisitor V;
 
+  StringRef getName() override { return "SIL Inst Count"; }
+
   /// The entry point to the transformation.
   void run() {
     V.visitSILFunction(getFunction());

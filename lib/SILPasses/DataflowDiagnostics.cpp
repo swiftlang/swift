@@ -151,6 +151,8 @@ static void diagnoseStaticReports(const SILInstruction *I,
 class EmitDFDiagnostics : public SILFunctionTransform {
   virtual ~EmitDFDiagnostics() {}
 
+  StringRef getName() override { return "Emit Dataflow Diagnostics"; }
+
   /// The entry point to the transformation.
   void run() {
     SILModule &M = getFunction()->getModule();
