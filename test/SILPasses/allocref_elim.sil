@@ -300,3 +300,24 @@ sil @non_trivial_destructor_objc_destructor : $@thin () -> () {
   %1 = tuple()
   return %1 : $()
 }
+
+// CHECK-LABEL: sil @non_trivial_destructor_on_stack : $@thin () -> () {
+// CHECK: alloc_stack
+// CHECK: return
+sil @non_trivial_destructor_on_stack : $@thin () -> () {
+  %0 = alloc_stack $NonTrivialDestructor
+  dealloc_stack %0#0 : $*@local_storage NonTrivialDestructor
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @trivial_destructor_on_stack : $@thin () -> () {
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: dealloc_stack
+// CHECK: return
+sil @trivial_destructor_on_stack : $@thin () -> () {
+  %0 = alloc_stack $Int
+  dealloc_stack %0#0 : $*@local_storage Int
+  %1 = tuple()
+  return %1 : $()
+}

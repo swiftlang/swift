@@ -39,12 +39,11 @@
 
 using namespace swift;
 
-STATISTIC(NumStoreOnlyAllocRefEliminated,
-          "number of store only alloc ref eliminated.");
+STATISTIC(DeadAllocRefEliminated,
+          "number of AllocRef instructions removed");
 
-//===----------------------------------------------------------------------===//
-//                            Destructor Analysis
-//===----------------------------------------------------------------------===//
+STATISTIC(DeadAllocStackEliminated,
+          "number of AllocStack instructions removed");
 
 static SILFunction *getDestructor(AllocationInst* AI) {
   if (auto *ARI = dyn_cast<AllocRefInst>(AI)) {
@@ -206,6 +205,11 @@ static bool canZapInstruction(SILInstruction *Inst) {
       !isa<TermInst>(Inst))
     return true;
 
+  // We know that the destructor has no side effects so we can remove the
+  // deallocation instruction too.
+  if (isa<DeallocationInst>(Inst))
+    return true;
+
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
   return false;
@@ -236,7 +240,7 @@ hasUnremoveableUsers(SILInstruction *AllocRef,
     // If we can't zap this instruction... bail...
     if (!canZapInstruction(I)) {
       DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
-      return false;
+      return true;
     }
 
     // At this point, we can remove the instruction as long as all of its users
@@ -251,7 +255,7 @@ hasUnremoveableUsers(SILInstruction *AllocRef,
         if (Op->get() == SI->getSrc()) {
           DEBUG(llvm::dbgs() << "        Found store of pointer. Failure: " <<
                 *SI);
-          return false;
+          return true;
         }
 
       // Otherwise, add normal instructions to the worklist for processing.
@@ -259,13 +263,39 @@ hasUnremoveableUsers(SILInstruction *AllocRef,
     }
   }
 
-  return true;
+  return false;
 }
 
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
+  llvm::SmallVector<AllocationInst*, 16> Allocations;
 
-  bool processFunction(SILFunction &Fn);
+  void collectAllocations(SILFunction &Fn) {
+    for (auto &BB : Fn)
+      for (auto &II : BB)
+        if (auto *AI = dyn_cast<AllocationInst>(&II))
+          Allocations.push_back(AI);
+    }
+
+  bool processAllocRef(AllocRefInst *ARI);
+  bool processAllocStack(AllocStackInst *ASI);
+  bool processAllocBox(AllocBoxInst *ABI){ return false;}
+
+  bool processFunction(SILFunction &Fn) {
+    Allocations.clear();
+    DestructorAnalysisCache.clear();
+    bool Changed = false;
+    collectAllocations(Fn);
+    for (auto *II : Allocations) {
+      if (auto *A = dyn_cast<AllocRefInst>(II))
+        Changed |= processAllocRef(A);
+      else if (auto *A = dyn_cast<AllocStackInst>(II))
+        Changed |= processAllocStack(A);
+      else if (auto *A = dyn_cast<AllocBoxInst>(II))
+        Changed |= processAllocBox(A);
+    }
+    return Changed;
+  }
 
   void run() {
     if (processFunction(*getFunction()))
@@ -279,76 +309,9 @@ class DeadObjectElimination : public SILFunctionTransform {
 //                            Function Processing
 //===----------------------------------------------------------------------===//
 
-bool DeadObjectElimination::processFunction(SILFunction &Fn) {
-  DEBUG(llvm::dbgs() << "***** Processing Function " << Fn.getName()
-        << " *****\n");
-
-  llvm::SmallVector<SILInstruction *, 16> DeleteList;
-  bool Changed = false;
-
-  // For each BB in Fn...
-  for (auto &BB : Fn)
-
-    // For each inst in BB...
-    for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-
-      // If the inst is not an alloc_ref inst, skip it...
-      auto *AllocRef = dyn_cast<AllocRefInst>(II);
-      if (!AllocRef) {
-        ++II;
-        continue;
-      }
-
-      DEBUG(llvm::dbgs() << "Visiting: " << *AllocRef);
-
-      // Ok, we have an alloc_ref. Check the cache to see if we have already
-      // computed the destructor behavior for its SILType.
-      bool HasSideEffects;
-      SILType Type = AllocRef->getType();
-      auto CacheSearchResult = DestructorAnalysisCache.find(Type);
-      if (CacheSearchResult != DestructorAnalysisCache.end()) {
-        // Ok we found a value in the cache.
-        HasSideEffects = CacheSearchResult->second;
-      } else {
-        // We did not find a value in the cache for our destructor. Analyze the
-        // destructor to make sure it has no side effects. For now this only
-        // supports alloc_ref of classes so any alloc_ref with a reference type
-        // that is not a class this will return false for. Once we have analyzed
-        // it, set Behavior to that value and insert the value into the Cache.
-        HasSideEffects = doesDestructorHaveSideEffects(AllocRef);
-        DestructorAnalysisCache[Type] = HasSideEffects;
-      }
-
-      if (HasSideEffects) {
-        DEBUG(llvm::dbgs() << "    Destructor had side effects. Can't "
-              "eliminate alloc_ref\n");
-        ++II;
-        continue;
-      }
-
-      // Our destructor has no side effects, so if we can prove no loads or
-      // escapes, then we can completely remove the use graph of this alloc_ref.
-      llvm::SmallSetVector<SILInstruction *, 16> UsersToRemove;
-      if (!hasUnremoveableUsers(AllocRef, UsersToRemove)) {
-        DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
-        ++II;
-        continue;
-      }
-
-      // Ok, we succeeded! Add all of the involved instructions to our delete
-      // list.
-      for (auto *I : UsersToRemove)
-        DeleteList.push_back(I);
-      DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
-
-      ++NumStoreOnlyAllocRefEliminated;
-      ++II;
-      Changed = true;
-    }
-
-  // Erase all instructions that are in DeleteList.
-  for (auto *I : DeleteList) {
-    // If I has any uses left, just set them to be undef.
+void static
+removeInstructions(llvm::SmallSetVector<SILInstruction *, 16> &UsersToRemove) {
+  for (auto *I : UsersToRemove) {
     if (!I->use_empty())
       for (unsigned i = 0, e = I->getNumTypes(); i != e; ++i)
         SILValue(I, i).replaceAllUsesWith(SILUndef::get(I->getType(i),
@@ -356,7 +319,65 @@ bool DeadObjectElimination::processFunction(SILFunction &Fn) {
     // Now we know that I should not have any uses... erase it from its parent.
     I->eraseFromParent();
   }
-  return Changed;
+}
+
+bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
+  // Ok, we have an alloc_ref. Check the cache to see if we have already
+  // computed the destructor behavior for its SILType.
+  bool HasSideEffects;
+  SILType Type = ARI->getType();
+  auto CacheSearchResult = DestructorAnalysisCache.find(Type);
+  if (CacheSearchResult != DestructorAnalysisCache.end()) {
+    // Ok we found a value in the cache.
+    HasSideEffects = CacheSearchResult->second;
+  } else {
+    // We did not find a value in the cache for our destructor. Analyze the
+    // destructor to make sure it has no side effects. For now this only
+    // supports alloc_ref of classes so any alloc_ref with a reference type
+    // that is not a class this will return false for. Once we have analyzed
+    // it, set Behavior to that value and insert the value into the Cache.
+    HasSideEffects = doesDestructorHaveSideEffects(ARI);
+    DestructorAnalysisCache[Type] = HasSideEffects;
+  }
+
+  if (HasSideEffects) {
+    DEBUG(llvm::dbgs() << " Destructor had side effects. \n");
+    return false;
+  }
+
+  // Our destructor has no side effects, so if we can prove that no loads
+  // escape, then we can completely remove the use graph of this alloc_ref.
+  llvm::SmallSetVector<SILInstruction *, 16> UsersToRemove;
+  if (hasUnremoveableUsers(ARI, UsersToRemove)) {
+    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+    return false;
+  }
+
+  // Remove the AllocRef and all of its users.
+  removeInstructions(UsersToRemove);
+  DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
+
+  ++DeadAllocRefEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
+  // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
+  if (!ASI->getElementType().isTrivial(ASI->getModule()))
+    return false;
+
+  llvm::SmallSetVector<SILInstruction *, 16> UsersToRemove;
+  if (hasUnremoveableUsers(ASI, UsersToRemove)) {
+    DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
+    return false;
+  }
+
+  // Remove the AllocRef and all of its users.
+  removeInstructions(UsersToRemove);
+  DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
+
+  ++DeadAllocStackEliminated;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
