@@ -40,24 +40,30 @@ struct OptionalObjectIdentifier {
   const void *id;
   bool isNone;
 };
+  
+struct String;
+  
+extern "C" void swift_stringFromUTF8InRawMemory(String *out,
+                                                const char *start,
+                                                intptr_t len);
+  
 struct String {
   const void *data;
   intptr_t countAndFlags;
   HeapObject *owner;
   
+  /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
   
   /// Wrap a string literal in a swift String.
   template<size_t N>
-  explicit String(const char (&s)[N])
-    : data(s), countAndFlags(N-1), owner(nullptr) {}
+  explicit String(const char (&s)[N]) {
+    swift_stringFromUTF8InRawMemory(this, s, N-1);
+  }
   
   /// Copy an ASCII string into a swift String on the heap.
-  explicit String(const char *ptr, size_t size)
-    // FIXME: leaks
-    : data(malloc(size)), countAndFlags(size), owner(nullptr)
-  {
-    memcpy(const_cast<void*>(data), ptr, size);
+  explicit String(const char *ptr, size_t size) {
+    swift_stringFromUTF8InRawMemory(this, ptr, size);
   }
   
   String(const void *data, intptr_t countAndFlags, HeapObject *owner)
@@ -78,7 +84,7 @@ struct OptionalIDERepresentable {
 /// We can't return String accurately from C on some platforms, so use a Swift
 /// thunk we can tail-call to do it for us.
 using StringReturn = void;
-extern "C" StringReturn _TFSs13_returnStringFT1sRSS_SS(String *s);
+extern "C" StringReturn swift_returnString(String *s);
   
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable {
@@ -180,7 +186,7 @@ StringMirrorTuple Opaque_getChild(intptr_t i, MagicMirrorData *self,
 StringReturn Opaque_getString(MagicMirrorData *self, const Metadata *Self) {
   String s("<something>");
   
-  return _TFSs13_returnStringFT1sRSS_SS(&s);
+  return swift_returnString(&s);
 }
 OptionalIDERepresentable Opaque_getIDERepresentation(MagicMirrorData *self,
                                                      const Metadata *Self) {
@@ -238,7 +244,7 @@ StringReturn Tuple_getString(MagicMirrorData *self, const Metadata *Self) {
   buf[127] = 0;
   
   String s{buf, intptr_t(strlen(buf)), nullptr};
-  return _TFSs13_returnStringFT1sRSS_SS(&s);
+  return swift_returnString(&s);
 }
   
 static const MirrorWitnessTable TupleMirrorWitness{
@@ -275,7 +281,6 @@ static const MirrorWitnessTable *getWitnessForType(const Metadata *T) {
     abort();
   }
 }
-
   
 /// MagicMirror ownership-taking constructor.
 MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
