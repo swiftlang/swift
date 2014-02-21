@@ -27,7 +27,6 @@ namespace swift {
   class SILDeserializer {
     ModuleFile *MF;
     SILModule &SILMod;
-    ASTContext &Ctx;
     SerializedSILLoader::Callback *Callback;
 
     /// The cursor used to lazily load SILFunctions.
@@ -114,7 +113,7 @@ public:
     /// Deserialize all WitnessTables inside the module and add them to SILMod.
     void getAllWitnessTables();
 
-    SILDeserializer(ModuleFile *MF, SILModule &M, ASTContext &Ctx,
+    SILDeserializer(ModuleFile *MF, SILModule &M,
                     SerializedSILLoader::Callback *callback);
 
     // Out of line to avoid instantiation OnDiskChainedHashTable here.

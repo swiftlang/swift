@@ -25,8 +25,7 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.getValue()->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, Ctx,
-                                       callback);
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callback);
 #ifndef NDEBUG
         SILMod->verify();
 #endif

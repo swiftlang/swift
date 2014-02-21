@@ -93,9 +93,8 @@ public:
 };
 
 SILDeserializer::SILDeserializer(ModuleFile *MF, SILModule &M,
-                                 ASTContext &Ctx,
                                  SerializedSILLoader::Callback *callback)
-    : MF(MF), SILMod(M), Ctx(Ctx), Callback(callback) {
+    : MF(MF), SILMod(M), Callback(callback) {
 
   SILCursor = MF->getSILCursor();
   SILIndexCursor = MF->getSILIndexCursor();
