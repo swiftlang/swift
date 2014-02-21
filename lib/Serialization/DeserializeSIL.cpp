@@ -287,23 +287,23 @@ static SILType getSILType(Type Ty, SILValueCategory Category) {
 
 /// Helper function to create a bogus SILFunction to appease error paths.
 static SILFunction *createBogusSILFunction(SILModule &M,
-                                           Identifier name,
+                                           StringRef name,
                                            SILType type) {
   SourceLoc loc;
-  return SILFunction::create(M, SILLinkage::Private, name.str(),
+  return SILFunction::create(M, SILLinkage::Private, name,
                              type.castTo<SILFunctionType>(),
                              nullptr,
                              SILFileLocation(loc));
 }
 
 /// Helper function to find a SILFunction, given its name and type.
-SILFunction *SILDeserializer::getFuncForReference(Identifier name,
+SILFunction *SILDeserializer::getFuncForReference(StringRef name,
                                                   SILType type) {
   // Check to see if we have a function by this name already.
-  SILFunction *fn = SILMod.lookUpFunction(name.str());
+  SILFunction *fn = SILMod.lookUpFunction(name);
   if (!fn) {
     // Otherwise, look for a function with this name in the module.
-    auto iter = FuncTable->find(name.str());
+    auto iter = FuncTable->find(name);
     if (iter != FuncTable->end()) {
       fn = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
     }
@@ -322,7 +322,7 @@ SILFunction *SILDeserializer::getFuncForReference(Identifier name,
 /// null, we create a SILFunction.
 SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               SILFunction *existingFn,
-                                              Identifier name,
+                                              StringRef name,
                                               bool declarationOnly) {
   if (FID == 0)
     return nullptr;
@@ -331,7 +331,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   auto &cacheEntry = Funcs[FID-1];
   if (cacheEntry.isFullyDeserialized() ||
       (cacheEntry.isDeserialized() && declarationOnly))
-    return cacheEntry.get(); 
+    return cacheEntry.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
   SILCursor.JumpToBit(cacheEntry.getOffset());
@@ -371,7 +371,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   // If we weren't handed a function, check for an existing
   // declaration in the output module.
-  if (!existingFn) existingFn = SILMod.lookUpFunction(name.str());
+  if (!existingFn) existingFn = SILMod.lookUpFunction(name);
   auto fn = existingFn;
 
   // TODO: use the correct SILLocation from module.
@@ -383,20 +383,20 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       return nullptr;
     }
-    
+
     // Don't override the transparency or linkage of a function with
     // an existing declaration.
 
   // Otherwise, create a new function.
   } else {
-    fn = SILFunction::create(SILMod, linkage.getValue(), name.str(),
+    fn = SILFunction::create(SILMod, linkage.getValue(), name,
                              ty.castTo<SILFunctionType>(),
                              nullptr, loc);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
 
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
-  
+
   assert(fn->empty() &&
          "SILFunction to be deserialized starts being empty.");
 
@@ -407,7 +407,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (!declarationOnly)
     contextParams = MF->maybeReadGenericParams(MF->getAssociatedModule(),
                                                SILCursor);
-  
+
   // If the next entry is the end of the block, then this function has
   // no contents.
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -422,18 +422,18 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     cacheEntry.set(fn, /*fully deserialized*/ false);
     return fn;
   }
-  
+
   // Set the cache entry now in order to properly handle both forward
   // declarations and deserialization errors.
   cacheEntry.set(fn, /*fully deserialized*/ true);
 
   scratch.clear();
-  
+
   assert(!fn->getContextGenericParams()
          && "function already has context generic params?!");
   if (contextParams)
     fn->setContextGenericParams(contextParams);
-  
+
   kind = SILCursor.readRecord(entry.ID, scratch);
 
   SILBasicBlock *CurrentBB = nullptr;
@@ -664,12 +664,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 #undef ONEOPERAND_ONETYPE_INST
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {
-    
+
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Ty2 = MF->getType(TyID2);
     SILValue operand = getLocalValue(ValID, ValResNum,
                          getSILType(Ty2, (SILValueCategory)TyCategory2));
-    
+
     SmallVector<ProtocolConformance*, 2> conformances;
     for (unsigned i = 0; i < Attr; ++i) {
       auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
@@ -680,9 +680,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
       conformances.push_back(conformance);
     }
-    
+
     auto ctxConformances = MF->getContext().AllocateCopy(conformances);
-    
+
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::InitExistentialInst:
@@ -699,7 +699,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::AllocRefInst:
-    assert(RecordKind == SIL_ONE_TYPE_VALUES && 
+    assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
     assert(ListOfValues.size() >= 1 && "Not enough values");
     ResultVal = Builder.createAllocRef(
@@ -726,14 +726,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    ArgTys[I>>1]));
     bool Transparent = (bool)IsTransparent;
     unsigned NumSub = NumSubs;
-    
+
     SmallVector<Substitution, 4> Substitutions;
     while (NumSub--) {
       auto sub = MF->maybeReadSubstitution(SILCursor);
       assert(sub.hasValue() && "missing substitution");
       Substitutions.push_back(*sub);
     }
-    
+
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     SubstFnTy,
                                     FTI->getInterfaceResult().getSILType(),
@@ -765,7 +765,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                               Args.size(),
                                               Fn->getModule(),
                                               {});
-    
+
     unsigned NumSub = NumSubs;
     SmallVector<Substitution, 4> Substitutions;
     while (NumSub--) {
@@ -773,7 +773,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       assert(sub.hasValue() && "missing substitution");
       Substitutions.push_back(*sub);
     }
-    
+
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(Loc, FnVal, SubstFnTy,
                                            Substitutions, Args,
@@ -801,7 +801,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     Identifier Name = MF->getIdentifier(ValID);
 
     // Find the global variable.
-    SILGlobalVariable *g = readGlobalVar(Name);
+    SILGlobalVariable *g = readGlobalVar(Name.str());
     assert(g && "Can't deserialize global variable");
     assert(g->getLoweredType().getAddressType() ==
            getSILType(Ty, (SILValueCategory)TyCategory) &&
@@ -829,7 +829,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     Identifier FuncName = MF->getIdentifier(ValID);
     ResultVal = Builder.createFunctionRef(Loc,
-        getFuncForReference(FuncName,
+        getFuncForReference(FuncName.str(),
                             getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
@@ -928,14 +928,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     case (unsigned)CheckedCastKind::SuperToArchetype:
       Kind = (CheckedCastKind)Attr;
       break;
-        
+
     default:
       llvm_unreachable("not a valid CheckedCastKind for SIL");
     }
     ResultVal = Builder.createUnconditionalCheckedCast(Loc, Kind, Val, Ty);
     break;
   }
-      
+
 #define UNARY_INSTRUCTION(ID) \
   case ValueKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_OPERAND &&            \
@@ -1049,7 +1049,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     SmallVector<SILValue, 4> OpList;
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I += 4) {
-      auto EltTy = MF->getType(ListOfValues[I]); 
+      auto EltTy = MF->getType(ListOfValues[I]);
       OpList.push_back(
         getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
                       getSILType(EltTy, (SILValueCategory)ListOfValues[I+1])));
@@ -1130,7 +1130,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 4)
       TrueArgs.push_back(
         getLocalValue(ListOfValues[I+2], ListOfValues[I+3],
-                      getSILType(MF->getType(ListOfValues[I]), 
+                      getSILType(MF->getType(ListOfValues[I]),
                                  (SILValueCategory)ListOfValues[I+1])));
 
     SmallVector<SILValue, 4> FalseArgs;
@@ -1281,7 +1281,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILType operandTy = getSILType(MF->getType(ListOfValues[5]),
                                    (SILValueCategory)ListOfValues[6]);
     bool IsVolatile = ListOfValues[0] > 0;
-    
+
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::ArchetypeMethodInst: {
@@ -1350,7 +1350,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                 (SILValueCategory)TyCategory);
     auto *successBB = getBBForReference(Fn, ListOfValues[5]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
-    
+
     ResultVal = Builder.createCheckedCastBranch(Loc, castKind, op, castTy,
                                                 successBB, failureBB);
     break;
@@ -1366,10 +1366,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 }
 
 SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
-  Identifier name = Ctx.getIdentifier(InFunc->getName());
+  StringRef name = InFunc->getName();
   if (!FuncTable)
     return nullptr;
-  auto iter = FuncTable->find(name.str());
+  auto iter = FuncTable->find(name);
   if (iter == FuncTable->end())
     return nullptr;
 
@@ -1380,10 +1380,10 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   return Func;
 }
 
-SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
+SILFunction *SILDeserializer::lookupSILFunction(StringRef name) {
   if (!FuncTable)
     return nullptr;
-  auto iter = FuncTable->find(name.str());
+  auto iter = FuncTable->find(name);
   if (iter == FuncTable->end())
     return nullptr;
 
@@ -1394,12 +1394,12 @@ SILFunction *SILDeserializer::lookupSILFunction(Identifier name) {
   return Func;
 }
 
-SILGlobalVariable *SILDeserializer::readGlobalVar(Identifier Name) {
+SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   if (!GlobalVarList)
     return nullptr;
 
   // Find Id for the given name.
-  auto iter = GlobalVarList->find(Name.str());
+  auto iter = GlobalVarList->find(Name);
   if (iter == GlobalVarList->end())
     return nullptr;
   auto VId = *iter;
@@ -1458,7 +1458,7 @@ void SILDeserializer::getAllSILFunctions() {
        ++KI) {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
-    readSILFunction(*DI, nullptr, Ctx.getIdentifier(*KI), false);
+    readSILFunction(*DI, nullptr, *KI, false);
   }
 }
 
@@ -1510,7 +1510,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
-    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
+    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
     if (Func)
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, 0), Func);
 
@@ -1640,7 +1640,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
       ArrayRef<uint64_t> ListOfValues;
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
-      SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID));
+      SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
       if (Func)
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
           getSILDeclRef(MF, ListOfValues, 0), Func

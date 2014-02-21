@@ -65,7 +65,7 @@ namespace swift {
 
     /// Read a SIL function.
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
-                                 Identifier name, bool declarationOnly);
+                                 StringRef Name, bool declarationOnly);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SmallVectorImpl<uint64_t> &scratch);
@@ -85,10 +85,10 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id, unsigned ResultNum,
                            SILType Type);
 
-    SILFunction *getFuncForReference(Identifier Name, SILType Ty);
-    SILFunction *lookupSILFunction(Identifier Name);
+    SILFunction *getFuncForReference(StringRef Name, SILType Ty);
+    SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
-    SILGlobalVariable *readGlobalVar(Identifier Name);
+    SILGlobalVariable *readGlobalVar(StringRef Name);
     SILWitnessTable *readWitnessTable(serialization::DeclID);
 
 public:
