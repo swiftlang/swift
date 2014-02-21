@@ -29,6 +29,8 @@
 #include "llvm/Support/Signals.h"
 using namespace swift;
 
+namespace {
+
 enum class PassKind {
   AllocBoxToStack,
   CapturePromotion,
@@ -58,6 +60,8 @@ enum class PassKind {
   AADumper,
   LoadStoreOpts,
 };
+
+} // end anonymous namespace
 
 static llvm::cl::opt<std::string>
 InputFilename(llvm::cl::desc("input file"), llvm::cl::init("-"),
