@@ -22,6 +22,8 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/PassManager.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -72,6 +74,11 @@ OutputFilename("o", llvm::cl::desc("output filename"), llvm::cl::init("-"));
 
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
+
+static llvm::cl::opt<std::string>
+ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
+                                         " a module. Necessary for processing "
+                                         "stdin."));
 
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
@@ -225,10 +232,28 @@ int main(int argc, char **argv) {
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
 
-  Invocation.setModuleName("main");
-  Invocation.setInputKind(SourceFileKind::SIL);
+  // Load the input file.
+  llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
+  if (llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    exit(-1);
+  }
 
-  Invocation.addInputFilename(InputFilename);
+  // If it looks like we have an AST, set the source file kind to SIL and the
+  // name of the module to the file's name.
+  Invocation.addInputBuffer(InputFile.get());
+  bool IsModule = false;
+  if (SerializedModuleLoader::isSerializedAST(InputFile.get()->getBuffer())) {
+    IsModule = true;
+    const StringRef Stem = ModuleName.size() ?
+                             StringRef(ModuleName) :
+                             llvm::sys::path::stem(InputFilename);
+    Invocation.setModuleName(Stem);
+    Invocation.setInputKind(SourceFileKind::Library);
+  } else {
+    Invocation.setModuleName("main");
+    Invocation.setInputKind(SourceFileKind::SIL);
+  }
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;
@@ -241,6 +266,19 @@ int main(int argc, char **argv) {
   // If parsing produced an error, don't run any passes.
   if (CI.getASTContext().hadError())
     return 1;
+
+  // Load the SIL if we have a module. We have to do this after SILParse
+  // creating the unfortunate double if statement.
+  if (IsModule) {
+    assert(!CI.hasSILModule() &&
+           "performParse() should not create a SILModule.");
+    CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule()));
+    SerializedSILLoader *SL = SerializedSILLoader::create(CI.getASTContext(),
+                                                          CI.getSILModule(),
+                                                          nullptr);
+    SL->getAll();
+    delete SL;
+  }
 
   // If we're in verify mode, install a custom diagnostic handling for
   // SourceMgr.
