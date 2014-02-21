@@ -144,6 +144,25 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
         continue;
       }
 
+      // Promote partial loads.
+      // Check that we are loading a struct element:
+      if (auto *SEAI = dyn_cast<StructElementAddrInst>(LI->getOperand())) {
+        // And that the previous store stores into that struct.
+        if (PrevStore && PrevStore->getDest() == SEAI->getOperand()) {
+          // And that the stored value is a struct construction instruction:
+          if (auto *SI = dyn_cast<StructInst>(PrevStore->getSrc())) {
+            DEBUG(llvm::dbgs() << "    Forwarding element store from: " <<
+                  *PrevStore);
+            unsigned FieldNo = SEAI->getFieldNo();
+            SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
+            recursivelyDeleteTriviallyDeadInstructions(LI, true);
+            Changed = true;
+            NumForwardedLoads++;
+            continue;
+          }
+        }
+      }
+
       // Search the previous loads and replace the current load with one of the
       // previous loads.
       for (auto PrevLI : Loads) {

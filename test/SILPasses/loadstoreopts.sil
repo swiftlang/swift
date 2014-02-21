@@ -169,3 +169,21 @@ bb0(%0 : $*Agg1):
   return %5 : $Builtin.Int32
 }
 
+struct Wrapper {
+  var value : Int
+}
+//CHECK-LABEL: promote_partial_load
+//CHECK: alloc_stack
+//CHECK-NOT: load
+//CHECK: return %0
+sil @promote_partial_load : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Wrapper
+  %2 = struct $Wrapper (%0 : $Int)
+  store %2 to %1#1 : $*Wrapper
+  %3 = struct_element_addr %1#1 : $*Wrapper, #value
+  %4 = load %3 : $*Int
+  dealloc_stack %1#0 : $*@local_storage Wrapper
+  return %4 : $Int
+}
+
