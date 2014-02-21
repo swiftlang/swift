@@ -183,7 +183,7 @@ SILDevirtThreshold("sil-devirt-threshold", llvm::cl::Hidden,
 static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
-                   llvm::cl::init(false),
+                   llvm::cl::init(true),
                    llvm::cl::desc("Run sil verifications after every pass."));
 
 static llvm::cl::opt<bool>
@@ -342,9 +342,6 @@ int main(int argc, char **argv) {
       PM.add(createLoadStoreOpts());
       break;
     }
-
-    // Verify the module after every pass.
-    CI.getSILModule()->verify();
   }
 
   PM.run();
