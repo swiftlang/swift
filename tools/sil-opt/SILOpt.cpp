@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the entry point.
+// This is a tool for reading sil files and running sil passes on them. The
+// targeted usecase is debugging and testing SIL passes.
 //
 //===----------------------------------------------------------------------===//
 
