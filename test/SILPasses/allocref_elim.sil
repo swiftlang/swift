@@ -317,6 +317,7 @@ sil @non_trivial_destructor_on_stack : $@thin () -> () {
 // CHECK: return
 sil @trivial_destructor_on_stack : $@thin () -> () {
   %0 = alloc_stack $Int
+  destroy_addr %0#1 : $*Int
   dealloc_stack %0#0 : $*@local_storage Int
   %1 = tuple()
   return %1 : $()

@@ -210,6 +210,10 @@ static bool canZapInstruction(SILInstruction *Inst) {
   if (isa<DeallocationInst>(Inst))
     return true;
 
+  // Much like deallocation, destroy addr is safe.
+  if (isa<DestroyAddrInst>(Inst))
+    return true;
+
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
   return false;
