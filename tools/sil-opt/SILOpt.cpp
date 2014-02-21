@@ -353,7 +353,7 @@ int main(int argc, char **argv) {
                  << ErrorInfo << '\n';
     return 1;
   }
-  CI.getSILModule()->print(OS, EmitVerboseSIL);
+  CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule());
 
   bool HadError = CI.getASTContext().hadError();
 
