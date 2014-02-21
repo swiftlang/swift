@@ -3539,12 +3539,21 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
-  // If we're constructing a class object, the metatype must be statically
-  // derived (rather than an arbitrary value of metatype type).
+  // If we're constructing a class object, either the metatype must be
+  // statically derived (rather than an arbitrary value of metatype type) or
+  // the referenced constructor must be abstract.
   if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
-      !isStaticallyDerivedMetatype(fn)) {
+      !isStaticallyDerivedMetatype(fn) &&
+      !cast<ConstructorDecl>(decl)->isAbstract()) {
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());
+    auto ctor = cast<ConstructorDecl>(decl);
+    // FIXME: Better description of the initializer than just it's type.
+    if (ctor->isImplicit())
+      tc.diagnose(decl, diag::note_nonabstract_implicit_initializer,
+                  ctor->getArgumentType());
+    else
+      tc.diagnose(decl, diag::note_nonabstract_initializer);
   }
 
   // Tail-recur to actually call the constructor.

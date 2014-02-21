@@ -238,8 +238,11 @@ class alignas(8) Decl {
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
+
+    /// Whether this initializer is abstract.
+    unsigned Abstract : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 3 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 4 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -2937,6 +2940,9 @@ public:
     AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
   }
 
+  /// Retrieve the Objective-C selector that names this method.
+  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
+
   /// Determine the default argument kind and type for the given argument index
   /// in this declaration, which must be a function or constructor.
   ///
@@ -3455,6 +3461,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
+  /// The constructor this overrides, which only makes sense when
+  /// both the overriding and the overridden constructors are abstract.
+  ConstructorDecl *OverriddenDecl = nullptr;
+
 public:
   ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
                   Pattern *SelfArgParam, Pattern *ArgParams,
@@ -3521,6 +3531,17 @@ public:
   BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                               Expr **init = nullptr);
 
+  /// Whether this constructor is abstract,
+  bool isAbstract() const { return ConstructorDeclBits.Abstract; }
+
+  /// Set whether this constructor is abstract.
+  void setAbstract(bool abstract) {
+    ConstructorDeclBits.Abstract = abstract;
+  }
+
+  ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
+  void setOverriddenDecl(ConstructorDecl *over) { OverriddenDecl = over; }
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
   }
@@ -3556,6 +3577,11 @@ public:
   SourceLoc getDestructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getDestructorLoc(); }
   SourceRange getSourceRange() const;
+
+  /// Retrieve the Objective-C selector associated with the destructor.
+  ///
+  /// This is always "dealloc".
+  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;

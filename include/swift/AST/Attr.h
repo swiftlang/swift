@@ -335,6 +335,7 @@ public:
   bool requiresStoredPropertyInits() const {
     return has(AK_requires_stored_property_inits);
   }
+  bool isAbstract() const { return has(AK_abstract); }
 
   bool hasMutating() const { return has(AK_mutating); }
   Optional<bool> getMutating() const {

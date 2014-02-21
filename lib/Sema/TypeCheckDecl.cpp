@@ -1930,6 +1930,45 @@ public:
     if (!IsSecondPass) {
       TC.addImplicitConstructors(CD);
       TC.addImplicitDestructor(CD);
+
+      // Check whether the superclass has any abstract initializers and whether
+      // they have been implemented.
+      if (auto superclassTy = CD->getSuperclass()) {
+        // Collect the set of constructors we override in the base class.
+        llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
+        for (auto member : TC.lookupConstructors(CD->getDeclaredTypeInContext(),
+                                                 CD)) {
+          auto ctor = cast<ConstructorDecl>(member);
+          if (auto overridden = ctor->getOverriddenDecl())
+            overriddenCtors.insert(overridden);
+        }
+
+        // Diagnose any abstract constructors from our superclass that have
+        // not been overridden.
+        bool diagnosed = false;
+        for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
+          // We only care about abstract constructors.
+          auto superclassCtor = cast<ConstructorDecl>(superclassMember);
+          if (!superclassCtor->isAbstract())
+            continue;
+
+          // If we have an override for this constructor, it's okay.
+          if (overriddenCtors.count(superclassCtor) > 0)
+            continue;
+
+          // Complain that we don't have an overriding constructor.
+          if (!diagnosed) {
+            TC.diagnose(CD, diag::abstract_incomplete_implementation,
+                        CD->getDeclaredInterfaceType());
+            diagnosed = true;
+          }
+
+          // FIXME: Using the type here is awful. We want to use the selector
+          // name and provide a nice Fix-It with that declaration.
+          TC.diagnose(superclassCtor, diag::abstract_initializer_not_overridden,
+                      superclassCtor->getArgumentType());
+        }
+      }
     }
     if (!IsFirstPass) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
@@ -2511,6 +2550,8 @@ public:
       overridingVar->setOverriddenDecl(cast<VarDecl>(overridden));
     } else if (auto overridingSubscript = dyn_cast<SubscriptDecl>(overriding)) {
       overridingSubscript->setOverriddenDecl(cast<SubscriptDecl>(overridden));
+    } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(overriding)) {
+      overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(overridden));
     } else {
       llvm_unreachable("Unexpected decl");
     }
@@ -2518,10 +2559,29 @@ public:
     return false;
   }
 
-  /// Determine which methods this method overrides.
+  /// Perform basic checking to determine whether a function can override a
+  /// parent function.
+  static bool areOverrideCompatibleSimple(AbstractFunctionDecl *afd,
+                                          AbstractFunctionDecl *parentAFD) {
+    if (auto func = dyn_cast<FuncDecl>(afd)) {
+      // Specific checking for methods.
+      auto parentFunc = cast<FuncDecl>(parentAFD);
+      if (func->isStatic() != parentFunc->isStatic())
+        return false;
+    } else if (isa<ConstructorDecl>(afd)) {
+      // Specific checking for constructors.
+      auto parentCtor = cast<ConstructorDecl>(parentAFD);
+      if (!parentCtor->isAbstract())
+        return false;
+    }
+
+    return true;
+  }
+
+  /// Determine which methods this function overrides (if any).
   ///
   /// \returns true if an error occurred.
-  bool checkMethodOverrides(FuncDecl *method) {
+  bool checkMethodOverrides(AbstractFunctionDecl *method) {
     if (method->isInvalid())
       return false;
 
@@ -2554,22 +2614,29 @@ public:
 
     // Look for members with the same name and matching types as this
     // one.
-    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
-    auto members = TC.lookupMember(superclassMetaTy, method->getName(), method,
-                                   /*allowDynamicLookup=*/false);
+    LookupResult members;
+    if (isa<ConstructorDecl>(method)) {
+      members = TC.lookupConstructors(superclass, method);
+    } else {
+      auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
+      members = TC.lookupMember(superclassMetaTy, method->getName(), method,
+                                /*allowDynamicLookup=*/false);
+    }
+
     unsigned numExactMatches = false;
-    SmallVector<llvm::PointerIntPair<FuncDecl *, 1, bool>, 2> matches;
-    FuncDecl *exactMatch = nullptr;
+    SmallVector<llvm::PointerIntPair<AbstractFunctionDecl *, 1, bool>, 2> matches;
+    AbstractFunctionDecl *exactMatch = nullptr;
     for (auto member : members) {
       if (member->isInvalid())
         continue;
 
-      auto parentMethod = dyn_cast<FuncDecl>(member);
+      auto parentMethod = dyn_cast<AbstractFunctionDecl>(member);
       if (!parentMethod)
         continue;
 
-      // Class and non-class methods are different.
-      if (method->isStatic() != parentMethod->isStatic())
+      // Check whether there are any obvious reasons why the two given
+      // functions do not have an overriding relationship.
+      if (!areOverrideCompatibleSimple(method, parentMethod))
         continue;
 
       // If both are Objective-C, then match based on selectors and
@@ -2901,6 +2968,15 @@ public:
         isObjC = false;
       CD->setIsObjC(isObjC);
     }
+
+    // Check whether this constructor overrides a constructor in its base class.
+    // This only makes sense when the overridden constructor is abstract.
+    checkMethodOverrides(CD);
+
+    // Determine whether this constructor is abstract.
+    bool isAbstract = CD->getAttrs().isAbstract() ||
+      (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isAbstract());
+    CD->setAbstract(isAbstract);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -3804,6 +3880,36 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
                 diag::requires_stored_property_inits_nonclass);
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
+  }
+
+  if (Attrs.isAbstract()) {
+    // The abstract attribute only applies to constructors.
+    if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
+      if (auto parentTy = ctor->getExtensionType()) {
+        // Only classes can have abstract constructors.
+        if (parentTy->getClassOrBoundGenericClass()) {
+          // The constructor must be declared within the class itself.
+          if (!isa<ClassDecl>(ctor->getDeclContext())) {
+            TC.diagnose(ctor, diag::abstract_initializer_in_extension, parentTy)
+              .highlight(Attrs.getLoc(AK_abstract));
+            D->getMutableAttrs().clearAttribute(AK_abstract);
+          }
+        } else {
+          if (!parentTy->is<ErrorType>()) {
+            TC.diagnose(ctor, diag::abstract_initializer_nonclass, parentTy)
+              .highlight(Attrs.getLoc(AK_abstract));
+          }
+          D->getMutableAttrs().clearAttribute(AK_abstract);
+        }
+      } else {
+        // Constructor outside of nominal type context; just clear the
+        // attribute; we've already complained elsewhere.
+        D->getMutableAttrs().clearAttribute(AK_abstract);
+      }
+    } else {
+      TC.diagnose(Attrs.getLoc(AK_abstract), diag::abstract_non_initializer);
+      D->getMutableAttrs().clearAttribute(AK_abstract);
+    }
   }
 
   static const AttrKind InvalidAttrs[] = {

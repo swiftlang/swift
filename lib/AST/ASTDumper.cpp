@@ -592,6 +592,9 @@ namespace {
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
+      if (CD->isAbstract())
+        OS << " abstract";
+
       printAbstractFunctionDecl(CD);
       OS << ')';
     }

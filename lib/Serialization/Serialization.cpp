@@ -1493,8 +1493,10 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
+                                  ctor->isAbstract(),
                                   addTypeRef(ctor->getType()),
-                                  addTypeRef(ctor->getInterfaceType()));
+                                  addTypeRef(ctor->getInterfaceType()),
+                                  addDeclRef(ctor->getOverriddenDecl()));
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
     assert(ctor->getArgParamPatterns().size() == 2);

@@ -577,6 +577,8 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
     return fd->getOverriddenDecl();
   if (auto sdd = dyn_cast<AbstractStorageDecl>(this))
     return sdd->getOverriddenDecl();
+  if (auto cd = dyn_cast<ConstructorDecl>(this))
+    return cd->getOverriddenDecl();
   return nullptr;
 }
 
@@ -1623,6 +1625,17 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   }
 }
 
+StringRef AbstractFunctionDecl::getObjCSelector(
+            SmallVectorImpl<char> &buffer) const {
+  if (auto func = dyn_cast<FuncDecl>(this))
+    return func->getObjCSelector(buffer);
+  if (auto ctor = dyn_cast<ConstructorDecl>(this))
+    return ctor->getObjCSelector(buffer);
+  if (auto dtor = dyn_cast<DestructorDecl>(this))
+    return dtor->getObjCSelector(buffer);
+  llvm_unreachable("Unhandled AbstractFunctionDecl subclass");
+}
+
 /// Set the DeclContext of any VarDecls in P to the specified DeclContext.
 static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
   if (!P) return;
@@ -1747,6 +1760,7 @@ ConstructorDecl::ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
   setBodyParams(SelfBodyParam, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
+  ConstructorDeclBits.Abstract = 0;
 }
 
 void ConstructorDecl::setArgParams(Pattern *selfPattern, Pattern *argParams) {
@@ -2071,6 +2085,10 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
     *init = finder.InitExpr;
 
   return finder.Kind;
+}
+
+StringRef DestructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
+  return "dealloc";
 }
 
 SourceRange DestructorDecl::getSourceRange() const {
