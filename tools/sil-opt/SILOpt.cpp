@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
   llvm::PrettyStackTraceProgram X(argc, argv);
-  
+
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
   // Call llvm_shutdown() on exit to print stats and free memory.
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("main");
   Invocation.setInputKind(SourceFileKind::SIL);
-  
+
   Invocation.addInputFilename(InputFilename);
 
   CompilerInstance CI;
@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation))
     return 1;
   CI.performParse();
-  
+
   // If parsing produced an error, don't run any passes.
   if (CI.getASTContext().hadError())
     return 1;
