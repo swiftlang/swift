@@ -842,6 +842,7 @@ public:
         callSites.pop_back();
         setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
         SILDeclRef constant(afd, kind,
+                            SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             gen.SGM.requiresObjCDispatch(afd));
         
@@ -874,6 +875,7 @@ public:
     // FIXME: Store context values for local funcs in a way that we can
     // apply them directly as an added "call site" here.
     SILDeclRef constant(e->getDecl(),
+                        SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCDispatch(e->getDecl()));
 
@@ -1077,6 +1079,7 @@ public:
     SILDeclRef constant;
     if (auto *ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       constant = SILDeclRef(ctorRef->getDecl(), SILDeclRef::Kind::Initializer,
+                         SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(ctorRef->getDecl()));
 
@@ -1085,6 +1088,7 @@ public:
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       constant = SILDeclRef(declRef->getDecl(),
+                         SILDeclRef::ConstructAtBestResilienceExpansion,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          gen.SGM.requiresObjCSuperDispatch(declRef->getDecl()));
 
@@ -1156,6 +1160,7 @@ public:
                   self.getValue(),
                   SILDeclRef(ctorRef->getDecl(),
                              SILDeclRef::Kind::Initializer,
+                             SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              /*isForeign=*/true),
                   getSubstFnType(), fn));
@@ -1165,7 +1170,8 @@ public:
                                   SILDeclRef(ctorRef->getDecl(),
                                              useAllocatingCtor
                                                ? SILDeclRef::Kind::Allocator
-                                               : SILDeclRef::Kind::Initializer),
+                                               : SILDeclRef::Kind::Initializer,
+                               SILDeclRef::ConstructAtBestResilienceExpansion),
                                   getSubstFnType(useAllocatingCtor), fn));
     }
 
@@ -1269,7 +1275,8 @@ public:
 
     // Determine the type of the method we referenced, by replacing the
     // class type of the 'Self' parameter with Builtin.ObjCPointer.
-    SILDeclRef member(fd, SILDeclRef::ConstructAtNaturalUncurryLevel,
+    SILDeclRef member(fd, SILDeclRef::ConstructAtBestResilienceExpansion,
+                      SILDeclRef::ConstructAtNaturalUncurryLevel,
                       /*isObjC=*/true);
 
     setCallee(Callee::forDynamic(gen, val, member, getSubstFnType(), e));
@@ -2628,6 +2635,7 @@ emitGetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                 bool isSuper, RValue &&subscripts, SGFContext c) {
  
   SILDeclRef get(decl->getGetter(), SILDeclRef::Kind::Func,
+                 SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
 
@@ -2659,6 +2667,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                                      bool isSuper,
                                      RValue &&subscripts, RValue &&setValue) {
   SILDeclRef set(decl->getSetter(), SILDeclRef::Kind::Func,
+                 SILDeclRef::ConstructAtBestResilienceExpansion,
                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                  decl->usesObjCGetterAndSetter());
 
@@ -2726,6 +2735,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
   SILDeclRef member(memberFunc, SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC=*/true);
   B.createDynamicMethodBranch(e, operand, member, hasMemberBB, noMemberBB);
@@ -2820,6 +2830,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
   SILDeclRef member(subscriptDecl->getGetter(),
                     SILDeclRef::Kind::Func,
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC=*/true);
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);

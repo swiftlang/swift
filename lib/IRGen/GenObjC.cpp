@@ -743,9 +743,8 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
 
 /// Create the LLVM function declaration for a thunk that acts like
 /// an Objective-C method for a Swift method implementation.
-static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref,
-                                            ResilienceExpansion expansion) {
-  auto fn = IGM.getAddrOfSILFunction(ref, expansion, NotForDefinition);
+static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
+  auto fn = IGM.getAddrOfSILFunction(ref, NotForDefinition);
   assert(fn && "no IR function for swift-as-objc thunk");
   // FIXME: Should set the linkage of the SILFunction to 'internal'.
   fn->setLinkage(llvm::GlobalValue::InternalLinkage);
@@ -768,10 +767,11 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
 
   SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func,
+                                 expansion,
                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                                  /*foreign*/ true);
 
-  return findSwiftAsObjCThunk(IGM, getter, expansion);
+  return findSwiftAsObjCThunk(IGM, getter);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -789,10 +789,11 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func,
+                                 expansion,
                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                                  /*foreign*/ true);
 
-  return findSwiftAsObjCThunk(IGM, setter, expansion);
+  return findSwiftAsObjCThunk(IGM, setter);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -807,10 +808,11 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(method, SILDeclRef::Kind::Func,
+                                  expansion,
                                   SILDeclRef::ConstructAtNaturalUncurryLevel,
                                   /*foreign*/ true);
 
-  return findSwiftAsObjCThunk(IGM, declRef, expansion);
+  return findSwiftAsObjCThunk(IGM, declRef);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -825,10 +827,11 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
 
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(constructor, SILDeclRef::Kind::Initializer,
+                                  expansion,
                                   SILDeclRef::ConstructAtNaturalUncurryLevel,
                                   /*foreign*/ true);
 
-  return findSwiftAsObjCThunk(IGM, declRef, expansion);
+  return findSwiftAsObjCThunk(IGM, declRef);
 }
 
 /// Produce a function pointer, suitable for invocation by
@@ -839,10 +842,11 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
                                             DestructorDecl *destructor) {
   ResilienceExpansion expansion = ResilienceExpansion::Minimal;
   SILDeclRef declRef = SILDeclRef(destructor, SILDeclRef::Kind::Deallocator,
+                                  expansion,
                                   SILDeclRef::ConstructAtNaturalUncurryLevel,
                                   /*foreign*/ true);
 
-  return findSwiftAsObjCThunk(IGM, declRef, expansion);
+  return findSwiftAsObjCThunk(IGM, declRef);
 }
 
 /// True if the value is of class type, or of a type that is bridged to class
@@ -1113,6 +1117,7 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
+                                  ResilienceExpansion::Minimal,
                                   1, 
                                   /*foreign*/ true);
   Selector selector(declRef);

@@ -20,6 +20,7 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -36,7 +37,6 @@ namespace swift {
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
-  enum class ResilienceExpansion : unsigned;
   class SILFunctionType;
   class SILModule;
 
@@ -106,7 +106,9 @@ struct SILDeclRef {
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
   /// The uncurry level of this SILDeclRef.
-  unsigned uncurryLevel : 16;
+  unsigned uncurryLevel : 8;
+  /// The required resilience expansion of the declaration.
+  unsigned Expansion : 1;
   /// True if the SILDeclRef is a curry thunk.
   unsigned isCurried : 1;
   /// True if this references a foreign entry point for the referenced decl.
@@ -117,14 +119,21 @@ struct SILDeclRef {
   /// A magic value for SILDeclRef constructors to ask for the natural uncurry
   /// level of the constant.
   enum : unsigned { ConstructAtNaturalUncurryLevel = ~0U };
+
+  /// A magic value for SILDeclRef constructors to ask for the best
+  /// available resilience expansion of the constant.
+  static constexpr ResilienceExpansion ConstructAtBestResilienceExpansion
+    = /*TODO*/ ResilienceExpansion::Minimal;
   
   /// Produces a null SILDeclRef.
-  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0),
+  SILDeclRef() : loc(), kind(Kind::Func), uncurryLevel(0), Expansion(0),
                  isCurried(0), isForeign(0),
                  defaultArgIndex(0) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
+                      ResilienceExpansion expansion
+                        = ResilienceExpansion::Minimal,
                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                       bool isForeign = false);
   
@@ -143,6 +152,8 @@ struct SILDeclRef {
   /// then the SILDeclRef for the natural uncurry level of the definition is
   /// used.
   explicit SILDeclRef(Loc loc,
+                      ResilienceExpansion expansion
+                        = ResilienceExpansion::Minimal,
                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                       bool isForeign = false);
 
@@ -174,8 +185,7 @@ struct SILDeclRef {
   }
 
   /// Produce a mangled form of this constant.
-  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer,
-                         ResilienceExpansion expansion) const;
+  llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer) const;
 
   /// True if the SILDeclRef references a function.
   bool isFunc() const {
@@ -201,7 +211,7 @@ struct SILDeclRef {
   
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
-  
+
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
@@ -219,6 +229,10 @@ struct SILDeclRef {
   
   void print(llvm::raw_ostream &os) const;
   void dump() const;
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return ResilienceExpansion(Expansion);
+  }
   
   // Returns the SILDeclRef for an entity at a shallower uncurry level.
   SILDeclRef atUncurryLevel(unsigned level) const {
@@ -261,7 +275,7 @@ struct SILDeclRef {
     auto overridden = getDecl()->getOverriddenDecl();
     if (!overridden)
       return SILDeclRef();
-    return SILDeclRef(overridden, kind, uncurryLevel);
+    return SILDeclRef(overridden, kind, getResilienceExpansion(), uncurryLevel);
   }
 };
 

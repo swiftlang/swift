@@ -1604,6 +1604,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   auto superclassDtorDecl = superclass->getDestructor();
   SILDeclRef superclassDtor(superclassDtorDecl, 
                             SILDeclRef::Kind::Deallocator,
+                            SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             /*isForeign=*/true);
   auto superclassDtorType = SGM.getConstantType(superclassDtor);
@@ -1825,7 +1826,10 @@ public:
                      ArrayRef<Substitution> WitnessSubstitutions) {
 
     // Emit the witness thunk and add it to the table.
-    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func);
+    // TODO: multiple resilience expansions?
+    // TODO: multiple uncurry levels?
+    SILDeclRef requirementRef(fd, SILDeclRef::Kind::Func,
+                              ResilienceExpansion::Minimal);
     // Free function witnesses have an implicit uncurry layer imposed on them by
     // the inserted metatype argument.
     auto isFree = isFreeFunctionWitness(fd, witnessDecl);
@@ -1833,6 +1837,7 @@ public:
                                           : requirementRef.uncurryLevel;
   
     SILDeclRef witnessRef(witnessDecl, SILDeclRef::Kind::Func,
+                          SILDeclRef::ConstructAtBestResilienceExpansion,
                           witnessUncurryLevel);
 
     SILFunction *witnessFn =

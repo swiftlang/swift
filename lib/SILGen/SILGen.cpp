@@ -303,10 +303,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;
 
-  ResilienceExpansion expansion = ResilienceExpansion::Minimal; /*TODO*/
-
   SmallVector<char, 128> buffer;
-  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer, expansion),
+  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans);
   
@@ -544,6 +542,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     // Emit the ivar initializer, if needed.
     if (requiresIVarInitialization(*this, cd)) {
       SILDeclRef ivarInitializer(cd, SILDeclRef::Kind::IVarInitializer,
+                                 SILDeclRef::ConstructAtBestResilienceExpansion,
                                  SILDeclRef::ConstructAtNaturalUncurryLevel,
                                  /*isForeign=*/true);
       SILFunction *f = preEmitFunction(ivarInitializer, dd, dd);
@@ -555,6 +554,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     // Emit the ivar destroyer, if needed.
     if (requiresIVarDestruction(*this, cd)) {
       SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
+                               SILDeclRef::ConstructAtBestResilienceExpansion,
                                SILDeclRef::ConstructAtNaturalUncurryLevel,
                                /*isForeign=*/true);
       SILFunction *f = preEmitFunction(ivarDestroyer, dd, dd);
@@ -649,7 +649,9 @@ void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
 }
 
 void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
-  SILDeclRef thunk(method, SILDeclRef::ConstructAtNaturalUncurryLevel,
+  SILDeclRef thunk(method,
+                   SILDeclRef::ConstructAtBestResilienceExpansion,
+                   SILDeclRef::ConstructAtNaturalUncurryLevel,
                    /*isObjC*/ true);
   
   // Don't emit the thunk if it already exists.
@@ -664,8 +666,9 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   SILDeclRef getter(prop->getGetter(), SILDeclRef::Kind::Func,
-                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                     /*isObjC*/ true);
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*isObjC*/ true);
                      
   // Don't emit the thunks if they already exist.
   if (hasFunction(getter))
@@ -686,8 +689,9 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
 
   // FIXME: Add proper location.
   SILDeclRef setter(prop->getSetter(), SILDeclRef::Kind::Func,
-                     SILDeclRef::ConstructAtNaturalUncurryLevel,
-                     /*isObjC*/ true);
+                    SILDeclRef::ConstructAtBestResilienceExpansion,
+                    SILDeclRef::ConstructAtNaturalUncurryLevel,
+                    /*isObjC*/ true);
 
   SILFunction *f = preEmitFunction(setter, prop, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
@@ -699,6 +703,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
 void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
   SILDeclRef thunk(constructor,
                    SILDeclRef::Kind::Initializer,
+                   SILDeclRef::ConstructAtBestResilienceExpansion,
                    SILDeclRef::ConstructAtNaturalUncurryLevel,
                    /*isObjC*/ true);
 
@@ -715,6 +720,7 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
 void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
   SILDeclRef thunk(destructor,
                    SILDeclRef::Kind::Deallocator,
+                   SILDeclRef::ConstructAtBestResilienceExpansion,
                    SILDeclRef::ConstructAtNaturalUncurryLevel,
                    /*isObjC*/ true);
 

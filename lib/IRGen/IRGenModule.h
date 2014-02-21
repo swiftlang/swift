@@ -418,10 +418,8 @@ public:
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ResilienceExpansion level,
                                        ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILDeclRef fn,
-                                       ResilienceExpansion level,
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      ForDefinition_t forDefinition);

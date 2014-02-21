@@ -1121,10 +1121,11 @@ namespace {
       // We don't have a destructor body, so hunt for the SIL function
       // for it.
       SILDeclRef dtorRef(destructor, SILDeclRef::Kind::Deallocator,
+                         ResilienceExpansion::Minimal,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          /*isForeign=*/true);
       llvm::SmallString<64> dtorNameBuffer;
-      auto dtorName = dtorRef.mangle(dtorNameBuffer, ResilienceExpansion::Minimal);
+      auto dtorName = dtorRef.mangle(dtorNameBuffer);
       if (auto silFn = IGM.SILMod->lookUpFunction(dtorName))
         return silFn->isDefinition();
 

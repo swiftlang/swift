@@ -517,12 +517,14 @@ static CheckedCastKind getCheckedCastKind(unsigned Attr) {
 /// Construct a SILDeclRef from ListOfValues.
 static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 ArrayRef<uint64_t> ListOfValues,
-                                unsigned StartIdx) {
-  assert(ListOfValues.size() >= StartIdx+4 &&
-         "Expect 4 numbers for SILDeclRef");
-  SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[StartIdx])),
-                  (SILDeclRef::Kind)ListOfValues[StartIdx+1],
-                  ListOfValues[StartIdx+2], ListOfValues[StartIdx+3] > 0);
+                                unsigned &NextIdx) {
+  assert(ListOfValues.size() >= NextIdx+5 &&
+         "Expect 5 numbers for SILDeclRef");
+  SILDeclRef DRef(cast<ValueDecl>(MF->getDecl(ListOfValues[NextIdx])),
+                  (SILDeclRef::Kind)ListOfValues[NextIdx+1],
+                  (ResilienceExpansion)ListOfValues[NextIdx+2],
+                  ListOfValues[NextIdx+3], ListOfValues[NextIdx+4] > 0);
+  NextIdx += 5;
   return DRef;
 }
 
@@ -1273,12 +1275,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // and an operand.
     // ArchetypeMethodInst is additionally optionally followed by a
     // ProtocolConformance record.
-    assert(ListOfValues.size() >= 7 &&
-           "Expect at least 7 numbers for MethodInst");
-    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, 1);
+    unsigned NextValueIndex = 1;
+    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    SILType operandTy = getSILType(MF->getType(ListOfValues[5]),
-                                   (SILValueCategory)ListOfValues[6]);
+    assert(ListOfValues.size() >= NextValueIndex + 2 &&
+           "Out of entries for MethodInst");
+    SILType operandTy = getSILType(MF->getType(ListOfValues[NextValueIndex]),
+                                   (SILValueCategory)ListOfValues[NextValueIndex+1]);
+    NextValueIndex += 2;
     bool IsVolatile = ListOfValues[0] > 0;
 
     switch ((ValueKind)OpCode) {
@@ -1296,27 +1300,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     case ValueKind::ProtocolMethodInst:
       ResultVal = Builder.createProtocolMethod(Loc,
-                    getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex],
+                                  ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::ClassMethodInst:
       ResultVal = Builder.createClassMethod(Loc,
-                    getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex],
+                                  ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::SuperMethodInst:
       ResultVal = Builder.createSuperMethod(Loc,
-                    getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex],
+                                  ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::PeerMethodInst:
       ResultVal = Builder.createPeerMethod(Loc,
-                    getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex],
+                                  ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     case ValueKind::DynamicMethodInst:
       ResultVal = Builder.createDynamicMethod(Loc,
-                    getLocalValue(ListOfValues[7], ListOfValues[8], operandTy),
+                    getLocalValue(ListOfValues[NextValueIndex],
+                                  ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);
       break;
     }
@@ -1325,15 +1334,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::DynamicMethodBranchInst: {
     // Format: a typed value, a SILDeclRef, a BasicBlock ID for method,
     // a BasicBlock ID for no method. Use SILOneTypeValuesLayout.
-    assert(ListOfValues.size() == 8 &&
-           "Expect 8 numbers for DynamicMethodBranchInst");
-    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, 2);
+    unsigned NextValueIndex = 2;
+    SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
+    assert(ListOfValues.size() == NextValueIndex + 2 &&
+           "Wrong number of entries for DynamicMethodBranchInst");
     ResultVal = Builder.createDynamicMethodBranch(Loc,
                     getLocalValue(ListOfValues[0], ListOfValues[1],
                                   getSILType(MF->getType(TyID),
                                              (SILValueCategory)TyCategory)),
-                    DRef, getBBForReference(Fn, ListOfValues[6]),
-                    getBBForReference(Fn, ListOfValues[7]));
+                    DRef, getBBForReference(Fn, ListOfValues[NextValueIndex]),
+                    getBBForReference(Fn, ListOfValues[NextValueIndex+1]));
     break;
   }
   case ValueKind::CheckedCastBranchInst: {
@@ -1510,8 +1520,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     DeclID NameID;
     VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
     SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
-    if (Func)
-      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, 0), Func);
+    if (Func) {
+      unsigned NextValueIndex = 0;
+      vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues,
+                                               NextValueIndex), Func);
+    }
 
     // Fetch the next record.
     scratch.clear();
@@ -1640,10 +1653,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
       SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
-      if (Func)
+      if (Func) {
+        unsigned NextValueIndex = 0;
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
-          getSILDeclRef(MF, ListOfValues, 0), Func
+          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
         });
+      }
     }
 
     // Fetch the next record.

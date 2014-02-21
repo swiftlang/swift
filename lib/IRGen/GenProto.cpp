@@ -2467,7 +2467,7 @@ namespace {
       
       llvm::Constant *witness
         = IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
-                                   ResilienceExpansion::Minimal, NotForDefinition);
+                                   NotForDefinition);
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
       Table.push_back(witness);
       

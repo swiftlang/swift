@@ -286,9 +286,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   llvm::Function *topLevelCodeFn = nullptr;
   if (auto topLevelCodeSILFn =
         SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
-    topLevelCodeFn = getAddrOfSILFunction(topLevelCodeSILFn,
-                                          ResilienceExpansion::Minimal,
-                                          NotForDefinition);
+    topLevelCodeFn = getAddrOfSILFunction(topLevelCodeSILFn, NotForDefinition);
   }
 
   llvm::Type* argcArgvTypes[2] = {
@@ -902,10 +900,9 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
 /// Find the entry point for a SIL function, which we assume exists in
 /// the module.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
-                                                  ResilienceExpansion expansion,
                                                   ForDefinition_t forDefinition) {
   llvm::SmallString<32> name;
-  fnRef.mangle(name, expansion);
+  fnRef.mangle(name);
   SILFunction *fn = SILMod->lookUpFunction(name);
 #ifndef NDEBUG
   if (!fn) {
@@ -913,14 +910,13 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
     abort();
   }
 #endif
-  return getAddrOfSILFunction(fn, expansion, forDefinition);
+  return getAddrOfSILFunction(fn, forDefinition);
 }
 
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
-                                                  ResilienceExpansion level,
                                                   ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forSILFunction(f, level);
+  LinkEntity entity = LinkEntity::forSILFunction(f);
 
   // Check whether we've created the function already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
@@ -954,7 +950,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
-                                               level,
+         /*FIXME: shouldn't be required here*/ ResilienceExpansion::Minimal,
                                                ExtraData::None,
                                                attrs);
   
@@ -998,6 +994,7 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
   if (isa<ConstructorDecl>(fn.getDecl()))
     kind = SILDeclRef::Kind::Allocator;
   SILDeclRef silFn = SILDeclRef(fn.getDecl(), kind,
+                                fn.getExplosionLevel(),
                                 fn.getUncurryLevel(),
                                 /*foreign*/ false);
   auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
@@ -1291,16 +1288,15 @@ Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
   SILDeclRef silRef(cd, 
                     isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                : SILDeclRef::Kind::IVarInitializer, 
+                    ResilienceExpansion::Minimal,
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
                     /*isForeign=*/true);
 
-  auto expansion = ResilienceExpansion::Minimal;
-
   llvm::SmallString<64> ivarInitDestroyNameBuffer;
-  auto name = silRef.mangle(ivarInitDestroyNameBuffer, expansion);
+  auto name = silRef.mangle(ivarInitDestroyNameBuffer);
   // Find the SILFunction for the ivar initializer or destroyer.
   if (auto silFn = SILMod->lookUpFunction(name)) {
-    return getAddrOfSILFunction(silFn, expansion, forDefinition);
+    return getAddrOfSILFunction(silFn, forDefinition);
   }
 
   return Nothing;

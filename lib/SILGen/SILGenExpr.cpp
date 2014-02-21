@@ -281,6 +281,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       
       // Reference the next uncurrying level of the function.
       SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
+                                 SILDeclRef::ConstructAtBestResilienceExpansion,
                                    constant.uncurryLevel + 1);
       // If the function is fully uncurried and natively foreign, reference its
       // foreign entry point.
@@ -486,7 +487,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       ++uncurryLevel;
   }
 
-  auto silDeclRef = SILDeclRef(decl, uncurryLevel);
+  auto silDeclRef = SILDeclRef(decl, ResilienceExpansion::Minimal, uncurryLevel);
   auto constantInfo = getConstantInfo(silDeclRef);
 
   ManagedValue result = emitFunctionRef(loc, silDeclRef, constantInfo);
@@ -2574,6 +2575,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Call the initializer.
   SILDeclRef initConstant =
     SILDeclRef(ctor, SILDeclRef::Kind::Initializer,
+               SILDeclRef::ConstructAtBestResilienceExpansion,
                SILDeclRef::ConstructAtNaturalUncurryLevel,
                /*isObjC=*/ctor->hasClangNode());
 

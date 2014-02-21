@@ -1331,9 +1331,9 @@ namespace {
     void addDestructorFunction() {
       auto expansion = ResilienceExpansion::Minimal;
       auto dtorRef = SILDeclRef(TargetClass->getDestructor(),
-                                SILDeclRef::Kind::Deallocator);
-      Fields.push_back(IGM.getAddrOfSILFunction(dtorRef, expansion,
-                                                NotForDefinition));
+                                SILDeclRef::Kind::Deallocator,
+                                expansion);
+      Fields.push_back(IGM.getAddrOfSILFunction(dtorRef, NotForDefinition));
     }
     
     void addNominalTypeDescriptor() {

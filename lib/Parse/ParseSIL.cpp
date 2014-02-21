@@ -784,10 +784,11 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
   unsigned uncurryLevel = 0;
   bool IsObjC = false;
+  ResilienceExpansion expansion = ResilienceExpansion::Minimal;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, uncurryLevel, IsObjC);
+    Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
     return false;
   }
 
@@ -858,12 +859,13 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
       P.consumeToken(tok::integer_literal);
       ParseState = 2;
     } else
+      // TODO: resilience expansion?
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, uncurryLevel, IsObjC);
+  Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
   return false;
 }
 

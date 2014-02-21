@@ -60,8 +60,7 @@ static SILFunction *getDestructor(AllocationInst* AI) {
     // FIXME: When destructors get moved into vtables, update this to use the
     // vtable for the class.
     SmallVector<char, 128> buffer;
-    StringRef Name = SILDeclRef(Destructor).mangle(buffer,
-                                                  ResilienceExpansion::Minimal);
+    StringRef Name = SILDeclRef(Destructor).mangle(buffer);
     DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
 
     // Then try to lookup the destructor from the module.

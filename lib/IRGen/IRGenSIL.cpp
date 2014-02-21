@@ -696,8 +696,7 @@ ResilienceExpansion LoweredValue::getResilienceExpansion() const {
 IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
                                    SILFunction *f,
                                    ResilienceExpansion explosionLevel)
-  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, explosionLevel,
-                                                ForDefinition),
+  : IRGenFunction(IGM, IGM.getAddrOfSILFunction(f, ForDefinition),
                   f->getDebugScope(), f->getLocation()),
     CurSILFn(f), CurSILFnExplosionLevel(explosionLevel)
 {}
@@ -1253,8 +1252,7 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // FIXME: pick the best available explosion level
   ResilienceExpansion explosionLevel = ResilienceExpansion::Minimal;
   llvm::Function *fnptr =
-    IGM.getAddrOfSILFunction(i->getReferencedFunction(), explosionLevel,
-                             NotForDefinition);
+    IGM.getAddrOfSILFunction(i->getReferencedFunction(), NotForDefinition);
   
   // Store the function constant and calling
   // convention as a StaticFunction so we can avoid bitcasting or thunking if

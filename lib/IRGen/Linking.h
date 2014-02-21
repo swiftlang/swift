@@ -308,12 +308,11 @@ public:
     return entity;
   }
 
-  static LinkEntity forSILFunction(SILFunction *F, ResilienceExpansion level)
+  static LinkEntity forSILFunction(SILFunction *F)
   {
     LinkEntity entity;
     entity.Pointer = F;
-    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction))
-                | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(level));
+    entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction));
     return entity;
   }
   
