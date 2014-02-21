@@ -461,8 +461,13 @@ void IRGenModule::emitGlobalTopLevel() {
     emitSILGlobalVariable(&v);
   
   // Emit SIL functions.
-  for (SILFunction &f : *SILMod)
+  for (SILFunction &f : *SILMod) {
+    // Only eagerly emit functions that are externally visible.
+    if (!isPossiblyUsedExternally(f.getLinkage()))
+      continue;
+
     emitSILFunction(&f);
+  }
 
   // Emit witness tables.
   for (SILWitnessTable &wt : SILMod->getWitnessTableList())
@@ -485,6 +490,18 @@ void IRGenModule::emitGlobalTopLevel() {
   // Emit external definitions used by this module.
   for (auto def : Context.ExternalDefinitions) {
     emitExternalDefinition(def);
+  }
+}
+
+/// Emit any lazy definitions (of globals or functions or whatever
+/// else) that we require.
+void IRGenModule::emitLazyDefinitions() {
+  // Emit any lazy function definitions we require.
+  while (!LazyFunctionDefinitions.empty()) {
+    SILFunction *f = LazyFunctionDefinitions.pop_back_val();
+    assert(!isPossiblyUsedExternally(f->getLinkage()) &&
+           "function with externally-visible linkage emitted lazily?");
+    emitSILFunction(f);
   }
 }
 
@@ -928,6 +945,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     if (auto emittedFunctionIterator
           = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
       insertBefore = *emittedFunctionIterator;
+
+    // Also, if we have a lazy definition for it, be sure to queue that up.
+    if (!forDefinition &&
+        !isPossiblyUsedExternally(f->getLinkage()))
+      LazyFunctionDefinitions.push_back(f);
   }
     
   llvm::AttributeSet attrs;

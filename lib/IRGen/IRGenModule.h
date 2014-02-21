@@ -305,6 +305,9 @@ private:
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
 
+  /// SIL functions that we need to emit lazily.
+  llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
+
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
   llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
@@ -436,6 +439,7 @@ public:
 //--- Global context emission --------------------------------------------------
 public:
   void emitGlobalTopLevel();
+  void emitLazyDefinitions();
 private:
   void emitGlobalDecl(Decl *D);
   void emitExternalDefinition(Decl *D);

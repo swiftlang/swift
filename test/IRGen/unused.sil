@@ -1,0 +1,48 @@
+// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
+
+sil_stage canonical
+
+sil private @foo : $@thin () -> () {
+bb0:
+  %0 = function_ref @bar : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
+  return %1 : $()
+}
+
+sil public_external @bar : $@thin () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil shared @baz : $@thin () -> () {
+bb0:
+  %0 = function_ref @bar : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
+  return %1 : $()
+}
+
+sil shared @qux : $@thin () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden @fred : $@thin () -> () {
+bb0:
+  %0 = function_ref @qux : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
+  return %1 : $()
+}
+
+// CHECK-NOT: @foo
+// CHECK-NOT: @bar
+// CHECK-NOT: @baz
+// CHECK: define linkonce_odr hidden void @qux()
+// CHECK-NOT: @foo
+// CHECK-NOT: @bar
+// CHECK-NOT: @baz
+// CHECK: define hidden void @fred()
+// CHECK-NOT: @foo
+// CHECK-NOT: @bar
+// CHECK-NOT: @baz
