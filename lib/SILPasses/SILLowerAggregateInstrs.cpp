@@ -264,7 +264,7 @@ class SILLowerAggregate : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "Lower Aggregates"; }
+  StringRef getName() override { return "Lower Aggregate Instructions"; }
 };
 
 SILTransform *swift::createLowerAggregate() {

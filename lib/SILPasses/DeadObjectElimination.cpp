@@ -305,7 +305,7 @@ class DeadObjectElimination : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "AllocRef Elimination"; }
+  StringRef getName() override { return "Dead Object Elimination"; }
 };
 
 //===----------------------------------------------------------------------===//
