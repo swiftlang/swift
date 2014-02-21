@@ -123,8 +123,8 @@ int main(int argc, char **argv) {
     llvm::MemoryBuffer::getMemBuffer(Buffer->getBuffer(),
                                      Buffer->getBufferIdentifier(),
                                      false));
-  FileUnit *FU;
-  if (!(FU = SML->loadAST(*MainModule, SourceLoc(), std::move(Input)))) {
+  FileUnit *FUnit;
+  if (!(FUnit = SML->loadAST(*MainModule, SourceLoc(), std::move(Input)))) {
     fprintf(stderr, "Error! Failed to load AST.\n");
     exit(-1);
   }
@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
     switch (Action) {
     case ActionKind::DumpDecls: {
       llvm::SmallVector<Decl *, 16> results;
-      FU->getTopLevelDecls(results);
+      FUnit->getTopLevelDecls(results);
 
       for (auto Decl : results) {
         Decl->print(llvm::outs());
@@ -142,14 +142,12 @@ int main(int argc, char **argv) {
       break;
     }
     case ActionKind::DumpSIL: {
-      Module *M = cast<SerializedASTFile>(FU)->getFile().getAssociatedModule();
-      std::unique_ptr<SILModule> SILMod = SILModule::createEmptyModule(M);
-      SerializedSILLoader::Callback Callback;
+      std::unique_ptr<SILModule> SILMod = SILModule::createEmptyModule(MainModule);
       std::unique_ptr<SerializedSILLoader> SL(SerializedSILLoader::create(*Context.get(),
                                                                           SILMod.get(),
-                                                                          &Callback));
+                                                                          nullptr));
       SL->getAll();
-      SILMod->print(llvm::outs(), EmitVerboseSIL, M);
+      SILMod->print(llvm::outs(), EmitVerboseSIL, MainModule);
       break;
     }
     }
