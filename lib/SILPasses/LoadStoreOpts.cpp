@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-load-store-opts"
+#define DEBUG_TYPE "load-store-opts"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
