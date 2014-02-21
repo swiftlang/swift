@@ -205,11 +205,7 @@ intptr_t Tuple_getCount(MagicMirrorData *self, const Metadata *Self) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
   return Tuple->NumElements;
 }
-  
-Mirror reflectInnerValue(HeapObject *owner,
-                         const OpaqueValue *value, const Metadata *T);
-    
-    
+
 StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
                                  const Metadata *Self) {
   StringMirrorTuple result;
@@ -230,7 +226,7 @@ StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
   auto bytes = reinterpret_cast<const char*>(self->Value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
   
-  result.second = reflectInnerValue(self->Owner, eltData, elt.Type);
+  result.second = swift_unsafeReflectAny(self->Owner, eltData, elt.Type);
   return result;
 }
   
@@ -307,22 +303,6 @@ const ReflectableWitnessTable *getReflectableConformance(const Metadata *T) {
     swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr));
 }
   
-/// Produce a mirror for any value, like swift_reflectAny, but do not consume
-/// the value, so we can produce a mirror for a subobject of a value already
-/// owned by a mirror.
-Mirror reflectInnerValue(HeapObject *owner,
-                         const OpaqueValue *value, const Metadata *T) {
-  auto witness = getReflectableConformance(T);
-  // Use the Reflectable conformance if the object has one.
-  if (witness) {
-    return witness->getMirror(const_cast<OpaqueValue*>(value), T);
-  }
-  // Otherwise, fall back to MagicMirror.
-  Mirror result;
-  ::new (&result) MagicMirror(owner, value, T);
-  return result;
-}
-  
 } // end anonymous namespace
 
 /// func reflect<T>(x: T) -> Mirror
@@ -353,3 +333,19 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   }
 }
 
+/// Produce a mirror for any value, like swift_reflectAny, but do not consume
+/// the value, so we can produce a mirror for a subobject of a value already
+/// owned by a mirror.
+Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
+                                     const OpaqueValue *value,
+                                     const Metadata *T) {
+  auto witness = getReflectableConformance(T);
+  // Use the Reflectable conformance if the object has one.
+  if (witness) {
+    return witness->getMirror(const_cast<OpaqueValue*>(value), T);
+  }
+  // Otherwise, fall back to MagicMirror.
+  Mirror result;
+  ::new (&result) MagicMirror(owner, value, T);
+  return result;
+}

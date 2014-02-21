@@ -36,4 +36,14 @@ struct Mirror {
 extern "C" Mirror
 swift_reflectAny(OpaqueValue *value, const Metadata *T);
   
+/// func unsafeReflect<T>(owner: Builtin.ObjectPointer,
+///                       x: UnsafePointer<T>) -> Mirror
+///
+/// Produce a mirror for any value. If the value's type conforms to Reflectable,
+/// invoke its getMirror() method; otherwise, fall back to an implementation
+/// in the runtime that structurally reflects values of any type.
+extern "C" Mirror
+swift_unsafeReflectAny(HeapObject *owner,
+                       const OpaqueValue *value, const Metadata *T);
+  
 }
