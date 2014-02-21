@@ -46,46 +46,56 @@ STATISTIC(NumStoreOnlyAllocRefEliminated,
 //                            Destructor Analysis
 //===----------------------------------------------------------------------===//
 
+static SILFunction *getDestructor(AllocationInst* AI) {
+  if (auto *ARI = dyn_cast<AllocRefInst>(AI)) {
+    // We only support classes.
+    ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
+    if (!ClsDecl)
+      return nullptr;
+
+    // Look up the destructor of ClsDecl.
+    DestructorDecl *Destructor = ClsDecl->getDestructor();
+    assert(Destructor && "getDestructor() should never return a nullptr.");
+
+    // Find the destructor name via SILDeclRef.
+    // FIXME: When destructors get moved into vtables, update this to use the
+    // vtable for the class.
+    SmallVector<char, 128> buffer;
+    StringRef Name = SILDeclRef(Destructor).mangle(buffer,
+                                                  ResilienceExpansion::Minimal);
+    DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
+
+    // Then try to lookup the destructor from the module.
+    SILFunction *Fn = ARI->getModule().lookUpFunction(Name);
+    if (!Fn || Fn->empty()) {
+      DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
+      return nullptr;
+    }
+
+    DEBUG(llvm::dbgs() << "    Found destructor!\n");
+
+    // If the destructor has an objc_method calling convention, we can not
+    // analyze it since it could be swapped out from under us at runtime.
+    if (Fn->getAbstractCC() == AbstractCC::ObjCMethod) {
+      DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
+            "analyze!\n");
+      return nullptr;
+    }
+
+    return Fn;
+  }
+
+  return nullptr;
+}
+
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
 static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
-  // We only support classes. Assume all other cases have side effects.
-  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
-  if (!ClsDecl)
+  SILFunction *Fn = getDestructor(ARI);
+  // If we can't find a constructor then assume it has side effects.
+  if (!Fn)
     return true;
-
-  // Look up the destructor of ClsDecl.
-  DestructorDecl *Destructor = ClsDecl->getDestructor();
-  assert(Destructor && "getDestructor() should never return a nullptr.");
-
-  // Ok we have a destructor. Compute its name (our lookup key) via SILDeclRef.
-  //
-  // FIXME: When destructors get moved into vtables, update this to use the
-  // vtable for the class.
-  SmallVector<char, 128> buffer;
-  StringRef Name = SILDeclRef(Destructor).mangle(buffer,
-                                                 ResilienceExpansion::Minimal);
-  DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
-
-  // Then try to lookup the destructor from the module. If we can't the
-  // destructor is unable to be found or external, be conservative and assume
-  // that it does have side effects.
-  SILFunction *Fn = ARI->getModule().lookUpFunction(Name);
-  if (!Fn || Fn->empty()) {
-    DEBUG(llvm::dbgs() << "    Could not find destructor...\n");
-    return true;
-  }
-
-  DEBUG(llvm::dbgs() << "    Found destructor!\n");
-
-  // If the destructor has an objc_method calling convention, we can not analyze
-  // it since it could be swapped out from under us at runtime.
-  if (Fn->getAbstractCC() == AbstractCC::ObjCMethod) {
-    DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
-          "analyze!\n");
-    return true;
-  }
 
   // A destructor only has one argument, self.
   assert(Fn->begin()->getNumBBArg() == 1 &&
