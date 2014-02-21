@@ -1,4 +1,4 @@
-//===-- SILDis.cpp - SIL function dision utility --------------------------===//
+//===-- SILDis.cpp - SIL function deserialization utility -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
