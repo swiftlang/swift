@@ -1286,14 +1286,19 @@ argument of the uncurried type, just like a native Swift method::
 That ``self`` is passed as the first argument at the IR level is abstracted
 away in SIL, as is the existence of the ``_cmd`` selector argument.
 
-Class Aliasing
---------------
+Type Based Alias Analysis
+-------------------------
 
-Class instances and other *heap object references* are
-pointers at the implementation level, but unlike SIL addresses, they are
-first class values and can be ``capture``-d and alias. Swift, however, is
-memory-safe and statically typed, so aliasing of classes is constrained by
-the type system as follows:
+SIL supports two types of Type Based Alias Analysis (TBAA): Class TBAA and
+Typed Access TBAA.
+
+Class TBAA
+~~~~~~~~~~
+
+Class instances and other *heap object references* are pointers at the
+implementation level, but unlike SIL addresses, they are first class values and
+can be ``capture``-d and alias. Swift, however, is memory-safe and statically
+typed, so aliasing of classes is constrained by the type system as follows:
 
 * A ``Builtin.ObjectPointer`` may alias any native Swift heap object,
   including a Swift class instance, a box allocated by ``alloc_box``, an array
@@ -1313,6 +1318,27 @@ the type system as follows:
   instance, such as ``$C<T>`` for archetype ``T``, must be assumed to
   potentially alias concrete instances of the generic type, such as
   ``$C<Int>``, because ``Int`` is a potential substitution for ``T``.
+
+Typed Access TBAA
+~~~~~~~~~~~~~~~~~
+
+Define a *typed access* of an address or reference as one of the following:
+
+* Any instruction that performs a typed read or write operation upon the memory
+  at the given location (e.x. ``load``, ``store``).
+* Any instruction that yields a typed offset of the pointer by performing a
+  typed projection operation (e.x. ``ref_element_addr``,
+  ``tuple_element_addr``).
+
+It is undefined behavior to perform a typed access to an address or reference if
+the stored object or referent is not an allocated object of the relevant type.
+
+This allows the optimizer to assume that two addresses cannot alias if there
+does not exist a substitution of archetypes that could cause one of the types to
+be the type of a subobject of the other. Additionally, this applies to the types
+of the values from which the addresses were derived, ignoring "blessed"
+alias-introducing operations such as ``pointer_to_address``, the ``bitcast``
+intrinsic, and the ``inttoptr`` intrinsic.
 
 Instruction Set
 ---------------
