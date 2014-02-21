@@ -135,7 +135,7 @@ void SourceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      if (onlyOperators ? VD->getName().isOperator() : !VD->getName().empty())
+      if (onlyOperators ? VD->getName().isOperator() : VD->hasName())
         TopLevelValues[VD->getName()].push_back(VD);
     if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);

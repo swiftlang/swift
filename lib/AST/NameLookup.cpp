@@ -626,7 +626,7 @@ void MemberLookupTable::addMembers(ArrayRef<Decl *> members) {
       continue;
 
     // Unnamed entities cannot be found by name lookup.
-    if (vd->getName().empty())
+    if (!vd->hasName())
       continue;
 
     // Add this declaration to the lookup set.

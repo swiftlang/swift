@@ -2537,7 +2537,7 @@ public:
     if (!superclass)
       return false;
 
-    if (method->getName().empty())
+    if (!method->hasName())
       return false;
 
     // Figure out the type of the method that we're use for comparisons.

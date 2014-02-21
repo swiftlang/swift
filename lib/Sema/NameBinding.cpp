@@ -270,7 +270,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
       // vars/funcs.
       // FIXME: We don't have enough information to do this properly here,
       // because we need resolved types to find duplicates.
-      if (VD->getName().empty())
+      if (!VD->hasName())
         continue;
       ValueDecl *&LookupD = CheckTypes[VD->getName()];
       ValueDecl *PrevD = LookupD;

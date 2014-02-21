@@ -772,6 +772,7 @@ public:
       RefKind(refKind) {
   }
   
+  bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
   DeclRefKind getRefKind() const { return RefKind; }
 

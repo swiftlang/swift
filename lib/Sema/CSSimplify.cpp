@@ -66,7 +66,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
 
         // For subtyping constraints, just make sure that this name isn't
         // used at some other position.
-        if (!elt2.getName().empty()) {
+        if (elt2.hasName()) {
           int matched = tuple1->getNamedElementId(elt2.getName());
           if (matched != -1) {
             // Record this failure.

@@ -197,7 +197,7 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
       auto &elt = tupleTy->getFields()[scalarIdx];
       if (elt.isVararg()) // FIXME: Should we keep the name?
         result.push_back(elt.getVarargBaseTy());
-      else if (!elt.getName().empty())
+      else if (elt.hasName())
         result.push_back(elt.getType());
     }
   }

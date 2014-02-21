@@ -240,7 +240,7 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
       continue;
     if (isa<DestructorDecl>(MemberVD) || isa<ConstructorDecl>(MemberVD))
       continue;
-    if (MemberVD->getName().empty())
+    if (!MemberVD->hasName())
       continue;
     if (MemberVD->getInterfaceType()->is<ErrorType>())
       continue;
@@ -650,7 +650,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   for (unsigned i = 0, e = SF.Decls.size(); i != e; ++i) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(SF.Decls[i])) {
       // FIXME: I'm not sure this check is really correct.
-      if (VD->getName().empty())
+      if (!VD->hasName())
         continue;
       if (VD->getType()->is<ErrorType>())
         continue;

@@ -155,7 +155,7 @@ static FuncDecl *findNamedWitness(TypeChecker &tc, DeclContext *dc,
   FuncDecl *requirement = nullptr;
   for (auto member : proto->getMembers()) {
     auto fd = dyn_cast<FuncDecl>(member);
-    if (!fd || fd->getName().empty())
+    if (!fd || !fd->hasName())
       continue;
 
     if (fd->getName() == name) {

@@ -100,7 +100,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
     const auto &toElt = toTuple->getFields()[i];
 
     // Skip unnamed elements.
-    if (toElt.getName().empty())
+    if (!toElt.hasName())
       continue;
 
     // Find the corresponding named element.

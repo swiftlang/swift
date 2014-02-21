@@ -470,7 +470,7 @@ struct ASTNodeBase {};
     }
 
     void verifyCheckedAlways(ValueDecl *D) {
-      if (!D->getName().empty())
+      if (D->hasName())
         checkMangling(D);
 
       if (D->hasType() && D->getType()->hasTypeVariable()) {

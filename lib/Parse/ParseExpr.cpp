@@ -361,7 +361,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // Check if we have an unary '-' with integer literal sub-expression, for
   // example, "-42".
   if (auto *ILE = dyn_cast<IntegerLiteralExpr>(SubExpr.get())) {
-    if (!Operator->getName().empty() && Operator->getName().str() == "-") {
+    if (Operator->hasName() && Operator->getName().str() == "-") {
       ILE->setNegative(Operator->getLoc());
       return makeParserResult(ILE);
     }

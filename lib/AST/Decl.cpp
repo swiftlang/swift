@@ -581,7 +581,7 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
-  if (getName().empty())
+  if (!hasName())
     return false;
 
   // Dynamic lookup can only find [objc] members.

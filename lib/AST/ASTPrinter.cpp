@@ -748,7 +748,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << "func ";
     recordDeclLoc(decl);
-    if (decl->getName().empty())
+    if (!decl->hasName())
       Printer << "<anonymous>";
     else
       Printer << decl->getName().str();

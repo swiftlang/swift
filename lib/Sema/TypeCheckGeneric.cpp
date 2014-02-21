@@ -893,7 +893,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   AssociatedTypeDecl *requirement = nullptr;
   for (auto member : protocol->getMembers()) {
     auto td = dyn_cast<AssociatedTypeDecl>(member);
-    if (!td || td->getName().empty())
+    if (!td || !td->hasName())
       continue;
 
     if (td->getName() == name) {

@@ -1615,7 +1615,7 @@ public:
 
   void visitNamedTypeRepr(NamedTypeRepr *T) {
     printCommon(T, "type_named");
-    if (!T->getName().empty())
+    if (T->hasName())
       OS << " id='" << T->getName();
     if (T->getTypeRepr()) {
       OS << '\n';

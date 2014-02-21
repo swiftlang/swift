@@ -1384,7 +1384,8 @@ public:
   /// declaration (e.g. of a function) that is implemented outside of the
   /// swift code.
   bool isDefinition() const;
-  
+
+  bool hasName() const { return !Name.empty(); }
   Identifier getName() const { return Name; }
   bool isOperator() const { return Name.isOperator(); }
 

@@ -444,7 +444,7 @@ namespace {
       // When NSString* is the type of a function parameter or a function
       // result type, map it to String.
       if (canBridgeTypes() &&
-          !imported->getName().empty() &&
+          imported->hasName() &&
           imported->getName().str() == "NSString" &&
           Impl.hasFoundationModule()) {
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");

@@ -386,7 +386,7 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
       return BumpAllocatedString(Name);
     }
 
-  if (!FD.getName().empty())
+  if (FD.hasName())
     return FD.getName().str();
 
   return StringRef();

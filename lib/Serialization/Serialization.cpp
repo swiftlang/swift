@@ -2205,7 +2205,7 @@ static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members,
   for (auto member : members) {
     // Add operator methods.
     if (auto func = dyn_cast<FuncDecl>(member)) {
-      if (!func->getName().empty() && func->getName().isOperator())
+      if (func->hasName() && func->getName().isOperator())
         operatorMethodDecls[func->getName()]
           .push_back({0, S.addDeclRef(func)});
       continue;
@@ -2230,7 +2230,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (isa<ImportDecl>(D))
         continue;
       else if (auto VD = dyn_cast<ValueDecl>(D)) {
-        if (VD->getName().empty())
+        if (!VD->hasName())
           continue;
         topLevelDecls[VD->getName()]
           .push_back({ getKindForTable(D), addDeclRef(D) });

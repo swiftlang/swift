@@ -443,7 +443,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
                                    stripLabels, stripDefaultArgs);
       if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
           (elt.hasInit() && stripDefaultArgs) ||
-          (!elt.getName().empty() && stripLabels)) {
+          (elt.hasName() && stripLabels)) {
         if (!anyChanged) {
           elements.reserve(tuple->getFields().size());
           for (unsigned i = 0; i != idx; ++i) {
@@ -474,7 +474,7 @@ static Type getStrippedType(const ASTContext &context, Type type,
     // An unlabeled 1-element tuple type is represented as a parenthesized
     // type.
     if (elements.size() == 1 && !elements[0].isVararg() && 
-        elements[0].getName().empty())
+        !elements[0].hasName())
       return ParenType::get(context, elements[0].getType());
     
     return TupleType::get(elements, context);

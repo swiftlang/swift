@@ -486,6 +486,7 @@ public:
     : TypeRepr(TypeReprKind::Named), Id(Id), Ty(Ty), IdLoc(IdLoc) {
   }
 
+  bool hasName() const { return !Id.empty(); }
   Identifier getName() const { return Id; }
   TypeRepr *getTypeRepr() const { return Ty; }
   SourceLoc getNameLoc() const { return IdLoc; }

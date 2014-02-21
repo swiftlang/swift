@@ -232,7 +232,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
     }
 
     printFullContext(decl->getDeclContext(), OS);
-    assert(!decl->getName().empty());
+    assert(decl->hasName());
 
     OS << decl->getName() << Suffix;
   } else {
