@@ -38,6 +38,7 @@ malloc_zone_t _swift_zone = {
   NULL, // FIXME -- struct malloc_introspection_t *
   0, // version
   NULL, // XXX -- add support for memalign and free_definite_size?
+  NULL, // XXX -- add support for memalign and free_definite_size?
 };
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
