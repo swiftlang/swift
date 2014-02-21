@@ -18,6 +18,7 @@
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Mangle.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
@@ -469,6 +470,9 @@ struct ASTNodeBase {};
     }
 
     void verifyCheckedAlways(ValueDecl *D) {
+      if (!D->getName().empty())
+        checkMangling(D);
+
       if (D->hasType() && D->getType()->hasTypeVariable()) {
         Out << "a type variable escaped the type checker";
         D->dump(Out);
@@ -489,6 +493,11 @@ struct ASTNodeBase {};
           abort();
         }
       }
+      verifyCheckedAlwaysBase(D);
+    }
+
+    void verifyCheckedAlways(NominalTypeDecl *D) {
+      checkMangling(D);
       verifyCheckedAlwaysBase(D);
     }
 
@@ -1714,6 +1723,17 @@ struct ASTNodeBase {};
       T1.print(Out);
       Out << "\n";
       abort();
+    }
+
+    void checkMangling(ValueDecl *D) {
+      llvm::SmallString<32> Buf;
+      llvm::raw_svector_ostream OS(Buf);
+      Mangle::Mangler Mangler(OS);
+      Mangler.mangleDeclName(D);
+      if (OS.str().empty()) {
+        Out << "Mangler gave empty string for a ValueDecl";
+        abort();
+      }
     }
 
     bool isGoodSourceRange(SourceRange SR) {
