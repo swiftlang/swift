@@ -252,12 +252,24 @@ hasUnremoveableUsers(SILInstruction *AllocRef,
   return true;
 }
 
+class DeadObjectElimination : public SILFunctionTransform {
+  llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
+
+  bool processFunction(SILFunction &Fn);
+
+  void run() {
+    if (processFunction(*getFunction()))
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  }
+
+  StringRef getName() override { return "AllocRef Elimination"; }
+};
+
 //===----------------------------------------------------------------------===//
 //                            Function Processing
 //===----------------------------------------------------------------------===//
 
-static bool
-processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
+bool DeadObjectElimination::processFunction(SILFunction &Fn) {
   DEBUG(llvm::dbgs() << "***** Processing Function " << Fn.getName()
         << " *****\n");
 
@@ -283,17 +295,19 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
       // computed the destructor behavior for its SILType.
       bool HasSideEffects;
       SILType Type = AllocRef->getType();
-      auto CacheSearchResult = Cache.find(Type);
-      if (CacheSearchResult != Cache.end())
+      auto CacheSearchResult = DestructorAnalysisCache.find(Type);
+      if (CacheSearchResult != DestructorAnalysisCache.end()) {
         // Ok we found a value in the cache.
         HasSideEffects = CacheSearchResult->second;
-      else
+      } else {
         // We did not find a value in the cache for our destructor. Analyze the
         // destructor to make sure it has no side effects. For now this only
         // supports alloc_ref of classes so any alloc_ref with a reference type
         // that is not a class this will return false for. Once we have analyzed
         // it, set Behavior to that value and insert the value into the Cache.
-        Cache[Type] = HasSideEffects = doesDestructorHaveSideEffects(AllocRef);
+        HasSideEffects = doesDestructorHaveSideEffects(AllocRef);
+        DestructorAnalysisCache[Type] = HasSideEffects;
+      }
 
       if (HasSideEffects) {
         DEBUG(llvm::dbgs() << "    Destructor had side effects. Can't "
@@ -338,18 +352,6 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
-
-class DeadObjectElimination : public SILFunctionTransform {
-  /// The entry point to the transformation.
-  void run() {
-    llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
-
-    if (processFunction(*getFunction(), DestructorAnalysisCache))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-  }
-
-  StringRef getName() override { return "AllocRef Elimination"; }
-};
 
 SILTransform *swift::createDeadObjectElimination() {
   return new DeadObjectElimination();
