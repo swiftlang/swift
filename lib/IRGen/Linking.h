@@ -417,7 +417,8 @@ public:
   llvm::Function *createFunction(IRGenModule &IGM,
                                  llvm::FunctionType *fnType,
                                  llvm::CallingConv::ID cc,
-                                 const llvm::AttributeSet &attrs);
+                                 const llvm::AttributeSet &attrs,
+                                 llvm::Function *insertBefore = nullptr);
 
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,

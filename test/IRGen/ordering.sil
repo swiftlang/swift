@@ -1,0 +1,31 @@
+// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
+
+sil_stage canonical
+
+sil @foo : $@thin () -> () {
+bb0:
+  // In a simple module-appending scheme where we emitted SIL
+  // functions in order, this function reference would cause
+  // @baz to be created immediately following @foo because we
+  // won't yet have created the declaration for @bar.
+  %0 = function_ref @baz : $@thin () -> ()
+  %1 = apply %0() : $@thin () -> ()
+  return %1 : $()
+}
+
+sil @bar : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+sil @baz : $@thin () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// Make sure that these functions are emitted in the order they 
+// CHECK: define void @foo
+// CHECK: define void @bar
+// CHECK: define void @baz

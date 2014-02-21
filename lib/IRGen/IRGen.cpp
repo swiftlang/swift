@@ -145,6 +145,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   Module->setDataLayout(DataLayout->getStringRepresentation());
 
   // Emit the module contents.
+  IGM.prepare();
   IGM.emitGlobalTopLevel();
 
   if (SF) {

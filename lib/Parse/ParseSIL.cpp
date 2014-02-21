@@ -286,6 +286,11 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     
     assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
     TUState.ForwardRefFns.erase(It);
+
+    // Move the function to this position in the module.
+    SILMod.getFunctionList().remove(Fn);
+    SILMod.getFunctionList().push_back(Fn);
+
     return Fn;
   }
   

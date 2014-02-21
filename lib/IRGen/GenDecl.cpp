@@ -281,8 +281,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   
   // Emit main().
   // FIXME: We should only emit this in non-JIT modes.
-  llvm::Function *topLevelCodeFn
-    = Module.getFunction(SWIFT_ENTRY_POINT_FUNCTION);
+
+  // Look for an entrypoint function in the SIL module.
+  llvm::Function *topLevelCodeFn = nullptr;
+  if (auto topLevelCodeSILFn =
+        SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
+    topLevelCodeFn = getAddrOfSILFunction(topLevelCodeSILFn,
+                                          ResilienceExpansion::Minimal,
+                                          NotForDefinition);
+  }
 
   llvm::Type* argcArgvTypes[2] = {
     llvm::TypeBuilder<llvm::types::i<32>, true>::get(LLVMContext),
@@ -429,6 +436,18 @@ void IRGenModule::emitGlobalLists() {
   // @llvm.used
   emitGlobalList(*this, LLVMUsed, "llvm.used", "llvm.metadata",
                  llvm::GlobalValue::AppendingLinkage);
+}
+
+/// Prepare for the emission of a program.
+void IRGenModule::prepare() {
+  // Generate order numbers for the functions in the SIL module that
+  // correspond to definitions in the LLVM module.
+  unsigned nextOrderNumber = 0;
+  for (auto &silFn : SILMod->getFunctions()) {
+    // Don't bother adding external declarations to the function order.
+    if (!silFn.isDefinition()) continue;
+    FunctionOrder.insert(std::make_pair(&silFn, nextOrderNumber++));
+  }
 }
 
 void IRGenModule::emitGlobalTopLevel() {
@@ -626,7 +645,8 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
                                          llvm::FunctionType *fnType,
                                          llvm::CallingConv::ID cc,
-                                         const llvm::AttributeSet &attrs) {
+                                         const llvm::AttributeSet &attrs,
+                                         llvm::Function *insertBefore) {
   llvm::Function *existing = IGM.Module.getFunction(getName());
   if (existing) {
     if (isPointerTo(existing->getType(), fnType))
@@ -641,7 +661,12 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   }
 
   llvm::Function *fn
-    = llvm::Function::Create(fnType, getLinkage(), getName(), &IGM.Module);
+    = llvm::Function::Create(fnType, getLinkage(), getName());
+  if (insertBefore) {
+    IGM.Module.getFunctionList().insert(insertBefore, fn);
+  } else {
+    IGM.Module.getFunctionList().push_back(fn);
+  }
   fn->setVisibility(getVisibility());
   fn->setCallingConv(cc);
   if (!attrs.isEmpty())
@@ -887,6 +912,23 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     if (forDefinition) updateLinkageForDefinition(*this, fn, entity);
     return fn;
   }
+
+  bool hasOrderNumber = f->isDefinition();
+  unsigned orderNumber = ~0U;
+  llvm::Function *insertBefore = nullptr;
+
+  // If the SIL function has a definition, we should have an order
+  // number for it; make sure to insert it in that position relative
+  // to other ordered functions.
+  if (hasOrderNumber) {
+    auto it = FunctionOrder.find(f);
+    assert(it != FunctionOrder.end() &&
+           "no order number for SIL function definition?");
+    orderNumber = it->second;
+    if (auto emittedFunctionIterator
+          = EmittedFunctionsByOrder.findLeastUpperBound(orderNumber))
+      insertBefore = *emittedFunctionIterator;
+  }
     
   llvm::AttributeSet attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
@@ -897,7 +939,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   auto cc = expandAbstractCC(*this, f->getAbstractCC());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  fn = link.createFunction(*this, fnType, cc, attrs);
+  fn = link.createFunction(*this, fnType, cc, attrs, insertBefore);
+
+  // If we have an order number for this function, set it up as appropriate.
+  if (hasOrderNumber) {
+    EmittedFunctionsByOrder.insert(orderNumber, fn);
+  }
 
   // Unless this is an external reference, emit debug info for it.
   // FIXME: Or if this is a witness. DebugInfo doesn't have an interface to

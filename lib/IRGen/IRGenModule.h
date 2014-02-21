@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_IRGENMODULE_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SuccessorMap.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -304,6 +305,14 @@ private:
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
 
+  /// The order in which all the SIL function definitions should
+  /// appear in the translation unit.
+  llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
+
+  /// A mapping from order numbers to the LLVM functions which we
+  /// created for the SIL functions with those orders.
+  SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
+
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
 
   void emitGlobalLists();
@@ -342,6 +351,7 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
+  void prepare();
   void emitSourceFile(SourceFile &SF, unsigned StartElem);
   void addLinkLibrary(const LinkLibrary &linkLib);
   void finalize();
