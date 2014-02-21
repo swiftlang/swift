@@ -204,8 +204,8 @@ static bool canZapInstruction(SILInstruction *Inst) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-analyzeUseGraph(AllocRefInst *AllocRef,
-                llvm::SmallSetVector<SILInstruction *, 16> &InvolvedInsts) {
+hasUnremoveableUsers(SILInstruction *AllocRef,
+                llvm::SmallSetVector<SILInstruction *, 16> &Users) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
@@ -218,7 +218,7 @@ analyzeUseGraph(AllocRefInst *AllocRef,
 
     // Insert the instruction into our InvolvedInstructions set.  If we have
     // already seen it, then don't reprocess all of the uses.
-    if (!InvolvedInsts.insert(I)) {
+    if (!Users.insert(I)) {
       DEBUG(llvm::dbgs() << "        Already seen skipping...\n");
       continue;
     }
@@ -304,8 +304,8 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 
       // Our destructor has no side effects, so if we can prove no loads or
       // escapes, then we can completely remove the use graph of this alloc_ref.
-      llvm::SmallSetVector<SILInstruction *, 16> InvolvedInstructions;
-      if (!analyzeUseGraph(AllocRef, InvolvedInstructions)) {
+      llvm::SmallSetVector<SILInstruction *, 16> UsersToRemove;
+      if (!hasUnremoveableUsers(AllocRef, UsersToRemove)) {
         DEBUG(llvm::dbgs() << "    Found a use that can not be zapped...\n");
         ++II;
         continue;
@@ -313,7 +313,7 @@ processFunction(SILFunction &Fn, llvm::DenseMap<SILType, bool> &Cache) {
 
       // Ok, we succeeded! Add all of the involved instructions to our delete
       // list.
-      for (auto *I : InvolvedInstructions)
+      for (auto *I : UsersToRemove)
         DeleteList.push_back(I);
       DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_ref.\n");
 
