@@ -1436,9 +1436,36 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   auto witnessSubstFTy = witnessSubstSILTy.castTo<SILFunctionType>();
   auto witnessSubstInputTys = stripInputTupleLabels(witnessSubstTy.getInput());
   
+  if (!isFree) {
+    // Check whether we need to upcast 'self' in order to invoke a base class
+    // method.
+    ManagedValue &selfOrigParam = origParams.back();
+    CanType selfType = selfOrigParam.getType().getSwiftRValueType();
+    CanType witnessType
+      = witnessSubstFTy->getInterfaceParameters().back().getType();
+    CanType selfInstanceType = selfType, witnessInstanceType = witnessType;
+    if (auto m = dyn_cast<MetatypeType>(selfType)) {
+      selfInstanceType = m.getInstanceType();
+      witnessInstanceType = cast<MetatypeType>(witnessType)
+        .getInstanceType();
+    }
+    
+    if (selfInstanceType->getClassOrBoundGenericClass()) {
+      if (selfInstanceType != witnessInstanceType) {
+        SILValue upcast = B.createUpcast(loc, selfOrigParam.getValue(),
+                                 SILType::getPrimitiveObjectType(witnessType));
+        selfOrigParam = ManagedValue(upcast, selfOrigParam.getCleanup());
+      }
+    } else {
+      assert(selfInstanceType == witnessInstanceType
+             && "only class witnesses should differ in 'self' type from "
+                "requirement");
+    }
+  }
+  
   TranslateArguments(*this, loc, TranslationKind::OrigToSubst,
-                     origParams, witnessParams,
-                     witnessSubstFTy->getInterfaceParametersWithoutIndirectResult())
+                 origParams, witnessParams,
+                 witnessSubstFTy->getInterfaceParametersWithoutIndirectResult())
     .translate(stripInputTupleLabels(reqtOrigInputTy),
                witnessSubstInputTys);
 
