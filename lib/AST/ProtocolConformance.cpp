@@ -20,6 +20,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeWalker.h"
 
 using namespace swift;
 
@@ -270,6 +271,10 @@ ProtocolConformance::getRootNormalConformance() const {
   return cast<NormalProtocolConformance>(C);
 }
 
+bool ProtocolConformance::isInheritable(LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(isInheritable, (resolver))
+}
+
 ProtocolConformance *ProtocolConformance::subst(Module *module,
                                                 Type substType,
                                                 ArrayRef<Substitution> subs,
@@ -368,4 +373,128 @@ found_inherited:
   assert(getType()->isEqual(foundInherited->getType())
          && "inherited conformance does not match type");
   return foundInherited;
+}
+
+namespace {
+  /// Describes whether a requirement refers to 'Self', for use in the
+  /// is-inheritable check.
+  enum class SelfReferenceKind {
+    /// The type does not refer to 'Self' at all.
+    No,
+    /// The type refers to 'Self', but only as the result type of a method.
+    Result,
+    /// The type refers to 'Self' in some position that is not the result type
+    /// of a method.
+    Yes
+  };
+}
+
+/// Determine whether the given type is the 'Self' generic parameter
+/// of a protocol.
+static bool isSelf(Type type) {
+  if (auto genericParam = type->getAs<GenericTypeParamType>()) {
+    return genericParam->getDepth() == 0 && genericParam->getIndex() == 0;
+  }
+
+  return false;
+}
+
+/// Determine whether the given type contains a reference to the
+/// 'Self' generic parameter of a protocol that is not the base of a
+/// dependent member expression.
+static bool containsSelf(Type type) {
+  struct SelfWalker : public TypeWalker {
+    bool FoundSelf = false;
+
+    virtual Action walkToTypePre(Type ty) { 
+      // If we found a reference to 'Self', note it and stop.
+      if (isSelf(ty)) {
+        FoundSelf = true;
+        return Action::Stop;
+      }
+
+      // Don't recurse into the base of a dependent member type: it
+      // doesn't contain a bare 'Self'.
+      if (ty->is<DependentMemberType>())
+        return Action::SkipChildren;
+
+      return Action::Continue; 
+    }
+  } selfWalker;
+
+  type.walk(selfWalker);
+  return selfWalker.FoundSelf;
+}
+
+/// Find the bare Self references within the given requirement.
+static SelfReferenceKind findSelfReferences(ValueDecl *value) {
+  // Types never refer to 'Self'.
+  if (isa<TypeDecl>(value))
+    return SelfReferenceKind::No;
+
+  // If the function requirement returns Self and has no other
+  // reference to Self, note that.
+  if (auto func = dyn_cast<FuncDecl>(value)) {
+    auto type = func->getInterfaceType();
+    // Skip the 'self' type.
+    type = type->castTo<AnyFunctionType>()->getResult();
+    for (unsigned i = 1, n = func->getNumParamPatterns(); i != n; ++i) {
+      // Check whether the input type contains Self anywhere.
+      auto fnType = type->castTo<AnyFunctionType>();
+      if (containsSelf(fnType->getInput()))
+        return SelfReferenceKind::Yes;
+
+      type = fnType->getResult();
+    }
+
+    // The result type remains.
+    return (isSelf(type) || func->hasDynamicSelf())
+             ? SelfReferenceKind::Result
+             : containsSelf(type) ? SelfReferenceKind::Yes
+                                  : SelfReferenceKind::No;
+  }
+
+  return containsSelf(value->getInterfaceType()) ? SelfReferenceKind::Yes
+                                                 : SelfReferenceKind::No;
+}
+
+bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
+  auto classDecl = getType()->getClassOrBoundGenericClass();
+  assert(classDecl && "Conformance can't be inheritable, ever");
+  
+  for (auto member : getProtocol()->getMembers()) {
+    auto req = dyn_cast<ValueDecl>(member);
+    if (!req)
+      continue;
+    
+    // Skip accessors.
+    if (isa<FuncDecl>(req) && cast<FuncDecl>(req)->isAccessor())
+      continue;
+      
+    // Check the kinds of references to Self that show up in the given
+    // requirement.
+    switch (findSelfReferences(req)) {
+    case SelfReferenceKind::No:
+      continue;
+
+    case SelfReferenceKind::Result: {
+      // When only the result type is 'Self', we can inherit the
+      // conformance if the witness returns DynamicSelf.
+      auto func = cast_or_null<FuncDecl>(
+                    getWitness(req, resolver).getDecl());
+      if (func && func->hasDynamicSelf())
+        continue;
+      // Fall through
+    }
+
+    case SelfReferenceKind::Yes: {
+      DCAndInheritable.setInt(IsInheritableKind::NotInheritable);
+      return false;
+    }
+    }
+  }
+
+  // 
+  DCAndInheritable.setInt(IsInheritableKind::Inheritable);
+  return true;
 }
