@@ -480,7 +480,9 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
     
         build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
-        "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
+        if [[ "${product}" != SourceKit ]] ; then
+            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
+        fi
 
         if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
             # Ninja buffers command output to avoid scrambling the output
