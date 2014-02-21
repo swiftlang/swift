@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
 #include <stdlib.h>

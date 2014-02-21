@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 #include <cstring>
 #include <climits>
 

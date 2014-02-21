@@ -16,7 +16,7 @@
 
 #include "llvm/Support/MathExtras.h"
 #include "swift/Basic/Range.h"
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include <algorithm>
 #include <dlfcn.h>

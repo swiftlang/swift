@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Reflection.h"
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include <cassert>
 #include <cstring>

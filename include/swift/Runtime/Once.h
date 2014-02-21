@@ -17,7 +17,7 @@
 #ifndef SWIFT_RUNTIME_ONCE_H
 #define SWIFT_RUNTIME_ONCE_H
 
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 
 namespace swift {
 

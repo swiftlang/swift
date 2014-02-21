@@ -16,7 +16,7 @@
 
 #include <Foundation/Foundation.h>
 
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 
 using namespace swift;
 

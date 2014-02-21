@@ -11,7 +11,7 @@ endif()
 
 add_swift_library(swift_runtime INSTALL
   FastEntryPoints.s
-  Alloc.cpp
+  HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp
   Stubs.cpp

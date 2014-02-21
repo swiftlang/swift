@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <Foundation/NSObject.h>
-#include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "gtest/gtest.h"
 
