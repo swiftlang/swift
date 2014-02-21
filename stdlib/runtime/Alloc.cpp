@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Alloc.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/MathExtras.h"
 #include "Private.h"
@@ -332,9 +333,9 @@ _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
   void *r;
   do {
     if (flags & SWIFT_RAWALLOC) {
-      r = malloc(sz);
+      r = swift::_swift_zone_malloc(NULL, sz);
     } else {
-      r = calloc(1, sz);
+      r = swift::_swift_zone_calloc(NULL, 1, sz);
     }
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
@@ -388,9 +389,9 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
 
   do {
     if (flags & SWIFT_RAWALLOC) {
-      r = malloc(size);
+      r = swift::_swift_zone_malloc(NULL, size);
     } else {
-      r = calloc(1, size);
+      r = swift::_swift_zone_calloc(NULL, 1, size);
     }
   } while (!r && !(flags & SWIFT_TRYALLOC));
 

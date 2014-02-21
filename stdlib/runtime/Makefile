@@ -16,7 +16,7 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swift_runtime
 SOURCES := FastEntryPoints.s Alloc.cpp KnownMetadata.cpp \
 	   Metadata.cpp Stubs.cpp SwiftObject.mm Enum.cpp BlockShims.mm \
-	   Once.cpp Init.cpp NSSwiftString.mm
+	   Once.cpp Init.cpp NSSwiftString.mm Heap.cpp
 
 include $(SWIFT_LEVEL)/Makefile
 
