@@ -44,6 +44,8 @@ PROTOCOL(DynamicLookup)
 PROTOCOL(RawRepresentable)
 PROTOCOL(RawOptionSet)
 PROTOCOL(Equatable)
+PROTOCOL(Hashable)
+PROTOCOL(Comparable)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)
