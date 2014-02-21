@@ -2958,6 +2958,31 @@ public:
     return AbstractFunctionDeclBits.NumParamPatterns;
   }
 
+  /// \brief Returns the "natural" number of argument clauses taken by this
+  /// function.  This value is always at least one, and it may be more if the
+  /// function is implicitly or explicitly curried.
+  ///
+  /// For example, this function:
+  /// \code
+  ///   func negate(x : Int) -> Int { return -x }
+  /// \endcode
+  /// has a natural argument count of 1 if it is freestanding.  If it is
+  /// a method, it has a natural argument count of 2, as does this
+  /// curried function:
+  /// \code
+  ///   func add(x : Int)(y : Int) -> Int { return x + y }
+  /// \endcode
+  ///
+  /// This value never exceeds the number of chained function types
+  /// in the function's type, but it can be less for functions which
+  /// return a value of function type:
+  /// \code
+  ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
+  /// \endcode
+  unsigned getNaturalArgumentCount() const {
+    return getNumParamPatterns();
+  }
+
   /// \brief Returns the argument pattern(s) for the function definition
   /// that determine the function type.
   //
@@ -3043,6 +3068,9 @@ public:
   /// \brief Determine whether this is a generic function, which can only be
   /// used when each of the archetypes is bound to a particular concrete type.
   bool isGeneric() const { return GenericParams != nullptr; }
+
+  /// Retrieve the declaration that this method overrides, if any.
+  AbstractFunctionDecl *getOverriddenDecl() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractFunctionDecl &&
@@ -3151,31 +3179,6 @@ public:
   void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
                                 ArrayRef<Pattern *> BodyParams,
                                 TypeLoc FnRetType);
-
-  /// \brief Returns the "natural" number of argument clauses taken by this
-  /// function.  This value is always at least one, and it may be more if the
-  /// function is implicitly or explicitly curried.
-  ///
-  /// For example, this function:
-  /// \code
-  ///   func negate(x : Int) -> Int { return -x }
-  /// \endcode
-  /// has a natural argument count of 1 if it is freestanding.  If it is
-  /// a method, it has a natural argument count of 2, as does this
-  /// curried function:
-  /// \code
-  ///   func add(x : Int)(y : Int) -> Int { return x + y }
-  /// \endcode
-  ///
-  /// This value never exceeds the number of chained function types
-  /// in the function's type, but it can be less for functions which
-  /// return a value of function type:
-  /// \code
-  ///   func const(x : Int) -> () -> Int { return { x } } // NAC==1
-  /// \endcode
-  unsigned getNaturalArgumentCount() const {
-    return getNumParamPatterns();
-  }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }

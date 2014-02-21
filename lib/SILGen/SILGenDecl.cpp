@@ -1039,8 +1039,14 @@ public:
   }
   
   void visitConstructorDecl(ConstructorDecl *cd) {
-    // FIXME: If this is a dynamically-dispatched constructor, add its
-    // initializing entry point to the vtable.
+    // Abstract constructors have their allocating entry point in the vtable.
+    if (!cd->isAbstract())
+      return;
+
+    // We don't need the initializing constructor because Swift doesn't have the
+    // notion of an allocated-but-not-initialized object, and chaining to a
+    // superclass constructor is always direct.
+    addEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
   
   void visitVarDecl(VarDecl *vd) {

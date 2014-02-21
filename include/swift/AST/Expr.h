@@ -219,12 +219,20 @@ public:
   /// like '(foo(), x:bar(), baz()).x'.
   Expr *getSemanticsProvidingExpr();
 
+  const Expr *getSemanticsProvidingExpr() const {
+    return const_cast<Expr *>(this)->getSemanticsProvidingExpr();
+  }
+
   /// getValueProvidingExpr - Find the smallest subexpression which is
   /// responsible for generating the value of this expression.
   /// Evaluating the result is not necessarily equivalent to
   /// evaluating this expression because of potential missing
   /// side-effects (which may influence the returned value).
   Expr *getValueProvidingExpr();
+
+  const Expr *getValueProvidingExpr() const {
+    return const_cast<Expr *>(this)->getValueProvidingExpr();
+  }
 
   /// walk - This recursively walks the AST rooted at this expression.
   Expr *walk(ASTWalker &walker);
@@ -234,7 +242,13 @@ public:
   /// an initializer that belongs in some sort of Initializer
   /// context, look through it for any existing context object.
   Initializer *findExistingInitializerContext();
-  
+
+  /// Determine whether this expression refers to a statically-derived metatype.
+  ///
+  /// A statically-derived metatype is a metatype value that comes from
+  /// referring to a named type directly.
+  bool isStaticallyDerivedMetatype() const;
+
   /// isImplicit - Determines whether this expression was implicitly-generated,
   /// rather than explicitly written in the AST.
   bool isImplicit() const {
@@ -2615,10 +2629,10 @@ public:
       LHS(LHS), DotLoc(DotLoc), RHS(RHS) {
   }
   
-  Expr *getLHS() { return LHS; }
+  Expr *getLHS() const { return LHS; }
   void setLHS(Expr *E) { LHS = E; }
   SourceLoc getDotLoc() const { return DotLoc; }
-  Expr *getRHS() { return RHS; }
+  Expr *getRHS() const { return RHS; }
   void setRHS(Expr *E) { RHS = E; }
 
   SourceLoc getStartLoc() const {

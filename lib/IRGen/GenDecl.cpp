@@ -992,7 +992,12 @@ llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
     return entry;
   }
 
-  SILDeclRef silFn = SILDeclRef(fn.getDecl(), SILDeclRef::Kind::Func,
+  // FIXME: Complete hack. We should be able to eliminate getAddrOfFunction()
+  // and this hack.
+  SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+  if (isa<ConstructorDecl>(fn.getDecl()))
+    kind = SILDeclRef::Kind::Allocator;
+  SILDeclRef silFn = SILDeclRef(fn.getDecl(), kind,
                                 fn.getUncurryLevel(),
                                 /*foreign*/ false);
   auto silFnType = SILMod->Types.getConstantFunctionType(silFn);

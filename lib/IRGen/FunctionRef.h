@@ -45,10 +45,11 @@ private:
 public:
   CodeRef() = default;
 
-  static CodeRef forFunction(FuncDecl *fn,
+  static CodeRef forFunction(AbstractFunctionDecl *fn,
                              ResilienceExpansion explosionLevel,
                              unsigned uncurryLevel) {
-    assert(!fn || !fn->isGetterOrSetter());
+    assert(!fn || !isa<FuncDecl>(fn) ||
+           !cast<FuncDecl>(fn)->isGetterOrSetter());
     return CodeRef(fn, explosionLevel, uncurryLevel);
   }
 
@@ -72,11 +73,12 @@ public:
 class FunctionRef : public CodeRef {
 public:
   FunctionRef() = default;
-  FunctionRef(FuncDecl *fn, ResilienceExpansion explosionLevel, unsigned uncurryLevel)
+  FunctionRef(AbstractFunctionDecl *fn, ResilienceExpansion explosionLevel,
+              unsigned uncurryLevel)
     : CodeRef(CodeRef::forFunction(fn, explosionLevel, uncurryLevel)) {}
   
-  FuncDecl *getDecl() const {
-    return cast<FuncDecl>(CodeRef::getDecl());
+  AbstractFunctionDecl *getDecl() const {
+    return cast<AbstractFunctionDecl>(CodeRef::getDecl());
   }
   
   AbstractCC getAbstractCC() const {

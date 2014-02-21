@@ -709,6 +709,7 @@ public:
   /// Get the type of the function for substitution purposes.
   ///
   /// \param otherCtorRefUsesAllocating If true, the OtherConstructorDeclRef
+  /// refers to the initializing 
   CanFunctionType getSubstFnType(bool otherCtorRefUsesAllocating = false) {
     // TODO: optimize this if there are no specializes in play
     auto getSiteType = [&](ApplyExpr *site, bool otherCtorRefUsesAllocating) {
@@ -806,20 +807,43 @@ public:
   // Known callees.
   //
   void visitDeclRefExpr(DeclRefExpr *e) {
-    // If this is a non-extension class method, emit class_method to
-    // dynamically dispatch the call.
-    // FIXME: Or if it's an ObjC method. Extension methods on classes will
-    // hopefully become dynamically dispatched too.
-    if (auto *fd = dyn_cast<FuncDecl>(e->getDecl())) {
-      if ((fd->isObjC() || isa<ClassDecl>(fd->getDeclContext())) &&
-          // didSet and willSet methods should always be directly dispatched.
-          !fd->isObservingAccessor()) {
+    // If we need to perform dynamic dispatch for the given function,
+    // emit class_method to do so.
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
+      SILDeclRef::Kind kind;
+      bool isDynamicallyDispatched = false;
+
+      // Non-extension class methods and Objective-C methods are dynamically
+      // dispatched.
+      // FIXME: Eventually, extension methods on classes will become
+      // dynamically dispatched as well.
+      if (auto fd = dyn_cast<FuncDecl>(afd)) {
+        if ((fd->isObjC() || isa<ClassDecl>(fd->getDeclContext())) &&
+            // didSet and willSet methods should always be directly dispatched.
+            !fd->isObservingAccessor()) {
+          isDynamicallyDispatched = true;
+          kind = SILDeclRef::Kind::Func;
+        }
+      }
+      // Abstract constructors are dynamically dispatched when the 'self' value
+      // is not statically derived.
+      else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+        ApplyExpr *thisCallSite = callSites.back();
+        if (ctor->isAbstract() &&
+            thisCallSite->getArg()->getType()->is<MetatypeType>() &&
+            !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
+          isDynamicallyDispatched = true;
+          kind = SILDeclRef::Kind::Allocator;
+        }
+      }
+
+      if (isDynamicallyDispatched) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
         setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
-        SILDeclRef constant(fd,
+        SILDeclRef constant(afd, kind,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                            gen.SGM.requiresObjCDispatch(fd));
+                            gen.SGM.requiresObjCDispatch(afd));
         
         setCallee(Callee::forClassMethod(gen, selfParam.peekScalarValue(),
                                          constant, getSubstFnType(), e));

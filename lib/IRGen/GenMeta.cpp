@@ -262,7 +262,8 @@ bool irgen::hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass) {
 }
 
 /// Is the given method known to be callable by vtable lookup?
-bool irgen::hasKnownVTableEntry(IRGenModule &IGM, FuncDecl *theMethod) {
+bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
+                                AbstractFunctionDecl *theMethod) {
   auto theClass = dyn_cast<ClassDecl>(theMethod->getDeclContext());
   if (!theClass) {
     assert(theMethod->hasClangNode() && "overriding a non-imported method");
@@ -1259,7 +1260,7 @@ namespace {
     const StructLayout &Layout;    
 
     /// A mapping from functions to their final overriders.
-    llvm::DenseMap<FuncDecl*,FuncDecl*> FinalOverriders;
+    llvm::DenseMap<AbstractFunctionDecl*,AbstractFunctionDecl*> FinalOverriders;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              const StructLayout &layout)
@@ -1277,7 +1278,7 @@ namespace {
       do {
         // Make sure that each function has its final overrider set.
         for (auto member : cls->getMembers()) {
-          auto fn = dyn_cast<FuncDecl>(member);
+          auto fn = dyn_cast<AbstractFunctionDecl>(member);
           if (!fn) continue;
 
           // Check whether we already have an entry for this function.
@@ -1445,7 +1446,7 @@ namespace {
       // Find the final overrider, which we should already have computed.
       auto it = FinalOverriders.find(fn.getDecl());
       assert(it != FinalOverriders.end());
-      FuncDecl *finalOverrider = it->second;
+      AbstractFunctionDecl *finalOverrider = it->second;
 
       fn = FunctionRef(finalOverrider, fn.getExplosionLevel(),
                        fn.getUncurryLevel());
@@ -1922,8 +1923,9 @@ static bool isIncompatibleOverrideResult(IRGenModule &IGM,
 
 /// Is the given method called in the same way that the overridden
 /// method is?
-static bool isCompatibleOverride(IRGenModule &IGM, FuncDecl *override,
-                                 FuncDecl *overridden,
+static bool isCompatibleOverride(IRGenModule &IGM,
+                                 AbstractFunctionDecl *override,
+                                 AbstractFunctionDecl *overridden,
                                  ResilienceExpansion explosionLevel,
                                  unsigned uncurryLevel) {
   CanType overrideTy = override->getType()->getCanonicalType();
@@ -1956,11 +1958,12 @@ static bool isCompatibleOverride(IRGenModule &IGM, FuncDecl *override,
 }
 
 /// Does the given method require an override entry in the class v-table?
-bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
+bool irgen::doesMethodRequireOverrideEntry(IRGenModule &IGM,
+                                           AbstractFunctionDecl *fn,
                                            ResilienceExpansion explosionLevel,
                                            unsigned uncurryLevel) {
   // Check each of the overridden declarations in turn.
-  FuncDecl *overridden = fn->getOverriddenDecl();
+  AbstractFunctionDecl *overridden = fn->getOverriddenDecl();
   do {
     assert(overridden);
     
@@ -2591,10 +2594,10 @@ namespace {
       public MetadataSearcher<ClassMetadataScanner<FindClassMethodIndex>> {
     typedef MetadataSearcher super;
 
-    FunctionRef TargetMethod;
+    CodeRef TargetMethod;
 
   public:
-    FindClassMethodIndex(IRGenModule &IGM, FunctionRef target)
+    FindClassMethodIndex(IRGenModule &IGM, CodeRef target)
       : super(IGM, cast<ClassDecl>(target.getDecl()->getDeclContext())),
         TargetMethod(target) {}
 
@@ -2618,8 +2621,9 @@ AbstractCallee irgen::getAbstractVirtualCallee(IRGenFunction &IGF,
 }
 
 /// Find the function which will actually appear in the virtual table.
-static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
-                                        FuncDecl *method,
+static AbstractFunctionDecl *findOverriddenFunction(
+                                        IRGenModule &IGM,
+                                        AbstractFunctionDecl *method,
                                         ResilienceExpansion explosionLevel,
                                         unsigned uncurryLevel) {
   // 'method' is the most final method in the hierarchy which we
@@ -2627,7 +2631,7 @@ static FuncDecl *findOverriddenFunction(IRGenModule &IGM,
   // we're currently looking at.  Compatibility is transitive,
   // so we can forget our original method and just keep going up.
 
-  FuncDecl *cur = method;
+  AbstractFunctionDecl *cur = method;
   while ((cur = cur->getOverriddenDecl())) {
     if (!hasKnownVTableEntry(IGM, cur))
       break;
@@ -2649,16 +2653,18 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
 
   // FIXME: Support property accessors.
-  FuncDecl *methodDecl = cast<FuncDecl>(method.getDecl());
+  AbstractFunctionDecl *methodDecl
+    = cast<AbstractFunctionDecl>(method.getDecl());
 
   // Find the function that's actually got an entry in the metadata.
-  FuncDecl *overridden =
+  AbstractFunctionDecl *overridden =
     findOverriddenFunction(IGF.IGM, methodDecl,
                            bestExplosion, method.uncurryLevel);
 
   // Find the metadata.
   llvm::Value *metadata;
-  if (methodDecl->isStatic()) {
+  if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
+      isa<ConstructorDecl>(methodDecl)) {
     metadata = base;
   } else {
     metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
@@ -2671,7 +2677,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   auto fnTy = IGF.IGM.getFunctionType(methodType, bestExplosion,
                                       ExtraData::None, attrs)->getPointerTo();
 
-  FunctionRef fnRef(overridden, bestExplosion, method.uncurryLevel);
+  CodeRef fnRef = CodeRef::forFunction(overridden, bestExplosion, method.uncurryLevel);
   auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
 
   return emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);

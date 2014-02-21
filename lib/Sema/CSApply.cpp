@@ -3362,53 +3362,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   return literal;
 }
 
-/// Determine whether the given expression, which has metatype type, is
-/// statically derived from references to type declarations rather than
-/// computed as a metatype value.
-static bool isStaticallyDerivedMetatype(Expr *expr) {
-  do {
-    // Skip syntax.
-    expr = expr->getSemanticsProvidingExpr();
-
-    // Direct reference to a type.
-    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-      return isa<TypeDecl>(declRef->getDecl());
-    }
-
-    // A "." expression that refers to a member.
-    if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
-      return isa<TypeDecl>(memberRef->getMember().getDecl());
-    }
-
-    // When the base of a "." expression is ignored, look at the member.
-    if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
-      expr = ignoredDot->getRHS();
-      continue;
-    }
-
-    // Direct reference to a type within an archetype.
-    if (auto archetypeMemberRef = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
-      return isa<TypeDecl>(archetypeMemberRef->getDecl());
-    }
-
-    // A synthesized metatype.
-    if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
-      // Recurse into the base, if there is one.
-      if (auto base = metatype->getBase()) {
-        expr = base;
-        continue;
-      }
-
-      // Either a reference to a type, or an expression that synthesizes a
-      // metatype from thin air. Either way, it's statically-derived.
-      return true;
-    }
-
-    // Anything else is not statically derived.
-    return false;
-  } while (true);
-}
-
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -3543,7 +3496,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // statically derived (rather than an arbitrary value of metatype type) or
   // the referenced constructor must be abstract.
   if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
-      !isStaticallyDerivedMetatype(fn) &&
+      !fn->isStaticallyDerivedMetatype() &&
       !cast<ConstructorDecl>(decl)->isAbstract()) {
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());

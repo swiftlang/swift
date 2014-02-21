@@ -128,7 +128,15 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'Wo' entity
   case Kind::WitnessTableOffset:
     buffer << "_TWo";
-    mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
+
+    // Witness table entries for constructors always refer to the allocating
+    // constructor.
+    if (auto ctor = dyn_cast<ConstructorDecl>(getDecl()))
+      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
+                                      getResilienceExpansion(),
+                                      getUncurryLevel());
+    else
+      mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
     return;
 
   //   global ::= 'Wv' directness entity
@@ -206,6 +214,12 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     if (auto type = dyn_cast<NominalTypeDecl>(getDecl())) {
       mangler.mangleNominalType(type, getResilienceExpansion(),
                                 Mangler::BindGenerics::None);
+    } else if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
+      // FIXME: Hack. LinkInfo should be able to refer to the allocating
+      // constructor rather than inferring it here.
+      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
+                                      getResilienceExpansion(),
+                                      getUncurryLevel());
     } else {
       mangler.mangleEntity(getDecl(), getResilienceExpansion(), getUncurryLevel());
     }

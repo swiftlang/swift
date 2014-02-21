@@ -1636,6 +1636,15 @@ StringRef AbstractFunctionDecl::getObjCSelector(
   llvm_unreachable("Unhandled AbstractFunctionDecl subclass");
 }
 
+AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
+  if (auto func = dyn_cast<FuncDecl>(this))
+    return func->getOverriddenDecl();
+  if (auto ctor = dyn_cast<ConstructorDecl>(this))
+    return ctor->getOverriddenDecl();
+  
+  return nullptr;
+}
+
 /// Set the DeclContext of any VarDecls in P to the specified DeclContext.
 static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
   if (!P) return;

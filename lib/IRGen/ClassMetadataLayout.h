@@ -33,7 +33,7 @@ const unsigned NumHeapMetadataFields = 3;
 /// entry from from all of the methods it overrides?  The restrictions
 /// on overriding generally prevent this, but it can happen when a
 /// class overrides a method from a generic class.
-bool doesMethodRequireOverrideEntry(IRGenModule &IGM, FuncDecl *fn,
+bool doesMethodRequireOverrideEntry(IRGenModule &IGM, AbstractFunctionDecl *fn,
                                     ResilienceExpansion explosionLevel,
                                     unsigned uncurryLevel);
 
@@ -125,6 +125,10 @@ private:
       // Add entries for methods.
       if (auto fn = dyn_cast<FuncDecl>(member))
         addMethodEntries(fn);
+      // Add entries for constructors.
+      else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        addMethodEntries(ctor);
+      }
     }
     
     // Add offset fields if *any* of the fields are generically
@@ -194,7 +198,7 @@ private:
     llvm_unreachable("invalid type size classification");
   }
 
-  void addMethodEntries(FuncDecl *fn) {
+  void addMethodEntries(AbstractFunctionDecl *fn) {
     // If the method does not have a vtable entry, don't add any.
     if (!hasKnownVTableEntry(IGM, fn))
       return;
@@ -207,11 +211,19 @@ private:
     maybeAddMethod(fn, explosionLevel, uncurryLevel);
   }
 
-  void maybeAddMethod(FuncDecl *fn, ResilienceExpansion explosionLevel,
+  void maybeAddMethod(AbstractFunctionDecl *fn,
+                      ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
-    // Ignore getters and setters.  This is probably wrong!
-    if (fn->isAccessor())
-      return;
+    // FIXME: Ignore getters and setters.  This is probably wrong!
+    if (auto func = dyn_cast<FuncDecl>(fn)) {
+      if (func->isAccessor())
+        return;
+    }
+    // Ignore non-abstract constructors.
+    else if (auto ctor = dyn_cast<ConstructorDecl>(fn)) {
+      if (!ctor->isAbstract())
+        return;
+    }
 
     // If the method overrides something, we don't need a new entry.
     if (fn->getOverriddenDecl()) {

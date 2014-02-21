@@ -113,6 +113,55 @@ Initializer *Expr::findExistingInitializerContext() {
   return finder.TheInitializer;
 }
 
+bool Expr::isStaticallyDerivedMetatype() const {
+  // IF the result isn't a metatype, there's nothing else to do.
+  if (!getType()->is<MetatypeType>())
+    return false;
+
+  const Expr *expr = this;
+  do {
+    // Skip syntax.
+    expr = expr->getSemanticsProvidingExpr();
+
+    // Direct reference to a type.
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+      return isa<TypeDecl>(declRef->getDecl());
+    }
+
+    // A "." expression that refers to a member.
+    if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+      return isa<TypeDecl>(memberRef->getMember().getDecl());
+    }
+
+    // When the base of a "." expression is ignored, look at the member.
+    if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
+      expr = ignoredDot->getRHS();
+      continue;
+    }
+
+    // Direct reference to a type within an archetype.
+    if (auto archetypeMemberRef = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
+      return isa<TypeDecl>(archetypeMemberRef->getDecl());
+    }
+
+    // A synthesized metatype.
+    if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
+      // Recurse into the base, if there is one.
+      if (auto base = metatype->getBase()) {
+        expr = base;
+        continue;
+      }
+
+      // Either a reference to a type, or an expression that synthesizes a
+      // metatype from thin air. Either way, it's statically-derived.
+      return true;
+    }
+
+    // Anything else is not statically derived.
+    return false;
+  } while (true);
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
