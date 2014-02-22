@@ -161,7 +161,7 @@ done
 INSTALL_PREFIX="${PREFIX}"
 
 # Set these to the paths of the OS X SDK and toolchain.
-SYSROOT="$(xcrun --show-sdk-path --sdk macosx)"
+SYSROOT="$(xcrun --show-sdk-path --sdk macosx10.10internal)"
 TOOLCHAIN="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain"
 
 # Set this to the path on matte to which release packages should be delivered.
@@ -359,6 +359,10 @@ fi
 #
 
 SWIFT_CMAKE_OPTIONS=(
+    -DCMAKE_OSX_SYSROOT="${SYSROOT}"
+    -DMODULES_SDK="${SYSROOT}"
+    -DCMAKE_C_FLAGS="-isysroot${SYSROOT}"
+    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
 )
@@ -374,7 +378,6 @@ function set_ios_options {
 
     local opts=(
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
-        "${SWIFT_CMAKE_OPTIONS[@]}"
         -DCMAKE_SYSTEM_PROCESSOR=${arch}
         -DCMAKE_OSX_ARCHITECTURES=${arch}
         -DCMAKE_OSX_SYSROOT="${sdkroot}"
@@ -386,6 +389,7 @@ function set_ios_options {
         -DSWIFT_BUILD_TOOLS=OFF
         -DPATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
         -DSWIFT_INCLUDE_DOCS=OFF
+        -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
     )
 
     eval $1=\(\${opts[@]}\)
