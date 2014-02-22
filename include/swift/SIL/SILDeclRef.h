@@ -38,7 +38,13 @@ namespace swift {
   class ASTContext;
   class ClassDecl;
   class SILFunctionType;
+  enum class SILLinkage : unsigned char;
   class SILModule;
+
+enum ForDefinition_t : bool {
+  NotForDefinition = false,
+  ForDefinition = true
+};
 
 /// \brief A key for referencing a Swift declaration in SIL.
 ///
@@ -211,6 +217,9 @@ struct SILDeclRef {
   
   /// \brief True if the function should be treated as transparent.
   bool isTransparent() const;
+
+  /// \brief Return the expected linkage of this declaration.
+  SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()

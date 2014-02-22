@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace swift {
   class CanType;
+  enum ForDefinition_t : bool;
   
 namespace irgen {
   using Lowering::AbstractionPattern;
@@ -58,8 +59,6 @@ inline IsLoadable_t operator&(IsLoadable_t l, IsLoadable_t r) {
 inline IsLoadable_t &operator&=(IsLoadable_t &l, IsLoadable_t r) {
   return (l = (l & r));
 }
-
-enum ForDefinition_t : bool { NotForDefinition, ForDefinition };
 
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {

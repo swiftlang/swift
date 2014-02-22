@@ -178,6 +178,57 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   isForeign = asForeign;
 }
 
+static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
+  while (!dc->isModuleScopeContext()) {
+    // Local definitions in transparent contexts are forced public because
+    // external references to them can be exposed by mandatory inlining.
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      if (fn->isTransparent())
+        return SILLinkage::Public;
+    }
+    // Check that this local context is not itself in a local transparent
+    // context.
+    dc = dc->getParent();
+  }
+  
+  return SILLinkage::Private;
+}
+
+SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
+  // Anonymous functions have local linkage.
+  if (auto closure = getAbstractClosureExpr())
+    return getLinkageForLocalContext(closure->getParent());
+  
+  // Function-local declarations always have internal linkage.
+  ValueDecl *d = getDecl();
+  DeclContext *dc = d->getDeclContext();
+  while (!dc->isModuleScopeContext()) {
+    if (dc->isLocalContext())
+      return getLinkageForLocalContext(dc);
+    dc = dc->getParent();
+  }
+  
+  // Currying and calling convention thunks have shared linkage.
+  if (isCurried || isForeignThunk())
+    return SILLinkage::Shared;
+  
+  // Declarations imported from Clang modules have shared linkage.
+  // FIXME: They shouldn't.
+  if (isa<ClangModuleUnit>(dc)) {
+    if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
+      return SILLinkage::Shared;
+
+    if (auto *FD = dyn_cast<FuncDecl>(d))
+      if (FD->isGetterOrSetter() || isa<EnumDecl>(d->getDeclContext()) ||
+          isa<StructDecl>(d->getDeclContext()))
+        return SILLinkage::Shared;
+  }
+
+  // Otherwise, we have external linkage.
+  // FIXME: access control
+  return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
+}
+
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
                                               unsigned defaultArgIndex) {
   SILDeclRef result;

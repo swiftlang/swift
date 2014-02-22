@@ -227,65 +227,13 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
-static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
-  while (!dc->isModuleScopeContext()) {
-    // Local definitions in transparent contexts are forced public because
-    // external references to them can be exposed by mandatory inlining.
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
-      if (fn->isTransparent())
-        return SILLinkage::Public;
-    }
-    // Check that this local context is not itself in a local transparent
-    // context.
-    dc = dc->getParent();
-  }
-  
-  return SILLinkage::Private;
-}
-
-SILLinkage SILGenModule::getConstantLinkage(SILDeclRef constant,
-                                            ForDefinition_t forDefinition) {
-  // Anonymous functions have local linkage.
-  if (auto closure = constant.getAbstractClosureExpr())
-    return getLinkageForLocalContext(closure->getParent());
-  
-  // Function-local declarations always have internal linkage.
-  ValueDecl *d = constant.getDecl();
-  DeclContext *dc = d->getDeclContext();
-  while (!dc->isModuleScopeContext()) {
-    if (dc->isLocalContext())
-      return getLinkageForLocalContext(dc);
-    dc = dc->getParent();
-  }
-  
-  // Currying and calling convention thunks have shared linkage.
-  if (constant.isCurried || constant.isForeignThunk())
-    return SILLinkage::Shared;
-  
-  // Declarations imported from Clang modules have shared linkage.
-  // FIXME: They shouldn't.
-  if (isa<ClangModuleUnit>(dc)) {
-    if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
-      return SILLinkage::Shared;
-
-    if (auto *FD = dyn_cast<FuncDecl>(d))
-      if (FD->isGetterOrSetter() || isa<EnumDecl>(d->getDeclContext()) ||
-          isa<StructDecl>(d->getDeclContext()))
-        return SILLinkage::Shared;
-  }
-
-  // Otherwise, we have external linkage.
-  // FIXME: access control
-  return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);
-}
-
 static void updateLinkageForDefinition(SILGenModule &SGM,
                                        SILFunction *fn, SILDeclRef constant) {
   // In all the cases where getConstantLinkage returns something
   // different for ForDefinition, it returns an available-externally
   // linkage.
   if (!isAvailableExternally(fn->getLinkage())) return;
-  fn->setLinkage(SGM.getConstantLinkage(constant, ForDefinition));
+  fn->setLinkage(constant.getLinkage(ForDefinition));
 }
 
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
@@ -298,7 +246,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   }
   
   auto constantType = getConstantType(constant).castTo<SILFunctionType>();
-  SILLinkage linkage = getConstantLinkage(constant, forDefinition);
+  SILLinkage linkage = constant.getLinkage(forDefinition);
 
   IsTransparent_t IsTrans = constant.isTransparent()?
                               IsTransparent : IsNotTransparent;

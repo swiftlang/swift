@@ -54,11 +54,6 @@ enum HasInOutSelfAbstractionDifference_t : bool {
   HasInOutSelfAbstractionDifference = true,
 };
 
-enum ForDefinition_t : bool {
-  NotForDefinition = false,
-  ForDefinition = true
-};
-  
 /// An ASTVisitor for generating SIL from top-level declarations in a module.
 class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
@@ -106,10 +101,6 @@ public:
   AbstractCC getConstantCC(SILDeclRef constant) {
     return getConstantType(constant).getAbstractCC();
   }
-  
-  /// Determine the linkage of a constant.
-  SILLinkage getConstantLinkage(SILDeclRef constant,
-                                ForDefinition_t forDefinition);
   
   /// Get the function for a SILDeclRef.
   SILFunction *getFunction(SILDeclRef constant,
