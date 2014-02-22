@@ -2082,15 +2082,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // FIXME: substitution means this type should be explicit to improve
     // performance.
-    auto ResultTy = Val.getType().getSwiftRValueType()
-      ->getTypeOfMember(Field->getModuleContext(),
-                        Field, nullptr)->getCanonicalType();
+    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     if (Opcode == ValueKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
-                                 SILType::getPrimitiveAddressType(ResultTy));
+                                            ResultTy.getAddressType());
     else
       ResultVal = B.createStructExtract(InstLoc, Val, Field,
-                                  SILType::getPrimitiveObjectType(ResultTy));
+                                        ResultTy.getObjectType());
     break;
   }
   case ValueKind::RefElementAddrInst: {

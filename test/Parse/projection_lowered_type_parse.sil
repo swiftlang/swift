@@ -1,0 +1,18 @@
+// RUN: %sil-opt %s -verify
+
+struct A {
+  var f : @callee_owned () -> ()
+}
+
+sil @callee_check : $@thin (@callee_owned () -> ()) -> ()
+
+sil @test : $@thin (@inout A) -> () {
+bb0(%0 : $*A):
+  %1 = struct_element_addr %0 : $*A, #f  
+  %2 = load %0 : $*A
+  %3 = struct_extract %2 : $A, #f
+  %4 = function_ref @callee_check : $@thin (@callee_owned () -> ()) -> ()
+  apply %4(%3) : $@thin (@callee_owned () -> ()) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
