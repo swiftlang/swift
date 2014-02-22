@@ -259,7 +259,8 @@ void LogicalPathComponent::_anchor() {}
 /// Return the LValueTypeData for a value whose type is its own
 /// lowering.
 static LValueTypeData getValueTypeData(SILValue value) {
-  assert(value.getType().isObject());
+  assert(value.getType().isObject() ||
+         value.getType().getSwiftRValueType()->is<ProtocolType>());
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
@@ -485,7 +486,13 @@ LValue SILGenLValue::visitRec(Expr *e) {
   // Non-lvalue types (references, values, metatypes, etc) form the root of a
   // logical l-value.
   if (!e->getType()->is<LValueType>() && !e->getType()->is<InOutType>()) {
-    ManagedValue rv = gen.emitRValueAsSingleValue(e);
+    // Calls through protocols can be done with +0 rvalues.  This allows us to
+    // avoid materializing copies of existentials.
+    SGFContext Ctx;
+    if (e->getType()->is<ProtocolType>())
+      Ctx = SGFContext::AllowPlusZero;
+    
+    ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
     auto typeData = getValueTypeData(rv.getValue());
     LValue lv;
     lv.add<ValueComponent>(rv, typeData);
@@ -605,8 +612,15 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
 }
 
 LValue SILGenLValue::visitExistentialSubscriptExpr(ExistentialSubscriptExpr *e){
-  llvm_unreachable("subscripts in protocols not implemented yet");
+  auto decl = cast<SubscriptDecl>(e->getDecl());
+  auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
+  
+  LValue lv = visitRec(e->getBase());
+  lv.add<GetterSetterComponent>(decl, false, ArrayRef<Substitution>(),
+                                typeData, e->getIndex());
+  return std::move(lv);
 }
+
 LValue SILGenLValue::visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *e) {
   llvm_unreachable("subscripts in archetypes not implemented yet");
 }

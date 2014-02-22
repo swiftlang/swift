@@ -1446,7 +1446,7 @@ RValue RValueEmitter::visitArchetypeSubscriptExpr(
 }
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
-                                                DynamicSubscriptExpr *E, SGFContext C) {
+                                      DynamicSubscriptExpr *E, SGFContext C) {
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
