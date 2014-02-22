@@ -45,7 +45,6 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
-#include "FunctionRef.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"

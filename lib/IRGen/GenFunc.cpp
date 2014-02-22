@@ -75,7 +75,6 @@
 #include "CallingConvention.h"
 #include "CallEmission.h"
 #include "Explosion.h"
-#include "FunctionRef.h"
 #include "GenClangType.h"
 #include "GenClass.h"
 #include "GenHeap.h"

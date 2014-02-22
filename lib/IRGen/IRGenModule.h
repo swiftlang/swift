@@ -92,10 +92,8 @@ namespace swift {
   
 namespace irgen {
   class Address;
-  class CodeRef;
   class ExplosionSchema;
   class FormalType;
-  class FunctionRef;
   class IRGenDebugInfo;
   class LinkEntity;
   class ProtocolInfo;
@@ -387,9 +385,7 @@ public:
   Address getAddrOfGlobalVariable(VarDecl *D, ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfFunction(FunctionRef ref, ExtraData data,
-                                    ForDefinition_t forDefinition);
-  Address getAddrOfWitnessTableOffset(CodeRef code,
+  Address getAddrOfWitnessTableOffset(SILDeclRef fn,
                                       ForDefinition_t forDefinition);
   Address getAddrOfWitnessTableOffset(VarDecl *field,
                                       ForDefinition_t forDefinition);

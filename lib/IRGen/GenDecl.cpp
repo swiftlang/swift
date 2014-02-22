@@ -906,8 +906,12 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
   SILFunction *fn = SILMod->lookUpFunction(name);
 #ifndef NDEBUG
   if (!fn) {
-    llvm::errs() << "function not declared in module: " << name << '\n';
-    abort();
+    assert(!forDefinition &&
+           "defining a SILFunction that's not in the SILModule?");
+    auto linkage = fnRef.getLinkage(forDefinition);
+    auto type = SILMod->Types.getConstantType(fnRef).castTo<SILFunctionType>();
+    fn = SILFunction::create(*SILMod, linkage, name, type, nullptr,
+                             Nothing, IsNotBare, IsNotTransparent);
   }
 #endif
   return getAddrOfSILFunction(fn, forDefinition);
@@ -973,45 +977,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     DebugInfo->emitFunction(f, fn);
 
   return fn;
-}
-
-/// Fetch the declaration of the given known function.
-llvm::Function *IRGenModule::getAddrOfFunction(FunctionRef fn,
-                                               ExtraData extraData,
-                                               ForDefinition_t forDefinition) {
-  LinkEntity entity = LinkEntity::forFunction(fn);
-
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  // FIXME: Complete hack. We should be able to eliminate getAddrOfFunction()
-  // and this hack.
-  SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
-  if (isa<ConstructorDecl>(fn.getDecl()))
-    kind = SILDeclRef::Kind::Allocator;
-  SILDeclRef silFn = SILDeclRef(fn.getDecl(), kind,
-                                fn.getExplosionLevel(),
-                                fn.getUncurryLevel(),
-                                /*foreign*/ false);
-  auto silFnType = SILMod->Types.getConstantFunctionType(silFn);
-
-  // A bit of a hack here. SIL represents closure functions with their context
-  // expanded out and uses a partial application function to construct the
-  // context. IRGen previously set up local functions to expect their extraData
-  // prepackaged.
-  llvm::AttributeSet attrs;
-  llvm::FunctionType *fnType =
-    getFunctionType(silFnType, fn.getExplosionLevel(), extraData, attrs);
-
-  auto cc = expandAbstractCC(*this, silFnType->getAbstractCC());
-
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
 }
 
 /// Get or create a llvm::GlobalVariable.
@@ -1369,11 +1334,12 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 /// getAddrOfWitnessTableOffset - Get the address of the global
 /// variable which contains an offset within a witness table for the
 /// value associated with the given function.
-Address IRGenModule::getAddrOfWitnessTableOffset(CodeRef code,
+Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(code.getDecl(), code.getExplosionLevel(),
-                                      code.getUncurryLevel());
+    LinkEntity::forWitnessTableOffset(code.getDecl(),
+                                      code.getResilienceExpansion(),
+                                      code.uncurryLevel);
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
                                  forDefinition);

@@ -1431,7 +1431,7 @@ namespace {
         Fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, 0));
     }
 
-    void addMethod(FunctionRef fn) {
+    void addMethod(SILDeclRef fn) {
       // If this function is associated with the target class, go
       // ahead and emit the witness offset variable.
       if (fn.getDecl()->getDeclContext() == TargetClass) {
@@ -1444,16 +1444,15 @@ namespace {
       }
 
       // Find the final overrider, which we should already have computed.
-      auto it = FinalOverriders.find(fn.getDecl());
+      auto it = FinalOverriders.find(cast<AbstractFunctionDecl>(fn.getDecl()));
       assert(it != FinalOverriders.end());
       AbstractFunctionDecl *finalOverrider = it->second;
 
-      fn = FunctionRef(finalOverrider, fn.getExplosionLevel(),
-                       fn.getUncurryLevel());
+      fn = SILDeclRef(finalOverrider, fn.getResilienceExpansion(),
+                      fn.uncurryLevel);
 
       // Add the appropriate method to the module.
-      Fields.push_back(IGM.getAddrOfFunction(fn, ExtraData::None,
-                                             NotForDefinition));
+      Fields.push_back(IGM.getAddrOfSILFunction(fn, NotForDefinition));
     }
 
     void addGenericArgument(ArchetypeType *archetype, ClassDecl *forClass) {
@@ -2594,14 +2593,14 @@ namespace {
       public MetadataSearcher<ClassMetadataScanner<FindClassMethodIndex>> {
     typedef MetadataSearcher super;
 
-    CodeRef TargetMethod;
+    SILDeclRef TargetMethod;
 
   public:
-    FindClassMethodIndex(IRGenModule &IGM, CodeRef target)
+    FindClassMethodIndex(IRGenModule &IGM, SILDeclRef target)
       : super(IGM, cast<ClassDecl>(target.getDecl()->getDeclContext())),
         TargetMethod(target) {}
 
-    void addMethod(FunctionRef fn) {
+    void addMethod(SILDeclRef fn) {
       if (TargetMethod == fn)
         setTargetIndex();
       NextIndex++;
@@ -2649,9 +2648,6 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                            SILDeclRef method,
                                            CanSILFunctionType methodType,
                                            ResilienceExpansion maxExplosion) {
-  // TODO: maybe use better versions in the v-table sometimes?
-  ResilienceExpansion bestExplosion = ResilienceExpansion::Minimal;
-
   // FIXME: Support property accessors.
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
@@ -2659,7 +2655,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Find the function that's actually got an entry in the metadata.
   AbstractFunctionDecl *overridden =
     findOverriddenFunction(IGF.IGM, methodDecl,
-                           bestExplosion, method.uncurryLevel);
+                           method.getResilienceExpansion(), method.uncurryLevel);
 
   // Find the metadata.
   llvm::Value *metadata;
@@ -2674,10 +2670,11 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
   llvm::AttributeSet attrs;
-  auto fnTy = IGF.IGM.getFunctionType(methodType, bestExplosion,
+  auto fnTy = IGF.IGM.getFunctionType(methodType, method.getResilienceExpansion(),
                                       ExtraData::None, attrs)->getPointerTo();
 
-  CodeRef fnRef = CodeRef::forFunction(overridden, bestExplosion, method.uncurryLevel);
+  SILDeclRef fnRef(overridden, method.kind, method.getResilienceExpansion(),
+                   method.uncurryLevel);
   auto index = FindClassMethodIndex(IGF.IGM, fnRef).getTargetIndex();
 
   return emitLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);

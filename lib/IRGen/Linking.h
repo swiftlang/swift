@@ -21,12 +21,13 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/GlobalValue.h"
 #include "DebugTypeInfo.h"
-#include "FunctionRef.h"
 #include "IRGen.h"
 #include "ValueWitness.h"
 
@@ -207,13 +208,6 @@ class LinkEntity {
   LinkEntity() = default;
 
 public:
-  static LinkEntity forFunction(CodeRef fn) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::Function, fn.getDecl(),
-                      fn.getExplosionLevel(), fn.getUncurryLevel());
-    return entity;
-  }
-  
   static LinkEntity forNonFunction(ValueDecl *decl) {
     assert(!isFunction(decl));
 

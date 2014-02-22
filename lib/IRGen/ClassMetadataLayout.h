@@ -17,7 +17,7 @@
 #ifndef SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 #define SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 
-#include "FunctionRef.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "IRGen.h"
 #include "MetadataLayout.h"
 
@@ -214,6 +214,8 @@ private:
   void maybeAddMethod(AbstractFunctionDecl *fn,
                       ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
+    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+
     // FIXME: Ignore getters and setters.  This is probably wrong!
     if (auto func = dyn_cast<FuncDecl>(fn)) {
       if (func->isAccessor())
@@ -223,6 +225,7 @@ private:
     else if (auto ctor = dyn_cast<ConstructorDecl>(fn)) {
       if (!ctor->isAbstract())
         return;
+      kind = SILDeclRef::Kind::Allocator;
     }
 
     // If the method overrides something, we don't need a new entry.
@@ -235,7 +238,7 @@ private:
     }
 
     // Both static and non-static functions go in the metadata.
-    asImpl().addMethod(FunctionRef(fn, explosionLevel, uncurryLevel));
+    asImpl().addMethod(SILDeclRef(fn, kind, explosionLevel, uncurryLevel));
   }
 };
 
@@ -262,7 +265,7 @@ public:
   void addInstanceAlignMask() { NextIndex++; }
   void addClassCacheData() { NextIndex += 2; }
   void addClassDataPointer() { NextIndex++; }
-  void addMethod(FunctionRef fn) { NextIndex++; }
+  void addMethod(SILDeclRef fn) { NextIndex++; }
   void addFieldOffset(VarDecl *var) { NextIndex++; }
   void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
     NextIndex++;

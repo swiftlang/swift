@@ -34,7 +34,6 @@
 #include "Explosion.h"
 #include "FormalType.h"
 #include "GenClangType.h"
-#include "FunctionRef.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
