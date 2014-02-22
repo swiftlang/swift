@@ -1188,14 +1188,6 @@ public:
     printRec(E->getIndex());
     OS << ')';
   }
-  void visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E) {
-    printCommon(E, "existential_subscript_expr");
-    OS << '\n';
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getIndex());
-    OS << ')';
-  }
   void visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E) {
     printCommon(E, "archetype_subscript_expr");
     OS << '\n';

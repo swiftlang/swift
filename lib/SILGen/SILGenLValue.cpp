@@ -164,7 +164,6 @@ public:
   
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
-  LValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *e);
   LValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
   
@@ -607,16 +606,6 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e) {
   LValue lv = visitRec(e->getBase());
   lv.add<GetterSetterComponent>(decl, e->isSuper(),
                                 e->getDecl().getSubstitutions(),
-                                typeData, e->getIndex());
-  return std::move(lv);
-}
-
-LValue SILGenLValue::visitExistentialSubscriptExpr(ExistentialSubscriptExpr *e){
-  auto decl = cast<SubscriptDecl>(e->getDecl());
-  auto typeData = getMemberTypeData(gen, decl->getElementType(), e);
-  
-  LValue lv = visitRec(e->getBase());
-  lv.add<GetterSetterComponent>(decl, false, ArrayRef<Substitution>(),
                                 typeData, e->getIndex());
   return std::move(lv);
 }

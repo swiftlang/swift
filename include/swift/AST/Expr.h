@@ -1348,44 +1348,6 @@ public:
   }
 };
 
-/// ExistentialSubscriptExpr - Subscripting expressions like a[i] that refer to
-/// an element within a container, where the container has existential type.
-///
-/// There is no built-in subscripting in the language. Rather, a fully
-/// type-checked and well-formed subscript expression refers to a subscript
-/// declaration, which provides a getter and (optionally) a setter that will
-/// be used to perform reads/writes.
-class ExistentialSubscriptExpr : public Expr {
-  SubscriptDecl *D;
-  Expr *Base;
-  Expr *Index;
-  
-public:
-  ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
-  
-  /// getBase - Retrieve the base of the subscript expression, i.e., the
-  /// value being indexed. This value has existential type.
-  Expr *getBase() const { return Base; }
-  void setBase(Expr *E) { Base = E; }
-  
-  /// getIndex - Retrieve the index of the subscript expression, i.e., the
-  /// "offset" into the base value.
-  Expr *getIndex() const { return Index; }
-  void setIndex(Expr *E) { Index = E; }
-  
-  /// getDecl - Retrieve the subscript declaration that this subscripting
-  /// operation refers to. 
-  SubscriptDecl *getDecl() const { return D; }
-
-  SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ExistentialSubscript;
-  }
-};
-
 /// ArchetypeSubscriptExpr - Subscripting expressions like a[i] that refer to
 /// an element within a container, where the container is an archetype.
 class ArchetypeSubscriptExpr : public Expr {

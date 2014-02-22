@@ -203,8 +203,6 @@ namespace {
                                        SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
-    RValue visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
-                                         SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
@@ -1417,25 +1415,6 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   ManagedValue MV =
     SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
                         std::move(baseRV), E->isSuper(),
-                        std::move(subscriptRV), C);
-  return RValue(SGF, E, MV);
-}
-
-RValue RValueEmitter::visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
-                                                    SGFContext C) {
-  auto subscript = cast<SubscriptDecl>(E->getDecl());
-
-  // FIXME: Check +0 bases and make sure the existential thunk is doing any
-  // +1 retains.
-  auto existential = SGF.emitRValue(E->getBase(), SGFContext::AllowPlusZero);
-  RValueSource existentialRVS(E, std::move(existential));
-  
-  // Emit the indices.
-  RValue subscriptRV = SGF.emitRValue(E->getIndex());
-
-  ManagedValue MV =
-    SGF.emitGetAccessor(E, subscript, ArrayRef<Substitution>(),
-                        std::move(existentialRVS), /*isSuper*/false,
                         std::move(subscriptRV), C);
   return RValue(SGF, E, MV);
 }

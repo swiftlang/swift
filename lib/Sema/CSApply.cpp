@@ -1837,11 +1837,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
- abort();
-      return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr));
-    }
     Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr));

@@ -339,15 +339,6 @@ ArrayRef<Expr *> CollectionExpr::getElements() const {
   return cast<TupleExpr>(SubExpr)->getElements();
 }
 
-ExistentialSubscriptExpr::
-ExistentialSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::ExistentialSubscript, /*Implicit=*/false,
-         D? D->getElementType() : Type()),
-    D(D), Base(Base), Index(Index) {
-  assert(Base->getType()->getRValueType()->isExistentialType() &&
-         "use SubscriptExpr for non-existential type subscript");
-}
-
 ArchetypeSubscriptExpr::
 ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
   : Expr(ExprKind::ArchetypeSubscript, /*Implicit=*/false,

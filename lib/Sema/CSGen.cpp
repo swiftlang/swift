@@ -616,10 +616,6 @@ namespace {
       return dictionaryTy;
     }
 
-    Type visitExistentialSubscriptExpr(ExistentialSubscriptExpr *expr) {
-      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
-    }
-
     Type visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
       return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
     }
