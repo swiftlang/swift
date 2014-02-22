@@ -332,8 +332,9 @@ public:
   /// handle to that r-value.
   RValue &forceAndPeekRValue(SILGenFunction &gen) &;
 
-  RValue getAsRValue(SILGenFunction &gen) &&;
-  ManagedValue getAsSingleValue(SILGenFunction &gen) &&;
+  RValue getAsRValue(SILGenFunction &gen, SGFContext C = SGFContext()) &&;
+  ManagedValue getAsSingleValue(SILGenFunction &gen,
+                                SGFContext C = SGFContext()) &&;
 
   void forwardInto(SILGenFunction &gen, Initialization *dest) &&;
   void forwardInto(SILGenFunction &gen, AbstractionPattern origFormalType,

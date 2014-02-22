@@ -675,21 +675,22 @@ void RValueSource::rewriteType(CanType newType) & {
   }
 }
 
-RValue RValueSource::getAsRValue(SILGenFunction &gen) && {
+RValue RValueSource::getAsRValue(SILGenFunction &gen, SGFContext C) && {
   if (isRValue())
     return std::move(*this).asKnownRValue();
 
-  return gen.emitRValue(std::move(*this).asKnownExpr());
+  return gen.emitRValue(std::move(*this).asKnownExpr(), C);
 }
 
-ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen) && {
+ManagedValue RValueSource::getAsSingleValue(SILGenFunction &gen,
+                                            SGFContext C) && {
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
     return std::move(*this).asKnownRValue().getAsSingleValue(gen, loc);
   }
 
   auto e = std::move(*this).asKnownExpr();
-  return gen.emitRValueAsSingleValue(e);
+  return gen.emitRValueAsSingleValue(e, C);
 }
 
 void RValueSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {
