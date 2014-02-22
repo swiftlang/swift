@@ -342,6 +342,9 @@ public:
     return Dependencies;
   }
 
+  /// The module shadowed by this module, if any.
+  Module *getShadowedModule() const { return ShadowedModule; }
+
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(Identifier name, SmallVectorImpl<ValueDecl*> &results);
 

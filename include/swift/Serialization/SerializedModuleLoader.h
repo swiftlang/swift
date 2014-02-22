@@ -144,6 +144,8 @@ class SerializedASTFile final : public LoadedFile {
 public:
   ModuleFile &getFile() { return File; }
 
+  virtual bool isSystemModule() const override;
+
   virtual void lookupValue(Module::AccessPathTy accessPath,
                            Identifier name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;

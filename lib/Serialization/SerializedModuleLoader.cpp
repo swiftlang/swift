@@ -270,6 +270,13 @@ void SerializedASTFile::collectLinkLibraries(
   File.collectLinkLibraries(callback);
 }
 
+bool SerializedASTFile::isSystemModule() const {
+  if (auto Mod = File.getShadowedModule()) {
+    return Mod->isSystemModule();
+  }
+  return false;
+}
+
 void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
                                     Identifier name, NLKind lookupKind,
                                     SmallVectorImpl<ValueDecl*> &results) const{
