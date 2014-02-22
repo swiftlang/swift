@@ -1562,23 +1562,6 @@ namespace {
                             expr->isDirectPropertyAccess());
     }
 
-    Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
-    Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *expr) {
-      auto selected = getOverloadChoice(
-                        cs.getConstraintLocator(expr,
-                                                ConstraintLocator::Member));
-      return buildMemberRef(expr->getBase(),
-                            selected.openedFullType,
-                            expr->getDotLoc(),
-                            selected.choice.getDecl(), expr->getNameLoc(),
-                            selected.openedType,
-                            cs.getConstraintLocator(expr),
-                            expr->isImplicit(), /*direct ivar*/false);
-    }
-
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(expr,
@@ -1685,12 +1668,6 @@ namespace {
             kind = ValueTypeMemberApplication::Enum;
           else
             goto not_value_type_member;
-        } else if (auto amRef = dyn_cast<ArchetypeMemberRefExpr>(member)) {
-          if (amRef->getBase()->getType()->is<MetatypeType>() ||
-              amRef->getBase()->getType()->hasReferenceSemantics())
-            goto not_value_type_member;
-          fn = dyn_cast<FuncDecl>(amRef->getDecl());
-          kind = ValueTypeMemberApplication::Archetype;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
           auto baseTy = pmRef->getBase()->getType();
           if (baseTy->hasReferenceSemantics())

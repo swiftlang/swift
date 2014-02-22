@@ -139,11 +139,6 @@ bool Expr::isStaticallyDerivedMetatype() const {
       continue;
     }
 
-    // Direct reference to a type within an archetype.
-    if (auto archetypeMemberRef = dyn_cast<ArchetypeMemberRefExpr>(expr)) {
-      return isa<TypeDecl>(archetypeMemberRef->getDecl());
-    }
-
     // A synthesized metatype.
     if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
       // Recurse into the base, if there is one.
@@ -247,35 +242,6 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
    
   MemberRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
   MemberRefExprBits.IsSuper = false;
-}
-
-ExistentialMemberRefExpr::ExistentialMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                                   ConcreteDeclRef Value,
-                                                   SourceLoc NameLoc)
-  : Expr(ExprKind::ExistentialMemberRef, /*Implicit=*/false),
-    Base(Base), Value(Value),
-    DotLoc(DotLoc), NameLoc(NameLoc) { }
-
-ArchetypeMemberRefExpr::ArchetypeMemberRefExpr(Expr *Base, SourceLoc DotLoc,
-                                               ConcreteDeclRef Value,
-                                               SourceLoc NameLoc)
-  : Expr(ExprKind::ArchetypeMemberRef, /*Implicit=*/false),
-    Base(Base), Value(Value),
-    DotLoc(DotLoc), NameLoc(NameLoc) { }
-
-ArchetypeType *ArchetypeMemberRefExpr::getArchetype() const {
-  Type BaseTy = getBase()->getType()->getRValueType();
-  if (auto Meta = BaseTy->getAs<MetatypeType>())
-    return Meta->getInstanceType()->castTo<ArchetypeType>();
-
-  return BaseTy->castTo<ArchetypeType>();
-}
-
-bool ArchetypeMemberRefExpr::isBaseIgnored() const {
-  if (isa<TypeDecl>(Value.getDecl()))
-    return true;
-
-  return false;
 }
 
 Type OverloadSetRefExpr::getBaseType() const {

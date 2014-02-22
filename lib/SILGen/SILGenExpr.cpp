@@ -190,10 +190,6 @@ namespace {
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
-    RValue visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
-                                       SGFContext C);
-    RValue visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E,
-                                         SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
                                          SGFContext C);
     RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
@@ -1368,32 +1364,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
   return SGF.emitDynamicMemberRefExpr(E, C);
-}
-
-RValue RValueEmitter::visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E,
-                                                  SGFContext C) {
-  SILValue archetype = visit(E->getBase()).getUnmanagedSingleValue(SGF,
-                                                                  E->getBase());
-  assert((archetype.getType().isAddress() ||
-          archetype.getType().is<MetatypeType>()) &&
-         "archetype must be an address or metatype");
-  // FIXME: curried archetype
-  // FIXME: archetype properties
-  (void)archetype;
-  llvm_unreachable("unapplied archetype method not implemented");
-}
-
-RValue RValueEmitter::visitExistentialMemberRefExpr(
-                                                 ExistentialMemberRefExpr *E,
-                                                 SGFContext C) {
-  SILValue existential = visit(E->getBase()).getUnmanagedSingleValue(SGF,
-                                                                  E->getBase());
-  //SILValue projection = B.createProjectExistential(E, existential);
-  //SILValue method = emitProtocolMethod(E, existential);
-  // FIXME: curried existential
-  // FIXME: existential properties
-  (void)existential;
-  llvm_unreachable("unapplied protocol method not implemented");
 }
 
 RValue RValueEmitter::

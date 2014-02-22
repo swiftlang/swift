@@ -1113,22 +1113,6 @@ public:
     printRec(E->getBase());
     OS << ')';
   }
-  void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-    printCommon(E, "existential_member_ref_expr")
-      << " decl=";
-    E->getDeclRef().dump(OS);
-    OS << '\n';
-    printRec(E->getBase());
-    OS << ')';
-  }
-  void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
-    printCommon(E, "archetype_member_ref_expr")
-      << " decl=";
-    E->getDeclRef().dump(OS);
-    OS << '\n';
-    printRec(E->getBase());
-    OS << ')';
-  }
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
     printCommon(E, "dynamic_member_ref_expr")
       << " decl=";

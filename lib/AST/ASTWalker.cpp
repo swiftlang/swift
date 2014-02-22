@@ -150,22 +150,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
     
-  Expr *visitExistentialMemberRefExpr(ExistentialMemberRefExpr *E) {
-    if (Expr *Base = doIt(E->getBase())) {
-      E->setBase(Base);
-      return E;
-    }
-    return nullptr;
-  }
-
-  Expr *visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *E) {
-    if (Expr *Base = doIt(E->getBase())) {
-      E->setBase(Base);
-      return E;
-    }
-    return nullptr;
-  }
-
   Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *E) {
     if (Expr *Base = doIt(E->getBase())) {
       E->setBase(Base);
