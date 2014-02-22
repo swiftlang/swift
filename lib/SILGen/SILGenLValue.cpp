@@ -259,7 +259,7 @@ void LogicalPathComponent::_anchor() {}
 /// lowering.
 static LValueTypeData getValueTypeData(SILValue value) {
   assert(value.getType().isObject() ||
-         value.getType().getSwiftRValueType()->is<ProtocolType>());
+         value.getType().getSwiftRValueType()->isExistentialType());
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),
@@ -488,7 +488,7 @@ LValue SILGenLValue::visitRec(Expr *e) {
     // Calls through protocols can be done with +0 rvalues.  This allows us to
     // avoid materializing copies of existentials.
     SGFContext Ctx;
-    if (e->getType()->is<ProtocolType>())
+    if (e->getType()->isExistentialType() || e->getType()->is<ArchetypeType>())
       Ctx = SGFContext::AllowPlusZero;
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);

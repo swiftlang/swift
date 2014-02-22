@@ -672,13 +672,20 @@ namespace {
         } else if (baseTy->is<ArchetypeType>()) {
           ref = new (context) ArchetypeMemberRefExpr(base, dotLoc, memberRef,
                                                      memberLoc);
-        } else {
+        } else if (!isa<VarDecl>(member)) {
           ref = new (context) ExistentialMemberRefExpr(base, dotLoc, memberRef,
                                                        memberLoc);
+        } else {
+          assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
+          ref = new (context) MemberRefExpr(base, dotLoc, memberRef,
+                                            memberLoc, Implicit,
+                                            IsDirectPropertyAccess);
+          cast<MemberRefExpr>(ref)->setIsSuper(isSuper);
         }
+        
         ref->setImplicit(Implicit);
         ref->setType(simplifyType(openedType));
-
+        
         return ref;
       }
 
