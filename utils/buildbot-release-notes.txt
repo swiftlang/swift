@@ -1,3 +1,26 @@
+2014-02-26
+----------
+
+* Property accessors have a new syntax:
+
+  var computedProperty: Int {
+    get {
+      return _storage
+    }
+    set {
+      _storage = value
+    }
+  }
+
+  var implicitGet: Int {
+    return 42
+  }
+
+  var storedPropertyWithObservingAccessors: Int = 0 {
+    willSet { ... }
+    didSet { ... }
+  }
+
 2014-02-19
 ----------
 

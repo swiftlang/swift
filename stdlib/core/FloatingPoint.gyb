@@ -259,29 +259,30 @@ extension ${Self} : FloatingPointNumber {
 // Not @transparent because the function is too complex.
 extension ${Self} /* : FloatingPointNumber */ {
   var floatingPointClass: FloatingPointClassification {
-  get:
-    var biasedExponent = __getBiasedExponent()
-    if biasedExponent == ${getInfinityExponent(bits)} {
-      var significand = __getSignificand()
-      // This is either +/-inf or NaN.
-      if significand == 0 {
-        return isSignMinus() ? .NegativeInfinity : .PositiveInfinity
+    get {
+      var biasedExponent = __getBiasedExponent()
+      if biasedExponent == ${getInfinityExponent(bits)} {
+        var significand = __getSignificand()
+        // This is either +/-inf or NaN.
+        if significand == 0 {
+          return isSignMinus() ? .NegativeInfinity : .PositiveInfinity
+        }
+        var isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
+        return isQNaN ? .QuietNaN : .SignalingNaN
       }
-      var isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
-      return isQNaN ? .QuietNaN : .SignalingNaN
-    }
 
-    // OK, the number is finite.
-    var isMinus = isSignMinus()
-    if biasedExponent != 0 {
-      return isMinus ? .NegativeNormal : .PositiveNormal
-    }
+      // OK, the number is finite.
+      var isMinus = isSignMinus()
+      if biasedExponent != 0 {
+        return isMinus ? .NegativeNormal : .PositiveNormal
+      }
 
-    // Exponent is zero.
-    if __getSignificand() == 0 {
-      return isMinus ? .NegativeZero : .PositiveZero
+      // Exponent is zero.
+      if __getSignificand() == 0 {
+        return isMinus ? .NegativeZero : .PositiveZero
+      }
+      return isMinus ? .NegativeSubnormal : .PositiveSubnormal
     }
-    return isMinus ? .NegativeSubnormal : .PositiveSubnormal
   }
 }
 @ end

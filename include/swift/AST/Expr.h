@@ -1029,8 +1029,9 @@ public:
 /// \code
 /// class C {
 ///   @objc subscript (i : Int) -> String {
-///   get: 
-///     ... 
+///     get {
+///       ...
+///     }
 ///   }
 /// };
 ///

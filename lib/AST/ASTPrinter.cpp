@@ -150,6 +150,7 @@ public:
     void printGenericParams(GenericParamList *params);
 
 private:
+    void printAccessors(AbstractStorageDecl *ASD);
     void printMembers(ArrayRef<Decl *> members, bool needComma = false);
     void printNominalDeclName(NominalTypeDecl *decl);
     void printInherited(const Decl *decl,
@@ -165,7 +166,9 @@ private:
     void printInherited(const EnumDecl *D);
     void printInherited(const ExtensionDecl *decl);
     void printInherited(const GenericTypeParamDecl *D);
-    void printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
+
+    /// \returns true if anything was printed.
+    bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
     /// \brief Print the function parameters in curried or selector style,
     /// to match the original function declaration.
@@ -358,6 +361,41 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
     }
   }
   Printer << ">";
+}
+
+void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
+  if (!ASD->hasAccessorFunctions())
+    return;
+
+  bool PrintAccessorBody = Options.FunctionDefinitions &&
+                           !isa<ProtocolDecl>(ASD->getDeclContext());
+  Printer << " {";
+  if (auto getter = ASD->getGetter()) {
+    if (!PrintAccessorBody)
+      Printer << " get";
+    else {
+      Printer << "\n";
+      IndentRAII IndentMore(*this);
+      indent();
+      visit(getter);
+    }
+  }
+  if (auto setter = ASD->getSetter()) {
+    if (!PrintAccessorBody)
+      Printer << " set";
+    else {
+      Printer << "\n";
+      IndentRAII IndentMore(*this);
+      indent();
+      visit(setter);
+    }
+  }
+  if (PrintAccessorBody) {
+    Printer << "\n";
+    indent();
+  } else
+    Printer << " ";
+  Printer << "}";
 }
 
 void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
@@ -619,34 +657,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     decl->getType().print(Printer, Options);
   }
 
-  if (decl->hasAccessorFunctions()) {
-    Printer << " {";
-    if (auto getter = decl->getGetter()) {
-      if (!Options.FunctionDefinitions)
-        Printer << " get";
-      else {
-        Printer << "\n";
-        indent();
-        visit(getter);
-        Printer << "\n";
-      }
-    }
-    if (auto setter = decl->getSetter()) {
-      if (!Options.FunctionDefinitions)
-        Printer << " set";
-      else {
-        Printer << "\n";
-        indent();
-        visit(setter);
-        Printer << "\n";
-      }
-    }
-    if (Options.FunctionDefinitions)
-      indent();
-    else
-      Printer << " ";
-    Printer << "}";
-  }
+  printAccessors(decl);
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
@@ -686,9 +697,11 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   }
 }
 
-void PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
+bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
   IndentRAII IndentMore(*this, NeedIndent);
+  bool PrintedSomething = false;
   for (auto element : stmt->getElements()) {
+    PrintedSomething = true;
     Printer << "\n";
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
@@ -701,6 +714,7 @@ void PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
       // visit(element.get<Expr*>());
     }
   }
+  return PrintedSomething;
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
@@ -711,10 +725,10 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     switch (decl->getAccessorKind()) {
     case AccessorKind::NotAccessor: break;
     case AccessorKind::IsGetter:
-      Printer << "get:";
+      Printer << "get {";
       break;
     case AccessorKind::IsDidSet:
-      Printer << "didSet:";
+      Printer << "didSet {";
       break;
     case AccessorKind::IsSetter:
     case AccessorKind::IsWillSet:
@@ -733,14 +747,15 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           }
         }
       }
-      Printer << ":";
+      Printer << " {";
     }
-
-    if (!Options.FunctionDefinitions || !decl->getBody()) {
-      return;
+    if (Options.FunctionDefinitions && decl->getBody()) {
+      if (printBraceStmtElements(decl->getBody())) {
+        Printer << "\n";
+        indent();
+      }
     }
-    
-    printBraceStmtElements(decl->getBody());
+    Printer << "}";
   } else {
     printAttributes(decl->getAttrs());
     printImplicitObjCNote(decl);
@@ -812,32 +827,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer << " -> ";
   decl->getElementType().print(Printer, Options);
 
-  Printer << " {";
-  {
-    IndentRAII indentMore(*this);
-    if (auto getter = decl->getGetter()) {
-      if (!Options.FunctionDefinitions)
-        Printer << " get";
-      else {
-        Printer << "\n";
-        indent();
-        visit(getter);
-        Printer << "\n";
-      }
-    }
-    if (auto setter = decl->getSetter()) {
-      if (!Options.FunctionDefinitions)
-        Printer << " set";
-      else {
-        Printer << "\n";
-        indent();
-        visit(setter);
-        Printer << "\n";
-      }
-    }
-  }
-  indent();
-  Printer << "}";
+  printAccessors(decl);
 }
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {

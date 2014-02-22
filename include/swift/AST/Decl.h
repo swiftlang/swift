@@ -2746,8 +2746,8 @@ enum class ObjCSubscriptKind {
 ///
 /// \code
 /// subscript (i : Int) -> String {
-///   get: /* return ith String */
-///   set: /* set ith string to value */
+///   get { /* return ith String */ }
+///   set { /* set ith string to value */ }
 /// }
 /// \endcode
 ///
@@ -2758,8 +2758,8 @@ enum class ObjCSubscriptKind {
 /// \code
 /// struct Matrix {
 ///   subscript (i : Int, j : Int) -> Double {
-///     get: /* return element at position (i, j) */
-///     set: /* set element at position (i, j) */
+///     get { /* return element at position (i, j) */ }
+///     set { /* set element at position (i, j) */ }
 ///   }
 /// }
 /// \endcode

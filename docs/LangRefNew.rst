@@ -593,29 +593,46 @@ Import Declarations
 
 .. code-block:: none
 
-    decl-var        ::= attribute-list ('static' | 'class')? 'var' pattern initializer?  (',' pattern initializer?)*
+  decl-var-head  ::= attribute-list ('static' | 'class')? 'var'
 
-    decl-var        ::= attribute-list 'var' identifier ':' type-annotation brace-item-list
+  decl-var       ::= decl-var-head pattern initializer?  (',' pattern initializer?)*
 
-    decl-var        ::= attribute-list 'var' identifier ':' type-annotation '{' get-set '}'
+  // 'get' is implicit in this syntax.
+  decl-var       ::= decl-var-head identifier ':' type-annotation brace-item-list
 
-    get-set         ::= get set?
-    get-set         ::= set get
+  decl-var       ::= decl-var-head identifier ':' type-annotation '{' get-set '}'
 
-    get             ::= 'get:' brace-item*
+  decl-var       ::= decl-var-head identifier ':' type-annotation initializer? '{' willset-didset '}'
 
-    set             ::= 'set' set-name? ':' brace-item*
+  // For use in protocols.
+  decl-var       ::= decl-var-head identifier ':' type-annotation '{' get-set-kw '}'
 
-    set-name        ::= '(' identifier ')'
+  get-set        ::= get set?
+  get-set        ::= set get
 
-``var`` declarations form the backbone of value declarations in Swift. A
+  get            ::= attribute-list 'get' brace-item-list
+  set            ::= attribute-list 'set' set-name? brace-item-list
+  set-name       ::= '(' identifier ')'
+
+  willset-didset ::= willset didset?
+  willset-didset ::= didset willset?
+
+  willset        ::= attribute-list 'willSet' set-name? brace-item-list
+  didset         ::= attribute-list 'didSet' brace-item-list
+
+  get-kw         ::= attribute-list 'get'
+  set-kw         ::= attribute-list 'set'
+  get-set-kw     ::= get-kw set-kw?
+  get-set-kw     ::= set-kw get-kw
+
+``var`` declarations form the backbone of value declarations in Swift.  A
 ``var`` declaration takes a pattern and an optional initializer, and declares
-all the pattern-identifiers in the pattern as variables. If there is an
+all the pattern-identifiers in the pattern as variables.  If there is an
 initializer and the pattern is :ref:`fully-typed <langref.types.fully_typed>`,
-the initializer is converted to the type of the pattern. If there is an
+the initializer is converted to the type of the pattern.  If there is an
 initializer and the pattern is not fully-typed, the type of initializer is
 computed independently of the pattern, and the type of the pattern is derived
-from the initializer. If no initializer is specified, the pattern must be
+from the initializer.  If no initializer is specified, the pattern must be
 fully-typed, and the values are default-initialized.
 
 If there is more than one pattern in a ``var`` declaration, they are each
@@ -625,12 +642,14 @@ considered independently, as if there were multiple declarations.  The initial
 A var declaration may contain a getter and (optionally) a setter, which will
 be used when reading or writing the variable, respectively.  Such a variable
 does not have any associated storage.  A ``var`` declaration with a getter or
-setter must have a type (call it ``T``). The getter function, whose
+setter must have a type (call it ``T``).  The getter function, whose
 body is provided as part of the ``var-get`` clause, has type ``() -> T``.
 Similarly, the setter function, whose body is part of the ``var-set`` clause
-(if provided), has type ``(T) -> ()``. If the ``var-set`` clause contains a
-``var-set-name`` clause, the identifier of that clause is used as the name of
-the parameter to the setter. Otherwise, the parameter name is ``value``.
+(if provided), has type ``(T) -> ()``.
+
+If the ``var-set`` or ``willset`` clause contains a ``set-name`` clause, the
+identifier of that clause is used as the name of the parameter to the setter or
+the observing accessor.  Otherwise, the parameter name is ``value``.
 
 FIXME: Should the type of a pattern which isn't fully typed affect the
 type-checking of the expression (i.e. should we compute a structured dependent
@@ -663,20 +682,79 @@ Here are some examples of ``var`` declarations:
     return _x
   }
   var x2: Int {
-  get:
+    get {
     return _x
-  set:
-    x_modify_count = x_modify_count + 1
-    _x = value
+    }
+    set {
+      x_modify_count = x_modify_count + 1
+      _x = value
+    }
   }
 
-Note that both ``get`` and ``set`` are context-sensitive keywords.
+Note that ``get``, ``set``, ``willSet`` and ``didSet`` are context-sensitive
+keywords.
 
 ``static`` keyword is allowed inside structs and enums, and extensions of
 those.
 
 ``class`` keyword is allowed inside classes, class extensions, and
 protocols.
+
+.. admonition:: Ambiguity 1
+
+  The production for implicit ``get`` makes this grammar ambiguous.  For example:
+
+  ::
+
+    class A {
+      func get(_: () -> Int) {}
+      var a: Int {
+        get { return 0 } // Getter declaration or call to 'get' with a trailing closure?
+      }
+      // But if this was intended as a call to 'get' function, then we have a
+      // getter without a 'return' statement, so the code is invalid anyway.
+    }
+
+  We disambiguate towards ``get-set`` or ``willset-didset`` production if the
+  first token after ``{`` is the corresponding keyword, possibly preceeded by
+  attributes.  Thus, the following code is rejected because we are expecting
+  ``{`` after ``set``:
+
+  ::
+
+    class A {
+      var set: Foo
+      var a: Int {
+        set.doFoo()
+        return 0
+      }
+    }
+
+.. admonition:: Ambiguity 2
+
+  The production with ``initializer`` and an accessor block is ambiguous.  For
+  example:
+
+  ::
+
+    func takeClosure(_: () -> Int) {}
+    struct A {
+      var willSet: Int
+      var a: Int = takeClosure {
+        willSet {} // A 'willSet' declaration or a call to 'takeClosure'?
+      }
+    }
+
+  We disambiguate towards ``willget-didset`` production if the first token
+  after ``{`` is the keyword ``willSet`` or ``didSet``, possibly preceeded by
+  attributes.
+
+.. admonition:: Rationale
+
+  Even though it is possible to do further checks and speculatively parse more,
+  it introduces unjustified complexity to cover (hopefully rare) corner cases.
+  In ambiguous cases users can always opt-out of the trailing closure syntax by
+  using explicit parentheses in the function call.
 
 ...
 
@@ -688,6 +766,13 @@ protocols.
 .. code-block:: none
 
   decl-subscript ::= subscript-head '{' get-set '}'
+
+  // 'get' is implicit in this syntax.
+  decl-subscript ::= subscript-head brace-item-list
+
+  // For use in protocols.
+  decl-subscript ::= subscript-head '{' get-set-kw '}'
+
   subscript-head ::= attribute-list 'subscript' pattern-tuple '->' type
 
 A subscript declaration provides support for <a href="#expr-subscript">

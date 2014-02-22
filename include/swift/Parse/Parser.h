@@ -50,9 +50,6 @@ namespace swift {
   enum class BraceItemListKind {
     /// A statement list terminated by a closing brace. The default.
     Brace,
-    /// A statement list in a variable getter or setter. The list
-    /// is terminated by a closing brace or a 'get:' or 'set:' label.
-    Variable,
     /// A statement list in a case block. The list is terminated
     /// by a closing brace or a 'case' or 'default' label.
     Case,
@@ -270,6 +267,10 @@ public:
     ParserPosition() = default;
     ParserPosition &operator=(const ParserPosition &) = default;
 
+    bool isValid() const {
+      return LS.isValid();
+    }
+
   private:
     ParserPosition(Lexer::State LS, SourceLoc PreviousLoc):
         LS(LS), PreviousLoc(PreviousLoc)
@@ -301,6 +302,8 @@ public:
   }
 
   void backtrackToPosition(ParserPosition PP) {
+    assert(PP.isValid());
+
     L->backtrackToState(PP.LS);
 
     // We might be at tok::eof now, so ensure that consumeToken() does not
@@ -635,7 +638,7 @@ public:
                    FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
                    FuncDecl *&DidSet, SourceLoc &LastValidLoc,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
-  VarDecl *parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
+  VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                               SourceLoc StaticLoc,
                               SmallVectorImpl<Decl *> &Decls);
   

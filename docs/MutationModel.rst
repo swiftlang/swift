@@ -27,13 +27,14 @@ The Problem
 
 Consider::
 
- class Window {
+  class Window {
 
-   var title: String { // title is not writable
-   get:
-     return somethingComputed()
-   }
- }
+    var title: String { // title is not writable
+      get {
+        return somethingComputed()
+      }
+    }
+  }
 
   var w = Window()
   w.title += " (parenthesized remark)”
@@ -155,7 +156,7 @@ Properties and Subscripts
 
 A subscript or property access expression is an rvalue if
 
-* the property or subscript has no ``set:`` clause
+* the property or subscript has no ``set`` clause
 * the target of the property or subscript expression is an rvalue of
   value type
 
@@ -163,18 +164,28 @@ For example, consider this extension to our ``Number`` struct:
   
 .. parsed-literal::
 
-   extension Number {
-     var readOnlyValue: Int { return getValue()  }
+  extension Number {
+    var readOnlyValue: Int { return getValue()  }
 
-     var writableValue: Int {
-       return getValue() **set(x):** name = x.toString()
-     }
+    var writableValue: Int {
+      get {
+       return getValue()
+      }
+      **set(x)** {
+        name = x.toString()
+      }
+    }
 
-     subscript(n: Int) -> String { return name }
-     subscript(n: String) -> Int {
-       return 42 **set(x):** name = x.toString()
-     }
-   }
+    subscript(n: Int) -> String { return name }
+    subscript(n: String) -> Int {
+      get {
+        return 42
+      }
+      **set(x)** {
+        name = x.toString()
+      }
+    }
+  }
 
 Also imagine we have a class called ``CNumber`` defined exactly the
 same way as ``Number`` (except that it's a class).  Then, the
@@ -187,7 +198,7 @@ following table holds:
 |                      |   var x = CNumber(42) // or this |  val x = Number(42)    |
 |                      |   val x = CNumber(42) // or this |                        |
 +======================+==================================+========================+
-| ``x.readOnlyValue``  |**rvalue** (no ``set:`` clause)   |**rvalue** (target is an|
+| ``x.readOnlyValue``  |**rvalue** (no ``set`` clause)    |**rvalue** (target is an|
 |                      |                                  |rvalue of value type)   |
 |                      |                                  |                        |
 +----------------------+                                  |                        |
@@ -195,14 +206,14 @@ following table holds:
 |                      |                                  |                        |
 |                      |                                  |                        |
 +----------------------+----------------------------------+                        |
-| ``x.writeableValue`` |**lvalue** (has ``set:`` clause)  |                        |
+| ``x.writeableValue`` |**lvalue** (has ``set`` clause)   |                        |
 |                      |                                  |                        |
 +----------------------+                                  |                        |
 | ``x["tree"]``        |                                  |                        |
 |                      |                                  |                        |
 +----------------------+----------------------------------+                        |
 | ``x.name``           |**lvalue** (instance variables    |                        |
-|                      |implicitly have a ``set:``        |                        |
+|                      |implicitly have a ``set``         |                        |
 |                      |clause)                           |                        |
 +----------------------+----------------------------------+------------------------+
 
@@ -269,14 +280,17 @@ program is ill-formed:
   struct BS {
     var count: Int    // ok; an lvalue or an rvalue is fine
 
-    var intValue : Int { 
-      return 3
-    set:             // ok, lvalue required and has a set clause
-      ignore(value)
+    var intValue : Int {
+      get {
+        return 3
+      }
+      set {             // ok, lvalue required and has a set clause
+        ignore(value)
+      }
     }
-  
+
     subscript(i: Int) -> Bool {
-      return true   // **Error:** needs a set: clause to yield an lvalue
+      return true   // **Error:** needs a 'set' clause to yield an lvalue
     }
   }
 

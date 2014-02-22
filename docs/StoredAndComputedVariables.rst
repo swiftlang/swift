@@ -67,29 +67,32 @@ is declared as a variable with a custom getter::
 
     // A computed member variable
     var maxX : Int {
-    get:
-      return x + width
-    set(newMax):
-      x = newMax - width
+      get {
+        return x + width
+      }
+      set(newMax) {
+        x = newMax - width
+      }
     }
-    
+
   // myRect.maxX = 40
 
 In this example, no storage is provided for ``maxX``.
 
-If the getter appears first, the "get:" label may be omitted. If the setter's
-argument is omitted, it is assumed to be named "value"::
+If the setter's argument is omitted, it is assumed to be named ``value``::
 
     var maxY : Int {
-      return y + height
-    set:
-      y = value - height
+      get {
+        return y + height
+      }
+      set {
+        y = value - height
+      }
     }
-  
-  // myRect.maxY += 5
 
 Finally, if a computed variable has a getter but no setter, it becomes a
-*read-only variable.* Attempting to set the variable is a compile-time error. ::
+*read-only variable.*  In this case the ``get`` label may be omitted.
+Attempting to set a read-only variable is a compile-time error::
 
     var area : Int {
       return self.width * self.height
@@ -111,29 +114,35 @@ this is to pair a stored variable with a computed variable::
 
   var _backgroundColor : Color
   var backgroundColor : Color {
-    return _backgroundColor
-  set:
-    _backgroundColor = value
-    refresh()
+    get {
+      return _backgroundColor
+    }
+    set {
+      _backgroundColor = value
+      refresh()
+    }
   }
 
 However, this contains a fair amount of boilerplate. For cases where a stored
 property provides the correct storage semantics, you can add custom behavior
-before or after the underlying assignment using "observing accessors" 
+before or after the underlying assignment using "observing accessors"
 ``willSet`` and ``didSet``::
 
   var backgroundColor : Color {
-  didSet:
-    refresh()
-  }
-  
-  var currentURL : URL {
-  willSet(newValue):
-    if newValue != currentURL {
-      cancelCurrentRequest()
+    didSet {
+      refresh()
     }
-  didSet:
-    sendNewRequest(currentURL)
+  }
+
+  var currentURL : URL {
+    willSet(newValue) {
+      if newValue != currentURL {
+        cancelCurrentRequest()
+      }
+    }
+    didSet {
+      sendNewRequest(currentURL)
+    }
   }
 
 A stored property may have either observing accessor, or both. Like ``set``,
@@ -141,8 +150,9 @@ the argument for ``willSet`` may be omitted, in which case it is provided as
 "value"::
 
   var accountName : String {
-  willSet:
-    assert(value != "root")
+    willSet {
+      assert(value != "root")
+    }
   }
 
 Observing accessors provide the same behavior as the two-variable example, with
@@ -187,8 +197,9 @@ The new stored variable may have observing accessors::
     var oldColors : Array<Color> = []
   
     var color : Color {
-    willSet:
-      oldColors.append(color)
+      willSet {
+        oldColors.append(color)
+      }
     }
   }
 
@@ -196,13 +207,16 @@ A computed variable may also be overridden with another computed variable::
 
   class MaybeColorful : Base {
     var color : Color {
-      if randomBooleanValue() {
-        return .Green
-      } else {
-        return super.color
+      get {
+        if randomBooleanValue() {
+          return .Green
+        } else {
+          return super.color
+        }
       }
-    set:
-      println("Sorry, we choose our own colors here.")
+      set {
+        println("Sorry, we choose our own colors here.")
+      }
     }
   }
 
@@ -216,20 +230,24 @@ A subclass may override the superclass's variable with a new computed variable::
 
   class ColorBase {
     var color : Color {
-    didSet:
-      println("I've been painted \(color)!")
+      didSet {
+        println("I've been painted \(color)!")
+      }
     }
   }
   
   class BrightlyColored : ColorBase {
     var color : Color {
-      return super.color
-    set(newColor):
-      // Prefer whichever color is brighter.
-      if newColor.luminance > super.color.luminance {
-        super.color = newColor
-      } else {
-        // Keep the old color.
+      get {
+        return super.color
+      }
+      set(newColor) {
+        // Prefer whichever color is brighter.
+        if newColor.luminance > super.color.luminance {
+          super.color = newColor
+        } else {
+          // Keep the old color.
+        }
       }
     }
   }
@@ -245,8 +263,9 @@ member variable::
     var prevColor : Color?
     
     var color : Color {
-    willSet:
-      prevColor = color
+      willSet {
+        prevColor = color
+      }
     }
   }
 

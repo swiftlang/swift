@@ -95,6 +95,10 @@ public:
   public:
     State() {}
 
+    bool isValid() const {
+      return Loc.isValid();
+    }
+
     State advance(unsigned Offset) const {
       assert(isValid());
       return State(Loc.getAdvancedLoc(Offset));
@@ -103,9 +107,6 @@ public:
   private:
     explicit State(SourceLoc Loc): Loc(Loc) {}
     SourceLoc Loc;
-    bool isValid() const {
-      return Loc.isValid();
-    }
     friend class Lexer;
   };
 

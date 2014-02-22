@@ -28,6 +28,8 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include <algorithm>
+
 using namespace swift;
 
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
@@ -1214,21 +1216,21 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
                              Params, ReturnType, P->CurDeclContext);
 
-  // non-static set:/willSet:/didSet: default to @mutating.
+  // non-static set/willSet/didSet default to @mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
     D->setMutating();
 
   return D;
 }
 
-/// Parse a "(value)" specifier for "set:" or "willSet:" if present.  Create a
+/// Parse a "(value)" specifier for "set" or "willSet" if present.  Create a
 /// pattern to represent the spelled argument or the implicit one if it is
 /// missing.
 static TypedPattern *
 parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
                               Parser &P, AccessorKind Kind) {
-  // Only set: and willSet: have a (value) parameter.  get: and didSet: take a
-  // () parameter always.
+  // Only 'set' and 'willSet' have a (value) parameter.  'get' and 'didSet'
+  // always take a () parameter.
   if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet)
     return nullptr;
 
@@ -1283,21 +1285,6 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
-///
-/// \verbatim
-///   get-set:
-///      get var-set?
-///      set var-get
-///
-///   get:
-///     'get' attribute-list ':' stmt-brace-item*
-///
-///   set:
-///     'set' attribute-list set-name? ':' stmt-brace-item*
-///
-///   set-name:
-///     '(' identifier ')'
-/// \endverbatim
 bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                          TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
                          FuncDecl *&WillSet, FuncDecl *&DidSet,
@@ -1370,10 +1357,18 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     return true;
   }
 
-
+  bool IsFirstAccessor = true;
   while (Tok.isNot(tok::r_brace)) {
     if (Tok.is(tok::eof))
       return true;
+
+    // If there are any attributes, we are going to parse them.  Because these
+    // attributes might not be appertaining to the accessor, but to the first
+    // declaration inside the implicit getter, we need to save the parser
+    // position and restore it later.
+    ParserPosition BeginParserPosition;
+    if (Tok.is(tok::at_sign))
+      BeginParserPosition = getParserPosition();
 
     // Parse any leading attributes.
     DeclAttributes Attributes;
@@ -1395,10 +1390,26 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
       Kind = AccessorKind::IsDidSet;
       TheDeclPtr = &DidSet;
     } else {
+      // This is an implicit getter.  Might be not valid in this position,
+      // though.  Anyway, go back to the beginning of the getter code to ensure
+      // that the diagnostics point to correct tokens.
+      if (BeginParserPosition.isValid()) {
+        backtrackToPosition(BeginParserPosition);
+        Attributes = DeclAttributes();
+      }
+      if (!IsFirstAccessor) {
+        // Can not have an implicit getter after other accessor.
+        diagnose(Tok, diag::expected_accessor_kw);
+        skipUntil(tok::r_brace);
+        // Don't signal an error since we recovered.
+        return false;
+      }
       Kind = AccessorKind::IsGetter;
       TheDeclPtr = &Get;
       isImplicitGet = true;
     }
+
+    IsFirstAccessor = false;
 
     // Consume the contextual keyword, if present.
     SourceLoc Loc = isImplicitGet ? Tok.getLoc() : consumeToken();
@@ -1409,18 +1420,21 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
     if (TheDecl) {
       diagnose(Loc, diag::duplicate_property_accessor, (unsigned)Kind);
       diagnose(TheDecl->getLoc(), diag::previous_accessor, (unsigned)Kind);
-      TheDecl = nullptr;  // Forget the previous decl.
+      // Forget the previous decl.
+      Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
+      TheDecl = nullptr;
     }
 
-    // set: and willSet: can have an optional name.
-
-    //   var-set-name    ::= '(' identifier ')'
+    // 'set' and 'willSet' can have an optional name.
+    //
+    //     set-name    ::= '(' identifier ')'
     auto *ValueNamePattern =
       parseOptionalAccessorArgument(Loc, ElementTy, *this, Kind);
 
-    SourceLoc ColonLoc = Tok.getLoc();
-    if (!isImplicitGet && !consumeIf(tok::colon)) {
-      diagnose(Tok, diag::expected_colon_accessor, (unsigned)Kind);
+    SourceLoc LBLoc = Tok.getLoc();
+    // FIXME: Use outer '{' loc if isImplicitGet.
+    if (!isImplicitGet && !consumeIf(tok::l_brace)) {
+      diagnose(Tok, diag::expected_lbrace_accessor, (unsigned)Kind);
       return true;
     }
 
@@ -1440,9 +1454,15 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
-    parseBraceItems(Entries, BraceItemListKind::Variable);
-    BraceStmt *Body = BraceStmt::create(Context, ColonLoc,
-                                        Entries, Tok.getLoc());
+    parseBraceItems(Entries);
+
+    SourceLoc RBLoc = Tok.getLoc();
+    if (!isImplicitGet &&
+        parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                           LBLoc))
+      RBLoc = PreviousLoc;
+
+    BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
     TheDecl->setBody(Body);
     
     Decls.push_back(TheDecl);
@@ -1454,13 +1474,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
-///
-/// \verbatim
-///   decl-var:
-///      attribute-list 'var' identifier : type-annotation
-///                     initializer? { get-set }
-/// \endverbatim
-VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
+VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                                     SourceLoc StaticLoc,
                                     SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
@@ -1469,7 +1483,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   // name. Complain if that isn't what we got.
   VarDecl *PrimaryVar = nullptr;
   {
-    Pattern *PrimaryPattern = &pattern;
+    Pattern *PrimaryPattern = pattern;
     if (TypedPattern *Typed = dyn_cast<TypedPattern>(PrimaryPattern))
       PrimaryPattern = Typed->getSubPattern();
     if (NamedPattern *Named = dyn_cast<NamedPattern>(PrimaryPattern)) {
@@ -1478,12 +1492,12 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   }
 
   if (!PrimaryVar) {
-    diagnose(pattern.getLoc(), diag::getset_nontrivial_pattern);
+    diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
   } else {
     setLocalDiscriminator(PrimaryVar);
-   
-    // Reject getters and setters for lets, but keep parsing them, for better
+
+    // Reject getters and setters for 'val's, but keep parsing them, for better
     // recovery.
     if (PrimaryVar->isVal()) {
       diagnose(Tok, diag::val_cannot_be_computed_property);
@@ -1494,11 +1508,11 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
   // The grammar syntactically requires a type annotation. Complain if
   // our pattern does not have one.
   TypeLoc TyLoc;
-  if (TypedPattern *TP = dyn_cast<TypedPattern>(&pattern)) {
+  if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
     TyLoc = TP->getTypeLoc();
   } else {
     if (PrimaryVar)
-      diagnose(pattern.getLoc(), diag::getset_missing_type);
+      diagnose(pattern->getLoc(), diag::getset_missing_type);
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
 
@@ -1512,14 +1526,12 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
                   Get, Set, WillSet, DidSet, LastValidLoc, StaticLoc,
                   Decls))
     Invalid = true;
-  
-  // Parse the final '}'.
-  SourceLoc RBLoc;
-  if (Invalid) {
-    skipUntilDeclRBrace();
-    RBLoc = LastValidLoc;
-  }
 
+  // Parse the final '}'.
+  if (Invalid)
+    skipUntil(tok::r_brace);
+
+  SourceLoc RBLoc;
   if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
                          LBLoc))
     RBLoc = LastValidLoc;
@@ -1593,16 +1605,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern &pattern, ParseDeclOptions Flags,
 }
 
 /// \brief Parse a 'var' or 'val' declaration, doing no token skipping on error.
-///
-/// \verbatim
-///   decl-var:
-///      ('static' | 'class')? 'val' attribute-list pattern initializer
-///              (',' pattern initializer )*
-///      ('static' | 'class')? 'var' attribute-list pattern initializer?
-///              (',' pattern initializer? )*
-///      'var' attribute-list identifier : type-annotation
-///            initializer? { get-set }
-/// \endverbatim
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
@@ -1751,7 +1753,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
       if (auto *boundVar =
-            parseDeclVarGetSet(*pattern.get(), Flags, StaticLoc, Decls)) {
+            parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Decls)) {
         hasStorage = boundVar->hasStorage();
 
         if (PBD->getInit() && !boundVar->hasStorage()) {

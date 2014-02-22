@@ -645,10 +645,13 @@ static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
   return StringRef(start, p - start);
 }
 
-/// isStartOfGetSetAccessor - The current token is a { token in a place that
-/// might be the start of a trailing closure.  Check to see if the { is followed
-/// by a didSet:/willSet: label.  If so, this isn't a trailing closure, it is
-/// the start of a get-set block in a variable definition.
+/// Disambiguate the parse after '{' token that is in a place that might be
+/// the start of a trailing closure, or start the variable accessor block.
+///
+/// Check to see if the '{' is followed by a 'didSet' or a 'willSet' label,
+/// possibly preceeded by attributes.  If so, we disambiguate the parse as the
+/// start of a get-set block in a variable definition (not as a trailing
+/// closure).
 static bool isStartOfGetSetAccessor(Parser &P) {
   assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
   
@@ -657,37 +660,30 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   // be checked for.  Conveniently however, get/set properties are not allowed
   // to have initializers, so we don't have an ambiguity, we just have to check
   // for observing accessors.
+  //
+  // If we have a 'didSet' or a 'willSet' label, disambiguate immediately as
+  // an accessor block.
   Token NextToken = P.peekToken();
-  if (!NextToken.isContextualKeyword("didSet") &&
-      !NextToken.isContextualKeyword("willSet") &&
-      NextToken.isNot(tok::at_sign))
+  if (NextToken.isContextualKeyword("didSet") ||
+      NextToken.isContextualKeyword("willSet"))
+    return true;
+
+  // If we don't have attributes, then it can not be an accessor block.
+  if (NextToken.isNot(tok::at_sign))
     return false;
-  
-  // If it does start with didSet/willSet, check to see if the token after it is
-  // a ":" or "(value):", to be absolutely sure that this is the start of a
-  // didSet/willSet specifier (not something like "{ didSet = 42 }").  To do
-  // this, we have to speculatively parse.
-  Parser::BacktrackingScope backtrack(P);
+
+  Parser::BacktrackingScope Backtrack(P);
 
   // Eat the "{".
   P.consumeToken(tok::l_brace);
 
-  // Check any arguments if present.
+  // Eat attributes, if present.
   if (!P.canParseAttributes())
     return false;
 
-  // Verify that we have the didSet/willSet after attributes.
-  if (P.Tok.getText() != "didSet" && P.Tok.getText() != "willSet")
-    return false;
-  P.consumeToken(tok::identifier);
-
-  // If this is "{ didSet:" then it is the start of a get/set accessor.
-  if (P.Tok.is(tok::colon)) return true;
-  // If this is "{ willSet(v):" then it is the start of a get/set accessor.
-  return P.consumeIf(tok::l_paren) &&
-         P.consumeIf(tok::identifier) &&
-         P.consumeIf(tok::r_paren) &&
-         P.consumeIf(tok::colon);
+  // Check if we have 'didSet'/'willSet' after attributes.
+  return P.Tok.isContextualKeyword("didSet") ||
+         P.Tok.isContextualKeyword("willSet");
 }
 
 /// parseExprPostfix

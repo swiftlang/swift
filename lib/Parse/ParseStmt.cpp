@@ -87,11 +87,6 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
-  case BraceItemListKind::Variable:
-    return Tok.isContextualKeyword("get") || Tok.isContextualKeyword("set") ||
-           Tok.isContextualKeyword("willSet") ||
-           Tok.isContextualKeyword("didSet") ||
-           Tok.is(tok::at_sign); // Attribute on get/set specifier.
   case BraceItemListKind::Case:
     return Tok.is(tok::kw_case) || Tok.is(tok::kw_default);
   case BraceItemListKind::TopLevelCode:

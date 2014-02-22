@@ -177,10 +177,10 @@ ERROR(getset_nontrivial_pattern,decl_parsing,none,
 ERROR(expected_rbrace_in_getset,decl_parsing,none,
       "expected '}' at end of variable get/set clause", ())
 ERROR(duplicate_property_accessor,decl_parsing,none,
-      "duplicate definition of %select{getter|setter|willSet:|didSet:}0",
+      "duplicate definition of %select{getter|setter|willSet|didSet}0",
       (unsigned))
 NOTE(previous_accessor,decl_parsing,none,
-     "previous definition of %select{getter|setter|willSet:|didSet:}0 is here",
+     "previous definition of %select{getter|setter|willSet|didSet}0 is here",
      (unsigned))
 ERROR(expected_accessor_name,decl_parsing,none,
       "expected the name of the %select{setter|willSet}0 value",(unsigned))
@@ -188,9 +188,12 @@ ERROR(expected_rparen_set_name,decl_parsing,none,
       "expected ')' after setter value name",())
 ERROR(expected_rparen_willSet_name,decl_parsing,none,
       "expected ')' after willSet value name",())
-ERROR(expected_colon_accessor,decl_parsing,none,
-      "expected ':' to start %select{getter|setter|willSet|didSet}0 definition",
+ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
+      "expected '{' to start %select{getter|setter|willSet|didSet}0 definition",
      (unsigned))
+ERROR(expected_accessor_kw,decl_parsing,none,
+      "expected 'get', 'set', 'willSet' or 'didSet' keyword to start "
+      "an accessor definition",())
 ERROR(var_set_without_get,decl_parsing,none,
       "variable with a setter must also have a getter", ())
 ERROR(observingproperty_with_getset,decl_parsing,none,
