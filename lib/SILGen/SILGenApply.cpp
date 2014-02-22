@@ -932,10 +932,11 @@ public:
   }
 
   void visitMemberRefExpr(MemberRefExpr *e) {
+    auto *theFuncDecl = dyn_cast<FuncDecl>(e->getMember().getDecl());
+
     // If the base is a non-protocol, non-archetype type, then this is a load of
     // a function pointer out of a vardecl.  Just emit it as an rvalue.
-    auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
-    if (!baseTy->isExistentialType() && !baseTy->is<ArchetypeType>())
+    if (!theFuncDecl)
       return visitExpr(e);
     
     // We have four cases to deal with here:
@@ -944,110 +945,85 @@ public:
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
     //  3) for an @mutating method, the base has inout type.
-    //  4) for a @!mutating method, the base is a general protocol rvalue, which
-    //     is address-only.  The base is passed at +0, so it isn't consumed.
+    //  4) for a @!mutating method, the base is a general protocol/archetype
+    //     rvalue, which is address-only.  The base is passed at +0, so it isn't
+    //     consumed.
     //
     // In the last case, the AST has this call typed as being applied to an
     // rvalue, but the witness is actually expecting a pointer to the +0 value
-    // in memory.  We access this with the project_existential instruction.
-    auto existential = gen.emitRValueAsSingleValue(e->getBase(),
-                                                   SGFContext::AllowPlusZero);
+    // in memory.  We access this with the project_existential instruction, or
+    // just pass in the address since archetypes are address-only.
+    auto baseVal = gen.emitRValueAsSingleValue(e->getBase(),
+                                               SGFContext::AllowPlusZero);
 
-    auto *theFuncDecl = cast<FuncDecl>(e->getMember().getDecl());
     auto *proto = cast<ProtocolDecl>(theFuncDecl->getDeclContext());
-
-    if (theFuncDecl->isInstanceMember()) {
+    auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
+    
+    if (!baseTy->isExistentialType()) {
+      setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
+                          baseVal), e);
+      
+    } else if (theFuncDecl->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
       SILType protoSelfTy
         = gen.getLoweredType(proto->getSelf()->getArchetype());
-      if (existential.getType().isClassExistentialType()) {
+      if (baseVal.getType().isClassExistentialType()) {
         SILValue val = gen.B.createProjectExistentialRef(e,
-                                           existential.getValue(), protoSelfTy);
-        proj = ManagedValue(val, existential.getCleanup());
+                                           baseVal.getValue(), protoSelfTy);
+        proj = ManagedValue(val, baseVal.getCleanup());
       } else {
         assert(protoSelfTy.isAddress() && "Self should be address-only");
-        SILValue val = gen.B.createProjectExistential(e, existential.getValue(),
+        SILValue val = gen.B.createProjectExistential(e, baseVal.getValue(),
                                                       protoSelfTy);
         proj = ManagedValue::forUnmanaged(val);
       }
 
       setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
     } else {
-      assert(existential.getType().is<MetatypeType>() &&
+      assert(baseVal.getType().is<MetatypeType>() &&
              "non-existential-metatype for existential static method?!");
+      // FIXME: It is impossible to invoke a class method on a protocol
+      // directly, it must be done through an archetype.
+      setSelfParam(RValue(gen, e, baseVal.getType().getSwiftRValueType(),
+                          baseVal), e);
+    }
+
+    // Method calls through ObjC protocols require ObjC dispatch.
+    bool isObjC = proto->isObjC();
+    
+    ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
+
+    if (!baseTy->isExistentialType()) {
       
-      setSelfParam(RValue(gen, e, existential.getType().getSwiftRValueType(),
-                          existential), e);
+      // Figure out the result type of this expression. If we had any
+      // substitutions not related to 'Self', we'll need to produce a
+      // PolymorphicFunctionType to mollify callee handling.
+      // FIXME: This is a temporary hack that will go away when callee handling
+      // no longer depends on PolymorphicFunctionType at all.
+      Type resultTy = e->getType();
+      if (!subs.empty()) {
+        TypeSubstitutionMap substitutions;
+        substitutions[proto->getSelf()->getArchetype()] = subs[0].Replacement;
+        
+        resultTy = e->getMember().getDecl()->getType()
+          ->castTo<PolymorphicFunctionType>()->getResult()
+        .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
+      }
+      setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
+                                     SILDeclRef(theFuncDecl).asForeign(isObjC),
+                                     getSubstFnType(), e));
+
+    } else {
+      // The declaration is always specialized (due to Self); ignore the
+      // substitutions related to Self. Skip the substitutions involving Self.
+      subs = getNonSelfSubstitutions(subs);
+
+      setCallee(Callee::forProtocol(gen, baseVal.getValue(),
+                                    SILDeclRef(theFuncDecl).asForeign(isObjC),
+                                    getSubstFnType(), e));
     }
-
-    // The declaration is always specialized (due to Self); ignore the
-    // substitutions related to Self. Skip the substitutions involving Self.
-    ArrayRef<Substitution> subs = getNonSelfSubstitutions(
-                                    e->getMember().getSubstitutions());
-
-    // Method calls through ObjC protocols require ObjC dispatch.
-    bool isObjC = proto->isObjC();
-
-    setCallee(Callee::forProtocol(gen, existential.getValue(),
-                                  SILDeclRef(theFuncDecl).asForeign(isObjC),
-                                  getSubstFnType(), e));
-
-    // If there are substitutions, add them now.
-    if (!subs.empty()) {
-      callee->setSubstitutions(gen, e, subs, callDepth);
-    }
-  }
-  
-  void visitArchetypeMemberRefExpr(ArchetypeMemberRefExpr *e) {
-    // We have four cases to deal with here:
-    //
-    //  1) for a "static" / "type" method, the base is a metatype.
-    //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
-    //     which is loadable.
-    //  3) for an @mutating method, the base has inout type.
-    //  4) for a @!mutating method, the base is a general archetype rvalue,
-    //     which is address-only.  The base is passed at +0, so it isn't
-    //     consumed.
-    //
-    // In the last case, the AST has this call typed as being applied to an
-    // rvalue, but the witness is actually expecting a pointer to the +0 value
-    // in memory (since the archetype is address-only).
-    //
-    auto archetype = gen.emitRValueAsSingleValue(e->getBase(),
-                                                 SGFContext::AllowPlusZero);
-    setSelfParam(RValue(gen, e->getBase(), archetype.getType().getSwiftType(),
-                        archetype), e);
-
-    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
-    assert(fd && "archetype properties not yet supported");
-
-    // Method calls through ObjC protocols require ObjC dispatch.
-    auto proto = cast<ProtocolDecl>(fd->getDeclContext());
-    bool isObjC = proto->isObjC();
-
-    ArrayRef<Substitution> subs;
-    subs = e->getDeclRef().getSubstitutions();
-
-    // Figure out the result type of this expression. If we had any
-    // substitutions not related to 'Self', we'll need to produce a
-    // PolymorphicFunctionType to mollify callee handling.
-    // FIXME: This is a temporary hack that will go away when callee handling
-    // no longer depends on PolymorphicFunctionType at all.
-    Type resultTy = e->getType();
-    if (!subs.empty()) {
-      TypeSubstitutionMap substitutions;
-      substitutions[proto->getSelf()->getArchetype()]
-        = e->getDeclRef().getSubstitutions()[0].Replacement;
-
-      resultTy = e->getDecl()->getType()
-                   ->castTo<PolymorphicFunctionType>()->getResult()
-                   .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
-    }
-    setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
-                                   SILDeclRef(fd).asForeign(isObjC),
-                                   getSubstFnType(), e));
 
     // If there are substitutions, add them now.
     if (!subs.empty()) {
