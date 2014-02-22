@@ -18,7 +18,7 @@
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
 #include <stdlib.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace swift;
 
@@ -40,7 +40,7 @@ malloc_zone_t _swift_zone = {
   0, // version
   NULL, // XXX -- add support for memalign and free_definite_size?
   NULL, // XXX -- add support for memalign and free_definite_size?
-  NULL // pressure_relief
+  NULL, // XXX -- add support for pressure_relief?
 };
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
