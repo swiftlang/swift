@@ -2534,7 +2534,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILDeclRef constant,
                                          RValueSource &selfValue,
                                          bool isSuper,
-                                         CanAnyFunctionType substAccessorType) {
+                                         CanAnyFunctionType substAccessorType,
+                                         ArrayRef<Substitution> &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
   
   // FIXME: Have a nicely-abstracted way to figure out which kind of
@@ -2583,6 +2584,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     // The protocol self is implicitly decurried.
     substAccessorType = CanAnyFunctionType(substAccessorType->getResult()
                                            ->castTo<AnyFunctionType>());
+    assert(substitutions.size() >= 1);
+    substitutions = substitutions.slice(1);
     
     // Method calls through ObjC protocols require ObjC dispatch.
     constant = constant.asForeign(protoDecl->isObjC());
@@ -2625,7 +2628,8 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // the Self type is generic.
   // FIXME: Dynamic dispatch for archetype/existential methods.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
-                                             isSuper, substAccessorType);
+                                             isSuper, substAccessorType,
+                                             substitutions);
   
   // If there are substitutions, specialize the generic accessor.
   // FIXME: Generic subscript operator could add another layer of
