@@ -2535,8 +2535,8 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          RValueSource &selfValue,
                                          bool isSuper,
                                          CanAnyFunctionType substAccessorType) {
-  ValueDecl *decl = constant.getDecl();
-
+  auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
+  
   // FIXME: Have a nicely-abstracted way to figure out which kind of
   // dispatch we're doing.
   // FIXME: We should do this for any declaration within a class. However,
@@ -2545,15 +2545,51 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   if (gen.SGM.requiresObjCDispatch(decl)) {
     auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
 
-    if (isSuper) {
-      if (auto *upcast = dyn_cast<UpcastInst>(self))
-        self = upcast->getOperand();
-      return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
-    }
-
-    return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
+    if (!isSuper)
+      return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
+    
+    if (auto *upcast = dyn_cast<UpcastInst>(self))
+      self = upcast->getOperand();
+    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
   }
 
+  // If this is a method in a protocol, generate it as a protocol call.
+  if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    auto selfLoc = selfValue.getLocation();
+    auto existential = std::move(selfValue).getAsSingleValue(gen);
+    
+    // Attach the existential cleanup to the projection so that it gets
+    // consumed (or not) when the call is applied to it (or isn't).
+    ManagedValue proj;
+    SILType protoSelfTy =
+      gen.getLoweredType(protoDecl->getSelf()->getArchetype());
+    if (existential.getType().isClassExistentialType()) {
+      SILValue val = gen.B.createProjectExistentialRef(loc,
+                                                       existential.getValue(),
+                                                       protoSelfTy);
+      proj = ManagedValue(val, existential.getCleanup());
+    } else {
+      assert(protoSelfTy.isAddress() && "Self should be address-only");
+      SILValue val = gen.B.createProjectExistential(selfLoc,
+                                                    existential.getValue(),
+                                                    protoSelfTy);
+      proj = ManagedValue::forUnmanaged(val);
+    }
+
+    selfValue = RValueSource(selfLoc, RValue(gen, selfLoc,
+                                             protoSelfTy.getSwiftType(),
+                                             proj));
+
+    // The protocol self is implicitly decurried.
+    substAccessorType = CanAnyFunctionType(substAccessorType->getResult()
+                                           ->castTo<AnyFunctionType>());
+    
+    // Method calls through ObjC protocols require ObjC dispatch.
+    constant = constant.asForeign(protoDecl->isObjC());
+    return Callee::forProtocol(gen, existential.getValue(), constant,
+                               substAccessorType, loc);
+  }
+  
   return Callee::forDirect(gen, constant, substAccessorType, loc);
 }
 

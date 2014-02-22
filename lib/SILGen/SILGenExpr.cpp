@@ -149,7 +149,6 @@ namespace {
       LValue lv = SGF.emitLValue(E->getSubExpr());
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }
-    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
 
@@ -199,6 +198,7 @@ namespace {
                                          SGFContext C);
     RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
+    RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
                                        SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
@@ -1404,20 +1404,50 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // rvalue subscript expressions are produced for get-only subscript
   // operations.  Emit a call to the getter.
-  auto decl = cast<SubscriptDecl>(E->getDecl().getDecl());
+  auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
 
   // Emit the base.
   ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase());
-  RValueSource baseRV = SGF.prepareAccessorBaseArg(E, base, decl->getGetter());
+  RValueSource baseRV =
+    SGF.prepareAccessorBaseArg(E, base, subscript->getGetter());
 
   // Emit the indices.
   RValue subscriptRV = SGF.emitRValue(E->getIndex());
 
   ManagedValue MV =
-    SGF.emitGetAccessor(E, decl, E->getDecl().getSubstitutions(),
+    SGF.emitGetAccessor(E, subscript, E->getDecl().getSubstitutions(),
                         std::move(baseRV), E->isSuper(),
                         std::move(subscriptRV), C);
   return RValue(SGF, E, MV);
+}
+
+RValue RValueEmitter::visitExistentialSubscriptExpr(ExistentialSubscriptExpr *E,
+                                                    SGFContext C) {
+  auto subscript = cast<SubscriptDecl>(E->getDecl());
+
+  // FIXME: Check +0 bases and make sure the existential thunk is doing any
+  // +1 retains.
+  auto existential = SGF.emitRValue(E->getBase(), SGFContext::AllowPlusZero);
+  RValueSource existentialRVS(E, std::move(existential));
+  
+  // Emit the indices.
+  RValue subscriptRV = SGF.emitRValue(E->getIndex());
+
+  ManagedValue MV =
+    SGF.emitGetAccessor(E, subscript, ArrayRef<Substitution>(),
+                        std::move(existentialRVS), /*isSuper*/false,
+                        std::move(subscriptRV), C);
+  return RValue(SGF, E, MV);
+}
+
+RValue RValueEmitter::visitArchetypeSubscriptExpr(
+                                                  ArchetypeSubscriptExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+RValue RValueEmitter::visitDynamicSubscriptExpr(
+                                                DynamicSubscriptExpr *E, SGFContext C) {
+  return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
 
@@ -3214,21 +3244,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   }
 
   return SGF.emitEmptyTupleRValue(E);
-}
-
-RValue RValueEmitter::visitArchetypeSubscriptExpr(
-                                     ArchetypeSubscriptExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
-}
-
-RValue RValueEmitter::visitDynamicSubscriptExpr(
-                                     DynamicSubscriptExpr *E, SGFContext C) {
-  return SGF.emitDynamicSubscriptExpr(E, C);
-}
-
-RValue RValueEmitter::visitExistentialSubscriptExpr(
-                                   ExistentialSubscriptExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
