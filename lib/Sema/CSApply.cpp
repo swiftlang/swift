@@ -672,9 +672,6 @@ namespace {
         } else if (baseTy->is<ArchetypeType>()) {
           ref = new (context) ArchetypeMemberRefExpr(base, dotLoc, memberRef,
                                                      memberLoc);
-        } else if (!isa<VarDecl>(member)) {
-          ref = new (context) ExistentialMemberRefExpr(base, dotLoc, memberRef,
-                                                       memberLoc);
         } else {
           assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
           ref = new (context) MemberRefExpr(base, dotLoc, memberRef,
@@ -1697,12 +1694,17 @@ namespace {
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(amRef->getDecl());
           kind = ValueTypeMemberApplication::Archetype;
-        } else if (auto pmRef = dyn_cast<ExistentialMemberRefExpr>(member)) {
-          if (pmRef->getBase()->getType()->is<MetatypeType>() ||
-              pmRef->getBase()->getType()->hasReferenceSemantics())
+        } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
+          auto baseTy = pmRef->getBase()->getType();
+          if (baseTy->isExistentialType()) {
+            if (baseTy->hasReferenceSemantics())
+              goto not_value_type_member;
+            kind = ValueTypeMemberApplication::Protocol;
+          } else if (baseTy->is<ArchetypeType>())
+            kind = ValueTypeMemberApplication::Archetype;
+          else
             goto not_value_type_member;
-          fn = dyn_cast<FuncDecl>(pmRef->getDecl());
-          kind = ValueTypeMemberApplication::Protocol;
+          fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
         }
         if (!fn)
           goto not_value_type_member;

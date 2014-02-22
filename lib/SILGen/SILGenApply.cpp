@@ -931,7 +931,13 @@ public:
     return subs.slice(innerIdx);
   }
 
-  void visitExistentialMemberRefExpr(ExistentialMemberRefExpr *e) {
+  void visitMemberRefExpr(MemberRefExpr *e) {
+    // If the base is a non-protocol, non-archetype type, then this is a load of
+    // a function pointer out of a vardecl.  Just emit it as an rvalue.
+    auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
+    if (!baseTy->isExistentialType() && !baseTy->is<ArchetypeType>())
+      return visitExpr(e);
+    
     // We have four cases to deal with here:
     //
     //  1) for a "static" / "type" method, the base is a metatype.
@@ -947,12 +953,10 @@ public:
     auto existential = gen.emitRValueAsSingleValue(e->getBase(),
                                                    SGFContext::AllowPlusZero);
 
-    auto *fd = dyn_cast<FuncDecl>(e->getDecl());
-    assert(fd && "existential properties not yet supported");
+    auto *theFuncDecl = cast<FuncDecl>(e->getMember().getDecl());
+    auto *proto = cast<ProtocolDecl>(theFuncDecl->getDeclContext());
 
-    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
-
-    if (e->getDecl()->isInstanceMember()) {
+    if (theFuncDecl->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
@@ -981,13 +985,13 @@ public:
     // The declaration is always specialized (due to Self); ignore the
     // substitutions related to Self. Skip the substitutions involving Self.
     ArrayRef<Substitution> subs = getNonSelfSubstitutions(
-                                    e->getDeclRef().getSubstitutions());
+                                    e->getMember().getSubstitutions());
 
     // Method calls through ObjC protocols require ObjC dispatch.
     bool isObjC = proto->isObjC();
 
     setCallee(Callee::forProtocol(gen, existential.getValue(),
-                                  SILDeclRef(fd).asForeign(isObjC),
+                                  SILDeclRef(theFuncDecl).asForeign(isObjC),
                                   getSubstFnType(), e));
 
     // If there are substitutions, add them now.

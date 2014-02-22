@@ -810,13 +810,16 @@ struct ASTNodeBase {};
       }
       
       // The only time the base is allowed to be inout is if we are accessing
-      // a computed property.
-      if (E->getBase()->getType()->is<InOutType>()) {
-        VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-        if (!VD || !VD->hasAccessorFunctions()) {
-          Out << "member_ref_expr on value of inout type\n";
-          E->dump(Out);
-          abort();
+      // a computed property or if the base is a protocol or existential.
+      if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
+        if (!baseIOT->getObjectType()->isExistentialType() &&
+            !baseIOT->getObjectType()->is<ArchetypeType>()) {
+          VarDecl *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
+          if (!VD || !VD->hasAccessorFunctions()) {
+            Out << "member_ref_expr on value of inout type\n";
+            E->dump(Out);
+            abort();
+          }
         }
       }
       
