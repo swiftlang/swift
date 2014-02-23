@@ -1377,8 +1377,14 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // operations.  Emit a call to the getter.
   auto subscript = cast<SubscriptDecl>(E->getDecl().getDecl());
 
+  // If this is an existential or archetype subscript, 'self' is passed at +0.
+  SGFContext SubContext;
+  if (subscript->getGetter()->getImplicitSelfDecl()->
+        getType()->getInOutObjectType()->is<ArchetypeType>())
+    SubContext = SGFContext::AllowPlusZero;
+  
   // Emit the base.
-  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase());
+  ManagedValue base = SGF.emitRValueAsSingleValue(E->getBase(), SubContext);
   RValueSource baseRV =
     SGF.prepareAccessorBaseArg(E, base, subscript->getGetter());
 

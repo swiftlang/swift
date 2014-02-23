@@ -15,6 +15,7 @@
 // fully-type-checked expression.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConstraintSystem.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTVisitor.h"
@@ -949,22 +950,6 @@ namespace {
         auto subscriptExpr = new (tc.Context) DynamicSubscriptExpr(base,
                                                                    index,
                                                                    subscript);
-        subscriptExpr->setType(resultTy);
-        return subscriptExpr;
-      }
-
-      // Handle subscripting of archetypes.
-      if (baseTy->is<ArchetypeType>() && containerTy->is<ProtocolType>()) {
-        // Coerce as an object argument.
-        base = coerceObjectArgumentToType(base, baseTy, subscript, false,
-                                          locator);
-        if (!base)
-          return nullptr;
-
-        // Create the archetype subscript operation.
-        auto subscriptExpr = new (tc.Context) ArchetypeSubscriptExpr(base,
-                                                                     index,
-                                                                     subscript);
         subscriptExpr->setType(resultTy);
         return subscriptExpr;
       }
