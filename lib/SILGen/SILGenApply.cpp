@@ -996,21 +996,6 @@ public:
     ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
 
     if (!baseTy->isExistentialType()) {
-      
-      // Figure out the result type of this expression. If we had any
-      // substitutions not related to 'Self', we'll need to produce a
-      // PolymorphicFunctionType to mollify callee handling.
-      // FIXME: This is a temporary hack that will go away when callee handling
-      // no longer depends on PolymorphicFunctionType at all.
-      Type resultTy = e->getType();
-      if (!subs.empty()) {
-        TypeSubstitutionMap substitutions;
-        substitutions[proto->getSelf()->getArchetype()] = subs[0].Replacement;
-        
-        resultTy = e->getMember().getDecl()->getType()
-          ->castTo<PolymorphicFunctionType>()->getResult()
-        .subst(gen.SGM.SwiftModule, substitutions, false, nullptr);
-      }
       setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
                                      SILDeclRef(theFuncDecl).asForeign(isObjC),
                                      getSubstFnType(), e));
