@@ -1805,11 +1805,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *expr) {
-      return buildSubscript(expr->getBase(), expr->getIndex(),
-                            cs.getConstraintLocator(expr));
-    }
-
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             cs.getConstraintLocator(expr));

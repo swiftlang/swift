@@ -1258,39 +1258,6 @@ public:
   }
 };
 
-/// ArchetypeSubscriptExpr - Subscripting expressions like a[i] that refer to
-/// an element within a container, where the container is an archetype.
-class ArchetypeSubscriptExpr : public Expr {
-  SubscriptDecl *D;
-  Expr *Base;
-  Expr *Index;
-  
-public:
-  ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D);
-  
-  /// getBase - Retrieve the base of the subscript expression, i.e., the
-  /// value being indexed. This value has archetype type.
-  Expr *getBase() const { return Base; }
-  void setBase(Expr *E) { Base = E; }
-  
-  /// getIndex - Retrieve the index of the subscript expression, i.e., the
-  /// "offset" into the base value.
-  Expr *getIndex() const { return Index; }
-  void setIndex(Expr *E) { Index = E; }
-  
-  /// getDecl - Retrieve the subscript declaration that this subscripting
-  /// operation refers to. 
-  SubscriptDecl *getDecl() const { return D; }
-
-  SourceRange getSourceRange() const {
-    return SourceRange(Base->getStartLoc(), Index->getEndLoc());
-  }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArchetypeSubscript;
-  }
-};
-
 /// UnresolvedDotExpr - A member access (foo.bar) on an expression with
 /// unresolved type.
 class UnresolvedDotExpr : public Expr {

@@ -305,15 +305,6 @@ ArrayRef<Expr *> CollectionExpr::getElements() const {
   return cast<TupleExpr>(SubExpr)->getElements();
 }
 
-ArchetypeSubscriptExpr::
-ArchetypeSubscriptExpr(Expr *Base, Expr *Index, SubscriptDecl *D)
-  : Expr(ExprKind::ArchetypeSubscript, /*Implicit=*/false,
-         D? D->getElementType() : Type()),
-    D(D), Base(Base), Index(Index) {
-  assert(Base->getType()->getInOutObjectType()->is<ArchetypeType>() &&
-         "use SubscriptExpr for non-archetype type subscript");
-}
-
 static ValueDecl *getCalledValue(Expr *E) {
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();

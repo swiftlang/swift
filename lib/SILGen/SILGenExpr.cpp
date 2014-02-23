@@ -195,8 +195,6 @@ namespace {
     RValue visitModuleExpr(ModuleExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
-    RValue visitArchetypeSubscriptExpr(ArchetypeSubscriptExpr *E,
-                                       SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
@@ -1396,11 +1394,6 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
                         std::move(baseRV), E->isSuper(),
                         std::move(subscriptRV), C);
   return RValue(SGF, E, MV);
-}
-
-RValue RValueEmitter::visitArchetypeSubscriptExpr(
-                                                  ArchetypeSubscriptExpr *E, SGFContext C) {
-  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
