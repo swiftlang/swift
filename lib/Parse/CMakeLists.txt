@@ -10,4 +10,4 @@ add_swift_library(swiftParse
   ParseType.cpp
   PersistentParserState.cpp
   Scope.cpp
-  DEPENDS swiftAST swiftSIL)
+  DEPENDS clangBasic swiftAST swiftSIL)

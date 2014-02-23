@@ -25,7 +25,10 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "clang/Basic/CharInfo.h"
+
 using namespace swift;
+using namespace clang;
 
 //===----------------------------------------------------------------------===//
 // UTF8 Validation/Encoding/Decoding helper functions
@@ -400,7 +403,7 @@ void Lexer::skipSlashStarComment() {
 
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
-    return isalnum(c) || c == '_' || c == '$';
+    return isAlphanumeric(c) || c == '_' || c == '$';
   
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
@@ -454,7 +457,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
-  if (c < 0x80 && (isdigit(c) || c == '$'))
+  if (c < 0x80 && (isDigit(c) || c == '$'))
     return false;
 
   // N1518: Recommendations for extended identifier characters for C and C++
@@ -671,9 +674,9 @@ void Lexer::lexDollarIdent() {
 
   bool isAllDigits = true;
   for (;; ++CurPtr) {
-    if (isdigit(*CurPtr)) {
+    if (isDigit(*CurPtr)) {
       // continue
-    } else if (isalpha(*CurPtr) || *CurPtr == '_' || *CurPtr == '$') {
+    } else if (isLetter(*CurPtr) || *CurPtr == '_' || *CurPtr == '$') {
       isAllDigits = false;
       // continue
     } else {
@@ -747,12 +750,12 @@ void Lexer::lexHexNumber() {
   if (*CurPtr == '+' || *CurPtr == '-')
     ++CurPtr;  // Eat the sign.
 
-  if (!isdigit(*CurPtr)) {
+  if (!isDigit(*CurPtr)) {
     diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
     return formToken(tok::unknown, TokStart);
   }
   
-  while (isdigit(*CurPtr) || *CurPtr == '_')
+  while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
   return formToken(tok::floating_literal, TokStart);
@@ -770,7 +773,7 @@ void Lexer::lexHexNumber() {
 ///                          (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?[pP][+-]?[0-9][0-9_]*
 void Lexer::lexNumber() {
   const char *TokStart = CurPtr-1;
-  assert((isdigit(*TokStart) || *TokStart == '.') && "Unexpected start");
+  assert((isDigit(*TokStart) || *TokStart == '.') && "Unexpected start");
   
   auto expected_digit = [&](const char *loc, Diag<> msg) {
     diagnose(loc, msg);
@@ -808,14 +811,14 @@ void Lexer::lexNumber() {
 
   // Handle a leading [0-9]+, lexing an integer or falling through if we have a
   // floating point value.
-  while (isdigit(*CurPtr) || *CurPtr == '_')
+  while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
   // Lex things like 4.x as '4' followed by a tok::period.
   if (*CurPtr == '.') {
     // NextToken is the soon to be previous token
     // Therefore: x.0.1 is sub-tuple access, not x.float_literal
-    if (!isdigit(CurPtr[1]) || NextToken.is(tok::period))
+    if (!isDigit(CurPtr[1]) || NextToken.is(tok::period))
       return formToken(tok::integer_literal, TokStart);
   } else {
     // Floating literals must have '.', 'e', or 'E' after digits.  If it is
@@ -834,7 +837,7 @@ void Lexer::lexNumber() {
     ++CurPtr;
    
     // Lex any digits after the decimal point.
-    while (isdigit(*CurPtr) || *CurPtr == '_')
+    while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
   
@@ -844,10 +847,10 @@ void Lexer::lexNumber() {
     if (*CurPtr == '+' || *CurPtr == '-')
       ++CurPtr;  // Eat the sign.
       
-    if (!isdigit(*CurPtr))
+    if (!isDigit(*CurPtr))
       return expected_digit(CurPtr, diag::lex_expected_digit_in_fp_exponent);
     
-    while (isdigit(*CurPtr) || *CurPtr == '_')
+    while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
   
@@ -872,7 +875,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   default: {// Normal characters are part of the string.
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
-      if (isprint(CurPtr[-1]) == 0)
+      if (isPrintable(CurPtr[-1]) == 0)
         if (EmitDiagnostics)
           diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
@@ -926,7 +929,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
       diagnose(CurPtr, diag::lex_invalid_escape);
     // If this looks like a plausible escape character, recover as though this
     // is an invalid escape.
-    if (isalnum(*CurPtr)) ++CurPtr;
+    if (isAlphanumeric(*CurPtr)) ++CurPtr;
     return ~1U;
       
   // Simple single-character escapes.
@@ -1444,10 +1447,10 @@ Restart:
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z]+ as a local SIL value
-    if (InSILBody && isalnum(CurPtr[0])) {
+    if (InSILBody && isAlphanumeric(CurPtr[0])) {
       do {
         ++CurPtr;
-      } while (isdigit(CurPtr[0]));
+      } while (isDigit(CurPtr[0]));
       
       return formToken(tok::sil_local_name, TokStart);
     }
