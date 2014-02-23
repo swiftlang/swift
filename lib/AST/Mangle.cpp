@@ -1181,7 +1181,7 @@ static char getCodeForAccessorKind(AccessorKind kind) {
   llvm_unreachable("bad accessor kind");
 }
 
-void Mangler::mangleAccessorEntity(AccessorKind kind, ValueDecl *decl,
+void Mangler::mangleAccessorEntity(AccessorKind kind, AbstractStorageDecl *decl,
                                    ResilienceExpansion explosion) {
   assert(kind != AccessorKind::NotAccessor);
   Buffer << 'F';

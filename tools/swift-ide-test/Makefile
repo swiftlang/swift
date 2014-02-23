@@ -38,6 +38,7 @@ LLVMLibsOptions :=     \
   -lclangEdit	       \
   -lclangRewriteCore   \
   -lclangLex	       \
+  -lclangIndex	       \
   -lclangAST	       \
   -lclangBasic         \
   $(LLVMLibsOptions)   \

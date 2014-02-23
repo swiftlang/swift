@@ -93,7 +93,7 @@ public:
                                ResilienceExpansion kind, unsigned uncurryingLevel);
   void mangleDestructorEntity(DestructorDecl *decl, bool isDeallocating);
   void mangleIVarInitDestroyEntity(ClassDecl *decl, bool isDestroyer);
-  void mangleAccessorEntity(AccessorKind kind, ValueDecl *decl,
+  void mangleAccessorEntity(AccessorKind kind, AbstractStorageDecl *decl,
                             ResilienceExpansion expansion);
   void mangleAddressorEntity(ValueDecl *decl);
   void mangleDefaultArgumentEntity(DeclContext *ctx, unsigned index);
