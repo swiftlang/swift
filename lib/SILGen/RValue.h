@@ -22,7 +22,6 @@
 
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
-//#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
