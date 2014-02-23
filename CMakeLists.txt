@@ -524,6 +524,13 @@ macro(add_swift_library name)
     ${SWIFTLIB_EXTERNAL_SOURCES})
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+  if (MODULE)
+    set_target_properties(${name} PROPERTIES
+      PREFIX ""
+      SUFFIX ${LLVM_PLUGIN_EXT}
+      )
+  endif()
+
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
   endif( LLVM_COMMON_DEPENDS )
