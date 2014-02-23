@@ -1261,7 +1261,7 @@ SILGenFunction::emitSubstToOrigValue(SILLocation loc, ManagedValue v,
 ManagedValue RValueSource::materialize(SILGenFunction &SGF,
                                        AbstractionPattern origFormalType,
                                        SILType destType) && {
-  auto substFormalType = getSubstType();
+  auto substFormalType = CanType(getSubstType()->getInOutObjectType());
   assert(!destType || destType.getObjectType() ==
                SGF.SGM.Types.getLoweredType(origFormalType,
                                             substFormalType).getObjectType());

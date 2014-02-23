@@ -259,7 +259,8 @@ void LogicalPathComponent::_anchor() {}
 /// lowering.
 static LValueTypeData getValueTypeData(SILValue value) {
   assert(value.getType().isObject() ||
-         value.getType().getSwiftRValueType()->isExistentialType());
+         value.getType().getSwiftRValueType()->isExistentialType() ||
+         value.getType().getSwiftRValueType()->is<ArchetypeType>());
   return {
     AbstractionPattern(value.getType().getSwiftRValueType()),
     value.getType().getSwiftRValueType(),

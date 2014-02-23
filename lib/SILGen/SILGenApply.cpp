@@ -1913,7 +1913,8 @@ namespace {
        
         // Collect the arguments to the uncurried call.
         for (auto &site : uncurriedSites) {
-          AbstractionPattern origParamType = claimNextParamClause(origFormalType);
+          AbstractionPattern origParamType =
+            claimNextParamClause(origFormalType);
           uncurriedLoc = site.Loc;
           args.push_back({});
           std::move(site).emit(gen, origParamType, paramLowering, args.back());
@@ -2521,40 +2522,56 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
-    auto selfLoc = selfValue.getLocation();
-    auto existential = std::move(selfValue).getAsSingleValue(gen);
     
-    // Attach the existential cleanup to the projection so that it gets
-    // consumed (or not) when the call is applied to it (or isn't).
-    ManagedValue proj;
-    SILType protoSelfTy =
-      gen.getLoweredType(protoDecl->getSelf()->getArchetype());
-    if (existential.getType().isClassExistentialType()) {
-      SILValue val = gen.B.createProjectExistentialRef(loc,
-                                                       existential.getValue(),
-                                                       protoSelfTy);
-      proj = ManagedValue(val, existential.getCleanup());
-    } else {
-      assert(protoSelfTy.isAddress() && "Self should be address-only");
-      SILValue val = gen.B.createProjectExistential(selfLoc,
-                                                    existential.getValue(),
-                                                    protoSelfTy);
-      proj = ManagedValue::forUnmanaged(val);
-    }
-
-    selfValue = RValueSource(selfLoc, RValue(gen, selfLoc,
-                                             protoSelfTy.getSwiftType(),
-                                             proj));
+    // Method calls through ObjC protocols require ObjC dispatch.
+    constant = constant.asForeign(protoDecl->isObjC());
 
     // The protocol self is implicitly decurried.
     substAccessorType = CanAnyFunctionType(substAccessorType->getResult()
                                            ->castTo<AnyFunctionType>());
+
+    // If this is an archetype case, construct an archetype call.
+    if (!selfValue.getSubstType()->getInOutObjectType()->isExistentialType()) {
+      SILValue baseVal =
+        selfValue.forceAndPeekRValue(gen).peekScalarValue();
+    
+      return Callee::forArchetype(gen, baseVal, constant,
+                                  substAccessorType, loc);
+    }
+    
+    // If this is a protocol (not archetype) use, project out the underlying
+    // existential.
+    ManagedValue baseVal =
+      std::move(selfValue).getAsSingleValue(gen, SGFContext::AllowPlusZero);
+    
+    SILType protoSelfTy =
+      gen.getLoweredType(protoDecl->getSelf()->getArchetype());
+    auto selfLoc = selfValue.getLocation();
+
+    ManagedValue projVal;
+    if (baseVal.getType().isClassExistentialType()) {
+      // Attach the existential cleanup to the projection so that it gets
+      // consumed (or not) when the call is applied to it (or isn't).
+      SILValue val = gen.B.createProjectExistentialRef(loc,
+                                                       baseVal.getValue(),
+                                                       protoSelfTy);
+      projVal = ManagedValue(val, baseVal.getCleanup());
+    } else {
+      assert(protoSelfTy.isAddress() && "Self should be address-only");
+      SILValue val = gen.B.createProjectExistential(selfLoc,
+                                                    baseVal.getValue(),
+                                                    protoSelfTy);
+      projVal = ManagedValue::forUnmanaged(val);
+    }
+
+    // Update the self value to use the projection.
+    selfValue = RValueSource(selfLoc, RValue(gen, selfLoc,
+                                             protoSelfTy.getSwiftType(),
+                                             projVal));
     assert(substitutions.size() >= 1);
     substitutions = substitutions.slice(1);
     
-    // Method calls through ObjC protocols require ObjC dispatch.
-    constant = constant.asForeign(protoDecl->isObjC());
-    return Callee::forProtocol(gen, existential.getValue(), constant,
+    return Callee::forProtocol(gen, baseVal.getValue(), constant,
                                substAccessorType, loc);
   }
   
@@ -2629,7 +2646,7 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
   base = ManagedValue::forUnmanaged(base.forward(*this));
   
   return RValueSource(loc, RValue(*this, loc,
-                                  base.getSwiftType(), base));
+                                  base.getType().getSwiftType(), base));
 }
 
 
