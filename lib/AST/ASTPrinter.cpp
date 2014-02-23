@@ -367,8 +367,14 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   if (!ASD->hasAccessorFunctions())
     return;
 
-  bool PrintAccessorBody = Options.FunctionDefinitions &&
-                           !isa<ProtocolDecl>(ASD->getDeclContext());
+  bool InProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
+  if (!InProtocol && !Options.FunctionDefinitions &&
+      !Options.PrintGetSetOnRWProperties &&
+      ASD->getGetter() && ASD->getSetter())
+    return;
+
+  bool PrintAccessorBody = Options.FunctionDefinitions && !InProtocol;
+
   Printer << " {";
   if (auto getter = ASD->getGetter()) {
     if (!PrintAccessorBody)
@@ -1762,8 +1768,11 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
 void swift::printModuleInterface(Module *M, ASTPrinter &Printer,
                                  const PrintOptions &Options) {
   auto AdjustedOptions = Options;
+
   // Don't print empty curly braces while printing the module interface.
   AdjustedOptions.FunctionDefinitions = false;
+
+  AdjustedOptions.PrintGetSetOnRWProperties = false;
 
   // Print var declarations separately, one variable per decl.
   AdjustedOptions.ExplodePatternBindingDecls = true;

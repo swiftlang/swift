@@ -22,9 +22,12 @@ namespace swift {
   struct PrintOptions {
     /// \brief The indentation width.
     unsigned Indent = 2;
-    
+
     /// \brief Whether to print function definitions.
     bool FunctionDefinitions = false;
+
+    /// \brief Whether to print '{ get set }' on readwrite computed properties.
+    bool PrintGetSetOnRWProperties = true;
 
     /// \brief Whether to print type definitions.
     bool TypeDefinitions = false;

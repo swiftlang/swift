@@ -18,13 +18,19 @@ int redeclaredInMultipleModulesFunc1(int a);
 @protocol FooProtocol
 - (void)fooProtoFunc;
 + (void)fooProtoClassFunc;
+
+@property int fooProperty1;
+@property (readwrite) int fooProperty2;
+@property (readonly) int fooProperty3;
 @end
 
 @interface FooClass <FooProtocol> {
   int fooIntIvar;
 }
 
-@property int fooProperty;
+@property int fooProperty1;
+@property (readwrite) int fooProperty2;
+@property (readonly) int fooProperty3;
 
 - (void) fooInstanceFunc0;
 - (void) fooInstanceFunc1:(int)a;
