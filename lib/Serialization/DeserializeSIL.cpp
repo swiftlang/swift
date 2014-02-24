@@ -1249,13 +1249,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::RefElementAddrInst: {
     // Use SILOneValueOneOperandLayout.
     VarDecl *Field = cast<VarDecl>(MF->getDecl(ValID));
-    auto OperandTy = MF->getType(TyID);
-    ResultVal = Builder.createRefElementAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2,
-                                  getSILType(OperandTy,
-                                             (SILValueCategory)TyCategory)),
-                    Field,
-                    getSILType(Field->getType(), SILValueCategory::Address));
+    auto Ty = MF->getType(TyID);
+    auto Val = getLocalValue(ValID2, ValResNum2,
+                             getSILType(Ty, (SILValueCategory)TyCategory));
+    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
+    ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
+                                             ResultTy);
     break;
   }
   case ValueKind::ArchetypeMethodInst:

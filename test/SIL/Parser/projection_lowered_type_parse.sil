@@ -1,12 +1,14 @@
 // RUN: %sil-opt %s -verify
 
+import Builtin
+
 struct A {
   var f : @callee_owned () -> ()
 }
 
 sil @callee_check : $@thin (@callee_owned () -> ()) -> ()
 
-sil @test : $@thin (@inout A) -> () {
+sil @test1 : $@thin (@inout A) -> () {
 bb0(%0 : $*A):
   %1 = struct_element_addr %0 : $*A, #f
   %2 = load %0 : $*A
@@ -16,3 +18,32 @@ bb0(%0 : $*A):
   %5 = tuple()
   return %5 : $()
 }
+
+class B {
+  var f : @callee_owned () -> ()
+}
+
+sil @test2 : $@thin (B) -> () {
+bb0(%0 : $B):
+  %1 = ref_element_addr %0 : $B, #f
+  %5 = tuple()
+  return %5 : $()
+}
+
+/*
+// This exposes a lowering bug in SILParameterInfo. Once fixed uncomment this
+// test.
+
+typealias BadTuple = (@callee_owned () -> (), Builtin.Int32)
+
+sil @test2 : $@thin (@inout BadTuple) -> () {
+bb0(%0 : $*BadTuple):
+  %1 = tuple_element_addr %0 : $*BadTuple, 0
+  %2 = load %0 : $*BadTuple
+  %3 = tuple_extract %2 : $BadTuple, 0
+  %4 = function_ref @callee_check : $@thin (@callee_owned () -> ()) -> ()
+  apply %4(%3) : $@thin (@callee_owned () -> ()) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+*/

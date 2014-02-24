@@ -2106,10 +2106,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    CanType FieldTy = Val.getType().getSwiftRValueType()
-      ->getTypeOfMember(Field->getModuleContext(), Field, nullptr)
-      ->getCanonicalType();
-    auto ResultTy = SILType::getPrimitiveAddressType(FieldTy);
+    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
