@@ -22,9 +22,18 @@
 
 namespace swift {
   namespace diag {
+
+    /// Describes the kind of requirement in a protocl.
+    enum class RequirementKind : uint8_t {
+      Constructor,
+      Func,
+      Var,
+      Subscript
+    };
+
   // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
-  extern detail::DiagWithArguments<void Signature>::type ID;
+    extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
 }

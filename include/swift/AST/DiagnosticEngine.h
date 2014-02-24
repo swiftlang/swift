@@ -38,7 +38,7 @@ namespace swift {
   
   enum class PatternKind : uint8_t;
   enum class StaticSpellingKind : uint8_t;
-  
+
   /// \brief Enumeration describing all of possible diagnostics.
   ///
   /// Each of the diagnostics described in Diagnostics.def has an entry in
@@ -81,6 +81,10 @@ namespace swift {
     PatternKind,
     StaticSpellingKind,
   };
+
+  namespace diag {
+    enum class RequirementKind : uint8_t;
+  }
 
   /// \brief Variant type that holds a single diagnostic argument of a known
   /// type.
@@ -140,6 +144,9 @@ namespace swift {
     DiagnosticArgument(StaticSpellingKind SSK)
         : Kind(DiagnosticArgumentKind::StaticSpellingKind),
           StaticSpellingKindVal(SSK) {}
+
+    DiagnosticArgument(diag::RequirementKind kind)
+      : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 

@@ -162,19 +162,18 @@ namespace {
 # pragma mark Witness resolution
 /// \brief Retrieve the kind of requirement described by the given declaration,
 /// for use in some diagnostics.
-/// FIXME: Enumify this.
-static int getRequirementKind(ValueDecl *VD) {
+static diag::RequirementKind getRequirementKind(ValueDecl *VD) {
   if (isa<ConstructorDecl>(VD))
-    return 0;
+    return diag::RequirementKind::Constructor;
 
   if (isa<FuncDecl>(VD))
-    return 1;
+    return diag::RequirementKind::Func;
 
   if (isa<VarDecl>(VD))
-    return 2;
+    return diag::RequirementKind::Var;
 
   assert(isa<SubscriptDecl>(VD) && "Unhandled requirement kind");
-  return 3;
+  return diag::RequirementKind::Subscript;
 }
 
 namespace {

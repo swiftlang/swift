@@ -39,9 +39,12 @@ namespace swift {
   enum class StaticSpellingKind : uint8_t;
 
   namespace diag {
+
+    enum class RequirementKind : uint8_t;
+
   // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
-  extern detail::DiagWithArguments<void Signature>::type ID;
+    extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsCommon.def"
   }
 }

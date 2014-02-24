@@ -334,11 +334,11 @@ NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,sema_tcd,none,
      "protocol requires %select{initializer %1|function %1|property %1|"
-     "subscript}0 with type %2", (int, Identifier, Type))
+     "subscript}0 with type %2", (RequirementKind, Identifier, Type))
 NOTE(ambiguous_witnesses,sema_tcd,none,
      "multiple matching "
      "%select{initializers names %1|functions named %1|properties named %1|"
-     "subscript operators}0 with type %2", (int, Identifier, Type))
+     "subscript operators}0 with type %2", (RequirementKind, Identifier, Type))
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
 NOTE(default_assocated_type_req_fail,sema_tcd,none,
@@ -352,7 +352,7 @@ NOTE(protocol_witness_renamed,sema_tcd,none,
      "candidate matches (with renaming)%0", (StringRef))
 NOTE(protocol_witness_kind_conflict,sema_tcd,none,
      "candidate has is not %select{an initializer|a function|a variable|"
-     "a subscript}0", (unsigned))
+     "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,sema_tcd,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
 NOTE(protocol_witness_static_conflict,sema_tcd,none,
