@@ -454,8 +454,12 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
                                   : SelfReferenceKind::No;
   }
 
-  return containsSelf(value->getInterfaceType()) ? SelfReferenceKind::Yes
-                                                 : SelfReferenceKind::No;
+  auto type = value->getInterfaceType();
+  if (isa<ConstructorDecl>(value))
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+  return containsSelf(type) ? SelfReferenceKind::Yes
+                            : SelfReferenceKind::No;
 }
 
 bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
@@ -470,7 +474,17 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
     // Skip accessors.
     if (isa<FuncDecl>(req) && cast<FuncDecl>(req)->isAccessor())
       continue;
-      
+
+    // A non-abstract initializer witness makes the conformance non-inheritable.
+    if (isa<ConstructorDecl>(req)) {
+      auto ctorWitness = cast_or_null<ConstructorDecl>(
+                           getWitness(req, resolver).getDecl());
+      if (ctorWitness && !ctorWitness->isAbstract()) {
+        DCAndInheritable.setInt(IsInheritableKind::NotInheritable);
+        return false;
+      }
+    }
+
     // Check the kinds of references to Self that show up in the given
     // requirement.
     switch (findSelfReferences(req)) {
@@ -484,6 +498,7 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
                     getWitness(req, resolver).getDecl());
       if (func && func->hasDynamicSelf())
         continue;
+
       // Fall through
     }
 
@@ -494,7 +509,7 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
     }
   }
 
-  // 
+  // Note that this conformance is inheritable.
   DCAndInheritable.setInt(IsInheritableKind::Inheritable);
   return true;
 }
