@@ -48,6 +48,10 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
       type = dynSelf->getSelfType();
     }
 
+    // Look through the metatype.
+    if (auto metaTy = type->getAs<MetatypeType>())
+      type = metaTy->getInstanceType();
+    
     // We only have constructors for nominal declarations.
     auto nominalDecl = type->getAnyNominal();
     if (!nominalDecl)

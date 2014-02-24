@@ -2789,8 +2789,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 
-  const bool ConstructorsNotAllowed =
-      !(Flags & PD_HasContainerType) || (Flags & PD_InProtocol);
+  const bool ConstructorsNotAllowed = !(Flags & PD_HasContainerType);
 
   // Reject constructors outside of types.
   if (ConstructorsNotAllowed) {
@@ -2836,7 +2835,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   if (SignatureStatus.hasCodeCompletion())
     CodeCompletion->setDelayedParsedDecl(CD);
 
-  if (ConstructorsNotAllowed) {
+  if (ConstructorsNotAllowed || SignatureStatus.isError()) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }

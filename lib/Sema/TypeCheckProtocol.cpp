@@ -164,14 +164,17 @@ namespace {
 /// for use in some diagnostics.
 /// FIXME: Enumify this.
 static int getRequirementKind(ValueDecl *VD) {
-  if (isa<FuncDecl>(VD))
+  if (isa<ConstructorDecl>(VD))
     return 0;
 
-  if (isa<VarDecl>(VD))
+  if (isa<FuncDecl>(VD))
     return 1;
 
+  if (isa<VarDecl>(VD))
+    return 2;
+
   assert(isa<SubscriptDecl>(VD) && "Unhandled requirement kind");
-  return 2;
+  return 3;
 }
 
 namespace {
@@ -429,6 +432,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
   // Perform basic matching of the requirement and witness.
   bool decomposeFunctionType = false;
+  bool ignoreReturnType = false;
   if (auto funcReq = dyn_cast<FuncDecl>(req)) {
     auto funcWitness = cast<FuncDecl>(witness);
 
@@ -472,8 +476,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
       
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
-  } else {
-
+  } else if (isa<AbstractStorageDecl>(witness)) {
     // If this is a property requirement, check that the static-ness matches.
     if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
       if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
@@ -487,6 +490,9 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
+  } else if (isa<ConstructorDecl>(witness)) {
+    decomposeFunctionType = true;
+    ignoreReturnType = true;
   }
 
   // Construct a constraint system to use to solve the equality between
@@ -541,9 +547,11 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
-    cs.addConstraint(constraints::ConstraintKind::Equal,
-                     witnessResultType, reqResultType);
-    // FIXME: Check whether this has already failed.
+    if (!ignoreReturnType) {
+      cs.addConstraint(constraints::ConstraintKind::Equal,
+                       witnessResultType, reqResultType);
+      // FIXME: Check whether this has already failed.
+    }
 
     // Parameter types and kinds must match. Start by decomposing the input
     // types into sets of tuple elements.
@@ -678,6 +686,11 @@ static Type getTypeForDisplay(TypeChecker &tc, Module *module,
   if (!decl->getDeclContext()->isTypeContext() ||
       !isa<AbstractFunctionDecl>(decl))
     return type;
+
+  // For a constructor, we only care about the parameter types.
+  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+    return ctor->getArgumentType();
+  }
 
   // We have something function-like, so we want to strip off the 'self'.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {

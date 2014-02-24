@@ -290,7 +290,7 @@ ERROR(subscript_static,decl_parsing,none,
 
 // initializer
 ERROR(initializer_decl_wrong_scope,decl_parsing,none,
-      "initializers may only be declared within a class, struct, or enum", ())
+      "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
       "expected '(' or parameter name for initializer parameters", ())
 
