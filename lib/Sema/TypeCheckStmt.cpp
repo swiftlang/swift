@@ -278,11 +278,8 @@ public:
   
   Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {
     
-    Stmt *S = ICS->getActiveStmt();
-    
-    if (S) {
-      if (typeCheckStmt(S)) return 0;
-    }
+    // Active members are attached to the enclosing declaration, so there's no
+    // need to walk anything within.
     
     return ICS;
   }

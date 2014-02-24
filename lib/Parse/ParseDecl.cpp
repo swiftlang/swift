@@ -1136,9 +1136,9 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
                                                  EndLoc,
                                                  Configuration.getPtrOrNull());
   if (ifBlockIsActive) {
-    ICD->setActiveMembers(IfDecls);
+    ICD->setActiveMembers(Context.AllocateCopy(IfDecls));
   } else {
-    ICD->setInactiveMembers(IfDecls);
+    ICD->setInactiveMembers(Context.AllocateCopy(IfDecls));
     ICD->setInactiveSourceRange(SourceRange(IfLoc, ElseLoc.isValid() ?
                                                     ElseLoc :
                                                     EndLoc));
@@ -1146,10 +1146,10 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
   
   if (ElseLoc.isValid()) {
     if (ifBlockIsActive) {
-      ICD->setInactiveMembers(ElseDecls);
+      ICD->setInactiveMembers(Context.AllocateCopy(ElseDecls));
       ICD->setInactiveSourceRange(SourceRange(IfLoc, EndLoc));
     } else {
-      ICD->setActiveMembers(ElseDecls);
+      ICD->setActiveMembers(Context.AllocateCopy(ElseDecls));
     }
   }
   

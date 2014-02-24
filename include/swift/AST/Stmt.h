@@ -107,6 +107,8 @@ public:
 class BraceStmt : public Stmt {
 private:
   unsigned NumElements;
+  bool IsConfigBlock = false;
+  bool IsInactiveConfigBlock = false;
   
   SourceLoc LBLoc;
   SourceLoc RBLoc;
@@ -116,9 +118,6 @@ private:
   ASTNode *getElementsStorage() {
     return reinterpret_cast<ASTNode*>(this + 1);
   }
-  
-  bool IsConfigBlock = false;
-  bool IsInactiveConfigBlock = false;
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,

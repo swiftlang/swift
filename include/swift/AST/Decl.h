@@ -1371,8 +1371,8 @@ public:
 /// separately, with the intention being that active members will be handed
 /// back to the enclosing declaration.
 class IfConfigDecl : public Decl {
-  SmallVector<Decl*, 8> ActiveMembers;
-  SmallVector<Decl*, 8> InactiveMembers;
+  ArrayRef<Decl*> ActiveMembers;
+  ArrayRef<Decl*> InactiveMembers;
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
   SourceLoc EndLoc;
@@ -1394,16 +1394,12 @@ public:
   
   ArrayRef<Decl*> getActiveMembers() const { return ActiveMembers; }
   void setActiveMembers(ArrayRef<Decl*>activeMembers) {
-    for (auto member: activeMembers) {
-      ActiveMembers.push_back(member);
-    }
+    ActiveMembers = activeMembers;
   }
   
   ArrayRef<Decl*> getInactiveMembers() const { return InactiveMembers; }
   void setInactiveMembers(ArrayRef<Decl*> inactiveMembers) {
-    for (auto member: inactiveMembers) {
-      InactiveMembers.push_back(member);
-    }
+    InactiveMembers = inactiveMembers;
   }
   
   Expr *getCond() { return Cond; }

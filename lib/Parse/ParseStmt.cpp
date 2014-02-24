@@ -112,7 +112,7 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     return false;
   case BraceItemListKind::ActiveConfigBlock:
   case BraceItemListKind::InactiveConfigBlock:
-    return Tok.is(tok::pound_else) || Tok.is(tok::pound_endif);
+    return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif);
   }
 }
 
@@ -164,39 +164,6 @@ static void unwrapIfDiscardedClosure(Parser &P,
   }
 }
 
-bool Parser::isStartOfIfConfigDecl() {
-  bool isConfigDecl = false;
-  
-  if (Tok.isNot(tok::pound_if))
-    return isConfigDecl;
-  
-  ParserPosition pos = getParserPosition();
-  consumeToken();
-  
-  // Technically, it doesn't matter which marker kind we use here, we just
-  // need something to guard against checks for trailing closures on target
-  // configuration "call" expressions.
-  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
-                                  StructureMarkerKind::Declaration);
-  
-  // Parse the configuration expression.
-  parseExprSequence(diag::expected_expr, true, true);
-  
-  // If it's an "#if", we'll want to try the next level down.
-  if (Tok.is(tok::pound_if)) {
-    isConfigDecl = isStartOfIfConfigDecl();
-  } else {
-    
-    // Otherwise, see if the current token is a valid start to a declaration.
-    isConfigDecl = isStartOfDecl(Tok, peekToken());
-  }
-  
-  // Return to the starting point.
-  backtrackToPosition(pos);
-  
-  return isConfigDecl;
-}
-
 ///   brace-item:
 ///     decl
 ///     expr
@@ -217,20 +184,20 @@ bool Parser::isStartOfIfConfigDecl() {
 ///   stmt-assign:
 ///     expr '=' expr
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
-                                     BraceItemListKind Kind) {
+                                     BraceItemListKind Kind,
+                                     BraceItemListKind ConfigKind) {
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
+  bool isActiveConfigBlock = ConfigKind == BraceItemListKind::ActiveConfigBlock;
+  bool isConfigBlock = isActiveConfigBlock ||
+                          ConfigKind == BraceItemListKind::InactiveConfigBlock;
 
-  // This forms a lexical scope.
-  
-  auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel :
-                                (Kind == BraceItemListKind::ActiveConfigBlock) ?
-                                  ScopeKind::ActiveConfigBlock :
-                                  ScopeKind::Brace;
-  auto isConfigBlock =  Kind == BraceItemListKind::ActiveConfigBlock ||
-                        Kind == BraceItemListKind::InactiveConfigBlock;
-  
-  Scope S(this, scopeKind);
+  // If we're not parsing an active #if block, form a new lexical scope.
+  Optional<Scope> initScope;
+  if (!isActiveConfigBlock) {
+    auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace;
+    initScope.emplace(this, scopeKind);
+  }
 
   ParserStatus BraceItemsStatus;
   SmallVector<Decl*, 8> TmpDecls;
@@ -238,13 +205,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   bool PreviousHadSemi = true;
   while ((Kind == BraceItemListKind::TopLevelLibrary ||
           Tok.isNot(tok::r_brace)) &&
-         (!isConfigBlock ||
-          (Tok.isNot(tok::pound_endif) && Tok.isNot(tok::pound_else))) &&
+         Tok.isNot(tok::pound_endif) &&
+         Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) && Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
-         !isTerminatorForBraceItemListKind(Tok, Kind, Entries)) {
+         (isConfigBlock ||
+          !isTerminatorForBraceItemListKind(Tok, Kind, Entries))) {
     if (Kind == BraceItemListKind::TopLevelLibrary &&
         skipExtraTopLevelRBraces())
       continue;
@@ -268,8 +236,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (isStartOfDecl(Tok, peekToken()) &&
-        (Tok.isNot(tok::pound_if) || isStartOfIfConfigDecl())) {
+    if (isStartOfDecl(Tok, peekToken()) && Tok.isNot(tok::pound_if)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -286,6 +253,45 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       if (!TmpDecls.empty())
         PreviousHadSemi = TmpDecls.back()->TrailingSemiLoc.isValid();
       TmpDecls.clear();
+    } else if (Tok.is(tok::pound_if)) {
+      SourceLoc StartLoc = Tok.getLoc();
+      
+      // We'll want to parse the #if block, but not wrap it in a top-level
+      // code declaration immediately.
+      Result = parseStmtIfConfig(IsTopLevel).get();
+      
+      if (!Result) {
+        NeedParseErrorRecovery = true;
+        continue;
+      }
+        
+      IfConfigStmt *ICS = dyn_cast<IfConfigStmt>(Result.dyn_cast<Stmt*>());
+      Stmt *activeStmt = ICS->getActiveStmt();
+      
+      if (activeStmt) {
+        // Pass on any members of the active block
+        BraceStmt *activeBlock = dyn_cast<BraceStmt>(activeStmt);
+        
+        if (activeBlock) {
+          auto activeEntries = activeBlock->getElements();
+          
+          for (auto entry : activeEntries) {
+            Entries.push_back(entry);
+          }
+        }
+      }
+      
+      // Add the #if block itself as a TLCD if necessary
+      if (IsTopLevel) {
+        auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
+        auto Brace = BraceStmt::create(Context, StartLoc,
+                                       {Result}, Tok.getLoc());
+        Brace->markAsConfigBlock();
+        TLCD->setBody(Brace);
+        Entries.push_back(TLCD);
+      } else {
+        Entries.push_back(Result);
+      }      
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
@@ -481,19 +487,23 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
 
-/// parseConfigBlock - Parse the active or inactive block of an #if/#else/#endif
-/// statement.
-ParserResult<BraceStmt> Parser::parseConfigBlock(bool isActive) {
+/// parseIfConfigStmtBlock - Parse the active or inactive block of an
+/// #if/#else/#endif statement.
+ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
+                                                       bool isTopLevel) {
   SourceLoc LBloc = Tok.getLoc();
   
   SmallVector<ASTNode, 16> Entries;
   SourceLoc RBloc;
   
-  ParserStatus Status = parseBraceItems(
-                                      Entries,
-                                      isActive ?
-                                        BraceItemListKind::ActiveConfigBlock :
-                                        BraceItemListKind::InactiveConfigBlock);
+  BraceItemListKind configKind = isActive ?
+                                  BraceItemListKind::ActiveConfigBlock :
+                                  BraceItemListKind::InactiveConfigBlock;
+  ParserStatus Status = parseBraceItems(Entries,
+                                        isTopLevel ?
+                                          BraceItemListKind::TopLevelCode :
+                                          BraceItemListKind::Brace,
+                                        configKind);
   
   if (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
     diagnose(Tok, diag::expected_close_to_config_stmt);
@@ -753,7 +763,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       if(auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
         auto argValue = UDRE->getName().str();
         return
-          Context.LangOpts.TargetConfigOptions[targetValue].equals(argValue);
+          !Context.LangOpts.TargetConfigOptions[targetValue].compare(argValue);
       } else {
         diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
         return false;
@@ -771,7 +781,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   }
 }
 
-ParserResult<Stmt> Parser::parseStmtIfConfig() {
+ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {
   SourceLoc IfLoc = consumeToken(tok::pound_if);
   
   ParserResult<Expr> Configuration;
@@ -786,13 +796,13 @@ ParserResult<Stmt> Parser::parseStmtIfConfig() {
   
   bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
   
-  NormalBody = parseConfigBlock(ifBlockIsActive);
+  NormalBody = parseIfConfigStmtBlock(ifBlockIsActive, isTopLevel);
   
   SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::pound_else)) {
     ElseLoc = consumeToken(tok::pound_else);
-    ElseBody = parseConfigBlock(!ifBlockIsActive);
+    ElseBody = parseIfConfigStmtBlock(!ifBlockIsActive, isTopLevel);
   }
   if (Tok.is(tok::pound_endif)) {
     consumeToken(tok::pound_endif);

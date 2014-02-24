@@ -186,8 +186,20 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
   const unsigned ContinueStmtType = 1;
   const unsigned UnknownStmtType  = 2;
   unsigned StmtType = UnknownStmtType;
+  
+  // There's nothing to do if this is a configuration block.
+  if (S->isConfigBlock()) {
+    return;
+  }
 
   for (auto &ESD : S->getElements()) {
+    
+    if (auto S = ESD.dyn_cast<Stmt*>()) {
+      if (isa<IfConfigStmt>(S)) {
+        continue;
+      }
+    }
+    
     // If we ever reach an unreachable point, stop emitting statements and issue
     // an unreachable code diagnostic. This will need revision if we ever add
     // goto.
@@ -309,10 +321,8 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
 }
 
 void SILGenFunction::visitIfConfigStmt(IfConfigStmt *S) {
-  Stmt *activeStmt = S->getActiveStmt();
-  
-  if (activeStmt)
-    visit(activeStmt);
+  // Active members are attached to the enclosing declaration, so there's no
+  // need to walk anything within.
 }
 
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {

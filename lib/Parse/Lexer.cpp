@@ -1421,7 +1421,7 @@ Restart:
   case '#':
     // # is only a token in SIL mode.
     if (InSILMode)
-      return formToken(tok::pound, TokStart);
+      return formToken(tok::sil_pound, TokStart);
       
     if(StringRef(TokStart, 3).equals("#if") &&
        isWhitespace(CurPtr[2]) &&

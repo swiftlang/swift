@@ -328,7 +328,7 @@ void CompilerInstance::performParse() {
         if (PrimaryBufferID == NO_SUCH_BUFFER ||
             (SF->getBufferID().hasValue() &&
              SF->getBufferID().getValue() == PrimaryBufferID))
-          performTypeChecking(*SF, PersistentState.getTopLevelContext(), 0);
+          performTypeChecking(*SF, PersistentState.getTopLevelContext());
 
     // If there were no source files, we should still record known protocols.
     if (Context->getStdlibModule())

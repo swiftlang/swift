@@ -142,11 +142,9 @@ public:
   ~Scope() {
     // Active config blocks delegate to the enclosing scope, so there's nothing
     // to pop off.
-    if (Kind != ScopeKind::ActiveConfigBlock) {
-      assert(SI.CurScope == this && "Scope mismatch");
-      SI.CurScope = PrevScope;
-      SI.ResolvableDepth = PrevResolvableDepth;
-    }
+    assert(SI.CurScope == this && "Scope mismatch");
+    SI.CurScope = PrevScope;
+    SI.ResolvableDepth = PrevResolvableDepth;
   }
 };
 

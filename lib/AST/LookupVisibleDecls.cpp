@@ -537,11 +537,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       visit(S->getElseStmt());
   }
   void visitIfConfigStmt(IfConfigStmt * S) {
-    Stmt *activeStmt = S->getActiveStmt();
-    
-    if (activeStmt) {
-      visit(activeStmt);
-    }
+    // Active members are attached to the enclosing declaration, so there's no
+    // need to walk anything within.
   }
   void visitWhileStmt(WhileStmt *S) {
     visit(S->getBody());

@@ -816,13 +816,8 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
 }
 
 Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
-  // No need to set the configuration expression
-  
-  Stmt *activeStmt = ICS->getActiveStmt();
-  
-  if (activeStmt) {
-    doIt(activeStmt);
-  }
+  // Active members are attached to the enclosing declaration, so there's no
+  // need to walk anything within.
   
   return ICS;
 }

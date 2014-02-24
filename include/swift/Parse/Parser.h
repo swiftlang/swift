@@ -554,10 +554,13 @@ public:
 
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                BraceItemListKind Kind =
+                                   BraceItemListKind::Brace,
+                               BraceItemListKind ConfigKind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  ParserResult<BraceStmt> parseConfigBlock(bool isActive);
+  ParserResult<BraceStmt> parseIfConfigStmtBlock(bool isActive,
+                                                 bool IsTopLevel);
 
   void parseTopLevelCodeDeclDelayed();
 
@@ -581,7 +584,6 @@ public:
     PD_InProtocol           = 1 << 9,
     PD_InClass              = 1 << 10,
     PD_InExtension          = 1 << 11,
-    PD_InactiveConfigBlock  = 1 << 12,
   };
 
   /// Options that control the parsing of declarations.
@@ -918,7 +920,7 @@ public:
   ParserResult<Stmt> parseStmtReturn();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<Stmt> parseStmtIf();
-  ParserResult<Stmt> parseStmtIfConfig();
+  ParserResult<Stmt> parseStmtIfConfig(bool isTopLevel = false);
   ParserResult<Stmt> parseStmtWhile();
   ParserResult<Stmt> parseStmtDoWhile();
   ParserResult<Stmt> parseStmtFor();

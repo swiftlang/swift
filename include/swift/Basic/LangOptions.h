@@ -55,11 +55,11 @@ namespace swift {
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
     ///     arch - The active arch target (X64, I386, ARM, ARM64)
-    std::map<llvm::StringRef, llvm::StringRef> TargetConfigOptions;
+    std::map<std::string, std::string> TargetConfigOptions;
     
     /// \brief Explicit build configuration options, initialized via the '-D'
     /// compiler flag.
-    std::map<llvm::StringRef, llvm::StringRef> BuildConfigOptions;
+    std::map<std::string, std::string> BuildConfigOptions;
     
     /// \brief A convenience method for determining if a given build
     /// configuration has been defined
