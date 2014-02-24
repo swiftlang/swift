@@ -24,12 +24,12 @@
 * Properties and subscripts now work in protocols, allowing you to do things like:
 
     protocol Subscriptable {
-      subscript(idx : Int) -> Int { get set }
+      subscript(idx1 : Int, idx2 : Int) -> Int { get set }
       var prop : Int { get }
     }
 
     func foo(s : Subscriptable) {
-      return s.prop + s[42]
+      return s.prop + s[42, 19]
     } 
 
   These can be used for generic algorithms now as well.
