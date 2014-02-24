@@ -2843,17 +2843,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   addPatternVariablesToScope(ArrayRef<Pattern*>{SelfPattern, BodyPattern} );
 
   // '{'
-  if (!Tok.is(tok::l_brace)) {
-    if (!isInSILMode()) {
-      if (!SignatureStatus.isError()) {
-        // Don't emit this diagnostic if we already complained about this
-        // constructor decl.
-        diagnose(Tok, diag::expected_lbrace_initializer);
-      }
-
-      return makeParserResult(CD);
-    }
-  } else {
+  if (Tok.is(tok::l_brace)) {
     // Parse the body.
     ParseFunctionBody CC(*this, CD);
 

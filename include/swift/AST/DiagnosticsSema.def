@@ -213,6 +213,9 @@ ERROR(var_type_not_materializable,sema_tcd,none,
 ERROR(enum_element_not_materializable,sema_tcd,none,
       "type of enum case is not materializable", ())
 
+ERROR(missing_initializer_def,decl_parsing,PointsToFirstBadToken,
+      "initializer requires a body", ())
+
 // Attributes
 ERROR(invalid_infix_input,sema_tcd,none,
   "function with 'infix' specified must take a two element tuple as input",

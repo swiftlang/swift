@@ -2864,8 +2864,12 @@ public:
     }
 
     if (!IsFirstPass) {
-      if (CD->getBody())
+      if (CD->getBody()) {
         TC.definedFunctions.push_back(CD);
+      } else if (requiresDefinition(CD)) {
+        // Complain if we should have a body.
+        TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+      }
     }
 
     if (IsSecondPass || CD->hasType()) {

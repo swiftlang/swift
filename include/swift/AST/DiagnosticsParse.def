@@ -293,8 +293,6 @@ ERROR(initializer_decl_wrong_scope,decl_parsing,none,
       "initializers may only be declared within a class, struct, or enum", ())
 ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
       "expected '(' or parameter name for initializer parameters", ())
-ERROR(expected_lbrace_initializer,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for initializer", ())
 
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
