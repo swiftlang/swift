@@ -321,7 +321,7 @@ func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // Bitwise negate
 @@transparent @@prefix
 func ~(rhs: ${Self}) -> ${Self} {
-  let mask = ${Self}.sub(0, 1).0
+  val mask = ${Self}.sub(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
 }
 
