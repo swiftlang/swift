@@ -196,6 +196,9 @@ namespace {
 
     /// \brief The witness did not match due to static/non-static differences.
     StaticNonStaticConflict,
+    
+    /// \brief The witness is not settable, but the requirement is.
+    SettableConflict,
 
     /// \brief The witness did not match due to prefix/non-prefix differences.
     PrefixNonPrefixConflict,
@@ -240,6 +243,7 @@ namespace {
       case MatchKind::KindConflict:
       case MatchKind::TypeConflict:
       case MatchKind::StaticNonStaticConflict:
+      case MatchKind::SettableConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
@@ -259,6 +263,7 @@ namespace {
       case MatchKind::WitnessInvalid:
       case MatchKind::KindConflict:
       case MatchKind::StaticNonStaticConflict:
+      case MatchKind::SettableConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
@@ -468,7 +473,17 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else {
-    // FIXME: Static variables will have to check static vs. non-static here.
+
+    // If this is a property requirement, check that the static-ness matches.
+    if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
+      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
+        return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+    }
+    
+    // If the requirement is settable and the witness is not, reject it.
+    if (req->isSettable(req->getDeclContext()) &&
+        !witness->isSettable(witness->getDeclContext()))
+      return RequirementMatch(witness, MatchKind::SettableConflict);
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
@@ -765,6 +780,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_static_conflict,
                 !req->isInstanceMember());
+    break;
+      
+  case MatchKind::SettableConflict:
+    tc.diagnose(match.Witness, diag::protocol_witness_settable_conflict);
     break;
 
   case MatchKind::PrefixNonPrefixConflict:

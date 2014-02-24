@@ -360,6 +360,8 @@ NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "%select{prefix|postfix}0 as required", (bool, unsigned))
 NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
      "candidate is marked 'mutating' but protocol does not allow it", ())
+NOTE(protocol_witness_settable_conflict,sema_tcd,none,
+     "candidate is not settable, but protocol requires it", ())
 
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
