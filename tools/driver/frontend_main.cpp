@@ -52,7 +52,8 @@ static std::string displayName(StringRef MainExecutablePath) {
 static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
                      std::string &OutputFilename) {
   std::string ErrorInfo;
-  llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo);
+  llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
+                          llvm::sys::fs::F_Binary);
   if (!ErrorInfo.empty()) {
     M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                           OutputFilename, ErrorInfo);
