@@ -41,7 +41,7 @@ void swift::CompilerInstance::createSILModule() {
 void swift::CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
                              LangOptions &LangOpts) {
   
-  llvm::Triple triple = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::Triple triple = llvm::Triple(IRGenOpts.Triple);
   
   // Set the "os" target configuration.
   if (triple.isMacOSX()) {
