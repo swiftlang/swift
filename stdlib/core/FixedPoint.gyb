@@ -79,6 +79,7 @@ typealias UIntMax = UInt${maxBits}
 @   BuiltinName = builtinIntName(name)
 @   Self = intName(name, signed)
 @   OtherSelf = otherIntName(name, signed)
+@   ConstructIntType = 'Int' if Self != 'Int' else ''
 @   ArrayBound = 'ArrayBound, ' if bits <= 64 else ''
 
 struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
@@ -166,6 +167,10 @@ extension ${Self} : RandomAccessIndex {
   func pred() -> ${Self} {
     return self - 1
   }
+  @@transparent
+  func distanceTo(other: ${Self}) -> Int {
+    return ${ConstructIntType}(other - self)
+  }  
   typealias DistanceType = ${Self}
   @@transparent
   static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
