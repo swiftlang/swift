@@ -482,11 +482,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);
-  
+
   TypeChecker TC(SF.getASTContext());
   auto &DefinedFunctions = TC.definedFunctions;
   size_t existingExternalDecls = TC.Context.ExternalDefinitions.size();
-
+  
   // Lookup the swift module.  This ensures that we record all known protocols
   // in the AST.
   (void) TC.getStdlibModule(&SF);

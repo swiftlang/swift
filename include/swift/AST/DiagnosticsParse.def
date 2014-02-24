@@ -581,6 +581,10 @@ ERROR(expected_expr_assignment,stmt_parsing,none,
 ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
       "expected '}' at end of brace statement", ())
 
+/// #if Statement
+ERROR(expected_close_to_config_stmt,stmt_parsing,none,
+"expected #else or #endif at end of configuration statement", ())
+
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
@@ -856,6 +860,19 @@ ERROR(expected_requirement_delim,parsing,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())
 
+//------------------------------------------------------------------------------
+// Build configuration parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(unsupported_build_config_binary_expression,parsing,none,
+"expected '&&' or '||' expression", ())
+ERROR(unsupported_build_config_unary_expression,parsing,none,
+"expected unary '!' expression", ())
+ERROR(unsupported_target_config_expression,parsing,none,
+"unexpected target configuration expression (expected 'os' or 'arch')", ())
+ERROR(unsupported_target_config_argument_type,parsing,none,
+"unexpected target configuration expression argument type", ())
+ERROR(unsupported_config_conditional_expression_type,parsing,none,
+"unexpected configuration expression type", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

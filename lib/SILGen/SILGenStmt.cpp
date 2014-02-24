@@ -308,6 +308,13 @@ void SILGenFunction::visitIfStmt(IfStmt *S) {
   Cond.complete(B);
 }
 
+void SILGenFunction::visitIfConfigStmt(IfConfigStmt *S) {
+  Stmt *activeStmt = S->getActiveStmt();
+  
+  if (activeStmt)
+    visit(activeStmt);
+}
+
 void SILGenFunction::visitWhileStmt(WhileStmt *S) {
   Scope condBufferScope(Cleanups, S);
   // Allocate a buffer for pattern binding conditions outside the loop.
@@ -590,6 +597,11 @@ void SILGenFunction::visitCaseStmt(CaseStmt *S) {
 void SILGenFunction::visitFallthroughStmt(FallthroughStmt *S) {
   // Implemented in SILGenPattern.cpp.
   emitSwitchFallthrough(S);
+}
+
+void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
+  // Nothing to do for these kinds of decls - anything active has been added
+  // to the enclosing declaration.
 }
 
 //===--------------------------------------------------------------------===//

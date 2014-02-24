@@ -365,6 +365,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::EnumCase:
+  case DeclKind::IfConfig:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -462,6 +463,10 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
   return Body->getSourceRange();
 }
 
+SourceRange IfConfigDecl::getSourceRange() const {
+  return SourceRange(IfLoc, EndLoc);
+}
+
 /// Return true if a DeclRefExpr or MemberRefExpr use of this value is
 /// "direct" when being used in the specified context.
 bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
@@ -488,6 +493,7 @@ bool ValueDecl::isDefinition() const {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
     llvm_unreachable("non-value decls shouldn't get here");
 
   case DeclKind::Func:
@@ -523,6 +529,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:

@@ -3802,6 +3802,10 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     case DeclKind::PatternBinding:
       continue;
 
+    // Active members of the IfConfig block are handled separately.
+    case DeclKind::IfConfig:
+       continue;
+
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
       continue;

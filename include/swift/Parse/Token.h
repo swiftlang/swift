@@ -37,6 +37,9 @@ enum class tok {
   string_literal,
   character_literal,
   sil_local_name,      // %42 in SIL mode.
+  pound_if,
+  pound_else,
+  pound_endif,
   comment,
   
 #define KEYWORD(X) kw_ ## X,

@@ -512,6 +512,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.DebugConstraintSolverAttempt = attempt;
   }
+  
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
+                                 Args.filtered_end())) {
+    Opts.BuildConfigOptions[A->getValue()] = A->getValue();
+  }
 
   return false;
 }

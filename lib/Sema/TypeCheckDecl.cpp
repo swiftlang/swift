@@ -2851,6 +2851,11 @@ public:
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
+  
+  void visitIfConfigDecl(IfConfigDecl *ICD) {
+    // The active members of the #if block will be type checked along with
+    // their enclosing declaration.
+  }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
@@ -3045,6 +3050,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
     llvm_unreachable("not a value decl");
 
   case DeclKind::TypeAlias: {

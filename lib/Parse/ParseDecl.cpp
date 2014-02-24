@@ -559,6 +559,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_init:
   case tok::kw_destructor:
   case tok::kw_func:
+  case tok::pound_if:
     return true;
   case tok::kw_protocol:
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
@@ -707,6 +708,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
   case tok::kw_protocol:
     DeclResult = parseDeclProtocol(Flags, Attributes);
+    Status = DeclResult;
+    break;
+  case tok::pound_if:
+    DeclResult = parseDeclIfConfig(Entries, Flags);
+
     Status = DeclResult;
     break;
 
@@ -1076,6 +1082,83 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   return makeParserResult(Status, ED);
+}
+
+ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
+                                            SmallVectorImpl<Decl*> &Entries,
+                                            ParseDeclOptions Flags) {
+  SourceLoc IfLoc = consumeToken(tok::pound_if);
+  SourceLoc ElseLoc;
+  SourceLoc EndLoc;
+  
+  // Evaluate the condition.
+  ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
+                                                       true,
+                                                       true);
+  if (Configuration.isNull()) {
+    return makeParserError();
+  }
+  
+  bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
+
+  SmallVector<Decl*, 8> IfDecls;
+  SmallVector<Decl*, 8> ElseDecls;
+  ParserStatus Status;
+  while(Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
+    Status = parseDecl(IfDecls, Flags);
+    
+    if (Status.isError()) {
+      return makeParserError();
+    }
+  }
+  
+  if (Tok.is(tok::pound_else)) {
+    ElseLoc = consumeToken(tok::pound_else);
+    
+    while(Tok.isNot(tok::pound_endif)) {
+      Status = parseDecl(ElseDecls, Flags);
+      
+      if (Status.isError()) {
+        return makeParserError();
+      }
+    }
+  }
+  
+  if (Tok.is(tok::pound_endif)) {
+    EndLoc = consumeToken(tok::pound_endif);
+  } else {
+    diagnose(Tok, diag::expected_close_to_config_stmt);
+  }
+  
+  IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
+                                                 IfLoc,
+                                                 ElseLoc,
+                                                 EndLoc,
+                                                 Configuration.getPtrOrNull());
+  if (ifBlockIsActive) {
+    ICD->setActiveMembers(IfDecls);
+  } else {
+    ICD->setInactiveMembers(IfDecls);
+    ICD->setInactiveSourceRange(SourceRange(IfLoc, ElseLoc.isValid() ?
+                                                    ElseLoc :
+                                                    EndLoc));
+  }
+  
+  if (ElseLoc.isValid()) {
+    if (ifBlockIsActive) {
+      ICD->setInactiveMembers(ElseDecls);
+      ICD->setInactiveSourceRange(SourceRange(IfLoc, EndLoc));
+    } else {
+      ICD->setActiveMembers(ElseDecls);
+    }
+  }
+  
+  // Copy the active members into the entries list.
+  for (auto activeMember : ICD->getActiveMembers()) {
+    Entries.push_back(activeMember);
+  }
+  
+  return makeParserResult(ICD);
 }
 
 /// \brief Parse a typealias decl.

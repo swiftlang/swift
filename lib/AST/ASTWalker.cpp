@@ -815,6 +815,18 @@ Stmt *Traversal::visitIfStmt(IfStmt *IS) {
   return IS;
 }
 
+Stmt *Traversal::visitIfConfigStmt(IfConfigStmt *ICS) {
+  // No need to set the configuration expression
+  
+  Stmt *activeStmt = ICS->getActiveStmt();
+  
+  if (activeStmt) {
+    doIt(activeStmt);
+  }
+  
+  return ICS;
+}
+
 Stmt *Traversal::visitWhileStmt(WhileStmt *WS) {
   if (StmtCondition E2 = doIt(WS->getCond()))
     WS->setCond(E2);

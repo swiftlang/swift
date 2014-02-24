@@ -58,6 +58,10 @@ namespace swift {
     TopLevelCode,
     /// The top-level of a file, when in parse-as-library mode.
     TopLevelLibrary,
+    /// The body of the inactive clause of an #if/#else/#endif block
+    InactiveConfigBlock,
+    /// The body of the active clause of an #if/#else/#endif block
+    ActiveConfigBlock
   };
 
 class Parser {
@@ -552,6 +556,8 @@ public:
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
+  
+  ParserResult<BraceStmt> parseConfigBlock(bool isActive);
 
   void parseTopLevelCodeDeclDelayed();
 
@@ -575,6 +581,7 @@ public:
     PD_InProtocol           = 1 << 9,
     PD_InClass              = 1 << 10,
     PD_InExtension          = 1 << 11,
+    PD_InactiveConfigBlock  = 1 << 12,
   };
 
   /// Options that control the parsing of declarations.
@@ -593,6 +600,9 @@ public:
   ParserResult<TypeDecl> parseDeclTypeAlias(bool WantDefinition,
                                             bool isAssociatedType,
                                             DeclAttributes &Attributes);
+  
+  ParserResult<IfConfigDecl> parseDeclIfConfig(SmallVectorImpl<Decl*> &Entries,
+                                               ParseDeclOptions Flags);
 
   void setLocalDiscriminator(ValueDecl *D);
 
@@ -838,11 +848,14 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
-  ParserResult<Expr> parseExprSequence(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprSequence(Diag<> ID,
+                                       bool isExprBasic,
+                                       bool isConfigCondition = false);
   ParserResult<Expr> parseExprPostfix(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprNew();
   ParserResult<Expr> parseExprSuper();
+  ParserResult<Expr> parseExprConfiguration();
   Expr *parseExprStringLiteral();
   
   Expr *parseExprIdentifier();
@@ -899,12 +912,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Statement Parsing
 
-  static bool isStartOfStmt(const Token &Tok);
+  bool isStartOfStmt(const Token &Tok);
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtReturn();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<Stmt> parseStmtIf();
+  ParserResult<Stmt> parseStmtIfConfig();
   ParserResult<Stmt> parseStmtWhile();
   ParserResult<Stmt> parseStmtDoWhile();
   ParserResult<Stmt> parseStmtFor();
@@ -914,6 +928,13 @@ public:
   ParserResult<CaseStmt> parseStmtCase();
   ParserStatus parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
                                    SmallVectorImpl<Decl *> &boundDecls);
+  
+  /// Evaluate the conditional configuration expression of an #if statement
+  bool evaluateConfigConditionExpr(Expr *configExpr);
+  
+  /// Decide whether the current token pointing to an #if block should be parsed
+  /// as a statement or as a declaration
+  bool isStartOfIfConfigDecl();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
@@ -923,6 +944,7 @@ public:
   GenericParamList *maybeParseGenericParams();
   bool parseGenericWhereClause(SourceLoc &WhereLoc,
                                SmallVectorImpl<RequirementRepr> &Requirements);
+
 };
 
 } // end namespace swift

@@ -175,6 +175,7 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
     llvm_unreachable("not expecting such a declaration result");
 
   case DeclKind::TypeAlias:

@@ -753,6 +753,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
+  case DeclKind::IfConfig:
     return;
 
   case DeclKind::Enum:
@@ -809,6 +810,7 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
     llvm_unreachable("Not a valid external definition for IRgen");
 
   case DeclKind::Func:
@@ -1401,6 +1403,10 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     // produce one as a side-effect of parsing a var property.
     // Just ignore it.
     case DeclKind::PatternBinding:
+      continue;
+    
+    // Active members of the IfConfig block are handled separately.
+    case DeclKind::IfConfig:
       continue;
 
     case DeclKind::Subscript:

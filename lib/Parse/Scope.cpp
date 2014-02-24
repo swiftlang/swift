@@ -39,6 +39,7 @@ static bool isResolvableScope(ScopeKind SK) {
   case ScopeKind::ConstructorBody:
   case ScopeKind::DestructorBody:
   case ScopeKind::Brace:
+  case ScopeKind::ActiveConfigBlock:
   case ScopeKind::ForVars:
   case ScopeKind::ForeachVars:
   case ScopeKind::ClosureParams:
@@ -56,13 +57,17 @@ Scope::Scope(Parser *P, ScopeKind SC):
     PrevResolvableDepth(SI.ResolvableDepth),
     Kind(SC) {
   assert(PrevScope || Kind == ScopeKind::TopLevel);
-  if (SI.CurScope)
-    Depth = SI.CurScope->Depth + 1;
-  else
-    Depth = 0;
-  SI.CurScope = this;
-  if (!isResolvableScope(Kind))
-    SI.ResolvableDepth = Depth + 1;
+  
+  // Active config blocks delegate to the enclosing scope.
+  if (SC != ScopeKind::ActiveConfigBlock) {
+    if (SI.CurScope)
+      Depth = SI.CurScope->Depth + 1;
+    else
+      Depth = 0;
+    SI.CurScope = this;
+    if (!isResolvableScope(Kind))
+      SI.ResolvableDepth = Depth + 1;
+  }
 }
 
 Scope::Scope(Parser *P, SavedScope &&SS):
@@ -72,9 +77,13 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     PrevResolvableDepth(SI.ResolvableDepth),
     Depth(SI.CurScope ? SI.CurScope->Depth + 1 : 0),
     Kind(SS.Kind) {
-  SI.CurScope = this;
-  if (!isResolvableScope(Kind))
-    SI.ResolvableDepth = Depth + 1;
+    
+    // Active config blocks delegate to the enclosing scope.
+    if (SS.Kind != ScopeKind::ActiveConfigBlock) {
+      SI.CurScope = this;
+      if (!isResolvableScope(Kind))
+        SI.ResolvableDepth = Depth + 1;
+    }
 }
 
 bool Scope::isResolvable() const {

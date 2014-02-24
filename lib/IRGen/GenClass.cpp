@@ -666,6 +666,10 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     case DeclKind::Subscript:
       // Getter/setter will be handled separately.
       continue;
+        
+    case DeclKind::IfConfig:
+      // Any active IfConfig block members are handled separately.
+      continue;
 
     case DeclKind::TypeAlias:
     case DeclKind::AssociatedType:

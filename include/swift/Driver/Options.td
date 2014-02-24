@@ -103,6 +103,9 @@ def sdk : Separate<["-"], "sdk">, Flags<[DriverOption, FrontendOption]>,
 def g : Flag<["-"], "g">, Flags<[FrontendOption]>,
   HelpText<"Emit debug info">;
 
+def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
+  HelpText<"Specifies one or more build configuration options">;
+
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption]>,

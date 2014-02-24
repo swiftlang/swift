@@ -496,6 +496,8 @@ public:
   
   void visitIfStmt(IfStmt *S);
   
+  void visitIfConfigStmt(IfConfigStmt *S);
+  
   void visitWhileStmt(WhileStmt *S);
   
   void visitDoWhileStmt(DoWhileStmt *S);

@@ -1315,6 +1315,11 @@ void Lexer::getStringLiteralSegments(
   }
 }
 
+/// \brief Determines if a given character is a valid whitespace character.
+static bool isWhitespace(char c) {
+  return c == '\n' || c == '\r' || c == ' ' || c == '\t' || c == '\0';
+}
+
 //===----------------------------------------------------------------------===//
 // Main Lexer Loop
 //===----------------------------------------------------------------------===//
@@ -1416,7 +1421,25 @@ Restart:
   case '#':
     // # is only a token in SIL mode.
     if (InSILMode)
-      return formToken(tok::sil_pound, TokStart);
+      return formToken(tok::pound, TokStart);
+      
+    if(StringRef(TokStart, 3).equals("#if") &&
+       isWhitespace(CurPtr[2]) &&
+       NextToken.isAtStartOfLine()) {
+      CurPtr += 2;
+      return formToken(tok::pound_if, TokStart);
+    } else if (StringRef(TokStart, 5).equals("#else") &&
+               isWhitespace(CurPtr[4]) &&
+               NextToken.isAtStartOfLine()) {
+      CurPtr += 4;
+      return formToken(tok::pound_else, TokStart);
+    } else if(StringRef(TokStart, 6).equals("#endif") &&
+              isWhitespace(CurPtr[5]) &&
+              NextToken.isAtStartOfLine()) {
+      CurPtr += 5;
+      return formToken(tok::pound_endif, TokStart);
+    }
+      
     // Allow a hashbang #! line at the beginning of the file.
     if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
       CurPtr--;
@@ -1425,7 +1448,9 @@ Restart:
       skipHashbang();
       goto Restart;
     }
-    diagnose(CurPtr-1, diag::lex_invalid_character);
+    else {
+        diagnose(CurPtr-1, diag::lex_invalid_character);
+    }
     goto Restart;
 
   // Operator characters.

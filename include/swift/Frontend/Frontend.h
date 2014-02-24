@@ -338,6 +338,9 @@ public:
 
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
+  
+  /// \brief Initializes the "os" and "arch" target build configuration values.
+  void setTargetConfigurations(IRGenOptions &IRGenOpts, LangOptions &LangOpts);
 
   /// Parses and type-checks all input files.
   void performParse();

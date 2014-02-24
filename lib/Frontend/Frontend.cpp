@@ -26,6 +26,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -35,6 +36,39 @@ using namespace swift;
 void swift::CompilerInstance::createSILModule() {
   assert(getMainModule());
   TheSILModule = SILModule::createEmptyModule(getMainModule());
+}
+
+void swift::CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
+                             LangOptions &LangOpts) {
+  
+  llvm::Triple triple = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  
+  // Set the "os" target configuration.
+  if (triple.isMacOSX()) {
+    LangOpts.TargetConfigOptions["os"] = "OSX";
+  } else if (triple.isiOS()) {
+    LangOpts.TargetConfigOptions["os"] = "iOS";
+  } else {
+    assert(false && "Unsupported target OS");
+  }
+  
+  // Set the "arch" target configuration.
+  switch (triple.getArch()) {
+  case llvm::Triple::ArchType::arm:
+    LangOpts.TargetConfigOptions["arch"] = "ARM";
+    break;
+  case llvm::Triple::ArchType::arm64:
+    LangOpts.TargetConfigOptions["arch"] = "ARM64";
+    break;
+  case llvm::Triple::ArchType::x86:
+    LangOpts.TargetConfigOptions["arch"] = "I386";
+    break;
+  case llvm::Triple::ArchType::x86_64:
+    LangOpts.TargetConfigOptions["arch"] = "X64";
+    break;
+  default:
+      assert(false && "Unsupported target architecture");
+  }
 }
 
 bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
@@ -50,6 +84,10 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     Args.push_back(nullptr);
     llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
   }
+  
+  // Initialize the target build configuration settings ("os" and "arch").
+  setTargetConfigurations(Invocation.getIRGenOptions(),
+                          Invocation.getLangOptions());
 
   Context.reset(new ASTContext(Invocation.getLangOptions(),
                                Invocation.getSearchPathOptions(),
@@ -259,12 +297,11 @@ void CompilerInstance::performParse() {
 
   if (hadLoadError)
     return;
-
+  
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
     SILParserState SILContext(TheSILModule.get());
-
     unsigned CurTUElem = 0;
     bool Done;
     do {
@@ -291,7 +328,7 @@ void CompilerInstance::performParse() {
         if (PrimaryBufferID == NO_SUCH_BUFFER ||
             (SF->getBufferID().hasValue() &&
              SF->getBufferID().getValue() == PrimaryBufferID))
-          performTypeChecking(*SF, PersistentState.getTopLevelContext());
+          performTypeChecking(*SF, PersistentState.getTopLevelContext(), 0);
 
     // If there were no source files, we should still record known protocols.
     if (Context->getStdlibModule())

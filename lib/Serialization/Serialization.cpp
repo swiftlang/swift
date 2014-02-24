@@ -861,6 +861,9 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
     llvm_unreachable("decl should never be a member");
   
+  case DeclKind::IfConfig:
+    return false;
+      
   case DeclKind::EnumCase:
     return false;
 
@@ -1081,6 +1084,9 @@ void Serializer::writeDecl(const Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
     llvm_unreachable("import decls should not be serialized");
+      
+  case DeclKind::IfConfig:
+    llvm_unreachable("#if block declarations should not be serialized");
 
   case DeclKind::Extension: {
     auto extension = cast<ExtensionDecl>(D);

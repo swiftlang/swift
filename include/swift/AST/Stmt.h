@@ -116,6 +116,9 @@ private:
   ASTNode *getElementsStorage() {
     return reinterpret_cast<ASTNode*>(this + 1);
   }
+  
+  bool IsConfigBlock = false;
+  bool IsInactiveConfigBlock = false;
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
@@ -137,6 +140,12 @@ public:
   ArrayRef<ASTNode> getElements() const {
     return const_cast<BraceStmt*>(this)->getElements();
   }
+  
+  void markAsConfigBlock() { IsConfigBlock = true; }
+  bool isConfigBlock() { return IsConfigBlock; }
+  
+  void markAsInactiveConfigBlock() { IsInactiveConfigBlock = true; }
+  bool isInactiveConfigBlock() { return IsInactiveConfigBlock; }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Brace; }
 };
@@ -205,6 +214,45 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
+/// IfConfigStmt - This class models the statement-side representation of
+/// #if/#else/#endif blocks.
+class IfConfigStmt : public Stmt {
+  SourceLoc IfLoc;
+  SourceLoc ElseLoc;
+  Expr *Cond = nullptr;
+  Stmt *Then = nullptr;
+  Stmt *Else = nullptr;
+  Stmt *ActiveStmt = nullptr;
+  
+public:
+  IfConfigStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
+         Stmt *Else, Optional<bool> implicit = {})
+  : Stmt(StmtKind::IfConfig, getDefaultImplicitFlag(implicit, IfLoc)),
+    IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
+  
+  SourceLoc getIfLoc() const { return IfLoc; }
+  SourceLoc getElseLoc() const { return ElseLoc; }
+  
+  SourceRange getSourceRange() const;
+  
+  Stmt *getThenStmt() const { return Then; }
+  void setThenStmt(Stmt *s) { Then = s; }
+  
+  Stmt *getElseStmt() const { return Else; }
+  void setElseStmt(Stmt *s) { Else = s; }
+  
+  Stmt *getActiveStmt() const { return ActiveStmt; }
+  void setActiveStmt(Stmt *s) { ActiveStmt = s; }
+  
+  Expr* getCond() const { return Cond; }
+  void setCond(Expr* e) { Cond = e; }
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::IfConfig;
+  }
+};
+  
 /// WhileStmt - while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
 class WhileStmt : public Stmt {

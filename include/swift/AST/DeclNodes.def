@@ -63,6 +63,7 @@ DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
 DECL(EnumCase, Decl)
 DECL(TopLevelCode, Decl)
+DECL(IfConfig, Decl)
 
 ABSTRACT_DECL(Operator, Decl)
   OPERATOR_DECL(InfixOperator, OperatorDecl)

@@ -227,6 +227,10 @@ namespace {
         // We only care about the var decls in the pattern binding.
         return;
 
+      // Active members of the IfConfig block are handled separately.
+      case DeclKind::IfConfig:
+        return;
+
       case DeclKind::Func:
         return visitFunc(cast<FuncDecl>(member));
 

@@ -600,6 +600,10 @@ void PrintAST::visitTopLevelCodeDecl(TopLevelCodeDecl *decl) {
   printBraceStmtElements(decl->getBody(), /*NeedIndent=*/false);
 }
 
+void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
+  // FIXME: Pretty print #if decls
+}
+
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAttributes(decl->getAttrs());
   Printer << "typealias ";
@@ -962,6 +966,18 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
     Printer << " else ";
     visit(elseStmt);
   }
+}
+
+void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
+  Printer << "#if ";
+  // FIXME: print condition
+  Printer << "\n";
+  visit(stmt->getThenStmt());
+  if (auto elseStmt = stmt->getElseStmt()) {
+    Printer << " #else\n";
+    visit(elseStmt);
+  }
+  Printer << "\n#endif";
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {

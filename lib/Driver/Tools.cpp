@@ -271,6 +271,13 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back("-serialize-diagnostics-path");
     Arguments.push_back(SerializedDiagnosticsPath.c_str());
   }
+  
+  // Pass on any build config options
+  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_D),
+                                 Args.filtered_end())) {
+    Arguments.push_back("-D");
+    Arguments.push_back(A->getValue());
+  }
 
   // Add the output file argument if necessary.
   if (Output->getPrimaryOutputType() != types::TY_Nothing) {

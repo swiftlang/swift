@@ -178,13 +178,18 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// The sequencing for binary exprs is not structural, i.e., binary operators
 /// are not inherently right-associative. If present, '?' and ':' tokens must
 /// match.
-ParserResult<Expr> Parser::parseExprSequence(Diag<> Message, bool isExprBasic) {
+ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
+                                             bool isExprBasic,
+                                             bool isConfigCondition) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   
   Expr *suffix = nullptr;
 
   while (true) {
+    if (isConfigCondition && Tok.isAtStartOfLine())
+      break;
+    
     // Parse a unary expression.
     ParserResult<Expr> Primary = parseExprUnary(Message, isExprBasic);
     if (Primary.hasCodeCompletion())
@@ -276,8 +281,15 @@ done:
     SequencedExprs.push_back(suffix);
   }
   
-  // If we had semantic errors, just fail here.
-  assert(!SequencedExprs.empty());
+  if (SequencedExprs.empty()) {
+    if (isConfigCondition) {
+      diagnose(startLoc, diag::expected_close_to_config_stmt);
+      return makeParserError();
+    } else {
+      // If we had semantic errors, just fail here.
+      assert(!SequencedExprs.empty());
+    }
+  }
 
   // If we saw no operators, don't build a sequence.
   if (SequencedExprs.size() == 1)
@@ -630,7 +642,6 @@ ParserResult<Expr> Parser::parseExprSuper() {
   diagnose(Tok, diag::expected_dot_or_subscript_after_super);
   return nullptr;
 }
-
 
 /// Copy a numeric literal value into AST-owned memory, stripping underscores
 /// so the semantic part of the value can be parsed by APInt/APFloat parsers.

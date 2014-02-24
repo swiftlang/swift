@@ -98,6 +98,15 @@ SourceRange IfStmt::getSourceRange() const {
   return SourceRange(IfLoc, End);
 }
 
+SourceRange IfConfigStmt::getSourceRange() const {
+  SourceLoc End;
+  if (Else)
+    End = Else->getEndLoc();
+  else
+    End = Then->getEndLoc();
+  return SourceRange(IfLoc, End);
+}
+
 SourceRange WhileStmt::getSourceRange() const {
   return SourceRange(WhileLoc, Body->getEndLoc());
 }

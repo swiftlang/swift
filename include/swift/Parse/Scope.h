@@ -73,6 +73,7 @@ enum class ScopeKind {
   CaseVars,
   IfVars,
   WhileVars,
+  ActiveConfigBlock,
 
   ClosureParams,
 };
@@ -139,9 +140,13 @@ public:
   /// scope frame to the new object.
   Scope(Parser *P, SavedScope &&SS);
   ~Scope() {
-    assert(SI.CurScope == this && "Scope mismatch");
-    SI.CurScope = PrevScope;
-    SI.ResolvableDepth = PrevResolvableDepth;
+    // Active config blocks delegate to the enclosing scope, so there's nothing
+    // to pop off.
+    if (Kind != ScopeKind::ActiveConfigBlock) {
+      assert(SI.CurScope == this && "Scope mismatch");
+      SI.CurScope = PrevScope;
+      SI.ResolvableDepth = PrevResolvableDepth;
+    }
   }
 };
 

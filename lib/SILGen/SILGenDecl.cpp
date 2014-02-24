@@ -1188,6 +1188,11 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     // Nothing to do in SILGen for other external types.
     break;
       
+  case DeclKind::IfConfig:
+    // Any active decls have been added to their parent, so there's nothing
+    // else to emit.
+    break;
+      
   case DeclKind::Extension:
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
@@ -1912,6 +1917,16 @@ public:
   
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
+  }
+
+  void visitVarDecl(VarDecl *vd) {
+    // FIXME: Emit getter and setter (if settable) witnesses.
+    // For now we ignore them, like the IRGen witness table builder did.
+  }
+  
+  void visitIfConfigDecl(IfConfigDecl *icd) {
+    // We only care about the active members, which were already subsumed by the
+    // enclosing type.
   }
 };
   

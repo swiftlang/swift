@@ -18,7 +18,11 @@
 #ifndef SWIFT_LANGOPTIONS_H
 #define SWIFT_LANGOPTIONS_H
 
+#include "llvm/ADT/StringMap.h"
+#include <map>
+
 namespace swift {
+  
   /// \brief A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
@@ -46,6 +50,22 @@ namespace swift {
 
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
+    
+    /// \brief Implicit target configuration options.  There are currently two
+    ///   supported target configuration values:
+    ///     os - The active os target (OSX or IOS)
+    ///     arch - The active arch target (X64, I386, ARM, ARM64)
+    std::map<llvm::StringRef, llvm::StringRef> TargetConfigOptions;
+    
+    /// \brief Explicit build configuration options, initialized via the '-D'
+    /// compiler flag.
+    std::map<llvm::StringRef, llvm::StringRef> BuildConfigOptions;
+    
+    /// \brief A convenience method for determining if a given build
+    /// configuration has been defined
+    bool hasBuildConfig(llvm::StringRef name) {
+      return BuildConfigOptions.count(name) != 0;
+    }
   };
 }
 

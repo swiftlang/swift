@@ -43,6 +43,7 @@ bool Parser::isStartOfStmt(const Token &Tok) {
   case tok::kw_switch:
   case tok::kw_case:
   case tok::kw_default:
+  case tok::pound_if:
     return true;
   }
 }
@@ -109,6 +110,9 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     return false;
   case BraceItemListKind::TopLevelLibrary:
     return false;
+  case BraceItemListKind::ActiveConfigBlock:
+  case BraceItemListKind::InactiveConfigBlock:
+    return Tok.is(tok::pound_else) || Tok.is(tok::pound_endif);
   }
 }
 
@@ -160,6 +164,39 @@ static void unwrapIfDiscardedClosure(Parser &P,
   }
 }
 
+bool Parser::isStartOfIfConfigDecl() {
+  bool isConfigDecl = false;
+  
+  if (Tok.isNot(tok::pound_if))
+    return isConfigDecl;
+  
+  ParserPosition pos = getParserPosition();
+  consumeToken();
+  
+  // Technically, it doesn't matter which marker kind we use here, we just
+  // need something to guard against checks for trailing closures on target
+  // configuration "call" expressions.
+  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                  StructureMarkerKind::Declaration);
+  
+  // Parse the configuration expression.
+  parseExprSequence(diag::expected_expr, true, true);
+  
+  // If it's an "#if", we'll want to try the next level down.
+  if (Tok.is(tok::pound_if)) {
+    isConfigDecl = isStartOfIfConfigDecl();
+  } else {
+    
+    // Otherwise, see if the current token is a valid start to a declaration.
+    isConfigDecl = isStartOfDecl(Tok, peekToken());
+  }
+  
+  // Return to the starting point.
+  backtrackToPosition(pos);
+  
+  return isConfigDecl;
+}
+
 ///   brace-item:
 ///     decl
 ///     expr
@@ -185,7 +222,15 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                     (Kind == BraceItemListKind::TopLevelLibrary);
 
   // This forms a lexical scope.
-  Scope S(this, IsTopLevel ? ScopeKind::TopLevel : ScopeKind::Brace);
+  
+  auto scopeKind =  IsTopLevel ? ScopeKind::TopLevel :
+                                (Kind == BraceItemListKind::ActiveConfigBlock) ?
+                                  ScopeKind::ActiveConfigBlock :
+                                  ScopeKind::Brace;
+  auto isConfigBlock =  Kind == BraceItemListKind::ActiveConfigBlock ||
+                        Kind == BraceItemListKind::InactiveConfigBlock;
+  
+  Scope S(this, scopeKind);
 
   ParserStatus BraceItemsStatus;
   SmallVector<Decl*, 8> TmpDecls;
@@ -193,6 +238,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   bool PreviousHadSemi = true;
   while ((Kind == BraceItemListKind::TopLevelLibrary ||
           Tok.isNot(tok::r_brace)) &&
+         (!isConfigBlock ||
+          (Tok.isNot(tok::pound_endif) && Tok.isNot(tok::pound_else))) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
          Tok.isNot(tok::kw_sil_vtable) && Tok.isNot(tok::kw_sil_global) &&
@@ -221,7 +268,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (isStartOfDecl(Tok, peekToken())) {
+    if (isStartOfDecl(Tok, peekToken()) &&
+        (Tok.isNot(tok::pound_if) || isStartOfIfConfigDecl())) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -263,6 +311,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       unwrapIfDiscardedClosure(*this, Result);
       if (!Result.isNull()) {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
+        
+        if (auto *RS = Result.dyn_cast<Stmt *>()) {
+          if (auto *ifConfigStmt = dyn_cast<IfConfigStmt>(RS)) {
+              if(ifConfigStmt->getActiveStmt()) {
+                Brace->markAsConfigBlock();
+              }
+          }
+        }
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
       }
@@ -367,16 +423,18 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
 }
 
 ParserResult<Stmt> Parser::parseStmt() {
+
   // Note that we're parsing a statement.
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
-
+  
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
     return nullptr;
   case tok::kw_return: return parseStmtReturn();
   case tok::kw_if:     return parseStmtIf();
+  case tok::pound_if:  return parseStmtIfConfig();
   case tok::kw_while:  return parseStmtWhile();
   case tok::kw_do:     return parseStmtDoWhile();
   case tok::kw_for:    return parseStmtFor();
@@ -422,6 +480,38 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
 }
+
+/// parseConfigBlock - Parse the active or inactive block of an #if/#else/#endif
+/// statement.
+ParserResult<BraceStmt> Parser::parseConfigBlock(bool isActive) {
+  SourceLoc LBloc = Tok.getLoc();
+  
+  SmallVector<ASTNode, 16> Entries;
+  SourceLoc RBloc;
+  
+  ParserStatus Status = parseBraceItems(
+                                      Entries,
+                                      isActive ?
+                                        BraceItemListKind::ActiveConfigBlock :
+                                        BraceItemListKind::InactiveConfigBlock);
+  
+  if (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
+    diagnose(Tok, diag::expected_close_to_config_stmt);
+  }
+  
+  RBloc = Tok.getLoc();
+  
+  auto result = makeParserResult(Status,
+                          BraceStmt::create(Context, LBloc, Entries, RBloc));
+  
+  (result.get())->markAsConfigBlock();
+  if (!isActive) {
+    (result.get())->markAsInactiveConfigBlock();
+  }
+  
+  return result;
+}
+
 
 /// parseStmtReturn
 ///
@@ -563,6 +653,163 @@ ParserResult<Stmt> Parser::parseStmtIf() {
   return makeParserResult(
       Status, new (Context) IfStmt(IfLoc, Condition, NormalBody.get(),
                                    ElseLoc, ElseBody.getPtrOrNull()));
+}
+
+// Evaluate a subset of expression types suitable for build configuration
+// conditional expressions.  The accepted expression types are:
+//  - Named decl ref expressions ("FOO")
+//  - Parenthesized expressions ("(FOO)")
+//  - Binary "&&" or "||" operations applied to other build configuration
+//    conditional expressions
+//  - Unary "!" expressions applied to other build configuration conditional
+//    expressions
+//  - Single-argument call expressions, where the function being invoked is a
+//    supported target configuration (currently "os" and "arch"), and whose
+//    argument is a named decl ref expression
+bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
+  
+  // Evaluate a ParenExpr.
+  if (auto *PE = dyn_cast_or_null<ParenExpr>(configExpr)) {
+    return evaluateConfigConditionExpr(PE->getSubExpr());
+  }
+  // Evaluate a "&&" or "||" expression.
+  else if (auto *SE = dyn_cast_or_null<SequenceExpr>(configExpr)) {
+    // check for '&&' and '||'
+    if (SE->getNumElements() < 3) {
+      diagnose(SE->getLoc(), diag::unsupported_build_config_binary_expression);
+      return false;
+    }
+    // Before type checking, chains of binary expressions will not be fully
+    // parsed, so associativity has not yet been encoded in the subtree.
+    auto elements = SE->getElements();
+    auto numElements = SE->getNumElements();
+    size_t iOperator = 1;
+    size_t iOperand = 2;
+    bool result = evaluateConfigConditionExpr(elements[0]);
+    
+    while (iOperand < numElements) {
+      if (auto *UDREOp =
+            dyn_cast_or_null<UnresolvedDeclRefExpr>(elements[iOperator])) {
+        auto name = UDREOp->getName().str();
+        
+        if (name.equals("||")) {
+          result = result || evaluateConfigConditionExpr(elements[iOperand]);
+        } else if (name.equals("&&")) {
+          if (!result) {
+            break;
+          }
+          else {
+            result = result && evaluateConfigConditionExpr(elements[iOperand]);
+          }
+        } else {
+          diagnose(SE->getLoc(),
+                   diag::unsupported_build_config_binary_expression);
+          return false;
+        }
+      }
+      
+      iOperator += 2;
+      iOperand += 2;
+    }
+    
+    return result;
+  }
+  // Evaluate a named reference expression.
+  else if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
+    // look up name
+    auto name = UDRE->getName().str();
+    return Context.LangOpts.hasBuildConfig(name);
+  }
+  // Evaluate a negation (unary "!") expression.
+  else if (auto *PUE = dyn_cast_or_null<PrefixUnaryExpr>(configExpr)) {
+    // If the PUE is not a negation expression, return false
+    auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(PUE->getFn());
+    auto name = fnNameExpr->getName().str();
+    
+    if (!name.equals("!")) {
+      diagnose(PUE->getLoc(), diag::unsupported_build_config_unary_expression);
+      return false;
+    }
+    
+    return !evaluateConfigConditionExpr(PUE->getArg());
+  }
+  // Evaluate a target config call expression.
+  else if (auto *CE = dyn_cast_or_null<CallExpr>(configExpr)) {
+    // look up target config, and compare value
+    auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(CE->getFn());
+    auto targetValue = fnNameExpr->getName().str();
+    
+    if (!targetValue.equals("arch") && !targetValue.equals("os")) {
+      diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
+      return false;
+    }
+    
+    // Get the arg, which should be in a paren expression.
+    if (auto *PE = dyn_cast_or_null<ParenExpr>(CE->getArg())) {
+      auto subExpr = PE->getSubExpr();
+      
+      // The sub expression should be an UnresolvedDeclRefExpr (we won't
+      // tolerate extra parens).
+      if(auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
+        auto argValue = UDRE->getName().str();
+        return
+          Context.LangOpts.TargetConfigOptions[targetValue].equals(argValue);
+      } else {
+        diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
+        return false;
+      }
+    } else {
+      diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
+      return false;
+    }
+  }
+  // If we've gotten here, it's an unsupported expression type.
+  else {
+    diagnose(configExpr->getLoc(),
+             diag::unsupported_config_conditional_expression_type);
+    return false;
+  }
+}
+
+ParserResult<Stmt> Parser::parseStmtIfConfig() {
+  SourceLoc IfLoc = consumeToken(tok::pound_if);
+  
+  ParserResult<Expr> Configuration;
+  ParserResult<BraceStmt> NormalBody;
+  
+  
+  Configuration = parseExprSequence(diag::expected_expr, true, true);
+  
+  if (Configuration.isNull()) {
+    return makeParserError();
+  }
+  
+  bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
+  
+  NormalBody = parseConfigBlock(ifBlockIsActive);
+  
+  SourceLoc ElseLoc;
+  ParserResult<Stmt> ElseBody;
+  if (Tok.is(tok::pound_else)) {
+    ElseLoc = consumeToken(tok::pound_else);
+    ElseBody = parseConfigBlock(!ifBlockIsActive);
+  }
+  if (Tok.is(tok::pound_endif)) {
+    consumeToken(tok::pound_endif);
+  } else {
+    diagnose(Tok, diag::expected_close_to_config_stmt);
+  }
+  
+  auto ifConfigStmt = new (Context) IfConfigStmt(IfLoc,
+                                                 Configuration.getPtrOrNull(),
+                                                 NormalBody.get(),
+                                                 ElseLoc,
+                                                 ElseBody.getPtrOrNull());
+  ifConfigStmt->setActiveStmt(ifBlockIsActive ?
+                                NormalBody.get() :
+                                ElseBody.getPtrOrNull());
+  
+  return makeParserResult(ifConfigStmt);
 }
 
 /// 

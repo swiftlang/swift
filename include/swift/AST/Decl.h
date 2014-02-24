@@ -1366,6 +1366,64 @@ public:
   using DeclContext::operator new;
 };
 
+/// IfConfigDecl - This class represents the declaration-side representation of
+/// #if/#else/#endif blocks. Active and inactive block members are stored
+/// separately, with the intention being that active members will be handed
+/// back to the enclosing declaration.
+class IfConfigDecl : public Decl {
+  SmallVector<Decl*, 8> ActiveMembers;
+  SmallVector<Decl*, 8> InactiveMembers;
+  SourceLoc IfLoc;
+  SourceLoc ElseLoc;
+  SourceLoc EndLoc;
+  SourceRange InactiveSourceRange;
+  Expr *Cond;
+  
+public:
+  
+  IfConfigDecl(DeclContext *Parent,
+               SourceLoc ifLoc,
+               SourceLoc elseLoc,
+               SourceLoc endLoc,
+               Expr *cond):
+          Decl(DeclKind::IfConfig, Parent),
+          IfLoc(ifLoc),
+          ElseLoc(elseLoc),
+          EndLoc(endLoc),
+          Cond(cond) {}
+  
+  ArrayRef<Decl*> getActiveMembers() const { return ActiveMembers; }
+  void setActiveMembers(ArrayRef<Decl*>activeMembers) {
+    for (auto member: activeMembers) {
+      ActiveMembers.push_back(member);
+    }
+  }
+  
+  ArrayRef<Decl*> getInactiveMembers() const { return InactiveMembers; }
+  void setInactiveMembers(ArrayRef<Decl*> inactiveMembers) {
+    for (auto member: inactiveMembers) {
+      InactiveMembers.push_back(member);
+    }
+  }
+  
+  Expr *getCond() { return Cond; }
+  
+  SourceLoc getIfLoc() const { return IfLoc; }
+  SourceLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getLoc() const { return getIfLoc(); }
+  
+  SourceRange getSourceRange() const;
+  
+  void setInactiveSourceRange(SourceRange range) {
+    InactiveSourceRange = range;
+  }
+  SourceRange getInactiveSourceRange() const { return InactiveSourceRange; }
+  
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::IfConfig;
+  }
+};
+
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {

@@ -188,7 +188,7 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     Buffer << ExtNominal->getName() << ".";
     return;
   }
-
+  
   case DeclContextKind::TopLevelCodeDecl:
     llvm_unreachable("unhandled context kind in SILPrint!");
   case DeclContextKind::AbstractFunctionDecl:

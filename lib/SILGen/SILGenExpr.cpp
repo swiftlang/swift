@@ -211,6 +211,7 @@ namespace {
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
+    
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
     RValue visitAssignExpr(AssignExpr *E, SGFContext C);
 

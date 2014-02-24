@@ -614,6 +614,10 @@ namespace {
       }
     }
     
+    void visitIfConfigDecl(IfConfigDecl *ICD) {
+      // Since this is conditional, nothing to print.
+    }
+    
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
@@ -829,6 +833,21 @@ public:
     }
     OS << ')';
   }
+  
+  void visitIfConfigStmt(IfConfigStmt *S) {
+    OS.indent(Indent) << "(#if_stmt\n";
+    printRec(S->getCond());
+    OS << '\n';
+    printRec(S->getThenStmt());
+    if (S->getElseStmt()) {
+      OS << '\n';
+      OS << "(#else_stmt\n";
+      printRec(S->getElseStmt());
+      OS << ')';
+    }
+    OS << ')';
+  }
+
   void visitWhileStmt(WhileStmt *S) {
     OS.indent(Indent) << "(while_stmt\n";
     printRec(S->getCond());

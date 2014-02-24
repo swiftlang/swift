@@ -276,6 +276,17 @@ public:
     return IS;
   }
   
+  Stmt *visitIfConfigStmt(IfConfigStmt *ICS) {
+    
+    Stmt *S = ICS->getActiveStmt();
+    
+    if (S) {
+      if (typeCheckStmt(S)) return 0;
+    }
+    
+    return ICS;
+  }
+  
   Stmt *visitWhileStmt(WhileStmt *WS) {
     StmtCondition C = WS->getCond();
     if (TC.typeCheckCondition(C, DC)) return 0;

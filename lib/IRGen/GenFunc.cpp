@@ -2742,6 +2742,7 @@ struct EmitLocalDecls : public ASTWalker {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::IfConfig:
       llvm_unreachable("declaration cannot appear in local scope");
       
     case DeclKind::TypeAlias:
