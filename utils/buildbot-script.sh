@@ -24,7 +24,6 @@ KNOWN_SETTINGS=(
     distcc                      ""               "use distcc in pump mode"
     config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
-    incremental                 ""               "when build directories already exist, skip configuration"
     package                     ""               "set to build packages"
     prefix                      "/usr"           "installation prefix"
     skip-ios                    ""               "set to skip everything iOS-related"
