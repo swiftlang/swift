@@ -203,24 +203,50 @@ void PrintAST::printAttributes(const DeclAttributes &Attrs) {
 void PrintAST::printTypedPattern(const TypedPattern *TP,
                                  bool StripOuterSliceType) {
   auto TheTypeLoc = TP->getTypeLoc();
-  
-  // If the outer typeloc is an InOutTypeRepr, print the inout before the
-  // subpattern.
-  if (auto *IOT = dyn_cast_or_null<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
-    TheTypeLoc = TypeLoc(IOT->getBase());
+  if (TheTypeLoc.hasLocation()) {
+    // If the outer typeloc is an InOutTypeRepr, print the inout before the
+    // subpattern.
+    if (auto *IOT = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
+      TheTypeLoc = TypeLoc(IOT->getBase());
+      Type T = TheTypeLoc.getType();
+      if (T) {
+        if (auto *IOT = T->getAs<InOutType>()) {
+          T = IOT->getObjectType();
+          TheTypeLoc.setType(T);
+        }
+      }
+
+      Printer << "inout ";
+    }
+
+    printPattern(TP->getSubPattern());
+    Printer << ": ";
+    if (StripOuterSliceType) {
+      Type T = TP->getType();
+      if (auto *BGT = T->getAs<BoundGenericType>()) {
+        BGT->getGenericArgs()[0].print(Printer, Options);
+        return;
+      }
+    }
+    printTypeLoc(TheTypeLoc);
+    return;
+  }
+
+  Type T = TP->getType();
+  if (auto *IOT = T->getAs<InOutType>()) {
+    T = IOT->getObjectType();
     Printer << "inout ";
   }
-  
+
   printPattern(TP->getSubPattern());
   Printer << ": ";
   if (StripOuterSliceType) {
-    Type T = TP->getType();
     if (auto *BGT = T->getAs<BoundGenericType>()) {
       BGT->getGenericArgs()[0].print(Printer, Options);
       return;
     }
   }
-  printTypeLoc(TheTypeLoc);
+  T.print(Printer, Options);
 }
 
 void PrintAST::printPattern(const Pattern *pattern) {
