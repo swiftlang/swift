@@ -136,11 +136,6 @@ public:
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
-    // inout arguments are printed specially.
-    if (auto *IOT = Ty->getAs<InOutType>()) {
-      addTextChunk("inout ");
-      Ty = IOT->getObjectType();
-    }
 
     if (!Name.empty()) {
       StringRef NameStr = Name.str();
@@ -159,6 +154,14 @@ public:
       if (IsAnnotation)
         getLastChunk().setIsAnnotation();
     }
+
+    // 'inout' arguments are printed specially.
+    if (auto *IOT = Ty->getAs<InOutType>()) {
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::Ampersand, "&");
+      Ty = IOT->getObjectType();
+    }
+
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      Ty->getString());
     CurrentNestingLevel--;

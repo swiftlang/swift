@@ -131,6 +131,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::Comma:
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
+    case Chunk::ChunkKind::Ampersand:
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
@@ -562,6 +563,7 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::Comma:
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
+    case CodeCompletionString::Chunk::ChunkKind::Ampersand:
       return C.getText();
 
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:

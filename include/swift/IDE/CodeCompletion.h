@@ -77,6 +77,7 @@ public:
       Comma,
       ExclamationMark,
       QuestionMark,
+      Ampersand,
 
       /// The first chunk of a substring that describes the parameter for a
       /// generic type.
@@ -122,6 +123,7 @@ public:
              Kind == ChunkKind::Comma ||
              Kind == ChunkKind::ExclamationMark ||
              Kind == ChunkKind::QuestionMark ||
+             Kind == ChunkKind::Ampersand ||
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
