@@ -1295,14 +1295,18 @@ void LifetimeChecker::getPredsLiveOut1(SILBasicBlock *BB,
     Result = DIKind::No;
 }
 
+/// Compute the set of live-outs for the specified basic block, which merges
+/// together local liveness information along with information from
+/// predecessors for non-local liveness.
 AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   LiveOutBlockState *BBState = &getBlockInfo(BB);
   switch (BBState->LOState) {
   case LiveOutBlockState::IsKnown:
     return BBState->getAvailabilitySet();
-  case LiveOutBlockState::IsComputingLiveOut:
+  case LiveOutBlockState::IsComputingLiveOut: {
     // Speculate that it will be live out in cyclic cases.
     return AvailabilitySet(TheMemory.NumElements);
+  }
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1330,7 +1334,18 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   }
 
   // Finally, cache and return our result.
-  BBState->setBlockAvailability(Result);
+  if (!Result.containsUnknownElements()) {
+    BBState->setBlockAvailability(Result);
+  } else {
+    // If any elements are still unknown, then do not cache the result.  This
+    // can happen in cyclic cases where a predecessor is being recursively
+    // analyzed.  Not caching here means that this block will have to be
+    // reanalyzed again if a future query for it comes along.
+    //
+    // In principle this algorithm should be rewritten to use standard dense RPO
+    // bitvector algorithms someday.
+    BBState->LOState = LiveOutBlockState::IsUnknown;
+  }
   return Result;
 }
 
@@ -1343,11 +1358,6 @@ getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
     // block's liveness.
     Result.mergeIn(getLiveOutN(P));
   }
-  
-  // If any elements are still unknown, smash them to "yes".  This can't
-  // happen in live code, and we want to avoid having analyzed blocks with
-  // "unset" values.
-  Result.changeUnsetElementsTo(DIKind::Yes);
 }
 
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
@@ -1444,6 +1454,12 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
     if (!NeededElements[i])
       Result.set(i, DIKind::Yes);
+    else if (!Result.getConditional(i)) {
+      // If the result element wasn't computed, we must be analyzing code within
+      // an unreachable cycle that is not dominated by "TheMemory".  Just force
+      // the unset element to yes so that clients don't have to handle this.
+      Result.set(i, DIKind::Yes);
+    }
   }
   return Result;
 }
