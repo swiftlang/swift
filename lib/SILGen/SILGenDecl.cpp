@@ -1918,11 +1918,6 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
   }
-
-  void visitVarDecl(VarDecl *vd) {
-    // FIXME: Emit getter and setter (if settable) witnesses.
-    // For now we ignore them, like the IRGen witness table builder did.
-  }
   
   void visitIfConfigDecl(IfConfigDecl *icd) {
     // We only care about the active members, which were already subsumed by the
