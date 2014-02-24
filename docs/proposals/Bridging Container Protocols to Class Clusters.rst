@@ -82,8 +82,8 @@ inheritance to hide the concrete implementing type behind an abstract base::
 
   // Abstract base class that forwards the Array protocol
   class ArrayOfImplBase<T> {
-    var startIndex : Int { fatal() }
-    var endIndex : Int { fatal() }
+    var startIndex: Int { fatal() }
+    var endIndex: Int { fatal() }
 
     func __getitem__(i: Int) -> T { fatal() }
 
@@ -96,8 +96,8 @@ inheritance to hide the concrete implementing type behind an abstract base::
     : ArrayOfImplBase<T>
   {
     var value: ArrayT
-    var startIndex : Int { return value.startIndex }
-    var endIndex : Int { return value.endIndex }
+    var startIndex: Int { return value.startIndex }
+    var endIndex: Int { return value.endIndex }
     func __getitem__(i: Int) -> T { return __getitem__(i) }
 
     // For COW
@@ -109,8 +109,8 @@ inheritance to hide the concrete implementing type behind an abstract base::
   struct ArrayOf<T> : Array {
     var value: ArrayOfImplBase<T>
 
-    var startIndex : Int { return value.startIndex }
-    var endIndex : Int { return value.endIndex }
+    var startIndex: Int { return value.startIndex }
+    var endIndex: Int { return value.endIndex }
     func __getitem__(i: Int) -> T { return value.__getitem__(i) }
 
     init<ArrayT : Array where ArrayT.Element == T>(arr: ArrayT) {
