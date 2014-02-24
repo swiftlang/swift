@@ -29,21 +29,3 @@ bb0(%0 : $B):
   %5 = tuple()
   return %5 : $()
 }
-
-/*
-// This exposes a lowering bug in SILParameterInfo. Once fixed uncomment this
-// test.
-
-typealias BadTuple = (@callee_owned () -> (), Builtin.Int32)
-
-sil @test2 : $@thin (@inout BadTuple) -> () {
-bb0(%0 : $*BadTuple):
-  %1 = tuple_element_addr %0 : $*BadTuple, 0
-  %2 = load %0 : $*BadTuple
-  %3 = tuple_extract %2 : $BadTuple, 0
-  %4 = function_ref @callee_check : $@thin (@callee_owned () -> ()) -> ()
-  apply %4(%3) : $@thin (@callee_owned () -> ()) -> ()
-  %5 = tuple()
-  return %5 : $()
-}
-*/
