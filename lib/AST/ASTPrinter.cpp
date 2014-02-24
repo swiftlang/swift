@@ -1336,6 +1336,11 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
+      Type EltType = TD.getType();
+      if (auto *IOT = EltType->getAs<InOutType>()) {
+        Printer << "inout ";
+        EltType = IOT->getObjectType();
+      }
 
       if (TD.hasName())
         Printer << TD.getName().str() << ": ";
@@ -1344,7 +1349,7 @@ public:
         visit(TD.getVarargBaseTy());
         Printer << "...";
       } else
-        visit(TD.getType());
+        visit(EltType);
     }
     Printer << ")";
   }
