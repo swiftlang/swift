@@ -1029,19 +1029,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto Ty = MF->getType(TyID);
     auto Val = getLocalValue(ValID2, ValResNum2,
                              getSILType(Ty, (SILValueCategory)TyCategory));
-    auto ResultTy = Val.getType().getSwiftRValueType()
-      ->getTypeOfMember(Field->getModuleContext(),
-                        Field, nullptr)->getCanonicalType();
+    auto ResultTy = Val.getType().getFieldType(Field, SILMod);
     if ((ValueKind)OpCode == ValueKind::StructElementAddrInst)
-      ResultVal = Builder.createStructElementAddr(Loc,
-                    Val,
-                    Field,
-                    SILType::getPrimitiveAddressType(ResultTy));
+      ResultVal = Builder.createStructElementAddr(Loc, Val, Field,
+                                                  ResultTy.getAddressType());
     else
-      ResultVal = Builder.createStructExtract(Loc,
-                    Val,
-                    Field,
-                    SILType::getPrimitiveObjectType(ResultTy));
+      ResultVal = Builder.createStructExtract(Loc, Val, Field,
+                                              ResultTy.getObjectType());
     break;
   }
   case ValueKind::StructInst: {
