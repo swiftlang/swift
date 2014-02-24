@@ -218,8 +218,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
     llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
-    if (isBinaryOutput(Opts.OutputKind))
-      OSFlags |= llvm::sys::fs::F_Binary;
     RawOS.reset(new raw_fd_ostream(Opts.OutputFilename.c_str(),
                                    Error, OSFlags));
     if (RawOS->has_error() || !Error.empty()) {

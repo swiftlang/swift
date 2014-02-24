@@ -53,7 +53,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
                      std::string &OutputFilename) {
   std::string ErrorInfo;
   llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
-                          llvm::sys::fs::F_Binary);
+                          llvm::sys::fs::F_None);
   if (!ErrorInfo.empty()) {
     M->Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                           OutputFilename, ErrorInfo);
@@ -65,7 +65,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
 
 static bool printAsObjC(const std::string &path, Module *M) {
   std::string errorInfo;
-  llvm::raw_fd_ostream out(path.c_str(), errorInfo, llvm::sys::fs::F_Binary);
+  llvm::raw_fd_ostream out(path.c_str(), errorInfo, llvm::sys::fs::F_None);
 
   if (out.has_error() || !errorInfo.empty()) {
     M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
@@ -285,7 +285,7 @@ int frontend_main(ArrayRef<const char *>Args,
       std::unique_ptr<llvm::raw_fd_ostream> OS;
       OS.reset(new llvm::raw_fd_ostream(SerializedDiagnosticsPath.c_str(),
                                         ErrorInfo,
-                                        llvm::sys::fs::F_Binary));
+                                        llvm::sys::fs::F_None));
 
       if (!ErrorInfo.empty()) {
         Instance.getDiags().diagnose(SourceLoc(),

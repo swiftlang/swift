@@ -2349,8 +2349,7 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
                       const SILModule *M, bool serializeAllSIL,
                       FilenamesTy inputFiles, StringRef moduleLinkName) {
   std::string errorInfo;
-  llvm::raw_fd_ostream out(outputPath, errorInfo,
-                           llvm::sys::fs::F_Binary);
+  llvm::raw_fd_ostream out(outputPath, errorInfo, llvm::sys::fs::F_None);
 
   if (out.has_error() || !errorInfo.empty()) {
     getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,

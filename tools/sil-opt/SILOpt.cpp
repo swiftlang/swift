@@ -386,7 +386,7 @@ int main(int argc, char **argv) {
 
   std::string ErrorInfo;
   llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
-                          llvm::sys::fs::F_Binary);
+                          llvm::sys::fs::F_None);
   if (!ErrorInfo.empty()) {
     llvm::errs() << "while opening '" << OutputFilename << "': "
                  << ErrorInfo << '\n';
