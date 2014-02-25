@@ -249,26 +249,23 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 /// "isDirectPropertyAccess".
 static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
                                             DeclContext *DC) {
-  // "StoredWithTrivialAccessors" are generally always accessed directly
-  // (except by the trivial accessors themselves which are specially handled),
-  // however, @objc properties always go through their accessors since they
-  // can be overridden.
-  if (member->getStorageKind() == VarDecl::StoredWithTrivialAccessors &&
-      // FIXME: This is probably not the right predicate.
-      !member->isObjC())
-    return true;
+  // Properties that have storage and accessors are frequently accessed through
+  // accessors.  However, in the init and destructor methods for the type
+  // immediately containing the property, accesses are done direct.
+  if (auto *AFD_DC = dyn_cast<AbstractFunctionDecl>(DC))
+    if (member->hasStorage() && member->hasAccessorFunctions() &&
+        // In a ctor or dtor.
+        (isa<ConstructorDecl>(AFD_DC) || isa<DestructorDecl>(AFD_DC)) &&
 
-  // "StoredWithTrivialAccessors" and "Observing" properties have storage, but
-  // are usually accessed through accessors.  However, in init and destructor
-  // methods, accesses are done direct.
-  if ((member->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
-       member->getStorageKind() == VarDecl::Observing) &&
-      (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
-      isa<DeclRefExpr>(base) &&
-      cast<AbstractFunctionDecl>(DC)->getImplicitSelfDecl() ==
-      cast<DeclRefExpr>(base)->getDecl()) {
-    return true;
-  }
+        // Ctor or dtor are for immediate class, not a derived class.
+        AFD_DC->getParent() == member->getDeclContext() &&
+
+        // Is a "self.property" reference.
+        isa<DeclRefExpr>(base) &&
+        AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
+      // Access this directly instead of going through (e.g.) observing accessors.
+      return true;
+    }
 
   // If the value is always directly accessed from this context, do it.
   return member->isUseFromContextDirect(DC);

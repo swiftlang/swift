@@ -470,14 +470,24 @@ SourceRange IfConfigDecl::getSourceRange() const {
 /// Return true if a DeclRefExpr or MemberRefExpr use of this value is
 /// "direct" when being used in the specified context.
 bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
-  // Observing member are accessed directly from within their didSet/willSet
-  // specifiers.  This prevents assignments from becoming infinite loops.
-  if (auto *var = dyn_cast<AbstractStorageDecl>(this))
+  if (auto *var = dyn_cast<AbstractStorageDecl>(this)) {
+    // Observing member are accessed directly from within their didSet/willSet
+    // specifiers.  This prevents assignments from becoming infinite loops.
     if (auto *UseFD = dyn_cast<FuncDecl>(UseDC))
       if (var->hasStorage() && var->hasAccessorFunctions() &&
           UseFD->getAccessorStorageDecl() == var)
         return true;
   
+    // "StoredWithTrivialAccessors" are generally always accessed directly
+    // (except by the trivial accessors themselves which are specially handled),
+    // however, @objc properties always go through their accessors since they
+    // can be overridden.
+    if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors &&
+        // FIXME: This is probably not the right predicate.
+        !isObjC())
+      return true;
+  }
+
   return false;
 }
 
