@@ -1,0 +1,45 @@
+// REQUIRES: X86
+// REQUIRES: ARM
+// RUN: %swift -target i386-apple-ios7 %s -emit-ir | FileCheck %s
+// RUN: %swift -target armv7-apple-ios7 %s -emit-ir | FileCheck %s
+
+// Check that we correctly lay out single-payload enums with a class reference
+// payload as nullable pointers. <rdar://problem/16093103>
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+sil @_TFC11enum_32_bit1CD : $@thin (@owned C) -> ()
+
+// CHECK-LABEL: %O11enum_32_bit3Foo = type <{ [4 x i8] }>
+enum Foo {
+  case A(C)
+  case B
+}
+
+@class_protocol @objc protocol ClassExistential {}
+
+// CHECK-LABEL: %O11enum_32_bit3Bar = type <{ [4 x i8] }>
+enum Bar {
+  case A(ClassExistential)
+  case B
+}
+
+// CHECK-LABEL: define void @foo(i32)
+sil @foo : $@thin (@owned Foo) -> () {
+entry(%0 : $Foo):
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @bar(i32)
+sil @bar : $@thin (@owned Bar) -> () {
+entry(%0 : $Bar):
+  return undef : $()
+}
+
+// Force instantiation of the IR types
+sil @indirect_foo : $@thin (@in Foo) -> ()
+sil @indirect_bar : $@thin (@in Bar) -> ()
