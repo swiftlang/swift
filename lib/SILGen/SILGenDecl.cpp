@@ -1851,7 +1851,23 @@ public:
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
-  
+
+  void visitConstructorDecl(ConstructorDecl *cd) {
+    SILDeclRef requirementRef(cd, SILDeclRef::Kind::Allocator,
+                              ResilienceExpansion::Minimal);
+
+    ConcreteDeclRef witness = Conformance->getWitness(cd, nullptr);
+    SILDeclRef witnessRef(witness.getDecl(), SILDeclRef::Kind::Allocator,
+                          SILDeclRef::ConstructAtBestResilienceExpansion,
+                          requirementRef.uncurryLevel);
+    SILFunction *witnessFn =
+      SGM.emitProtocolWitness(Conformance, requirementRef, witnessRef,
+                              IsNotFreeFunctionWitness,
+                              witness.getSubstitutions());
+    Entries.push_back(
+      SILWitnessTable::MethodWitness{requirementRef, witnessFn});
+  }
+
   void visitAbstractStorageDecl(AbstractStorageDecl *d) {
     // Find the witness in the conformance.
     ConcreteDeclRef witness = Conformance->getWitness(d, nullptr);
@@ -2111,17 +2127,23 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     Mangler mangler(nameStream);
     mangler.mangleProtocolConformance(conformance);
 
-    assert(isa<FuncDecl>(requirement.getDecl())
-           && "need to handle mangling of non-Func SILDeclRefs here");
-    auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
-    auto accessorKind = requiredDecl->getAccessorKind();
-    if (accessorKind != AccessorKind::NotAccessor) {
-      mangler.mangleAccessorEntity(accessorKind,
-                                   requiredDecl->getAccessorStorageDecl(),
-                                   ResilienceExpansion::Minimal);
+    if (auto ctor = dyn_cast<ConstructorDecl>(requirement.getDecl())) {
+      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
+                                      ResilienceExpansion::Minimal,
+                                      requirement.uncurryLevel);
     } else {
-      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
-                           requirement.uncurryLevel);
+      assert(isa<FuncDecl>(requirement.getDecl())
+             && "need to handle mangling of non-Func SILDeclRefs here");
+      auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
+      auto accessorKind = requiredDecl->getAccessorKind();
+      if (accessorKind != AccessorKind::NotAccessor) {
+        mangler.mangleAccessorEntity(accessorKind,
+                                     requiredDecl->getAccessorStorageDecl(),
+                                     ResilienceExpansion::Minimal);
+      } else {
+        mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
+                             requirement.uncurryLevel);
+      }
     }
   }
   

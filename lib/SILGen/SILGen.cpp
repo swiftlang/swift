@@ -392,6 +392,11 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // Emit any default argument getter functions.
   emitAbstractFuncDecl(decl);
 
+  // We never emit constructors in protocols.
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return;
+
+
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl, decl);
   PrettyStackTraceSILFunction X("silgen emitConstructor", f);

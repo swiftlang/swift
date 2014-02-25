@@ -932,13 +932,18 @@ public:
   }
 
   void visitMemberRefExpr(MemberRefExpr *e) {
-    auto *theFuncDecl = dyn_cast<FuncDecl>(e->getMember().getDecl());
+    auto *fd = dyn_cast<AbstractFunctionDecl>(e->getMember().getDecl());
 
     // If the base is a non-protocol, non-archetype type, then this is a load of
     // a function pointer out of a vardecl.  Just emit it as an rvalue.
-    if (!theFuncDecl)
+    if (!fd)
       return visitExpr(e);
-    
+
+    // Figure out the kind of declaration reference we're working with.
+    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+    if (isa<ConstructorDecl>(fd))
+      kind = SILDeclRef::Kind::Allocator;
+
     // We have four cases to deal with here:
     //
     //  1) for a "static" / "type" method, the base is a metatype.
@@ -956,14 +961,14 @@ public:
     auto baseVal = gen.emitRValueAsSingleValue(e->getBase(),
                                                SGFContext::AllowPlusZero);
 
-    auto *proto = cast<ProtocolDecl>(theFuncDecl->getDeclContext());
+    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
     auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
     
     if (!baseTy->isExistentialType()) {
       setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
                           baseVal), e);
       
-    } else if (theFuncDecl->isInstanceMember()) {
+    } else if (fd->isInstanceMember()) {
       // Attach the existential cleanup to the projection so that it gets
       // consumed (or not) when the call is applied to it (or isn't).
       ManagedValue proj;
@@ -995,9 +1000,9 @@ public:
     
     ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
 
-    if (!baseTy->isExistentialType()) {
+    if (!baseTy->getRValueInstanceType()->isExistentialType()) {
       setCallee(Callee::forArchetype(gen, selfParam.peekScalarValue(),
-                                     SILDeclRef(theFuncDecl).asForeign(isObjC),
+                                     SILDeclRef(fd, kind).asForeign(isObjC),
                                      getSubstFnType(), e));
 
     } else {
@@ -1006,7 +1011,7 @@ public:
       subs = getNonSelfSubstitutions(subs);
 
       setCallee(Callee::forProtocol(gen, baseVal.getValue(),
-                                    SILDeclRef(theFuncDecl).asForeign(isObjC),
+                                    SILDeclRef(fd, kind).asForeign(isObjC),
                                     getSubstFnType(), e));
     }
 
