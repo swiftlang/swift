@@ -413,8 +413,8 @@ namespace {
       case VarDecl::Stored:
         OS << "'stored'";
         break;
-      case VarDecl::StoredObjC:
-        OS << "'stored_objc'";
+      case VarDecl::StoredWithTrivialAccessors:
+        OS << "'stored_trivial_accessors'";
         break;
       case VarDecl::Observing:
         OS << "'observing'";

@@ -1122,8 +1122,10 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   setStorageKind(Computed);
 }
 
-/// \brief Turn this into a StorageObjC var, providing a getter and setter.
-void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
+/// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
+/// accessors (getter and setter) that go with it.
+void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,
+                                                         FuncDecl *Set) {
   assert(getStorageKind() == Stored && "VarDecl StorageKind already set");
   assert(Get);
   auto &Context = getASTContext();
@@ -1136,8 +1138,8 @@ void AbstractStorageDecl::makeStoredObjC(FuncDecl *Get, FuncDecl *Set) {
   Get->makeAccessor(this, AccessorKind::IsGetter);
   if (Set) Set->makeAccessor(this, AccessorKind::IsSetter);
   
-  // Mark that this is a StoredObjC property.
-  setStorageKind(StoredObjC);
+  // Mark that this is a StoredWithTrivialAccessors property.
+  setStorageKind(StoredWithTrivialAccessors);
 }
 
 void AbstractStorageDecl::makeObserving(SourceLoc LBraceLoc,

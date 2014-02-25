@@ -1163,10 +1163,10 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
   PD->setMembers(PD->getASTContext().AllocateCopy(members), PD->getBraces());
 }
 
-/// Given a "Stored" property that needs to be converted to StoreObjC (i.e.,
-/// has @objc getters and setters), create the getter and setter, and switch the
-/// storage kind.
-static void convertStoredVarToStoredObjC(VarDecl *VD) {
+/// Given a "Stored" property that needs to be converted to
+/// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
+/// the storage kind.
+static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
@@ -1199,7 +1199,7 @@ static void convertStoredVarToStoredObjC(VarDecl *VD) {
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeStoredObjC(Get, Set);
+  VD->makeStoredWithTrivialAccessors(Get, Set);
   
   
   // We've added some members to our containing class, add them to the members
@@ -1403,11 +1403,8 @@ public:
     // If this is a stored ObjC property and should have an objc getter and
     // setter, then synthesize the accessors and change its storage kind.
     if (VD->getStorageKind() == VarDecl::Stored &&
-        VD->usesObjCGetterAndSetter() &&
-        // FIXME: properties in protocols should not be modeled as stored
-        // properties!
-        !isa<ProtocolDecl>(VD->getDeclContext())) {
-      convertStoredVarToStoredObjC(VD);
+        VD->usesObjCGetterAndSetter()) {
+      addTrivialAccessorsToStoredVar(VD);
 
       // Type check the body of the getter and setter.
       TC.typeCheckDecl(VD->getGetter(), true);

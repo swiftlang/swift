@@ -2578,11 +2578,19 @@ public:
     /// directly.
     Stored,
     
-    /// This is a stored property reflected through to Objective-C access with
-    /// getters and setters.  It is possible to either access it directly, or to
-    /// use the associated getter/setter method.  This is not valid for a
-    /// SubscriptDecl.
-    StoredObjC,
+    /// This is a stored property with trivial accessors which simply get and
+    /// set the underlying storage.  This is not valid for a SubscriptDecl,
+    /// since they never have storage.
+    ///
+    /// These accessors are used for several different purposes:
+    ///   1) In an @objc variable, these accessors are dynamically dispatched
+    ///      to and may be overridden.
+    ///   2) When a stored property satisfies a protocol requirement, these
+    ///      accessors end up as entries in the witness table.
+    ///   3) Perhaps someday these will be used by accesses outside of this
+    ///      resilience domain, when the owning type is resilient.
+    ///
+    StoredWithTrivialAccessors,
 
     /// There is no memory associated with this decl anywhere.  It is accessed
     /// by calling a getter and setter.  If the setter is absent, then the value
@@ -2635,7 +2643,7 @@ public:
   bool hasStorage() const {
     switch (getStorageKind()) {
     case Stored:
-    case StoredObjC:
+    case StoredWithTrivialAccessors:
     case Observing:
       return true;
     case Computed:
@@ -2646,7 +2654,7 @@ public:
   bool hasAccessorFunctions() const {
     switch (getStorageKind()) {
     case Computed:
-    case StoredObjC:
+    case StoredWithTrivialAccessors:
     case Observing:
       return true;
     case Stored:
@@ -2658,8 +2666,9 @@ public:
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     SourceLoc RBraceLoc);
 
-  /// \brief Turn this into a StorageObjC var, providing a getter and setter.
-  void makeStoredObjC(FuncDecl *Get, FuncDecl *Set);
+  /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
+  /// accessors (getter and setter) that go with it.
+  void makeStoredWithTrivialAccessors(FuncDecl *Get, FuncDecl *Set);
 
   /// \brief Turn this into a Observing var, providing the didSet/willSet
   /// specifiers.

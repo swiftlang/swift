@@ -62,7 +62,7 @@ using CharOffset = BitOffset;
 using CharOffsetField = BitOffsetField;
 
 enum class VarDeclStorageKind : uint8_t {
-  Stored, StoredObjC, Computed, Observing
+  Stored, StoredWithTrivialAccessors, Computed, Observing
 };
 using VarDeclStorageKindField = BCFixed<2>;
 

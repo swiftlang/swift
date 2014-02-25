@@ -1530,9 +1530,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     switch ((VarDeclStorageKind)StorageKind) {
     case VarDeclStorageKind::Stored: break;
-    case VarDeclStorageKind::StoredObjC:
-      var->makeStoredObjC(cast_or_null<FuncDecl>(getDecl(getterID)),
-                          cast_or_null<FuncDecl>(getDecl(setterID)));
+    case VarDeclStorageKind::StoredWithTrivialAccessors:
+      var->makeStoredWithTrivialAccessors(
+                                    cast_or_null<FuncDecl>(getDecl(getterID)),
+                                    cast_or_null<FuncDecl>(getDecl(setterID)));
       break;
     case VarDeclStorageKind::Computed:
       var->makeComputed(SourceLoc(),

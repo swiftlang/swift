@@ -127,7 +127,7 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
     }
 
     switch (var->getStorageKind()) {
-    case VarDecl::StoredObjC:
+    case VarDecl::StoredWithTrivialAccessors:
     case VarDecl::Computed:
       return var->getSetter()
         ? CaptureKind::GetterSetter : CaptureKind::Getter;

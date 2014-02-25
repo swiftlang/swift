@@ -250,10 +250,10 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
                                             DeclContext *DC) {
 
-  // "StoredObjC" and "Observing" properties have storage, but are usually
-  // accessed through accessors.  However, in init and destructor methods,
-  // accesses are done direct.
-  if ((member->getStorageKind() == VarDecl::StoredObjC ||
+  // "StoredWithTrivialAccessors" and "Observing" properties have storage, but
+  // are usually accessed through accessors.  However, in init and destructor
+  // methods, accesses are done direct.
+  if ((member->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
        member->getStorageKind() == VarDecl::Observing) &&
       (isa<ConstructorDecl>(DC) || isa<DestructorDecl>(DC)) &&
       isa<DeclRefExpr>(base) &&

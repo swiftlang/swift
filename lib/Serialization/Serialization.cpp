@@ -1365,8 +1365,8 @@ void Serializer::writeDecl(const Decl *D) {
     case VarDecl::Stored:
       StorageKind = VarDeclStorageKind::Stored;
       break;
-    case VarDecl::StoredObjC:
-      StorageKind = VarDeclStorageKind::StoredObjC;
+    case VarDecl::StoredWithTrivialAccessors:
+      StorageKind = VarDeclStorageKind::StoredWithTrivialAccessors;
       break;
     case VarDecl::Computed:
       StorageKind = VarDeclStorageKind::Computed;
