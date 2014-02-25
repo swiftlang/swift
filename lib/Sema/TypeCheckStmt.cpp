@@ -372,6 +372,9 @@ public:
       if (!TC.conformsToProtocol(SequenceType, SequenceProto, DC,
                                  &Conformance, Sequence->getLoc()))
         return nullptr;
+      
+      if (Conformance && Conformance->isInvalid())
+        return nullptr;
 
       GeneratorTy = TC.getWitnessType(SequenceType, SequenceProto,
                                       Conformance,
