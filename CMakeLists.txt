@@ -189,6 +189,9 @@ option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
+option(SWIFT_STDLIB_SERIALIZE_ALL
+  "Serialize all SIL functions in the stdlib instead of just transparent functions."
+  NO)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
 set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 
@@ -344,6 +347,9 @@ function(compile_swift_files)
   endif()
   if(SWIFTFILE_IS_STDLIB_CORE)
     list(APPEND swift_flags -parse-stdlib -module-name "Swift")
+    if (SWIFT_STDLIB_SERIALIZE_ALL)
+      list(APPEND swift_flags -Xfrontend -sil-serialize-all)
+    endif()
   endif()
 
   set(objfile ${SWIFTFILE_OUTPUT})
