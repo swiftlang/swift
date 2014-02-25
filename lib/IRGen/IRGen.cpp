@@ -45,19 +45,6 @@ using namespace swift;
 using namespace irgen;
 using namespace llvm;
 
-static bool isBinaryOutput(IRGenOutputKind kind) {
-  switch (kind) {
-  case IRGenOutputKind::Module:
-  case IRGenOutputKind::LLVMAssembly:
-  case IRGenOutputKind::NativeAssembly:
-    return false;
-  case IRGenOutputKind::LLVMBitcode:
-  case IRGenOutputKind::ObjectFile:
-    return true;
-  }
-  llvm_unreachable("bad output kind!");
-}
-
 static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
