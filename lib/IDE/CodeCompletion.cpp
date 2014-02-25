@@ -1321,10 +1321,9 @@ public:
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call getters or setters.  We use VarDecls and
-        // SubscriptDecls to produce completions that refer to getters and
-        // setters.
-        if (FD->isGetterOrSetter())
+        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // produce completions that refer to getters and setters.
+        if (FD->isAccessor())
           return;
 
         addMethodCall(FD, Reason);
@@ -1393,10 +1392,9 @@ public:
         if (FD->isBinaryOperator() || FD->isUnaryOperator())
           return;
 
-        // We can not call getters or setters.  We use VarDecls and
-        // SubscriptDecls to produce completions that refer to getters and
-        // setters.
-        if (FD->isGetterOrSetter())
+        // We can not call accessors.  We use VarDecls and SubscriptDecls to
+        // produce completions that refer to getters and setters.
+        if (FD->isAccessor())
           return;
 
         addMethodCall(FD, Reason);
