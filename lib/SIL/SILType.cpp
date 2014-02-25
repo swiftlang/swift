@@ -94,5 +94,5 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
 bool SILType::isAddressOnly(SILModule &M) const {
-  return M.getTypeLowering(*this).isAddressOnly();
+  return M.isAddressOnlyType(*this);
 }
