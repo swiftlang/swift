@@ -57,16 +57,6 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
       // Define implicit default constructor for a struct/class.
       if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl))
         addImplicitConstructors(nominalDecl);
-
-      // If we're looking for constructors in an enum, return the enum
-      // elements.
-      // FIXME: This feels like a hack.
-      if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl)) {
-        for (auto member : enumDecl->getMembers()) {
-          if (auto element = dyn_cast<EnumElementDecl>(member))
-            result.addResult(element);
-        }
-      }
     }
 
     // Fall through to look for constructors via the normal means.
