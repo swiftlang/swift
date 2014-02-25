@@ -54,7 +54,7 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(SILModule &M) const {
-  return M.getTypeLowering(*this).isTrivial();
+  return M.isTrivialType(*this);
 }
 
 std::string SILType::getAsString() const {

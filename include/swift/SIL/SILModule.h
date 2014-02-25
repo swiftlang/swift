@@ -127,6 +127,9 @@ private:
   /// This is a cache of builtin Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, BuiltinInfo> BuiltinIDCache;
 
+  /// This is a cache of the isTrivial property for SILTypes.
+  llvm::DenseMap<SILType, bool> TrivialTypeCache;
+
   /// This is the set of undef values we've created, for uniquing purposes.
   llvm::DenseMap<SILType, SILUndef*> UndefValues;
 
@@ -161,6 +164,19 @@ public:
   void eraseFunction(SILFunction *F) {
     getFunctionList().erase(F);
     FunctionTable.erase(F->getName());
+  }
+
+  bool isTrivialType(SILType Ty) {
+    auto It = TrivialTypeCache.find(Ty);
+
+    // Check if this type is already in the cache.
+    if (It != TrivialTypeCache.end())
+      return It->second;
+
+    // Check if the type is trivial and store the result in the cache.
+    bool IsTriv = getTypeLowering(Ty).isTrivial();
+    TrivialTypeCache[Ty] = IsTriv;
+    return IsTriv;
   }
 
   /// Construct a SIL module from an AST module.
