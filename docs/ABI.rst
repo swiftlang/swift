@@ -867,14 +867,15 @@ Generics
 
 ::
 
-  generics ::= generic-parameter+
+  generics ::= generic-parameter+ ('U' generic-parameter+)?
   generic-parameter ::= protocol-list '_'
   protocol-list ::= protocol*
   protocol ::= substitution
   protocol ::= declaration-name
 
 ``<protocol-list>`` is unambiguous because protocols are always top-level,
-so the structure is quite simple.
+so the structure is quite simple. If there are associated types in the signature,
+they are mangled following a second ``U``.
 
 ::
 

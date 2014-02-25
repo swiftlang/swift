@@ -1027,19 +1027,30 @@ private:
   NodePointer demangleGenerics(GenericContext &C) {
     DemanglerPrinter result_printer;
     NodePointer archetypes = Node::create(Node::Kind::Generics);
+    // FIXME: Swallow the mangled associated type constraints.
+    bool assocTypes = false;
     while (true) {
+      if (!assocTypes && Mangled.nextIf('U')) {
+        assocTypes = true;
+        continue;
+      }
       if (Mangled.nextIf('_')) {
         if (!Mangled)
           return nullptr;
         char c = Mangled.peek();
-        if (c != '_' && c != 'S' && !isStartOfIdentifier(c))
+        if (c != '_' && c != 'S'
+            && (assocTypes || c != 'U')
+            && !isStartOfIdentifier(c))
           break;
-        archetypes->addChild(Node::create(
-            Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
+        if (!assocTypes)
+          archetypes->addChild(Node::create(
+              Node::Kind::ArchetypeRef, archetypeName(ArchetypeCount)));
       } else {
         NodePointer proto_list = demangleProtocolList();
         if (!proto_list)
           return nullptr;
+        if (assocTypes)
+          continue;
         NodePointer arch_and_proto =
             Node::create(Node::Kind::ArchetypeAndProtocol);
         arch_and_proto->addChild(Node::create(

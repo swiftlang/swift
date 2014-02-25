@@ -362,8 +362,21 @@ void Mangler::bindGenericParameters(const GenericParamList *genericParams,
     mangleProtocolList(archetype->getConformsTo());
     Buffer << '_';
   }
-
-  if (mangle) Buffer << '_';  
+  
+  if (!mangle)
+    return;
+  
+  auto assocTypes = genericParams->getAssociatedArchetypes();
+  if (!assocTypes.empty()) {
+    // Mangle the associated types.
+    Buffer << 'U';
+    
+    for (auto *assocType : assocTypes) {
+      mangleProtocolList(assocType->getConformsTo());
+      Buffer << '_';
+    }
+  }
+  Buffer << '_';
 }
 
 void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
