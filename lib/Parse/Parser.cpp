@@ -82,7 +82,15 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    bool Parsed = false;
+    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+      if (FD->isAccessor()) {
+        TheParser.parseAccessorBodyDelayed(AFD);
+        Parsed = true;
+      }
+    }
+    if (!Parsed)
+      TheParser.parseAbstractFunctionBodyDelayed(AFD);
     if (CodeCompletion)
       CodeCompletion->doneParsing();
   }

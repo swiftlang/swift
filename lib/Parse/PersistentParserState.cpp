@@ -26,18 +26,40 @@ void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
   std::unique_ptr<FunctionBodyState> State;
   State.reset(new FunctionBodyState(BodyRange, PreviousLoc,
                                     ScopeInfo.saveCurrentScope()));
-  assert(DelayedBodies.find(AFD) == DelayedBodies.end() &&
+  assert(DelayedFunctionBodies.find(AFD) == DelayedFunctionBodies.end() &&
          "Already recorded state for this body");
-  DelayedBodies[AFD] = std::move(State);
+  DelayedFunctionBodies[AFD] = std::move(State);
 }
 
 std::unique_ptr<PersistentParserState::FunctionBodyState>
-PersistentParserState::takeBodyState(AbstractFunctionDecl *AFD) {
+PersistentParserState::takeFunctionBodyState(AbstractFunctionDecl *AFD) {
   assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
-  DelayedBodiesTy::iterator I = DelayedBodies.find(AFD);
-  assert(I != DelayedBodies.end() && "State should be saved");
+  DelayedFunctionBodiesTy::iterator I = DelayedFunctionBodies.find(AFD);
+  assert(I != DelayedFunctionBodies.end() && "State should be saved");
   std::unique_ptr<FunctionBodyState> State = std::move(I->second);
-  DelayedBodies.erase(I);
+  DelayedFunctionBodies.erase(I);
+  return State;
+}
+
+void PersistentParserState::delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
+                                                     SourceRange BodyRange,
+                                                     SourceLoc PreviousLoc,
+                                                     SourceLoc LBLoc) {
+  std::unique_ptr<AccessorBodyState> State;
+  State.reset(new AccessorBodyState(BodyRange, PreviousLoc,
+                                    ScopeInfo.saveCurrentScope(), LBLoc));
+  assert(DelayedAccessorBodies.find(AFD) == DelayedAccessorBodies.end() &&
+         "Already recorded state for this body");
+  DelayedAccessorBodies[AFD] = std::move(State);
+}
+
+std::unique_ptr<PersistentParserState::AccessorBodyState>
+PersistentParserState::takeAccessorBodyState(AbstractFunctionDecl *AFD) {
+  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
+  DelayedAccessorBodiesTy::iterator I = DelayedAccessorBodies.find(AFD);
+  assert(I != DelayedAccessorBodies.end() && "State should be saved");
+  std::unique_ptr<AccessorBodyState> State = std::move(I->second);
+  DelayedAccessorBodies.erase(I);
   return State;
 }
 

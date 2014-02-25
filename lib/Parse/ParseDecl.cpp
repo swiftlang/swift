@@ -1364,15 +1364,65 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
                                     /*Implicit*/true);
 }
 
+static unsigned skipUntilMatchingRBrace(Parser &P) {
+  unsigned OpenBraces = 1;
+  while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
+    if (P.consumeIf(tok::l_brace)) {
+      OpenBraces++;
+      continue;
+    }
+    if (OpenBraces == 1 && P.Tok.is(tok::r_brace))
+      break;
+    if (P.consumeIf(tok::r_brace)) {
+      OpenBraces--;
+      continue;
+    }
+    P.consumeToken();
+  }
+  return OpenBraces;
+}
+
+static unsigned skipBracedBlock(Parser &P) {
+  P.consumeToken(tok::l_brace);
+  unsigned OpenBraces = skipUntilMatchingRBrace(P);
+  if (P.consumeIf(tok::r_brace))
+    OpenBraces--;
+  return OpenBraces;
+}
+
+void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
+                               SourceLoc LBLoc) {
+  SourceLoc SavedPreviousLoc = PreviousLoc;
+
+  SourceRange BodyRange;
+  BodyRange.Start = Tok.getLoc();
+
+  // Skip until the next '}' at the correct nesting level.
+  unsigned OpenBraces = skipUntilMatchingRBrace(*this);
+
+  if (OpenBraces != 1) {
+    // FIXME gribozavr
+  }
+
+  BodyRange.End = PreviousLoc;
+
+  if (DelayedParseCB->shouldDelayFunctionBodyParsing(
+          *this, AFD, AFD->getAttrs(), BodyRange)) {
+    State->delayAccessorBodyParsing(AFD, BodyRange, SavedPreviousLoc, LBLoc);
+    AFD->setBodyDelayed(BodyRange);
+  } else {
+    AFD->setBodySkipped(BodyRange);
+  }
+}
 
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
-bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
-                         TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
-                         FuncDecl *&WillSet, FuncDecl *&DidSet,
-                         SourceLoc &LastValidLoc, SourceLoc StaticLoc,
-                         SmallVectorImpl<Decl *> &Decls) {
+bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
+                             TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
+                             FuncDecl *&WillSet, FuncDecl *&DidSet,
+                             SourceLoc &LastValidLoc, SourceLoc StaticLoc,
+                             SmallVectorImpl<Decl *> &Decls) {
   Get = Set = WillSet = DidSet = nullptr;
 
   // Properties in protocols use sufficiently limited syntax that we have a
@@ -1537,7 +1587,10 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
 
     // Parse the body.
     SmallVector<ASTNode, 16> Entries;
-    parseBraceItems(Entries);
+    if (!isDelayedParsingEnabled())
+      parseBraceItems(Entries);
+    else
+      consumeGetSetBody(TheDecl, LBLoc);
 
     SourceLoc RBLoc = Tok.getLoc();
     if (!isImplicitGet &&
@@ -1545,16 +1598,79 @@ bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
                            LBLoc))
       RBLoc = PreviousLoc;
 
-    BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
-    TheDecl->setBody(Body);
-    
+    if (!isDelayedParsingEnabled()) {
+      BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
+      TheDecl->setBody(Body);
+    }
+
     Decls.push_back(TheDecl);
-    LastValidLoc = Body->getRBraceLoc();
+    LastValidLoc = RBLoc;
   }
 
   return false;
 }
 
+bool Parser::parseGetSet(ParseDeclOptions Flags, Pattern *Indices,
+                         TypeLoc ElementTy, FuncDecl *&Get, FuncDecl *&Set,
+                         FuncDecl *&WillSet, FuncDecl *&DidSet,
+                         SourceLoc &LBLoc, SourceLoc &RBLoc,
+                         SourceLoc StaticLoc,
+                         SmallVectorImpl<Decl *> &Decls) {
+  LBLoc = consumeToken(tok::l_brace);
+  SourceLoc LastValidLoc = LBLoc;
+  bool Invalid = parseGetSetImpl(Flags, Indices, ElementTy, Get, Set, WillSet,
+                                 DidSet, LastValidLoc, StaticLoc, Decls);
+
+  // Parse the final '}'.
+  if (Invalid)
+    skipUntil(tok::r_brace);
+
+  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                         LBLoc)) {
+    Invalid = true;
+    RBLoc = LastValidLoc;
+  }
+  return Invalid;
+}
+
+void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
+  assert(!AFD->getBody() && "function should not have a parsed body");
+  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
+         "function body should be delayed");
+
+  auto AccessorParserState = State->takeAccessorBodyState(AFD);
+  assert(AccessorParserState.get() && "should have a valid state");
+
+  auto BeginParserPosition = getParserPosition(AccessorParserState->BodyPos);
+  auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
+
+  // ParserPositionRAII needs a primed parser to restore to.
+  if (Tok.is(tok::NUM_TOKENS))
+    consumeToken();
+
+  // Ensure that we restore the parser state at exit.
+  ParserPositionRAII PPR(*this);
+
+  // Create a lexer that can not go past the end state.
+  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
+
+  // Temporarily swap out the parser's current lexer with our new one.
+  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+
+  // Rewind to the first token of the accessor body.
+  restoreParserPosition(BeginParserPosition);
+
+  // Re-enter the lexical scope.
+  Scope S(this, AccessorParserState->takeScope());
+  ParseFunctionBody CC(*this, AFD);
+
+  SmallVector<ASTNode, 16> Entries;
+  parseBraceItems(Entries);
+  BraceStmt *Body =
+      BraceStmt::create(Context, AccessorParserState->LBLoc, Entries,
+                        Tok.getLoc());
+  AFD->setBody(Body);
+}
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
 VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
@@ -1599,25 +1715,14 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
   }
 
-  SourceLoc LBLoc = consumeToken(tok::l_brace);
-    
   // Parse getter and setter.
   FuncDecl *Get = nullptr, *Set = nullptr;
   FuncDecl *WillSet = nullptr, *DidSet = nullptr;
-  SourceLoc LastValidLoc = LBLoc;
-  if (parseGetSet(Flags, /*Indices=*/0, TyLoc,
-                  Get, Set, WillSet, DidSet, LastValidLoc, StaticLoc,
-                  Decls))
-    Invalid = true;
-
-  // Parse the final '}'.
-  if (Invalid)
-    skipUntil(tok::r_brace);
-
+  SourceLoc LBLoc;
   SourceLoc RBLoc;
-  if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                         LBLoc))
-    RBLoc = LastValidLoc;
+  if (parseGetSet(Flags, /*Indices=*/0, TyLoc, Get, Set, WillSet, DidSet,
+                  LBLoc, RBLoc, StaticLoc, Decls))
+    Invalid = true;
 
   // If we have an invalid case, bail out now.
   if (!PrimaryVar)
@@ -1657,20 +1762,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     return PrimaryVar;
   }
 
-  // Otherwise, this must be a get/set property.  The set is optional, but get
-  // is not.
-  if (Set && !Get) {
-    if (!Invalid)
-      diagnose(Set->getLoc(), diag::var_set_without_get);
-    Invalid = true;
-  }
-
-  // If things went well, turn this into a computed variable.
-  if (!Invalid && (Set || Get)) {
-    PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
-    return PrimaryVar;
-  }
-  
   // If this decl is invalid, mark any parsed accessors as invalid to avoid
   // tripping up later invariants.
   if (Invalid) {
@@ -1683,7 +1774,19 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       Set->setInvalid();
     }
   }
-  
+
+  // Otherwise, this must be a get/set property.  The set is optional, but get
+  // is not.
+  if (!Invalid && Set && !Get) {
+    diagnose(Set->getLoc(), diag::var_set_without_get);
+  }
+
+  // Turn this into a computed variable.
+  if (Set || Get) {
+    PrimaryVar->makeComputed(LBLoc, Get, Set, RBLoc);
+    return PrimaryVar;
+  }
+
   return nullptr;
 }
 
@@ -1910,19 +2013,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   BodyRange.Start = Tok.getLoc();
 
   // Consume the '{', and find the matching '}'.
-  consumeToken(tok::l_brace);
-  unsigned OpenBraces = 1;
-  while (OpenBraces != 0 && Tok.isNot(tok::eof)) {
-    if (consumeIf(tok::l_brace)) {
-      OpenBraces++;
-      continue;
-    }
-    if (consumeIf(tok::r_brace)) {
-      OpenBraces--;
-      continue;
-    }
-    consumeToken();
-  }
+  unsigned OpenBraces = skipBracedBlock(*this);
   if (OpenBraces != 0 && Tok.isNot(tok::code_complete)) {
     assert(Tok.is(tok::eof));
     // We hit EOF, and not every brace has a pair.  Recover by searching
@@ -2129,7 +2220,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
          "function body should be delayed");
 
-  auto FunctionParserState = State->takeBodyState(AFD);
+  auto FunctionParserState = State->takeFunctionBodyState(AFD);
   assert(FunctionParserState.get() && "should have a valid state");
 
   auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
@@ -2720,26 +2811,13 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     diagnose(Tok, diag::expected_lbrace_subscript);
     Status.setIsParseError();
   } else {
-    SourceLoc LBLoc = consumeToken();
-    
-    SourceLoc LastValidLoc = LBLoc;
     FuncDecl *WillSet = nullptr, *DidSet = nullptr;
-    if (parseGetSet(Flags, Indices.get(), ElementTy.get(),
-                    Get, Set, WillSet, DidSet, LastValidLoc,
-                    /*StaticLoc*/ SourceLoc(), Decls))
-      Status.setIsParseError();
-
-    // Parse the final '}'.
+    SourceLoc LBLoc;
     SourceLoc RBLoc;
-    if (Status.isError()) {
-      skipUntilDeclRBrace();
-      RBLoc = LastValidLoc;
-    }
-
-    if (parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                           LBLoc)) {
-      RBLoc = LastValidLoc;
-    }
+    if (parseGetSet(Flags, Indices.get(), ElementTy.get(),
+                    Get, Set, WillSet, DidSet, LBLoc, RBLoc,
+                    /*StaticLoc=*/SourceLoc(), Decls))
+      Status.setIsParseError();
 
     if (Status.isSuccess()) {
       if (!Get)

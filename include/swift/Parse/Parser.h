@@ -645,11 +645,19 @@ public:
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc,
                             StaticSpellingKind StaticSpelling);
+
+  void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
+  bool parseGetSetImpl(ParseDeclOptions Flags,
+                       Pattern *Indices, TypeLoc ElementTy,
+                       FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
+                       FuncDecl *&DidSet, SourceLoc &LastValidLoc,
+                       SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
   bool parseGetSet(ParseDeclOptions Flags,
                    Pattern *Indices, TypeLoc ElementTy,
                    FuncDecl *&Get, FuncDecl *&Set, FuncDecl *&WillSet,
-                   FuncDecl *&DidSet, SourceLoc &LastValidLoc,
+                   FuncDecl *&DidSet, SourceLoc &LBLoc, SourceLoc &RBLoc,
                    SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
+  void parseAccessorBodyDelayed(AbstractFunctionDecl *AFD);
   VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                               SourceLoc StaticLoc,
                               SmallVectorImpl<Decl *> &Decls);
