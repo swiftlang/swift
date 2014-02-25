@@ -1,80 +1,12 @@
 2014-02-26
 ----------
 
-* The "swift" command line tool now has limited support for configuration-dependent
-statements and declarations.
+* Swift now has both fully-closed ranges, which include their endpoint, and half-open ranges, which don't.
 
-The compiler now supports "#if", "#else" and "#endif" blocks, along with build and
-target configuration values, to allow for conditional compilation within declaration 
-and statement contexts.
-
-Build configurations are identifiers that can be specified via the compiler's
-new '-D' flag, and referenced via the '#if' keyword in any valid statement and
-declaration location.  For example:
-
-  #if FOO
-    println("FOO") // will print FOO if '-D FOO' is passed into swift
-  #else
-    println("!FOO") // will print !FOO if '-D FOO' is NOT passed into swift
-  #endif
-
-  class C {
-  #if os(OSX)
-    func foo() {
-      // OSX stuff goes here
-    }
-  #else
-    func foo() {
-      // non-OSX stuff goes here
-    }
-  #endif
-  } 
-
-The conditional expression of an "#if" block can be composed of one or more of
-the following expression types:
-  - An identifier expression, evaluating to 'true' if the identifier is bound
-  to a valid build configuration value, and 'false' otherwise
-  - A unary expression, using '!'
-  - A binary expression, using '&&' or '||'
-  - A paren expression
-  - A target configuration function call (see below)
-
-For example:
-
-  #if FOO && (!BAR || (os(iOS) && arch(I386)))
-  ...
-  #endif
-
-Note that build configurations do not constitute a preprocessor, and must form
-valid and complete expressions or statements, so the following would trigger a
-parser error:
-
-  class C {
-
-  #if FOO
-    func foo() {}
-  }
-  #else
-    func bar() {}
-    func baz() {}
-  }
-  #endif
-
-Also note that "active" code will be parsed, typechecked and emitted, while
-"inactive" code will only be parsed. (So code in an inactive #if or #else block
-may produce parser errors.) Active and inactive code cannot interact.
-
-Target configurations are implicit and hard-wired into the compiler.  There are
-currently only two supported target configurations
-  "os", which can have the values OSX or iOS
-  "arch", which can have the values I386, X64, ARM and ARM64
-
-Target configurations are tested against their values via a pseudo-function
-invocation, taking a single argument expressed as an identitifer.  For example,
-
-  #if (arch(X64) && os(OSX))
-    println("Mac")
-  #endif
+    (swift) for x in 0...5 { print(x) } ; print('\n') // half-open range
+    01234
+    (swift) for x in 0..5 { print(x) } ; print('\n')  // fully-closed range
+    012345
 
 * Property accessors have a new syntax:
 
@@ -108,11 +40,6 @@ invocation, taking a single argument expressed as an identitifer.  For example,
     } 
 
   These can be used for generic algorithms now as well.
-
-  One known caveat is:
-<rdar://problem/15912000> Stored property doesn't properly fulfil a protocol property requirement
-  which can be worked around by making the implementation of the property 
-  be computed.
 
 2014-02-19
 ----------
