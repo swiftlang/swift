@@ -34,11 +34,6 @@
 
   These can be used for generic algorithms now as well.
 
-  One known caveat is:
-<rdar://problem/15912000> Stored property doesn't properly fulfil a protocol property requirement
-  which can be worked around by making the implementation of the property 
-  be computed.
-
 2014-02-19
 ----------
 
