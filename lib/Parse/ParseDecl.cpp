@@ -1401,7 +1401,7 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   unsigned OpenBraces = skipUntilMatchingRBrace(*this);
 
   if (OpenBraces != 1) {
-    // FIXME gribozavr
+    // FIXME: implement some error recovery?
   }
 
   BodyRange.End = PreviousLoc;
