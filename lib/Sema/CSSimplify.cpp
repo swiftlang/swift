@@ -1334,6 +1334,12 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
         return false;
       }
     }
+
+    // Only look at the argument type of a constructor.
+    if (isa<ConstructorDecl>(afd)) {
+      auto argTy = type->castTo<AnyFunctionType>()->getInput();
+      return containsProtocolSelf(argTy);
+    }
   }
 
   return containsProtocolSelf(type);

@@ -434,11 +434,12 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
 
   // If the function requirement returns Self and has no other
   // reference to Self, note that.
-  if (auto func = dyn_cast<FuncDecl>(value)) {
-    auto type = func->getInterfaceType();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto type = afd->getInterfaceType();
+
     // Skip the 'self' type.
     type = type->castTo<AnyFunctionType>()->getResult();
-    for (unsigned i = 1, n = func->getNumParamPatterns(); i != n; ++i) {
+    for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
       // Check whether the input type contains Self anywhere.
       auto fnType = type->castTo<AnyFunctionType>();
       if (containsSelf(fnType->getInput()))
@@ -447,7 +448,12 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
       type = fnType->getResult();
     }
 
+    // For constructors, we're done.
+    if (isa<ConstructorDecl>(afd))
+      return SelfReferenceKind::No;
+
     // The result type remains.
+    auto func = cast<FuncDecl>(afd);
     return (isSelf(type) || func->hasDynamicSelf())
              ? SelfReferenceKind::Result
              : containsSelf(type) ? SelfReferenceKind::Yes
@@ -455,8 +461,6 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
   }
 
   auto type = value->getInterfaceType();
-  if (isa<ConstructorDecl>(value))
-    type = type->castTo<AnyFunctionType>()->getResult();
 
   return containsSelf(type) ? SelfReferenceKind::Yes
                             : SelfReferenceKind::No;

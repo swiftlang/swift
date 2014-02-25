@@ -656,8 +656,12 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       funcTy = fn->getDynamicSelfInterface();
     }
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
-    funcTy = ctor->getExtensionType()->getAnyNominal()
-               ->getDeclaredInterfaceType();
+    if (auto proto = dyn_cast<ProtocolDecl>(ctor->getDeclContext())) {
+      funcTy = proto->getSelf()->getDeclaredType();
+    } else {
+      funcTy = ctor->getExtensionType()->getAnyNominal()
+                 ->getDeclaredInterfaceType();
+    }
     initFuncTy = funcTy;
   } else {
     assert(isa<DestructorDecl>(func));
