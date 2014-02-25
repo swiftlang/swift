@@ -48,8 +48,7 @@ public:
   clang::CanQualType visitMetatypeType(CanMetatypeType type);
   clang::CanQualType visitProtocolType(CanProtocolType type);
   clang::CanQualType visitClassType(CanClassType type);
-  clang::CanQualType visitBoundGenericStructType(
-                                                CanBoundGenericStructType type);
+  clang::CanQualType visitBoundGenericType(CanBoundGenericType type);
   clang::CanQualType visitEnumType(CanEnumType type);
   clang::CanQualType visitFunctionType(CanFunctionType type);
   clang::CanQualType visitProtocolCompositionType(

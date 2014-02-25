@@ -171,9 +171,12 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-      return FunctionType::get(fTy->getInput(),
-                               fTy->getResult(),
-                               AnyFunctionType::ExtInfo().withIsBlock(true));
+      fTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
+                              fTy->getExtInfo().withIsBlock(true));
+
+      if (Impl.EnableOptional)
+        return UncheckedOptionalType::get(fTy);
+      return fTy;
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {
@@ -453,7 +456,8 @@ namespace {
       return imported->getDeclaredType();
     }
 
-    Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
+    Type
+    VisitObjCObjectPointerTypeImpl(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
       if (auto interface = type->getInterfaceType()) {
@@ -492,6 +496,13 @@ namespace {
       // Class maps to DynamicLookup.metatype.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
       return MetatypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
+    }
+
+    Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
+      Type result = VisitObjCObjectPointerTypeImpl(type);
+      if (!result || !Impl.EnableOptional)
+        return result;
+      return UncheckedOptionalType::get(result);
     }
   };
 }

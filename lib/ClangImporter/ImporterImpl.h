@@ -162,7 +162,8 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx) : SwiftContext(ctx) { }
+  Implementation(ASTContext &ctx, bool enableOptional)
+    : SwiftContext(ctx), EnableOptional(enableOptional) { }
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -170,6 +171,8 @@ public:
 
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
+
+  const bool EnableOptional;
 
   bool hasValidSDK() const;
 

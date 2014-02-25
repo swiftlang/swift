@@ -95,6 +95,9 @@ def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
+def enable_objc_optional : Flag<["-"], "enable-objc-optional">,
+  HelpText<"Import Objective-C references using UncheckedOptional">;
+
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 

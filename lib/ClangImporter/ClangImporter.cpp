@@ -69,8 +69,8 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx)
-  : Impl(*new Implementation(ctx))
+ClangImporter::ClangImporter(ASTContext &ctx, bool useOptional)
+  : Impl(*new Implementation(ctx, useOptional))
 {
 }
 
@@ -82,7 +82,9 @@ ClangImporter::~ClangImporter() {
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
-  std::unique_ptr<ClangImporter> importer(new ClangImporter(ctx));
+  std::unique_ptr<ClangImporter> importer{
+    new ClangImporter(ctx, clangImporterOpts.EnableOptional)
+  };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;

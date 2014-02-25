@@ -1604,6 +1604,9 @@ namespace {
       if (decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
         resultTy = result->getDynamicSelf();
+        assert(resultTy && "failed to get dynamic self");
+        if (Impl.EnableOptional)
+          resultTy = UncheckedOptionalType::get(resultTy);
         
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();

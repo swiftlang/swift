@@ -150,12 +150,21 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   return getClangIdType(getClangASTContext());
 }
 
-clang::CanQualType GenClangType::visitBoundGenericStructType(
-  CanBoundGenericStructType type) {
-  // We only expect UnsafePointer<T>.
+clang::CanQualType
+GenClangType::visitBoundGenericType(CanBoundGenericType type) {
+  // We only expect UnsafePointer<T>, UncheckedOptional<T>, and Optional<T>.
+  // The first two are structs; the last is an enum.
+  if (auto underlyingTy = type->getAnyOptionalObjectType()) {
+    assert((underlyingTy->is<FunctionType>() ||
+            underlyingTy->getClassOrBoundGenericClass() ||
+            underlyingTy->isClassExistentialType()) &&
+           "Unexpected optional type in Clang type generation!");
+    return visit(underlyingTy->getCanonicalType());
+  }
+
   auto swiftStructDecl = type->getDecl();
   assert(swiftStructDecl->getName().str() == "UnsafePointer" &&
-         "Unexpected bound generic struct in imported Clang module!");
+         "Unexpected bound generic type in imported Clang module!");
   (void) swiftStructDecl;
   auto args = type->getGenericArgs();
   assert(args.size() == 1 &&

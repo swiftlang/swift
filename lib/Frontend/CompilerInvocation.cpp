@@ -534,6 +534,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
+  Opts.EnableOptional = Args.hasArg(OPT_enable_objc_optional);
+
   return false;
 }
 

@@ -44,7 +44,7 @@ public:
 private:
   Implementation &Impl;
 
-  ClangImporter(ASTContext &ctx);
+  ClangImporter(ASTContext &ctx, bool useOptional);
 
 public:
   /// \brief Create a new Clang importer that can import a suitable Clang
