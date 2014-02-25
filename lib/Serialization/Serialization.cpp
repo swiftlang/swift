@@ -400,7 +400,7 @@ void Serializer::writeInputFiles(const Module *M,
     err = llvm::sys::fs::make_absolute(path);
     if (err)
       continue;
-    
+
     SourceFile.emit(ScratchRecord, path);
   }
 
@@ -510,7 +510,7 @@ void Serializer::writePattern(const Pattern *pattern) {
   }
   case PatternKind::Isa: {
     auto isa = cast<IsaPattern>(pattern);
-    
+
     unsigned abbrCode = DeclTypeAbbrCodes[IsaPatternLayout::Code];
     IsaPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  addTypeRef(isa->getCastTypeLoc().getType()),
@@ -540,7 +540,7 @@ void Serializer::writePattern(const Pattern *pattern) {
 
   case PatternKind::Var: {
     auto var = cast<VarPattern>(pattern);
-    
+
     unsigned abbrCode = DeclTypeAbbrCodes[VarPatternLayout::Code];
     VarPatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                  var->isImplicit());
@@ -698,7 +698,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numValueWitnesses = 0;
     unsigned numTypeWitnesses = 0;
     unsigned numDefaultedDefinitions = 0;
-    conformance->forEachValueWitness(nullptr, 
+    conformance->forEachValueWitness(nullptr,
                                      [&](ValueDecl *req,
                                          ConcreteDeclRef witness) {
       data.push_back(addDeclRef(req));
@@ -860,10 +860,10 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::TopLevelCode:
   case DeclKind::Extension:
     llvm_unreachable("decl should never be a member");
-  
+
   case DeclKind::IfConfig:
     return false;
-      
+
   case DeclKind::EnumCase:
     return false;
 
@@ -887,13 +887,13 @@ static bool shouldSerializeMember(Decl *D) {
 
 void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   using namespace decls_block;
-  
+
   unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
   SmallVector<DeclID, 16> memberIDs;
   for (auto member : members) {
     if (!shouldSerializeMember(member))
       continue;
-    
+
     DeclID memberID = addDeclRef(member);
     memberIDs.push_back(memberID);
 
@@ -1084,7 +1084,7 @@ void Serializer::writeDecl(const Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
     llvm_unreachable("import decls should not be serialized");
-      
+
   case DeclKind::IfConfig:
     llvm_unreachable("#if block declarations should not be serialized");
 
@@ -1119,7 +1119,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::EnumCase:
     llvm_unreachable("enum case decls should not be serialized");
-      
+
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
     checkAllowedAttributes<>(binding);
@@ -1158,7 +1158,7 @@ void Serializer::writeDecl(const Decl *D) {
                                     op->getPrecedence());
     break;
   }
-      
+
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
@@ -1171,7 +1171,7 @@ void Serializer::writeDecl(const Decl *D) {
                                      addDeclRef(DC));
     break;
   }
-    
+
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
@@ -1723,7 +1723,7 @@ void Serializer::writeType(Type ty) {
 
   case TypeKind::Archetype: {
     auto archetypeTy = cast<ArchetypeType>(ty.getPointer());
-    
+
     // Opened existential types use a separate layout.
     if (auto existentialTy = archetypeTy->getOpenedExistentialType()) {
       unsigned abbrCode = DeclTypeAbbrCodes[OpenedExistentialTypeLayout::Code];
@@ -1890,7 +1890,7 @@ void Serializer::writeType(Type ty) {
       unsigned conv = getRawStableParameterConvention(param.getConvention());
       paramTypes.push_back(TypeID(conv));
     }
-    
+
     auto sig = fnTy->getGenericSignature();
     if (sig) {
       for (auto param : sig->getGenericParams())
@@ -1984,7 +1984,7 @@ void Serializer::writeType(Type ty) {
   }
   case TypeKind::InOut: {
     auto iotTy = cast<InOutType>(ty.getPointer());
-    
+
     unsigned abbrCode = DeclTypeAbbrCodes[InOutTypeLayout::Code];
     InOutTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(iotTy->getObjectType()));
@@ -2127,7 +2127,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
     auto &offsets = next.isDecl() ? DeclOffsets : TypeOffsets;
     assert((id - 1) == offsets.size());
-    
+
     offsets.push_back(Out.GetCurrentBitNo());
 
     if (next.isDecl())
@@ -2202,13 +2202,13 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
                        KnownProtocolKind kind, ArrayRef<DeclID> adopters) {
   if (adopters.empty())
     return;
-                       
+
   SmallVector<uint32_t, 32> scratch;
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
 /// Add operator methods to the given declaration type.
-static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members, 
+static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members,
                                    Serializer::DeclTable &operatorMethodDecls) {
   for (auto member : members) {
     // Add operator methods.
@@ -2245,7 +2245,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
         // Add operator methods from nominal types.
         if (auto nominal = dyn_cast<NominalTypeDecl>(VD)) {
-          addOperatorMethodDecls(*this, nominal->getMembers(), 
+          addOperatorMethodDecls(*this, nominal->getMembers(),
                                  operatorMethodDecls);
         }
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {

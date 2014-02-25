@@ -1,4 +1,4 @@
-//===--- SerializedModuleLoader.cpp - Import Swift modules ------*- c++ -*-===//
+//===--- SerializedModuleLoader.cpp - Import Swift modules ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

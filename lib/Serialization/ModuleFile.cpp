@@ -1,4 +1,4 @@
-//===--- ModuleFile.cpp - Loading a serialized module -----------*- c++ -*-===//
+//===--- ModuleFile.cpp - Loading a serialized module -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -153,10 +153,10 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
         return result;
       }
     }
-    
+
     topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
   }
-  
+
   if (topLevelEntry.Kind == llvm::BitstreamEntry::EndBlock) {
     cursor.ReadBlockEnd();
     assert(cursor.GetCurrentBitNo() % CHAR_BIT == 0);
@@ -560,10 +560,10 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
       }
       break;
     }
-    
+
     topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
   }
-  
+
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
     error();
     return;
@@ -795,11 +795,11 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
 
   if (!ClassMembersByName)
     return;
-  
+
   auto iter = ClassMembersByName->find(name);
   if (iter == ClassMembersByName->end())
     return;
-  
+
   if (!accessPath.empty()) {
     for (auto item : *iter) {
       auto vd = cast<ValueDecl>(getDecl(item.second));
@@ -812,7 +812,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
     }
     return;
   }
-  
+
   for (auto item : *iter) {
     auto vd = cast<ValueDecl>(getDecl(item.second));
     results.push_back(vd);

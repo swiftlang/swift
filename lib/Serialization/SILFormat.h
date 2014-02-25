@@ -103,7 +103,7 @@ namespace sil_block {
     SIL_WITNESS_BASE_ENTRY = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
-    
+
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
     BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
@@ -214,7 +214,7 @@ namespace sil_block {
     ValueIDField,
     SILValueResultField
   >;
-  
+
   // SIL instructions that construct existential values.
   using SILInitExistentialLayout = BCRecordLayout<
     SIL_INIT_EXISTENTIAL,

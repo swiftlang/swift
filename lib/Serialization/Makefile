@@ -1,5 +1,5 @@
 ##===- swift/lib/Serialization/Makefile --------------------*- Makefile -*-===##
-# 
+#
 # This source file is part of the Swift.org open source project
 #
 # Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
@@ -16,4 +16,3 @@ include $(SWIFT_LEVEL)/../../Makefile.config
 LIBRARYNAME := swiftSerialization
 
 include $(SWIFT_LEVEL)/Makefile
-

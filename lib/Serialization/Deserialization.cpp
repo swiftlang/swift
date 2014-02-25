@@ -1,4 +1,4 @@
-//===--- Deserialization.cpp - Loading a serialized AST ---------*- c++ -*-===//
+//===--- Deserialization.cpp - Loading a serialized AST -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -192,7 +192,7 @@ getActualDefaultArgKind(uint8_t raw) {
 
 Pattern *ModuleFile::maybeReadPattern() {
   using namespace decls_block;
-  
+
   SmallVector<uint64_t, 8> scratch;
 
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
@@ -448,7 +448,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
              ctx.getInheritedConformance(conformingType,
                                          inheritedConformance) };
   }
-      
+
   // Not a protocol conformance.
   default:
     return Nothing;
@@ -819,7 +819,7 @@ void ModuleFile::readGenericRequirements(
       shouldContinue = false;
       break;
     }
-    
+
     if (!shouldContinue)
       break;
   }
@@ -1248,7 +1248,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
-    
+
     if (declOrOffset.isComplete())
       break;
 
@@ -1335,7 +1335,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    TypeLoc defaultDefinitionType = 
+    TypeLoc defaultDefinitionType =
       TypeLoc::withoutLoc(getType(defaultDefinitionID));
     auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
                                                   getIdentifier(nameID),
@@ -1558,7 +1558,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    
+
     var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
     break;
   }
@@ -1829,7 +1829,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                SourceLoc(), infixData);
     break;
   }
-      
+
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
@@ -1839,7 +1839,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC, isIBLiveView,
-                                         resilienceKind, 
+                                         resilienceKind,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
                                          superclassID);
@@ -1869,7 +1869,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     else if ((Resilience)resilienceKind == Resilience::Resilient)
       theClass->getMutableAttrs().setAttr(AK_resilient, SourceLoc());
     if (attrRequiresStoredPropertyInits)
-      theClass->getMutableAttrs().setAttr(AK_requires_stored_property_inits, 
+      theClass->getMutableAttrs().setAttr(AK_requires_stored_property_inits,
                                           SourceLoc());
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
@@ -2315,7 +2315,7 @@ Type ModuleFile::getType(TypeID TID) {
                                       noreturn,
                                       autoClosure,
                                       blockCompatible);
-    
+
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
     break;
@@ -2332,19 +2332,19 @@ Type ModuleFile::getType(TypeID TID) {
       break;
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      typeOrOffset = MetatypeType::get(getType(instanceID), 
+      typeOrOffset = MetatypeType::get(getType(instanceID),
                                        MetatypeRepresentation::Thin,
                                        ctx);
       break;
 
     case serialization::MetatypeRepresentation::MR_Thick:
-      typeOrOffset = MetatypeType::get(getType(instanceID), 
+      typeOrOffset = MetatypeType::get(getType(instanceID),
                                        MetatypeRepresentation::Thick,
                                        ctx);
       break;
 
     case serialization::MetatypeRepresentation::MR_ObjC:
-      typeOrOffset = MetatypeType::get(getType(instanceID), 
+      typeOrOffset = MetatypeType::get(getType(instanceID),
                                        MetatypeRepresentation::ObjC,
                                        ctx);
       break;
@@ -2485,14 +2485,14 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::OPENED_EXISTENTIAL_TYPE: {
     TypeID existentialID;
-    
+
     decls_block::OpenedExistentialTypeLayout::readRecord(scratch,
                                                          existentialID);
-    
+
     typeOrOffset = ArchetypeType::getOpened(getType(existentialID));
     break;
   }
-      
+
   case decls_block::GENERIC_TYPE_PARAM_TYPE: {
     DeclID declIDOrDepth;
     unsigned indexPlusOne;
@@ -2535,7 +2535,7 @@ Type ModuleFile::getType(TypeID TID) {
     // See if we triggered deserialization through our conformances.
     if (typeOrOffset.isComplete())
       break;
-    
+
     typeOrOffset = assocType->getDeclaredType();
     break;
   }
@@ -2735,7 +2735,7 @@ Type ModuleFile::getType(TypeID TID) {
       SILParameterInfo param(type, convention.getValue());
       allParams.push_back(param);
     }
-    
+
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
     if (!calleeConvention.hasValue()) {
@@ -2749,11 +2749,11 @@ Type ModuleFile::getType(TypeID TID) {
       genericParamTypes.push_back(
                   cast<GenericTypeParamType>(getType(id)->getCanonicalType()));
     }
-    
+
     // Read the generic requirements, if any.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
-    
+
     GenericSignature *genericSig = nullptr;
     if (!genericParamTypes.empty() || !requirements.empty())
       genericSig = GenericSignature::get(genericParamTypes, requirements);
@@ -2817,7 +2817,7 @@ Type ModuleFile::getType(TypeID TID) {
     error();
     return nullptr;
   }
-  
+
   return typeOrOffset;
 }
 

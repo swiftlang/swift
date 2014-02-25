@@ -47,7 +47,7 @@ class Serializer {
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
 
-public:    
+public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
   /// Convenience wrapper around a PointerUnion.
@@ -298,7 +298,7 @@ public:
   /// usage out of decl block.
   void writeSubstitutions(ArrayRef<Substitution> substitutions,
                           const std::array<unsigned, 256> &abbrCodes);
-  
+
   /// Writes a protocol conformance.
   void writeConformance(const ProtocolDecl *protocol,
                         const ProtocolConformance *conformance,
@@ -308,7 +308,7 @@ public:
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams,
                           const std::array<unsigned, 256> &abbrCodes);
-  
+
 };
 } // end namespace serialization
 } // end namespace swift
