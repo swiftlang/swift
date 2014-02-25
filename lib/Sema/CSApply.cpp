@@ -3415,7 +3415,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>());
+  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+         ty->is<ArchetypeType>());
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
                       locator.withPathElement(

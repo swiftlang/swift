@@ -51,23 +51,21 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
     // Look through the metatype.
     if (auto metaTy = type->getAs<MetatypeType>())
       type = metaTy->getInstanceType();
-    
-    // We only have constructors for nominal declarations.
-    auto nominalDecl = type->getAnyNominal();
-    if (!nominalDecl)
-      return result;
 
-    // Define implicit default constructor for a struct/class.
-    if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl))
-      addImplicitConstructors(nominalDecl);
+    // For nominal types, make sure we have the right constructors available.
+    if (auto nominalDecl = type->getAnyNominal()) {
+      // Define implicit default constructor for a struct/class.
+      if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl))
+        addImplicitConstructors(nominalDecl);
 
-    // If we're looking for constructors in an enum, return the enum
-    // elements.
-    // FIXME: This feels like a hack.
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl)) {
-      for (auto member : enumDecl->getMembers()) {
-        if (auto element = dyn_cast<EnumElementDecl>(member))
-          result.addResult(element);
+      // If we're looking for constructors in an enum, return the enum
+      // elements.
+      // FIXME: This feels like a hack.
+      if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl)) {
+        for (auto member : enumDecl->getMembers()) {
+          if (auto element = dyn_cast<EnumElementDecl>(member))
+            result.addResult(element);
+        }
       }
     }
 

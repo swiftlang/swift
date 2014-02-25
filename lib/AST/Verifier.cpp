@@ -1236,8 +1236,8 @@ struct ASTNodeBase {};
     void verifyChecked(ConstructorDecl *CD) {
       auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
-          !CD->isInvalid()) {
-        Out << "ConstructorDecls outside structs, classes or enums"
+          !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
+        Out << "ConstructorDecls outside structs, classes or enums "
                "should be marked invalid";
         abort();
       }
