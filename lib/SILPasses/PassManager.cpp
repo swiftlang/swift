@@ -38,8 +38,10 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
       if (Options.TimeTransforms) {
-        auto Delta = llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
-        llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F.getName() << ")\n";
+        auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
+          StartTime.nanoseconds();
+        llvm::dbgs() << Delta << " (" << SFT->getName() << "," <<
+        F.getName() << ")\n";
       }
 
       // If this pass invalidated anything, print and verify.
@@ -85,7 +87,8 @@ void SILPassManager::runOneIteration() {
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
       if (Options.TimeTransforms) {
-        auto Delta = llvm::sys::TimeValue::now().nanoseconds() - StartTime.nanoseconds();
+        auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
+          StartTime.nanoseconds();
         llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
       }
 
