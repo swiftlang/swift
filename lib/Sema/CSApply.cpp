@@ -1995,9 +1995,11 @@ namespace {
       auto cond
         = solution.convertToLogicValue(expr->getCondExpr(),
                                        cs.getConstraintLocator(expr));
-      if (!cond)
-        return nullptr;
-      expr->setCondExpr(cond);
+      if (!cond) {
+        cond->setType(ErrorType::get(cs.getASTContext()));
+      } else {
+        expr->setCondExpr(cond);
+      }
 
       // Coerce the then/else branches to the common type.
       expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
@@ -3717,8 +3719,15 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
                                               witness, expr->getEndLoc(),
                                               /*Implicit=*/true);
     bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-    assert(!failed && "Could not reference witness?");
-    (void)failed;
+    if (failed) {
+      // If the member reference expression failed to type check, the Expr's
+      // type does not conform to the given protocol.
+      tc.diagnose(expr->getLoc(),
+                  diag::type_does_not_conform,
+                  type,
+                  protocol->getType());
+      return nullptr;
+    }
 
     // Call the witness.
     Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(),

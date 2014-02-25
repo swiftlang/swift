@@ -101,6 +101,9 @@ namespace {
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, ValueDecl *decl) {
       // If we're referring to an invalid declaration, fail.
+      if (!decl)
+        return nullptr;
+      
       CS.getTypeChecker().validateDecl(decl, true);
       if (decl->isInvalid())
         return nullptr;
