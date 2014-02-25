@@ -3416,7 +3416,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-         ty->is<ArchetypeType>());
+         ty->is<ArchetypeType>() || ty->isExistentialType());
   auto selected = getOverloadChoiceIfAvailable(
                     cs.getConstraintLocator(
                       locator.withPathElement(
@@ -3452,6 +3452,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                   ctor->getArgumentType());
     else
       tc.diagnose(decl, diag::note_nonabstract_initializer);
+  } else if (isa<ConstructorDecl>(decl) && ty->isExistentialType() &&
+             fn->isStaticallyDerivedMetatype()) {
+    tc.diagnose(apply->getLoc(), diag::static_construct_existential, ty)
+      .highlight(fn->getSourceRange());
   }
 
   // Tail-recur to actually call the constructor.

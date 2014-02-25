@@ -564,6 +564,9 @@ NOTE(note_nonabstract_initializer,sema_tce,none,
       "selected non-abstract initializer declared here", ())
 NOTE(note_nonabstract_implicit_initializer,sema_tce,none,
      "selected implicit initializer with type %0", (Type))
+ERROR(static_construct_existential,sema_tce,none,
+      "constructing an object of protocol type %0 requires a metatype value",
+      (Type))
 
 // Operators
 ERROR(unknown_binop,sema_tce,none,

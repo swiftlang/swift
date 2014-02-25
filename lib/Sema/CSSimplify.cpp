@@ -1084,6 +1084,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::BoundGenericStruct:
   case TypeKind::Archetype:
   case TypeKind::DynamicSelf:
+  case TypeKind::ProtocolComposition:
+  case TypeKind::Protocol:
     // Break out to handle the actual construction below.
     break;
 
@@ -1099,10 +1101,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::Metatype:
   case TypeKind::Function:
   case TypeKind::Array:
-  case TypeKind::ProtocolComposition:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::Protocol:
   case TypeKind::Module:
     // If we are supposed to record failures, do so.
     if (shouldRecordFailures()) {
