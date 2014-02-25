@@ -1,6 +1,13 @@
 2014-02-26
 ----------
 
+* Swift now has both fully-closed ranges, which include their endpoint, and half-open ranges, which don't.
+
+    (swift) for x in 0...5 { print(x) } ; print('\n') // half-open range
+    01234
+    (swift) for x in 0..5 { print(x) } ; print('\n')  // fully-closed range
+    012345
+
 * Property accessors have a new syntax:
 
   var computedProperty: Int {
