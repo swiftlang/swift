@@ -126,8 +126,16 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
       return CaptureKind::Box;
     }
 
-    switch (var->getStorageKind()) {
-    case VarDecl::StoredWithTrivialAccessors:
+    auto StorageKind = var->getStorageKind();
+
+    // Properties with trivial accessors are captured by-accessor if they are
+    // @objc (since the accessors can be overriden) or captured by constant or
+    // by-box if not.
+    if (StorageKind == VarDecl::StoredWithTrivialAccessors)
+      StorageKind = var->isObjC() ? VarDecl::Computed : VarDecl::Stored;
+
+    switch (StorageKind) {
+    case VarDecl::StoredWithTrivialAccessors:  assert(0 && "Handled above");
     case VarDecl::Computed:
       return var->getSetter()
         ? CaptureKind::GetterSetter : CaptureKind::Getter;

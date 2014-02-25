@@ -1167,6 +1167,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
 static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
+  assert(VD->getStorageKind() == VarDecl::Stored && "Isn't a stored vardecl");
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
@@ -1204,13 +1205,40 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
   
   // We've added some members to our containing class, add them to the members
   // list.
-  ClassDecl *CD = cast<ClassDecl>(VD->getDeclContext());
-  SmallVector<Decl*, 4> members(CD->getMembers().begin(),
-                                CD->getMembers().end());
+  if (auto *CD = dyn_cast<ClassDecl>(VD->getDeclContext())) {
+    SmallVector<Decl*, 4> members(CD->getMembers().begin(),
+                                  CD->getMembers().end());
+    members.push_back(Get);
+    if (Set) members.push_back(Set);
+    CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
+    return;
+  }
+
+  auto *SD = cast<StructDecl>(VD->getDeclContext());
+  SmallVector<Decl*, 4> members(SD->getMembers().begin(),
+                                SD->getMembers().end());
   members.push_back(Get);
   if (Set) members.push_back(Set);
-  CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
+  SD->setMembers(Context.AllocateCopy(members), SD->getBraces());
 }
+
+/// The specified VarDecl with "Stored" StorageKind was just found to satisfy
+/// a protocol property requirement.  Convert it to
+/// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
+/// variable, enabling the witness table to use those accessors.
+void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
+  addTrivialAccessorsToStoredVar(VD);
+
+  // Type check the body of the getter and setter.
+  validateDecl(VD->getGetter(), true);
+  definedFunctions.push_back(VD->getGetter());
+
+  if (auto *setter = VD->getSetter()) {
+    validateDecl(setter, true);
+    definedFunctions.push_back(setter);
+  }
+}
+
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// (trivial) getter and the setter, which calls these.

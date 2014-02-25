@@ -249,6 +249,14 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 /// "isDirectPropertyAccess".
 static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
                                             DeclContext *DC) {
+  // "StoredWithTrivialAccessors" are generally always accessed directly
+  // (except by the trivial accessors themselves which are specially handled),
+  // however, @objc properties always go through their accessors since they
+  // can be overridden.
+  if (member->getStorageKind() == VarDecl::StoredWithTrivialAccessors &&
+      // FIXME: This is probably not the right predicate.
+      !member->isObjC())
+    return true;
 
   // "StoredWithTrivialAccessors" and "Observing" properties have storage, but
   // are usually accessed through accessors.  However, in init and destructor
@@ -263,7 +271,7 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
   }
 
   // If the value is always directly accessed from this context, do it.
- return member->isUseFromContextDirect(DC);
+  return member->isUseFromContextDirect(DC);
 }
 
 namespace {
