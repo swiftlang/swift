@@ -49,35 +49,29 @@ static void registerZone() {
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
-  auto z = malloc_default_zone();
-  return z->size(z, pointer);
+  return malloc_size(pointer);
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
-  auto z = malloc_default_zone();
-  return z->malloc(z, size);
+  return malloc(size);
 }
 
 void *swift::_swift_zone_calloc(malloc_zone_t *zone,
                                 size_t count, size_t size) {
-  auto z = malloc_default_zone();
-  return z->calloc(z, count, size);
+  return calloc(count, size);
 }
 
 void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
-  auto z = malloc_default_zone();
-  return z->valloc(z, size);
+  return valloc(size);
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
-  auto z = malloc_default_zone();
-  return z->free(z, pointer);
+  return free(pointer);
 }
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
                                  void *pointer, size_t size) {
-  auto z = malloc_default_zone();
-  return z->realloc(z, pointer, size);
+  return realloc(pointer, size);
 }
 
 void swift::_swift_zone_destroy(malloc_zone_t *zone) {
