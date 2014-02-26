@@ -125,7 +125,8 @@
   These can be used for generic algorithms now as well.
 
 * The syntax for referring to the type of a type, 'T.metatype', has been
-  changed to 'T.Type'.
+  changed to 'T.Type'. The syntax for getting the type of a value, 'typeof(x)',
+  has been changed to 'x.type'.
 
 * 'DynamicSelf' is now called 'Self'; the semantics are unchanged.
 

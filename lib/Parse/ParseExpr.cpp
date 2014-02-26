@@ -721,6 +721,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 ///     '.' identifier
 ///
 ///   expr-dot:
+///     expr-postfix '.' 'type'
 ///     expr-postfix '.' identifier generic-args? expr-call-suffix?
 ///     expr-postfix '.' integer_literal
 ///
@@ -908,6 +909,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       // Non-identifier cases.
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
+        // A metatype expr.
+        if (Tok.is(tok::kw_type)) {
+          Result = makeParserResult(
+            new (Context) MetatypeExpr(Result.get(), consumeToken(),
+                                       Type()));
+          continue;
+        }
+        
         // If we have '.<keyword><code_complete>', try to recover by creating
         // an identifier with the same spelling as the keyword.
         if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {
