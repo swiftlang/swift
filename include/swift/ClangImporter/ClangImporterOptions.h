@@ -29,10 +29,6 @@ public:
 
   /// A directory for overriding Clang's resource directory.
   std::string OverrideResourceDir;
-
-  /// If true, Objective-C class references and block pointers are imported
-  /// as optional class references and optional closures, respectively.
-  bool EnableOptional = false;
 };
 
 } // end namespace swift

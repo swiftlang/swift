@@ -83,7 +83,7 @@ ClangImporter::~ClangImporter() {
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, clangImporterOpts.EnableOptional)
+    new ClangImporter(ctx, ctx.LangOpts.EnableObjCOptional)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.

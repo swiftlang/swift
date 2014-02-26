@@ -518,6 +518,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildConfigOptions[A->getValue()] = A->getValue();
   }
 
+  Opts.EnableObjCOptional = Args.hasArg(OPT_enable_objc_optional);
+
   return false;
 }
 
@@ -533,8 +535,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                  Args.filtered_end())) {
     Opts.ExtraArgs.push_back(A->getValue());
   }
-
-  Opts.EnableOptional = Args.hasArg(OPT_enable_objc_optional);
 
   return false;
 }

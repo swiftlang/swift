@@ -50,7 +50,11 @@ namespace swift {
 
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
-    
+
+    /// Import Objective-C class references and block pointers as optional class
+    /// references and optional closures, respectively.
+    bool EnableObjCOptional = false;
+
     /// \brief Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
