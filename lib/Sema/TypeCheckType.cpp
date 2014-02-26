@@ -1372,7 +1372,7 @@ static void lookupLibraryTypes(TypeChecker &TC,
   }
 }
 
-static bool isClassOrObjCProtocol(TypeChecker &TC, Type T) {
+static bool isClassOrObjCProtocol(Type T) {
   if (T->is<ClassType>())
     return true;
 
@@ -1628,18 +1628,26 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose){
   return Result;
 }
 
-bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
-                                                 Type T) {
-  if (isClassOrObjCProtocol(*this, T))
+static bool isObjCPointerType(Type T) {
+  // FIXME: Return true for closures, and for anything bridged to a class type.
+
+  // Look through a single level of metatype.
+  if (auto MTT = T->getAs<MetatypeType>())
+    T = MTT->getInstanceType();
+
+  if (isClassOrObjCProtocol(T))
     return true;
 
   if (T->is<DynamicSelfType>())
     return true;
 
-  if (auto MTT = T->getAs<MetatypeType>()) {
-    if (isClassOrObjCProtocol(*this, MTT->getInstanceType()))
-      return true;
-  }
+  return false;
+}
+
+bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
+                                                 Type T) {
+  if (isObjCPointerType(T))
+    return true;
 
   if (auto NTD = T->getAnyNominal()) {
     // If the type was imported from Clang, it is representable in Objective-C.
@@ -1653,20 +1661,20 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
 
   // An UnsafePointer<T> is representable in Objective-C if T is a trivially
   // mapped type, or T is a representable UnsafePointer<U> type.
-  while (true) {
-    if (auto BGT = T->getAs<BoundGenericType>()) {
-      if (BGT->getDecl() == getUnsafePointerDecl(DC)) {
-        T = BGT->getGenericArgs()[0];
-        continue;
-      }
-    }
+  // An Optional<T> or UncheckedOptional<T> is representable in Objective-C if
+  // the object type is a class or block pointer (after bridging).
+  while (auto BGT = T->getAs<BoundGenericType>()) {
+    if (Context.LangOpts.EnableObjCOptional)
+      if (auto underlying = T->getAnyOptionalObjectType())
+        return isObjCPointerType(underlying);
 
-    if (ObjCMappedTypes.count(T->getCanonicalType()))
-      return true;
-    break;
+    if (BGT->getDecl() != getUnsafePointerDecl(DC))
+      break;
+
+    T = BGT->getGenericArgs()[0];
   }
 
-  return false;
+  return ObjCMappedTypes.count(T->getCanonicalType());
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {

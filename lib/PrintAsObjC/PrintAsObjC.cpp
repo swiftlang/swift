@@ -437,6 +437,13 @@ private:
     visitBoundGenericType(BGT);
   }
 
+  void visitBoundGenericType(BoundGenericType *BGT) {
+    if (auto underlying = BGT->getAnyOptionalObjectType())
+      visitPart(underlying);
+    else
+      visitType(BGT);
+  }
+
   void visitEnumType(EnumType *ET) {
     const EnumDecl *ED = ET->getDecl();
 
