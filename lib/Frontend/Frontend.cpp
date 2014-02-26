@@ -55,18 +55,18 @@ void swift::CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   // Set the "arch" target configuration.
   switch (triple.getArch()) {
   case llvm::Triple::ArchType::arm:
-    LangOpts.TargetConfigOptions["arch"] = "ARM";
+    LangOpts.TargetConfigOptions["arch"] = "arm";
     break;
   case llvm::Triple::ArchType::x86:
-    LangOpts.TargetConfigOptions["arch"] = "I386";
+    LangOpts.TargetConfigOptions["arch"] = "i386";
     break;
   case llvm::Triple::ArchType::x86_64:
-    LangOpts.TargetConfigOptions["arch"] = "X64";
+    LangOpts.TargetConfigOptions["arch"] = "x86_64";
     break;
   default:
     // FIXME: Use `case llvm::Triple::arm64` when underlying LLVM is new enough
     if (StringRef("arm64") == llvm::Triple::getArchTypeName(triple.getArch()))
-      LangOpts.TargetConfigOptions["arch"] = "ARM64";
+      LangOpts.TargetConfigOptions["arch"] = "arm64";
       break;
     llvm_unreachable("Unsupported target architecture");
   }
