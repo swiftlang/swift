@@ -1598,6 +1598,16 @@ public:
       TC.validateDecl(getter);
     if (auto setter = SD->getSetter())
       TC.validateDecl(setter);
+
+    if (!checkOverrides(SD)) {
+      // If a subscript has an override attribute but does not override
+      // anything, complain.
+      if (SD->getAttrs().isOverride() && !SD->getOverriddenDecl()) {
+        TC.diagnose(SD, diag::subscript_does_not_override)
+          .highlight(SD->getAttrs().getLoc(AK_override));
+        SD->getMutableAttrs().clearAttribute(AK_override);
+      }
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -2537,7 +2547,7 @@ public:
       FD->setIsObjC(isObjC);
     }
 
-    if (!checkMethodOverrides(FD)) {
+    if (!checkOverrides(FD)) {
       // If a method has an override attribute but does not override
       // anything, complain.
       if (FD->getAttrs().isOverride() && !FD->getOverriddenDecl()) {
@@ -2636,14 +2646,15 @@ public:
     return true;
   }
 
-  /// Determine which methods this function overrides (if any).
+  /// Determine which method or subscript this method or subscript overrides
+  /// (if any).
   ///
   /// \returns true if an error occurred.
-  bool checkMethodOverrides(AbstractFunctionDecl *method) {
-    if (method->isInvalid())
+  bool checkOverrides(ValueDecl *decl) {
+    if (decl->isInvalid())
       return false;
 
-    auto owningTy = method->getExtensionType();
+    auto owningTy = decl->getDeclContext()->getDeclaredInterfaceType();
     if (!owningTy)
       return false;
 
@@ -2655,98 +2666,140 @@ public:
     if (!superclass)
       return false;
 
-    if (!method->hasName())
+    auto method = dyn_cast<AbstractFunctionDecl>(decl);
+    auto subscript = dyn_cast<SubscriptDecl>(decl);
+    assert((method || subscript) && "Not a method or subscript?");
+
+    // Only named methods are permitted.
+    // FIXME: Should this be a check for an accessor.
+    if (method && !method->hasName())
       return false;
 
-    // Figure out the type of the method that we're use for comparisons.
-    auto methodTy = method->getInterfaceType();
-    auto uncurriedMethodTy = methodTy->castTo<AnyFunctionType>()->getResult();
-    if (method->isObjC())
-      uncurriedMethodTy = uncurriedMethodTy->getUnlabeledType(TC.Context);
+    // Figure out the type of the declaration that we're use for comparisons.
+    auto declTy = decl->getInterfaceType();
+    auto uncurriedDeclTy = declTy;
+    if (method)
+      uncurriedDeclTy = declTy->castTo<AnyFunctionType>()->getResult();
+    if (decl->isObjC())
+      uncurriedDeclTy = uncurriedDeclTy->getUnlabeledType(TC.Context);
 
     // If the method is an Objective-C method, compute its selector.
     llvm::SmallString<32> methodSelectorBuffer;
     StringRef methodSelector;
-    if (method->isObjC())
-      methodSelector = method->getObjCSelector(methodSelectorBuffer);
+    ObjCSubscriptKind subscriptKind = ObjCSubscriptKind::None;
+
+    if (decl->isObjC()) {
+      if (method)
+        methodSelector = method->getObjCSelector(methodSelectorBuffer);
+      else
+        subscriptKind = subscript->getObjCSubscriptKind();
+    }
 
     // Look for members with the same name and matching types as this
     // one.
     LookupResult members;
-    if (isa<ConstructorDecl>(method)) {
-      members = TC.lookupConstructors(superclass, method);
+    if (isa<ConstructorDecl>(decl)) {
+      members = TC.lookupConstructors(superclass, decl->getDeclContext());
     } else {
       auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
-      members = TC.lookupMember(superclassMetaTy, method->getName(), method,
+      members = TC.lookupMember(superclassMetaTy, decl->getName(),
+                                decl->getDeclContext(),
                                 /*allowDynamicLookup=*/false);
     }
 
     unsigned numExactMatches = 0;
-    SmallVector<llvm::PointerIntPair<AbstractFunctionDecl *,1,bool>, 2> matches;
-    AbstractFunctionDecl *exactMatch = nullptr;
+    SmallVector<std::tuple<ValueDecl *, bool, Type>, 2> matches;
+    ValueDecl *exactMatch = nullptr;
+    Type exactMatchType;
     for (auto member : members) {
       if (member->isInvalid())
         continue;
 
-      auto parentMethod = dyn_cast<AbstractFunctionDecl>(member);
-      if (!parentMethod)
+      if (member->getKind() != decl->getKind())
         continue;
+
+      auto parentDecl = cast<ValueDecl>(member);
 
       // Check whether there are any obvious reasons why the two given
       // functions do not have an overriding relationship.
-      if (!areOverrideCompatibleSimple(method, parentMethod))
+      if (!areOverrideCompatibleSimple(decl, parentDecl))
         continue;
 
-      // If both are Objective-C, then match based on selectors and
-      // check the types separately.
-      bool objCSelectorMatch = false;
-      if (method->isObjC() && parentMethod->isObjC()) {
-        // If the selectors don't match, it's not an override.
-        llvm::SmallString<32> buffer;
-        if (methodSelector != parentMethod->getObjCSelector(buffer))
-          continue;
+      auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
+      auto parentSubscript = dyn_cast<SubscriptDecl>(parentDecl);
+      assert(parentMethod || parentSubscript);
 
-        objCSelectorMatch = true;
+      // If both are Objective-C, then match based on selectors or subscript
+      /// kind and check the types separately.
+      bool objCMatch = false;
+      if (decl->isObjC() && parentDecl->isObjC()) {
+        if (method) {
+          // If the selectors don't match, it's not an override.
+          llvm::SmallString<32> buffer;
+          if (methodSelector != parentMethod->getObjCSelector(buffer))
+            continue;
+
+          objCMatch = true;
+        } else {
+          // If the subscript kinds don't match, it's not an override.
+          if (subscriptKind != parentSubscript->getObjCSubscriptKind())
+            continue;
+
+          objCMatch = true;
+        }
       }
 
       // Check whether the types are identical.
-      // FIXME: It's wrong to use the uncurried types here.
-      auto parentMethodTy = adjustSuperclassMemberDeclType(parentMethod, 
-                                                           superclass);
-      auto uncurriedParentMethodTy
-        = parentMethodTy->castTo<AnyFunctionType>()->getResult();
-      if (objCSelectorMatch)
-        uncurriedParentMethodTy = uncurriedParentMethodTy->getUnlabeledType(
-                                    TC.Context);
-      if (uncurriedMethodTy->isEqual(uncurriedParentMethodTy)) {
+      // FIXME: It's wrong to use the uncurried types here for methods.
+      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl,superclass);
+      auto uncurriedParentDeclTy = parentDeclTy;
+      if (method) {
+        uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
+                                  ->getResult();
+      }
+      if (objCMatch) {
+        uncurriedParentDeclTy = uncurriedParentDeclTy
+                                  ->getUnlabeledType(TC.Context);
+      }
+
+      if (uncurriedDeclTy->isEqual(uncurriedParentDeclTy)) {
         ++numExactMatches;
-        matches.push_back({parentMethod, true});
-        if (!exactMatch)
-          exactMatch = parentMethod;
+        matches.push_back({parentDecl, true, uncurriedParentDeclTy});
+        if (!exactMatch) {
+          exactMatch = parentDecl;
+          exactMatchType = uncurriedParentDeclTy;
+        }
         continue;
       }
 
       // Failing that, check for subtyping.
-      if (TC.isTrivialSubtypeOf(uncurriedMethodTy, uncurriedParentMethodTy,
-                                method->getDeclContext())) {
+      if (TC.isTrivialSubtypeOf(uncurriedDeclTy, uncurriedParentDeclTy,
+                                decl->getDeclContext())) {
         // If the Objective-C selectors match, always call it exact.
-        if (objCSelectorMatch) {
+        // For subscripts, we perform extra checking below.
+        if (objCMatch) {
           ++numExactMatches;
-          if (!exactMatch)
-            exactMatch = parentMethod;
+          if (!exactMatch) {
+            exactMatch = parentDecl;
+            exactMatchType = uncurriedParentDeclTy;
+          }
         }
 
-        matches.push_back({parentMethod, objCSelectorMatch});
+        matches.push_back({parentDecl, objCMatch, uncurriedParentDeclTy});
         continue;
       }
 
-      // Not a match. If the Objective-C selectors matched, this is a
-      // serious problem.
-      if (objCSelectorMatch) {
-        TC.diagnose(method, diag::override_objc_type_mismatch,
-                    methodSelector, uncurriedMethodTy);
-        TC.diagnose(parentMethod, diag::overridden_here_with_type,
-                    uncurriedParentMethodTy);
+      // Not a match. If we had an Objective-C match, this is a serious problem.
+      if (objCMatch) {
+        if (method) {
+          TC.diagnose(decl, diag::override_objc_type_mismatch_method,
+                      methodSelector, uncurriedDeclTy);
+        } else {
+          TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
+                      static_cast<unsigned>(subscriptKind), uncurriedDeclTy);
+        }
+        TC.diagnose(parentDecl, diag::overridden_here_with_type,
+                    uncurriedParentDeclTy);
         return true;
       }
     }
@@ -2756,24 +2809,51 @@ public:
       return false;
     }
 
+    // Check for a proper subscript override.
+    auto checkSubscript = [&](ValueDecl *parentDecl, Type type) -> bool {
+      assert(subscript && "Not a subscript");
+
+      // An exact match is always okay.
+      if (uncurriedDeclTy->isEqual(type))
+        return false;
+
+      // If the parent is non-mutable, it's okay to be covariant.
+      auto parentSubscript = cast<SubscriptDecl>(parentDecl);
+      if (!parentSubscript->getSetter())
+        return false;
+
+      TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
+                  uncurriedDeclTy, type);
+      TC.diagnose(parentDecl, diag::subscript_override_here);
+      return true;
+    };
+
     // If we have a single exact match, take it.
     if (numExactMatches == 1) {
-      return recordOverride(method, exactMatch);
+      if (subscript && checkSubscript(exactMatch, exactMatchType))
+        return true;
+
+      return recordOverride(decl, exactMatch);
     }
 
     // If we have a single subtype match, take it.
+    using std::get;
     if (numExactMatches == 0 && matches.size() == 1) {
-      return recordOverride(method, matches.front().getPointer());
+      if (subscript &&
+          checkSubscript(get<0>(matches.front()), get<2>(matches.front())))
+        return true;
+
+      return recordOverride(decl, get<0>(matches.front()));
     }
 
-    // We override more than one method. Complain.
-    TC.diagnose(method, diag::override_multiple_decls_base);
+    // We override more than one declaration. Complain.
+    TC.diagnose(decl, diag::override_multiple_decls_base);
     for (auto match : matches) {
       // If we had exact matches, skip non-exact ones.
-      if (exactMatch && !match.getInt())
+      if (exactMatch && !get<1>(match))
         continue;
 
-      TC.diagnose(match.getPointer(), diag::overridden_here);
+      TC.diagnose(get<0>(match), diag::overridden_here);
     }
     return true;
   }
@@ -2864,7 +2944,7 @@ public:
                                 property->getDeclContext())) {
         // The overridden property must not be mutable.
         if (parentProperty->getSetter()) {
-          TC.diagnose(property, diag::override_mutable_covariant,
+          TC.diagnose(property, diag::override_mutable_covariant_property,
                       property->getName(), parentPropertyTy, propertyTy);
           TC.diagnose(parentProperty, diag::property_override_here);
           return true;
@@ -2880,7 +2960,7 @@ public:
       return true;
     }
 
-    // We override more than one method. Complain.
+    // We override more than one property. Complain.
     TC.diagnose(property, diag::override_multiple_decls_base);
     for (auto match : matches) {
       TC.diagnose(match, diag::overridden_here);
@@ -3148,7 +3228,7 @@ public:
 
     // Check whether this constructor overrides a constructor in its base class.
     // This only makes sense when the overridden constructor is abstract.
-    checkMethodOverrides(CD);
+    checkOverrides(CD);
 
     // Determine whether this constructor is abstract.
     bool isAbstract = CD->getAttrs().isAbstract() ||

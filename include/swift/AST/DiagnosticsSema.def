@@ -417,9 +417,13 @@ ERROR(override_decl_extension,sema_tcd,none,
       "%select{override|be overridden}0 yet", (bool))
 NOTE(overridden_here,sema_tcd,none,
      "overridden declaration is here", ())
-ERROR(override_objc_type_mismatch,sema_tcd,none,
+ERROR(override_objc_type_mismatch_method,sema_tcd,none,
       "overriding method with selector '%0' has incompatible type %1", 
       (StringRef, Type))
+ERROR(override_objc_type_mismatch_subscript,sema_tcd,none,
+      "overriding %select{|indexed |keyed }0subscript with incompatible type "
+      "%1",
+      (unsigned, Type))
 NOTE(overridden_here_with_type,sema_tcd,none,
      "overridden declaration here has type %0", (Type))
 ERROR(missing_override,sema_tcd,none,
@@ -428,8 +432,12 @@ ERROR(method_does_not_override,sema_tcd,none,
       "method does not override any method from its superclass", ())
 ERROR(property_does_not_override,sema_tcd,none,
       "property does not override any property from its superclass", ())
+ERROR(subscript_does_not_override,sema_tcd,none,
+      "subscript does not override any subscript from its superclass", ())
 NOTE(property_override_here,sema_tcd,none,
      "attempt to override property here", ())
+NOTE(subscript_override_here,sema_tcd,none,
+     "attempt to override subscript here", ())
 ERROR(override_nonclass_decl,sema_tcd,none,
       "'override' attribute is only available on class members", ())
 ERROR(override_nonoverridable_decl,sema_tcd,none,
@@ -441,9 +449,12 @@ ERROR(override_stored_property,sema_tcd,none,
       "cannot override a stored property %0", (Identifier))
 ERROR(override_with_stored_property,sema_tcd,none,
       "cannot override with a stored property %0", (Identifier))
-ERROR(override_mutable_covariant,sema_tcd,none,
+ERROR(override_mutable_covariant_property,sema_tcd,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",
       (Identifier, Type, Type))
+ERROR(override_mutable_covariant_subscript,sema_tcd,none,
+      "cannot override mutable subscript of type %0 with covariant type %1",
+      (Type, Type))
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a superclass", ())
 

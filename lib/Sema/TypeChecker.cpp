@@ -276,6 +276,16 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
         continue;
       }
 
+      if (isa<VarDecl>(MemberVD)) {
+        // Properties are handled as part of type checking the declaration.
+        continue;
+      }
+
+      if (isa<SubscriptDecl>(MemberVD)) {
+        // Subscripts are handled as part of type checking the declaration.
+        continue;
+      }
+
       ValueDecl *OverriddenDecl = nullptr;
 
       // First, check for an exact type match.
