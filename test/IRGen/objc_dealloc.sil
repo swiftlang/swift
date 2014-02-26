@@ -17,7 +17,7 @@ func onDestruct() { }
 
 class SwiftGizmo : Gizmo {
   var x : X
-  deinit()
+  deinit
 }
 sil @_TFCSo10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
 

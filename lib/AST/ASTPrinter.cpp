@@ -894,7 +894,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
-  Printer << "deinit() ";
+  Printer << "deinit ";
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;

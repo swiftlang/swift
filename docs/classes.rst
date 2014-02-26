@@ -24,7 +24,7 @@ Syntax overview
     init() {
       MyVar = 10
     }
-    deinit() {
+    deinit {
       // Misc finalization
     }
   }

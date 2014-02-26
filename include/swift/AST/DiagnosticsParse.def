@@ -303,6 +303,8 @@ ERROR(destructor_is_deinit,decl_parsing,none,
       "'destructor ()' is now written as 'deinit'", ())
 ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
       "expected ')' to close parameter list", ())
+ERROR(destructor_params,decl_parsing,none,
+      "deinitializer does not have a parameter clause", ())
 
 // Operator
 ERROR(operator_decl_inner_scope,decl_parsing,none,

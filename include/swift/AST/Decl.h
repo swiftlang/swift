@@ -3638,7 +3638,7 @@ public:
 /// \code
 /// struct X {
 ///   var fd : Int
-///   deinit() {
+///   deinit {
 ///      close(fd)
 ///   }
 /// }

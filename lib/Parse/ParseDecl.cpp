@@ -2979,6 +2979,12 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
     diagnose(Tok, diag::destructor_is_deinit)
       .fixItReplaceChars(StartLoc, EndLoc, "deinit");
+  } else if (ParenRange.isValid()) {
+    diagnose(ParenRange.Start, diag::destructor_params)
+    .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                 DestructorLoc),
+                      Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                 ParenRange.End));
   }
 
   // '{'
