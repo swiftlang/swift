@@ -2525,7 +2525,15 @@ public:
       FD->setIsObjC(isObjC);
     }
 
-    checkMethodOverrides(FD);
+    if (!checkMethodOverrides(FD)) {
+      // If a method has an override attribute but does not override
+      // anything, complain.
+      if (FD->getAttrs().isOverride() && !FD->getOverriddenDecl()) {
+        TC.diagnose(FD, diag::method_does_not_override)
+          .highlight(FD->getAttrs().getLoc(AK_override));
+        FD->getMutableAttrs().clearAttribute(AK_override);
+      }
+    }
   }
 
   /// Adjust the type of the given declaration to appear as if it were
@@ -2567,6 +2575,14 @@ public:
                   !overriding->getDeclContext()->isExtensionContext());
       TC.diagnose(overridden, diag::overridden_here);
       return true;
+    }
+
+    // If the overriding declaration does not have the @override
+    // attribute on it, complain.
+    if (!overriding->getAttrs().isOverride() && isa<FuncDecl>(overriding)) {
+      TC.diagnose(overriding, diag::missing_override)
+        .fixItInsert(overriding->getStartLoc(), "@override ");
+      TC.diagnose(overridden, diag::overridden_here);
     }
 
     if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
@@ -3944,6 +3960,34 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     } else {
       TC.diagnose(Attrs.getLoc(AK_abstract), diag::abstract_non_initializer);
       D->getMutableAttrs().clearAttribute(AK_abstract);
+    }
+  }
+
+  if (Attrs.isOverride()) {
+    if (auto contextTy = D->getDeclContext()->getDeclaredTypeOfContext()) {
+      if (auto nominal = contextTy->getAnyNominal()) {
+        if (isa<ClassDecl>(nominal)) {
+          // we're in a class; check the kind of member.
+          if (isa<FuncDecl>(D) || isa<VarDecl>(D) || isa<SubscriptDecl>(D)) {
+            // okay
+          } else {
+            TC.diagnose(D, diag::override_nonoverridable_decl)
+              .highlight(D->getAttrs().getLoc(AK_override));
+            D->getMutableAttrs().clearAttribute(AK_override);
+          }
+        } else {
+          TC.diagnose(D, diag::override_nonclass_decl)
+            .highlight(D->getAttrs().getLoc(AK_override));
+          D->getMutableAttrs().clearAttribute(AK_override);
+        }
+      } else {
+        // Error case: just ignore the @override attribute.
+        D->getMutableAttrs().clearAttribute(AK_override);
+      }
+    } else {
+      TC.diagnose(D, diag::override_nonclass_decl)
+        .highlight(D->getAttrs().getLoc(AK_override));
+      D->getMutableAttrs().clearAttribute(AK_override);
     }
   }
 

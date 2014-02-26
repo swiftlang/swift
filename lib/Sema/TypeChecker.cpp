@@ -184,6 +184,15 @@ static void overrideDecl(TypeChecker &TC,
     TC.diagnose(OverriddenDecl->getLoc(), diag::overridden_here);
     return;
   }
+
+  // If the overriding declaration does not have the @override
+  // attribute on it, complain.
+  if (!MemberVD->getAttrs().isOverride()) {
+    TC.diagnose(MemberVD, diag::missing_override)
+      .fixItInsert(MemberVD->getStartLoc(), "@override ");
+    TC.diagnose(OverriddenDecl, diag::overridden_here);
+  }
+
   if (auto FD = dyn_cast<FuncDecl>(MemberVD)) {
     FD->setOverriddenDecl(cast<FuncDecl>(OverriddenDecl));
   } else if (auto VD = dyn_cast<VarDecl>(MemberVD)) {

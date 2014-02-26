@@ -1,6 +1,17 @@
 2014-02-26
 ----------
 
+* The 'override' attribute is now required when overriding a method,
+  property, or subscript from a superclass. For example:
+
+    class A {
+      func foo() { }
+    }
+
+    class B : A {
+      @override func foo() { } // 'override' is required here
+    }
+
 * We're renaming 'val' back to 'let'.  The compiler accepts both for this week,
   next week it will just accept 'let'.  Please migrate your code this week, sorry
   for the back and forth on this.

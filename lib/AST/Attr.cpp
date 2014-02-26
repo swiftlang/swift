@@ -84,4 +84,6 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@!mutating ";
   if (isAbstract())
     Printer << "@abstract ";
+  if (isOverride())
+    Printer << "@override ";
 }

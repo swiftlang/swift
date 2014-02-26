@@ -1053,6 +1053,10 @@ template <AttrKind ...KINDS>
 static void checkAllowedAttributes(const Decl *D) {
 #ifndef NDEBUG
   DeclAttributes attrs = D->getAttrs();
+
+  // We never need to record @override.
+  attrs.clearAttribute(AK_override);
+
   for (AttrKind AK : {
 #define ATTR(X)
 #define VIRTUAL_ATTR(X) AK_ ## X,

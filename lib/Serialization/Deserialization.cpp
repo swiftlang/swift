@@ -1559,7 +1559,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
-    var->setOverriddenDecl(cast_or_null<VarDecl>(getDecl(overriddenID)));
+    if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
+      var->setOverriddenDecl(overridden);
+      var->getMutableAttrs().setAttr(AK_override, SourceLoc());
+    }
+
     break;
   }
 
@@ -1638,7 +1642,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setDeserializedSignature(argPatterns, bodyPatterns,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
-    fn->setOverriddenDecl(cast_or_null<FuncDecl>(getDecl(overriddenID)));
+    if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {
+      fn->setOverriddenDecl(overridden);
+      fn->getMutableAttrs().setAttr(AK_override, SourceLoc());
+    }
 
     fn->setStatic(isStatic);
     if (isImplicit)
@@ -2031,8 +2038,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     subscript->setIsObjC(isObjC);
     if (isOptional)
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    auto overriddenDecl = cast_or_null<SubscriptDecl>(getDecl(overriddenID));
-    subscript->setOverriddenDecl(overriddenDecl);
+    if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
+      subscript->setOverriddenDecl(overridden);
+      subscript->getMutableAttrs().setAttr(AK_override, SourceLoc());
+    }
     break;
   }
 

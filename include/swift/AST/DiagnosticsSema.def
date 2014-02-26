@@ -272,7 +272,7 @@ ERROR(invalid_ibliveview_decl,sema_tcd,none,
       "only classes can be declared 'IBLiveView'", ())
 ERROR(class_protocol_not_protocol,sema_tcd,none,
       "'class_protocol' attribute can only be applied to protocols", ())
-      
+
 ERROR(invalid_decl_attribute,sema_tcd,none,
       "attribute cannot be applied to declaration", ())
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
@@ -422,6 +422,15 @@ ERROR(override_objc_type_mismatch,sema_tcd,none,
       (StringRef, Type))
 NOTE(overridden_here_with_type,sema_tcd,none,
      "overridden declaration here has type %0", (Type))
+ERROR(missing_override,sema_tcd,none,
+      "overriding declaration requires an 'override' attribute", ())
+ERROR(method_does_not_override,sema_tcd,none,
+      "method does not override any method from its superclass", ())
+ERROR(override_nonclass_decl,sema_tcd,none,
+      "'override' attribute is only available on class members", ())
+ERROR(override_nonoverridable_decl,sema_tcd,none,
+      "'override' attribute on a non-overridable declaration", ())
+
 
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a superclass", ())
