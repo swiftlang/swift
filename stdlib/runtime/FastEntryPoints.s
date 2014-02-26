@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/FastEntryPoints.h"
 
+#if SWIFT_HAVE_FAST_ENTRY_POINTS
 #ifdef __x86_64__
 // The custom swift runtime ABI for x86_64 is as follows.
 //
@@ -264,6 +265,9 @@ END_FUNC
 
 #error fast entry points promised but not implemented on this architecture
 
+#else
+#error "unknown architecture"
+#endif
 #endif
 
 .subsections_via_symbols
