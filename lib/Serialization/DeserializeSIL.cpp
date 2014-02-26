@@ -326,11 +326,11 @@ maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
     return MF->getAssociatedModule();
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
-  if (kind != decls_block::SIL_GENERIC_OUTER_PARAM_DECL_ID)
+  if (kind != SIL_GENERIC_OUTER_PARAM_DECL_ID)
     return MF->getAssociatedModule();
 
   uint64_t declID;
-  decls_block::SILGenericOuterParamDeclIDLayout::readRecord(scratch, declID);
+  SILGenericOuterParamDeclIDLayout::readRecord(scratch, declID);
   return MF->getDeclContext((DeclID)declID);
 }
 

@@ -103,6 +103,7 @@ namespace sil_block {
     SIL_WITNESS_BASE_ENTRY = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
     SIL_WITNESS_ASSOC_PROTOCOL,
     SIL_WITNESS_ASSOC_ENTRY,
+    SIL_GENERIC_OUTER_PARAM_DECL_ID,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -295,6 +296,11 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     SILValueResultField
+  >;
+
+  using SILGenericOuterParamDeclIDLayout = BCRecordLayout<
+    SIL_GENERIC_OUTER_PARAM_DECL_ID,
+    DeclIDField // The decl id of the outer param if any.
   >;
 }
 

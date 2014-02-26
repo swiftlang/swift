@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 7;
+const uint16_t VERSION_MINOR = 8;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -797,11 +797,6 @@ namespace decls_block {
     VAR_PATTERN,
     BCFixed<1>  // implicit?
     // The sub-pattern trails the record.
-  >;
-
-  using SILGenericOuterParamDeclIDLayout = BCRecordLayout<
-    SIL_GENERIC_OUTER_PARAM_DECL_ID,
-    DeclIDField // The decl id of the outer param if any.
   >;
 
   using GenericParamListLayout = BCRecordLayout<
