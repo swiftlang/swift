@@ -55,7 +55,7 @@
 #define SWIFT_RAWALLOC 0x0002
 #define SWIFT_TRYRAWALLOC 0x0003
 
-#if __x86_64__
+#if __x86_64__ && !TARGET_IPHONE_SIMULATOR
 # define SWIFT_HAVE_FAST_ENTRY_POINTS 1
 #elif __i386__  ||  __arm__  ||  __arm64__
 # undef  SWIFT_HAVE_FAST_ENTRY_POINTS
