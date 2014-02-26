@@ -297,14 +297,12 @@ ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
       "'deinitializer' functions may only be declared within a class", ())
-ERROR(expected_lparen_destructor,decl_parsing,none,
-      "expected an empty parameter list for deinitializer", ())
-ERROR(destructor_parameter_nonempty_tuple,decl_parsing,none,
-      "deinitializers don't have parameters", ())
 ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_is_deinit,decl_parsing,none,
-      "'destructor' is now written as 'deinit'", ())
+      "'destructor ()' is now written as 'deinit'", ())
+ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
+      "expected ')' to close parameter list", ())
 
 // Operator
 ERROR(operator_decl_inner_scope,decl_parsing,none,

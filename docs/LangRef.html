@@ -729,7 +729,7 @@
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'deinit' '(' ')' <a href="#brace-item-list">brace-item-list</a>
+    decl-deinit ::= <a href="#attribute-list">attribute-list</a> 'deinit' <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
   <p>'deinit' declares a deinitializer for a class.  This function is called
@@ -749,7 +749,7 @@
   <pre class="example">
     class X {
       var fd : Int
-      deinit() {
+      deinit {
         close(fd)
       }
     }

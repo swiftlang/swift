@@ -2950,55 +2950,35 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
 
 ParserResult<DestructorDecl> Parser::
 parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  SourceLoc DestructorLoc;
-  if (Tok.is(tok::kw_destructor)) {
-    diagnose(Tok, diag::destructor_is_deinit)
-      .fixItReplace(SourceLoc(Tok.getLoc()), "deinit");
+  assert(Tok.is(tok::kw_deinit) || Tok.is(tok::kw_destructor));
+  bool hasDestructorKeyword = Tok.is(tok::kw_destructor);
+  SourceLoc DestructorLoc = consumeToken();
 
-    DestructorLoc = consumeToken(tok::kw_destructor);
-  } else {
-    DestructorLoc = consumeToken(tok::kw_deinit);
+  // Parse extraneous parentheses.
+  SourceRange ParenRange;
+  if (Tok.is(tok::l_paren)) {
+    SourceLoc LParenLoc = consumeToken();
+    SourceLoc RParenLoc;
+    skipUntil(tok::r_paren);
+
+    if (Tok.is(tok::r_paren)) {
+      SourceLoc RParenLoc = consumeToken();
+      ParenRange = SourceRange(LParenLoc, RParenLoc);
+    } else {
+      diagnose(Tok, diag::opened_destructor_expected_rparen);
+      diagnose(LParenLoc, diag::opening_paren);
+    }
   }
 
-  ParserResult<Pattern> Params;
-  if (Tok.is(tok::l_paren)) {
-    // Parse the parameter tuple.
-    SourceLoc LParenLoc = Tok.getLoc();
-    DefaultArgumentInfo DefaultArgs; // ignored in valid code
-    ParserResult<Pattern> Params =
-      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
-    if (!Params.isParseError()) {
-      // Check that the destructor has zero parameters.
-      SourceRange ElementsRange;
-      SourceLoc RParenLoc;
-      if (auto Tuple = dyn_cast<TuplePattern>(Params.get())) {
-        auto Fields = Tuple->getFields();
-        if (!Fields.empty()) {
-          ElementsRange = { Fields.front().getPattern()->getStartLoc(),
-                            Fields.back().getPattern()->getEndLoc() };
-          RParenLoc = Tuple->getRParenLoc();
-        }
-      } else {
-        auto Paren = cast<ParenPattern>(Params.get());
-        ElementsRange = Paren->getSubPattern()->getSourceRange();
-        RParenLoc = Paren->getRParenLoc();
-      }
-      if (ElementsRange.isValid()) {
-        diagnose(LParenLoc, diag::destructor_parameter_nonempty_tuple)
-            .fixItRemove(ElementsRange);
-        Params = makeParserErrorResult(
-            TuplePattern::create(Context, LParenLoc,
-                                 ArrayRef<TuplePatternElt>(), RParenLoc));
-      }
-    }
-  } else {
-    SourceLoc AfterDestructorKw =
-        Lexer::getLocForEndOfToken(SourceMgr, DestructorLoc);
-    diagnose(AfterDestructorKw, diag::expected_lparen_destructor)
-        .fixItInsert(AfterDestructorKw, "()");
-    Params = makeParserErrorResult(
-        TuplePattern::create(Context, Tok.getLoc(),
-                             ArrayRef<TuplePatternElt>(), Tok.getLoc()));
+  // If we have 'destructor', replace it (and any extraneous parentheses) with
+  // 'deinit'.
+  if (hasDestructorKeyword) {
+    SourceLoc StartLoc = DestructorLoc;
+    SourceLoc EndLoc = ParenRange.isValid()? ParenRange.End : DestructorLoc;
+    EndLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, EndLoc);
+
+    diagnose(Tok, diag::destructor_is_deinit)
+      .fixItReplaceChars(StartLoc, EndLoc, "deinit");
   }
 
   // '{'

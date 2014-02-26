@@ -142,7 +142,14 @@
 * 'DynamicSelf' is now called 'Self'; the semantics are unchanged.
 
 * 'destructor' has been replaced with 'deinit', to emphasize that it
-  is related to 'init'. We will refer to these as 'deinitializers'.
+  is related to 'init'. We will refer to these as
+  'deinitializers'. We've also dropped the parentheses, i.e.:
+
+    class MyClass {
+      deinit {
+        // release any resources we might have acquired, etc.
+      }
+    }
 
 * Class methods defined within extensions of Objective-C classes can
   now refer to 'self', including using 'instancetype' methods. As a
