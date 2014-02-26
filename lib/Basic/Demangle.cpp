@@ -2259,7 +2259,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::Metatype: {
     Node *type = pointer->getChild(0);
     print(type);
-    Printer << ".metatype";
+    Printer << ".Type";
     return;
   }
   case Node::Kind::ArchetypeRef:

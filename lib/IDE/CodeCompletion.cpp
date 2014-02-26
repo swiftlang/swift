@@ -1599,7 +1599,8 @@ public:
     lookupVisibleMemberDecls(*this, MetaBase,
                              CurrDeclContext, TypeResolver.get());
 
-    addKeyword("metatype", MetaBase);
+    addKeyword("Type", MetaBase);
+    addKeyword("self", BaseType);
   }
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {

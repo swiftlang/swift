@@ -2510,7 +2510,7 @@ llvm::Value *irgen::emitTypeMetadataRefForOpaqueHeapObject(IRGenFunction &IGF,
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
                                          object,
-                                         object->getName() + ".metatype");
+                                         object->getName() + ".Type");
   metadata->setCallingConv(IGF.IGM.RuntimeCC);
   metadata->setDoesNotThrow();
   metadata->setDoesNotAccessMemory();

@@ -5,20 +5,21 @@
   configuration expressions, to allow for conditional compilation within
   declaration and statement contexts.
 
-  Target configurations represent certain static information about the compile-time
-  build environment.  They are implicit, hard-wired into the compiler, and can
-  only be referenced within the conditional expression of an "#if" block.
+  Target configurations represent certain static information about the
+  compile-time build environment.  They are implicit, hard-wired into the
+  compiler, and can only be referenced within the conditional expression of an
+  "#if" block.
 
   Target configurations are tested against their values via a pseudo-function
-  invocation expression, taking a single argument expressed as an identitifer. The
-  argument represents certain static build-time information.
+  invocation expression, taking a single argument expressed as an identitifer.
+  The argument represents certain static build-time information.
 
   There are currently two supported target configurations:
     "os", which can have the values OSX or iOS
     "arch", which can have the values i386, x86_64, arm and arm64
 
-  Within the context of an "#if" block's conditional expression, a target configuration
-  expression can evaluate to either 'true' or 'false'.
+  Within the context of an "#if" block's conditional expression, a target
+  configuration expression can evaluate to either 'true' or 'false'.
 
   For example:
 
@@ -53,9 +54,9 @@
     ...
     #endif
 
-  Note that #if/#else/#endif blocks do not constitute a preprocessor, and must form
-  valid and complete expressions or statements. Hence, the following produces a
-  parser error:
+  Note that #if/#else/#endif blocks do not constitute a preprocessor, and must
+  form valid and complete expressions or statements. Hence, the following
+  produces a parser error:
 
     class C {
 
@@ -73,10 +74,11 @@
   #else block will produce parser errors for malformed code.  This allows the
   compiler to detect basic errors in inactive regions.
 
-  This is the first step to getting functionality parity with the important subset
-  of the C preprocessor.  Further refinements are planned for later.
+  This is the first step to getting functionality parity with the important
+  subset of the C preprocessor.  Further refinements are planned for later.
 
-* Swift now has both fully-closed ranges, which include their endpoint, and half-open ranges, which don't.
+* Swift now has both fully-closed ranges, which include their endpoint, and
+  half-open ranges, which don't.
 
     (swift) for x in 0...5 { print(x) } ; print('\n') // half-open range
     01234
@@ -104,19 +106,22 @@
     didSet { ... }
   }
 
-* Properties and subscripts now work in protocols, allowing you to do things like:
+* Properties and subscripts now work in protocols, allowing you to do things
+  like:
 
     protocol Subscriptable {
-      subscript(idx1 : Int, idx2 : Int) -> Int { get set }
-      var prop : Int { get }
+      subscript(idx1: Int, idx2: Int) -> Int { get set }
+      var prop: Int { get }
     }
 
-    func foo(s : Subscriptable) {
+    func foo(s: Subscriptable) {
       return s.prop + s[42, 19]
-    } 
+    }
 
   These can be used for generic algorithms now as well.
 
+* The syntax for referring to the type of a type, 'T.metatype', has been
+  changed to 'T.Type'.
 
 2014-02-19
 ----------

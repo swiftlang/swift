@@ -62,7 +62,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-identifier
 ///     type-tuple
 ///     type-composition
-///     type-simple '.metatype'
+///     type-simple '.Type'
 ///     type-simple '?'
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
@@ -87,7 +87,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return makeParserCodeCompletionResult<TypeRepr>();
   }
   case tok::kw_super:
-  case tok::kw_metatype:
+  case tok::kw_type:
+  case tok::kw_Type:
   case tok::kw_self:
   case tok::kw_weak:
   case tok::kw_unowned: {
@@ -105,12 +106,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return nullptr;
   }
 
-  // '.metatype' and '?' still leave us with type-simple.
+  // '.Type' and '?' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().is(tok::kw_metatype)) {
+        peekToken().is(tok::kw_Type)) {
       consumeToken();
-      SourceLoc metatypeLoc = consumeToken(tok::kw_metatype);
+      SourceLoc metatypeLoc = consumeToken(tok::kw_Type);
       ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
       continue;
@@ -279,7 +280,7 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
       consumeToken();
       break;
 
-    // FIXME: specialize diagnostic for 'metatype': type can not start with
+    // FIXME: specialize diagnostic for 'Type': type can not start with
     // 'metatype'
     // FIXME: offer a fixit: 'self' -> 'Self'
     default:
@@ -308,13 +309,13 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'metatype'.
+    // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
       if (peekToken().is(tok::code_complete)) {
         Status.setHasCodeCompletion();
         break;
       }
-      if (peekToken().isNot(tok::kw_metatype)) {
+      if (peekToken().isNot(tok::kw_Type)) {
         consumeToken();
         continue;
       }
@@ -703,12 +704,12 @@ bool Parser::canParseType() {
     return false;
   }
   
-  // '.metatype' and '?' still leave us with type-simple.
+  // '.Type' and '?' still leave us with type-simple.
   while (true) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().is(tok::kw_metatype)) {
+        peekToken().is(tok::kw_Type)) {
       consumeToken();
-      consumeToken(tok::kw_metatype);
+      consumeToken(tok::kw_Type);
       continue;
     }
     if (Tok.is(tok::question_postfix)) {
@@ -763,9 +764,9 @@ bool Parser::canParseTypeIdentifier() {
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'metatype'.
+    // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().isNot(tok::kw_metatype)) {
+        peekToken().isNot(tok::kw_Type)) {
       consumeToken();
     } else {
       return true;

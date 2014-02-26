@@ -938,7 +938,7 @@ struct ASTNodeBase {};
 
       if (E->getBase()) {
         checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
-                      "base type of .metatype expression");
+                      "base type of .Type expression");
       }
 
       verifyCheckedBase(E);

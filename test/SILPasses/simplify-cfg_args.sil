@@ -11,8 +11,8 @@ sil_global private @globalinit_token120 : $Builtin.Word
 sil @globalinit_func11 :  $@thin () -> () 
 
 //CHECK: sil @a_method_to_simplify 
-sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.ObjectPointer, Builtin.Word, @thin StringByteData.metatype) -> @owned StringByteData {
-bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.ObjectPointer, %2 : $Builtin.Word, %3 : $@thin StringByteData.metatype):
+sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.ObjectPointer, Builtin.Word, @thin StringByteData.Type) -> @owned StringByteData {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.ObjectPointer, %2 : $Builtin.Word, %3 : $@thin StringByteData.Type):
   %4 = struct $UnsafePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
   strong_retain %1 : $Builtin.ObjectPointer       // id: %5
   strong_retain %1 : $Builtin.ObjectPointer       // id: %6

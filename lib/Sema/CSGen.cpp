@@ -371,7 +371,7 @@ namespace {
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
       //
-      //   T0.metatype[.member] == T1
+      //   T0.Type[.member] == T1
       //
       // for fresh type variables T0 and T1, which pulls out a static
       // member, i.e., an enum case or a static variable.

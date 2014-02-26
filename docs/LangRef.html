@@ -1286,10 +1286,10 @@
   <!-- _____________________________________________________________________ -->
   <h3 id="type-metatype">Metatype Types</h3>
   <pre class="grammar">
-    type-metatype ::= type-simple '.' 'metatype'
+    type-metatype ::= type-simple '.' 'Type'
   </pre>
 
-  <p>Every type has an associated metatype.  A value of the metatype
+  <p>Every type has an associated metatype <tt>T.type</tt>.  A value of the metatype
     type is a reference to a global object which describes the type.
     Most metatype types are singleton and therefore require no
     storage, but metatypes associated with <a href="#decl-class">class
@@ -2141,7 +2141,7 @@ ill-formed if the type does not conform to the protocol.</p>
 
   <pre class="example">
     <i>// An operator that operates on metatypes.</i>
-    func @infix +-+ &lt;T, U&gt;(t:T.metatype, u:U.metatype) -&gt; Foo { }
+    func @infix +-+ &lt;T, U&gt;(t:T.Type, u:U.Type) -&gt; Foo { }
     
     var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;UnicodeScalar&gt;)
     println(foo)

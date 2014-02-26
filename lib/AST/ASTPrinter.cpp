@@ -1454,7 +1454,7 @@ public:
       }
     }
     printWithParensIfNotSimple(T->getInstanceType());
-    Printer << ".metatype";
+    Printer << ".Type";
   }
 
   void visitModuleType(ModuleType *T) {

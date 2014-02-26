@@ -543,7 +543,7 @@ private:
 
 /// \brief A 'metatype' type.
 /// \code
-///   Foo.metatype
+///   Foo.Type
 /// \endcode
 class MetatypeTypeRepr : public TypeRepr {
   TypeRepr *Base;

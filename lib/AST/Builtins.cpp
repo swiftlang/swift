@@ -556,7 +556,7 @@ static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
 }
 
 static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
-  // <T> T -> T.metatype
+  // <T> T -> T.Type
   Type GenericTy;
   Type ArchetypeTy;
   GenericParamList *ParamList;
@@ -572,7 +572,7 @@ static ValueDecl *getTypeOfOperation(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
                                           Identifier Id) {
-  // <T> T.metatype -> Builtin.Int1
+  // <T> T.Type -> Builtin.Int1
   Type GenericTy;
   Type ArchetypeTy;
   GenericParamList *ParamList;

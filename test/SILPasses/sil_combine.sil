@@ -449,8 +449,8 @@ enum U {
 // alone.
 //
 // rdar://15568314
-sil @sil_destroyvalue_of_enum : $@thin (@thin U.metatype, C) -> (U, U, U) {
-bb0(%0 : $@thin U.metatype, %1 : $C):
+sil @sil_destroyvalue_of_enum : $@thin (@thin U.Type, C) -> (U, U, U) {
+bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   destroy_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
@@ -476,8 +476,8 @@ bb0(%0 : $@thin U.metatype, %1 : $C):
 // is a no-op. Leave enums with non-trivial payloads alone.
 //
 // rdar://15568314
-sil @sil_copyvalue_of_enum : $@thin (@thin U.metatype, C) -> (U, U, U) {
-bb0(%0 : $@thin U.metatype, %1 : $C):
+sil @sil_copyvalue_of_enum : $@thin (@thin U.Type, C) -> (U, U, U) {
+bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
   copy_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32

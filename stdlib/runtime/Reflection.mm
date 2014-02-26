@@ -88,24 +88,24 @@ extern "C" StringReturn swift_returnString(String *s);
   
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable {
-  /// func getValue() -> Any
+  /// var value: Any { get }
   Any (*getValue)(MagicMirrorData *self, const Metadata *Self);
-  /// func getType() -> Any.metatype
+  /// var valueType: Any.Type { get }
   const Metadata * (*getType)(MagicMirrorData *self, const Metadata *Self);
   
-  /// func getObjectIdentifier() -> ObjectIdentifier?
+  /// var objectIdentifier: ObjectIdentifier? { get }
   OptionalObjectIdentifier (*getObjectIdentifier)(MagicMirrorData *self,
                                                   const Metadata *Self);
-  /// func getCount() -> Int
+  /// var count: Int { get }
   intptr_t (*getCount)(MagicMirrorData *self, const Metadata *Self);
   
-  /// func getChild(Int) -> (String, Mirror)
+  /// subscript(Int) -> (String, Mirror) { get }
   StringMirrorTuple (*getChild)(intptr_t i, MagicMirrorData *self,
                                 const Metadata *Self);
-  /// func getString() -> String
+  /// var summary: String { get }
   StringReturn (*getString)(MagicMirrorData *self, const Metadata *Self);
   
-  /// func getIDERepresentation() -> IDERepresentable?
+  /// var IDERepresentation: IDERepresentable? { get }
   OptionalIDERepresentable (*getIDERepresentation)
     (MagicMirrorData *self, const Metadata *Self);
 };

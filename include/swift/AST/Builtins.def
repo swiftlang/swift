@@ -156,7 +156,7 @@ BUILTIN_SIL_OPERATION(Load, "load", Special)
 /// Move has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Move, "move", Special)
 
-/// Destroy has type (metatype<T>, Builtin.RawPointer) -> ()
+/// Destroy has type (T.Type, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Destroy, "destroy", Special)
 
 /// Assign has type (T, Builtin.RawPointer) -> ()
@@ -184,7 +184,7 @@ BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 /// valid within the scope of the statement for logical lvalues.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
 
-/// typeof(T) -> T.metatype
+/// typeof(T) -> T.Type
 /// Returns the runtime type of a value.
 BUILTIN_SIL_OPERATION(TypeOf, "typeof", Special)
 
@@ -204,13 +204,13 @@ BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
           BUILTIN(Id, Name, Attrs)
 #endif
                        
-/// Sizeof has type T.metatype -> Int
+/// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
-/// Strideof has type T.metatype -> Int
+/// Strideof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 
-/// Alignof has type T.metatype -> Int
+/// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -273,7 +273,7 @@ BUILTIN_MISC_OPERATION(Once, "once", "", Special)
   BUILTIN(Id, #Name, "n")
 #endif
 
-/// canBeObjCClass(T.metatype) -> Builtin.Int1
+/// canBeObjCClass(T.Type) -> Builtin.Int1
 /// At compile time, evaluate whether T is or can be bound to an @objc class or
 /// protocol type.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeObjCClass)

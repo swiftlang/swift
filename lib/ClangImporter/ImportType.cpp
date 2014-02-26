@@ -493,7 +493,7 @@ namespace {
         return proto->getDeclaredType();
       }
 
-      // Class maps to DynamicLookup.metatype.
+      // Class maps to DynamicLookup.Type.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
       return MetatypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
     }

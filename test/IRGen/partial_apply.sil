@@ -20,7 +20,7 @@ bb0(%0 : $ObjCClass):
 
 sil @_TToFCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
-  // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.metatype)() -> ObjectiveC.ObjCClass
+  // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.Type)() -> ObjectiveC.ObjCClass
   %1 = function_ref @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
   %2 = apply %1(%0) : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %3
   return %2 : $ObjCClass

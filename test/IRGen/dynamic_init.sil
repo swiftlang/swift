@@ -8,22 +8,22 @@ class C {
   @abstract init()
 }
 
-sil @_TFC12dynamic_init1CCfMS0_FT_S0_ : $@thin (@thick C.metatype) -> @owned C
+sil @_TFC12dynamic_init1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
 sil @_TFC12dynamic_init1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C
 sil @_TFC12dynamic_init1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer
 sil @_TFC12dynamic_init1CD : $@cc(method) @thin (@owned C) -> ()
 
 // CHECK-LABEL: define void @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_
-sil @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_ : $@thin (@thick C.metatype) -> () {
-bb0(%0 : $@thick C.metatype):
+sil @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_ : $@thin (@thick C.Type) -> () {
+bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %C12dynamic_init1C* (%swift.type*)**
   // CHECK:   [[VTABLE_OFFSET:%[0-9]+]] = getelementptr inbounds %C12dynamic_init1C* (%swift.type*)** [[META]], i64 8
   // CHECK:   [[CTOR:%[0-9]+]] = load %C12dynamic_init1C* (%swift.type*)** [[VTABLE_OFFSET]], align 8
   // CHECK:   [[CTOR_I8:%[0-9]+]] = bitcast %C12dynamic_init1C* (%swift.type*)* [[CTOR]] to i8*
   // CHECK:   [[CTOR_FN:%[0-9]+]] = bitcast i8* [[CTOR_I8]] to %C12dynamic_init1C* (%swift.type*)*
-  %2 = class_method %0 : $@thick C.metatype, #C.init!allocator.1 : $@thin (@thick C.metatype) -> @owned C
+  %2 = class_method %0 : $@thick C.Type, #C.init!allocator.1 : $@thin (@thick C.Type) -> @owned C
   // CHECK:   [[RESULT:%[0-9]+]] = call %C12dynamic_init1C* [[CTOR_FN]](%swift.type* %0)
-  %3 = apply %2(%0) : $@thin (@thick C.metatype) -> @owned C
+  %3 = apply %2(%0) : $@thin (@thick C.Type) -> @owned C
   // CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C12dynamic_init1C*)*)(%C12dynamic_init1C* [[RESULT]]) #0
   strong_release %3 : $C
   // CHECK: ret void
@@ -32,5 +32,5 @@ bb0(%0 : $@thick C.metatype):
 }
 
 sil_vtable C {
-  #C.init!allocator.1: _TFC12dynamic_init1CCfMS0_FT_S0_ // dynamic_init.C.__allocating_init (dynamic_init.C.metatype)() -> dynamic_init.C
+  #C.init!allocator.1: _TFC12dynamic_init1CCfMS0_FT_S0_ // dynamic_init.C.__allocating_init (dynamic_init.C.Type)() -> dynamic_init.C
 }

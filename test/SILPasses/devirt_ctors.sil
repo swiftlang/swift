@@ -19,7 +19,7 @@ bb0(%0 : $Int64, %1 : $ABC):
 
 sil @_TFC4main3ABC6memberfS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
 sil @_TFC4main3ABC7member2fS0_FT_T_ : $@cc(method) @thin (@owned ABC) -> ()
-sil @_TFC4main3ABCCfMS0_FT1ySi_S0_ : $@thin (Int64, @thick ABC.metatype) -> @owned ABC
+sil @_TFC4main3ABCCfMS0_FT1ySi_S0_ : $@thin (Int64, @thick ABC.Type) -> @owned ABC
 
 //CHECK:@_TF4main3fooFT_T_
 //CHECK-NOT: class_method
@@ -29,7 +29,7 @@ bb0:
   %0 = integer_literal $Builtin.Int64, 7          // user: %1
   %1 = struct $Int64 (%0 : $Builtin.Int64)        // user: %4
   %2 = alloc_ref $ABC                             // user: %4
-  // function_ref main.ABC.init (main.ABC.metatype)(y : Swift.Int64) -> main.ABC
+  // function_ref main.ABC.init (main.ABC.Type)(y : Swift.Int64) -> main.ABC
   %3 = function_ref @_TFC4main3ABCcfMS0_FT1ySi_S0_ : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // user: %4
   %4 = apply %3(%1, %2) : $@cc(method) @thin (Int64, @owned ABC) -> @owned ABC // users: %7, %6, %5, %10, %9, %8, %11
   strong_retain %4 : $ABC                         // id: %5

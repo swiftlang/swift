@@ -862,8 +862,8 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
 
   // Metatype conversion casts in the AST might not be reflected as
-  // such in the SIL type system, for example, a cast from DynamicSelf.metatype
-  // directly to its own Self.metatype.
+  // such in the SIL type system, for example, a cast from DynamicSelf.Type
+  // directly to its own Self.Type.
   auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
   if (metaBase.getType() == loweredResultTy)
     return RValue(SGF, E, ManagedValue::forUnmanaged(metaBase));

@@ -258,7 +258,7 @@ enum class DeclVisibilityKind {
   /// module or in a imported module.
   VisibleAtTopLevel,
 
-  /// Declaration was found via \c DynamicLookup or \c DynamicLookup.metatype.
+  /// Declaration was found via \c DynamicLookup or \c DynamicLookup.Type.
   DynamicLookup,
 };
 
