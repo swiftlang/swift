@@ -133,6 +133,14 @@
 * 'destructor' has been replaced with 'deinit', to emphasize that it
   is related to 'init'. We will refer to these as 'deinitializers'.
 
+* Class methods defined within extensions of Objective-C classes can
+  now refer to 'self', including using 'instancetype' methods. As a
+  result, NSMutableString, NSMutableArray, and NSMutableDictionary
+  objects can now be created with their respective literals, i.e.,
+
+    var dict: NSMutableDictionary = ["a" : 1, "b" : 2]
+
+
 2014-02-19
 ----------
 
