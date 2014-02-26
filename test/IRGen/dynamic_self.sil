@@ -5,7 +5,7 @@ import Builtin
 import Swift
 
 protocol P {
-  func f() -> DynamicSelf
+  func f() -> Self
 }
 
 // CHECK-LABEL: define void @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_

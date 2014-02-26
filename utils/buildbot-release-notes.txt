@@ -127,6 +127,8 @@
 * The syntax for referring to the type of a type, 'T.metatype', has been
   changed to 'T.Type'.
 
+* 'DynamicSelf' is now called 'Self'; the semantics are unchanged.
+
 2014-02-19
 ----------
 

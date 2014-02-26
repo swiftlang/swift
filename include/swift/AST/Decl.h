@@ -222,7 +222,7 @@ class alignas(8) Decl {
 
     /// Whether this function is a 'mutating' method.
     unsigned Mutating : 1;
-    /// Whether this function has a \c DynamicSelf return type.
+    /// Whether this function has a dynamic Self return type.
     unsigned HasDynamicSelf : 1;
   };
   enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
@@ -3335,22 +3335,22 @@ public:
     return getAccessorKind() != AccessorKind::NotAccessor;
   }
 
-  /// Determine whether this function has a \c DynamicSelf return
+  /// Determine whether this function has a dynamic \c Self return
   /// type.
   bool hasDynamicSelf() const { return FuncDeclBits.HasDynamicSelf; }
 
-  /// Set whether this function has a dynamic self or not.
+  /// Set whether this function has a dynamic \c Self return or not.
   void setDynamicSelf(bool hasDynamicSelf) { 
     FuncDeclBits.HasDynamicSelf = hasDynamicSelf;
   }
   
-  /// Retrieve the \c DynamicSelf type for this method, or a null type if
-  /// this method does not have a \c DynamicSelf return type.
+  /// Retrieve the dynamic \c Self type for this method, or a null type if
+  /// this method does not have a dynamic \c Self return type.
   DynamicSelfType *getDynamicSelf() const;
 
-  /// Retrieve the \c DynamicSelf interface type for this method, or a
-  /// null type if this method does not have a \c DynamicSelf return
-  /// type.
+  /// Retrieve the dynamic \c Self interface type for this method, or
+  /// a null type if this method does not have a dynamic \c Self
+  /// return type.
   DynamicSelfType *getDynamicSelfInterface() const;
 
   /// Given that this is an Objective-C method declaration, produce

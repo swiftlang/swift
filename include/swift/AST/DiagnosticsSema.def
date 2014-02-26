@@ -492,20 +492,13 @@ NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
 ERROR(broken_raw_representable_requirement,sema_tcd,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 
-// DynamicSelf
+// Dynamic Self
 ERROR(dynamic_self_non_method,sema_tcd,none,
-      "%select{global|local}0 function cannot return 'DynamicSelf'", (bool))
+      "%select{global|local}0 function cannot return 'Self'", (bool))
 ERROR(dynamic_self_struct_enum,sema_tcd,none,
-      "%select{struct|enum}0 method cannot return 'DynamicSelf'; "
+      "%select{struct|enum}0 method cannot return 'Self'; "
       "did you mean to use the %select{struct|enum}0 type %1?",
       (int, Identifier))
-ERROR(dynamic_self_not_result_type,sema_tcd,none,
-      "'DynamicSelf' can only be used in the return type of a method", ())
-ERROR(dynamic_self_not_result_type_suggest,sema_tcd,none,
-      "'DynamicSelf' can only be used in the return type of a method; "
-      "did you mean %0?", (Identifier))
-ERROR(dynamic_self_requirement,sema_tcd,none,
-      "candidate result type is not 'DynamicSelf'", ())
 
 // Duplicate declarations
 ERROR(duplicate_enum_element,sema_tcd,none,
@@ -785,7 +778,8 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 ERROR(unchecked_not_optional_type,sema_tct,none,
       "type following '@unchecked' must be an optional type", ())
 ERROR(self_in_nominal,sema_tct,none,
-      "'Self' is only available in a protocol; did you mean %0?", (Identifier))
+      "'Self' is only available in a protocol or as the result of a class "
+      "method; did you mean %0?", (Identifier))
 
 // Ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,

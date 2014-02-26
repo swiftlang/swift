@@ -4,7 +4,7 @@ import Builtin
 import Swift
 
 @class_protocol protocol CP {
-  func f() -> DynamicSelf
+  func f() -> Self
 }
 
 sil @plus : $@thin (Int64, Int64) -> Int64

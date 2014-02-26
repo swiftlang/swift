@@ -354,46 +354,6 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       return false;
     }
     
-    // Attempt to refer to 'DynamicSelf' anywhere that isn't the
-    // result type of a method declaration.
-    if (comp->getIdentifier() == tc.Context.Id_DynamicSelf &&
-        !isa<GenericIdentTypeRepr>(comp)) {
-      // If we're within a nominal context, suggest either 'Self' (for
-      // a protocol) or the name of the nominal context.
-      if (auto nominal = getEnclosingNominalContext(dc)) {
-        Type type;
-        Identifier name;
-        if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-          type = resolveTypeDecl(tc, proto->getSelf(), comp->getIdLoc(), dc, 
-                                 { }, /*allowUnboundGenerics=*/false, resolver);
-          if (type->is<ErrorType>())
-            return true;
-
-          name = tc.Context.Id_Self;
-        } else {
-          type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
-                                 /*allowUnboundGenerics=*/false, resolver);
-          if (type->is<ErrorType>())
-            return true;
-
-          name = nominal->getName();
-        }
-
-        tc.diagnose(comp->getIdLoc(), 
-                    diag::dynamic_self_not_result_type_suggest,
-                    name)
-          .fixItReplace(comp->getIdLoc(), name.str());
-
-        comp->overwriteIdentifier(name);
-        comp->setValue(type);
-        return false;
-      }
-
-      tc.diagnose(comp->getIdLoc(), diag::dynamic_self_not_result_type);
-      return true;
-                  
-    }
-
     // Fallback.
     tc.diagnose(comp->getIdLoc(), diag::use_undeclared_type,
                 comp->getIdentifier())

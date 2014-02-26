@@ -88,7 +88,7 @@ inheritance to hide the concrete implementing type behind an abstract base::
     func __getitem__(i: Int) -> T { fatal() }
 
     // For COW
-    func _clone() -> DynamicSelf { fatal() }
+    func _clone() -> Self { fatal() }
   }
 
   // Concrete derived class containing a specific Array implementation
@@ -101,7 +101,7 @@ inheritance to hide the concrete implementing type behind an abstract base::
     func __getitem__(i: Int) -> T { return __getitem__(i) }
 
     // For COW
-    func _clone() -> DynamicSelf { return DynamicSelf(value) }
+    func _clone() -> Self { return self(value) }
   }
 
   // Wrapper type that uses the base class to erase the concrete type of

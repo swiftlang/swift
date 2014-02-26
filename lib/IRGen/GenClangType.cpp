@@ -236,7 +236,7 @@ clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
 }
 
 clang::CanQualType GenClangType::visitDynamicSelfType(CanDynamicSelfType type) {
-  // DynamicSelf is equivalent to 'instancetype', which is treated as
+  // Dynamic Self is equivalent to 'instancetype', which is treated as
   // 'id' within the Objective-C type system.
   return getClangIdType(getClangASTContext());
 }

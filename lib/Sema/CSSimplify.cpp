@@ -1297,6 +1297,14 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 }
 
+/// Determine whether the given type is the Self type of the protocol.
+static bool isProtocolSelf(Type type) {
+  if (auto genericParam = type->getAs<GenericTypeParamType>())
+    return genericParam->getDepth() == 0;
+  
+  return false;
+}
+
 /// Determine whether the given type contains a reference to the 'Self' type
 /// of a protocol.
 static bool containsProtocolSelf(Type type) {
@@ -1305,10 +1313,7 @@ static bool containsProtocolSelf(Type type) {
     return false;
 
   return type.findIf([](Type type) -> bool {
-    if (auto genericParam = type->getAs<GenericTypeParamType>())
-      return genericParam->getDepth() == 0;
-
-    return false;
+    return isProtocolSelf(type);
   });
 }
 
@@ -1321,25 +1326,21 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     type = type->castTo<AnyFunctionType>()->getResult();
 
-    // Allow method requirements to return DynamicSelf.
-    if (auto func = dyn_cast<FuncDecl>(afd)) {
-      if (func->hasDynamicSelf()) {
-        while (auto funcTy = type->getAs<AnyFunctionType>()) {
-          if (containsProtocolSelf(funcTy->getInput()))
-            return true;
-
-          type = funcTy->getResult();
-        }
-        assert(type->is<DynamicSelfType>() && "Should only have DynamicSelf");
-        return false;
-      }
+    // Allow functions to return Self, but not have Self anywhere in
+    // their argument types.
+    for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
+      // Check whether the input type contains Self anywhere.
+      auto fnType = type->castTo<AnyFunctionType>();
+      if (containsProtocolSelf(fnType->getInput()))
+        return true;
+      
+      type = fnType->getResult();
     }
+    
+    if (isProtocolSelf(type) || type->is<DynamicSelfType>())
+      return false;
 
-    // Only look at the argument type of a constructor.
-    if (isa<ConstructorDecl>(afd)) {
-      auto argTy = type->castTo<AnyFunctionType>()->getInput();
-      return containsProtocolSelf(argTy);
-    }
+    return containsProtocolSelf(type);
   }
 
   return containsProtocolSelf(type);

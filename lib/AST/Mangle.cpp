@@ -589,7 +589,7 @@ void Mangler::mangleGenericSignature(GenericSignature *sig,
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
-/// <type> ::= D <type>              # DynamicSelf
+/// <type> ::= D <type>              # dynamic Self return
 /// <type> ::= ERR                   # Error type
 /// <type> ::= 'a' <context> <identifier> # Type alias (DWARF only)
 /// <type> ::= F <type> <type>       # function type
@@ -942,12 +942,18 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     return;
   }
 
-  case TypeKind::DynamicSelf:
-    Buffer << 'D';
-    mangleType(cast<DynamicSelfType>(type).getSelfType(), explosion,
-               uncurryLevel);
+  case TypeKind::DynamicSelf: {
+    auto dynamicSelf = cast<DynamicSelfType>(type);
+    if (dynamicSelf->getSelfType()->getAnyNominal()) {
+      Buffer << 'D';
+      mangleType(dynamicSelf.getSelfType(), explosion, uncurryLevel);
+    } else {
+      // Mangle DynamicSelf as Self within a protocol.
+      mangleType(dynamicSelf.getSelfType(), explosion, uncurryLevel);
+    }
     return;
-
+  }
+    
   case TypeKind::GenericFunction: {
     llvm_unreachable("cannot mangle generic function types yet");
   }

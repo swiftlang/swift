@@ -1502,16 +1502,16 @@ private:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
   
-/// The type given to \c DynamicSelf.
+/// The type given to a dynamic \c Self return type.
 ///
 /// Example:
 /// \code
 /// class X {
-///   class func factory() -> DynamicSelf { ... }
+///   class func factory() -> Self { ... }
 /// };
 /// \endcode
 ///
-/// In this example, \c DynamicSelf is represented by a 
+/// In this example, \c Self is represented by a 
 /// \c DynamicSelfType node whose self type is \c X.
 class DynamicSelfType : public TypeBase {
   Type SelfType;

@@ -1464,7 +1464,7 @@ public:
   }
 
   void visitDynamicSelfType(DynamicSelfType *T) {
-    Printer << "DynamicSelf";
+    Printer << "Self";
   }
 
   void printFunctionExtInfo(AnyFunctionType::ExtInfo info) {

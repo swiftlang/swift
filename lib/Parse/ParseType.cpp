@@ -274,6 +274,14 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
     Identifier Name;
     switch (Tok.getKind()) {
     case tok::kw_DynamicSelf:
+      diagnose(Tok, diag::dynamic_self_is_self)
+        .fixItReplace(SourceRange(Tok.getLoc()), "Self");
+      Name = Context.getIdentifier("Self");
+      Loc = Tok.getLoc();
+      consumeToken();
+      break;
+      
+
     case tok::kw_Self:
       Name = Context.getIdentifier(Tok.getText());
       Loc = Tok.getLoc();

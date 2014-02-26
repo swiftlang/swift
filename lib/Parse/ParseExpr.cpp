@@ -1245,6 +1245,15 @@ Expr *Parser::parseExprStringLiteral() {
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self) || Tok.is(tok::kw_DynamicSelf));
+  if (Tok.is(tok::kw_DynamicSelf)) {
+    diagnose(Tok, diag::dynamic_self_is_self)
+      .fixItReplace(SourceRange(Tok.getLoc()), "Self");
+    SourceLoc Loc = Tok.getLoc();
+    Identifier Name = Context.getIdentifier("Self");
+    consumeToken();
+    return actOnIdentifierExpr(Name, Loc);    
+  }
+
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());
   consumeToken();

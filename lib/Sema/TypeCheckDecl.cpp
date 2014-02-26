@@ -2168,7 +2168,7 @@ public:
     FD->setType(funcTy);
     FD->setBodyResultType(bodyResultType);
 
-    // For a non-generic method that returns DynamicSelf, we need to
+    // For a non-generic method that returns dynamic Self, we need to
     // provide an interface type where the 'self' argument is the
     // nominal type.
     if (FD->hasDynamicSelf() && !genericParams && !outerGenericParams) {
@@ -2302,11 +2302,11 @@ public:
     if (!simpleRepr)
       return false;
 
-    // Check whether it is 'DynamicSelf'.
-    if (simpleRepr->getIdentifier() != TC.Context.Id_DynamicSelf)
+    // Check whether it is 'Self'.
+    if (simpleRepr->getIdentifier() != TC.Context.Id_Self)
       return false;
 
-    // 'DynamicSelf' is only permitted on methods.
+    // Dynamic 'Self' is only permitted on methods.
     auto dc = func->getDeclContext();
     if (!dc->isTypeContext()) {
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
@@ -2319,7 +2319,7 @@ public:
     if (containerTy->is<ErrorType>())
       return true;
 
-    // 'DynamicSelf' is only permitted on class or protocol methods.
+    // 'Self' is only a dynamic self on class methods.
     auto nominal = containerTy->getAnyNominal();
     assert(nominal && "Non-nominal container for method type?");
     if (!isa<ClassDecl>(nominal) && !isa<ProtocolDecl>(nominal)) {
@@ -2337,7 +2337,7 @@ public:
       return true;
     }
 
-    // Note that the function has a DynamicSelf return type, and set
+    // Note that the function has a dynamic Self return type and set
     // the return type component to the dynamic self type.
     func->setDynamicSelf(true);
     auto dynamicSelfType = func->getDynamicSelf();
@@ -2434,7 +2434,7 @@ public:
 
     bool isInvalid = false;
 
-    // Check whether the return type is 'DynamicSelf'.
+    // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
       isInvalid = true;
 

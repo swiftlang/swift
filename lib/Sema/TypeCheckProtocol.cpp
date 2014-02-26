@@ -209,10 +209,7 @@ namespace {
     PostfixNonPostfixConflict,
     
     /// \brief The witness did not match because of @mutating conflicts.
-    MutatingConflict,
-
-    /// \brief The witness did not return DynamicSelf when it was expected.
-    DynamicSelfConflict
+    MutatingConflict
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -249,7 +246,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::DynamicSelfConflict:
         return false;
       }
     }
@@ -269,7 +265,6 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
-      case MatchKind::DynamicSelfConflict:
         return false;
       }
     }
@@ -456,23 +451,6 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (funcWitness->isMutating() && !funcReq->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);
     
-    // If the requirement is for a method returning DynamicSelf, but
-    // the witness does not, check more closely.
-    if (funcReq->hasDynamicSelf() && !funcWitness->hasDynamicSelf()) {
-      if (auto nominal = funcWitness->getExtensionType()->getAnyNominal()) {
-        // For structs and enums, DynamicSelf is not permitted on the
-        // declaration. The matching below will determine whether the
-        // result type of a struct or enum method matches the type of
-        // its enclosing struct or enum.
-        if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
-          // okay
-        } else {
-          assert(isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal));
-          return RequirementMatch(witness, MatchKind::DynamicSelfConflict);
-        }
-      }
-    }
-      
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (isa<AbstractStorageDecl>(witness)) {
@@ -812,10 +790,6 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
-    break;
-  case MatchKind::DynamicSelfConflict:
-    // FIXME: Could emit a Fix-It here.
-    tc.diagnose(match.Witness, diag::dynamic_self_requirement);
     break;
   }
 }

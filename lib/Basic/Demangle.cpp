@@ -2246,7 +2246,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     printBoundGeneric(pointer);
     return;
   case Node::Kind::DynamicSelf:
-    Printer << "DynamicSelf";
+    Printer << "Self";
     return;
   case Node::Kind::ObjCBlock: {
     Printer << "@objc_block ";

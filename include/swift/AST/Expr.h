@@ -1437,9 +1437,9 @@ public:
 ///
 /// This expression is implicitly created by the type checker in
 /// narrow circumstances where we need a way to refer to the dynamic
-/// type, i.e., when calling a \c DynamicSelf method on a protocol. In
-/// the future, this may become an actual operation within the
-/// language.
+/// type, i.e., when calling a method on a protocol that returns
+/// Self. In the future, this may become an actual operation within
+/// the language.
 class OpenExistentialExpr : public Expr {
   Expr *ExistentialValue;
   OpaqueValueExpr *OpaqueValue;
@@ -1633,7 +1633,7 @@ public:
 ///
 /// This conversion is technically unsafe; however, semantic analysis will
 /// only introduce such a conversion in cases where other language features
-/// (i.e., DynamicSelf) enforce static safety. Additionally, this conversion
+/// (i.e., Self returns) enforce static safety. Additionally, this conversion
 /// avoids changing the ABI of the function in question.
 class CovariantFunctionConversionExpr : public ImplicitConversionExpr {
 public:
@@ -1651,7 +1651,7 @@ public:
 ///
 /// This conversion is technically unsafe; however, semantic analysis will
 /// only introduce such a conversion in cases where other language features
-/// (i.e., DynamicSelf) enforce static safety.
+/// (i.e., Self returns) enforce static safety.
 class CovariantReturnConversionExpr : public ImplicitConversionExpr {
 public:
   CovariantReturnConversionExpr(Expr *subExpr, Type type)
