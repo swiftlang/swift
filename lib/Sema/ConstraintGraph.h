@@ -158,9 +158,13 @@ private:
   /// are representatives of their equivalence classes.
   mutable SmallVector<TypeVariableType *, 2> EquivalenceClass;
 
-  /// A mapping from the names of members of this type variable to the
-  /// type variable representing the corresponding member.
-  llvm::SmallDenseMap<Identifier, TypeVariableType *> MemberTypes;
+  /// A set of (name, type variable) pairs representing the member types of 
+  /// the given type variable.
+  llvm::SmallVector<std::pair<Identifier, TypeVariableType *>, 2> MemberTypes;
+
+  /// A mapping from the names of members of this type variable to an
+  /// index into the \c MemberTypes vector.
+  llvm::SmallDenseMap<Identifier, unsigned> MemberTypeIndex;
 
   /// Print this graph node.
   void print(llvm::raw_ostream &out, unsigned indent);

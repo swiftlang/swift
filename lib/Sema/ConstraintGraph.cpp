@@ -218,12 +218,13 @@ void ConstraintGraphNode::removeFixedBinding(TypeVariableType *typeVar) {
 TypeVariableType *
 ConstraintGraphNode::getMemberType(Identifier name,
                                    std::function<TypeVariableType *()> create) {
-  auto known = MemberTypes.find(name);
-  if (known != MemberTypes.end())
-    return known->second;
+  auto known = MemberTypeIndex.find(name);
+  if (known != MemberTypeIndex.end())
+    return MemberTypes[known->second].second;
 
   auto memberType = create();
-  MemberTypes.insert({name, memberType});
+  MemberTypeIndex.insert({name, MemberTypes.size()});
+  MemberTypes.push_back({name, memberType});
   return memberType;
 }
 
@@ -335,9 +336,21 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
   case ChangeKind::AddedMemberType: {
     auto &node = cg[MemberType.TypeVar];
 
-    auto known = node.MemberTypes.find(MemberType.Name);
-    assert(known != node.MemberTypes.end() && "Constraint graph corrupted");
-    node.MemberTypes.erase(known);
+    // Erase the member type entry from the 
+    auto known = node.MemberTypeIndex.find(MemberType.Name);
+    assert(known != node.MemberTypeIndex.end() && "Constraint graph corrupted");
+    unsigned index = known->second;
+    node.MemberTypeIndex.erase(known);
+
+    // If this was not the last member type, swap it with the last
+    // member type.
+    if (index != node.MemberTypes.size()-1) {
+      node.MemberTypes[index] = node.MemberTypes.back();
+      node.MemberTypeIndex[node.MemberTypes[index].first] = index;
+    }
+     
+    // Pop off the last member type.
+    node.MemberTypes.pop_back();
     break;
   }
   }
@@ -452,15 +465,16 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 
   // Merge member types.
   for (auto newEquivTypeVar : nonRepNode.getEquivalenceClassUnsafe()) {
-    // FIXME: non-determinism here.
     auto &newEquivNode = newEquivTypeVar == typeVarNonRep
                            ? nonRepNode
                            : (*this)[newEquivTypeVar];
     for (auto memberType : newEquivNode.MemberTypes) {
-      auto repKnown = repNode.MemberTypes.find(memberType.first);
-      if (repKnown == repNode.MemberTypes.end()) {
+      auto repKnown = repNode.MemberTypeIndex.find(memberType.first);
+      if (repKnown == repNode.MemberTypeIndex.end()) {
         // We haven't seen this member type before. Add it.
-        repNode.MemberTypes.insert(memberType);
+        repNode.MemberTypeIndex.insert({memberType.first, 
+                                        repNode.MemberTypes.size()});
+        repNode.MemberTypes.push_back(memberType);
         if (ActiveScope)
           Changes.push_back(Change::addedMemberType(typeVarRep, 
                                                     memberType.first));
@@ -469,14 +483,13 @@ void ConstraintGraph::mergeNodes(TypeVariableType *typeVar1,
 
       // We have seen this member before. If the type variables are
       // the same, do nothing. This is a fast-patch check.
-      if (repKnown->second == memberType.second)
+      auto repMemberTypeVar = repNode.MemberTypes[repKnown->second].second;
+      if (repMemberTypeVar == memberType.second)
         continue;
 
       // Find the representatives for the member type variables.
-      TypeVariableType *repMemberTypeVar 
-        = CS.getRepresentative(repKnown->second);
-      TypeVariableType *otherMemberTypeVar
-        = CS.getRepresentative(memberType.second);
+      repMemberTypeVar = CS.getRepresentative(repMemberTypeVar);
+      auto otherMemberTypeVar = CS.getRepresentative(memberType.second);
 
       // If the representatives are equivalent, do nothing.
       if (repMemberTypeVar == otherMemberTypeVar)
@@ -690,7 +703,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
     std::sort(sortedConstraints.begin(), sortedConstraints.end());
     for (auto constraint : sortedConstraints) {
       out.indent(indent + 4);
-      constraint->print(out, /*FIXME:*/nullptr);
+      constraint->print(out, &TypeVar->getASTContext().SourceMgr);
       out << "\n";
     }
   }
@@ -839,6 +852,11 @@ static void printValue(llvm::raw_ostream &os, unsigned value) {
   os << value;
 }
 
+/// Print an identifier value.
+static void printValue(llvm::raw_ostream &os, Identifier value) {
+  os << value.str();
+}
+
 void ConstraintGraphNode::verify(ConstraintGraph &cg) {
 #define require(condition, complaint) _require(condition, complaint, cg, this)
 #define requireWithContext(condition, complaint, context) \
@@ -873,6 +891,14 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
             "adjacency information should have been removed");
     require(info.second.NumConstraints <= Constraints.size(),
             "adjacency information has higher degree than # of constraints");
+  }
+
+  // Verify that the member types haven't gotten out of sync.
+  for (auto index : MemberTypeIndex) {
+    require(index.second < MemberTypes.size(), 
+            "member type index out-of-range");
+    requireSameValue(index.first, MemberTypes[index.second].first,
+                     "member type index map provides wrong index into vector");
   }
 
   // Based on the constraints we have, build up a representation of what
