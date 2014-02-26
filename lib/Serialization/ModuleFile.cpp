@@ -376,12 +376,16 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
 }
 
 
-ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
+ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input,
+                       bool isFramework)
   : FileContext(nullptr),
     InputFile(std::move(input)),
     InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
                 reinterpret_cast<const uint8_t *>(InputFile->getBufferEnd())),
-    Status(ModuleStatus::Valid) {
+    Bits() {
+  assert(getStatus() == ModuleStatus::Valid);
+  Bits.IsFramework = isFramework;
+
   PrettyModuleFileDeserialization stackEntry(*this);
 
   llvm::BitstreamCursor cursor{InputReader};
@@ -573,7 +577,7 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input)
 bool ModuleFile::associateWithFileContext(FileUnit *file) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
-  assert(Status == ModuleStatus::Valid && "invalid module file");
+  assert(getStatus() == ModuleStatus::Valid && "invalid module file");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
@@ -618,7 +622,7 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
     return false;
   }
 
-  return Status == ModuleStatus::Valid;
+  return getStatus() == ModuleStatus::Valid;
 }
 
 ModuleFile::~ModuleFile() = default;
@@ -685,7 +689,7 @@ void ModuleFile::getImportedModules(
 }
 
 void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
-  if (!ComputedImportDecls) {
+  if (!Bits.ComputedImportDecls) {
     ASTContext &Ctx = getContext();
     for (auto &Dep : Dependencies) {
       StringRef ModulePath, ScopePath;
@@ -730,7 +734,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           Ctx, FileContext, SourceLoc(), Kind, SourceLoc(), Dep.IsExported,
           AccessPath));
     }
-    ComputedImportDecls = true;
+    Bits.ComputedImportDecls = true;
   }
   Results.append(ImportDecls.begin(), ImportDecls.end());
 }
@@ -855,6 +859,9 @@ void
 ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
   for (auto &lib : LinkLibraries)
     callback(lib);
+  if (Bits.IsFramework)
+    callback(LinkLibrary(FileContext->getParentModule()->Name.str(),
+                         LibraryKind::Framework));
 }
 
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {

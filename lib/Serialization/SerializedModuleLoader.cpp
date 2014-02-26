@@ -62,15 +62,17 @@ SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
-                                   std::unique_ptr<llvm::MemoryBuffer> &buffer){
+                                   std::unique_ptr<llvm::MemoryBuffer> &buffer,
+                                   bool &isFramework) {
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
   llvm::SmallString<128> inputFilename;
 
-  for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
-    inputFilename = Path;
+  isFramework = false;
+  for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
+    inputFilename = path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
     auto err = llvm::MemoryBuffer::getFile(inputFilename.str(),
                                            makeOwningPtrAdapter(buffer));
@@ -78,7 +80,30 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
       return err;
   }
 
+  llvm::SmallString<64> moduleFramework(moduleID.first.str());
+  moduleFramework += ".framework";
+  isFramework = true;
+
+  // FIXME: Which name should we be using here? Do we care about CPU subtypes?
+  // FIXME: At the very least, don't hardcode "arch".
+  llvm::SmallString<16> archFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
+  if (!archFilename.empty()) {
+    archFilename += '.';
+    archFilename += SERIALIZED_MODULE_EXTENSION;
+  }
+
+  for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
+    inputFilename = path;
+    llvm::sys::path::append(inputFilename, moduleFramework.str(),
+                            moduleFilename.str(), archFilename.str());
+    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(),
+                                           makeOwningPtrAdapter(buffer));
+    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
+      return err;
+  }
+
   // Search the runtime import path.
+  isFramework = false;
   inputFilename = ctx.SearchPathOpts.RuntimeLibraryImportPath;
   llvm::sys::path::append(inputFilename, moduleFilename.str());
   return llvm::MemoryBuffer::getFile(inputFilename.str(),
@@ -87,11 +112,13 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
 
 FileUnit *
 SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
-                                std::unique_ptr<llvm::MemoryBuffer> input) {
+                                std::unique_ptr<llvm::MemoryBuffer> input,
+                                bool isFramework) {
   assert(input);
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
-  ModuleStatus err = ModuleFile::load(std::move(input), loadedModuleFile);
+  ModuleStatus err = ModuleFile::load(std::move(input), loadedModuleFile,
+                                      isFramework);
   switch (err) {
   case ModuleStatus::Valid:
     Ctx.bumpGeneration();
@@ -192,6 +219,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     return nullptr;
 
   auto moduleID = path[0];
+  bool isFramework = false;
 
   std::unique_ptr<llvm::MemoryBuffer> inputFile;
   // First see if we find it in the registered memory buffers.
@@ -210,7 +238,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Otherwise look on disk.
   if (!inputFile) {
-    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile)) {
+    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile,
+                                          isFramework)) {
       if (err.value() != llvm::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
                            moduleID.first.str(), err.message());
@@ -225,7 +254,7 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto M = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = M;
 
-  (void)loadAST(*M, moduleID.second, std::move(inputFile));
+  (void)loadAST(*M, moduleID.second, std::move(inputFile), isFramework);
   return M;
 }
 

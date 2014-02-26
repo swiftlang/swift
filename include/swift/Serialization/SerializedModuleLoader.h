@@ -87,7 +87,8 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   FileUnit *loadAST(Module &M, Optional<SourceLoc> diagLoc,
-                    std::unique_ptr<llvm::MemoryBuffer> input);
+                    std::unique_ptr<llvm::MemoryBuffer> input,
+                    bool isFramework = false);
 
   /// \brief Register a memory buffer that contains the serialized
   /// module for the given access path. This API is intended to be

@@ -213,8 +213,7 @@ private:
   std::unique_ptr<SerializedDeclTable> ClassMembersByName;
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
 
-  SmallVector<Decl *, 1> ImportDecls;
-  bool ComputedImportDecls = false;
+  TinyPtrVector<Decl *> ImportDecls;
 
   using DeclIDVector = SmallVector<serialization::DeclID, 4>;
 
@@ -222,18 +221,33 @@ private:
   DeclIDVector KnownProtocolAdopters[NumKnownProtocols];
   DeclIDVector EagerDeserializationDecls;
 
-  /// Whether this module file can be used.
-  ModuleStatus Status;
+  struct {
+    /// Whether this module file comes from a framework.
+    unsigned IsFramework : 1;
+
+    /// Whether or not ImportDecls is valid.
+    unsigned ComputedImportDecls : 1;
+
+    /// Whether this module file can be used, and what's wrong if not.
+    unsigned Status : 3;
+    unsigned : 0;
+  } Bits;
+  static_assert(sizeof(Bits) <= 4, "The bit set should be small");
+
+  void setStatus(ModuleStatus status) {
+    Bits.Status = static_cast<unsigned>(status);
+    assert(status == getStatus() && "not enough bits for status");
+  }
 
   /// Constructs an new module and validates it.
-  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input);
+  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input, bool isFramework);
 
   /// Convenience function for module loading.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
     assert(issue != ModuleStatus::Valid);
     assert((!FileContext || issue != ModuleStatus::Malformed) &&
            "error deserializing an individual record");
-    Status = issue;
+    setStatus(issue);
   }
 
 public:
@@ -315,8 +329,9 @@ public:
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static ModuleStatus load(std::unique_ptr<llvm::MemoryBuffer> input,
-                           std::unique_ptr<ModuleFile> &module) {
-    module.reset(new ModuleFile(std::move(input)));
+                           std::unique_ptr<ModuleFile> &module,
+                           bool isFramework) {
+    module.reset(new ModuleFile(std::move(input), isFramework));
     return module->getStatus();
   }
 
@@ -329,7 +344,9 @@ public:
   bool associateWithFileContext(FileUnit *file);
 
   /// Checks whether this module can be used.
-  ModuleStatus getStatus() const { return Status; }
+  ModuleStatus getStatus() const {
+    return static_cast<ModuleStatus>(Bits.Status);
+  }
 
   /// Returns paths to the source files that were used to build this module.
   ArrayRef<StringRef> getInputSourcePaths() const {
