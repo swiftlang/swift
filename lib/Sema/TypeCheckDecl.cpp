@@ -1449,6 +1449,17 @@ public:
       TC.typeCheckDecl(VD->getGetter(), true);
       TC.typeCheckDecl(VD->getSetter(), true);
     }
+
+    if (IsFirstPass && !checkPropertyOverrides(VD)) {
+      // If a property has an override attribute but does not override
+      // anything, complain.
+      if (VD->getAttrs().isOverride() && !VD->getOverriddenDecl()) {
+        TC.diagnose(VD, diag::property_does_not_override)
+          .highlight(VD->getAttrs().getLoc(AK_override));
+        VD->getMutableAttrs().clearAttribute(AK_override);
+      }
+    }
+
   }
 
 
@@ -1478,7 +1489,7 @@ public:
     if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-    // If this is an declaration with an initializer, reject code if
+    // If this is a declaration with an initializer, reject code if
     // uninitialized vars are not allowed.
     if (!PBD->hasInit() && !isInSILMode) {
       PBD->getPattern()->forEachVariable([&](VarDecl *var) {
@@ -2513,7 +2524,8 @@ public:
         if (isa<SubscriptDecl>(prop))
           TC.validateDecl(prop);
         else
-          visitPatternBindingDecl(cast<VarDecl>(prop)->getParentPattern());
+          validatePatternBindingDecl(TC,
+                                     cast<VarDecl>(prop)->getParentPattern());
 
         isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
       }
@@ -2579,7 +2591,8 @@ public:
 
     // If the overriding declaration does not have the @override
     // attribute on it, complain.
-    if (!overriding->getAttrs().isOverride() && isa<FuncDecl>(overriding)) {
+    if (!overriding->getAttrs().isOverride() &&
+        !isa<ConstructorDecl>(overriding)) {
       TC.diagnose(overriding, diag::missing_override)
         .fixItInsert(overriding->getStartLoc(), "@override ");
       TC.diagnose(overridden, diag::overridden_here);
@@ -2600,19 +2613,23 @@ public:
     return false;
   }
 
-  /// Perform basic checking to determine whether a function can override a
-  /// parent function.
-  static bool areOverrideCompatibleSimple(AbstractFunctionDecl *afd,
-                                          AbstractFunctionDecl *parentAFD) {
-    if (auto func = dyn_cast<FuncDecl>(afd)) {
+  /// Perform basic checking to determine whether a declaration can override a
+  /// declaration in a superclass.
+  static bool areOverrideCompatibleSimple(ValueDecl *decl,
+                                          ValueDecl *parentDecl) {
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
       // Specific checking for methods.
-      auto parentFunc = cast<FuncDecl>(parentAFD);
+      auto parentFunc = cast<FuncDecl>(parentDecl);
       if (func->isStatic() != parentFunc->isStatic())
         return false;
-    } else if (isa<ConstructorDecl>(afd)) {
+    } else if (isa<ConstructorDecl>(decl)) {
       // Specific checking for constructors.
-      auto parentCtor = cast<ConstructorDecl>(parentAFD);
+      auto parentCtor = cast<ConstructorDecl>(parentDecl);
       if (!parentCtor->isAbstract())
+        return false;
+    } else if (auto var = dyn_cast<VarDecl>(decl)) {
+      auto parentVar = cast<VarDecl>(parentDecl);
+      if (var->isStatic() != parentVar->isStatic())
         return false;
     }
 
@@ -2664,8 +2681,8 @@ public:
                                 /*allowDynamicLookup=*/false);
     }
 
-    unsigned numExactMatches = false;
-    SmallVector<llvm::PointerIntPair<AbstractFunctionDecl *, 1, bool>, 2> matches;
+    unsigned numExactMatches = 0;
+    SmallVector<llvm::PointerIntPair<AbstractFunctionDecl *,1,bool>, 2> matches;
     AbstractFunctionDecl *exactMatch = nullptr;
     for (auto member : members) {
       if (member->isInvalid())
@@ -2757,6 +2774,116 @@ public:
         continue;
 
       TC.diagnose(match.getPointer(), diag::overridden_here);
+    }
+    return true;
+  }
+
+  /// Determine which property this property overrides (if any).
+  ///
+  /// \returns true if an error occurred.
+  bool checkPropertyOverrides(VarDecl *property) {
+    if (property->isInvalid())
+      return false;
+
+    auto owningTy = property->getDeclContext()->getDeclaredInterfaceType();
+    if (!owningTy)
+      return false;
+
+    auto classDecl = owningTy->getClassOrBoundGenericClass();
+    if (!classDecl)
+      return false;
+
+    Type superclass = classDecl->getSuperclass();
+    if (!superclass)
+      return false;
+
+    if (!property->hasName())
+      return false;
+
+    // Look for members with the same name as this one.
+    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
+    LookupResult members = TC.lookupMember(superclassMetaTy, property->getName(),
+                                           property->getDeclContext(),
+                                           /*allowDynamicLookup=*/false);
+    SmallVector<VarDecl *, 2> matches;
+    for (auto member : members) {
+      if (member->isInvalid())
+        continue;
+
+      auto parentProperty = dyn_cast<VarDecl>(member);
+      if (!parentProperty)
+        continue;
+
+      // Check whether there are any obvious reasons why the two given
+      // properties do not have an overriding relationship.
+      if (!areOverrideCompatibleSimple(property, parentProperty))
+        continue;
+
+      // Otherwise, it's an override.
+      matches.push_back(parentProperty);
+    }
+
+    // If we have no matches, there's nothing to do.
+    if (matches.empty()) {
+      return false;
+    }
+
+    // If we have a single match, make sure it has a compatible type.
+    // FIXME: readonly properties could allow covariance.
+    if (matches.size() == 1) {
+      auto parentProperty = matches.front();
+
+      // Make sure that the parent property is actually overridable.
+      if (!parentProperty->isOverridable()) {
+        TC.diagnose(property, diag::override_stored_property,
+                    property->getName());
+        TC.diagnose(parentProperty, diag::property_override_here);
+        return true;
+      }
+
+      // Make sure that the overriding property doesn't have storage.
+      if (property->hasStorage()) {
+        TC.diagnose(property, diag::override_with_stored_property,
+                    property->getName());
+        TC.diagnose(parentProperty, diag::property_override_here);
+        return true;
+      }
+
+      // Check the types.
+      auto propertyTy = property->getInterfaceType();
+      auto parentPropertyTy = adjustSuperclassMemberDeclType(parentProperty,
+                                                           superclass);
+
+      // An exact match is always fine.
+      if (propertyTy->isEqual(parentPropertyTy)) {
+        return recordOverride(property, parentProperty);
+      }
+
+      // Check for subtyping.
+      if (TC.isTrivialSubtypeOf(propertyTy, parentPropertyTy,
+                                property->getDeclContext())) {
+        // The overridden property must not be mutable.
+        if (parentProperty->getSetter()) {
+          TC.diagnose(property, diag::override_mutable_covariant,
+                      property->getName(), parentPropertyTy, propertyTy);
+          TC.diagnose(parentProperty, diag::property_override_here);
+          return true;
+        }
+
+        return recordOverride(property, parentProperty);
+      }
+
+
+      TC.diagnose(property, diag::override_property_type_mismatch,
+                  property->getName(), propertyTy, parentPropertyTy);
+      TC.diagnose(parentProperty, diag::property_override_here);
+      return true;
+    }
+
+    // We override more than one method. Complain.
+    TC.diagnose(property, diag::override_multiple_decls_base);
+    for (auto match : matches) {
+      TC.diagnose(match, diag::overridden_here);
     }
     return true;
   }

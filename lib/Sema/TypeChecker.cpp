@@ -247,7 +247,8 @@ static void checkClassOverrides(TypeChecker &TC, ClassDecl *CD,
     ValueDecl *MemberVD = dyn_cast<ValueDecl>(MemberD);
     if (!MemberVD)
       continue;
-    if (isa<DestructorDecl>(MemberVD) || isa<ConstructorDecl>(MemberVD))
+    if (isa<DestructorDecl>(MemberVD) || isa<ConstructorDecl>(MemberVD)
+        || isa<VarDecl>(MemberVD))
       continue;
     if (!MemberVD->hasName())
       continue;

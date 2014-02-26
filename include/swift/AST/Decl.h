@@ -2662,6 +2662,18 @@ public:
     }
   }
 
+  /// Determine whether this property is overridable.
+  bool isOverridable() const {
+    switch (getStorageKind()) {
+    case Computed:
+    case Observing:
+      return true;
+
+    case Stored:
+    case StoredWithTrivialAccessors:
+      return false;
+    }
+  }
   /// \brief Turn this into a computed variable, providing a getter and setter.
   void makeComputed(SourceLoc LBraceLoc, FuncDecl *Get, FuncDecl *Set,
                     SourceLoc RBraceLoc);

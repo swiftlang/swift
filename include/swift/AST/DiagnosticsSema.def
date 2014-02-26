@@ -426,12 +426,24 @@ ERROR(missing_override,sema_tcd,none,
       "overriding declaration requires an 'override' attribute", ())
 ERROR(method_does_not_override,sema_tcd,none,
       "method does not override any method from its superclass", ())
+ERROR(property_does_not_override,sema_tcd,none,
+      "property does not override any property from its superclass", ())
+NOTE(property_override_here,sema_tcd,none,
+     "attempt to override property here", ())
 ERROR(override_nonclass_decl,sema_tcd,none,
       "'override' attribute is only available on class members", ())
 ERROR(override_nonoverridable_decl,sema_tcd,none,
       "'override' attribute on a non-overridable declaration", ())
-
-
+ERROR(override_property_type_mismatch,sema_tcd,none,
+      "property %0 with type %1 cannot override a property with type %2",
+      (Identifier, Type, Type))
+ERROR(override_stored_property,sema_tcd,none,
+      "cannot override a stored property %0", (Identifier))
+ERROR(override_with_stored_property,sema_tcd,none,
+      "cannot override with a stored property %0", (Identifier))
+ERROR(override_mutable_covariant,sema_tcd,none,
+      "cannot override mutable property %0 of type %1 with covariant type %2",
+      (Identifier, Type, Type))
 ERROR(overload_base_decl,sema_tcd,none,
       "cannot overload a declaration from a superclass", ())
 
