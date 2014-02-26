@@ -1111,7 +1111,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
     Status = parseDecl(IfDecls, Flags);
     
     if (Status.isError()) {
-      return makeParserError();
+      diagnose(Tok, diag::expected_close_to_config_stmt);
+      skipUntilConfigBlockClose();
     }
   }
   
@@ -1122,7 +1123,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
       Status = parseDecl(ElseDecls, Flags);
       
       if (Status.isError()) {
-        return makeParserError();
+        skipUntilConfigBlockClose();
       }
     }
   }
@@ -1131,6 +1132,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
     EndLoc = consumeToken(tok::pound_endif);
   } else {
     diagnose(Tok, diag::expected_close_to_config_stmt);
+    skipUntilConfigBlockClose();
   }
   
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,

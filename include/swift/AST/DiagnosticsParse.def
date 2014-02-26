@@ -581,7 +581,7 @@ ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
 
 /// #if Statement
 ERROR(expected_close_to_config_stmt,stmt_parsing,none,
-"expected #else or #endif at end of configuration statement", ())
+"expected #else or #endif at end of configuration block", ())
 
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,

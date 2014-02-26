@@ -404,6 +404,9 @@ public:
   }
 
   void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
+  
+  /// \brief Skip until the next '#else', '#endif' or until eof.
+  void skipUntilConfigBlockClose();
 
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///

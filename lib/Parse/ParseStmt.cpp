@@ -811,6 +811,7 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {
     consumeToken(tok::pound_endif);
   } else {
     diagnose(Tok, diag::expected_close_to_config_stmt);
+    skipUntilConfigBlockClose();
   }
   
   auto ifConfigStmt = new (Context) IfConfigStmt(IfLoc,
