@@ -82,7 +82,7 @@ are **value types**.
 Mutating and Read-Only Methods
 ------------------------------
 
-A method attributed with ``mutating`` is considered **mutating**.
+A method attributed with ``inout`` is considered **mutating**.
 Otherwise, it is considered **read-only**.
 
 .. parsed-literal::
@@ -141,15 +141,15 @@ implicitly:
 Binding for Rvalues
 -------------------
 
-Just as ``var`` declares a name for an lvalue, ``val`` now gives a
+Just as ``var`` declares a name for an lvalue, ``let`` now gives a
 name to an rvalue:
 
 .. parsed-literal::
 
    var clay = 42
-   **val** stone = clay + 100 // stone can now be used as an rvalue
+   **let** stone = clay + 100 // stone can now be used as an rvalue
 
-The grammar rules for ``val`` are identical to those for ``var``.
+The grammar rules for ``let`` are identical to those for ``var``.
 
 Properties and Subscripts
 -------------------------
@@ -195,8 +195,8 @@ following table holds:
 |          Declaration:|::                                |                        |
 |                      |                                  |::                      |
 |Expression            |   var x = Number(42)  // this    |                        |
-|                      |   var x = CNumber(42) // or this |  val x = Number(42)    |
-|                      |   val x = CNumber(42) // or this |                        |
+|                      |   var x = CNumber(42) // or this |  let x = Number(42)    |
+|                      |   let x = CNumber(42) // or this |                        |
 +======================+==================================+========================+
 | ``x.readOnlyValue``  |**rvalue** (no ``set`` clause)    |**rvalue** (target is an|
 |                      |                                  |rvalue of value type)   |
@@ -235,7 +235,7 @@ For example:
    **stone +=** 3          // **Error:** += is declared inout, @assignment and thus
                        // implicitly takes the address of 'stone'
 
-   **val** x = Number(42)  // x is an rvalue
+   **let** x = Number(42)  // x is an rvalue
    x.getValue()        // ok, read-only method
    x.increment()       // **Error:** calling mutating method on rvalue
    x.readOnlyValue     // ok, read-only property
