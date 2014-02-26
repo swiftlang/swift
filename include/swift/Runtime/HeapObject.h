@@ -148,17 +148,8 @@ extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
 // return swift_alloc(tinyIndex);
 typedef unsigned long AllocIndex;
 
-extern "C" void *swift_alloc(AllocIndex idx);
 extern "C" void *swift_rawAlloc(AllocIndex idx);
-extern "C" void *swift_tryAlloc(AllocIndex idx);
 extern "C" void *swift_tryRawAlloc(AllocIndex idx);
-
-
-// Plain old memory deallocation
-//
-// Like swift allocation tiny index trick, but for deallocation
-// If bytes is knowable and fits within the tinyIndex rule:
-extern "C" void swift_dealloc(void *ptr, AllocIndex idx);
 
 // If bytes is knowable but is large OR if bytes is not knowable,
 // then use the slow entry point and pass zero:
@@ -210,7 +201,7 @@ static inline HeapObject *_swift_retain(HeapObject *object) {
 /// It's unlikely that a custom CC would be beneficial here.
 extern "C" void swift_release(HeapObject *object);
 
-/// Deallocate the given memory; it was returned by swift_alloc
+/// Deallocate the given memory; it was returned by swift_allocObject
 /// but is otherwise in an unknown state.
 ///
 /// \param object - never null

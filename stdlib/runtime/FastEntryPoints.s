@@ -169,13 +169,6 @@ BEGIN_FUNC _swift_release
   ret
 END_FUNC
 
-BEGIN_FUNC _swift_dealloc
-  mov   %gs:SWIFT_TSD_ALLOC_BASE(,%rsi,8), %r11
-  mov   %r11, (%rdi)
-  mov   %rdi, %gs:SWIFT_TSD_ALLOC_BASE(,%rsi,8)
-  ret
-END_FUNC
-
 BEGIN_FUNC _swift_rawDealloc
   mov   %gs:SWIFT_TSD_RAW_ALLOC_BASE(,%rsi,8), %r11
   mov   %r11, (%rdi)
@@ -215,8 +208,6 @@ BEGIN_FUNC $0
 END_FUNC
 .endmacro
 
-ALLOC_FUNC _swift_alloc, SWIFT_TSD_ALLOC_BASE, 0
-ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_ALLOC_BASE, SWIFT_TRYALLOC
 ALLOC_FUNC _swift_rawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_RAWALLOC
 ALLOC_FUNC _swift_tryRawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYRAWALLOC
 

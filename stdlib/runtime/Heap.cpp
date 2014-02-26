@@ -128,11 +128,8 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   if (!tmp) {
     return;
   }
-  if (flags & SWIFT_RAWALLOC) {
-    swift_rawDealloc(tmp, idx);
-  } else {
-    swift_dealloc(tmp, idx);
-  }
+  assert(flags & SWIFT_RAWALLOC);
+  swift_rawDealloc(tmp, idx);
 }
 
 void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
@@ -159,11 +156,8 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
 
   void *r;
   if (idx != SIZE_MAX) {
-    if (flags & SWIFT_RAWALLOC) {
-      r = swift_tryRawAlloc(idx);
-    } else {
-      r = swift_tryAlloc(idx);
-    }
+    assert(flags & SWIFT_RAWALLOC);
+    r = swift_tryRawAlloc(idx);
     if (r) return r;
   }
 
@@ -214,15 +208,6 @@ setRawAllocCacheEntry(unsigned long idx, AllocCacheEntry *entry) {
   _os_tsd_set_direct(idx + ALLOC_RAW_CACHE_START, entry);
 }
 
-void *swift::swift_alloc(AllocIndex idx) {
-  AllocCacheEntry *r = getAllocCacheEntry(idx);
-  if (r) {
-    setAllocCacheEntry(idx, r->next);
-    return r;
-  }
-  return _swift_alloc_slow(idx, 0);
-}
-
 void *swift::swift_rawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = getRawAllocCacheEntry(idx);
   if (r) {
@@ -232,15 +217,6 @@ void *swift::swift_rawAlloc(AllocIndex idx) {
   return _swift_alloc_slow(idx, SWIFT_RAWALLOC);
 }
 
-void *swift::swift_tryAlloc(AllocIndex idx) {
-  AllocCacheEntry *r = getAllocCacheEntry(idx);
-  if (r) {
-    setAllocCacheEntry(idx, r->next);
-    return r;
-  }
-  return _swift_alloc_slow(idx, SWIFT_TRYALLOC);
-}
-
 void *swift::swift_tryRawAlloc(AllocIndex idx) {
   AllocCacheEntry *r = getRawAllocCacheEntry(idx);
   if (r) {
@@ -248,13 +224,6 @@ void *swift::swift_tryRawAlloc(AllocIndex idx) {
     return r;
   }
   return _swift_alloc_slow(idx, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
-}
-
-void swift::swift_dealloc(void *ptr, AllocIndex idx) {
-  auto cur = static_cast<AllocCacheEntry *>(ptr);
-  AllocCacheEntry *prev = getAllocCacheEntry(idx);
-  cur->next = prev;
-  setAllocCacheEntry(idx, cur);
 }
 
 void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
@@ -300,7 +269,7 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   } else { return free(ptr);
   }
 
-  swift_dealloc(ptr, idx);
+  swift_rawDealloc(ptr, idx);
 }
 
 void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
