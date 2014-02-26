@@ -17,6 +17,23 @@
 #include "swift/Runtime/FastEntryPoints.h"
 
 #ifdef __x86_64__
+.macro BEGIN_FUNC
+  .text
+  .globl $0
+  .align 4
+$0:
+.endmacro
+
+.macro STATIC_FUNC
+  .text
+  .private_extern $0
+  .align  4
+$0:
+.endmacro
+
+.macro END_FUNC
+.endmacro
+
 #if SWIFT_HAVE_FAST_ENTRY_POINTS
 // The custom swift runtime ABI for x86_64 is as follows.
 //
@@ -57,23 +74,6 @@
 // MISC NOTES AND BUGS
 //
 // 11565357 ld should rewrite JMPs into fall-through NOPs when possible
-
-.macro BEGIN_FUNC
-  .text
-  .globl $0
-  .align 4
-$0:
-.endmacro
-
-.macro STATIC_FUNC
-  .text
-  .private_extern $0
-  .align  4
-$0:
-.endmacro
-
-.macro END_FUNC
-.endmacro
 
 .macro SaveRegisters
   .cfi_startproc
