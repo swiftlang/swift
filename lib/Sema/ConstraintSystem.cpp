@@ -489,7 +489,13 @@ namespace {
       // Replace a generic type parameter with its corresponding type variable.
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
-        assert(known != replacements.end());
+        
+        // If no replacement was found for the type parameter, there had to have
+        // been an upstream semantic error.  In this case, pass the type
+        // parameter on to provide better error recovery.
+        if (known == replacements.end())
+          return genericParam;
+        
         return known->second;
       }
 
