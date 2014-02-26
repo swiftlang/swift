@@ -1262,7 +1262,7 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
 
   // Walk into parenthesized expressions to update the subexpression.
-  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+  if (auto paren = dyn_cast<IdentityExpr>(expr)) {
     auto sub = coerceToMaterializable(paren->getSubExpr());
     paren->setSubExpr(sub);
     paren->setType(sub->getType());

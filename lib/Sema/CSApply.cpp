@@ -1721,7 +1721,7 @@ namespace {
       llvm_unreachable("Expression wasn't parsed?");
     }
 
-    Expr *visitParenExpr(ParenExpr *expr) {
+    Expr *visitIdentityExpr(IdentityExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
       return expr;
     }
@@ -2411,7 +2411,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   // Capture the tuple expression, if there is one.
   Expr *innerExpr = expr;
-  while (auto paren = dyn_cast<ParenExpr>(innerExpr))
+  while (auto paren = dyn_cast<IdentityExpr>(innerExpr))
     innerExpr = paren->getSubExpr();
   TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
@@ -2581,8 +2581,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(fromTupleType);
 
     // Update the types of parentheses around the tuple expression.
-    for (auto paren = dyn_cast<ParenExpr>(expr); paren;
-         paren = dyn_cast<ParenExpr>(paren->getSubExpr()))
+    for (auto paren = dyn_cast<IdentityExpr>(expr); paren;
+         paren = dyn_cast<IdentityExpr>(paren->getSubExpr()))
       paren->setType(fromTupleType);
   }
 
@@ -2595,8 +2595,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(toSugarType);
 
     // Update the types of parentheses around the tuple expression.
-    for (auto paren = dyn_cast<ParenExpr>(expr); paren;
-         paren = dyn_cast<ParenExpr>(paren->getSubExpr()))
+    for (auto paren = dyn_cast<IdentityExpr>(expr); paren;
+         paren = dyn_cast<IdentityExpr>(paren->getSubExpr()))
       paren->setType(toSugarType);
 
     return expr;

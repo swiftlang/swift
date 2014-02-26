@@ -475,7 +475,7 @@ namespace {
       llvm_unreachable("Didn't even parse?");
     }
 
-    Type visitParenExpr(ParenExpr *expr) {
+    Type visitIdentityExpr(IdentityExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
       return expr->getType();
     }

@@ -1013,29 +1013,73 @@ public:
   }
 };
   
-/// ParenExpr - A parenthesized expression like '(x+x)'.  Syntactically,
+/// An expression node that does not affect the evaluation of its subexpression.
+class IdentityExpr : public Expr {
+  Expr *SubExpr;
+  
+  // FIXME: Hack for CollectionExpr::getElements()
+  friend class CollectionExpr;
+
+public:
+  IdentityExpr(ExprKind kind,
+               Expr *subExpr, Type ty = Type())
+    : Expr(kind, /*implicit*/ false, ty), SubExpr(subExpr)
+  {}
+  
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() >= ExprKind::First_IdentityExpr
+        && E->getKind() <= ExprKind::Last_IdentityExpr;
+  }
+};
+  
+/// The '.self' pseudo-property, which has no effect except to
+/// satisfy the syntactic requirement that type values appear only as part of
+/// a property chain.
+class DotSelfExpr : public IdentityExpr {
+  SourceLoc DotLoc;
+  SourceLoc SelfLoc;
+  
+public:
+  DotSelfExpr(Expr *subExpr, SourceLoc dot, SourceLoc self,
+              Type ty = Type())
+    : IdentityExpr(ExprKind::DotSelf, subExpr, ty),
+      DotLoc(dot), SelfLoc(self)
+  {}
+  
+  SourceLoc getDotLoc() const { return DotLoc; }
+  SourceLoc getSelfLoc() const { return SelfLoc; }
+  SourceRange getSourceRange() const {
+    return {getSubExpr()->getStartLoc(), SelfLoc};
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DotSelf;
+  }
+};
+  
+/// A parenthesized expression like '(x+x)'.  Syntactically,
 /// this is just a TupleExpr with exactly one element that has no label.
 /// Semantically, however, it serves only as grouping parentheses and
 /// does not form an expression of tuple type (unless the sub-expression
 /// has tuple type, of course).
-class ParenExpr : public Expr {
+class ParenExpr : public IdentityExpr {
   SourceLoc LParenLoc, RParenLoc;
-  Expr *SubExpr;
-
+  
   /// \brief Whether we're wrapping a trailing closure expression.
   /// FIXME: Pack bit into superclass.
   bool HasTrailingClosure;
-
-  // FIXME: Hack for CollectionExpr::getElements()
-  friend class CollectionExpr;
 
 public:
   ParenExpr(SourceLoc lploc, Expr *subExpr, SourceLoc rploc,
             bool hasTrailingClosure,
             Type ty = Type())
-    : Expr(ExprKind::Paren, /*Implicit=*/false, ty),
+    : IdentityExpr(ExprKind::Paren, subExpr, ty),
       LParenLoc(lploc), RParenLoc(rploc),
-      SubExpr(subExpr), HasTrailingClosure(hasTrailingClosure) {
+      HasTrailingClosure(hasTrailingClosure) {
     assert(lploc.isValid() == rploc.isValid() &&
            "Mismatched source location information");
   }
@@ -1043,26 +1087,22 @@ public:
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
   SourceRange getSourceRange() const {
     // When the locations of the parentheses are invalid, ask our subexpression
     // for its source range instead.
     if (LParenLoc.isInvalid())
-      return SubExpr->getSourceRange();
+      return getSubExpr()->getSourceRange();
 
     // If we have a trailing closure, our end point is the end of the trailing
     // closure.
     if (HasTrailingClosure)
-      return SourceRange(LParenLoc, SubExpr->getEndLoc());
+      return SourceRange(LParenLoc, getSubExpr()->getEndLoc());
 
     return SourceRange(LParenLoc, RParenLoc);
   }
 
   /// \brief Whether this expression has a trailing closure as its argument.
   bool hasTrailingClosure() const { return HasTrailingClosure; }
-
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *E) { SubExpr = E; }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Paren; }
 };

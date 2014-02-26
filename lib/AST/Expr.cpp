@@ -81,7 +81,7 @@ SourceLoc Expr::getLoc() const {
 }
 
 Expr *Expr::getSemanticsProvidingExpr() {
-  if (ParenExpr *PE = dyn_cast<ParenExpr>(this))
+  if (IdentityExpr *PE = dyn_cast<IdentityExpr>(this))
     return PE->getSubExpr()->getSemanticsProvidingExpr();
 
   if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
@@ -297,7 +297,7 @@ SourceRange TupleExpr::getSourceRange() const {
 
 ArrayRef<Expr *> CollectionExpr::getElements() const {
   if (auto paren = dyn_cast<ParenExpr>(SubExpr)) {
-    // FIXME: Hack. When this goes away, remove ParenExpr's friendship of
+    // FIXME: Hack. When this goes away, remove IdentityExpr's friendship of
     // CollectionExpr.
     return llvm::makeArrayRef(&paren->SubExpr, 1);
   }

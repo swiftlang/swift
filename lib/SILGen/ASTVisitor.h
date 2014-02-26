@@ -51,7 +51,7 @@ public:
     llvm_unreachable("expression kind should not survive to SILGen");
   }
 
-  ExprRetTy visitParenExpr(ParenExpr *E, Args...AA) {
+  ExprRetTy visitIdentityExpr(IdentityExpr *E, Args...AA) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }

@@ -917,6 +917,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           continue;
         }
         
+        // A '.self' expr.
+        if (Tok.is(tok::kw_self)) {
+          Result = makeParserResult(
+            new (Context) DotSelfExpr(Result.get(), TokLoc, consumeToken()));
+          continue;
+        }
+        
         // If we have '.<keyword><code_complete>', try to recover by creating
         // an identifier with the same spelling as the keyword.
         if (Tok.isKeyword() && peekToken().is(tok::code_complete)) {

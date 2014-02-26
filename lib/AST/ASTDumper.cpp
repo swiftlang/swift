@@ -1149,6 +1149,12 @@ public:
     }
     OS << "')";
   }
+  void visitDotSelfExpr(DotSelfExpr *E) {
+    printCommon(E, "dot_self_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitParenExpr(ParenExpr *E) {
     printCommon(E, "paren_expr");
     if (E->hasTrailingClosure())

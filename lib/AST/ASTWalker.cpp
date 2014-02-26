@@ -159,7 +159,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
-  Expr *visitParenExpr(ParenExpr *E) {
+  Expr *visitIdentityExpr(IdentityExpr *E) {
     if (Expr *subExpr = doIt(E->getSubExpr())) {
       E->setSubExpr(subExpr);
       return E;

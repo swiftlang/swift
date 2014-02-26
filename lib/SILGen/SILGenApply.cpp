@@ -1034,7 +1034,7 @@ public:
     visitExpr(e);
   }
 
-  void visitParenExpr(ParenExpr *e) {
+  void visitIdentityExpr(IdentityExpr *e) {
     visit(e->getSubExpr());
   }
   
