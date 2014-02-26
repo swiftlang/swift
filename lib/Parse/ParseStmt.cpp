@@ -787,6 +787,9 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {
   ParserResult<Expr> Configuration;
   ParserResult<BraceStmt> NormalBody;
   
+  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                  StructureMarkerKind::IfConfig);
+  
   
   Configuration = parseExprSequence(diag::expected_expr, true, true);
   

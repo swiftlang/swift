@@ -212,7 +212,9 @@ public:
     /// An open brace.
     OpenBrace,
     /// An open square bracket.
-    OpenSquare
+    OpenSquare,
+    /// An #if conditional clause.
+    IfConfig,
   };
 
   /// A structure marker, which identifies the location at which the

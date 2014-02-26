@@ -1091,6 +1091,9 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
   SourceLoc ElseLoc;
   SourceLoc EndLoc;
   
+  StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
+                                  StructureMarkerKind::IfConfig);
+  
   // Evaluate the condition.
   ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
                                                        true,

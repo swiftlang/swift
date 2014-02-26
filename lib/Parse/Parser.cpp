@@ -488,6 +488,10 @@ bool Parser::isContinuationSlow(const Token &tok) {
     // Check the source locations below;
     break;
 
+  case StructureMarkerKind::IfConfig:
+    // Conditional clauses for #if blocks do not support closures.
+    return false;
+
   case StructureMarkerKind::OpenBrace:
   case StructureMarkerKind::OpenParen:
   case StructureMarkerKind::OpenSquare:
