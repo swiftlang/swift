@@ -1618,6 +1618,34 @@ const {
   return GenericFunctionType::get(sig, input, result, getExtInfo());
 }
 
+static CanType getArchetypeFromMap(ArchetypeType *archetype,
+                       ArrayRef<GenericTypeParamType *> &genericParams,
+                       llvm::DenseMap<ArchetypeType*, CanType> &archetypeMap) {
+  auto found = archetypeMap.find(archetype);
+  if (found != archetypeMap.end())
+    return found->second;
+  
+  // If it's an associated type, build a dependent member type from the base.
+  CanType result;
+  if (auto parent = archetype->getParent()) {
+    result
+      = CanDependentMemberType::get(getArchetypeFromMap(parent, genericParams,
+                                                        archetypeMap),
+                                    archetype->getAssocType(),
+                                    archetype->getASTContext());
+    
+  } else {
+    // If no parent, it's a primary archetype. Substitute the next generic
+    // parameter.
+    result = CanType(genericParams[0]);
+    genericParams = genericParams.slice(1);
+  }
+  
+  archetypeMap[archetype] = result;
+  return result;
+  
+}
+
 TypeSubstitutionMap
 GenericSignature::getSubstitutionMap(
                                 ArrayRef<GenericTypeParamType *> genericParams,
@@ -1631,36 +1659,16 @@ GenericSignature::getSubstitutionMap(
   }
   
   assert(!args.empty() && "no substitutions?!");
-  ASTContext &C = args[0].Archetype->getASTContext();
   llvm::DenseMap<ArchetypeType*, CanType> archetypeMap;
-  
-  // The substitution vector should be ordered so that substitutions for
-  // primary archetypes at each depth are followed by the associated archetypes
-  // for that depth. We should thus be able to convert primary archetypes to
-  // generic parameters in order, then convert associated types to dependent
-  // member types of archetypes we've already seen.
-  unsigned genericParam = 0;
   for (auto &arg : args) {
-    CanType fromType;
-    if (auto parent = arg.Archetype->getParent()) {
-      // If it's an associated type, substitute a dependent member type.
-      assert(archetypeMap.count(parent));
-      fromType = DependentMemberType::get(archetypeMap.find(parent)->second,
-                                          arg.Archetype->getAssocType(), C)
-        ->getCanonicalType();
-    } else {
-      // If no parent, it's a primary archetype. Substitute the next generic
-      // parameter.
-      auto param = genericParams[genericParam++];
-      fromType = CanType(param);
-      // FIXME: DependentMemberTypes are not SubstitutableTypes.
-      subs[param] = arg.Replacement;
-    }
-    
-    archetypeMap[arg.Archetype] = fromType;
+    auto depTy = getArchetypeFromMap(arg.Archetype, genericParams,
+                                     archetypeMap);
+    // FIXME: DependentMemberTypes aren't SubstitutableTypes.
+    if (auto subTy = dyn_cast<SubstitutableType>(depTy))
+      subs[subTy] = arg.Replacement;
   }
   
-  assert(genericParam == genericParams.size()
+  assert(genericParams.empty()
          && "did not substitute all generic params!");
   
   return subs;
