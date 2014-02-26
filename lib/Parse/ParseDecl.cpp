@@ -1707,7 +1707,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     // Reject getters and setters for 'val's, but keep parsing them, for better
     // recovery.
     if (PrimaryVar->isLet()) {
-      diagnose(Tok, diag::val_cannot_be_computed_property);
+      diagnose(Tok, diag::let_cannot_be_computed_property);
       Invalid = true;
     }
   }

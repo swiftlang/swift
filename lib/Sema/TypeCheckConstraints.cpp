@@ -963,7 +963,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
         if (VD->isImplicit() && VD->getName() == getASTContext().Id_self)
           d = diag::assignment_to_self;
         else if (VD->isLet())
-          d = diag::assignment_lhs_is_val;
+          d = diag::assignment_lhs_is_let;
         else if (VD->hasAccessorFunctions() && !VD->getSetter())
           d = diag::assignment_get_only_property;
         else
