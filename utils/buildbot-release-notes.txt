@@ -1,6 +1,10 @@
 2014-02-26
 ----------
 
+* We're renaming 'val' back to 'let'.  The compiler accepts both for this week,
+  next week it will just accept 'let'.  Please migrate your code this week, sorry
+  for the back and forth on this.
+
 * Swift now supports "#if", "#else" and "#endif" blocks, along with target 
   configuration expressions, to allow for conditional compilation within
   declaration and statement contexts.

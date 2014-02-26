@@ -534,6 +534,7 @@ void Lexer::lexIdentifier() {
 #define KEYWORD(kw) \
     .Case(#kw, tok::kw_##kw)
 #include "swift/Parse/Tokens.def"
+    .Case("let", tok::kw_val)
     .Default(tok::identifier);
 
   // These keywords are only active in SIL mode.
