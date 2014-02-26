@@ -209,11 +209,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       // parent.
       if (GenericParamList *outerParams = gp->getOuterParameters()) {
         DeclID D = S.addDeclRef(S.getGenericContext(outerParams));
-        using SILGenericOuterParamDeclIDLayout =
-          SILGenericOuterParamDeclIDLayout;
-        unsigned abbrCode = SILAbbrCodes[SILGenericOuterParamDeclIDLayout::Code];
-        SILGenericOuterParamDeclIDLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                     D);
+        unsigned abbrCode = SILAbbrCodes[SILGenericOuterParamsLayout::Code];
+        SILGenericOuterParamsLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                D);
       }
 
       S.writeGenericParams(gp, SILAbbrCodes);
@@ -1385,7 +1383,7 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
     registerSILAbbr<WitnessBaseEntryLayout>();
     registerSILAbbr<WitnessAssocProtocolLayout>();
     registerSILAbbr<WitnessAssocEntryLayout>();
-    registerSILAbbr<SILGenericOuterParamDeclIDLayout>();
+    registerSILAbbr<SILGenericOuterParamsLayout>();
 
     registerSILAbbr<SILInstCastLayout>();
 
