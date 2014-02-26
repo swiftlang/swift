@@ -16,8 +16,8 @@
 
 #include "swift/Runtime/FastEntryPoints.h"
 
-#if SWIFT_HAVE_FAST_ENTRY_POINTS
 #ifdef __x86_64__
+#if SWIFT_HAVE_FAST_ENTRY_POINTS
 // The custom swift runtime ABI for x86_64 is as follows.
 //
 // Like normal function calls:
@@ -114,6 +114,8 @@ BEGIN_FUNC _swift_retain
   jmp   _swift_retainAndReturnThree
 END_FUNC
 
+#endif // SWIFT_HAVE_FAST_ENTRY_POINTS
+
 // XXX FIXME -- hack until we have tinycc
 // func swift_retainAndReturnThree(obj,(rsi,rdx,rcx)) -> (rax,rdx,rcx)
 BEGIN_FUNC _swift_retainAndReturnThree
@@ -136,6 +138,7 @@ BEGIN_FUNC _swift_retainAndReturnThree
   ret
 END_FUNC
 
+#if SWIFT_HAVE_FAST_ENTRY_POINTS
 BEGIN_FUNC _swift_release
   test  %rdi, %rdi
   jz    1f
@@ -260,14 +263,7 @@ BEGIN_FUNC _swift_weakRelease
   ret
 END_FUNC
 
-// __x86_64__
-#elif defined(SWIFT_HAVE_FAST_ENTRY_POINTS)
-
-#error fast entry points promised but not implemented on this architecture
-
-#else
-#error "unknown architecture"
-#endif
-#endif
+#endif // SWIFT_HAVE_FAST_ENTRY_POINTS
+#endif // __x86_64__
 
 .subsections_via_symbols
