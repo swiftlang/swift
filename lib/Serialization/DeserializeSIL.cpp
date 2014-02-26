@@ -315,6 +315,25 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
   return fn;
 }
 
+static
+DeclContext *
+maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
+  BCOffsetRAII lastRecordOffset(Cursor);
+  SmallVector<uint64_t, 64> scratch;
+
+  auto next = Cursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return MF->getAssociatedModule();
+
+  unsigned kind = Cursor.readRecord(next.ID, scratch);
+  if (kind != decls_block::SIL_GENERIC_OUTER_PARAM_DECL_ID)
+    return MF->getAssociatedModule();
+
+  uint64_t declID;
+  decls_block::SILGenericOuterParamDeclIDLayout::readRecord(scratch, declID);
+  return MF->getDeclContext((DeclID)declID);
+}
+
 /// Deserialize a SILFunction if it is not already deserialized. The input
 /// SILFunction can either be an empty declaration or null. If it is an empty
 /// declaration, we fill in the contents. If the input SILFunction is
@@ -403,9 +422,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (!fn->hasLocation()) fn->setLocation(loc);
 
   GenericParamList *contextParams = nullptr;
-  if (!declarationOnly)
-    contextParams = MF->maybeReadGenericParams(MF->getAssociatedModule(),
+  if (!declarationOnly) {
+    DeclContext *outerParamContext = maybeReadGenericDeclContext(MF, SILCursor);
+    contextParams = MF->maybeReadGenericParams(outerParamContext,
                                                SILCursor);
+  }
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -474,6 +495,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (Callback) Callback->didDeserializeBody(MF->getAssociatedModule(), fn);
 
   cacheEntry.set(fn, /*fully deserialized*/ true);
+
   return fn;
 }
 

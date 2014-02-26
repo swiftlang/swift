@@ -799,6 +799,10 @@ namespace decls_block {
     // The sub-pattern trails the record.
   >;
 
+  using SILGenericOuterParamDeclIDLayout = BCRecordLayout<
+    SIL_GENERIC_OUTER_PARAM_DECL_ID,
+    DeclIDField // The decl id of the outer param if any.
+  >;
 
   using GenericParamListLayout = BCRecordLayout<
     GENERIC_PARAM_LIST,

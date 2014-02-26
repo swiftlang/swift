@@ -96,6 +96,10 @@ public:
   /// table.
   using DeclTable = llvm::DenseMap<Identifier, DeclTableData>;
 
+  /// Returns the declaration the given generic parameter list is associated
+  /// with.
+  const Decl *getGenericContext(const GenericParamList *paramList);
+
 private:
   /// A map from identifiers to methods and properties with the given name.
   ///
@@ -155,10 +159,6 @@ private:
       return index_block::IDENTIFIER_OFFSETS;
     llvm_unreachable("unknown offset kind");
   }
-
-  /// Returns the declaration the given generic parameter list is associated
-  /// with.
-  const Decl *getGenericContext(const GenericParamList *paramList);
 
   /// Writes the BLOCKINFO block.
   void writeBlockInfoBlock();

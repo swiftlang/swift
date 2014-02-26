@@ -313,13 +313,13 @@ private:
   /// XREF_PATH_PIECE records.
   Decl *resolveCrossReference(Module *M, uint32_t pathLen);
 
-  /// Returns the decl context with the given ID, deserializing it if needed.
-  DeclContext *getDeclContext(serialization::DeclID DID);
-
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
 public:
+  /// Returns the decl context with the given ID, deserializing it if needed.
+  DeclContext *getDeclContext(serialization::DeclID DID);
+
   /// Loads a module from the given memory buffer.
   ///
   /// \param input A memory buffer containing the serialized module data.

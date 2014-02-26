@@ -205,6 +205,17 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
     if (auto gp = F.getContextGenericParams()) {
+      // If we have outer parameters, first serialize the decl context of their
+      // parent.
+      if (GenericParamList *outerParams = gp->getOuterParameters()) {
+        DeclID D = S.addDeclRef(S.getGenericContext(outerParams));
+        using SILGenericOuterParamDeclIDLayout =
+          decls_block::SILGenericOuterParamDeclIDLayout;
+        unsigned abbrCode = SILAbbrCodes[SILGenericOuterParamDeclIDLayout::Code];
+        SILGenericOuterParamDeclIDLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                     D);
+      }
+
       S.writeGenericParams(gp, SILAbbrCodes);
     }
   }
@@ -1390,6 +1401,7 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
     registerSILAbbr<decls_block::GenericParamLayout>();
     registerSILAbbr<decls_block::GenericRequirementLayout>();
     registerSILAbbr<decls_block::LastGenericRequirementLayout>();
+    registerSILAbbr<decls_block::SILGenericOuterParamDeclIDLayout>();
 
     for (const SILGlobalVariable &g : SILMod->getSILGlobals())
       writeGlobalVar(g);
