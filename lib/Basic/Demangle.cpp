@@ -467,13 +467,13 @@ private:
         appendNode(Node::Kind::Metaclass)->addChild(type);
         return true;
       }
-    if (Mangled.nextIf('n')) {
+      if (Mangled.nextIf('n')) {
         NodePointer type = demangleType();
         if (!type)
-            return failure();
+          return failure();
         appendNode(Node::Kind::NominalTypeDescriptor)->addChild(type);
         return true;
-    }
+      }
       Directness d = demangleDirectness();
       appendNode(Node::Kind::Directness, toString(d));
       NodePointer type = demangleType();
