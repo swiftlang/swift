@@ -962,7 +962,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
         Diag<Identifier> d;
         if (VD->isImplicit() && VD->getName() == getASTContext().Id_self)
           d = diag::assignment_to_self;
-        else if (VD->isVal())
+        else if (VD->isLet())
           d = diag::assignment_lhs_is_val;
         else if (VD->hasAccessorFunctions() && !VD->getSetter())
           d = diag::assignment_get_only_property;
@@ -1126,8 +1126,8 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
-  // Create a 'val' binding to stand in for the RHS value.
-  auto *matchVar = new (Context) VarDecl(/*static*/ false, /*IsVal*/true,
+  // Create a 'let' binding to stand in for the RHS value.
+  auto *matchVar = new (Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          rhsType,

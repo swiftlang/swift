@@ -182,9 +182,9 @@ class alignas(8) Decl {
     /// called 'static').
     unsigned IsStatic : 1;
 
-    /// \brief Whether this is a 'val' property, which can only be initialized
+    /// \brief Whether this is a 'let' property, which can only be initialized
     /// in its declaration, and never assigned to, making it immutable.
-    unsigned IsVal : 1;
+    unsigned IsLet : 1;
 
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -2737,15 +2737,15 @@ public:
   }
 };
 
-/// VarDecl - 'var' and 'val' declarations.
+/// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
   PatternBindingDecl *ParentPattern = nullptr;
 public:
-  VarDecl(bool IsStatic, bool IsVal, SourceLoc NameLoc, Identifier Name,
+  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
           Type Ty, DeclContext *DC)
     : AbstractStorageDecl(DeclKind::Var, DC, Name, NameLoc) {
     VarDeclBits.IsStatic = IsStatic;
-    VarDeclBits.IsVal = IsVal;
+    VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
     setType(Ty);
   }
@@ -2787,9 +2787,9 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
 
-  /// Is this an immutable 'val' property?
-  bool isVal() const { return VarDeclBits.IsVal; }
-  void setVal(bool IsVal) { VarDeclBits.IsVal = IsVal; }
+  /// Is this an immutable 'let' property?
+  bool isLet() const { return VarDeclBits.IsLet; }
+  void setLet(bool IsLet) { VarDeclBits.IsLet = IsLet; }
 
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return VarDeclBits.IsDebuggerVar; }

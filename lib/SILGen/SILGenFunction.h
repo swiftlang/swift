@@ -855,7 +855,7 @@ public:
     // We handle these in pattern binding.
   }
   
-  /// Emit an Initialization for a 'var' or 'val' decl in a pattern.
+  /// Emit an Initialization for a 'var' or 'let' decl in a pattern.
   std::unique_ptr<Initialization> emitInitializationForVarDecl(VarDecl *vd,
                                                              bool isArgument,
                                                              Type patternType);

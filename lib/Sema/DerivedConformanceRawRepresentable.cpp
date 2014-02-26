@@ -108,7 +108,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                                                       rawInterfaceType);
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
+  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
                                       SourceLoc(),
                                       C.Id_self,
                                       enumType,

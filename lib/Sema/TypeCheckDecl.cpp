@@ -1063,7 +1063,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC,
                                            VarDecl **SelfDeclRet = nullptr) {
   ASTContext &Ctx = DC->getASTContext();
-  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsVal*/ true,
+  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
                                      Loc, Ctx.Id_self, Type(), DC);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
   if (SelfDeclRet)
@@ -1077,7 +1077,7 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC,
 static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
                                                 VarDecl **ValueDecl) {
   auto &Context = VD->getASTContext();
-  auto *Arg = new (Context) VarDecl(/*static*/false, /*IsVal*/true,
+  auto *Arg = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
                                     VD->getLoc(),Context.getIdentifier("value"),
                                     Type(), VD->getDeclContext());
   *ValueDecl = Arg;
@@ -1183,7 +1183,7 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
   Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
 
   FuncDecl *Set = nullptr;
-  if (!VD->isVal()) {
+  if (!VD->isLet()) {
     // Okay, the getter is set up, create the setter next.
     VarDecl *ValueDecl = nullptr;
 
@@ -1419,7 +1419,7 @@ public:
     // computed properties with just a getter.  Create the getter decl now.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
         VD->getStorageKind() == VarDecl::Stored &&
-        !VD->isVal()) {
+        !VD->isLet()) {
       TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
       
       convertStoredVarInProtocolToComputed(VD);
@@ -1502,7 +1502,7 @@ public:
         // Let declarations require an initializer, unless they are a property
         // (in which case they get set during the init method of the enclosing
         // type).
-        if (var->isVal() && !varDC->isTypeContext()) {
+        if (var->isLet() && !varDC->isTypeContext()) {
           TC.diagnose(var->getLoc(), diag::val_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();
@@ -2373,9 +2373,9 @@ public:
     Type selfTy = func->computeSelfType(&outerGenericParams);
     assert(selfDecl && selfTy && "Not a method");
 
-    // 'self' is 'val' for reference types (i.e., classes) or when 'self' is
+    // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
     // neither inout.
-    selfDecl->setVal(!selfTy->is<InOutType>());
+    selfDecl->setLet(!selfTy->is<InOutType>());
     selfDecl->setType(selfTy);
     
     auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
@@ -3462,7 +3462,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       auto varType = tc.getTypeOfRValue(var);
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(/*static*/false, /*IsVal*/true,
+      auto *arg = new (context) VarDecl(/*static*/false, /*IsLet*/true,
                                         Loc, var->getName(), varType, decl);
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);

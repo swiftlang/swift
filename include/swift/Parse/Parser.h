@@ -85,10 +85,10 @@ public:
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
   enum {
-    IVOLP_NotInVarOrVal,
+    IVOLP_NotInVarOrLet,
     IVOLP_InVar,
-    IVOLP_InVal
-  } InVarOrValPattern = IVOLP_NotInVarOrVal;
+    IVOLP_InLet
+  } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
   bool GreaterThanIsOperator = true;
 
@@ -782,7 +782,7 @@ public:
                                          DefaultArgumentInfo &defaultArgs,
                                          bool &HasSelectorStyleSignature);
 
-  ParserResult<Pattern> parsePattern(bool isVal);
+  ParserResult<Pattern> parsePattern(bool isLet);
 
   /// \brief Determine whether the parser is in a state that can start a
   /// binding name, identifier or the special discard-value binding '_'.
@@ -799,18 +799,18 @@ public:
   ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool isVal, bool isArgumentList,
+  parsePatternTupleElement(bool isLet, bool isArgumentList,
                            Pattern *ImplicitName, DefaultArgumentInfo *args);
-  ParserResult<Pattern> parsePatternTuple(bool isVal, bool isArgumentList,
+  ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList,
                                           DefaultArgumentInfo *args);
-  ParserResult<Pattern> parsePatternTupleAfterLP(bool isVal,bool isArgumentList,
+  ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,
                                                  SourceLoc LPLoc,
                                                  DefaultArgumentInfo *args);
-  ParserResult<Pattern> parsePatternAtom(bool isVal);
-  ParserResult<Pattern> parsePatternIdentifier(bool isVal);
-  ParserResult<Pattern> parsePatternVarOrVal();
+  ParserResult<Pattern> parsePatternAtom(bool isLet);
+  ParserResult<Pattern> parsePatternIdentifier(bool isLet);
+  ParserResult<Pattern> parsePatternVarOrLet();
   
-  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isVal);
+  Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
   
   //===--------------------------------------------------------------------===//
   // Pattern Parsing

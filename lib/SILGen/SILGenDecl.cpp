@@ -279,14 +279,14 @@ public:
   }
 };
 
-/// Initialize a writeback buffer that receives the value of a 'val'
+/// Initialize a writeback buffer that receives the value of a 'let'
 /// declaration.
-class ValValueInitialization : public Initialization {
-  /// The VarDecl for the val decl.
+class LetValueInitialization : public Initialization {
+  /// The VarDecl for the let decl.
   VarDecl *vd;
 
   /// The address of the buffer used for the binding, if this is an address-only
-  /// val.
+  /// let.
   SILValue address;
 
   /// The cleanup we pushed to destroy the local variable.
@@ -295,18 +295,18 @@ class ValValueInitialization : public Initialization {
   bool DidFinish = false;
 
 public:
-  ValValueInitialization(VarDecl *vd, bool isArgument, SILGenFunction &gen)
+  LetValueInitialization(VarDecl *vd, bool isArgument, SILGenFunction &gen)
     : Initialization(Initialization::Kind::LetValue), vd(vd) {
 
     auto &lowering = gen.getTypeLowering(vd->getType());
 
-    // If this is an address-only val declaration for a real val declaration
+    // If this is an address-only let declaration for a real let declaration
     // (not a function argument), create a buffer to bind the expression value
     // assigned into this slot.
     bool needsTemporaryBuffer = lowering.isAddressOnly();
 
     // If this is a function argument, we don't usually need a temporary buffer
-    // because the incoming pointer can be directly bound as our val buffer.
+    // because the incoming pointer can be directly bound as our let buffer.
     // However, if this VarDecl has tuple type, then it will be passed to the
     // SILFunction as multiple SILArguments, and those *do* need to be rebound
     // into a temporary buffer.
@@ -318,7 +318,7 @@ public:
       gen.enterDormantTemporaryCleanup(address, lowering);
       gen.VarLocs[vd] = SILGenFunction::VarLoc::getConstant(address);
     } else {
-      // Push a cleanup to destroy the val declaration.  This has to be
+      // Push a cleanup to destroy the let declaration.  This has to be
       // inactive until the variable is initialized: if control flow exits the
       // before the value is bound, we don't want to destroy the value.
       gen.Cleanups.pushCleanupInState<DestroyLocalVariable>(
@@ -327,7 +327,7 @@ public:
     DestroyCleanup = gen.Cleanups.getTopCleanup();
   }
   
-  ~ValValueInitialization() override {
+  ~LetValueInitialization() override {
     assert(DidFinish && "did not call LetValueInit::finishInitialization!");
   }
 
@@ -358,7 +358,7 @@ public:
   void finishInitialization(SILGenFunction &gen) override {
     assert(!DidFinish &&
            "called LetValueInit::finishInitialization twice!");
-    assert(gen.VarLocs.count(vd) && "Didn't bind a value to this val!");
+    assert(gen.VarLocs.count(vd) && "Didn't bind a value to this let!");
     gen.Cleanups.setCleanupState(DestroyCleanup, CleanupState::Active);
     DidFinish = true;
   }
@@ -592,10 +592,10 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   if (isa<InOutType>(varType))
     return InitializationPtr(new InOutInitialization(vd));
 
-  // If this is a 'val' initialization for a non-address-only type, set up a
-  // val binding, which stores the initialization value into VarLocs directly.
-  if (vd->isVal())
-    return InitializationPtr(new ValValueInitialization(vd, isArgument, *this));
+  // If this is a 'let' initialization for a non-address-only type, set up a
+  // let binding, which stores the initialization value into VarLocs directly.
+  if (vd->isLet())
+    return InitializationPtr(new LetValueInitialization(vd, isArgument, *this));
 
   // Otherwise, we have a normal local-variable initialization.
   auto varInit = emitLocalVariableWithCleanup(vd);
@@ -750,7 +750,7 @@ struct ArgumentInitVisitor :
     auto &lowering = gen.getTypeLowering(P->getType());
 
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ true, SourceLoc(),
+    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
                                // FIXME: we should probably number them.
                                AC.getIdentifier("_"), P->getType(),
                                f.getDeclContext());
@@ -885,7 +885,7 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   const TypeLowering &returnTI = getTypeLowering(resultType);
   if (returnTI.isReturnedIndirectly()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ false, SourceLoc(),
+    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
                                AC.getIdentifier("$return_value"), resultType,
                                DeclCtx);
     IndirectReturnAddress = new (SGM.M)
@@ -1351,10 +1351,10 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   
   auto loc = VarLocs[vd];
   
-  // For 'val' bindings, we emit a destroy_value or destroy_addr, depending on
+  // For 'let' bindings, we emit a destroy_value or destroy_addr, depending on
   // whether we have an address or not.
   if (loc.isConstant()) {
-    assert(vd->isVal() && "Mutable vardecl assigned a constant value?");
+    assert(vd->isLet() && "Mutable vardecl assigned a constant value?");
     SILValue Val = loc.getConstant();
     if (!Val.getType().isAddress())
       B.emitDestroyValueOperation(silLoc, Val);

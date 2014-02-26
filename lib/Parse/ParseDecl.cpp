@@ -37,7 +37,7 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
                                            DeclContext *CurDeclContext,
                                            VarDecl **SelfDeclRet = nullptr) {
   ASTContext &Ctx = CurDeclContext->getASTContext();
-  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsVal*/ true,
+  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
                                      Loc, Ctx.Id_self,
                                      Type(), CurDeclContext);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
@@ -615,7 +615,7 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
 ///   decl:
 ///     decl-typealias
 ///     decl-extension
-///     decl-val
+///     decl-let
 ///     decl-var
 ///     decl-class
 ///     decl-func
@@ -1362,7 +1362,7 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
     StartLoc = SourceLoc();
   }
 
-  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsVal*/true,
+  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
                                          NameLoc, Name,
                                          Type(), P.CurDeclContext);
   if (IsNameImplicit)
@@ -1706,7 +1706,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
 
     // Reject getters and setters for 'val's, but keep parsing them, for better
     // recovery.
-    if (PrimaryVar->isVal()) {
+    if (PrimaryVar->isLet()) {
       diagnose(Tok, diag::val_cannot_be_computed_property);
       Invalid = true;
     }
@@ -1822,7 +1822,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     }
   }
 
-  bool isVal = Tok.is(tok::kw_val);
+  bool isLet = Tok.is(tok::kw_val);
   assert(Tok.getKind() == tok::kw_val || Tok.getKind() == tok::kw_var);
   SourceLoc VarLoc = consumeToken();
 
@@ -1855,11 +1855,11 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   do {
     ParserResult<Pattern> pattern;
 
-    { // In our recursive parse, remember that we're in a var/val pattern.
-      llvm::SaveAndRestore<decltype(InVarOrValPattern)>
-        T(InVarOrValPattern, isVal ? IVOLP_InVal : IVOLP_InVar);
+    { // In our recursive parse, remember that we're in a var/let pattern.
+      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
 
-      pattern = parsePattern(isVal);
+      pattern = parsePattern(isLet);
     }
     if (pattern.hasCodeCompletion())
       return makeParserCodeCompletionStatus();
@@ -1957,7 +1957,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
         }
       }
 
-      if (isVal)
+      if (isLet)
         return makeParserError();
 
       HasGetSet = true;
@@ -2779,7 +2779,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   }
 
   ParserResult<Pattern> Indices =
-    parsePatternTuple(/*IsVal*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
+    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   
@@ -2966,7 +2966,7 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     SourceLoc LParenLoc = Tok.getLoc();
     DefaultArgumentInfo DefaultArgs; // ignored in valid code
     ParserResult<Pattern> Params =
-      parsePatternTuple(/*IsVal*/true, /*IsArgList*/true, &DefaultArgs);
+      parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, &DefaultArgs);
     if (!Params.isParseError()) {
       // Check that the destructor has zero parameters.
       SourceRange ElementsRange;

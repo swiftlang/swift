@@ -1504,7 +1504,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isVal;
+    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet;
     uint8_t StorageKind;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
@@ -1512,7 +1512,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isIBOutlet, isOptional, isStatic,
-                                       isVal, StorageKind, typeID,
+                                       isLet, StorageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        willSetID, didSetID, overriddenID);
 
@@ -1520,7 +1520,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto var = new (ctx) VarDecl(isStatic, isVal, SourceLoc(),
+    auto var = new (ctx) VarDecl(isStatic, isLet, SourceLoc(),
                                  getIdentifier(nameID), getType(typeID), DC);
 
     declOrOffset = var;

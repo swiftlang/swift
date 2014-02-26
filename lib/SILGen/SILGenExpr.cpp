@@ -393,11 +393,11 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
     if (It->second.isAddress())
       return ManagedValue::forLValue(It->second.getAddress());
     
-    // If this is an address-only 'val', return its address as an lvalue.
+    // If this is an address-only 'let', return its address as an lvalue.
     if (It->second.getConstant().getType().isAddress())
       return ManagedValue::forLValue(It->second.getConstant());
     
-    // Otherwise, it is an RValue 'val'.
+    // Otherwise, it is an RValue let.
     return ManagedValue();
   }
   
@@ -590,7 +590,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     return emitLoadOfLValue(loc, LV, C);
   }
 
-  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'val'
+  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
   assert(base.getType().getSwiftRValueType()->getAnyNominal() &&
          "The base of an rvalue MemberRefExpr should be an rvalue value");
@@ -1758,12 +1758,12 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
       break;
 
     case CaptureKind::Constant: {
-      // val declarations.
+      // let declarations.
       auto Entry = VarLocs[vd];
 
 #if 0
-      assert(Entry.isConstant() && vd->isVal() &&
-             "only val decls captured by constant");
+      assert(Entry.isConstant() && vd->isLet() &&
+             "only let decls captured by constant");
       SILValue Val = Entry.getConstant();
       // FIXME: This should work for both paths.  partial_apply hasn't been
       // taught how to work with @in address only values yet.
@@ -1789,7 +1789,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
           Val = Entry.getConstant();
           Val = B.emitCopyValueOperation(loc, Val);
         } else {
-          // If we have a mutable binding for a 'val', such as 'self' in an
+          // If we have a mutable binding for a 'let', such as 'self' in an
           // 'init' method, load it.
           Val = emitLoad(loc, Entry.getAddress(), tl, SGFContext(), IsNotTake)
             .forward(*this);
@@ -2117,7 +2117,7 @@ static void emitConstructorMetatypeArg(SILGenFunction &gen,
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ true, SourceLoc(),
+  auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
                              AC.getIdentifier("$metatype"), metatype,
                              ctor->getDeclContext());
   new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
@@ -2137,7 +2137,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ true, SourceLoc(),
+    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), ty, DC);
     SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
                                                        gen.F.begin(), VD);
@@ -2170,7 +2170,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILValue resultSlot;
   if (selfTy.isAddressOnly(gen.SGM.M)) {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ false, SourceLoc(),
+    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
                                AC.getIdentifier("$return_value"), selfTyCan,
                                ctor);
     resultSlot = new (gen.F.getModule()) SILArgument(selfTy, gen.F.begin(), VD);
@@ -2334,7 +2334,7 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
 
   // Emit the indirect return slot.
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ false, SourceLoc(),
+  auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
                              AC.getIdentifier("$return_value"),
                              enumTy.getSwiftType(),
                              element->getDeclContext());
@@ -2454,7 +2454,7 @@ namespace {
     
     void visitAnyPattern(AnyPattern *P) {
       auto &AC = gen.getASTContext();
-      auto VD = new (AC) VarDecl(/*static*/ false, /*IsVal*/ true, SourceLoc(),
+      auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
                                  // FIXME: we should probably number them.
                                  AC.getIdentifier("_"), P->getType(), DC);
       makeArgument(P->getType(), VD);

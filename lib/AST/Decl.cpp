@@ -1279,9 +1279,9 @@ StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buff
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
 bool VarDecl::isSettable(DeclContext *UseDC) const {
-  // 'val' properties are generally immutable, unless they are a 'val' ivar
+  // 'let' properties are generally immutable, unless they are a 'let' ivar
   // and we are in the init() for the type that holds the ivar.
-  if (isVal()) {
+  if (isLet()) {
     if (auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC))
       if (CD->getDeclContext() == getDeclContext())
         return true;

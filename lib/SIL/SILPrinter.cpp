@@ -542,7 +542,7 @@ public:
   void visitAllocStackInst(AllocStackInst *AVI) {
     OS << "alloc_stack " << AVI->getElementType();
     if (VarDecl *vd = AVI->getDecl())
-      OS << "  // " << (vd->isVal() ? "val " : "var ") << vd->getName();
+      OS << "  // " << (vd->isLet() ? "val " : "var ") << vd->getName();
   }
 
   void visitAllocRefInst(AllocRefInst *ARI) {
@@ -555,7 +555,7 @@ public:
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box " << ABI->getElementType();
     if (VarDecl *vd = ABI->getDecl())
-      OS << "  // " << (vd->isVal() ? "val " : "var ") << vd->getName();
+      OS << "  // " << (vd->isLet() ? "val " : "var ") << vd->getName();
   }
 
   void visitAllocArrayInst(AllocArrayInst *AAI) {
@@ -685,14 +685,14 @@ public:
     OS << "debug_value " << getIDAndType(DVI->getOperand());
 
     if (VarDecl *vd = DVI->getDecl())
-      OS << "  // " << (vd->isVal() ? "val " : "var ") << vd->getName();
+      OS << "  // " << (vd->isLet() ? "val " : "var ") << vd->getName();
   }
 
   void visitDebugValueAddrInst(DebugValueAddrInst *DVAI) {
     OS << "debug_value_addr " << getIDAndType(DVAI->getOperand());
 
     if (VarDecl *vd = DVAI->getDecl())
-      OS << "  // " << (vd->isVal() ? "val " : "var ") << vd->getName();
+      OS << "  // " << (vd->isLet() ? "val " : "var ") << vd->getName();
 }
 
   void visitLoadWeakInst(LoadWeakInst *LI) {

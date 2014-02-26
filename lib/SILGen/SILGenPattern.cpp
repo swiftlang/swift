@@ -1290,7 +1290,7 @@ public:
     auto addVar = [&](VarDecl *vd, SILLocation loc) {
       if (!varToEmit
           // If we have a 'var', that takes precedence over 'let's.
-          || (!vd->isVal() && varToEmit->first->isVal())) {
+          || (!vd->isLet() && varToEmit->first->isLet())) {
         varToEmit = {vd, loc};
       }
       varsToAlias.push_back(vd);

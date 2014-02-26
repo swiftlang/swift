@@ -1391,7 +1391,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->getAttrs().isIBOutlet(),
                           var->getAttrs().isOptional(),
                           var->isStatic(),
-                          var->isVal(),
+                          var->isLet(),
                           uint8_t(StorageKind),
                           addTypeRef(type),
                           addTypeRef(var->getInterfaceType()),
