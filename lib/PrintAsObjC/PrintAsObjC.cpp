@@ -98,7 +98,7 @@ private:
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    os << "@interface " << CD->getName();
+    os << "SWIFT_CLASS\n@interface " << CD->getName();
     if (Type superTy = CD->getSuperclass())
       os << " : " << superTy->getClassOrBoundGenericClass()->getName();
     printProtocols(CD->getProtocols());
