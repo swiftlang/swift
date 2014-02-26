@@ -1,11 +1,8 @@
 2014-02-26
 ----------
 
-* The "swift" command line tool now has limited support for configuration-dependent
-  statements and declarations.
-
-  The compiler now supports "#if", "else" and "#endif" blocks, along with 
-  target configuration expressions, to allow for conditional compilation within
+* Swift now supports "#if", "#else" and "#endif" blocks, along with target 
+  configuration expressions, to allow for conditional compilation within
   declaration and statement contexts.
 
   Target configurations represent certain static information about the compile-time
@@ -47,17 +44,17 @@
   the following expression types:
     - A unary expression, using '!'
     - A binary expression, using '&&' or '||'
-    - A paren expression
+    - A parenthesized expression
     - A target configuration expression
 
   For example:
 
-    #if (os(iOS) && !arch(I386))
+    #if os(iOS) && !arch(I386)
     ...
     #endif
 
   Note that #if/#else/#endif blocks do not constitute a preprocessor, and must form
-  valid and complete expressions or statements. Hence, the following would trigger a
+  valid and complete expressions or statements. Hence, the following produces a
   parser error:
 
     class C {
@@ -72,8 +69,12 @@
     #endif
 
   Also note that "active" code will be parsed, typechecked and emitted, while
-  "inactive" code will only be parsed. (So code in an inactive #if or #else block
-  may produce parser errors.) Active and inactive code cannot interact.
+  "inactive" code will only be parsed.  This is why code in an inactive #if or 
+  #else block will produce parser errors for malformed code.  This allows the
+  compiler to detect basic errors in inactive regions.
+
+  This is the first step to getting functionality parity with the important subset
+  of the C preprocessor.  Further refinements are planned for later.
 
 * Swift now has both fully-closed ranges, which include their endpoint, and half-open ranges, which don't.
 
@@ -82,7 +83,8 @@
     (swift) for x in 0..5 { print(x) } ; print('\n')  // fully-closed range
     012345
 
-* Property accessors have a new syntax:
+* Property accessors have a new brace-based syntax, instead of using the former
+  "label like" syntax.  The new syntax is:
 
   var computedProperty: Int {
     get {
@@ -93,7 +95,7 @@
     }
   }
 
-  var implicitGet: Int {
+  var implicitGet: Int {    // This form still works.
     return 42
   }
 
@@ -114,6 +116,7 @@
     } 
 
   These can be used for generic algorithms now as well.
+
 
 2014-02-19
 ----------
@@ -250,13 +253,13 @@
 * Half-open ranges (those that don't include their endpoint) are now
   spelled with three '.'s instead of two, for consistency with Ruby.
 
-    (swift) for x in 0...5 { print(x) } ; print('\n') # new syntax
+    (swift) for x in 0...5 { print(x) } ; print('\n') // new syntax
     01234
   
   Next week, we'll introduce a fully-closed range which does include 
   its endpoint.  This will provide:
 
-    (swift) for x in 0..5 { print(x) } ; print('\n')  # coming soon
+    (swift) for x in 0..5 { print(x) } ; print('\n')  // coming soon
     012345
   
   These changes are being released separately so that users have a
