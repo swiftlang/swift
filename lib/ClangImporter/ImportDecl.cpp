@@ -1194,6 +1194,15 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // We don't import structs with bitfields because we can not layout them
+      // correctly in IRGen.
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        if (auto FD = dyn_cast<clang::FieldDecl>(*m))
+          if (FD->isBitField())
+            return nullptr;
+      }
+
       // Create the struct declaration and record it.
       auto result = new (Impl.SwiftContext)
                       StructDecl(Impl.importSourceLoc(decl->getLocStart()),
@@ -1438,6 +1447,11 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
+      // We don't import bitfields because we can not layout them correctly in
+      // IRGen.
+      if (decl->isBitField())
+        return nullptr;
+
       // Fields are imported as variables.
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
