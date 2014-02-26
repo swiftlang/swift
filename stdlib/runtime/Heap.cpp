@@ -43,6 +43,11 @@ malloc_zone_t _swift_zone = {
   NULL, // XXX -- add support for pressure_relief?
 };
 
+__attribute__((constructor))
+static void registerZone() {
+  malloc_zone_register(&_swift_zone);
+}
+
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   auto z = malloc_default_zone();
   return z->size(z, pointer);
@@ -114,9 +119,9 @@ _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
   void *r;
   do {
     if (flags & SWIFT_RAWALLOC) {
-      r = swift::_swift_zone_malloc(NULL, sz);
+      r = _swift_zone.malloc(NULL, sz);
     } else {
-      r = swift::_swift_zone_calloc(NULL, 1, sz);
+      r = _swift_zone.calloc(NULL, 1, sz);
     }
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
@@ -170,9 +175,9 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
 
   do {
     if (flags & SWIFT_RAWALLOC) {
-      r = swift::_swift_zone_malloc(NULL, size);
+      r = _swift_zone.malloc(NULL, size);
     } else {
-      r = swift::_swift_zone_calloc(NULL, 1, size);
+      r = _swift_zone.calloc(NULL, 1, size);
     }
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
