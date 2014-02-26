@@ -1,6 +1,80 @@
 2014-02-26
 ----------
 
+* The "swift" command line tool now has limited support for configuration-dependent
+  statements and declarations.
+
+  The compiler now supports "#if", "else" and "#endif" blocks, along with 
+  target configuration expressions, to allow for conditional compilation within
+  declaration and statement contexts.
+
+  Target configurations represent certain static information about the compile-time
+  build environment.  They are implicit, hard-wired into the compiler, and can
+  only be referenced within the conditional expression of an "#if" block.
+
+  Target configurations are tested against their values via a pseudo-function
+  invocation expression, taking a single argument expressed as an identitifer. The
+  argument represents certain static build-time information.
+
+  There are currently two supported target configurations:
+    "os", which can have the values OSX or iOS
+    "arch", which can have the values i386, x86_64, arm and arm64
+
+  Within the context of an "#if" block's conditional expression, a target configuration
+  expression can evaluate to either 'true' or 'false'.
+
+  For example:
+
+    #if arch(x86_64)
+      println("Building for x86_64") 
+    #else
+      println("Not building for x86_64")
+    #endif
+
+    class C {
+    #if os(OSX)
+      func foo() {
+        // OSX stuff goes here
+      }
+    #else
+      func foo() {
+        // non-OSX stuff goes here
+      }
+    #endif
+    } 
+
+  The conditional expression of an "#if" block can be composed of one or more of
+  the following expression types:
+    - A unary expression, using '!'
+    - A binary expression, using '&&' or '||'
+    - A paren expression
+    - A target configuration expression
+
+  For example:
+
+    #if (os(iOS) && !arch(I386))
+    ...
+    #endif
+
+  Note that #if/#else/#endif blocks do not constitute a preprocessor, and must form
+  valid and complete expressions or statements. Hence, the following would trigger a
+  parser error:
+
+    class C {
+
+    #if os(iOS)
+      func foo() {}
+    }
+    #else
+      func bar() {}
+      func baz() {}
+    }
+    #endif
+
+  Also note that "active" code will be parsed, typechecked and emitted, while
+  "inactive" code will only be parsed. (So code in an inactive #if or #else block
+  may produce parser errors.) Active and inactive code cannot interact.
+
 * Swift now has both fully-closed ranges, which include their endpoint, and half-open ranges, which don't.
 
     (swift) for x in 0...5 { print(x) } ; print('\n') // half-open range
