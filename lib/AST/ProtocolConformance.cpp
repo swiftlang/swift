@@ -469,6 +469,7 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
 bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
   auto classDecl = getType()->getClassOrBoundGenericClass();
   assert(classDecl && "Conformance can't be inheritable, ever");
+  (void)classDecl;
   
   for (auto member : getProtocol()->getMembers()) {
     auto req = dyn_cast<ValueDecl>(member);
