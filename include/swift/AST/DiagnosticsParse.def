@@ -296,13 +296,15 @@ ERROR(expected_lparen_initializer,decl_parsing,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class,decl_parsing,none,
-      "'destructor' functions may only be declared within a class", ())
+      "'deinitializer' functions may only be declared within a class", ())
 ERROR(expected_lparen_destructor,decl_parsing,none,
-      "expected an empty parameter list for destructor", ())
+      "expected an empty parameter list for deinitializer", ())
 ERROR(destructor_parameter_nonempty_tuple,decl_parsing,none,
-      "destructors don't have parameters", ())
+      "deinitializers don't have parameters", ())
 ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
-      "expected '{' for destructor", ())
+      "expected '{' for deinitializer", ())
+ERROR(destructor_is_deinit,decl_parsing,none,
+      "'destructor' is now written as 'deinit'", ())
 
 // Operator
 ERROR(operator_decl_inner_scope,decl_parsing,none,
@@ -529,6 +531,7 @@ ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
 // Dynamic Self
 ERROR(dynamic_self_is_self,type_parsing,none,
       "'DynamicSelf' is now called 'Self'", ())
+
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------

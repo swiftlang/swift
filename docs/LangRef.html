@@ -30,7 +30,7 @@
   <pre class="grammar">
     decl ::= <a href="#decl-class">decl-class</a>
     decl ::= <a href="#decl-constructor">decl-constructor</a>
-    decl ::= <a href="#decl-destructor">decl-destructor</a>
+    decl ::= <a href="#decl-deinit">decl-deinit</a>
     decl ::= <a href="#decl-extension">decl-extension</a>
     decl ::= <a href="#decl-func">decl-func</a>
     decl ::= <a href="#decl-import">decl-import</a>
@@ -725,31 +725,31 @@
   </pre>
 
   <!-- ===================================================================== -->
-  <h3 id="decl-destructor">destructor Declarations</h3>
+  <h3 id="decl-deinit">deinitializer Declarations</h3>
   <!-- ===================================================================== -->
   
   <pre class="grammar">
-    decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'destructor' '(' ')' <a href="#brace-item-list">brace-item-list</a>
+    decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'deinit' '(' ')' <a href="#brace-item-list">brace-item-list</a>
   </pre>
 
-  <p>'destructor' declares a destructor for a class.  This function is called
+  <p>'deinit' declares a deinitializer for a class.  This function is called
      when there are no longer any references to a class object, just before it
-     is destroyed.  Note that destructors can only be declared for classes,
-     and cannot be declared in extensions. Subclass destructors implicitly
-     invoke their superclass destructors after executing.</p>
+     is destroyed.  Note that deinitializers can only be declared for classes,
+     and cannot be declared in extensions. Subclass deinitializers implicitly
+     invoke their superclass deinitializers after executing.</p>
 
   <p>FIXME: We haven't really decided the precise rules here, but it's probably
      a fatal error to either throw an exception or stash a reference to 'self'
-     in a destructor.  Not sure what happens when we cause the reference count
-     of another object to reach zero inside a destructor.  We might eventually
-     allow destructors in extensions once we have ivars in extensions.</p>
+     in a deinitializer.  Not sure what happens when we cause the reference count
+     of another object to reach zero inside a deinitializer.  We might eventually
+     allow deinitializers in extensions once we have ivars in extensions.</p>
 
   <p>A simple example:</p>
   
   <pre class="example">
     class X {
       var fd : Int
-      destructor() {
+      deinit() {
         close(fd)
       }
     }

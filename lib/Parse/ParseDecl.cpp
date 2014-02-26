@@ -536,6 +536,7 @@ static bool isStartOfModifiedDecl(const Token &Tok, const Token &Tok2,
   return
        (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_val) || Tok2.is(tok::kw_var) ||
         Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
+        Tok2.is(tok::kw_deinit) ||
         Tok2.is(tok::kw_subscript) || Tok2.is(tok::kw_struct) ||
         Tok2.is(tok::kw_enum) || Tok2.is(tok::kw_class) ||
         Tok2.is(tok::kw_protocol) || Tok2.is(tok::kw_typealias));
@@ -557,6 +558,7 @@ bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
   case tok::kw_import:
   case tok::kw_subscript:
   case tok::kw_init:
+  case tok::kw_deinit:
   case tok::kw_destructor:
   case tok::kw_func:
   case tok::pound_if:
@@ -702,6 +704,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     DeclResult = parseDeclConstructor(Flags, Attributes);
     Status = DeclResult;
     break;
+  case tok::kw_deinit:
   case tok::kw_destructor:
     DeclResult = parseDeclDestructor(Flags, Attributes);
     Status = DeclResult;
@@ -2947,7 +2950,15 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
 
 ParserResult<DestructorDecl> Parser::
 parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  SourceLoc DestructorLoc = consumeToken(tok::kw_destructor);
+  SourceLoc DestructorLoc;
+  if (Tok.is(tok::kw_destructor)) {
+    diagnose(Tok, diag::destructor_is_deinit)
+      .fixItReplace(SourceLoc(Tok.getLoc()), "deinit");
+
+    DestructorLoc = consumeToken(tok::kw_destructor);
+  } else {
+    DestructorLoc = consumeToken(tok::kw_deinit);
+  }
 
   ParserResult<Pattern> Params;
   if (Tok.is(tok::l_paren)) {
@@ -3003,7 +3014,7 @@ parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                                  CurDeclContext, &SelfDecl);
 
   Scope S(this, ScopeKind::DestructorBody);
-  auto *DD = new (Context) DestructorDecl(Context.Id_destructor, DestructorLoc,
+  auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,
                                           SelfPattern, CurDeclContext);
   // No need to setLocalDiscriminator.
   addToScope(SelfDecl);

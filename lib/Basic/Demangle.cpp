@@ -2332,10 +2332,10 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     printEntity(false, true, "init");
     return;
   case Node::Kind::Destructor:
-    printEntity(false, false, "destructor");
+    printEntity(false, false, "deinit");
     return;
   case Node::Kind::Deallocator:
-    printEntity(false, false, "__deallocating_destructor");
+    printEntity(false, false, "__deallocating_deinit");
     return;
   case Node::Kind::IVarInitializer:
     printEntity(false, false, "__ivar_initializer");

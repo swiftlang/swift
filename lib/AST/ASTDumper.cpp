@@ -724,7 +724,7 @@ static void printContext(raw_ostream &os, DeclContext *dc) {
     if (isa<ConstructorDecl>(AFD))
       os << "init";
     if (isa<DestructorDecl>(AFD))
-      os << "destructor";
+      os << "deinit";
     break;
   }
   }

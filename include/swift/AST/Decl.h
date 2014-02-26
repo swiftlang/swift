@@ -3626,7 +3626,7 @@ public:
 /// \code
 /// struct X {
 ///   var fd : Int
-///   destructor() {
+///   deinit() {
 ///      close(fd)
 ///   }
 /// }

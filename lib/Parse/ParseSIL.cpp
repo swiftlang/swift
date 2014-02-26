@@ -222,7 +222,12 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
   case tok::kw_destructor:
-    Result = P.Context.Id_destructor;
+    P.diagnose(P.Tok, diag::destructor_is_deinit)
+      .fixItReplace(SourceLoc(P.Tok.getLoc()), "deinit");
+    // fall through
+
+  case tok::kw_deinit:
+    Result = P.Context.Id_deinit;
     break;
   case tok::kw_init:
     Result = P.Context.Id_init;
@@ -672,7 +677,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
   SmallVector<ValueDecl *, 4> Lookup;
   unsigned options = NL_QualifiedDefault;
   // FIXME: a bit of a hack.
-  if (Name == P.Context.Id_destructor || Name == P.Context.Id_init)
+  if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
     options = options & ~NL_VisitSupertypes;
   P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
   assert(Lookup.size() == 1);

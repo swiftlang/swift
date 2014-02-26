@@ -130,6 +130,9 @@
 
 * 'DynamicSelf' is now called 'Self'; the semantics are unchanged.
 
+* 'destructor' has been replaced with 'deinit', to emphasize that it
+  is related to 'init'. We will refer to these as 'deinitializers'.
+
 2014-02-19
 ----------
 

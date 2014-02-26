@@ -1001,7 +1001,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
-  auto name = getASTContext().Id_destructor;
+  auto name = getASTContext().Id_deinit;
   auto results = lookupDirect(name);
   assert(!results.empty() && "Class without destructor?");
   assert(results.size() == 1 && "More than one destructor?");

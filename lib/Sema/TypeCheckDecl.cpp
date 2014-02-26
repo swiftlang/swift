@@ -3423,7 +3423,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   VarDecl *selfDecl;
   Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD, &selfDecl);
 
-  auto *DD = new (Context) DestructorDecl(Context.Id_destructor, CD->getLoc(),
+  auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
                                           selfPat, CD);
 
   DD->setImplicit();

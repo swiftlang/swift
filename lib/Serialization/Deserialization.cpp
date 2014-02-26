@@ -2084,7 +2084,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto dtor = new (ctx) DestructorDecl(ctx.Id_destructor, SourceLoc(),
+    auto dtor = new (ctx) DestructorDecl(ctx.Id_deinit, SourceLoc(),
                                          /*selfpat*/nullptr, parent);
     declOrOffset = dtor;
 

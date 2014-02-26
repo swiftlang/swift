@@ -21,10 +21,10 @@ Syntax overview
     class func getAMyclass() -> MyClass {
       return new MyClass
     }
-    constructor() {
+    init() {
       MyVar = 10
     }
-    destructor() {
+    deinit() {
       // Misc finalization
     }
   }

@@ -23,8 +23,7 @@
 #  error Must define IDENTIFIER_WITH_NAME(Name, IdStr) before including this x-macro file
 #endif
 
-IDENTIFIER(destructor)
-IDENTIFIER(DynamicSelf)
+IDENTIFIER(deinit)
 IDENTIFIER(init)
 IDENTIFIER(self)
 IDENTIFIER(Self)
