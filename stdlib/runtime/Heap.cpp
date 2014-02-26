@@ -149,6 +149,7 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   else if (size <  0x800) idx = (size >> 7) + 0x20;
   else if (size < 0x1000) idx = (size >> 8) + 0x28;
 #else
+/* FIXME: rdar://16168244
   if      (size <   0x40) idx = (size >> 2) +  0x0;
   else if (size <   0x80) idx = (size >> 3) +  0x8;
   else if (size <  0x100) idx = (size >> 4) + 0x10;
@@ -156,6 +157,7 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   else if (size <  0x400) idx = (size >> 6) + 0x20;
   else if (size <  0x800) idx = (size >> 7) + 0x28;
   else if (size < 0x1000) idx = (size >> 8) + 0x30;
+*/
 #endif
 
   void *r;
