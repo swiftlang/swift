@@ -401,26 +401,28 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 
   bool PrintAccessorBody = Options.FunctionDefinitions && !InProtocol;
 
+  auto PrintAccessor = [&](AbstractFunctionDecl *Accessor, StringRef Label) {
+    if (!Accessor)
+      return;
+    if (Accessor->isImplicit())
+      return;
+    if (!PrintAccessorBody)
+      Printer << " " << Label;
+    else {
+      Printer << "\n";
+      IndentRAII IndentMore(*this);
+      indent();
+      visit(Accessor);
+    }
+  };
+
   Printer << " {";
-  if (auto getter = ASD->getGetter()) {
-    if (!PrintAccessorBody)
-      Printer << " get";
-    else {
-      Printer << "\n";
-      IndentRAII IndentMore(*this);
-      indent();
-      visit(getter);
-    }
-  }
-  if (auto setter = ASD->getSetter()) {
-    if (!PrintAccessorBody)
-      Printer << " set";
-    else {
-      Printer << "\n";
-      IndentRAII IndentMore(*this);
-      indent();
-      visit(setter);
-    }
+  if (ASD->getStorageKind() == VarDecl::Observing) {
+    PrintAccessor(ASD->getWillSetFunc(), "willSet");
+    PrintAccessor(ASD->getDidSetFunc(), "didSet");
+  } else {
+    PrintAccessor(ASD->getGetter(), "get");
+    PrintAccessor(ASD->getSetter(), "set");
   }
   if (PrintAccessorBody) {
     Printer << "\n";
@@ -754,7 +756,7 @@ bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
-  if (decl->isGetterOrSetter()) {
+  if (decl->isAccessor()) {
     // FIXME: Attributes
     printImplicitObjCNote(decl);
     recordDeclLoc(decl);
@@ -1085,7 +1087,7 @@ void Decl::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 
 bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
   // Skip getters/setters. They are part of the variable or subscript.
-  if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isGetterOrSetter())
+  if (isa<FuncDecl>(this) && cast<FuncDecl>(this)->isAccessor())
     return false;
 
   if (PO.ExplodePatternBindingDecls) {
@@ -1099,15 +1101,19 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Skip stored variables, unless they came from a Clang module.
     // Stored variables in Swift source will be picked up by the
     // PatternBindingDecl.
-    if (isa<VarDecl>(this) && !this->hasClangNode() &&
-        cast<VarDecl>(this)->hasStorage())
-      return false;
+    if (auto *VD = dyn_cast<VarDecl>(this)) {
+      if (!VD->hasClangNode() && VD->hasStorage() &&
+          VD->getStorageKind() != VarDecl::Observing)
+        return false;
+    }
 
     // Skip pattern bindings that consist of just one computed variable.
     if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
       auto pattern = pbd->getPattern()->getSemanticsProvidingPattern();
       if (auto named = dyn_cast<NamedPattern>(pattern)) {
-        if (named->getDecl()->getStorageKind() == VarDecl::Computed)
+        auto StorageKind = named->getDecl()->getStorageKind();
+        if (StorageKind == VarDecl::Computed ||
+            StorageKind == VarDecl::Observing)
           return false;
       }
     }
