@@ -27,11 +27,7 @@
 // Most of the first 128 are reserved for OS use. 
 // The last 128 are unused except on iOS Simulator.
 // We store two caches in these unused slots.
-#if !TARGET_IPHONE_SIMULATOR
-# define ALLOC_CACHE_COUNT 64
-#else
-# define ALLOC_CACHE_COUNT 32  // dodge libSystem simulator keys at 210..215
-#endif
+#define ALLOC_CACHE_COUNT 64
 #define ALLOC_CACHE_START 128
 #define ALLOC_RAW_CACHE_START (ALLOC_CACHE_START + ALLOC_CACHE_COUNT)
 
