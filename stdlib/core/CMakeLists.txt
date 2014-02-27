@@ -8,19 +8,6 @@ configure_file(SwiftLibSources.txt SwiftLibSources.txt.copy)
 
 file(STRINGS SwiftLibSources.txt SWIFTLIB_SOURCES)
 
-# Replace FixedPointXX.swift with FixedPoint64.swift or FixedPoint32.swift, 
-# according to the target architecture
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-  set(word_size 64)
-elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
-  set(word_size 32)
-else()
-  message(SEND_ERROR
-    "Target word size of ${CMAKE_SIZEOF_VOID_P} bytes does not have a matching FixedPoint${CMAKE_SIZEOF_VOID_P}.swift implementation")
-endif()
-
-string(REPLACE ";FixedPointXX.swift" ";FixedPoint${word_size}.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
-
 # Replace Assert.swift with AssertDebug.swift if assertions are enabled
 if(SWIFT_ASSERTS)
   string(REPLACE ";Assert.swift" ";AssertDebug.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
@@ -28,12 +15,6 @@ endif()
 
 if(NOT SWIFT_ENABLE_BENCHMARKS)
   string(REPLACE ";Benchmark.swift" "" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
-endif()
-
-# Compile only 32-bit and 64-bit floating point on non-x86 architectures
-if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL i386 AND
-    NOT CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-  string(REPLACE ";FloatAll.swift" ";FloatDouble.swift" SWIFTLIB_SOURCES "${SWIFTLIB_SOURCES}")
 endif()
 
 # Strip comments and blank lines

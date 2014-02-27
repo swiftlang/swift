@@ -1,6 +1,7 @@
 @# -*- mode: swift -*-
 
 @# Ignore the following admonition; it applies to the resulting .swift file only
+//// Automatically Generated From FloatingPoint.gyb.  Do Not Edit Directly
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -13,19 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-//// Automatically Generated From FloatingPoint.gyb.  Do Not Edit Directly
-//// To regenerate:
-////     bash -c 'for x in 1All 0Double ; do ../../utils/gyb FloatingPoint.gyb -DwithExtendedPrecision=$''{x:0:1} -o Float$''{x:1}.swift ; done'
 @{
 #
 # Utility code for later in this template
 #
 
-# Bit counts for all floating point types
-allFloatBits = [32, 64]
-
-if int(withExtendedPrecision) != 0:
-    allFloatBits += [80]
+if CMAKE_SYSTEM_PROCESSOR in ('i386', 'x86_64'):
+  allFloatBits = [32, 64, 80]
+else:
+  # Compile only 32-bit and 64-bit floating point on non-x86 architectures
+  allFloatBits = [32, 64]
 
 # Bit counts for all int types
 allIntBits = [8, 16, 32, 64, 'Int']

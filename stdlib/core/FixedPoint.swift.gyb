@@ -1,6 +1,7 @@
 @# -*- mode: swift -*-
 
 @# Ignore the following admonition; it applies to the resulting .swift file only
+//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -13,11 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-//// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly!
-//// To regenerate, execute the following command:
-////
-////   for bits in 32 64; do ../../utils/gyb -DWORD=$bits FixedPoint.gyb -o FixedPoint$bits.swift ; done
-////
 @{
 #
 # Utility code for later in this template
@@ -40,7 +36,7 @@ allNames = [8, 16, 32, 64, 'Int']
 maxBits = 64
 
 # Number of bits in the Builtin.Word type
-wordBits = int(WORD)
+wordBits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
