@@ -444,8 +444,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   verify(SF);
 
   // Verify modules imported by Clang importer.
-  if (auto ClangLoader = TC.Context.getClangModuleLoader())
-    ClangLoader->verifyAllModules();
+#ifndef NDEBUG
+  if (SF.Kind != SourceFileKind::REPL)
+    if (auto ClangLoader = TC.Context.getClangModuleLoader())
+      ClangLoader->verifyAllModules();
+#endif
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,

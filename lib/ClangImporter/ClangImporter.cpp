@@ -1010,6 +1010,7 @@ clang::ASTContext &ClangImporter::getClangASTContext() const {
 }
 
 void ClangImporter::verifyAllModules() {
+#ifndef NDEBUG
   if (Impl.ImportCounter == Impl.VerifiedImportCounter)
     return;
 
@@ -1024,6 +1025,7 @@ void ClangImporter::verifyAllModules() {
     verify(D);
 
   Impl.VerifiedImportCounter = Impl.ImportCounter;
+#endif
 }
 
 //===----------------------------------------------------------------------===//
