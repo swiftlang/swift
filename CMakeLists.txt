@@ -480,6 +480,28 @@ set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
 # The OS is currently needed in lieu of proper SDK support.
 set(SWIFTLIB_SUBDIR ".")
 
+function(handle_gyb_sources sourcesvar)
+  set(de_gybbed_sources)
+  set(gyb_sources)
+  set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
+  foreach (src ${${sourcesvar}})
+    string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
+    if(src STREQUAL src_sans_gyb)
+      list(APPEND de_gybbed_sources "${src}")
+    else()
+      set(output_file "${CMAKE_CURRENT_BINARY_DIR}/${src_sans_gyb}")
+      list(APPEND de_gybbed_sources "${output_file}")
+      add_custom_command(
+        OUTPUT "${output_file}"
+        COMMAND "${gyb_tool}" -o "${output_file}" "${src}"
+        DEPENDS "${gyb_tool}" "${src}"
+        COMMENT "Generating ${src_sans_gyb} from ${src}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+    endif()
+  endforeach()
+  set(${sourcesvar} "${de_gybbed_sources}" PARENT_SCOPE)
+endfunction()
 
 # Add a new Swift library.
 #
@@ -495,6 +517,8 @@ macro(add_swift_library name)
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
+  handle_gyb_sources(SWIFTLIB_SOURCES)
+  
   if(MSVC_IDE OR XCODE)
     string( REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list( GET split_path -1 dir)
