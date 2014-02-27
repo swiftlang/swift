@@ -534,8 +534,14 @@ void Lexer::lexIdentifier() {
 #define KEYWORD(kw) \
     .Case(#kw, tok::kw_##kw)
 #include "swift/Parse/Tokens.def"
-    .Case("let", tok::kw_val)
     .Default(tok::identifier);
+
+  if (StringRef(TokStart, CurPtr-TokStart) == "val") {
+    diagnose(TokStart, diag::val_deprecated)
+      .fixItReplace(getSourceLoc(TokStart), "let");
+    Kind = tok::kw_let;
+  }
+
 
   // These keywords are only active in SIL mode.
   if ((Kind == tok::kw_sil || Kind == tok::kw_sil_stage ||

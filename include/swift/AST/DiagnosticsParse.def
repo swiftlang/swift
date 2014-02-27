@@ -55,7 +55,10 @@ NOTE(previous_definition,parsing,none,
 
 ERROR(extra_rbrace,parsing,none,
       "extraneous '}' at top level", ())
-      
+
+WARNING(val_deprecated,lexing,none,
+        "'val' is being removed, please switch to 'let'", ())
+
 //------------------------------------------------------------------------------
 // Lexer diagnostics
 //------------------------------------------------------------------------------

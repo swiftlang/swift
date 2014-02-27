@@ -559,12 +559,12 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                         Diag<> ID) {
   ParserStatus Status;
   Condition = StmtCondition();
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val)) {
+  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let)) {
     // We're parsing a conditional binding.
     assert(CurDeclContext->isLocalContext()
            && "conditional binding in non-local context?!");
     
-    bool IsLet = Tok.is(tok::kw_val);
+    bool IsLet = Tok.is(tok::kw_let);
     SourceLoc VarLoc = consumeToken();
     
     auto Pattern = parsePattern(IsLet);
@@ -974,7 +974,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     LPLocConsumed = true;
   }
   // Parse the first part, either a var, let, expr, or stmt-assign.
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val) || Tok.is(tok::at_sign)) {
+  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::at_sign)) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(

@@ -605,7 +605,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 ///   pattern ::= 'let' pattern
 ParserResult<Pattern> Parser::parsePattern(bool isLet) {
   // If this is a let or var pattern parse it.
-  if (Tok.is(tok::kw_val) || Tok.is(tok::kw_var))
+  if (Tok.is(tok::kw_let) || Tok.is(tok::kw_var))
     return parsePatternVarOrLet();
   
   // First, parse the pattern atom.
@@ -633,8 +633,8 @@ ParserResult<Pattern> Parser::parsePattern(bool isLet) {
 }
 
 ParserResult<Pattern> Parser::parsePatternVarOrLet() {
-  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects let or var");
-  bool isLet = Tok.is(tok::kw_val);
+  assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects let or var");
+  bool isLet = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
 
   // 'var' and 'let' patterns shouldn't nest.
@@ -872,7 +872,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 
   // Parse productions that can only be patterns.
   // matching-pattern ::= matching-pattern-var
-  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_val))
+  if (Tok.is(tok::kw_var) || Tok.is(tok::kw_let))
     return parseMatchingPatternVarOrVal();
 
   // matching-pattern ::= 'is' type
@@ -892,8 +892,8 @@ ParserResult<Pattern> Parser::parseMatchingPattern() {
 }
 
 ParserResult<Pattern> Parser::parseMatchingPatternVarOrVal() {
-  assert((Tok.is(tok::kw_val) || Tok.is(tok::kw_var)) && "expects val or var");
-  bool isVal = Tok.is(tok::kw_val);
+  assert((Tok.is(tok::kw_let) || Tok.is(tok::kw_var)) && "expects val or var");
+  bool isVal = Tok.is(tok::kw_let);
   SourceLoc varLoc = consumeToken();
 
   // 'var' and 'let' patterns shouldn't nest.
@@ -920,5 +920,5 @@ ParserResult<Pattern> Parser::parseMatchingPatternIs() {
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  return Tok.is(tok::kw_var) || Tok.is(tok::kw_val) || Tok.is(tok::kw_is);
+  return Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::kw_is);
 }
