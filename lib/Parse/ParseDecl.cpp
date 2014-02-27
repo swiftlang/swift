@@ -2838,10 +2838,11 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
     DefRange = SourceRange(LBLoc, RBLoc);
   }
 
+  bool Invalid = false;
   // Reject 'subscript' functions outside of type decls
   if (!(Flags & PD_HasContainerType)) {
     diagnose(SubscriptLoc, diag::subscript_decl_wrong_scope);
-    Status.setIsParseError();
+    Invalid = true;
   }
 
   // If we had no getter (e.g., because we're in SIL mode or because the
@@ -2851,19 +2852,18 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
                              ElementTy.get(), Indices.get(),
                              /*StaticLoc*/ SourceLoc(), Flags,
                              AccessorKind::IsGetter, this);
-    
     Get->setInvalid();
     Get->setType(ErrorType::get(Context));
     Decls.push_back(Get);
   }
 
   Subscript->setAccessors(DefRange, Get, Set);
-  
-  if (!Status.isSuccess()) {
+
+  if (Invalid) {
     Subscript->setType(ErrorType::get(Context));
     Subscript->setInvalid();
-  }  
-  
+  }
+
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
   return Status;
