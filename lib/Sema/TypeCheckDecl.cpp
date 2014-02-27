@@ -3003,18 +3003,17 @@ public:
     
     // Only attempt to validate the argument type or raw value if the element
     // is not currenly being validated.
-    if (!EED->getInValidation()) {
-      EED->setInValidation(true);
+    if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
+      EED->setRecursiveness(ElementRecursiveness::PotentiallyRecursive);
       
       validateAttributes(TC, EED);
       
       if (!EED->getArgumentTypeLoc().isNull())
-      if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext())) {
-        EED->overwriteType(ErrorType::get(TC.Context));
-        EED->setInValidation(false);
-        EED->setInvalid();
-        return;
-      }
+        if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext())) {
+          EED->overwriteType(ErrorType::get(TC.Context));
+          EED->setInvalid();
+          return;
+        }
       
       // Check the raw value, if we have one.
       if (auto *rawValue = EED->getRawValueExpr()) {
@@ -3030,8 +3029,15 @@ public:
         if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, false))
           EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
       }
-      
-      EED->setInValidation(false);
+    } else if (EED->getRecursiveness() ==
+                ElementRecursiveness::PotentiallyRecursive) {
+      EED->setRecursiveness(ElementRecursiveness::Recursive);
+    }
+    
+    // If the element was not already marked as recursive by a re-entrant call,
+    // we can be sure it's not recursive.
+    if (EED->getRecursiveness() == ElementRecursiveness::PotentiallyRecursive) {
+      EED->setRecursiveness(ElementRecursiveness::NotRecursive);
     }
 
     // If we have a simple element, just set the type.

@@ -119,6 +119,18 @@ enum class StaticSpellingKind : uint8_t {
   KeywordStatic,
   KeywordClass,
 };
+  
+/// Describes if an enum element constructor directly or indirectly references
+/// its enclosing type.
+enum class ElementRecursiveness {
+  /// The element does not reference its enclosing type.
+  NotRecursive,
+  /// The element is currently being validated, and may references its enclosing
+  /// type.
+  PotentiallyRecursive,
+  /// The element does not reference its enclosing type.
+  Recursive
+};
 
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
@@ -197,10 +209,11 @@ class alignas(8) Decl {
     friend class EnumElementDecl;
     unsigned : NumValueDeclBits;
     
-    /// \brief Whether this element is currently being validated.
-    unsigned InValidation: 1;
+    /// \brief Whether or not this element directly or indirectly references
+    /// the enum type.
+    unsigned Recursiveness : 2;
   };
-  enum { NumEnumElementDeclBits = NumValueDeclBits + 1 };
+  enum { NumEnumElementDeclBits = NumValueDeclBits + 2 };
   static_assert(NumEnumElementDeclBits <= 32, "fits in an unsigned");
   
   class AbstractFunctionDeclBitfields {
@@ -3500,7 +3513,8 @@ public:
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    EnumElementDeclBits.InValidation = false;
+    EnumElementDeclBits.Recursiveness =
+        static_cast<unsigned>(ElementRecursiveness::NotRecursive);
   }
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
@@ -3523,17 +3537,19 @@ public:
     return cast<EnumDecl>(getDeclContext());
   }
   
-  bool getInValidation() {
-    return EnumElementDeclBits.InValidation;
-  }
-  void setInValidation(bool isBeingValidated) {
-    EnumElementDeclBits.InValidation = isBeingValidated;
-  }
-  
   SourceLoc getStartLoc() const {
     return getNameLoc();
   }
   SourceRange getSourceRange() const;
+  
+  ElementRecursiveness getRecursiveness() const {
+    return
+      static_cast<ElementRecursiveness>(EnumElementDeclBits.Recursiveness);
+  }
+  
+  void setRecursiveness(ElementRecursiveness recursiveness) {
+    EnumElementDeclBits.Recursiveness = static_cast<unsigned>(recursiveness);
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumElement;
