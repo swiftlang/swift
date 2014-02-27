@@ -476,37 +476,52 @@ void PrintAST::printInherited(const Decl *decl,
         return;
     }
   }
-
-  Printer << " : ";
-
+  
   if (inherited.empty()) {
+    bool PrintedColon = false;
     bool PrintedInherited = false;
 
     if (superclass) {
+      Printer << " : ";
       superclass.print(Printer, Options);
       PrintedInherited = true;
     }
 
     bool UseProtocolCompositionSyntax =
         PrintAsProtocolComposition && protos.size() > 1;
-    if (UseProtocolCompositionSyntax)
-      Printer << "protocol<";
+    if (UseProtocolCompositionSyntax) {
+      Printer << " : protocol<";
+      PrintedColon = true;
+    }
     for (auto Proto : protos) {
       if (Proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
         continue;
-      if (isa<EnumDecl>(decl)
-          && cast<EnumDecl>(decl)->hasRawType()
-          && Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable))
-        continue;
+      if (auto Enum = dyn_cast<EnumDecl>(decl)) {
+        // Conformance to RawRepresentable is implied by having a raw type.
+        if (Enum->hasRawType()
+            && Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable))
+          continue;
+        // Conformance to Equatable and Hashable is implied by being a "simple"
+        // no-payload enum.
+        if (Enum->isSimpleEnum()
+            && (Proto->isSpecificProtocol(KnownProtocolKind::Equatable)
+                || Proto->isSpecificProtocol(KnownProtocolKind::Hashable)))
+          continue;
+      }
       
       if (PrintedInherited)
         Printer << ", ";
+      else if (!PrintedColon)
+        Printer << " : ";
       Proto->getDeclaredType()->print(Printer, Options);
       PrintedInherited = true;
+      PrintedColon = true;
     }
     if (UseProtocolCompositionSyntax)
       Printer << ">";
   } else {
+    Printer << " : ";
+    
     interleave(inherited, [&](TypeLoc TL) {
       TL.getType()->print(Printer, Options);
     }, [&]() {

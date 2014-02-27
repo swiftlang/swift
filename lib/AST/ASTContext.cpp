@@ -333,6 +333,58 @@ void ASTContext::lookupInSwiftModule(
   M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
 }
 
+NominalTypeDecl *ASTContext::getBoolDecl() const {
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("Bool", results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
+      return nominal;
+    }
+  }
+  return nullptr;
+}
+
+NominalTypeDecl *ASTContext::getIntDecl() const {
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("Int", results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
+      return nominal;
+    }
+  }
+  return nullptr;
+}
+
+ValueDecl *ASTContext::getTrueDecl() const {
+  auto boolDecl = getBoolDecl();
+  if (!boolDecl) return nullptr;
+  auto boolTy = boolDecl->getDeclaredType();
+  
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("true", results);
+  for (auto result : results) {
+    if (result->getType()->isEqual(boolTy))
+      return result;
+  }
+  return nullptr;
+  
+}
+
+ValueDecl *ASTContext::getFalseDecl() const {
+  auto boolDecl = getBoolDecl();
+  if (!boolDecl) return nullptr;
+  auto boolTy = boolDecl->getDeclaredType();
+  
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("false", results);
+  for (auto result : results) {
+    if (result->getType()->isEqual(boolTy))
+      return result;
+  }
+  return nullptr;
+  
+}
+
 /// Find the generic implementation declaration for the named syntactic-sugar
 /// type.
 static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,

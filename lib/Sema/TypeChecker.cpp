@@ -61,7 +61,7 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
     addImplicitDestructor(CD);
   }
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
-    addRawRepresentableConformance(ED);
+    addImplicitEnumConformances(ED);
   }
 }
 

@@ -313,6 +313,25 @@ void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, Identifier name,
   getCache().lookupValue(name, lookupKind, *this, result);
 }
 
+void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
+                                  Identifier name,
+                                  NLKind lookupKind,
+                                  SmallVectorImpl<ValueDecl*> &result) const {
+  if (name == DerivedDecl->getName())
+    result.push_back(DerivedDecl);
+}
+
+void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
+                                         VisibleDeclConsumer &consumer,
+                                         NLKind lookupKind) const {
+  consumer.foundDecl(DerivedDecl, DeclVisibilityKind::VisibleAtTopLevel);
+}
+
+void DerivedFileUnit::getTopLevelDecls(SmallVectorImpl<swift::Decl *> &results)
+const {
+  results.push_back(DerivedDecl);
+}
+
 void SourceFile::lookupValue(Module::AccessPathTy accessPath, Identifier name,
                              NLKind lookupKind,
                              SmallVectorImpl<ValueDecl*> &result) const {
@@ -795,7 +814,8 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
 {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
-    // The Builtin module declares no operators.
+  case FileUnitKind::Derived:
+    // The Builtin module declares no operators, nor do derived units.
     return nullptr;
   case FileUnitKind::Source:
     break;

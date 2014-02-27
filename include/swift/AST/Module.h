@@ -43,6 +43,7 @@ namespace swift {
   class ExtensionDecl;
   class DebuggerClient;
   class FileUnit;
+  class FuncDecl;
   class InfixOperatorDecl;
   class LinkLibrary;
   class LookupCache;
@@ -127,7 +128,9 @@ enum class FileUnitKind {
   /// A serialized Swift AST.
   SerializedAST,
   /// An imported Clang module.
-  ClangModule
+  ClangModule,
+  /// A derived declaration.
+  Derived,
 };
 
 enum class SourceFileKind {
@@ -551,7 +554,35 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(FileUnit));
 };
-
+  
+/// A container for a module-level definition derived as part of an implicit
+/// protocol conformance.
+class DerivedFileUnit final : public FileUnit {
+  FuncDecl *const DerivedDecl;
+  
+public:
+  DerivedFileUnit(Module &M, FuncDecl *derivedDecl)
+    : FileUnit(FileUnitKind::Derived, M), DerivedDecl(derivedDecl) {}
+  ~DerivedFileUnit() {}
+  
+  void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+                   NLKind lookupKind,
+                   SmallVectorImpl<ValueDecl*> &result) const override;
+  
+  void lookupVisibleDecls(Module::AccessPathTy accessPath,
+                          VisibleDeclConsumer &consumer,
+                          NLKind lookupKind) const override;
+  
+  void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+  
+  static bool classof(const FileUnit *file) {
+    return file->getKind() == FileUnitKind::Derived;
+  }
+  static bool classof(const DeclContext *DC) {
+    return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
+  }
+};
+  
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of

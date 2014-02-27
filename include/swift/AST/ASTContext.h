@@ -330,7 +330,19 @@ public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
-
+  
+  /// Retrieve the declaration of Swift.Bool.
+  NominalTypeDecl *getBoolDecl() const;
+  
+  /// Retrieve the declaration of Swift.Int.
+  NominalTypeDecl *getIntDecl() const;
+  
+  /// Retrieve the declaration of Swift.true.
+  ValueDecl *getTrueDecl() const;
+  
+  /// Retrieve the declaration of Swift.false.
+  ValueDecl *getFalseDecl() const;
+  
   /// Retrieve the declaration of Swift.Slice<T>.
   NominalTypeDecl *getSliceDecl() const;
 

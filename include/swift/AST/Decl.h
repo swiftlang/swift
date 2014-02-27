@@ -2086,7 +2086,11 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   SourceRange Braces;
   ArrayRef<Decl*> Members;
   GenericParamList *GenericParams;
-
+  
+  /// Global declarations that were synthesized on this type's behalf, such as
+  /// default operator definitions derived for protocol conformances.
+  ArrayRef<Decl*> DerivedGlobalDecls;
+  
   /// \brief The set of protocol conformance mappings. The element order
   /// corresponds to the order of Protocols returned by getProtocols().
   // FIXME: We don't really need this correspondence any more.
@@ -2257,6 +2261,11 @@ public:
   StoredPropertyRange getStoredProperties() const {
     return StoredPropertyRange(getMembers());
   }
+  
+  ArrayRef<Decl*> getDerivedGlobalDecls() const { return DerivedGlobalDecls; }
+  void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
+    DerivedGlobalDecls = decls;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -2354,6 +2363,10 @@ public:
 
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) { RawType = rawType; }
+  
+  /// True if the enum is a "simple" enum, and none of its cases have associated
+  /// payloads.
+  bool isSimpleEnum() const;
 };
 
 /// StructDecl - This is the declaration of a struct, for example:

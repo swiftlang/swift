@@ -11,6 +11,7 @@ add_swift_library(swiftSema
   CSSolver.cpp
   NameBinding.cpp
   SourceLoader.cpp
+  DerivedConformanceEquatableHashable.cpp
   DerivedConformanceRawRepresentable.cpp
   MiscDiagnostics.cpp
   TypeChecker.cpp

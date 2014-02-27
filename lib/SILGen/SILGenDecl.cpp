@@ -1084,6 +1084,11 @@ public:
       visit(member);
     }
     
+    for (Decl *member : theType->getDerivedGlobalDecls()) {
+      
+      SGM.visit(member);
+    }
+    
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     if (isa<ProtocolDecl>(theType))

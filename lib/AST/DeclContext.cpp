@@ -347,12 +347,16 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
     case FileUnitKind::Builtin:
       OS << " Builtin";
       break;
+    case FileUnitKind::Derived:
+      OS << " derived";
+      break;
     case FileUnitKind::Source:
       OS << " file=\"" << cast<SourceFile>(this)->getFilename() << "\"";
       break;
     case FileUnitKind::SerializedAST:
     case FileUnitKind::ClangModule:
       OS << " file=\"" << cast<LoadedFile>(this)->getFilename() << "\"";
+      break;
     }
     break;
   case DeclContextKind::AbstractClosureExpr:

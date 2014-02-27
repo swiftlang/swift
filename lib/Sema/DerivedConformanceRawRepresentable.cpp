@@ -27,23 +27,36 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-namespace {
-  static void _insertDecl(NominalTypeDecl *scope, Decl *member) {
-    auto oldMembers = scope->getMembers();
-    auto oldSize = oldMembers.size();
-    auto newMembers = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
+void DerivedConformance::_insertMemberDecl(NominalTypeDecl *scope, Decl *member)
+{
+  auto oldMembers = scope->getMembers();
+  auto oldSize = oldMembers.size();
+  auto newMembers = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
 
-    std::move(oldMembers.begin(), oldMembers.end(), newMembers.begin());
-    newMembers[oldSize] = member;
-    
-    scope->setMembers(newMembers, scope->getBraces());
-  }
+  std::move(oldMembers.begin(), oldMembers.end(), newMembers.begin());
+  newMembers[oldSize] = member;
   
-  template<typename DECL>
-  DECL *insertDecl(NominalTypeDecl *scope, DECL *member) {
-    _insertDecl(scope, member);
-    return member;
-  }
+  scope->setMembers(newMembers, scope->getBraces());
+}
+
+void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
+                                             Decl *member) {
+  // Find the module.
+  auto &C = scope->getASTContext();
+  auto mod = scope->getModuleContext();
+  
+  // Add it to the module in a DerivedFileUnit.
+  mod->addFile(*new (C) DerivedFileUnit(*mod, cast<FuncDecl>(member)));
+  
+  // Add it as a derived global decl to the nominal type.
+  auto oldDerived = scope->getDerivedGlobalDecls();
+  auto oldSize = oldDerived.size();
+  auto newDerived = C.Allocate<Decl*>(oldSize + 1);
+  
+  std::move(oldDerived.begin(), oldDerived.end(), newDerived.begin());
+  newDerived[oldSize] = member;
+  
+  scope->setDerivedGlobalDecls(newDerived);
 }
 
 static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
@@ -85,7 +98,7 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   rawTypeDecl->setImplicit();
   rawTypeDecl->setType(rawType);
   rawTypeDecl->setInterfaceType(rawInterfaceType);
-  return insertDecl(enumDecl, rawTypeDecl);
+  return insertMemberDecl(enumDecl, rawTypeDecl);
 }
 
 static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
@@ -179,14 +192,15 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
 
   tc.implicitlyDefinedFunctions.push_back(toRawDecl);
 
-  return insertDecl(enumDecl, toRawDecl);
+  return insertMemberDecl(enumDecl, toRawDecl);
 }
 
 static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                                 EnumDecl *enumDecl) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
-  //   static func [derived] fromRaw(raw: SomeType) -> SomeEnum? {
+  //   @derived
+  //   static func fromRaw(raw: SomeType) -> SomeEnum? {
   //     switch raw {
   //     case 111:
   //       return A
@@ -334,7 +348,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
 
   tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
 
-  return insertDecl(enumDecl, fromRawDecl);
+  return insertMemberDecl(enumDecl, fromRawDecl);
 }
 
 ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
@@ -344,7 +358,7 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   // type-checking but we may still get here after recovery.
   
   // The type must be an enum.
-  auto enumDecl = cast<EnumDecl>(type);
+  auto enumDecl = dyn_cast<EnumDecl>(type);
   if (!enumDecl)
     return nullptr;
   

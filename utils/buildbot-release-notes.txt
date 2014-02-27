@@ -22,8 +22,33 @@
     return x.description() // ...and I accidentally called +description
                            //    instead of -description
 
+
 * Properties in Objective-C protocols are now correctly imported as properties.
   (Previously the getter and setter were imported as methods.)
+
+* Simple enums with no payloads, including NS_ENUMs imported
+  from Cocoa, now implicitly conform to the Equatable and Hashable protocols.
+  This means they can be compared with the '==' and '!=' operators and can
+  be used as Dictionary keys:
+
+    enum Flavor {
+      case Lemon, Banana, Cherry
+    }
+
+    assert(Flavor.Lemon == .Lemon)
+    assert(Flavor.Banana != .Lemon)
+
+    struct Profile {
+      var sweet, sour: Bool
+    }
+
+    let flavorProfiles: Dictionary<Flavor, Profile> = [
+      .Lemon:  Profile(sweet: false, sour: true ),
+      .Banana: Profile(sweet: true,  sour: false),
+      .Cherry: Profile(sweet: true,  sour: true ),
+    ]
+    assert(flavorProfiles[.Lemon].sour)
+
 
 2014-02-26
 ----------

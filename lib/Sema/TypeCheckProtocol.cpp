@@ -2075,6 +2075,12 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
     return DerivedConformance::deriveRawRepresentable(*this,
                                                       TypeDecl, Requirement);
   }
+  if (protocol == Context.getProtocol(KnownProtocolKind::Equatable)) {
+    return DerivedConformance::deriveEquatable(*this, TypeDecl, Requirement);
+  }
+  if (protocol == Context.getProtocol(KnownProtocolKind::Hashable)) {
+    return DerivedConformance::deriveHashable(*this, TypeDecl, Requirement);
+  }
   
   return nullptr;
 }

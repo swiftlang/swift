@@ -499,15 +499,16 @@ public:
   /// user-provided destructor.
   void addImplicitDestructor(ClassDecl *CD);
 
-  /// \brief Add the RawRepresentable methods to an enum with a raw type.
-  void addRawRepresentableConformance(EnumDecl *ED);
-
+  /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
+  /// enum with a raw type.
+  void addImplicitEnumConformances(EnumDecl *ED);
+  
   /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
   /// a protocol property requirement.  Convert it to
   /// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
   /// variable, enabling the witness table to use those accessors.
   void synthesizeWitnessAccessorsForStoredVar(VarDecl *VD);
-
+  
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.

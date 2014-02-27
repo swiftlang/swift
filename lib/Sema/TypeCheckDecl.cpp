@@ -3666,7 +3666,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
 }
 
-void TypeChecker::addRawRepresentableConformance(EnumDecl *ED) {
+void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
   // Type-check the raw values of the enum.
   for (auto elt : ED->getAllElements()) {
     assert(elt->hasRawValueExpr());

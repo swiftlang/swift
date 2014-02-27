@@ -1011,10 +1011,15 @@ namespace {
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
         
-        ProtocolDecl *rawRepresentable = Impl.SwiftContext
-          .getProtocol(KnownProtocolKind::RawRepresentable);
-        auto protoList = Impl.SwiftContext.AllocateCopy(
-                                          llvm::makeArrayRef(rawRepresentable));
+        auto getProtocol = [&](KnownProtocolKind k) {
+          return Impl.SwiftContext.getProtocol(k);
+        };
+        ProtocolDecl *protocols[] = {
+          getProtocol(KnownProtocolKind::RawRepresentable),
+          getProtocol(KnownProtocolKind::Equatable),
+          getProtocol(KnownProtocolKind::Hashable),
+        };
+        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
         enumDecl->setProtocols(protoList);
         
         result = enumDecl;

@@ -725,11 +725,18 @@ void NominalTypeDecl::setGenericParams(GenericParamList *params) {
 
 
 bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
-  // Enums with raw types can derive their RawRepresentable conformance.
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
-    auto rawRepresentable
-      = getASTContext().getProtocol(KnownProtocolKind::RawRepresentable);
-    return enumDecl->hasRawType() && protocol == rawRepresentable;
+    // Enums with raw types can derive their RawRepresentable conformance.
+    if (protocol
+          == getASTContext().getProtocol(KnownProtocolKind::RawRepresentable))
+      return enumDecl->hasRawType();
+    
+    // Simple enums can derive Equatable and Hashable conformance.
+    if (protocol
+          == getASTContext().getProtocol(KnownProtocolKind::Equatable)
+        || protocol
+             == getASTContext().getProtocol(KnownProtocolKind::Hashable))
+      return enumDecl->isSimpleEnum();
   }
   return false;
 }
@@ -899,6 +906,20 @@ void NominalTypeDecl::getImplicitProtocols(
       protocols.push_back(dynamicLookup);
     }
   }
+  
+  // If this is a simple enum, it conforms to the Hashable and Equatable
+  // protocols.
+  if (auto theEnum = dyn_cast<EnumDecl>(this)) {
+    if (theEnum->isSimpleEnum()) {
+      if (auto equatable = getASTContext().getProtocol(
+                                                 KnownProtocolKind::Equatable))
+        protocols.push_back(equatable);
+        
+      if (auto hashable = getASTContext().getProtocol(
+                                                 KnownProtocolKind::Hashable))
+        protocols.push_back(hashable);
+    }
+  }
 }
 
 OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
@@ -1022,11 +1043,21 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
 
 EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
   // FIXME: Linear search is not great for large enum decls.
-  for (Decl *D : getMembers())
-    if (EnumElementDecl *Elt = dyn_cast<EnumElementDecl>(D))
-      if (Elt->getName() == Name)
-        return Elt;
-  return 0;
+  for (EnumElementDecl *Elt : getAllElements())
+    if (Elt->getName() == Name)
+      return Elt;
+  return nullptr;
+}
+
+bool EnumDecl::isSimpleEnum() const {
+  // FIXME: Should probably cache this.
+  bool hasElements = false;
+  for (auto elt : getAllElements()) {
+    hasElements = true;
+    if (!elt->getArgumentTypeLoc().isNull())
+      return false;
+  }
+  return hasElements;
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,

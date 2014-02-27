@@ -309,10 +309,10 @@ ERROR(let_requires_initializer,decl_parsing,none,
 ERROR(observingprop_requires_initializer,decl_parsing,none,
       "non-member observing properties require an initializer", ())
 ERROR(global_requires_initializer,decl_parsing,none,
-      "global 'var' declaration require an initializer expression or "
+      "global 'var' declaration requires an initializer expression or "
       "getter/setter specifier", ())
 ERROR(static_requires_initializer,decl_parsing,none,
-      "%select{ERROR|'static var'|'class var'|}0 declaration require an initializer "
+      "%select{ERROR|'static var'|'class var'|}0 declaration requires an initializer "
       "expression or getter/setter specifier", (StaticSpellingKind))
 
 // Extensions
@@ -523,7 +523,16 @@ NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
      "raw value implicitly auto-incremented from zero",())
 ERROR(broken_raw_representable_requirement,sema_tcd,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
-
+ERROR(broken_equatable_requirement,sema_tcd,none,
+      "Equatable protocol is broken: unexpected requirement", ())
+ERROR(broken_hashable_requirement,sema_tcd,none,
+      "Hashable protocol is broken: unexpected requirement", ())
+ERROR(broken_int_hashable_conformance,sema_tcd,none,
+      "Int type is broken: does not conform to Hashable", ())
+ERROR(broken_int_integer_literal_convertible_conformance,sema_tcd,none,
+      "Int type is broken: does not conform to IntegerLiteralConvertible", ())
+ERROR(broken_equatable_eq_operator,sema_tcd,none,
+      "Equatable protocol is broken: no operator infix declaration for '=='", ())
 // Dynamic Self
 ERROR(dynamic_self_non_method,sema_tcd,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
