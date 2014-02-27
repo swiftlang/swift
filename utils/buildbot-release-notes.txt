@@ -22,6 +22,9 @@
     return x.description() // ...and I accidentally called +description
                            //    instead of -description
 
+* Properties in Objective-C protocols are now correctly imported as properties.
+  (Previously the getter and setter were imported as methods.)
+
 2014-02-26
 ----------
 
