@@ -151,5 +151,9 @@ STDLIB_TYPEDEF(__SIZE_TYPE__, size_t);
 // Types from sys/types.h (POSIX).
 STDLIB_TYPEDEF(long, ssize_t);
 
+// Types from libkern/OSTypes.h.
+STDLIB_TYPEDEF(signed int, SInt);
+STDLIB_TYPEDEF(unsigned int, UInt);
+
 // Types from CoreFoundation.
 STDLIB_TYPEDEF(signed long, CFIndex);

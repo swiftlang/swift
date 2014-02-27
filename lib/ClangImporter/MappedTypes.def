@@ -82,6 +82,10 @@ MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false, DefineOnly)
 // FIXME: why does this not catch va_list on x86_64?
 MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false, DoNothing)
 
+// libkern/OSTypes.h types.
+MAP_STDLIB_TYPE("UInt", UnsignedInt, 32, "CUnsignedInt", All, false, DoNothing)
+MAP_STDLIB_TYPE("SInt", SignedInt, 32, "CInt", All, false, DoNothing)
+
 // Objective-C types.
 MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", ObjC1, false,
          DoNothing)
