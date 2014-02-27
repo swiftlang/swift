@@ -437,12 +437,12 @@ public:
   }
 
   /// \brief Import a cloned version of the given declaration, which is part of
-  /// an Objective-C protocol and currently must be a method, into the given
-  /// declaration context.
+  /// an Objective-C protocol and currently must be a method or property, into
+  /// the given declaration context.
   ///
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
-  Decl *importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc,
+  Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            bool forceClassMethod = false);
 
   /// \brief Import the given Clang declaration context into Swift.

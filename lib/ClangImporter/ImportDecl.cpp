@@ -2582,9 +2582,29 @@ namespace {
             continue;
 
         for (auto member : proto->getMembers()) {
-          // FIXME: Import properties.
+          if (auto prop = dyn_cast<VarDecl>(member)) {
+            auto objcProp =
+              dyn_cast_or_null<clang::ObjCPropertyDecl>(prop->getClangDecl());
+            if (!objcProp)
+              continue;
+
+            // We can't import a property if there's already a method with this
+            // name. (This also covers other properties with that same name.)
+            clang::Selector sel = objcProp->getGetterName();
+            if (decl->getMethod(sel, /*instance=*/true))
+              continue;
+
+            if (auto imported = Impl.importMirroredDecl(objcProp, dc)) {
+              members.push_back(imported);
+              // FIXME: We should mirror properties of the root class onto the
+              // metatype.
+            }
+
+            continue;
+          }
+
           auto func = dyn_cast<FuncDecl>(member);
-          if (!func)
+          if (!func || func->isAccessor())
             continue;
 
           auto objcMethod =
@@ -2750,7 +2770,7 @@ namespace {
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,
                                                  Type(result->getDeclaredType()),
-                                                 Type());
+                                                 Type(), /*Index=*/0);
       selfDecl->setArchetype(selfArchetype);
 
       // Set the generic parameters and requirements.
@@ -2862,21 +2882,20 @@ namespace {
     }
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl) {
-      // Properties are imported as variables.
-
-      // FIXME: For now, don't import properties in protocols, because IRGen
-      // can't handle them.
-      if (isa<clang::ObjCProtocolDecl>(decl->getDeclContext()))
-        return nullptr;
-
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
-      // We might have imported this decl while importing the DeclContext.
+      // While importing the DeclContext, we might have imported the decl
+      // itself.
       if (auto Known = Impl.importDeclCached(decl))
         return Known;
 
+      return VisitObjCPropertyDecl(decl, dc);
+    }
+
+    Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
+                                DeclContext *dc) {
       auto name = Impl.importName(decl->getDeclName());
       if (name.empty())
         return nullptr;
@@ -2902,26 +2921,32 @@ namespace {
         return nullptr;
 
       // Import the getter.
-      auto getter
-        = cast_or_null<FuncDecl>(Impl.importDecl(decl->getGetterMethodDecl()));
-      if (!getter && decl->getGetterMethodDecl())
-        return nullptr;
+      FuncDecl *getter = nullptr;
+      if (auto clangGetter = decl->getGetterMethodDecl()) {
+        getter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangGetter, dc));
+        if (!getter)
+          return nullptr;
+      }
 
       // Import the setter, if there is one.
-      auto setter
-        = cast_or_null<FuncDecl>(Impl.importDecl(decl->getSetterMethodDecl()));
-      if (!setter && decl->getSetterMethodDecl())
-        return nullptr;
+      FuncDecl *setter = nullptr;
+      if (auto clangSetter = decl->getSetterMethodDecl()) {
+        setter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangSetter, dc));
+        if (!setter)
+          return nullptr;
+      }
 
       // Check whether the property already got imported.
-      auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
-      if (known != Impl.ImportedDecls.end())
-        return known->second;
+      if (dc == Impl.importDeclContextOf(decl)) {
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
+      }
 
-      auto result = new (Impl.SwiftContext)
-      VarDecl(/*static*/ false, /*IsLet*/ false,
-              Impl.importSourceLoc(decl->getLocation()),
-                              name, type, dc);
+      auto result = new (Impl.SwiftContext) VarDecl(
+          /*static*/ false, /*IsLet*/ false,
+          Impl.importSourceLoc(decl->getLocation()),
+          name, type, dc);
 
       // Build thunks.
       FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
@@ -3208,9 +3233,9 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 }
 
 Decl *
-ClangImporter::Implementation::
-importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc,
-                   bool forceClassMethod) {
+ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
+                                                  DeclContext *dc,
+                                                  bool forceClassMethod) {
   if (!decl)
     return nullptr;
 
@@ -3220,7 +3245,16 @@ importMirroredDecl(const clang::ObjCMethodDecl *decl, DeclContext *dc,
     return known->second;
 
   SwiftDeclConverter converter(*this);
-  auto result = converter.VisitObjCMethodDecl(decl, dc, forceClassMethod);
+  Decl *result;
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
+    result = converter.VisitObjCMethodDecl(method, dc, forceClassMethod);
+  } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
+    assert(!forceClassMethod && "can't mirror properties yet");
+    result = converter.VisitObjCPropertyDecl(prop, dc);
+  } else {
+    llvm_unreachable("unexpected mirrored decl");
+  }
+
   if (result) {
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(decl);

@@ -1,4 +1,4 @@
-@protocol Foo
+@protocol FooProto
 @property int bar;
 @end
 

@@ -2508,22 +2508,6 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          CanAnyFunctionType substAccessorType,
                                          ArrayRef<Substitution> &substitutions){
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
-  
-  // FIXME: Have a nicely-abstracted way to figure out which kind of
-  // dispatch we're doing.
-  // FIXME: We should do this for any declaration within a class. However,
-  // IRGen doesn't yet have the machinery for handling class_method on
-  // getters and setters.
-  if (gen.SGM.requiresObjCDispatch(decl)) {
-    auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
-
-    if (!isSuper)
-      return Callee::forClassMethod(gen, self, constant, substAccessorType, loc);
-    
-    if (auto *upcast = dyn_cast<UpcastInst>(self))
-      self = upcast->getOperand();
-    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
-  }
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
@@ -2579,7 +2563,24 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     return Callee::forProtocol(gen, baseVal.getValue(), constant,
                                substAccessorType, loc);
   }
-  
+
+  // FIXME: Have a nicely-abstracted way to figure out which kind of
+  // dispatch we're doing.
+  // FIXME: We should do this for any declaration within a class. However,
+  // IRGen doesn't yet have the machinery for handling class_method on
+  // getters and setters.
+  if (gen.SGM.requiresObjCDispatch(decl)) {
+    auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
+
+    if (!isSuper)
+      return Callee::forClassMethod(gen, self, constant, substAccessorType,
+                                    loc);
+
+    if (auto *upcast = dyn_cast<UpcastInst>(self))
+      self = upcast->getOperand();
+    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
+  }
+
   return Callee::forDirect(gen, constant, substAccessorType, loc);
 }
 
