@@ -1206,6 +1206,11 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
   if (ty->is<ErrorType>())
     return ty;
+
+  if (!(options & TR_FunctionInput)) {
+    TC.diagnose(repr->getInOutLoc(), diag::inout_only_parameter);
+    return ty;
+  }
   
   return InOutType::get(ty);
 }

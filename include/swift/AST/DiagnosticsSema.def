@@ -234,6 +234,8 @@ ERROR(assignment_without_inout,sema_tcd,none,
       "assignment operator must have an initial inout argument", ())
 ERROR(inout_cant_be_variadic,sema_tce,none,
       "inout arguments cannot be variadic", ())
+ERROR(inout_only_parameter,sema_tce,none,
+      "'inout' is only valid in parameter lists", ())
 
 ERROR(mutating_invalid_global_scope,sema_tcd,none,
       "'mutating' is only valid on methods", ())
