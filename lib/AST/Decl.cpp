@@ -650,6 +650,8 @@ void ValueDecl::overwriteType(Type T) {
 DeclContext *ValueDecl::getPotentialGenericDeclContext() {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func;
+  if (auto NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD;
 
   return getDeclContext();
 }

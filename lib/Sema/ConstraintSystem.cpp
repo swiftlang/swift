@@ -888,7 +888,11 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // Figure out the declaration context to use when opening this type.
-  DeclContext *dc = value->getPotentialGenericDeclContext();
+  DeclContext *dc;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
+    dc = func;
+  else
+    dc = value->getDeclContext();
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;

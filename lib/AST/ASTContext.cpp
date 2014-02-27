@@ -915,6 +915,7 @@ Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type,
 
 void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto, 
                                ConformanceEntry entry) {
+  assert(!type->is<GenericTypeParamType>());
   auto arena = getArena(type->getRecursiveProperties());
   auto &conformsTo = Impl.getArena(arena).ConformsTo;
   conformsTo[{type, proto}] = entry;

@@ -86,13 +86,15 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
                                               getConstraintSystem().DC,
                                               &conformance);
         assert((conforms ||
-                replacement->isExistentialType()) &&
+                replacement->isExistentialType() ||
+                replacement->is<GenericTypeParamType>()) &&
                "Constraint system missed a conformance?");
         (void)conforms;
 
         assert(conformance ||
                replacement->isExistentialType() ||
-               replacement->is<ArchetypeType>());
+               replacement->is<ArchetypeType>() ||
+               replacement->is<GenericTypeParamType>());
         currentConformances.push_back(conformance);
         break;
       }
@@ -536,10 +538,11 @@ namespace {
 
         memberRef = ConcreteDeclRef(context, member, substitutions);
 
-        auto openedFullFnType = openedFullType->castTo<FunctionType>();
-        auto openedBaseType = openedFullFnType->getInput()
-                                ->getRValueInstanceType();
-        containerTy = solution.simplifyType(tc, openedBaseType);
+        if (auto openedFullFnType = openedFullType->getAs<FunctionType>()) {
+          auto openedBaseType = openedFullFnType->getInput()
+                                  ->getRValueInstanceType();
+          containerTy = solution.simplifyType(tc, openedBaseType);
+        }
       } else {
         // No substitutions required; the declaration reference is simple.
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
