@@ -65,6 +65,8 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   : Stmt(StmtKind::Brace, getDefaultImplicitFlag(implicit, lbloc)),
     NumElements(elts.size()), LBLoc(lbloc), RBLoc(rbloc)
 {
+  IsConfigBlock = false;
+  IsInactiveConfigBlock = false;
   memcpy(getElementsStorage(), elts.data(),
          elts.size() * sizeof(ASTNode));
 }

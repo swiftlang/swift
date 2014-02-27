@@ -261,9 +261,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
         
       IfConfigStmt *ICS = dyn_cast<IfConfigStmt>(Result.dyn_cast<Stmt*>());
-      Stmt *activeStmt = ICS->getActiveStmt();
       
-      if (activeStmt) {
+      if (auto activeStmt = ICS->getActiveStmt()) {
         // Pass on any members of the active block
         BraceStmt *activeBlock = dyn_cast<BraceStmt>(activeStmt);
         
@@ -677,9 +676,10 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   if (auto *PE = dyn_cast_or_null<ParenExpr>(configExpr)) {
     return evaluateConfigConditionExpr(PE->getSubExpr());
   }
+  
   // Evaluate a "&&" or "||" expression.
-  else if (auto *SE = dyn_cast_or_null<SequenceExpr>(configExpr)) {
-    // check for '&&' and '||'
+  if (auto *SE = dyn_cast<SequenceExpr>(configExpr)) {
+    // Check for '&&' or '||' as the expression type.
     if (SE->getNumElements() < 3) {
       diagnose(SE->getLoc(), diag::unsupported_build_config_binary_expression);
       return false;
@@ -719,14 +719,16 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     
     return result;
   }
+  
   // Evaluate a named reference expression.
-  else if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
+  if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
     // look up name
     auto name = UDRE->getName().str();
     return Context.LangOpts.hasBuildConfig(name);
   }
+  
   // Evaluate a negation (unary "!") expression.
-  else if (auto *PUE = dyn_cast_or_null<PrefixUnaryExpr>(configExpr)) {
+  if (auto *PUE = dyn_cast_or_null<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
     auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(PUE->getFn());
     auto name = fnNameExpr->getName().str();
@@ -738,8 +740,9 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     
     return !evaluateConfigConditionExpr(PUE->getArg());
   }
+  
   // Evaluate a target config call expression.
-  else if (auto *CE = dyn_cast_or_null<CallExpr>(configExpr)) {
+  if (auto *CE = dyn_cast_or_null<CallExpr>(configExpr)) {
     // look up target config, and compare value
     auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(CE->getFn());
     auto targetValue = fnNameExpr->getName().str();
@@ -768,12 +771,11 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       return false;
     }
   }
+  
   // If we've gotten here, it's an unsupported expression type.
-  else {
-    diagnose(configExpr->getLoc(),
+  diagnose(configExpr->getLoc(),
              diag::unsupported_config_conditional_expression_type);
     return false;
-  }
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {

@@ -1430,17 +1430,17 @@ Restart:
     if (InSILMode)
       return formToken(tok::sil_pound, TokStart);
       
-    if(StringRef(TokStart, 3).equals("#if") &&
+    if (StringRef(TokStart + 1, 2).equals("if") &&
        isWhitespace(CurPtr[2]) &&
        NextToken.isAtStartOfLine()) {
       CurPtr += 2;
       return formToken(tok::pound_if, TokStart);
-    } else if (StringRef(TokStart, 5).equals("#else") &&
+    } else if (StringRef(TokStart + 1, 4).equals("else") &&
                isWhitespace(CurPtr[4]) &&
                NextToken.isAtStartOfLine()) {
       CurPtr += 4;
       return formToken(tok::pound_else, TokStart);
-    } else if(StringRef(TokStart, 6).equals("#endif") &&
+    } else if(StringRef(TokStart + 1, 5).equals("endif") &&
               isWhitespace(CurPtr[5]) &&
               NextToken.isAtStartOfLine()) {
       CurPtr += 5;

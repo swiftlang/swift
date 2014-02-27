@@ -107,8 +107,8 @@ public:
 class BraceStmt : public Stmt {
 private:
   unsigned NumElements;
-  bool IsConfigBlock = false;
-  bool IsInactiveConfigBlock = false;
+  unsigned IsConfigBlock : 1;
+  unsigned IsInactiveConfigBlock : 1;
   
   SourceLoc LBLoc;
   SourceLoc RBLoc;
