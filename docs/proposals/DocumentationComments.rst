@@ -285,7 +285,7 @@ Features related to links in markup
 ===================================
 
 Note that we don't need to implement the *parsing* and *resolving* of
-refereneces, just specify what we want to expect there, and treat the reference
+references, just specify what we want to expect there, and treat the reference
 as 'inline monospaced' markup.
 
 [P3] Reference a parameter of the current function
