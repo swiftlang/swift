@@ -18,6 +18,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "clang/AST/Decl.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -662,19 +663,31 @@ class ModuleWriter {
 
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
-  raw_ostream &os;
+  llvm::SmallSetVector<Module *, 8> imports;
+
+  std::string bodyBuffer;
+  llvm::raw_string_ostream os{bodyBuffer};
+
   Module &M;
   ObjCPrinter printer;
 public:
-  ModuleWriter(raw_ostream &out, Module &mod)
-    : os(out), M(mod), printer(M.Ctx, os) {}
+  ModuleWriter(Module &mod)
+    : M(mod), printer(M.Ctx, os) {
+    imports.insert(M.Ctx.getStdlibModule());
+  }
 
-  bool isLocal(const Decl *D) {
-    return D->getModuleContext() == &M;
+  /// Returns true if we added the decl's module to the import set, false if
+  /// the decl is a local decl.
+  bool addImport(const Decl *D) {
+    Module *otherModule = D->getModuleContext();
+    if (otherModule == &M)
+      return false;
+    imports.insert(otherModule);
+    return true;
   }
 
   bool require(const TypeDecl *D) {
-    if (!isLocal(D))
+    if (addImport(D))
       return true;
 
     auto &state = seenTypes[D];
@@ -690,7 +703,7 @@ public:
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD, StringRef introducer) {
-    if (!isLocal(NTD))
+    if (addImport(NTD))
       return;
     auto &state = seenTypes[NTD];
     if (state.second)
@@ -719,7 +732,7 @@ public:
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
-        if (!isLocal(TD))
+        if (addImport(TD))
           return;
         if (auto CD = dyn_cast<ClassDecl>(TD))
           forwardDeclare(CD);
@@ -737,7 +750,7 @@ public:
   }
 
   bool writeClass(const ClassDecl *CD) {
-    if (!isLocal(CD))
+    if (addImport(CD))
       return true;
 
     auto &state = seenTypes[CD];
@@ -765,7 +778,7 @@ public:
   }
 
   bool writeProtocol(const ProtocolDecl *PD) {
-    if (!isLocal(PD))
+    if (addImport(PD))
       return true;
 
     auto knownProtocol = PD->getKnownProtocolKind();
@@ -809,7 +822,13 @@ public:
     return true;
   }
 
-  bool writeDecls() {
+  void writeImports(raw_ostream &out) {
+    for (auto import : imports)
+      out << "@import " << import->Name << ";\n";
+    os << '\n';
+  }
+
+  bool writeToStream(raw_ostream &out) {
     SmallVector<Decl *, 64> decls;
     M.getTopLevelDecls(decls);
 
@@ -918,20 +937,14 @@ public:
       }
     }
 
+    writeImports(out);
+    out << os.str();
+
     return false;
   }
 };
 }
 
-static void writeImports(raw_ostream &os, Module &M) {
-  SmallVector<Module::ImportedModule, 16> imports;
-  M.getImportedModules(imports, Module::ImportFilter::All);
-  for (auto import : imports)
-    os << "@import " << import.second->Name << ";\n";
-  os << '\n';
-}
-
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M) {
-  writeImports(os, *M);
-  return ModuleWriter(os, *M).writeDecls();
+  return ModuleWriter(*M).writeToStream(os);
 }
