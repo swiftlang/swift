@@ -819,7 +819,7 @@ void Parser::parseDeclDelayed() {
 ///   decl-import:
 ///     'import' attribute-list import-kind? import-path
 ///   import-kind:
-///     'typealias'
+///     ('type'|'typealias')
 ///     'struct'
 ///     'class'
 ///     'enum'
@@ -847,6 +847,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   SourceLoc KindLoc;
   if (Tok.isKeyword()) {
     switch (Tok.getKind()) {
+    case tok::kw_type:
     case tok::kw_typealias:
       Kind = ImportKind::Type;
       break;

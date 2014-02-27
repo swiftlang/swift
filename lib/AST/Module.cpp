@@ -321,7 +321,7 @@ void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
 
   // If this import is specific to some named type or decl ("import Swift.int")
   // then filter out any lookups that don't match.
-  if (accessPath.size() == 1 && accessPath.front().first != Name)
+  if (accessPath.size() == 1 && accessPath.front().first != name)
     return;
 
   if (name == DerivedDecl->getName())

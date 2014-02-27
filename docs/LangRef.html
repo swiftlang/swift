@@ -119,9 +119,10 @@
   module:</p>
   
   <ul>
-    <li><code>typealias</code> can be used to import any concrete type (struct,
-    class, enum, or another typealias). It cannot be used to import protocols,
-    which are often used for more than just their existential type.</li>
+    <li><code>type</code> can be used to import any concrete type (struct,
+    class, enum, or typealias). It cannot be used to import protocols, which are
+    often used for more than just their existential type. 
+    <code>typealias</code> is accepted as an alias for <code>type</code></li>
     
     <li><code>struct</code>, <code>class</code>, <code>enum</code> can be used
     to import any type whose <i>canonical type</i> is a struct, class,
@@ -141,7 +142,7 @@
     import Swift
 
     <i>// Import a single type.</i>
-    import typealias Swift.BufferedStream
+    import type Swift.BufferedStream
 
     <i>// Import all addition overloads.</i>
     import func Swift.+

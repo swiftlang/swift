@@ -563,7 +563,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   case ImportKind::Module:
     break;
   case ImportKind::Type:
-    Printer << "typealias ";
+    Printer << "type ";
     break;
   case ImportKind::Struct:
     Printer << "struct ";

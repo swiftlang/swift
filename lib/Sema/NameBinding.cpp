@@ -113,7 +113,7 @@ static const char *getImportKindString(ImportKind kind) {
   case ImportKind::Module:
     llvm_unreachable("module imports do not bring in decls");
   case ImportKind::Type:
-    return "typealias";
+    return "type";
   case ImportKind::Struct:
     return "struct";
   case ImportKind::Class:
