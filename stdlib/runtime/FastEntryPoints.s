@@ -174,22 +174,27 @@ BEGIN_FUNC _swift_release
 END_FUNC
 
 BEGIN_FUNC _swift_rawDealloc
-  mov   %gs:SWIFT_TSD_RAW_ALLOC_BASE(,%rsi,8), %r11
+  add   __swift_alloc_offset(%rip), %rsi
+  mov   %gs:(,%rsi,8), %r11
   mov   %r11, (%rdi)
-  mov   %rdi, %gs:SWIFT_TSD_RAW_ALLOC_BASE(,%rsi,8)
+  mov   %rdi, %gs:(,%rsi,8)
+  sub   __swift_alloc_offset(%rip), %rsi
   ret
 END_FUNC
 
 .macro ALLOC_FUNC
 BEGIN_FUNC $0
 1:
-  mov   %gs:$1(,%rdi,8), %rax
+  add   __swift_alloc_offset(%rip), %rdi
+  mov   %gs:(,%rdi,8), %rax
   test  %rax, %rax
   je    2f
   mov   (%rax), %r11
-  mov   %r11, %gs:$1(,%rdi,8)
+  mov   %r11, %gs:(,%rdi,8)
+  sub   __swift_alloc_offset(%rip), %rdi
   ret
 2:
+  sub   __swift_alloc_offset(%rip), %rdi
   SaveRegisters
 .if $2 == 0
   xor   %esi, %esi
@@ -199,11 +204,15 @@ BEGIN_FUNC $0
   call  __swift_refillThreadAllocCache
   RestoreRegisters
 .if $2 == SWIFT_TRYALLOC
-  cmpq  $$0, %gs:$1(,%rdi,8)
+  mov   __swift_alloc_offset(%rip), %r11
+  shl   $$3, %r11
+  cmpq  $$0, %gs:(%r11,%rdi,8)
   jnz   1b
   ret
 .elseif $2 == SWIFT_TRYRAWALLOC
-  cmpq  $$0, %gs:$1(,%rdi,8)
+  mov   __swift_alloc_offset(%rip), %r11
+  shl   $$3, %r11
+  cmpq  $$0, %gs:(%r11,%rdi,8)
   jnz   1b
   ret
 .else
