@@ -253,10 +253,15 @@ static bool IRGenImportedModules(CompilerInstance &CI,
     prev = next;
   }
 
+  ImportedModules.insert(M);
+  if (!CI.hasSourceImport())
+    return hadError;
+
   // IRGen the modules this module depends on. This is only really necessary
   // for imported source, but that's a very convenient thing to do in -i mode.
   // FIXME: Crawling all loaded modules is a hack.
-  ImportedModules.insert(M);
+  // FIXME: And re-doing SILGen, SIL-linking, SIL diagnostics, and IRGen is
+  // expensive, because it's not properly being limited to new things right now.
   for (auto &entry : CI.getASTContext().LoadedModules) {
     swift::Module *import = entry.getValue();
     if (!ImportedModules.insert(import))

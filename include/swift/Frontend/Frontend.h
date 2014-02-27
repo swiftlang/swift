@@ -332,6 +332,10 @@ public:
     return Invocation.getLinkLibraries();
   }
 
+  bool hasSourceImport() const {
+    return Invocation.getFrontendOptions().EnableSourceImport;
+  }
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input
   SourceFile *getPrimarySourceFile() { return PrimarySourceFile; };
