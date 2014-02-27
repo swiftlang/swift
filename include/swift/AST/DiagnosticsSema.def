@@ -711,6 +711,17 @@ NOTE(indent_expression_to_silence,tce_sema,none,
 ERROR(value_of_module_type,tce_sema,none,
       "expected module member name after module name", ())
 
+ERROR(value_of_metatype_type,tce_sema,none,
+      "expected member name or constructor call after type name", ())
+
+NOTE(add_parens_to_type,tce_sema,none,
+     "add arguments after the type to construct a value of the type", ())
+NOTE(add_self_to_type,tce_sema,none,
+     "use '.self' to reference the type object", ())
+
+ERROR(type_of_metatype,tce_sema,none,
+      "'.type' is not allowed after a type name", ())
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------

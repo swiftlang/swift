@@ -1,3 +1,27 @@
+2014-03-05
+----------
+
+* All values now have a 'self' property, exactly equivalent to the value
+  itself:
+
+    let x = 0
+    let x2 = x.self
+
+  Types also have a 'self' property that is the type object for that
+  type:
+
+    let theClass = NSObject.self
+    let theObj = theClass()
+
+  References to type names are now disallowed outside of a constructor call
+  or member reference; to get a type object as a value, "T.self" is required.
+  This prevents the mistake of intending to construct an instance of a
+  class but forgetting the parens and ending up with the class object instead:
+
+    let x = MyObject // oops, I meant MyObject()...
+    return x.description() // ...and I accidentally called +description
+                           //    instead of -description
+
 2014-02-26
 ----------
 

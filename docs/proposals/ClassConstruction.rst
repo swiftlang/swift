@@ -153,7 +153,7 @@ Summary
 
 By eliminating by-default ``init``\ method inheritance and disabling
 virtual dispatch in constructor delegation, we give class designers
-full control over the state of his constructed instances.  By
+full control over the state of their constructed instances.  By
 preserving virtual dispatch for non-``self``, non-``super`` calls to
 ``init`` methods, we allow Objective-C programmers to keep using the
 patterns that depend on virtual dispatch, including designated

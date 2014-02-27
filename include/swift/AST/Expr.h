@@ -2272,6 +2272,7 @@ public:
   void setBaseTypeErpr(TypeRepr *tyR) { BaseOrType = tyR; }
 
   SourceLoc getLoc() const;
+  SourceLoc getMetatypeLoc() const { return MetatypeLoc; }
 
   SourceRange getSourceRange() const;
 
