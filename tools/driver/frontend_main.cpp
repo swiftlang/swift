@@ -142,9 +142,9 @@ static bool performCompile(CompilerInstance &Instance,
     else
       SM = performSILGeneration(Instance.getMainModule());
 
-    // Link in transparent functions.
-    if (Invocation.getSILOptions().LinkMode > SILOptions::LinkNone)
-      performSILLinking(SM.get(), false);
+    auto LinkMode = Invocation.getSILOptions().LinkMode;
+    if (LinkMode > SILOptions::LinkNone)
+      performSILLinking(SM.get(), LinkMode == SILOptions::LinkAll);
   }
 
   // We've been told to emit SIL after SILGen, so write it now.
@@ -157,10 +157,6 @@ static bool performCompile(CompilerInstance &Instance,
   if (!Invocation.getDiagnosticOptions().SkipDiagnosticPasses &&
       runSILDiagnosticPasses(*SM, Invocation.getSILOptions()))
     return true;
-
-  // Now if we are asked to link all, link all.
-  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM.get(), true);
 
   SM->verify();
 
