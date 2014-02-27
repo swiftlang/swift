@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -138,6 +139,8 @@ public:
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
+  Stmt *walkToStmtPost(Stmt *S) override;
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
@@ -208,6 +211,31 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
   // Pass the rest of the token nodes.
   for (auto &TokNode : TokenNodes)
     passNode(TokNode);
+}
+
+std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
+  if (isa<BraceStmt>(S) && !dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl())) {
+    SourceRange SR = S->getSourceRange();
+    if (SR.isValid()) {
+      // Pass BraceStatement structure node.
+      SyntaxStructureNode SN;
+      SN.Kind = SyntaxStructureKind::BraceStatement;
+      SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                         S->getSourceRange());
+      pushStructureNode(SN);
+    }
+  }
+  return { true, S };
+}
+
+Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
+  if (isa<BraceStmt>(S) && !dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl())) {
+    SourceRange SR = S->getSourceRange();
+    if (SR.isValid())
+      popStructureNode();
+  }
+  return S;
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
