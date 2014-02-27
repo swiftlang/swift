@@ -145,7 +145,7 @@ extension ${Self} : Hashable {
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
 @ elif bits > wordBits:
     var result: Int = 0
-    for var i = 0; i < (sizeof(self) * 8); i += sizeof(Int) * 8 {
+    for var i = 0; i < (sizeof(self) * 8); i += sizeof(Int.self) * 8 {
       result ^= Int(self >> ${Self}(i)) & ~0
     }
     return result
