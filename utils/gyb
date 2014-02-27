@@ -35,14 +35,14 @@ def splitLines(s):
     """
     return [ l + '\n' for l in s.split('\n') ]
     
-# text on a line up to the first '$$', '${', or '@@'
+# text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n@] | \$(?![${]) | @(?!@) )*'
 
 # The part of an '@end' line that follows the '@' sign
 atEndLine = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
 
 ## Note: Where "# Absorb" appears below, the regexp attempts to eat up
-## through the end of ${...} and @{...}@ constructs.  In reality we
+## through the end of ${...} and %{...}% constructs.  In reality we
 ## handle this with the Python tokenizer, which avoids mis-detections
 ## due to nesting, comments and strings.  This extra absorption in the
 ## regexp facilitates testing the regexp on its own, by preventing the
@@ -50,17 +50,17 @@ atEndLine = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
 ## text.
 tokenizeRE = re.compile(
     r'''
-# @-lines and @{...}-blocks
+# %-lines and %{...}-blocks
     # \n? # absorb one preceding newline
     ^
     (?: 
       (?P<atLines>
-        (?P<_indent> [\ \t]* @ (?! [{@] ) [\ \t]* ) (?! [\ \t] | %(atEndLine)s ) .*
-        ( \n (?P=_indent) (?! %(atEndLine)s ) .* ) *
+        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | '''+atEndLine+r''' ) .*
+        ( \n (?P=_indent) (?! '''+atEndLine+r''' ) .* ) *
       )
-      | (?P<atEndLine> [\ \t]* @ [ \t]* %(atEndLine)s )
-      | [\ \t]* (?P<atBlockOpen> @\{  )
-        (?: [^}]| \} (?!@) )* \}@  # Absorb
+      | (?P<atEndLine> [\ \t]* % [ \t]* '''+atEndLine+r''' )
+      | [\ \t]* (?P<atBlockOpen> %\{  )
+        (?: [^}]| \} (?!%) )* \}%  # Absorb
     )
     \n? # absorb one trailing newline
 
@@ -68,22 +68,22 @@ tokenizeRE = re.compile(
 | (?P<substitutionOpen> \$\{ )
   [^}]* \} # Absorb
 
-# @@ and $$ are literal @ and $ respectively
-| (?P<symbol>[$@]) (?P=symbol)
+# %% and $$ are literal % and $ respectively
+| (?P<symbol>[$%]) (?P=symbol)
 
 # Literal text
-| (?P<literal> %(literalText)s
+| (?P<literal> '''+literalText+r'''
     (?: 
-      # newline that doesn't precede space+@
-      (?: \n (?! [\ \t]* @[^@] ) )
-      %(literalText)s
+      # newline that doesn't precede space+%
+      (?: \n (?! [\ \t]* %[^%] ) )
+      '''+literalText+r'''
     )*
     \n?
   )
-''' % globals()
+'''
 , re.VERBOSE|re.MULTILINE)
 
-atBlockClose = re.compile('\}@[ \t]*\n?')
+atBlockClose = re.compile('\}%[ \t]*\n?')
 
 def tokenPosToIndex(tokenPos, start, lineStarts):
     """Translate a tokenize (line, column) pair into an absolute
@@ -153,36 +153,36 @@ def tokenizeTemplate(templateText):
 
     >>> for kind, text, _ in tokenizeTemplate('''
     ... This is $some$ literal stuff containing a ${substitution}
-    ... followed by a @{...} block:
-    ...   @{
+    ... followed by a %{...} block:
+    ...   %{
     ...   # Python code
-    ...   }@
-    ... and here $${are} some @-lines:
-    ...   @ x = 1
-    ...   @ y = 2
-    ...   @ if z == 3:
-    ...   @    print '${hello}'
-    ...   @ end
-    ...   @    for x in zz:
-    ...   @        print x
-    ...     @ # different indentation
-    ... @ twice
-    ... and some lines that literally start with @
-    ... @@ first line
-    ...   @@ second line
+    ...   }%
+    ... and here $${are} some %-lines:
+    ...   % x = 1
+    ...   % y = 2
+    ...   % if z == 3:
+    ...   %    print '${hello}'
+    ...   % end
+    ...   %    for x in zz:
+    ...   %        print x
+    ...     % # different indentation
+    ... % twice
+    ... and some lines that literally start with %
+    ... %% first line
+    ...   %% second line
     ... '''):
     ...     print (kind, text.strip().split('\n',1)[0])
     ('literal', 'This is $some$ literal stuff containing a')
     ('substitutionOpen', '${')
-    ('literal', 'followed by a @{...} block:')
-    ('atBlockOpen', '@{')
-    ('literal', 'and here ${are} some @-lines:')
-    ('atLines', '@ x = 1')
-    ('atEndLine', '@ end')
-    ('atLines', '@    for x in zz:')
-    ('atLines', '@ # different indentation')
-    ('atLines', '@ twice')
-    ('literal', 'and some lines that literally start with @')
+    ('literal', 'followed by a %{...} block:')
+    ('atBlockOpen', '%{')
+    ('literal', 'and here ${are} some %-lines:')
+    ('atLines', '% x = 1')
+    ('atEndLine', '% end')
+    ('atLines', '%    for x in zz:')
+    ('atLines', '% # different indentation')
+    ('atLines', '% twice')
+    ('literal', 'and some lines that literally start with %')
     """
     pos = 0
     end = len(templateText)
@@ -224,7 +224,7 @@ def splitAtLines(sourceLines):
     r"""Return a list of lines at which to split the incoming source
 
     These positions represent the beginnings of python blocks that
-    will require a matching @end construct if they are to be closed.
+    will require a matching %end construct if they are to be closed.
 
     >>> src = splitLines('''\
     ... if x:
@@ -330,9 +330,9 @@ class ParseContext:
         which baseTokens resumes scanning the underlying text.
 
         >>> ctx = ParseContext('dummy', '''
-        ... @for x in y:
-        ... @    print x
-        ... @ end
+        ... %for x in y:
+        ... %    print x
+        ... % end
         ... ''')
         >>> ctx.tokenKind
         'literal'
@@ -359,7 +359,7 @@ class ParseContext:
             # Do we need to close the current block?
             self.closeBlock = kind == 'atEndLine'
 
-            if kind.endswith('Open'): # @{...}@ and ${...} constructs
+            if kind.endswith('Open'): # %{...}% and ${...} constructs
 
                 # Tokenize text that follows as Python up to an unmatched '}'
                 codeStart = m.end(kind)
@@ -371,7 +371,7 @@ class ParseContext:
                 yield kind
 
                 if (kind == 'atBlockOpen'):
-                    # Absorb any '}@ <optional-comment> \n'
+                    # Absorb any '}% <optional-comment> \n'
                     m2 = atBlockClose.match(self.template, closePos)
                     assert m2, "Invalid block closure" # FIXME: need proper error handling here.
                     nextPos = m2.end(0)
@@ -388,7 +388,7 @@ class ParseContext:
                 codeStartPos = m.end('_indent')
                 indentation = m.group('_indent')
 
-                # Strip off the leading indentation and @-sign
+                # Strip off the leading indentation and %-sign
                 sourceLines = re.split(
                     '^' + re.escape(indentation), 
                     m.group('atLines')+'\n', 
@@ -520,10 +520,10 @@ class Code(ASTNode):
             source, sourceLineCount = accumulateCode()
             
             # Only handle a substitution as part of this code block if
-            # we don't already have some @-lines.
+            # we don't already have some %-lines.
         elif context.tokenKind == 'atBlockOpen':
 
-            # Opening ${...} and @{...}@ constructs
+            # Opening ${...} and %{...}% constructs
             source, sourceLineCount = accumulateCode()
 
         self.code = compile(source, context.filename, evalExec)
@@ -563,9 +563,9 @@ def parseTemplate(filename, text = None):
     If text is supplied, it is assumed to be the contents of the file,
     as a string.
 
-    >>> print parseTemplate('dummy.file', text='''@
-    ... @for x in y:
-    ... @    print y
+    >>> print parseTemplate('dummy.file', text='''%
+    ... %for x in y:
+    ... %    print y
     ... ''')
     Block:
     [
@@ -582,11 +582,11 @@ def parseTemplate(filename, text = None):
         ]
     ]
 
-    >>> print parseTemplate('dummy.file', text='''@
-    ... @if x:
-    ... @    print y
+    >>> print parseTemplate('dummy.file', text='''%
+    ... %if x:
+    ... %    print y
     ... AAAA
-    ... @else:
+    ... %else:
     ... BBBB
     ... ''')
     Block:
@@ -613,12 +613,12 @@ def parseTemplate(filename, text = None):
         ]
     ]
 
-    >>> print parseTemplate('dummy.file', text='''@
-    ... @if x:
-    ... @    print y
+    >>> print parseTemplate('dummy.file', text='''%
+    ... %if x:
+    ... %    print y
     ... AAAA
-    ... @# This is a comment
-    ... @else:
+    ... %# This is a comment
+    ... %else:
     ... BBBB
     ... ''')
     Block:
@@ -647,11 +647,11 @@ def parseTemplate(filename, text = None):
     ]
 
     >>> print parseTemplate('dummy.file', text='''\
-    ... @for x in y:
+    ... %for x in y:
     ... AAAA
-    ... @if x:
+    ... %if x:
     ... BBBB
-    ... @end
+    ... %end
     ... CCCC
     ... ''')
     Block:
@@ -692,11 +692,11 @@ def executeTemplate(ast, **localBindings):
 Keyword arguments become local variable bindings in the execution context
 
     >>> ast = parseTemplate('dummy.file', text=
-    ... '''@ if x:
-    ... @    for i in range(3):
+    ... '''% if x:
+    ... %    for i in range(3):
     ... ${i}
-    ... @    end
-    ... @ else:
+    ... %    end
+    ... % else:
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
     >>> print executeTemplate(ast, x=1)
@@ -718,46 +718,46 @@ if __name__ == '__main__':
 
       - Literal text which is inserted directly into the output
     
-      - @@ or $$ in literal text, which insert literal '@' and '$'
+      - %% or $$ in literal text, which insert literal '%' and '$'
         symbols respectively.
 
       - Substitutions of the form ${<python-expression>}.  The Python
         expression is converted to a string and the result is inserted
         into the output.
 
-      - Python code delimited by @{...}@.  Typically used to inject
+      - Python code delimited by %{...}%.  Typically used to inject
         definitions (functions, classes, variable bindings) into the
         evaluation context of the template.  Common indentation is
         stripped, so you can add as much indentation to the beginning
         of this code as you like
 
       - Lines beginning with optional whitespace followed by a single
-        '@' and Python code.  @-lines allow you to nest other
+        '%' and Python code.  %-lines allow you to nest other
         constructs inside them.  To close a level of nesting, use the
-        "@end" construct.
+        "%end" construct.
 
       - Lines beginning with optional whitespace and followed by a
-        single '@' and the token "end", which close open constructs in
-        @-lines.
+        single '%' and the token "end", which close open constructs in
+        %-lines.
 
     Example template:
 
           - Hello -
-        @{
+        %{
              x = 42
              def succ(a): 
                  return a+1
-        }@
+        }%
 
         I can assure you that ${x} < ${succ(x)}
 
-        @ if int(y) > 7:
-        @    for i in range(3):
+        % if int(y) > 7:
+        %    for i in range(3):
         y is greater than seven!
-        @    end
-        @ else:
+        %    end
+        % else:
         y is less than or equal to seven
-        @ end
+        % end
 
           - The End. -
 
