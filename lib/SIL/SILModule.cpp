@@ -25,7 +25,7 @@ namespace swift {
   public:
     unsigned NumTypes;
     SILType Types[1];  // Actually variable sized.
-    
+
     void Profile(llvm::FoldingSetNodeID &ID) const {
       for (unsigned i = 0, e = NumTypes; i != e; ++i) {
         ID.AddPointer(Types[i].getOpaqueValue());
@@ -74,7 +74,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   }
   const NormalProtocolConformance *NormalC
     = cast<NormalProtocolConformance>(ParentC);
-  
+
   // If the normal conformance is for a generic type, and we didn't hit a
   // specialized conformance, collect the substitutions from the generic type.
   // FIXME: The AST should do this for us.
@@ -83,17 +83,17 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
       ->gatherAllSubstitutions(NormalC->getDeclContext()->getParentModule(),
                                nullptr);
   }
-  
+
   // Did we already find this?
   auto found = WitnessTableLookupCache.find(NormalC);
   if (found != WitnessTableLookupCache.end())
     return {found->second, Subs};
-  
+
   // If not, search through the witness table list, caching the entries we
   // visit.
   for (SILWitnessTable &WT : witnessTables) {
     WitnessTableLookupCache[WT.getConformance()] = &WT;
-    
+
     if (WT.getConformance() == NormalC)
       return {&WT, Subs};
   }
@@ -135,17 +135,17 @@ ArrayRef<SILType> ValueBase::getTypes() const {
 SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   assert(Types.size() > 1 && "Shouldn't use type list for 0 or 1 types");
   auto UniqueMap = (SILTypeListUniquingType*)TypeListUniquing;
-  
+
   llvm::FoldingSetNodeID ID;
   for (auto T : Types) {
     ID.AddPointer(T.getOpaqueValue());
   }
-  
+
   // If we already have this type list, just return it.
   void *InsertPoint = 0;
   if (SILTypeList *TypeList = UniqueMap->FindNodeOrInsertPos(ID, InsertPoint))
     return TypeList;
-  
+
   // Otherwise, allocate a new one.
   void *NewListP = BPA.Allocate(sizeof(SILTypeList)+
                                 sizeof(SILType)*(Types.size()-1),
@@ -153,7 +153,7 @@ SILTypeList *SILModule::getSILTypeList(ArrayRef<SILType> Types) const {
   SILTypeList *NewList = new (NewListP) SILTypeList();
   NewList->NumTypes = Types.size();
   std::copy(Types.begin(), Types.end(), NewList->Types);
-  
+
   UniqueMap->InsertNode(NewList, InsertPoint);
   return NewList;
 }
