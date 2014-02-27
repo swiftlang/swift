@@ -1082,9 +1082,16 @@ public:
       break;
     case LookupKind::ValueInDeclContext:
       IsImlicitlyCurriedInstanceMethod =
-          CurrentMethod &&
+          InsideStaticMethod &&
           FD->getDeclContext() == CurrentMethod->getDeclContext() &&
-          InsideStaticMethod && !FD->isStatic();
+          !FD->isStatic();
+      if (!IsImlicitlyCurriedInstanceMethod) {
+        if (auto Init = dyn_cast<Initializer>(CurrDeclContext)) {
+          IsImlicitlyCurriedInstanceMethod =
+              FD->getDeclContext() == Init->getParent() &&
+              !FD->isStatic();
+        }
+      }
       break;
     case LookupKind::EnumElement:
     case LookupKind::Type:

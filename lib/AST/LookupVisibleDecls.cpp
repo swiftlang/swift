@@ -83,7 +83,7 @@ public:
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
   if (auto *FD = dyn_cast<FuncDecl>(Member)) {
     // Can not call static functions on non-metatypes.
-    if (!(LS.isQualified() && LS.isOnMetatype()) && FD->isStatic())
+    if (!LS.isOnMetatype() && FD->isStatic())
       return false;
 
     // Otherwise, either call a function or curry it.
@@ -95,7 +95,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
       return false;
 
     // Can not use instance properties on metatypes.
-    if (LS.isQualified() && LS.isOnMetatype() && !VD->isStatic())
+    if (LS.isOnMetatype() && !VD->isStatic())
       return false;
 
     return true;
@@ -614,6 +614,14 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     const ValueDecl *MetaBaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
+    auto LS = LookupState::makeUnqalified();
+
+    // Skip initializer contexts, we will not find any declarations there.
+    if (isa<Initializer>(DC)) {
+      DC = DC->getParent();
+      LS = LS.withOnMetatype();
+    }
+
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
@@ -661,8 +669,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
 
     if (BaseDecl) {
-      ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC,
-                                 LookupState::makeUnqalified(), Reason,
+      ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver);
     }
 
