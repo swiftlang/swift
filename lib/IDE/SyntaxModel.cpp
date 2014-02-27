@@ -182,6 +182,15 @@ CharSourceRange charSourceRangeFromSourceRange(const SourceManager &SM,
   return CharSourceRange(SM, SR.Start, SRE);
 }
 
+CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
+                                                    const SourceRange &SR) {
+  if (SR.isInvalid())
+    return CharSourceRange();
+
+  SourceLoc SRS = Lexer::getLocForEndOfToken(SM, SR.Start);
+  return CharSourceRange(SM, SRS, (SR.End != SR.Start) ? SR.End : SRS);
+}
+
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
@@ -235,6 +244,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       else
         SN.Kind = SyntaxStructureKind::FreeFunction;
       SN.Range = charSourceRangeFromSourceRange(SM, AFD->getSourceRange());
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                     AFD->getBodySourceRange());
       SourceLoc NRStart = AFD->getNameLoc();
       SourceLoc NREnd = NRStart.getAdvancedLoc(AFD->getName().getLength());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -246,6 +257,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SyntaxStructureNode SN;
     SN.Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
     SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, NTD->getBraces());
     SourceLoc NRStart = NTD->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
@@ -269,6 +281,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       else
         SR = VD->getSourceRange();
       SN.Range = charSourceRangeFromSourceRange(SM, SR);
+      if (VD->hasAccessorFunctions())
+        SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                           VD->getBracesRange());
       SourceLoc NRStart = VD->getNameLoc();
       SourceLoc NREnd = NRStart.getAdvancedLoc(VD->getName().getLength());
       SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
