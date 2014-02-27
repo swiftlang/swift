@@ -138,12 +138,9 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   skipUntil(tok::eof);
 }
 
-static void unwrapIfDiscardedClosure(Parser &P,
-                                     ASTNode &Result) {
+static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
   // If we parsed a bare closure as an expression, it will be a discarded value
   // expression and the type checker will complain.
-  //
-  // Instead, recover by unwrapping the BraceStmt that is contained inside.
 
   if (isa<AbstractClosureExpr>(P.CurDeclContext))
     // Inside a closure expression, an expression which syntactically looks
@@ -157,9 +154,7 @@ static void unwrapIfDiscardedClosure(Parser &P,
         // Parameters are explicitly specified, and could be used in the body,
         // don't attempt recovery.
         return;
-      auto *BS = CE->getBody();
-      Result = BS;
-      P.diagnose(BS->getLBraceLoc(), diag::brace_stmt_invalid);
+      P.diagnose(CE->getBody()->getLBraceLoc(), diag::brace_stmt_invalid);
     }
   }
 }
@@ -314,7 +309,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                  Result.is<Stmt*>() ? diag::illegal_top_level_stmt
                                     : diag::illegal_top_level_expr);
       }
-      unwrapIfDiscardedClosure(*this, Result);
+      diagnoseDiscardedClosure(*this, Result);
       if (!Result.isNull()) {
         auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
         
@@ -334,7 +329,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       BraceItemsStatus |= ExprOrStmtStatus;
       if (ExprOrStmtStatus.isError())
         NeedParseErrorRecovery = true;
-      unwrapIfDiscardedClosure(*this, Result);
+      diagnoseDiscardedClosure(*this, Result);
       if (ExprOrStmtStatus.isSuccess() && IsTopLevel) {
         // If this is a normal library, you can't have expressions or statements
         // outside at the top level.
