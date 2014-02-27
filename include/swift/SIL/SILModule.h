@@ -48,7 +48,7 @@ namespace swift {
   namespace Lowering {
     class SILGenModule;
   }
-  
+
 /// \brief A stage of SIL processing.
 enum class SILStage {
   /// \brief "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
@@ -57,7 +57,7 @@ enum class SILStage {
   /// Raw SIL does not have fully-constructed SSA and may contain undiagnosed
   /// dataflow errors.
   Raw,
-  
+
   /// \brief Canonical SIL, which has been run through at least the guaranteed
   /// optimization and diagnostic passes.
   ///
@@ -75,7 +75,7 @@ public:
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
-  
+
 private:
   friend class SILBasicBlock;
   friend class SILFunction;
@@ -93,20 +93,20 @@ private:
 
   /// The swift Module associated with this SILModule.
   Module *TheSwiftModule;
-  
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
-  
+
   /// The list of SILVTables in the module.
   VTableListType vtables;
-  
+
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
-  
+
   /// The list of SILGlobalVariables in the module.
   /// FIXME: Merge with 'globals'.
   GlobalListType silGlobals;
-  
+
   /// The collection of global variables used in the module.
   /// FIXME: Remove this when SILGlobalVariable is ready.
   llvm::SetVector<VarDecl*> globals;
@@ -116,11 +116,11 @@ private:
 
   /// Lookup table for SIL global variables.
   llvm::StringMap<SILGlobalVariable*> GlobalVariableTable;
-  
+
   /// Lookup cache for SIL witness tables.
   llvm::DenseMap<const NormalProtocolConformance*,SILWitnessTable*>
     WitnessTableLookupCache;
-  
+
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
@@ -141,11 +141,11 @@ private:
 
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;
-  
+
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(Module *M);
-  
+
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
@@ -157,7 +157,7 @@ public:
 
   /// \brief This converts Swift types to SILTypes.
   Lowering::TypeConverter Types;
-  
+
   /// Look up the TypeLowering for a SILType.
   const Lowering::TypeLowering &getTypeLowering(SILType t) {
     return Types.getTypeLowering(t);
@@ -211,7 +211,7 @@ public:
   static std::unique_ptr<SILModule> createEmptyModule(Module *M) {
     return std::unique_ptr<SILModule>(new SILModule(M));
   }
-  
+
   /// Get the Swift module associated with this SIL module.
   Module *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
@@ -220,10 +220,10 @@ public:
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
   // FIXME: Remove these when SILGlobalVariable is ready to take over.
-  
+
   using global_iterator = decltype(globals)::const_iterator;
   using GlobalRange = Range<global_iterator>;
-  
+
   /// Returns the set of global variables in this module.
   GlobalRange getGlobals() const {
     return {globals.begin(), globals.end()};
@@ -234,7 +234,7 @@ public:
   global_iterator global_end() const {
     return globals.end();
   }
-  
+
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
   FunctionListType &getFunctionList() { return functions; }
@@ -248,7 +248,7 @@ public:
   Range<const_iterator> getFunctions() const {
     return {functions.begin(), functions.end()};
   }
-  
+
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
   VTableListType &getVTableList() { return vtables; }
@@ -276,7 +276,7 @@ public:
   Range<witness_table_const_iterator> getWitnessTables() const {
     return {witnessTables.begin(), witnessTables.end()};
   }
-  
+
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;
   GlobalListType &getSILGlobalList() { return silGlobals; }
@@ -316,16 +316,16 @@ public:
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent);
-  
+
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.
   std::pair<SILWitnessTable *, ArrayRef<Substitution>>
   lookUpWitnessTable(const ProtocolConformance *C);
-  
+
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
-  
+
   /// \brief Advance the module to a further stage of processing.
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
@@ -341,7 +341,7 @@ public:
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
-  
+
   /// Pretty-print the module.
   void dump() const;
 
@@ -358,7 +358,7 @@ public:
   void *allocate(unsigned Size, unsigned Align) const {
     if (getASTContext().LangOpts.UseMalloc)
       return AlignedAlloc(Size, Align);
-    
+
     return BPA.Allocate(Size, Align);
   }
 
@@ -375,7 +375,7 @@ public:
   /// declaration is not a builtin.
   const BuiltinInfo &getBuiltinInfo(Identifier ID);
 };
-  
+
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
   M.print(OS);
   return OS;
