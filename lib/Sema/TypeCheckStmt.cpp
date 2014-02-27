@@ -88,7 +88,16 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        assert(CE->getParent() == ParentDC);
+        if (CE->getParent() != ParentDC) {
+          // If a closure is nested within an auto closure, we'll need to update
+          // its parent to the auto closure parent.
+          if (ParentDC->getContextKind() ==
+                DeclContextKind::AbstractClosureExpr) {
+            CE->setParent(ParentDC);
+          } else {
+            llvm_unreachable("Incorrect parent decl context for closure");
+          }
+        }
 
         // If the closure has a single expression body, we need to
         // walk into it with a new sequence.  Otherwise, it'll have

@@ -2045,6 +2045,9 @@ public:
     body.setPointer(S);
     body.setInt(isSingleExpression);
   }
+  
+  // Expose this to users.
+  using DeclContext::setParent;
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.

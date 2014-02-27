@@ -102,6 +102,7 @@ class alignas(8) DeclContext {
   void setParent(DeclContext *parent) { ParentAndKind.setPointer(parent); }
   friend class Initializer; // uses setParent
   friend class AutoClosureExpr; // uses setParent
+  friend class ClosureExpr; // uses setParent
   
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
