@@ -21,22 +21,6 @@
 
 // Note: This file is #included in assembly files.
 
-// XXX FIXME -- we need to clean this up when the project isn't a secret.
-// Allocation cache layout.
-// This uses slots in pthread direct tsd. There are 256 slots. 
-// Most of the first 128 are reserved for OS use. 
-// The last 128 are unused except on iOS Simulator.
-// We store two caches in these unused slots.
-#define ALLOC_CACHE_COUNT 64
-#define ALLOC_CACHE_START 128
-#define ALLOC_RAW_CACHE_START (ALLOC_CACHE_START + ALLOC_CACHE_COUNT)
-
-#ifdef __LP64__
-# define SWIFT_TSD_RAW_ALLOC_BASE (ALLOC_RAW_CACHE_START*8)
-#else
-# define SWIFT_TSD_RAW_ALLOC_BASE (ALLOC_RAW_CACHE_START*4)
-#endif
-
 #define RC_OFFSET 0x8
 #define RC_INTERVAL 4
 #define RC_MASK 0xfffffffc

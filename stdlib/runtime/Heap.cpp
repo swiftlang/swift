@@ -17,8 +17,10 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <cassert>
+#include <pthread.h>
 
 using namespace swift;
 
@@ -43,9 +45,23 @@ malloc_zone_t _swift_zone = {
   NULL, // XXX -- add support for pressure_relief?
 };
 
+extern "C" pthread_key_t _swift_alloc_offset = -1;
+
 __attribute__((constructor))
 static void registerZone() {
+  assert(sizeof(pthread_key_t) == sizeof(long));
   malloc_zone_register(&_swift_zone);
+  pthread_key_t key, prev_key;
+  int r = pthread_key_create(&key, NULL);
+  assert(r == 0);
+  prev_key = key;
+  _swift_alloc_offset = key;
+  for (unsigned i = 0; i < 64; i++) {
+    int r = pthread_key_create(&key, NULL);
+    assert(r == 0);
+    assert(key == prev_key + 1);
+    prev_key = key;
+  }
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
