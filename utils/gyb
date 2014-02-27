@@ -699,7 +699,7 @@ Keyword arguments become local variable bindings in the execution context
     ... % else:
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
-    >>> print executeTemplate(ast, x=1)
+    >>> print executeTemplate(ast, x=1),
     0
     1
     2
