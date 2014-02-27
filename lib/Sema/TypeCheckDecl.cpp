@@ -3972,10 +3972,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  // Only classes can be IBLiveViews.
-  if (Attrs.isIBLiveView() && !isa<ClassDecl>(D)) {
-    TC.diagnose(Attrs.getLoc(AK_IBLiveView), diag::invalid_ibliveview_decl);
-    D->getMutableAttrs().clearAttribute(AK_IBLiveView);
+  // Only classes can be marked with 'IBDesignable'.
+  if (Attrs.isIBDesignable() && !isa<ClassDecl>(D)) {
+    TC.diagnose(Attrs.getLoc(AK_IBDesignable), diag::invalid_ibdesignable_decl);
+    D->getMutableAttrs().clearAttribute(AK_IBDesignable);
     return;
   }
 

@@ -79,7 +79,7 @@ ATTR(requires_stored_property_inits)
 
 IB_ATTR(IBOutlet)
 IB_ATTR(IBAction)
-IB_ATTR(IBLiveView)
+IB_ATTR(IBDesignable)
 IB_ATTR(IBInspectable)
 
 // "Virtual" attributes can not be spelled in the source code.

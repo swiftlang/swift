@@ -1840,12 +1840,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBLiveView, attrRequiresStoredPropertyInits;
+    bool isImplicit, isObjC, isIBDesignable, attrRequiresStoredPropertyInits;
     bool requiresStoredPropertyInits;
     TypeID superclassID;
     unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, isObjC, isIBLiveView,
+                                         isImplicit, isObjC, isIBDesignable,
                                          resilienceKind,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
@@ -1895,8 +1895,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setGenericSignature(sig);
     }
     theClass->setIsObjC(isObjC);
-    if (isIBLiveView)
-      theClass->getMutableAttrs().setAttr(AK_IBLiveView, SourceLoc());
+    if (isIBDesignable)
+      theClass->getMutableAttrs().setAttr(AK_IBDesignable, SourceLoc());
     theClass->computeType();
 
     CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();

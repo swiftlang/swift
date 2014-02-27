@@ -580,7 +580,7 @@ namespace decls_block {
     DeclIDField,       // context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // IBLiveView?
+    BCFixed<1>,        // IBDesignable?
     BCFixed<2>,        // Resilience kind
     BCFixed<1>,        // requires stored property initial values (attribute)
     BCFixed<1>,        // requires stored property initial values

@@ -1303,7 +1303,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
     checkAllowedAttributes<
-      AK_IBLiveView, AK_objc, AK_resilient, AK_fragile,
+      AK_IBDesignable, AK_objc, AK_resilient, AK_fragile,
       AK_born_fragile, AK_requires_stored_property_inits>(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1314,7 +1314,7 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclRef(DC),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->getAttrs().isIBLiveView(),
+                            theClass->getAttrs().isIBDesignable(),
                             (unsigned)theClass->getAttrs().getResilienceKind(),
                             theClass->getAttrs().requiresStoredPropertyInits(),
                             theClass->requiresStoredPropertyInits(),
