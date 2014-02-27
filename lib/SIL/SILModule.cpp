@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILExternalSource.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -41,9 +42,45 @@ void SILExternalSource::anchor() {
 /// SILModule that these things are uniqued into.
 typedef llvm::FoldingSet<SILTypeList> SILTypeListUniquingType;
 
+class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
+  void didDeserialize(Module *M, SILFunction *fn) override {
+    updateLinkage(fn);
+  }
+
+  void didDeserialize(Module *M, SILGlobalVariable *var) override {
+    updateLinkage(var);
+  }
+
+  void didDeserialize(Module *M, SILVTable *vtable) override {
+    // TODO: should vtables get linkage?
+    //updateLinkage(vtable);
+  }
+
+  template <class T> void updateLinkage(T *decl) {
+    switch (decl->getLinkage()) {
+    case SILLinkage::Public:
+      decl->setLinkage(SILLinkage::PublicExternal);
+      return;
+    case SILLinkage::Hidden:
+      decl->setLinkage(SILLinkage::HiddenExternal);
+      return;
+    case SILLinkage::Shared:
+      decl->setLinkage(SILLinkage::Shared);
+    case SILLinkage::Private: // ?
+    case SILLinkage::PublicExternal:
+    case SILLinkage::HiddenExternal:
+      return;
+    }
+  }
+};
+
 SILModule::SILModule(Module *SwiftModule)
-  : TheSwiftModule(SwiftModule), Stage(SILStage::Raw), Types(*this) {
+  : TheSwiftModule(SwiftModule), Stage(SILStage::Raw),
+    Callback(new SILModule::SerializationCallback()), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
+  SILLoader = SerializedSILLoader::create(getASTContext(), this,
+                                          Callback.get());
+
 }
 
 SILModule::~SILModule() {

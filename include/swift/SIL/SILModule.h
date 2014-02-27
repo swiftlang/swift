@@ -44,6 +44,7 @@ namespace swift {
   class SILTypeList;
   class SILUndef;
   class SourceFile;
+  class SerializedSILLoader;
 
   namespace Lowering {
     class SILGenModule;
@@ -86,6 +87,7 @@ private:
   friend class SILWitnessTable;
   friend class Lowering::SILGenModule;
   friend class Lowering::TypeConverter;
+  class SerializationCallback;
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
@@ -138,6 +140,12 @@ private:
 
   /// The stage of processing this module is at.
   SILStage Stage;
+
+  /// The callback used by the SILLoader.
+  std::unique_ptr<SerializationCallback> Callback;
+
+  /// The SILLoader used when linking functions into this module.
+  SerializedSILLoader *SILLoader;
 
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;
