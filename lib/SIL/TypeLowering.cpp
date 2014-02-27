@@ -980,6 +980,10 @@ namespace {
                                                   elt, nullptr,
                                                   elt->getArgumentType())
           ->getCanonicalType();
+        
+        if (eltType == enumType)
+          continue;
+        
         auto &lowering = TC.getTypeLowering(eltType);
         if (lowering.isAddressOnly())
           return handleAddressOnly(enumType);
@@ -1101,7 +1105,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     auto &substElt = substType->getFields()[i];
     loweredElts.push_back(substElt.getWithType(loweredSubstEltType));
   }
-
+  
   if (!changed) return substType;
 
   // Because we're transforming an existing tuple, the weird corner

@@ -193,6 +193,16 @@ class alignas(8) Decl {
   enum { NumVarDeclBits = NumValueDeclBits + 3 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
   
+  class EnumElementDeclBitfields {
+    friend class EnumElementDecl;
+    unsigned : NumValueDeclBits;
+    
+    /// \brief Whether this element is currently being validated.
+    unsigned InValidation: 1;
+  };
+  enum { NumEnumElementDeclBits = NumValueDeclBits + 1 };
+  static_assert(NumEnumElementDeclBits <= 32, "fits in an unsigned");
+  
   class AbstractFunctionDeclBitfields {
     friend class AbstractFunctionDecl;
     unsigned : NumValueDeclBits;
@@ -353,6 +363,7 @@ protected:
     ValueDeclBitfields ValueDeclBits;
     AbstractFunctionDeclBitfields AbstractFunctionDeclBits;
     VarDeclBitfields VarDeclBits;
+    EnumElementDeclBitfields EnumElementDeclBits;
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
@@ -3488,7 +3499,9 @@ public:
     ArgumentType(ArgumentType),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
-  {}
+  {
+    EnumElementDeclBits.InValidation = false;
+  }
 
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
@@ -3508,6 +3521,13 @@ public:
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
     return cast<EnumDecl>(getDeclContext());
+  }
+  
+  bool getInValidation() {
+    return EnumElementDeclBits.InValidation;
+  }
+  void setInValidation(bool isBeingValidated) {
+    EnumElementDeclBits.InValidation = isBeingValidated;
   }
   
   SourceLoc getStartLoc() const {

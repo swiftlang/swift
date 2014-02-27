@@ -2991,30 +2991,40 @@ public:
     if (IsSecondPass || EED->hasType())
       return;
 
-    validateAttributes(TC, EED);
-
     EnumDecl *ED = EED->getParentEnum();
     Type ElemTy = ED->getDeclaredTypeInContext();
-
-    if (!EED->getArgumentTypeLoc().isNull())
+    
+    // Only attempt to validate the argument type or raw value if the element
+    // is not currenly being validated.
+    if (!EED->getInValidation()) {
+      EED->setInValidation(true);
+      
+      validateAttributes(TC, EED);
+      
+      if (!EED->getArgumentTypeLoc().isNull())
       if (TC.validateType(EED->getArgumentTypeLoc(), EED->getDeclContext())) {
         EED->overwriteType(ErrorType::get(TC.Context));
+        EED->setInValidation(false);
         EED->setInvalid();
         return;
       }
-
-    // Check the raw value, if we have one.
-    if (auto *rawValue = EED->getRawValueExpr()) {
-      Type rawTy;
-      if (ED->hasRawType()) {
-        rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-      } else {
-        TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
-        // Recover by setting the raw type as this element's type.
+      
+      // Check the raw value, if we have one.
+      if (auto *rawValue = EED->getRawValueExpr()) {
+        
+        Type rawTy;
+        if (ED->hasRawType()) {
+          rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+        } else {
+          TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
+          // Recover by setting the raw type as this element's type.
+        }
+        Expr *typeCheckedExpr = rawValue;
+        if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, false))
+          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
       }
-      Expr *typeCheckedExpr = rawValue;
-      if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, false))
-        EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+      
+      EED->setInValidation(false);
     }
 
     // If we have a simple element, just set the type.
