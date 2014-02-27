@@ -317,6 +317,13 @@ void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
                                   Identifier name,
                                   NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &result) const {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  // If this import is specific to some named type or decl ("import Swift.int")
+  // then filter out any lookups that don't match.
+  if (accessPath.size() == 1 && accessPath.front().first != Name)
+    return;
+
   if (name == DerivedDecl->getName())
     result.push_back(DerivedDecl);
 }
@@ -324,6 +331,14 @@ void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
 void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
+  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
+
+  // If this import is specific to some named type or decl ("import Swift.int")
+  // then filter out any lookups that don't match.
+  if (accessPath.size() == 1 &&
+      accessPath.front().first != DerivedDecl->getName())
+    return;
+
   consumer.foundDecl(DerivedDecl, DeclVisibilityKind::VisibleAtTopLevel);
 }
 
