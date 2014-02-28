@@ -731,7 +731,13 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
 /// folding set node ID.
 static void profileArchetypeConstraints(ArchetypeType *arch,
                                         llvm::FoldingSetNodeID &ID,
+                                        llvm::DenseSet<ArchetypeType*> &seen,
                                         unsigned depth = 0) {
+  if (!seen.insert(arch).second) {
+    ID.AddPointer(arch);
+    return;
+  }
+  
   // Is the archetype class-constrained?
   ID.AddBoolean(arch->requiresClass());
   
@@ -748,19 +754,21 @@ static void profileArchetypeConstraints(ArchetypeType *arch,
   
   // Recursively profile nested archetypes.
   for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(nested.second, ID, depth + 1);
+    profileArchetypeConstraints(nested.second, ID, seen, depth + 1);
   }
 }
 
 void ExemplarArchetype::Profile(llvm::FoldingSetNodeID &ID) const {
-  profileArchetypeConstraints(Archetype, ID);
+  llvm::DenseSet<ArchetypeType*> seen;
+  profileArchetypeConstraints(Archetype, ID, seen);
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Check the folding set to see whether we already have an exemplar matching
   // this archetype.
   llvm::FoldingSetNodeID ID;
-  profileArchetypeConstraints(t, ID);
+  llvm::DenseSet<ArchetypeType*> seen;
+  profileArchetypeConstraints(t, ID, seen);
   void *insertPos;
   ExemplarArchetype *existing
     = Types.ExemplarArchetypes.FindNodeOrInsertPos(ID, insertPos);
