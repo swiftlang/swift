@@ -41,9 +41,7 @@ static StringRef getNodeKindString(swift::Demangle::Node::Kind k) {
 static void printNode(llvm::raw_ostream &out, const Node *node,
                       unsigned depth) {
   // Indent two spaces per depth.
-  for (unsigned i = 0; i < depth; i++) {
-    out << "  ";
-  }
+  out.indent(depth * 2);
   out << "kind=" << getNodeKindString(node->getKind());
   if (node->hasText()) {
     out << ", text=\"" << node->getText() << '\"';
@@ -63,6 +61,26 @@ void Node::dump() const {
 
 void Node::print(llvm::raw_ostream &out) const {
   printNode(out, this, 0);
+}
+
+namespace {
+  /// A pretty-stack-trace node for demangling trees.
+  class PrettyStackTraceNode : public llvm::PrettyStackTraceEntry {
+    const char *Action;
+    Node *TheNode;
+  public:
+    PrettyStackTraceNode(const char *action, Node *node)
+      : Action(action), TheNode(node) {}
+    void print(llvm::raw_ostream &out) const override {
+      out << "While " << Action << ' ';
+      if (!TheNode) {
+        out << "<<null demangling node>>\n";
+      } else {
+        out << "demangling tree:\n";
+        printNode(out, TheNode, 4);
+      }
+    }
+  };
 }
 
 Node::~Node() {
@@ -186,6 +204,13 @@ public:
     return true;
   }
 
+  /// Claim the next few characters if they exactly match the given string.
+  bool nextIf(StringRef str) {
+    if (!Text.startswith(str)) return false;
+    advanceOffset(str.size());
+    return true;
+  }
+
   /// Return the next len characters without claiming them.  Asserts
   /// that there are at least so many characters.
   StringRef slice(size_t len) { return Text.substr(0, len); }
@@ -245,8 +270,9 @@ public:
       Mangled.advanceOffset(2);
     }
     
-    if (!demangleGlobal())
-      return false;
+    NodePointer global = demangleGlobal();
+    if (!global) return failure();
+    appendNode(std::move(global));
 
     // Add a suffix node if there's anything left unmangled.
     if (!Mangled.isEmpty()) {
@@ -274,6 +300,23 @@ private:
     return appendNode(Node::create(k, std::move(t)));
   }
 
+/// Try to demangle a child node of the given kind.  If that fails,
+/// return; otherwise add it to the parent.
+#define DEMANGLE_CHILD_OR_RETURN(PARENT, CHILD_KIND) do { \
+    auto _node = demangle##CHILD_KIND();                  \
+    if (!_node) return nullptr;                           \
+    (PARENT)->addChild(std::move(_node));                 \
+  } while (false)
+
+/// Try to demangle a child node of the given kind.  If that fails,
+/// return; otherwise add it to the parent.
+#define DEMANGLE_CHILD_AS_NODE_OR_RETURN(PARENT, CHILD_KIND) do {  \
+    auto _kind = demangle##CHILD_KIND();                           \
+    if (_kind == CHILD_KIND::Unknown) return nullptr;              \
+    (PARENT)->addChild(Node::create(Node::Kind::CHILD_KIND,        \
+                                    toString(_kind)));             \
+  } while (false)
+
   enum class IsProtocol {
     yes = true, no = false
   };
@@ -283,18 +326,19 @@ private:
   };
 
   enum class Directness {
-    Direct, Indirect, Unkown
+    Unknown = 0, Direct, Indirect
   };
 
-  const char *toString(Directness d) {
+  StringRef toString(Directness d) {
     switch (d) {
     case Directness::Direct:
       return "direct";
     case Directness::Indirect:
       return "indirect";
-    default:
-      return "unknown";
+    case Directness::Unknown:
+      llvm_unreachable("shouldn't toString an unknown directness");
     }
+    llvm_unreachable("bad directness");
   }
 
   bool failure() {
@@ -307,7 +351,7 @@ private:
       return Directness::Direct;
     if (Mangled.nextIf('i'))
       return Directness::Indirect;
-    return Directness::Unkown;
+    return Directness::Unknown;
   }
 
   bool demangleNatural(Node::IndexType &num) {
@@ -360,7 +404,7 @@ private:
     Unknown
   };
 
-  const char *toString(ValueWitnessKind k) {
+  StringRef toString(ValueWitnessKind k) {
     switch (k) {
     case ValueWitnessKind::AllocateBuffer:
       return "allocateBuffer";
@@ -396,9 +440,10 @@ private:
       return "getEnumTag";
     case ValueWitnessKind::InplaceProjectEnumData:
       return "inplaceProjectEnumData";
-    default:
-      return "unknown";
+    case ValueWitnessKind::Unknown:
+      llvm_unreachable("stringifying the unknown value witness kind?");
     }
+    llvm_unreachable("bad value witness kind");
   }
 
   ValueWitnessKind demangleValueWitnessKind() {
@@ -445,155 +490,129 @@ private:
     return ValueWitnessKind::Unknown;
   }
 
-  bool demangleGlobal() {
+  NodePointer demangleGlobal() {
     if (!Mangled)
-      return failure();
+      return nullptr;
+
+    // Type metadata.
     if (Mangled.nextIf('M')) {
       if (Mangled.nextIf('P')) {
-        Directness d = demangleDirectness();
-        if (d == Directness::Unkown)
-          return failure();
-        NodePointer type = demangleType();
-        if (!type)
-          return failure();
-        appendNode(Node::Kind::Directness, toString(d));
-        appendNode(Node::Kind::GenericTypeMetadataPattern)->addChild(type);
-        return true;
+        auto pattern = Node::create(Node::Kind::GenericTypeMetadataPattern);
+        DEMANGLE_CHILD_AS_NODE_OR_RETURN(pattern, Directness);
+        DEMANGLE_CHILD_OR_RETURN(pattern, Type);
+        return pattern;
       }
       if (Mangled.nextIf('m')) {
-        NodePointer type = demangleType();
-        if (!type)
-          return failure();
-        appendNode(Node::Kind::Metaclass)->addChild(type);
-        return true;
+        auto metaclass = Node::create(Node::Kind::Metaclass);
+        DEMANGLE_CHILD_OR_RETURN(metaclass, Type);
+        return metaclass;
       }
       if (Mangled.nextIf('n')) {
-        NodePointer type = demangleType();
-        if (!type)
-          return failure();
-        appendNode(Node::Kind::NominalTypeDescriptor)->addChild(type);
-        return true;
+        auto nominalType = Node::create(Node::Kind::NominalTypeDescriptor);
+        DEMANGLE_CHILD_OR_RETURN(nominalType, Type);
+        return nominalType;
       }
-      Directness d = demangleDirectness();
-      appendNode(Node::Kind::Directness, toString(d));
-      NodePointer type = demangleType();
-      if (!type)
-        return failure();
-      appendNode(Node::Kind::TypeMetadata)->addChild(type);
-      return true;
+      auto metadata = Node::create(Node::Kind::TypeMetadata);
+      DEMANGLE_CHILD_AS_NODE_OR_RETURN(metadata, Directness);
+      DEMANGLE_CHILD_OR_RETURN(metadata, Type);
+      return metadata;
     }
+
+    // Top-level types, for various consumers.
     if (Mangled.nextIf('t')) {
-      NodePointer type = demangleType();
-      if (!type)
-        return failure();
-      appendNode(type);
-      return true;
+      return demangleType();
     }
+
+    // Value witnesses.
     if (Mangled.nextIf('w')) {
       ValueWitnessKind w = demangleValueWitnessKind();
       if (w == ValueWitnessKind::Unknown)
-        return failure();
-      NodePointer type = demangleType();
-      if (!type)
-        return failure();
-      appendNode(Node::Kind::ValueWitnessKind, toString(w))->addChild(type);
-      return true;
+        return nullptr;
+      auto witness = Node::create(Node::Kind::ValueWitness, toString(w));
+      DEMANGLE_CHILD_OR_RETURN(witness, Type);
+      return witness;
     }
+
+    // Offsets, value witness tables, and protocol witnesses.
     if (Mangled.nextIf('W')) {
       if (Mangled.nextIf('V')) {
-        NodePointer type = demangleType();
-        if (!type)
-          return failure();
-        appendNode(Node::Kind::ValueWitnessTable)->addChild(type);
-        return true;
+        auto witnessTable = Node::create(Node::Kind::ValueWitnessTable);
+        DEMANGLE_CHILD_OR_RETURN(witnessTable, Type);
+        return witnessTable;
       }
       if (Mangled.nextIf('o')) {
-        bool entity_ok = demangleEntity(appendNode(Node::Kind::WitnessTableOffset));
-        if (!entity_ok)
-          return failure();
-        return true;
+        auto witnessTableOffset = Node::create(Node::Kind::WitnessTableOffset);
+        DEMANGLE_CHILD_OR_RETURN(witnessTableOffset, Entity);
+        return witnessTableOffset;
       }
       if (Mangled.nextIf('v')) {
-        Directness d = demangleDirectness();
-        appendNode(Node::Kind::Directness, toString(d));
-        bool entity_ok = demangleEntity(appendNode(Node::Kind::FieldOffset));
-        if (!entity_ok)
-          return failure();
-        return true;
+        auto fieldOffset = Node::create(Node::Kind::FieldOffset);
+        DEMANGLE_CHILD_AS_NODE_OR_RETURN(fieldOffset, Directness);
+        DEMANGLE_CHILD_OR_RETURN(fieldOffset, Entity);
+        return fieldOffset;
       }
       if (Mangled.nextIf('P')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        appendNode(Node::Kind::ProtocolWitnessTable)->addChild(conformance);
-        return true;
+        auto witnessTable = Node::create(Node::Kind::ProtocolWitnessTable);
+        DEMANGLE_CHILD_OR_RETURN(witnessTable, ProtocolConformance);
+        return witnessTable;
       }
       if (Mangled.nextIf('Z')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        appendNode(Node::Kind::LazyProtocolWitnessTableAccessor)->addChild(conformance);
-        return true;
+        auto accessor =
+          Node::create(Node::Kind::LazyProtocolWitnessTableAccessor);
+        DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolConformance);
+        return accessor;
       }
       if (Mangled.nextIf('z')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        appendNode(Node::Kind::LazyProtocolWitnessTableTemplate)->addChild(conformance);
-        return true;
+        auto tableTemplate =
+          Node::create(Node::Kind::LazyProtocolWitnessTableTemplate);
+        DEMANGLE_CHILD_OR_RETURN(tableTemplate, ProtocolConformance);
+        return tableTemplate;
       }
       if (Mangled.nextIf('D')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        appendNode(Node::Kind::DependentProtocolWitnessTableGenerator)->addChild(conformance);
-        return true;
+        auto tableGenerator =
+          Node::create(Node::Kind::DependentProtocolWitnessTableGenerator);
+        DEMANGLE_CHILD_OR_RETURN(tableGenerator, ProtocolConformance);
+        return tableGenerator;
       }
       if (Mangled.nextIf('d')) {
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        appendNode(Node::Kind::DependentProtocolWitnessTableTemplate)->addChild(conformance);
-        return true;
+        auto tableTemplate =
+          Node::create(Node::Kind::DependentProtocolWitnessTableTemplate);
+        DEMANGLE_CHILD_OR_RETURN(tableTemplate, ProtocolConformance);
+        return tableTemplate;
       }
-      return failure();
+      return nullptr;
     }
+
+    // Other thunks.
     if (Mangled.nextIf('T')) {
       if (Mangled.nextIf('b')) {
-        NodePointer type = demangleType();
-        if (!type)
-          return failure();
-        appendNode(Node::Kind::BridgeToBlockFunction)->addChild(type);
-        return true;
+        auto bridge = Node::create(Node::Kind::BridgeToBlockFunction);
+        DEMANGLE_CHILD_OR_RETURN(bridge, Type);
+        return bridge;
       }
       if (Mangled.nextIf('R')) {
-        NodePointer thunk = appendNode(Node::Kind::ReabstractionThunkHelper);
-        return demangleReabstractSignature(thunk);
-      }
-      if (Mangled.nextIf('r')) {
-        NodePointer thunk = appendNode(Node::Kind::ReabstractionThunk);
-        return demangleReabstractSignature(thunk);
-      }
-      if (Mangled.nextIf('W')) {
-        NodePointer thunk = appendNode(Node::Kind::ProtocolWitness);
-
-        NodePointer conformance = demangleProtocolConformance();
-        if (!conformance)
-          return failure();
-        thunk->addChild(std::move(conformance));
-
-        NodePointer entity = demangleEntity();
-        if (!entity)
-          return failure();
-        thunk->addChild(std::move(entity));
-
+        NodePointer thunk = Node::create(Node::Kind::ReabstractionThunkHelper);
+        if (!demangleReabstractSignature(thunk))
+          return nullptr;
         return thunk;
       }
-      return failure();
+      if (Mangled.nextIf('r')) {
+        NodePointer thunk = Node::create(Node::Kind::ReabstractionThunk);
+        if (!demangleReabstractSignature(thunk))
+          return nullptr;
+        return thunk;
+      }
+      if (Mangled.nextIf('W')) {
+        NodePointer thunk = Node::create(Node::Kind::ProtocolWitness);
+        DEMANGLE_CHILD_OR_RETURN(thunk, ProtocolConformance);
+        DEMANGLE_CHILD_OR_RETURN(thunk, Entity);
+        return thunk;
+      }
+      return nullptr;
     }
-    if (!demangleEntity(getRootNode()))
-      return failure();
-    return true;
+
+    // Everything else is just an entity.
+    return demangleEntity();
   }
 
   NodePointer demangleSpecializedAttribute() {
@@ -2185,8 +2204,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   }
   case Node::Kind::FieldOffset: {
+    print(pointer->getChild(0)); // directness
     Printer << "field offset for ";
-    auto entity = pointer->getFirstChild();
+    auto entity = pointer->getChild(1);
     print(entity, /*asContext*/ false,
              /*suppressType*/ !Options.DisplayTypeOfIVarFieldOffset);
     return;
@@ -2213,22 +2233,24 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   }
   case Node::Kind::GenericTypeMetadataPattern:
+    print(pointer->getChild(0)); // directness
     Printer << "generic type metadata pattern for ";
-    print(pointer->getFirstChild());
+    print(pointer->getChild(1));
     return;
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(pointer->getFirstChild());
     return;
   case Node::Kind::TypeMetadata:
+    print(pointer->getChild(0)); // directness
     Printer << "type metadata for ";
-    print(pointer->getFirstChild());
+    print(pointer->getChild(1));
     return;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
-    print(pointer->getFirstChild());
+    print(pointer->getChild(0));
     return;
-  case Node::Kind::ValueWitnessKind:
+  case Node::Kind::ValueWitness:
     Printer << pointer->getText() << " value witness for ";
     print(pointer->getFirstChild());
     return;
@@ -2459,6 +2481,8 @@ std::string Demangle::nodeToString(NodePointer root,
                                    const DemangleOptions &options) {
   if (!root)
     return "";
+
+  PrettyStackTraceNode trace("printing", root.getPtr());
   return NodePrinter(options).printRoot(root.getPtr());
 }
 
