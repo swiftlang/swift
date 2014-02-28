@@ -24,12 +24,12 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(Type Ty,
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty,
                              uint64_t SizeInBytes,
                              uint32_t AlignInBytes,
                              DeclContext *DC)
-  : DeclOrType(Ty.getPointer()),
-    DeclCtx(DC),
+  : DeclOrContext(DC),
+    Type(Ty.getPointer()),
     StorageType(nullptr),
     size(SizeInBytes),
     align(AlignInBytes),
@@ -37,9 +37,10 @@ DebugTypeInfo::DebugTypeInfo(Type Ty,
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, Size size, Alignment align, DeclContext *DC)
-  : DeclOrType(Ty.getPointer()),
-    DeclCtx(DC),
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
+                             DeclContext *DC)
+  : DeclOrContext(DC),
+    Type(Ty.getPointer()),
     StorageType(nullptr),
     size(size),
     align(align),
@@ -54,39 +55,68 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     size = FixTy.getFixedSize();
-    align = FixTy.getBestKnownAlignment();
   } else {
+    // FIXME: Handle NonFixedTypeInfo here or assert that we won't
+    // encounter one.
     size = Size(0);
-    align = Info.getBestKnownAlignment();
   }
+  align = Info.getBestKnownAlignment();
   assert(align.getValue() != 0);
 }
 
-DebugTypeInfo::DebugTypeInfo(Type Ty, const TypeInfo &Info, DeclContext *DC)
-  : DeclOrType(Ty.getPointer()),
-    DeclCtx(DC),
-    DebugScope(nullptr) {
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, const TypeInfo &Info,
+                             DeclContext *DC, SILDebugScope *DS)
+  : DeclOrContext(DC),
+    Type(Ty.getPointer()),
+    DebugScope(DS) {
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                              SILDebugScope *DS)
-  : DeclOrType(Decl),
-    DeclCtx(nullptr),
+  : DeclOrContext(Decl),
     DebugScope(DS) {
+  // Use the sugared version of the type, if there is one.
+  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
+    Type = AliasDecl->getAliasType();
+  else
+    Type = Decl->getType().getPointer();
+
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
                              SILDebugScope *DS)
-  : DeclOrType(Decl),
-    DeclCtx(nullptr),
+  : DeclOrContext(Decl),
     StorageType(nullptr),
     size(size),
     align(align),
     DebugScope(DS)  {
+  // Use the sugared version of the type, if there is one.
+  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
+    Type = AliasDecl->getAliasType();
+  else
+    Type = Decl->getType().getPointer();
+
   assert(align.getValue() != 0);
 }
+
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
+                             const TypeInfo &Info,
+                             SILDebugScope *DS)
+  : DeclOrContext(Decl),
+    DebugScope(DS) {
+  // Use the sugared version of the type, if there is one.
+  if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl)) {
+    Type = AliasDecl->getAliasType();
+    assert(AliasDecl->getType().getPointer() == Ty.getPointer()
+           && "sugared type and override type disagree");
+  } else
+    Type = Ty.getPointer();
+
+  initFromTypeInfo(size, align, StorageType, Info);
+}
+
 
 static bool typesEqual(Type A, Type B) {
   if (A.getPointer() == B.getPointer())
@@ -117,7 +147,8 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const {
 }
 
 void DebugTypeInfo::dump() const {
-  llvm::errs()<<"[Size "<<size.getValue()<<" Alignment "<<align.getValue()<<"] ";
+  llvm::errs() << "[Size " << size.getValue()
+               << " Alignment " << align.getValue()<<"] ";
   if (getDecl())
     getDecl()->dump(llvm::errs());
   else

@@ -464,7 +464,7 @@ public:
 
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(IRBuilder& Builder,
+  void emitDebugVariableDeclaration(IRBuilder &Builder,
                                     StorageType Storage,
                                     DebugTypeInfo Ty,
                                     StringRef Name) {
@@ -2283,7 +2283,12 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                  i->getElementType().getSwiftRValueType(),
                                  dbgname);
   if (IGM.DebugInfo && Decl) {
-    auto DTI = DebugTypeInfo(Decl, type, i->getDebugScope());
+    // Discard any inout or lvalue qualifiers. Since the object itself
+    // is stored in the alloca, emitting it as a reference type would
+    // be wrong.
+    auto DTI = DebugTypeInfo(Decl,
+                             Decl->getType()->getLValueOrInOutObjectType(),
+                             type, i->getDebugScope());
     auto Name = Decl->getName().str();
     emitDebugVariableDeclaration(Builder, addr.getAddress(), DTI, Name);
   }

@@ -32,58 +32,55 @@ namespace swift {
   namespace irgen {
     class TypeInfo;
 
-    /// This data structure holds all the debug info we want to emit
-    /// for types. It also provides a useful abstraction while we
-    /// decide on what type of debug info we want to emit for types.
+    /// This data structure holds everything needed to emit debug info
+    /// for a type.
     class DebugTypeInfo {
-    public:
-      /// Type info is stored in the form of a Decl or a Type+DeclContext.
-      PointerUnion<ValueDecl*, TypeBase*> DeclOrType;
-      DeclContext *DeclCtx;
+      public:
+      /// The Decl holds the DeclContext, location, but also allows to
+      /// look up struct members. If there is no Decl, generic types
+      /// mandate there be at least a DeclContext.
+      PointerUnion<ValueDecl*, DeclContext*> DeclOrContext;
+      /// The type we need to emit may be different from the type
+      /// mentioned in the Decl, for example, stripped of qualifiers.
+      TypeBase *Type;
+      /// Needed to determine the size of basic types.
+      // FIXME: Remove this if possible.
       llvm::Type *StorageType;
       Size size;
       Alignment align;
+      /// The scope the variable should be emitted in.
+      // FIXME: This does not belong here.
       SILDebugScope *DebugScope;
 
       DebugTypeInfo()
-        : StorageType(nullptr), size(0), align(1), DebugScope(nullptr) {
+        : Type(nullptr), StorageType(nullptr), size(0), align(1),
+          DebugScope(nullptr) {
       }
-      DebugTypeInfo(Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes,
+      DebugTypeInfo(swift::Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes,
                     DeclContext *DC);
-      DebugTypeInfo(Type Ty, Size size, Alignment align,
+      DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
                     DeclContext *DC);
-      DebugTypeInfo(Type Ty, const TypeInfo &Info, DeclContext *DC);
+      DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC,
+                    SILDebugScope *DS = nullptr);
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
                     SILDebugScope *DS = nullptr);
       DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
                     SILDebugScope *DS = nullptr);
-      inline TypeBase* getHash() const { return getType(); }
-      inline TypeBase* getType() const {
-        if (DeclOrType.isNull())
-          return nullptr;
+      DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info,
+                    SILDebugScope *DS = nullptr);
+      TypeBase* getHash() const { return getType(); }
+      TypeBase* getType() const { return Type; }
 
-        if (auto Ty = DeclOrType.dyn_cast<TypeBase*>())
-          return Ty;
-
-        auto Decl = DeclOrType.get<ValueDecl*>();
-        TypeBase* BaseTy = Decl->getType().getPointer();
-        // Return the sugared version of the type, if there is one.
-        if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
-          BaseTy = AliasDecl->getAliasType();
-        return BaseTy;
-      }
-
-      inline ValueDecl* getDecl() const {
-        return DeclOrType.dyn_cast<ValueDecl*>();
+      ValueDecl* getDecl() const {
+        return DeclOrContext.dyn_cast<ValueDecl*>();
       }
 
       SILDebugScope *getDebugScope() const { return DebugScope; }
       DeclContext *getDeclContext() const {
-        if (auto Decl = getDecl())
-          return Decl->getDeclContext();
-        return DeclCtx;
+        if (ValueDecl *D = getDecl()) return D->getDeclContext();
+        else return DeclOrContext.get<DeclContext*>();
       }
-      inline bool isNull() const { return DeclOrType.isNull(); }
+      bool isNull() const { return Type == nullptr; }
       bool operator==(DebugTypeInfo T) const;
       bool operator!=(DebugTypeInfo T) const;
 
