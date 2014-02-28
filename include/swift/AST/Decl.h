@@ -3034,7 +3034,7 @@ protected:
 
   CaptureInfo Captures;
 
-  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, Identifier Name,
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, ValueName Name,
                        SourceLoc NameLoc, unsigned NumParamPatterns,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
@@ -3302,7 +3302,7 @@ class FuncDecl : public AbstractFunctionDecl {
   OperatorDecl *Operator;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-           SourceLoc FuncLoc, Identifier Name,
+           SourceLoc FuncLoc, ValueName Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
@@ -3321,7 +3321,7 @@ public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
                                       StaticSpellingKind StaticSpelling,
-                                      SourceLoc FuncLoc, Identifier Name,
+                                      SourceLoc FuncLoc, ValueName Name,
                                       SourceLoc NameLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
@@ -3329,7 +3329,7 @@ public:
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
-                          SourceLoc FuncLoc, Identifier Name, SourceLoc NameLoc,
+                          SourceLoc FuncLoc, ValueName Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
