@@ -16,8 +16,9 @@
 namespace graph {
 
 // It is expected that the user uses a closure + data_index to perform
-// comparisons. This will enable us to test closure computations in swift.
+// comparisons. This will enable us to test closure computations.
 struct Node {
+  Node(unsigned i) : Id(i), adjList() { }
   /// The index in the data array of Node's data.
   unsigned Id;
 
@@ -26,9 +27,9 @@ struct Node {
 };
 
 /// Calculate the minimum spanning tree of the connected graph G using the
-/// comparison function Fun. Returns result in TreeEdges.
+/// weight function Fun. Returns result in TreeEdges.
 void prims(std::vector<Node *> &Graph,
            std::vector<unsigned> &TreeEdges,
-           std::function<bool(unsigned, unsigned)> Fun);
+           std::function<double (unsigned, unsigned)> Fun);
 
 } // end namespace graph
