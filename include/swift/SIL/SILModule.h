@@ -175,8 +175,8 @@ public:
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F) {
-    getFunctionList().erase(F);
     FunctionTable.erase(F->getName());
+    getFunctionList().erase(F);
   }
 
   bool isTrivialType(SILType Ty) {
