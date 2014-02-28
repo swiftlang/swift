@@ -1485,7 +1485,23 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-
+DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
+  assert(components.size() > 0 && "must have at least one name component");
+  if (components.size() == 1) {
+    SimpleOrCompound = components.front();
+  }
+  
+  auto buf = C.Allocate(sizeof(CompoundDeclName)
+                          + components.size() * sizeof(Identifier),
+                        alignof(CompoundDeclName));
+  auto compoundName = new (buf) CompoundDeclName{components.size()};
+  
+  for (unsigned i : indices(components))
+    new (&compoundName->getComponents()[i]) Identifier{components[i]};
+  
+  SimpleOrCompound = compoundName;
+}
+    
 static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
                                     bool isInitializingCtor,
                                     bool wantInterfaceType,
@@ -1709,7 +1725,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc FuncLoc,
-                                       ValueName Name, SourceLoc NameLoc,
+                                       DeclName Name, SourceLoc NameLoc,
                                        GenericParamList *GenericParams,
                                        Type Ty, unsigned NumParamPatterns,
                                        DeclContext *Parent) {
@@ -1724,7 +1740,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
 
 FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
-                           SourceLoc FuncLoc, ValueName Name,
+                           SourceLoc FuncLoc, DeclName Name,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
                            Type Ty, ArrayRef<Pattern *> ArgParams,
                            ArrayRef<Pattern *> BodyParams,

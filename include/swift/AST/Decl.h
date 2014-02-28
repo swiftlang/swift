@@ -1445,59 +1445,63 @@ public:
 };
   
 /// A declaration name, which may comprise one or more identifier pieces.
-class ValueName {
-  // Either a single identifier piece stored inline, or a reference to an array
-  // of identifier pieces owned by the ASTContext.
-  llvm::PointerUnion<Identifier, Identifier*> First;
-  // The size of a referenced component array, or zero if the identifier is
-  // stored in-line.
-  unsigned Count;
+class DeclName {
+  struct alignas(Identifier*) CompoundDeclName {
+    size_t Size;
+    ArrayRef<Identifier> getComponents() const {
+      return {reinterpret_cast<const Identifier*>(this + 1), Size};
+    }
+    MutableArrayRef<Identifier> getComponents() {
+      return {reinterpret_cast<Identifier*>(this + 1), Size};
+    }
+  };
+  
+  // Either a single identifier piece stored inline, or a reference to a
+  // run-length-encoded array of identifier pieces owned by the ASTContext.
+  llvm::PointerUnion<Identifier, CompoundDeclName*> SimpleOrCompound;
   
 public:
   /// Build a null name.
-  ValueName() : First(Identifier()), Count(0) {}
+  DeclName() : SimpleOrCompound(Identifier()) {}
   
   /// Build a simple value name with one component.
-  /*implicit*/ ValueName(Identifier simpleName)
-    : First(simpleName), Count(0) {}
+  /*implicit*/ DeclName(Identifier simpleName)
+    : SimpleOrCompound(simpleName) {}
   
-  /// Build a compound value name.
-  explicit ValueName(MutableArrayRef<Identifier> components)
-    : First(components.data()), Count(components.size())
-  {
-    assert(Count > 0 && "must have at least one name component");
-  }
+  /// Build a compound value name by copying a list of components.
+  DeclName(ASTContext &C, ArrayRef<Identifier> components);
   
   /// Get the first name component. This is the name that is looked up in
   /// "C-style" property accesses, such as 'foo.bar' or 'foo.bar(1, 2)'.
   ///
   /// TODO: Eventually compound names should not return a name here.
   Identifier getSimpleName() const {
-    if (Count)
-      return *First.get<Identifier*>();
-      
-    return First.get<Identifier>();
+    if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return compound->getComponents()[0];
+    
+    return SimpleOrCompound.get<Identifier>();
   }
   
   /// Get the components array.
   ArrayRef<Identifier> getComponents() const {
-    if (Count)
-      return {First.get<Identifier*>(), Count};
-    auto name = First.get<Identifier>();
-    if (name.get())
-      return name;
+    if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return compound->getComponents();
+    
+    auto identifier = SimpleOrCompound.get<Identifier>();
+    if (identifier.get())
+      return identifier;
     return {};
   }
   
   explicit operator bool() const {
-    if (Count)
+    if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
-    return First.get<Identifier>().get();
+    return SimpleOrCompound.get<Identifier>().get();
   }
   
   /// True if this is a simple one-component name.
   bool isSimpleName() const {
-    return Count <= 1;
+    return !SimpleOrCompound.dyn_cast<CompoundDeclName*>();
   }
   
   /// True if this name is an operator.
@@ -1509,12 +1513,12 @@ public:
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
-  ValueName Name;
+  DeclName Name;
   SourceLoc NameLoc;
   Type Ty;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, ValueName name, SourceLoc NameLoc)
+  ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
     : Decl(K, DC), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.ConformsToProtocolRequrement = false;
   }
@@ -1533,7 +1537,7 @@ public:
   Identifier getName() const { return Name.getSimpleName(); }
   bool isOperator() const { return Name.isOperator(); }
   /// TODO: Rename to getName?
-  ValueName getFullName() const { return Name; }
+  DeclName getFullName() const { return Name; }
   
   
   SourceLoc getNameLoc() const { return NameLoc; }
@@ -3034,7 +3038,7 @@ protected:
 
   CaptureInfo Captures;
 
-  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, ValueName Name,
+  AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, unsigned NumParamPatterns,
                        GenericParamList *GenericParams)
       : ValueDecl(Kind, Parent, Name, NameLoc),
@@ -3302,7 +3306,7 @@ class FuncDecl : public AbstractFunctionDecl {
   OperatorDecl *Operator;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-           SourceLoc FuncLoc, ValueName Name,
+           SourceLoc FuncLoc, DeclName Name,
            SourceLoc NameLoc, unsigned NumParamPatterns,
            GenericParamList *GenericParams, Type Ty, DeclContext *Parent)
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
@@ -3321,7 +3325,7 @@ public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
                                       StaticSpellingKind StaticSpelling,
-                                      SourceLoc FuncLoc, ValueName Name,
+                                      SourceLoc FuncLoc, DeclName Name,
                                       SourceLoc NameLoc,
                                       GenericParamList *GenericParams, Type Ty,
                                       unsigned NumParamPatterns,
@@ -3329,7 +3333,7 @@ public:
 
   static FuncDecl *create(ASTContext &Context, SourceLoc StaticLoc,
                           StaticSpellingKind StaticSpelling,
-                          SourceLoc FuncLoc, ValueName Name, SourceLoc NameLoc,
+                          SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
