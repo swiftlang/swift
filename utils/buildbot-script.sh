@@ -505,8 +505,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
 done
 
 # Run the Swift performance tests.
-#if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
-if false; then
+if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   # Currently we use the toolchain-specific Clang as our CC under test, because
   # our locally built one might not end up invoking an LD that supports
   # autolinking on older machines. We can reconsider this when it becomes useful
