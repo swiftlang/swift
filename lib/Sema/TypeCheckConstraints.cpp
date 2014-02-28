@@ -399,9 +399,15 @@ namespace {
         options |= TR_AllowUnspecifiedTypes;
         options |= TR_AllowUnboundGenerics;
         options |= TR_FunctionInput;
+        bool hadParameterError = false;
         if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
           expr->setType(ErrorType::get(TC.Context));
-          return { false, expr };
+          
+          // If we encounter an error validating the parameter list, don't bail.
+          // Instead, go on to validate any potential result type, and bail
+          // afterwards.  This allows for better diagnostics, and keeps the
+          // closure expression type well-formed.
+          hadParameterError = true;
         }
 
         // Validate the result type, if present.
@@ -410,6 +416,9 @@ namespace {
           expr->setType(ErrorType::get(TC.Context));
           return { false, expr };
         }
+        
+        if (hadParameterError)
+          return { false, expr };
         
         return { closure->hasSingleExpressionBody(), expr };
       }
