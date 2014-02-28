@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
       PM.add(createInOutDeshadowing());
       break;
     case PassKind::MandatoryInlining:
-      PM.add(createMandatoryInlining(SILOpts.LinkMode));
+      PM.add(createMandatoryInlining());
       break;
     case PassKind::PredictableMemoryOpt:
       PM.add(createPredictableMemoryOptimizations());

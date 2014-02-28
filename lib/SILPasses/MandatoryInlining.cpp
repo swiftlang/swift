@@ -432,18 +432,14 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 //===----------------------------------------------------------------------===//
 
 class MandatoryInlining : public SILModuleTransform {
-  SILModule::LinkingMode Mode;
-  bool ShouldCleanup;
-public:
-  MandatoryInlining(SILModule::LinkingMode M, bool C) : SILModuleTransform(),
-                                                        Mode(M),
-                                                        ShouldCleanup(C) {}
-private:
   /// The entry point to the transformation.
   void run() {
     SILModule *M = getModule();
+    SILModule::LinkingMode Mode = getOptions().LinkMode;
+    bool ShouldCleanup = !getOptions().DebugSerialization;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
+
     for (auto &F : *M)
       runOnFunctionRecursively(&F, nullptr, Mode, FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet());
@@ -484,7 +480,6 @@ private:
   StringRef getName() override { return "Mandatory Inlining"; }
 };
 
-SILTransform *swift::createMandatoryInlining(SILModule::LinkingMode Mode,
-                                             bool ShouldCleanup) {
-  return new MandatoryInlining(Mode, ShouldCleanup);
+SILTransform *swift::createMandatoryInlining() {
+  return new MandatoryInlining();
 }

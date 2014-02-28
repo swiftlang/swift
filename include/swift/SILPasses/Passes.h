@@ -52,8 +52,7 @@ namespace swift {
   SILTransform *createPredictableMemoryOptimizations();
   SILTransform *createConstantPropagation();
   SILTransform *createDCE();
-  SILTransform *createMandatoryInlining(SILModule::LinkingMode Mode,
-                                        bool ShouldCleanup=true);
+  SILTransform *createMandatoryInlining();
   SILTransform *createSILCleanup();
   SILTransform *createEmitDFDiagnostics();
 
