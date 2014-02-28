@@ -1180,8 +1180,8 @@ void Lexer::lexStringLiteral() {
     // If this is the end of string, we are done.  If it is a normal character
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
-      if (wasErroneous)
-        return formToken(tok::unknown, TokStart);
+      ++CurPtr;
+      if (wasErroneous) return formToken(tok::unknown, TokStart);
       return formToken(tok::string_literal, TokStart);
     }
   }
