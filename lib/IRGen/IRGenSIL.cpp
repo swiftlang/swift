@@ -574,7 +574,6 @@ public:
   void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
-  void visitClassMetatypeInst(ClassMetatypeInst *i);
   void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *i);
   void visitTupleExtractInst(TupleExtractInst *i);
@@ -1300,37 +1299,70 @@ void IRGenSILFunction::visitMetatypeInst(swift::MetatypeInst *i) {
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
-void IRGenSILFunction::visitClassMetatypeInst(swift::ClassMetatypeInst *i) {
-  Explosion base = getLoweredExplosion(i->getOperand());
-  auto baseValue = base.claimNext();
+static llvm::Value *getClassBaseValue(IRGenSILFunction &IGF,
+                                      SILValue v) {
+  if (v.getType().isAddress()) {
+    auto addr = IGF.getLoweredAddress(v);
+    return IGF.Builder.CreateLoad(addr);
+  }
+  
+  Explosion e = IGF.getLoweredExplosion(v);
+  return e.claimNext();
+}
 
-  auto metaTy = i->getType().castTo<MetatypeType>();
-  SILType instanceType = i->getOperand().getType();
-  Explosion e(ResilienceExpansion::Maximal);
-  switch (metaTy->getRepresentation()) {
+static llvm::Value *getClassMetatype(IRGenFunction &IGF,
+                                     llvm::Value *baseValue,
+                                     MetatypeRepresentation repr,
+                                     SILType instanceType) {
+  switch (repr) {
   case MetatypeRepresentation::Thin:
     llvm_unreachable("Class metatypes are never thin");
-
+    
   case MetatypeRepresentation::Thick:
-    e.add(emitTypeMetadataRefForHeapObject(*this, baseValue, instanceType));
-    break;
-
+    return emitTypeMetadataRefForHeapObject(IGF, baseValue, instanceType);
+      
   case MetatypeRepresentation::ObjC:
-    e.add(emitHeapMetadataRefForHeapObject(*this, baseValue, instanceType));
-    break;
+    return emitHeapMetadataRefForHeapObject(IGF, baseValue, instanceType);
   }
-  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitArchetypeMetatypeInst(
                                               swift::ArchetypeMetatypeInst *i) {
-  Address base = getLoweredAddress(i->getOperand());
+  SILType instanceTy = i->getOperand().getType();
+  auto metaTy = i->getType().castTo<MetatypeType>();
   
-  llvm::Value *metatype = emitTypeMetadataRefForArchetype(*this, base,
-                                                    i->getOperand().getType());
-  Explosion result(ResilienceExpansion::Maximal);
-  result.add(metatype);
-  setLoweredExplosion(SILValue(i, 0), result);
+  if (metaTy->getRepresentation() == MetatypeRepresentation::Thin) {
+    Explosion empty(ResilienceExpansion::Maximal);
+    setLoweredExplosion(SILValue(i, 0), empty);
+    return;
+  }
+  
+  Explosion e(ResilienceExpansion::Maximal);
+  
+  if (instanceTy.getClassOrBoundGenericClass()) {
+    e.add(getClassMetatype(*this,
+                           getClassBaseValue(*this, i->getOperand()),
+                           metaTy->getRepresentation(), instanceTy));
+  } else if (auto arch = instanceTy.getAs<ArchetypeType>()) {
+    if (arch->requiresClass()) {
+      e.add(getClassMetatype(*this,
+                             getClassBaseValue(*this, i->getOperand()),
+                             metaTy->getRepresentation(), instanceTy));
+    } else {
+      Address base = getLoweredAddress(i->getOperand());
+      e.add(emitTypeMetadataRefForArchetype(*this, base,
+                                            i->getOperand().getType()));
+      // FIXME: We need to convert this back to an ObjC class for an
+      // ObjC metatype representation.
+      if (metaTy->getRepresentation() == MetatypeRepresentation::ObjC)
+        unimplemented(i->getLoc().getSourceLoc(),
+                      "objc metatype of non-class-bounded archetype");
+    }
+  } else {
+    emitMetatypeRef(*this, metaTy, e);
+  }
+  
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitProtocolMetatypeInst(

@@ -631,11 +631,6 @@ public:
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }
 
-  ClassMetatypeInst *createClassMetatype(SILLocation Loc, SILType Metatype,
-                                         SILValue Base) {
-    return insert(new (F.getModule()) ClassMetatypeInst(Loc, Metatype, Base));
-  }
-
   ArchetypeMetatypeInst *createArchetypeMetatype(SILLocation Loc,
                                                  SILType Metatype,
                                                  SILValue Base) {

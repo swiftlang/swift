@@ -643,15 +643,6 @@ SILCloner<ImplClass>::visitMetatypeInst(MetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitClassMetatypeInst(ClassMetatypeInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createClassMetatype(getOpLocation(Inst->getLoc()),
-                                getOpType(Inst->getType()),
-                                getOpValue(Inst->getOperand())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitArchetypeMetatypeInst(ArchetypeMetatypeInst *Inst) {
   doPostProcess(Inst,
     Builder.createArchetypeMetatype(getOpLocation(Inst->getLoc()),

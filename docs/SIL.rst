@@ -2406,19 +2406,6 @@ metatype
 
 Creates a reference to the metatype object for type ``T``.
 
-class_metatype
-``````````````
-::
-
-  sil-instruction ::= 'class_metatype' sil-type ',' sil-operand
-
-  %1 = class_metatype $T.metatype, %0 : $T
-  // %0 must be of a class type $T
-  // %1 will be of type $T.metatype and reference the runtime metatype of %0
-
-Obtains a reference to the dynamic metatype of the class instance ``%0``.
-It is undefined behavior if the class instance reference is null.
-
 archetype_metatype
 ``````````````````
 ::
@@ -2426,11 +2413,10 @@ archetype_metatype
   sil-instruction ::= 'archetype_metatype' sil-type ',' sil-operand
 
   %1 = archetype_metatype $T.metatype, %0 : $T
-  // %0 must be a value of class archetype $T, or the address of
-  // an address-only archetype $*T
+  // %0 must be a value or address of type $T
   // %1 will be of type $T.metatype
 
-Obtains a reference to the dynamic metatype of the archetype value ``%0``.
+Obtains a reference to the dynamic metatype of the value ``%0``.
 
 protocol_metatype
 `````````````````

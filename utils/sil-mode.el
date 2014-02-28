@@ -77,7 +77,7 @@
    `(,(regexp-opt '("apply" "partial_apply")
 		  'words) . font-lock-keyword-face)
    ;; Metatypes
-   `(,(regexp-opt '("metatype" "class_metatype" "archetype_metatype"
+   `(,(regexp-opt '("metatype" "archetype_metatype"
                     "protocol_metatype") 'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("copy_value" "destroy_value" "tuple" "tuple_extract"

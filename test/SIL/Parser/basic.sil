@@ -542,12 +542,12 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %5 = store %1 to %3#1 : $*SomeSubclass
   %7 = load %2#1 : $*SomeClass                    // CHECK: load
   %8 = strong_retain %7 : $SomeClass
-  // CHECK: class_metatype $@thick SomeClass.Type, {{%.*}} : $SomeClass
-  %9 = class_metatype $@thick SomeClass.Type, %7 : $SomeClass
+  // CHECK: archetype_metatype $@thick SomeClass.Type, {{%.*}} : $SomeClass
+  %9 = archetype_metatype $@thick SomeClass.Type, %7 : $SomeClass
   %11 = load %3#1 : $*SomeSubclass                // CHECK: load
   %12 = strong_retain %11 : $SomeSubclass
-  // CHECK: class_metatype $@thick SomeSubclass.Type, {{%.*}} : $SomeSubclass
-  %13 = class_metatype $@thick SomeSubclass.Type, %11 : $SomeSubclass
+  // CHECK: archetype_metatype $@thick SomeSubclass.Type, {{%.*}} : $SomeSubclass
+  %13 = archetype_metatype $@thick SomeSubclass.Type, %11 : $SomeSubclass
   %14 = upcast %13 : $@thick SomeSubclass.Type to $@thick SomeClass.Type  // CHECK: upcast
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type) // CHECK: tuple
   %16 = strong_release %11 : $SomeSubclass

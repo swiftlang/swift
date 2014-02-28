@@ -1681,13 +1681,12 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   // For class, archetype, and protocol types, look up the dynamic metatype.
   SILType metaTy = getLoweredLoadableType(
     MetatypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
-  if (base.getType().getSwiftType()->getClassOrBoundGenericClass())
-    return B.createClassMetatype(loc, metaTy, base);
-  if (base.getType().getSwiftRValueType()->is<ArchetypeType>())
-    return B.createArchetypeMetatype(loc, metaTy, base);
   if (base.getType().getSwiftRValueType()->isExistentialType())
     return B.createProtocolMetatype(loc, metaTy, base);
-
+  if (base.getType().getSwiftType()->getClassOrBoundGenericClass()
+      || base.getType().getSwiftRValueType()->is<ArchetypeType>())
+    return B.createArchetypeMetatype(loc, metaTy, base);
+  
   // Otherwise, ignore the base and return the static metatype.
   return B.createMetatype(loc, metaTy);
 }

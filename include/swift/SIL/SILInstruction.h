@@ -1456,18 +1456,7 @@ public:
   }
 };
 
-/// ClassMetatypeInst - Represents loading a dynamic class metatype
-/// for a class instance.
-class ClassMetatypeInst
-  : public UnaryInstructionBase<ValueKind::ClassMetatypeInst>
-{
-public:
-  ClassMetatypeInst(SILLocation Loc, SILType Metatype, SILValue Base)
-    : UnaryInstructionBase(Loc, Base, Metatype) {}
-};
-
-/// ArchetypeMetatypeInst - Represents loading a dynamic metatype from an
-/// archetype instance.
+/// Represents loading a dynamic metatype from a value.
 class ArchetypeMetatypeInst
   : public UnaryInstructionBase<ValueKind::ArchetypeMetatypeInst>
 {

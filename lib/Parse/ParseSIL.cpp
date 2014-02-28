@@ -968,7 +968,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("bridge_to_block", ValueKind::BridgeToBlockInst)
     .Case("builtin_function_ref", ValueKind::BuiltinFunctionRefInst)
     .Case("checked_cast_br", ValueKind::CheckedCastBranchInst)
-    .Case("class_metatype", ValueKind::ClassMetatypeInst)
     .Case("class_method", ValueKind::ClassMethodInst)
     .Case("cond_br", ValueKind::CondBranchInst)
     .Case("cond_fail", ValueKind::CondFailInst)
@@ -1685,7 +1684,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   case ValueKind::DeallocBoxInst:
   case ValueKind::ArchetypeMetatypeInst:
-  case ValueKind::ClassMetatypeInst:
   case ValueKind::ProtocolMetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
@@ -1696,9 +1694,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::ArchetypeMetatypeInst:
       ResultVal = B.createArchetypeMetatype(InstLoc, Ty, Val);
-      break;
-    case ValueKind::ClassMetatypeInst:
-      ResultVal = B.createClassMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::ProtocolMetatypeInst:
       ResultVal = B.createProtocolMetatype(InstLoc, Ty, Val);
