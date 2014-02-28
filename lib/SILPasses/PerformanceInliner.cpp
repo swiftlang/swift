@@ -29,10 +29,12 @@ STATISTIC(NumFunctionsInlined, "Number of functions inlined");
 namespace {
   class SILPerformanceInliner {
     const unsigned InlineCostThreshold;
+    SILModule::LinkingMode Mode;
 
   public:
-    explicit SILPerformanceInliner(unsigned threshold)
-      : InlineCostThreshold(threshold) {}
+    SILPerformanceInliner(unsigned threshold,
+                          SILModule::LinkingMode M)
+      : InlineCostThreshold(threshold), Mode(M) {}
 
     bool inlineCallsIntoFunction(SILFunction *F);
   };
@@ -44,7 +46,8 @@ namespace {
 
 /// \brief Returns a SILFunction if this ApplyInst calls a recognizable function
 /// that is legal to inline.
-static SILFunction *getInlinableFunction(ApplyInst *AI) {
+static SILFunction *getInlinableFunction(ApplyInst *AI,
+                                         SILModule::LinkingMode Mode) {
   // Avoid substituion lists, we don't support them.
   if (AI->hasSubstitutions())
     return nullptr;
@@ -54,9 +57,17 @@ static SILFunction *getInlinableFunction(ApplyInst *AI) {
     return nullptr;
 
   SILFunction *F = FRI->getReferencedFunction();
-
-  if (F->empty() || F->isExternalDeclaration()) {
+  // If F is an external declaration, we can't inline...
+  if (F->isExternalDeclaration()) {
     DEBUG(llvm::dbgs() << "  Can't inline " << F->getName() << ".\n");
+    return nullptr;
+  }
+
+  // If F is empty attempt to link it. If we fail to link F, we can't
+  // inline... bail.
+  if (F->empty() && !FRI->getModule().linkFunction(F, Mode)) {
+    DEBUG(llvm::dbgs() << "  Failed to link " << F->getName() << ". Can't "
+          "inline.\n");
     return nullptr;
   }
 
@@ -94,7 +105,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     DEBUG(llvm::dbgs() << "  Found call site:" <<  *AI);
 
     // Get the callee.
-    SILFunction *Callee = getInlinableFunction(AI);
+    SILFunction *Callee = getInlinableFunction(AI, Mode);
     if (!Callee)
       continue;
 
@@ -152,7 +163,8 @@ public:
     std::vector<SILFunction *> Worklist(Order);
     std::reverse(Worklist.begin(), Worklist.end());
 
-    SILPerformanceInliner inliner(getOptions().InlineThreshold);
+    SILPerformanceInliner inliner(getOptions().InlineThreshold,
+                                  getOptions().LinkMode);
 
     bool Changed = false;
     while (!Worklist.empty()) {
