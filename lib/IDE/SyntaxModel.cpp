@@ -239,6 +239,9 @@ Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
+  if (D->isImplicit())
+    return false;
+
   if (!handleAttrs(D->getAttrs()))
     return false;
 
