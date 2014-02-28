@@ -43,6 +43,7 @@ SourceLoc SourceManager::getLocForBufferStart(unsigned BufferID) const {
 
 unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
                                              unsigned BufferID) const {
+  assert(Loc.isValid() && "location should be valid");
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
   assert(Loc.Value.getPointer() >= Buffer->getBuffer().begin() &&
          Loc.Value.getPointer() <= Buffer->getBuffer().end() &&
@@ -51,6 +52,8 @@ unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
 }
 
 unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
+  assert(Start.isValid() && "start location should be valid");
+  assert(End.isValid() && "end location should be valid");
 #ifndef NDEBUG
   unsigned BufferID = findBufferContainingLoc(Start);
   auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);

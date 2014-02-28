@@ -111,10 +111,11 @@ public:
   /// might point at whitespace or comment.
   SourceLoc getLocForBufferStart(unsigned BufferID) const;
 
-  /// \brief Returns the offset in bytes for the given source location.
+  /// \brief Returns the offset in bytes for the given valid source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 
-  /// \brief Returns the distance in bytes between the given source locations.
+  /// \brief Returns the distance in bytes between the given valid source
+  /// locations.
   unsigned getByteDistance(SourceLoc Start, SourceLoc End) const;
 
   /// Returns the SourceLoc for the byte offset in the specified buffer.
