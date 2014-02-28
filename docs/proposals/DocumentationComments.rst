@@ -4,6 +4,74 @@
 Documentation Comments in Swift
 ===============================
 
+Big Picture
+===========
+
+- Swift documentation comments will start with a special character sequence.
+  They can be line-based ``///`` or block-based ``/** ... */``.
+
+- Swift comments will use only ReST markup (reStructuredText) inside
+  documentation comments.  No Doxygen or HeaderDoc commands (\foo or @foo) will
+  be allowed.  We will try to produce fixits if the parser encounters Doxygen
+  syntax, but this will be done only for the most widely used commands.
+
+  [Rationale: for a completely new language compatibility with Doxygen is not
+  deemed extremely important.  Compatibility with existing infrastructure
+  around existing, standartized markup language (ReST) is much more compelling.
+
+  ReST markup is versatile -- DevPubs have been using it for Swift
+  documentation for some time already.  ReST has a specification, so different
+  implementations should be able to interoperate.  ReST is extensible, so we
+  will be able to invent markup in future if we want to express something
+  special that is not described in the standard.
+
+  Developers will have to learn a lot of new syntax for the language anyway,
+  and documentation comments will be the most complicated part.  Templates and
+  the Swift book will guide them.  Warnings and fixits for the most popular
+  Doxygen tags will also help. ]
+
+- March milestone: top-level commands are recognized, brief description is
+  available in code completion results on the SourceKit side.
+
+- GM milestone: the most important ReST inline markup is recognized.
+
+Micro Details
+=============
+
+- No explicit markup for brief description.  Brief description is always the
+  first paragraph without special markup.
+
+- Documentation for function parameters and generic parameters uses the same
+  syntax.
+
+- We will start implementing ReST parsing, starting with recognizing top-level
+  structure, and will prioritize/implement specific features based on feedback
+  from DevPubs and DaveA.
+
+Example
+=======
+
+Here is how documentation comments can look like in ReST markup::
+
+  /// Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+  ///
+  /// :param: bar Ipsum vitae mattis adipiscing, lorem risus mattis
+  ///   elit, nec imperdiet justo est at nisi.  Quisque venenatis in
+  ///   erat non suscipit.  Praesent varius tellus tortor.
+  ///
+  /// :returns: ut bibendum ligula sit amet arcu euismod sagittis.
+  func foo(bar: Int) -> Double {
+  }
+
+ReST specification is avaliable here:
+
+http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
+
+Old Proposal
+============
+
+The old proposal follows.
+
 In this document [P1] [P2] [P3] [P4] designate priorities.
 
 March milestone
