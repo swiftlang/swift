@@ -120,10 +120,10 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   // Look through the metatype.
   if (auto metaT = type->getAs<MetatypeType>())
     type = metaT->getInstanceType();
-
-  // Callers must cope with dependent types directly.
-  assert(!type->isDependentType());
-
+  
+  // Callers must cope with dependent types directly.  
+  assert(!type->is<DependentMemberType>() && !type->is<GenericTypeParamType>());
+         
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;
   unsigned options = NL_QualifiedDefault | NL_ProtocolMembers;

@@ -496,9 +496,11 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         auto parentTy = parent.get<Type>();
         if (parentTy->is<ErrorType>())
           return parent.get<Type>();
-
+        
         // If the parent is a dependent type, the member is a dependent member.
-        if (parentTy->isDependentType()) {
+        if (parentTy->is<DependentMemberType>() ||
+            parentTy->is<GenericTypeParamType>()) {
+          
           // Try to resolve the dependent member type to a specific associated
           // type.
           Type memberType = resolver->resolveDependentMemberType(
@@ -506,6 +508,8 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                         parentRange,
                                         comp->getIdentifier(),
                                         comp->getIdLoc());
+          
+          
           assert(memberType && "Received null dependent member type");
 
           if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
@@ -520,7 +524,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           comp->setValue(memberType);
           return memberType;
         }
-
+        
         // Look for member types with the given name.
         auto memberTypes = TC.lookupMemberType(parentTy, comp->getIdentifier(),
                                                DC);
