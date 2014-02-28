@@ -54,11 +54,13 @@ static void registerZone() {
   pthread_key_t key, prev_key;
   int r = pthread_key_create(&key, NULL);
   assert(r == 0);
+  (void)r;
   prev_key = key;
   _swift_alloc_offset = key;
   for (unsigned i = 0; i < 64; i++) {
     int r = pthread_key_create(&key, NULL);
     assert(r == 0);
+    (void)r;
     assert(key == prev_key + 1);
     prev_key = key;
   }
