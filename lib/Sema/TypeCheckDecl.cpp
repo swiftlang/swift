@@ -1212,21 +1212,23 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
     if (Set) members.push_back(Set);
     CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
     return;
-  } else if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+  }
+  
+  if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
     SmallVector<Decl*, 4> members(ED->getMembers().begin(),
                                   ED->getMembers().end());
     members.push_back(Get);
     if (Set) members.push_back(Set);
     ED->setMembers(Context.AllocateCopy(members), ED->getBraces());
     return;
-  } else {
-    auto *SD = cast<StructDecl>(VD->getDeclContext());
-    SmallVector<Decl*, 4> members(SD->getMembers().begin(),
-                                  SD->getMembers().end());
-    members.push_back(Get);
-    if (Set) members.push_back(Set);
-    SD->setMembers(Context.AllocateCopy(members), SD->getBraces());
   }
+  
+  auto *SD = cast<StructDecl>(VD->getDeclContext());
+  SmallVector<Decl*, 4> members(SD->getMembers().begin(),
+                                SD->getMembers().end());
+  members.push_back(Get);
+  if (Set) members.push_back(Set);
+  SD->setMembers(Context.AllocateCopy(members), SD->getBraces());
 }
 
 /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
