@@ -542,15 +542,6 @@ SILCloner<ImplClass>::visitBridgeToBlockInst(BridgeToBlockInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *Inst) {
-  doPostProcess(Inst,
-    Builder.createArchetypeRefToSuper(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst *Inst) {
   doPostProcess(Inst,
     Builder.createIsNonnull(getOpLocation(Inst->getLoc()),

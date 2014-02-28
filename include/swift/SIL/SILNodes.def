@@ -166,7 +166,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(UpcastInst, ConversionInst, None)
-    INST(ArchetypeRefToSuperInst, ConversionInst, None)
     INST(AddressToPointerInst, ConversionInst, None)
     INST(PointerToAddressInst, ConversionInst, None)
     INST(RefToObjectPointerInst, ConversionInst, None)

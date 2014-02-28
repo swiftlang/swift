@@ -1208,17 +1208,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// ArchetypeRefToSuperInst - Given a class archetype value with a base
-/// class constraint, returns a reference to the superclass instance.
-class ArchetypeRefToSuperInst
-  : public UnaryInstructionBase<ValueKind::ArchetypeRefToSuperInst,
-                                ConversionInst>
-{
-public:
-  ArchetypeRefToSuperInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
 /// Test that an address or reference type is not null.
 class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
 public:

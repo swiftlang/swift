@@ -629,7 +629,6 @@ public:
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitBridgeToBlockInst(BridgeToBlockInst *i);
-  void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
@@ -2468,20 +2467,6 @@ void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
   Explosion to(ResilienceExpansion::Maximal);
   emitBridgeToBlock(*this, i->getType(), from, to);
   setLoweredExplosion(SILValue(i, 0), to);
-}
-
-void IRGenSILFunction::visitArchetypeRefToSuperInst(
-                                              swift::ArchetypeRefToSuperInst *i) {
-  // Get the archetype value.
-  Explosion archetype = getLoweredExplosion(i->getOperand());
-  llvm::Value *in = archetype.claimNext();
-  
-  Explosion out(ResilienceExpansion::Maximal);
-  const TypeInfo &baseTypeInfo = getTypeInfo(i->getType());
-  llvm::Type *baseTy = baseTypeInfo.StorageType;
-  llvm::Value *cast = Builder.CreateBitCast(in, baseTy);
-  out.add(cast);
-  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 /// Emit a checked cast sequence. Returns an Address; this may be either

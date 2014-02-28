@@ -28,7 +28,6 @@ SILValue SILValue::stripCasts() {
   while (true) {
     switch (V->getKind()) {
     case ValueKind::UpcastInst:
-    case ValueKind::ArchetypeRefToSuperInst:
     case ValueKind::AddressToPointerInst:
     case ValueKind::PointerToAddressInst:
     case ValueKind::RefToObjectPointerInst:

@@ -801,9 +801,6 @@ public:
   void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "bridge_to_block");
   }
-  void visitArchetypeRefToSuperInst(ArchetypeRefToSuperInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(),"archetype_ref_to_super");
-  }
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }

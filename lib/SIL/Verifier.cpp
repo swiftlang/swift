@@ -1142,16 +1142,6 @@ public:
             "deinit_existential must be applied to non-class existential");
   }
   
-  void checkArchetypeRefToSuperInst(ArchetypeRefToSuperInst *ASI) {
-    ArchetypeType *archetype
-      = ASI->getOperand().getType().getAs<ArchetypeType>();
-    require(archetype, "archetype_ref_to_super operand must be archetype");
-    require(archetype->requiresClass(),
-            "archetype_ref_to_super operand must be class archetype");
-    require(ASI->getType().getClassOrBoundGenericClass(),
-            "archetype_ref_to_super must convert to a class type");
-  }
-  
   void verifyCheckedCast(CheckedCastKind kind, SILType fromTy, SILType toTy) {
     // Verify common invariants.
     require(fromTy != toTy, "can't checked cast to same type");
@@ -1347,16 +1337,11 @@ public:
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand().getType().castTo<MetatypeType>()
                          ->getInstanceType());
-      require(opInstTy->getClassOrBoundGenericClass(),
-              "upcast operand must be a class or class metatype instance");
       require(instTy->getClassOrBoundGenericClass(),
               "upcast must convert a class metatype to a class metatype");
       require(instTy->isSuperclassOf(opInstTy, nullptr),
               "upcast must cast to a superclass");
     } else {
-      require(UI->getOperand().getType().getSwiftType()
-                ->getClassOrBoundGenericClass(),
-              "upcast operand must be a class or class metatype instance");
       require(UI->getType().getSwiftType()->getClassOrBoundGenericClass(),
               "upcast must convert a class instance to a class type");
       require(UI->getType().getSwiftType()

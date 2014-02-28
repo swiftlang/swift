@@ -961,7 +961,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("archetype_metatype", ValueKind::ArchetypeMetatypeInst)
     .Case("archetype_method", ValueKind::ArchetypeMethodInst)
-    .Case("archetype_ref_to_super", ValueKind::ArchetypeRefToSuperInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("assign", ValueKind::AssignInst)
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
@@ -1438,7 +1437,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::BridgeToBlockInst:
-  case ValueKind::ArchetypeRefToSuperInst:
   case ValueKind::ConvertFunctionInst:
   case ValueKind::UpcastExistentialRefInst: {
     SILType Ty;
@@ -1498,9 +1496,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::BridgeToBlockInst:
       ResultVal = B.createBridgeToBlock(InstLoc, Val, Ty);
-      break;
-    case ValueKind::ArchetypeRefToSuperInst:
-      ResultVal = B.createArchetypeRefToSuper(InstLoc, Val, Ty);
       break;
     case ValueKind::UpcastExistentialRefInst:
       ResultVal = B.createUpcastExistentialRef(InstLoc, Val, Ty);

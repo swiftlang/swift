@@ -877,7 +877,7 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
   // Replace the cleanup with a new one on the superclass value so we always use
   // concrete retain/release operations.
-  SILValue base = SGF.B.createArchetypeRefToSuper(E,
+  SILValue base = SGF.B.createUpcast(E,
                                     archetype.forward(SGF),
                                     SGF.getLoweredLoadableType(E->getType()));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));

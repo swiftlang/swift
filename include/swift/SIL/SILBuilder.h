@@ -384,13 +384,6 @@ public:
     return insert(new (F.getModule()) RefToUnownedInst(loc, op, ty));
   }
 
-  ArchetypeRefToSuperInst *createArchetypeRefToSuper(SILLocation Loc,
-                                                     SILValue Archetype,
-                                                     SILType BaseTy) {
-    return insert(new (F.getModule())
-                    ArchetypeRefToSuperInst(Loc, Archetype, BaseTy));
-  }
-  
   IsNonnullInst *createIsNonnull(SILLocation loc,
                                  SILValue operand) {
     return insert(new (F.getModule())

@@ -3004,21 +3004,7 @@ upcast
   // %1 will have type $B
 
 Represents a conversion from a derived class instance or metatype to a
-superclass.
-
-archetype_ref_to_super
-``````````````````````
-::
-
-  sil-instruction ::= 'archetype_ref_to_super' sil-operand 'to' sil-type
-
-  %1 = archetype_to_super %0 : $T to $B
-  // %0 must be of an archetype type $T with a base class constraint
-  // $B must be the base class constraint type of $T or a superclass thereof
-  // %1 will be of the base type $B
-
-Represents a conversion from a generic type to a superclass specified as a
-constraint of the generic type.
+superclass, or from a base-class-constrained archetype to its base class.
 
 address_to_pointer
 ``````````````````

@@ -181,7 +181,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
 
   case ValueKind::AddressToPointerInst:
   case ValueKind::ArchetypeMetatypeInst:
-  case ValueKind::ArchetypeRefToSuperInst:
   case ValueKind::BranchInst:
   case ValueKind::BridgeToBlockInst:
   case ValueKind::CheckedCastBranchInst:

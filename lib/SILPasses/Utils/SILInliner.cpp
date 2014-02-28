@@ -339,7 +339,6 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::AllocStackInst:
     case ValueKind::ArchetypeMetatypeInst:
     case ValueKind::ArchetypeMethodInst:
-    case ValueKind::ArchetypeRefToSuperInst:
     case ValueKind::AssignInst:
     case ValueKind::AutoreleaseReturnInst:
     case ValueKind::BranchInst:

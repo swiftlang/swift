@@ -94,7 +94,7 @@
                     "upcast_existential_ref" "project_existential_ref")
 		  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
-   `(,(regexp-opt '("coerce" "upcast" "archetype_ref_to_super"
+   `(,(regexp-opt '("coerce" "upcast"
                     "address_to_pointer" "pointer_to_address"
                     "ref_to_object_pointer" "object_pointer_to_ref"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
