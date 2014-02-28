@@ -1685,7 +1685,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
     return B.createProtocolMetatype(loc, metaTy, base);
   if (base.getType().getSwiftType()->getClassOrBoundGenericClass()
       || base.getType().getSwiftRValueType()->is<ArchetypeType>())
-    return B.createArchetypeMetatype(loc, metaTy, base);
+    return B.createValueMetatype(loc, metaTy, base);
   
   // Otherwise, ignore the base and return the static metatype.
   return B.createMetatype(loc, metaTy);

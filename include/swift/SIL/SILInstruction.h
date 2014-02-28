@@ -1457,11 +1457,11 @@ public:
 };
 
 /// Represents loading a dynamic metatype from a value.
-class ArchetypeMetatypeInst
-  : public UnaryInstructionBase<ValueKind::ArchetypeMetatypeInst>
+class ValueMetatypeInst
+  : public UnaryInstructionBase<ValueKind::ValueMetatypeInst>
 {
 public:
-  ArchetypeMetatypeInst(SILLocation Loc, SILType Metatype, SILValue Base)
+  ValueMetatypeInst(SILLocation Loc, SILType Metatype, SILValue Base)
     : UnaryInstructionBase(Loc, Base, Metatype) {}
 };
 

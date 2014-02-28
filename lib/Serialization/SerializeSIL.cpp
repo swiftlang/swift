@@ -343,16 +343,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::DeallocBoxInst:
-  case ValueKind::ArchetypeMetatypeInst:
+  case ValueKind::ValueMetatypeInst:
   case ValueKind::ProtocolMetatypeInst:
   case ValueKind::AllocArrayInst: {
     SILValue operand;
     SILType Ty;
     switch (SI.getKind()) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ArchetypeMetatypeInst:
-      operand = cast<ArchetypeMetatypeInst>(&SI)->getOperand();
-      Ty = cast<ArchetypeMetatypeInst>(&SI)->getType();
+    case ValueKind::ValueMetatypeInst:
+      operand = cast<ValueMetatypeInst>(&SI)->getOperand();
+      Ty = cast<ValueMetatypeInst>(&SI)->getType();
       break;
     case ValueKind::ProtocolMetatypeInst:
       operand = cast<ProtocolMetatypeInst>(&SI)->getOperand();

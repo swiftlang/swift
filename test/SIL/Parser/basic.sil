@@ -542,12 +542,12 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %5 = store %1 to %3#1 : $*SomeSubclass
   %7 = load %2#1 : $*SomeClass                    // CHECK: load
   %8 = strong_retain %7 : $SomeClass
-  // CHECK: archetype_metatype $@thick SomeClass.Type, {{%.*}} : $SomeClass
-  %9 = archetype_metatype $@thick SomeClass.Type, %7 : $SomeClass
+  // CHECK: value_metatype $@thick SomeClass.Type, {{%.*}} : $SomeClass
+  %9 = value_metatype $@thick SomeClass.Type, %7 : $SomeClass
   %11 = load %3#1 : $*SomeSubclass                // CHECK: load
   %12 = strong_retain %11 : $SomeSubclass
-  // CHECK: archetype_metatype $@thick SomeSubclass.Type, {{%.*}} : $SomeSubclass
-  %13 = archetype_metatype $@thick SomeSubclass.Type, %11 : $SomeSubclass
+  // CHECK: value_metatype $@thick SomeSubclass.Type, {{%.*}} : $SomeSubclass
+  %13 = value_metatype $@thick SomeSubclass.Type, %11 : $SomeSubclass
   %14 = upcast %13 : $@thick SomeSubclass.Type to $@thick SomeClass.Type  // CHECK: upcast
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type) // CHECK: tuple
   %16 = strong_release %11 : $SomeSubclass
@@ -557,15 +557,15 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
-sil @test_archetype_metatype : $@thin <T> (@in T) -> (@thick T.Type, @thick T.Type) {
+sil @test_value_metatype : $@thin <T> (@in T) -> (@thick T.Type, @thick T.Type) {
 bb0(%0 : $*T):
   %1 = alloc_box $T                               // CHECK: alloc_box
   %2 = copy_addr [take] %0 to [initialization] %1#1 : $*T
   %3 = metatype $@thick T.Type                       // CHECK: metatype
   %5 = alloc_stack $T                               // CHECK: alloc_stack
   %6 = copy_addr %1#1 to [initialization] %5#1 : $*T
-  // CHECK: archetype_metatype $@thick T.Type, {{%.*}} : $*T
-  %7 = archetype_metatype $@thick T.Type, %5#1 : $*T
+  // CHECK: value_metatype $@thick T.Type, {{%.*}} : $*T
+  %7 = value_metatype $@thick T.Type, %5#1 : $*T
   %8 = tuple (%3 : $@thick T.Type, %7 : $@thick T.Type) // CHECK: tuple
   %9 = destroy_addr %5#1 : $*T
   %10 = dealloc_stack %5#0 : $*@local_storage T

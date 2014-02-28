@@ -631,11 +631,11 @@ public:
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }
 
-  ArchetypeMetatypeInst *createArchetypeMetatype(SILLocation Loc,
+  ValueMetatypeInst *createValueMetatype(SILLocation Loc,
                                                  SILType Metatype,
                                                  SILValue Base) {
     return insert(new (F.getModule())
-                    ArchetypeMetatypeInst(Loc, Metatype, Base));
+                    ValueMetatypeInst(Loc, Metatype, Base));
   }
   
   ProtocolMetatypeInst *createProtocolMetatype(SILLocation Loc,

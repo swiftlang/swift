@@ -2406,13 +2406,13 @@ metatype
 
 Creates a reference to the metatype object for type ``T``.
 
-archetype_metatype
+value_metatype
 ``````````````````
 ::
 
-  sil-instruction ::= 'archetype_metatype' sil-type ',' sil-operand
+  sil-instruction ::= 'value_metatype' sil-type ',' sil-operand
 
-  %1 = archetype_metatype $T.metatype, %0 : $T
+  %1 = value_metatype $T.metatype, %0 : $T
   // %0 must be a value or address of type $T
   // %1 will be of type $T.metatype
 

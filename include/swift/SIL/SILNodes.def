@@ -131,7 +131,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Metatypes
   INST(MetatypeInst, SILInstruction, None)
-  INST(ArchetypeMetatypeInst, SILInstruction, None)
+  INST(ValueMetatypeInst, SILInstruction, None)
   INST(ProtocolMetatypeInst, SILInstruction, None)
 
   // Aggregate Types

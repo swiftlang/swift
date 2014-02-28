@@ -574,7 +574,7 @@ public:
   void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
-  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *i);
+  void visitValueMetatypeInst(ValueMetatypeInst *i);
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *i);
   void visitTupleExtractInst(TupleExtractInst *i);
   void visitTupleElementAddrInst(TupleElementAddrInst *i);
@@ -1326,8 +1326,8 @@ static llvm::Value *getClassMetatype(IRGenFunction &IGF,
   }
 }
 
-void IRGenSILFunction::visitArchetypeMetatypeInst(
-                                              swift::ArchetypeMetatypeInst *i) {
+void IRGenSILFunction::visitValueMetatypeInst(
+                                              swift::ValueMetatypeInst *i) {
   SILType instanceTy = i->getOperand().getType();
   auto metaTy = i->getType().castTo<MetatypeType>();
   

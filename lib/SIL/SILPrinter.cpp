@@ -974,8 +974,8 @@ public:
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getIDAndType(DEI->getOperand());
   }
-  void visitArchetypeMetatypeInst(ArchetypeMetatypeInst *MI) {
-    OS << "archetype_metatype " << MI->getType() << ", "
+  void visitValueMetatypeInst(ValueMetatypeInst *MI) {
+    OS << "value_metatype " << MI->getType() << ", "
        << getIDAndType(MI->getOperand());
   }
   void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {

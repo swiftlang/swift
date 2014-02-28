@@ -648,7 +648,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                (SILValueCategory)TyCategory2)));               \
     break;
   ONETYPE_ONEOPERAND_INST(DeallocBox)
-  ONETYPE_ONEOPERAND_INST(ArchetypeMetatype)
+  ONETYPE_ONEOPERAND_INST(ValueMetatype)
   ONETYPE_ONEOPERAND_INST(ProtocolMetatype)
   ONETYPE_ONEOPERAND_INST(AllocArray)
 #undef ONETYPE_ONEOPERAND_INST
