@@ -813,17 +813,17 @@ class MemberRefExpr : public Expr {
   Expr *Base;
   ConcreteDeclRef Member;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
+  SourceRange NameRange;
   
 public:  
   MemberRefExpr(Expr *base, SourceLoc dotLoc, ConcreteDeclRef member,
-                SourceLoc nameLoc, bool Implicit,
+                SourceRange nameRange, bool Implicit,
                 // If True, access to computed properties with storage goes to
                 // the storage, instead of through the accessors.
                 bool UsesDirectPropertyAccess = false);
   Expr *getBase() const { return Base; }
   ConcreteDeclRef getMember() const { return Member; }
-  SourceLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getNameLoc() const { return NameRange.Start; }
   SourceLoc getDotLoc() const { return DotLoc; }
   
   void setBase(Expr *E) { Base = E; }
@@ -842,12 +842,12 @@ public:
   /// property.
   void setIsSuper(bool isSuper) { MemberRefExprBits.IsSuper = isSuper; }
 
-  SourceLoc getLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameRange.Start; }
   SourceRange getSourceRange() const {
     if (Base->isImplicit())
-      return SourceRange(NameLoc);
+      return NameRange;
   
-    return SourceRange(Base->getStartLoc(), NameLoc);
+    return SourceRange(Base->getStartLoc(), NameRange.End);
   }
   
   static bool classof(const Expr *E) {
@@ -1298,8 +1298,7 @@ public:
   }
 };
 
-/// UnresolvedDotExpr - A member access (foo.bar) on an expression with
-/// unresolved type.
+/// A member access (foo.bar) on an expression with unresolved type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;
   SourceLoc DotLoc;
@@ -1328,6 +1327,60 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedDot;
+  }
+};
+  
+/// A selector-style member access (foo.bar:bas:) on an expression with
+/// unresolved type.
+class UnresolvedSelectorExpr : public Expr {
+public:
+  // A selector component.
+  struct Component {
+    SourceLoc NameLoc;
+    SourceLoc ColonLoc;
+    Identifier Name;
+  };
+  
+private:
+  Expr *SubExpr;
+  SourceLoc DotLoc;
+  unsigned NumComponents;
+  
+  MutableArrayRef<Component> getComponentsBuf() {
+    return {reinterpret_cast<Component*>(this+1), NumComponents};
+  }
+  
+  UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
+                         ArrayRef<Component> components);
+  
+public:
+  static UnresolvedSelectorExpr *create(ASTContext &C,
+                                        Expr *subExpr,
+                                        SourceLoc dotLoc,
+                                        ArrayRef<Component> components);
+  
+  ArrayRef<Component> getComponents() const {
+    return {reinterpret_cast<const Component*>(this+1), NumComponents};
+  }
+  
+  SourceLoc getLoc() const {
+    return getComponents().front().NameLoc;
+  }
+  
+  SourceRange getSourceRange() const {
+    return {SubExpr->getStartLoc(), getComponents().back().ColonLoc};
+  }
+  
+  SourceLoc getDotLoc() const { return DotLoc; }
+  Expr *getBase() const { return SubExpr; }
+  void setBase(Expr *e) { SubExpr = e; }
+  
+  SourceRange getNameRange() const {
+    return {getComponents().front().NameLoc, getComponents().back().ColonLoc};
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedSelector;
   }
 };
 

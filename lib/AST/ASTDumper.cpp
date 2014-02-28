@@ -1216,6 +1216,21 @@ public:
     }
     OS << ')';
   }
+  void visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
+    printCommon(E, "unresolved_selector_expr")
+      << " selector '";
+    
+    for (auto component : E->getComponents()) {
+      OS << component.Name << ':';
+    }
+    
+    OS << "'";
+    if (E->getBase()) {
+      OS << '\n';
+      printRec(E->getBase());
+    }
+    OS << ')';
+  }
   void visitModuleExpr(ModuleExpr *E) {
     printCommon(E, "module_expr") << ')';
   }

@@ -235,10 +235,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 }
 
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
-                             ConcreteDeclRef member, SourceLoc nameLoc,
+                             ConcreteDeclRef member, SourceRange nameRange,
                              bool Implicit, bool UsesDirectPropertyAccess)
   : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+    Member(member), DotLoc(dotLoc), NameRange(nameRange) {
    
   MemberRefExprBits.IsDirectPropertyAccess = UsesDirectPropertyAccess;
   MemberRefExprBits.IsSuper = false;
@@ -387,6 +387,24 @@ SourceRange UnresolvedPatternExpr::getSourceRange() const {
   return subPattern->getSourceRange();
 }
 
+UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
+                                               ArrayRef<Component> components)
+  : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
+    SubExpr(subExpr), DotLoc(dotLoc), NumComponents(components.size())
+{
+  auto buf = getComponentsBuf();
+  for (unsigned i : indices(components)) {
+    new (&buf[i]) Component(components[i]);
+  }
+}
+
+UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
+             Expr *subExpr, SourceLoc dotLoc, ArrayRef<Component> components) {
+  void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
+                           + components.size() * sizeof(Component),
+                         alignof(UnresolvedSelectorExpr));
+  return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, components);
+}
 
 unsigned ScalarToTupleExpr::getScalarField() const {
   unsigned result = std::find(Elements.begin(), Elements.end(), Element())

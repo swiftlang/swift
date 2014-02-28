@@ -1628,6 +1628,10 @@ namespace {
       ValueTypeMemberApplications;
     
   public:
+    Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
+      llvm_unreachable("not implemented");
+    }
+    
     Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
       // Determine the declaration selected for this overloaded reference.
       auto selected = getOverloadChoice(

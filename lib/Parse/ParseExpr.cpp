@@ -1024,12 +1024,39 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         continue;
 
       Identifier Name = Context.getIdentifier(Tok.getText());
-      Result = makeParserResult(
-          new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name,
-                                          Tok.getLoc(),
-                                          /*Implicit=*/false));
+      SourceLoc NameLoc = Tok.getLoc();
       if (Tok.is(tok::identifier)) {
         consumeToken(tok::identifier);
+        
+        // If this is a selector reference, collect the selector pieces.
+        bool IsSelector = false;
+        if (Tok.is(tok::colon) && peekToken().is(tok::identifier)) {
+          BacktrackingScope BS(*this);
+          
+          IsSelector = consumeIf(tok::colon)
+            && consumeIf(tok::identifier)
+            && consumeIf(tok::colon);
+        }
+        
+        if (IsSelector) {
+          // Collect the selector pieces.
+          SmallVector<UnresolvedSelectorExpr::Component, 2> Components;
+          Components.push_back({NameLoc, consumeToken(tok::colon), Name});
+          while (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+            Identifier SelName = Context.getIdentifier(Tok.getText());
+            SourceLoc SelLoc = consumeToken(tok::identifier);
+            SourceLoc ColonLoc = consumeToken(tok::colon);
+            Components.push_back({SelLoc, ColonLoc, SelName});
+          }
+          Result = makeParserResult(
+            UnresolvedSelectorExpr::create(Context, Result.get(), TokLoc,
+                                           Components));
+        } else {
+          Result = makeParserResult(
+            new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,
+                                            /*Implicit=*/false));
+        }
+        
         if (canParseAsGenericArgumentList()) {
           SmallVector<TypeRepr*, 8> args;
           SourceLoc LAngleLoc, RAngleLoc;
@@ -1051,6 +1078,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           continue;
         }
       } else {
+        Result = makeParserResult(
+            new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,
+                                            /*Implicit=*/false));
         consumeToken(tok::integer_literal);
       }
 

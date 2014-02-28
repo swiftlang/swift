@@ -158,6 +158,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::ConstructorRefCall:
           case ExprKind::UnresolvedMember:
           case ExprKind::UnresolvedDot:
+          case ExprKind::UnresolvedSelector:
           case ExprKind::UnresolvedSpecialize:
           case ExprKind::DotSyntaxBaseIgnored:
             Diagnose = Diagnostic::None;

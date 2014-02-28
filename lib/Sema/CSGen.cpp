@@ -410,6 +410,12 @@ namespace {
       return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     
+    Type visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
+      CS.TC.diagnose(expr->getLoc(), diag::not_implemented,
+                     "selector member references");
+      return nullptr;
+    }
+    
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
       auto baseTy = expr->getSubExpr()->getType();
       
