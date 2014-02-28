@@ -39,7 +39,7 @@ public:
       Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
-      EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind());
+      EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind()) << "i = " << i;
     }
 
     return Toks;
@@ -79,6 +79,36 @@ TEST_F(LexerTest, EOFTokenLengthIsZero) {
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
                                      /*KeepComments=*/true,
                                      /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
+}
+
+TEST_F(LexerTest, BrokenStringLiteral1) {
+  StringRef Source("\"meow\0", 6);
+  std::vector<tok> ExpectedTokens{ tok::unknown, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 6U);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
+}
+
+TEST_F(LexerTest, BrokenStringLiteral2) {
+  StringRef Source("\"\\(meow\0", 8);
+  std::vector<tok> ExpectedTokens{ tok::unknown, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 8U);
+  EXPECT_EQ(Toks[1].getLength(), 0U);
+}
+
+TEST_F(LexerTest, StringLiteralWithNUL1) {
+  StringRef Source("\"\0\"", 3);
+  std::vector<tok> ExpectedTokens{ tok::string_literal, tok::eof };
+  std::vector<Token> Toks = checkLex(Source, ExpectedTokens,
+                                     /*KeepComments=*/true,
+                                     /*KeepEOF=*/true);
+  EXPECT_EQ(Toks[0].getLength(), 3U);
   EXPECT_EQ(Toks[1].getLength(), 0U);
 }
 
@@ -280,3 +310,47 @@ TEST_F(LexerTest, getLocForStartOfToken) {
               SourceMgr.getLocForOffset(BufferID, Pair[1]));
   }
 }
+
+TEST_F(LexerTest, NestedSubLexers) {
+  const char *Source = "aaa0 bbb1 ccc2 ddd3 eee4 fff5 ggg6";
+
+  MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
+  unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
+
+  Lexer Primary(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
+                /*InSILMode=*/false);
+  std::vector<Token> TokensPrimary;
+  do {
+    TokensPrimary.emplace_back();
+    Primary.lex(TokensPrimary.back());
+  } while (TokensPrimary.back().isNot(tok::eof));
+  ASSERT_EQ(8U, TokensPrimary.size());
+  ASSERT_EQ(tok::eof, TokensPrimary.back().getKind());
+
+  Lexer Sub1(Primary, Primary.getStateForBeginningOfToken(TokensPrimary[1]),
+             Primary.getStateForBeginningOfToken(*(TokensPrimary.end() - 2)));
+  std::vector<Token> TokensSub1;
+  do {
+    TokensSub1.emplace_back();
+    Sub1.lex(TokensSub1.back());
+  } while (TokensSub1.back().isNot(tok::eof));
+  ASSERT_EQ(6U, TokensSub1.size());
+  ASSERT_EQ("bbb1", TokensSub1.front().getText());
+  ASSERT_EQ("fff5", (TokensSub1.end() - 2)->getText());
+  ASSERT_EQ(tok::eof, TokensSub1.back().getKind());
+  ASSERT_EQ("ggg6", TokensSub1.back().getText());
+
+  Lexer Sub2(Sub1, Sub1.getStateForBeginningOfToken(TokensSub1[1]),
+             Sub1.getStateForBeginningOfToken(*(TokensSub1.end() - 2)));
+  std::vector<Token> TokensSub2;
+  do {
+    TokensSub2.emplace_back();
+    Sub2.lex(TokensSub2.back());
+  } while (TokensSub2.back().isNot(tok::eof));
+  ASSERT_EQ(4U, TokensSub2.size());
+  ASSERT_EQ("ccc2", TokensSub2.front().getText());
+  ASSERT_EQ("eee4", (TokensSub2.end() - 2)->getText());
+  ASSERT_EQ(tok::eof, TokensSub2.back().getKind());
+  ASSERT_EQ("fff5", TokensSub2.back().getText());
+}
+

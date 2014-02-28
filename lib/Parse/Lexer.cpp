@@ -199,12 +199,14 @@ void Lexer::initSubLexer(Lexer &Parent, State BeginState, State EndState) {
 
   // If the parent lexer should stop prematurely, and the ArtificialEOF
   // position is in this subrange, then we should stop at that point, too.
+  const char *BeginStatePtr = getBufferPtrForSourceLoc(BeginState.Loc);
+  const char *EndStatePtr = getBufferPtrForSourceLoc(EndState.Loc);
   if (Parent.ArtificialEOF &&
-      Parent.ArtificialEOF >= BufferStart &&
-      Parent.ArtificialEOF <= BufferEnd) {
+      Parent.ArtificialEOF >= BeginStatePtr &&
+      Parent.ArtificialEOF <= EndStatePtr) {
     ArtificialEOF = Parent.ArtificialEOF;
   } else
-    ArtificialEOF = getBufferPtrForSourceLoc(EndState.Loc);
+    ArtificialEOF = EndStatePtr;
 
   primeLexer();
   restoreState(BeginState);
@@ -231,6 +233,9 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {
+  assert(CurPtr >= BufferStart &&
+         CurPtr <= BufferEnd && "Current pointer out of range!");
+
   // When we are lexing a subrange from the middle of a file buffer, we will
   // run past the end of the range, but will stay within the file.  Check if
   // we are past the imaginary EOF, and synthesize a tok::eof in this case.
@@ -914,7 +919,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     if (CurPtr-1 != BufferEnd) {
       if (EmitDiagnostics)
         diagnose(CurPtr-1, diag::lex_nul_character);
-      return ~0U;
+      return CurPtr[-1];
     }
     // Move the pointer back to EOF.
     --CurPtr;
@@ -1180,8 +1185,9 @@ void Lexer::lexStringLiteral() {
     // If this is the end of string, we are done.  If it is a normal character
     // or an already-diagnosed error, just munch it.
     if (CharValue == ~0U) {
-      ++CurPtr;
-      if (wasErroneous) return formToken(tok::unknown, TokStart);
+      CurPtr++;
+      if (wasErroneous)
+        return formToken(tok::unknown, TokStart);
       return formToken(tok::string_literal, TokStart);
     }
   }
