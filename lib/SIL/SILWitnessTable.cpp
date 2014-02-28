@@ -14,7 +14,7 @@
 // conformance for a type to its implementing SILFunctions. This information is
 // (FIXME will be) used by IRGen to create witness tables for protocol dispatch.
 // It can also be used by generic specialization and existential
-// devirtualization passes to promote archetype_method and protocol_method
+// devirtualization passes to promote witness_method and protocol_method
 // instructions to static function_refs.
 //
 //===----------------------------------------------------------------------===//

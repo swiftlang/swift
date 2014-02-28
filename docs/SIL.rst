@@ -2124,14 +2124,14 @@ dispatched, so this instruction is only valid for Objective-C methods.
 It is undefined behavior if the class value is null and the method is
 not an Objective-C method.
 
-archetype_method
+witness_method
 ````````````````
 ::
 
-  sil-instruction ::= 'archetype_method' sil-method-attributes?
+  sil-instruction ::= 'witness_method' sil-method-attributes?
                         sil-type ',' sil-decl-ref ':' sil-type
 
-  %1 = archetype_method $T, #Proto.method!1 \
+  %1 = witness_method $T, #Proto.method!1 \
     : $@thin @cc(witness_method) <Self: Proto> U -> V
   // $T must be an archetype
   // #Proto.method!1 must be a reference to a method of one of the protocol
@@ -2897,7 +2897,7 @@ Obtains the address of the concrete value inside the existential
 container referenced by ``%0``. The protocol conformances associated
 with this existential container are associated directly with the
 archetype ``$*@opened P``. This pointer can be used with any operation
-on archetypes, such as ``archetype_method``.
+on archetypes, such as ``witness_method``.
 
 init_existential_ref
 ````````````````````
@@ -2983,7 +2983,7 @@ Extracts the class instance refernece from a class existential
 container. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``. This 
 pointer can be used with any operation on archetypes, such as 
-``archetype_method``.
+``witness_method``.
 
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~

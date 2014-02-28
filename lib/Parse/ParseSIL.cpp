@@ -960,7 +960,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("archetype_metatype", ValueKind::ArchetypeMetatypeInst)
-    .Case("archetype_method", ValueKind::ArchetypeMethodInst)
+    .Case("witness_method", ValueKind::ArchetypeMethodInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("assign", ValueKind::AssignInst)
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)

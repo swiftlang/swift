@@ -413,9 +413,9 @@ ERROR(sil_apply_archetype_not_found,decl_parsing,none,
 ERROR(sil_substitutions_on_non_polymorphic_type,decl_parsing,none,
       "apply of non-polymorphic function cannot have substitutions", ())
 ERROR(sil_archetype_method_not_protocol,decl_parsing,none,
-      "archetype_method is not a protocol method", ())
+      "witness_method is not a protocol method", ())
 ERROR(sil_archetype_method_type_does_not_conform,decl_parsing,none,
-      "archetype_method type does not conform to protocol", ())
+      "witness_method type does not conform to protocol", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

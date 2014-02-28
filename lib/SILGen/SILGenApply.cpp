@@ -70,7 +70,7 @@ public:
   
     GenericMethod_First,
       /// A method call using archetype dispatch.
-      ArchetypeMethod = GenericMethod_First,
+      WitnessMethod = GenericMethod_First,
       /// A method call using protocol dispatch.
       ProtocolMethod,
       /// A method call using dynamic lookup.
@@ -229,7 +229,7 @@ private:
       if (!member->isInstanceMember())
         type = CanType(MetatypeType::get(type, SGM.getASTContext()));
       return type;
-    } else if (kind == Kind::ArchetypeMethod) {
+    } else if (kind == Kind::WitnessMethod) {
       return method.selfValue.getType().getSwiftRValueType();
     } else {
       llvm_unreachable("bad callee kind for protocol method");
@@ -288,7 +288,7 @@ private:
         getThickFunctionType(constantInfo.LoweredInterfaceType);
     }
 
-    // The expected result of archetype_method is a partial application
+    // The expected result of witness_method is a partial application
     // of the archetype method to the expected archetype.
     CanAnyFunctionType partialSubstFormalType =
       cast<FunctionType>(
@@ -392,7 +392,7 @@ public:
                              SILDeclRef name,
                              CanAnyFunctionType substFormalType,
                              SILLocation l) {
-    Callee callee(Kind::ArchetypeMethod, gen, value, name,
+    Callee callee(Kind::WitnessMethod, gen, value, name,
                   substFormalType, l);
     callee.addProtocolSelfToFormalType(gen.SGM, name);
     return callee;
@@ -453,7 +453,7 @@ public:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::PeerMethod:
-    case Kind::ArchetypeMethod:
+    case Kind::WitnessMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
       return method.methodName.uncurryLevel;
@@ -545,7 +545,7 @@ public:
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
-    case Kind::ArchetypeMethod: {
+    case Kind::WitnessMethod: {
       assert(level >= 1
              && "currying 'self' of generic method dispatch not yet supported");
       assert(level <= method.methodName.uncurryLevel
@@ -644,7 +644,7 @@ public:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
     case Kind::PeerMethod:
-    case Kind::ArchetypeMethod:
+    case Kind::WitnessMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
       return Nothing;

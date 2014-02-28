@@ -812,22 +812,22 @@ public:
 
   void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
-                                        "result of archetype_method");
+                                        "result of witness_method");
 
     auto *protocol
       = dyn_cast<ProtocolDecl>(AMI->getMember().getDecl()->getDeclContext());
     require(protocol,
-            "archetype_method method must be a protocol method");
+            "witness_method method must be a protocol method");
 
     require(methodType->isThin(),
-            "result of archetype_method must be thin function");
+            "result of witness_method must be thin function");
     
     require(methodType->getAbstractCC()
               == F.getModule().Types.getProtocolWitnessCC(protocol),
-            "result of archetype_method must have correct @cc for protocol");
+            "result of witness_method must have correct @cc for protocol");
 
     require(methodType->isPolymorphic(),
-            "result of archetype_method must be polymorphic");
+            "result of witness_method must be polymorphic");
 
     auto selfGenericParam
       = methodType->getGenericSignature()->getGenericParams()[0];

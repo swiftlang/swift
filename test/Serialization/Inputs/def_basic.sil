@@ -204,14 +204,14 @@ protocol Runcible {
 
 //sil @_TF4arch20archetype_member_refUS_8Runcible___FT1xQ__T_ : $@thin <T : Runcible> (T) -> () {
 //bb0(%0 : $*T):
-  //%1 = archetype_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int
+  //%1 = witness_method $*T, #Runcible.free_method!1 : $@cc(method) (@inout T) -> Int
   //%2 = apply %1(%0) : $@cc(method) ((), @inout T) -> Int
   //%3 = alloc_stack $@thick T.U.Type
-  //%4 = archetype_method $*T, #Runcible.associated_method!1 : $@cc(method) (@inout T) -> @thick T.U.Type
+  //%4 = witness_method $*T, #Runcible.associated_method!1 : $@cc(method) (@inout T) -> @thick T.U.Type
   //%5 = apply %4(%0) : $@cc(method) ((), @inout T) -> @thick T.U.Type
   //%6 = store %5 to %3#1 : $*@thick T.U.Type
   //%7 = metatype $@thick T.Type
-  //%8 = archetype_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
+  //%8 = witness_method [volatile] $*T, #Runcible.static_method!1 : $(@thick T.Type) -> ()
   //%9 = apply %8(%7) : $((), @thick T.Type) -> ()
   //%10 = dealloc_stack %3#0 : $*@local_storage @thick T.U.Type
   //%11 = tuple ()

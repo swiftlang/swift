@@ -42,7 +42,7 @@ static const unsigned RecursionMaxDepth = 8;
 
 STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
-STATISTIC(NumAMI, "Number of archetype_method devirtualzied");
+STATISTIC(NumAMI, "Number of witness_method devirtualzied");
 STATISTIC(NumArgSpecialized, "# functions specialized on polymorphic args");
 
 /// Given two SILResolvedArgIdxLists from the same function, return true if
@@ -1173,9 +1173,9 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   // Find call sites that may participate in deep devirtualization.
   collectPolyArgs(AI);
 
-  // Devirtualize apply instructions that call archetype_method instructions:
+  // Devirtualize apply instructions that call witness_method instructions:
   //
-  //   %8 = archetype_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   ArchetypeMethodInst *AMI = dyn_cast<ArchetypeMethodInst>(AI->getCallee());

@@ -2878,7 +2878,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
   case AbstractCC::ObjCMethod:
-    // An ObjC archetype_method reference will notionally have polymorphic type
+    // An ObjC witness_method reference will notionally have polymorphic type
     // <Self: P> (...) -> (...), but there are no polymorphic parameters that
     // can't be solved from the usual ObjC metadata.
     return false;

@@ -924,7 +924,7 @@ public:
     OS << " : " << AMI->getType();
   }
   void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
-    OS << "archetype_method ";
+    OS << "witness_method ";
     if (AMI->isVolatile())
       OS << "[volatile] ";
     AMI->getLookupType().print(OS);

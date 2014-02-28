@@ -113,7 +113,7 @@ private:
   void visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
-    // Specialize the Self substitution of the archetype_method.
+    // Specialize the Self substitution of the witness_method.
     auto sub =
     Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
                                       CallerInst->getSubstitutions());
