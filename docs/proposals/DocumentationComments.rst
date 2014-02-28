@@ -63,7 +63,7 @@ Here is how documentation comments can look like in ReST markup::
   func foo(bar: Int) -> Double {
   }
 
-ReST specification is avaliable here:
+ReST specification is available here:
 
 http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
 
