@@ -518,6 +518,18 @@ private:
       return metadata;
     }
 
+    // Partial application thunks.
+    if (Mangled.nextIf('P')) {
+      if (!Mangled.nextIf('A')) return nullptr;
+      Node::Kind kind = Node::Kind::PartialApplyForwarder;
+      if (Mangled.nextIf('o'))
+        kind = Node::Kind::PartialApplyObjCForwarder;
+      auto forwarder = Node::create(kind);
+      if (Mangled.nextIf("__T"))
+        DEMANGLE_CHILD_OR_RETURN(forwarder, Global);
+      return forwarder;
+    }
+
     // Top-level types, for various consumers.
     if (Mangled.nextIf('t')) {
       return demangleType();
@@ -2203,6 +2215,20 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     print(pointer->getChild(0));
     return;
   }
+  case Node::Kind::PartialApplyForwarder:
+    Printer << "partial apply forwarder";
+    if (pointer->hasChildren()) {
+      Printer << " for ";
+      print(pointer->getFirstChild());
+    }
+    return;
+  case Node::Kind::PartialApplyObjCForwarder:
+    Printer << "partial apply ObjC forwarder";
+    if (pointer->hasChildren()) {
+      Printer << " for ";
+      print(pointer->getFirstChild());
+    }
+    return;
   case Node::Kind::FieldOffset: {
     print(pointer->getChild(0)); // directness
     Printer << "field offset for ";
