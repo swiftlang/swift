@@ -1443,16 +1443,78 @@ public:
     return D->getKind() == DeclKind::IfConfig;
   }
 };
-
+  
+/// A declaration name, which may comprise one or more identifier pieces.
+class ValueName {
+  // Either a single identifier piece stored inline, or a reference to an array
+  // of identifier pieces owned by the ASTContext.
+  llvm::PointerUnion<Identifier, Identifier*> First;
+  // The size of a referenced component array, or zero if the identifier is
+  // stored in-line.
+  unsigned Count;
+  
+public:
+  /// Build a null name.
+  ValueName() : First(Identifier()), Count(0) {}
+  
+  /// Build a simple value name with one component.
+  /*implicit*/ ValueName(Identifier simpleName)
+    : First(simpleName), Count(0) {}
+  
+  /// Build a compound value name.
+  explicit ValueName(MutableArrayRef<Identifier> components)
+    : First(components.data()), Count(components.size())
+  {
+    assert(Count > 0 && "must have at least one name component");
+  }
+  
+  /// Get the first name component. This is the name that is looked up in
+  /// "C-style" property accesses, such as 'foo.bar' or 'foo.bar(1, 2)'.
+  ///
+  /// TODO: Eventually compound names should not return a name here.
+  Identifier getSimpleName() const {
+    if (Count)
+      return *First.get<Identifier*>();
+      
+    return First.get<Identifier>();
+  }
+  
+  /// Get the components array.
+  ArrayRef<Identifier> getComponents() const {
+    if (Count)
+      return {First.get<Identifier*>(), Count};
+    auto name = First.get<Identifier>();
+    if (name.get())
+      return name;
+    return {};
+  }
+  
+  explicit operator bool() const {
+    if (Count)
+      return true;
+    return First.get<Identifier>().get();
+  }
+  
+  /// True if this is a simple one-component name.
+  bool isSimpleName() const {
+    return Count <= 1;
+  }
+  
+  /// True if this name is an operator.
+  bool isOperator() const {
+    return isSimpleName() && getSimpleName().isOperator();
+  }
+};
+  
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
-  Identifier Name;
+  ValueName Name;
   SourceLoc NameLoc;
   Type Ty;
 
 protected:
-  ValueDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc)
+  ValueDecl(DeclKind K, DeclContext *DC, ValueName name, SourceLoc NameLoc)
     : Decl(K, DC), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.ConformsToProtocolRequrement = false;
   }
@@ -1466,10 +1528,14 @@ public:
   /// swift code.
   bool isDefinition() const;
 
-  bool hasName() const { return !Name.empty(); }
-  Identifier getName() const { return Name; }
+  bool hasName() const { return bool(Name); }
+  /// TODO: Rename to getSimpleName?
+  Identifier getName() const { return Name.getSimpleName(); }
   bool isOperator() const { return Name.isOperator(); }
-
+  /// TODO: Rename to getName?
+  ValueName getFullName() const { return Name; }
+  
+  
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
