@@ -1682,7 +1682,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   SILType metaTy = getLoweredLoadableType(
     MetatypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
   if (base.getType().getSwiftRValueType()->isExistentialType())
-    return B.createProtocolMetatype(loc, metaTy, base);
+    return B.createExistentialMetatype(loc, metaTy, base);
   if (base.getType().getSwiftType()->getClassOrBoundGenericClass()
       || base.getType().getSwiftRValueType()->is<ArchetypeType>())
     return B.createValueMetatype(loc, metaTy, base);

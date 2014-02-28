@@ -652,9 +652,9 @@ SILCloner<ImplClass>::visitValueMetatypeInst(ValueMetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitProtocolMetatypeInst(ProtocolMetatypeInst *Inst) {
+SILCloner<ImplClass>::visitExistentialMetatypeInst(ExistentialMetatypeInst *Inst) {
   doPostProcess(Inst,
-    Builder.createProtocolMetatype(getOpLocation(Inst->getLoc()),
+    Builder.createExistentialMetatype(getOpLocation(Inst->getLoc()),
                                    getOpType(Inst->getType()),
                                    getOpValue(Inst->getOperand())));
 }

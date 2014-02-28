@@ -618,16 +618,16 @@ public:
             CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
             "value_metatype result must be metatype of operand type");
   }
-  void checkProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
+  void checkExistentialMetatypeInst(ExistentialMetatypeInst *MI) {
     require(MI->getType().is<MetatypeType>(),
-            "protocol_metatype instruction must be of metatype type");
+            "existential_metatype instruction must be of metatype type");
     require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
-            "protocol_metatype operand must be of protocol type");
+            "existential_metatype operand must be of protocol type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
             CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
-            "protocol_metatype result must be metatype of operand type");
+            "existential_metatype result must be metatype of operand type");
   }
   
   void checkStrongRetainInst(StrongRetainInst *RI) {

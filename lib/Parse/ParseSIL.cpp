@@ -1012,7 +1012,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
-    .Case("protocol_metatype", ValueKind::ProtocolMetatypeInst)
+    .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
@@ -1684,7 +1684,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   case ValueKind::DeallocBoxInst:
   case ValueKind::ValueMetatypeInst:
-  case ValueKind::ProtocolMetatypeInst: {
+  case ValueKind::ExistentialMetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -1695,8 +1695,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::ValueMetatypeInst:
       ResultVal = B.createValueMetatype(InstLoc, Ty, Val);
       break;
-    case ValueKind::ProtocolMetatypeInst:
-      ResultVal = B.createProtocolMetatype(InstLoc, Ty, Val);
+    case ValueKind::ExistentialMetatypeInst:
+      ResultVal = B.createExistentialMetatype(InstLoc, Ty, Val);
       break;
     case ValueKind::DeallocBoxInst:
       ResultVal = B.createDeallocBox(InstLoc, Ty, Val);

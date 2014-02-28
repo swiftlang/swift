@@ -204,7 +204,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::PointerToAddressInst:
   case ValueKind::ProjectExistentialInst:
   case ValueKind::ProjectExistentialRefInst:
-  case ValueKind::ProtocolMetatypeInst:
+  case ValueKind::ExistentialMetatypeInst:
   case ValueKind::ProtocolMethodInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefElementAddrInst:

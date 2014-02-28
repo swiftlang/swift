@@ -78,7 +78,7 @@
 		  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
-                    "protocol_metatype") 'words) . font-lock-keyword-face)
+                    "existential_metatype") 'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("copy_value" "destroy_value" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"

@@ -575,7 +575,7 @@ public:
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitValueMetatypeInst(ValueMetatypeInst *i);
-  void visitProtocolMetatypeInst(ProtocolMetatypeInst *i);
+  void visitExistentialMetatypeInst(ExistentialMetatypeInst *i);
   void visitTupleExtractInst(TupleExtractInst *i);
   void visitTupleElementAddrInst(TupleElementAddrInst *i);
   void visitStructExtractInst(StructExtractInst *i);
@@ -1365,8 +1365,8 @@ void IRGenSILFunction::visitValueMetatypeInst(
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
-void IRGenSILFunction::visitProtocolMetatypeInst(
-                                               swift::ProtocolMetatypeInst *i) {
+void IRGenSILFunction::visitExistentialMetatypeInst(
+                                               swift::ExistentialMetatypeInst *i) {
   llvm::Value *metatype;
   if (i->getOperand().getType().isClassExistentialType()) {
     Explosion existential = getLoweredExplosion(i->getOperand());

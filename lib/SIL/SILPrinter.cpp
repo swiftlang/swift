@@ -978,8 +978,8 @@ public:
     OS << "value_metatype " << MI->getType() << ", "
        << getIDAndType(MI->getOperand());
   }
-  void visitProtocolMetatypeInst(ProtocolMetatypeInst *MI) {
-    OS << "protocol_metatype " << MI->getType() << ", "
+  void visitExistentialMetatypeInst(ExistentialMetatypeInst *MI) {
+    OS << "existential_metatype " << MI->getType() << ", "
        << getIDAndType(MI->getOperand());
   }
   void visitMetatypeInst(MetatypeInst *MI) {

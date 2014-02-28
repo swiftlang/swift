@@ -344,7 +344,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::DeallocBoxInst:
   case ValueKind::ValueMetatypeInst:
-  case ValueKind::ProtocolMetatypeInst:
+  case ValueKind::ExistentialMetatypeInst:
   case ValueKind::AllocArrayInst: {
     SILValue operand;
     SILType Ty;
@@ -354,9 +354,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       operand = cast<ValueMetatypeInst>(&SI)->getOperand();
       Ty = cast<ValueMetatypeInst>(&SI)->getType();
       break;
-    case ValueKind::ProtocolMetatypeInst:
-      operand = cast<ProtocolMetatypeInst>(&SI)->getOperand();
-      Ty = cast<ProtocolMetatypeInst>(&SI)->getType();
+    case ValueKind::ExistentialMetatypeInst:
+      operand = cast<ExistentialMetatypeInst>(&SI)->getOperand();
+      Ty = cast<ExistentialMetatypeInst>(&SI)->getType();
       break;
     case ValueKind::DeallocBoxInst:
       operand = cast<DeallocBoxInst>(&SI)->getOperand();

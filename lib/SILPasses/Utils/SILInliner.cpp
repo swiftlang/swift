@@ -373,7 +373,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::PeerMethodInst:
     case ValueKind::ProjectExistentialInst:
     case ValueKind::ProjectExistentialRefInst:
-    case ValueKind::ProtocolMetatypeInst:
+    case ValueKind::ExistentialMetatypeInst:
     case ValueKind::ProtocolMethodInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::RefToUnownedInst:

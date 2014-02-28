@@ -2407,7 +2407,7 @@ metatype
 Creates a reference to the metatype object for type ``T``.
 
 value_metatype
-``````````````````
+``````````````
 ::
 
   sil-instruction ::= 'value_metatype' sil-type ',' sil-operand
@@ -2418,13 +2418,13 @@ value_metatype
 
 Obtains a reference to the dynamic metatype of the value ``%0``.
 
-protocol_metatype
-`````````````````
+existential_metatype
+````````````````````
 ::
 
-  sil-instruction ::= 'protocol_metatype' sil-type ',' sil-operand
+  sil-instruction ::= 'existential_metatype' sil-type ',' sil-operand
 
-  %1 = protocol_metatype $P.metatype, %0 : $P
+  %1 = existential_metatype $P.metatype, %0 : $P
   // %0 must be a value of class protocol or protocol composition
   //   type $P, or an address of address-only protocol type $*P
   // %1 will be a $P.metatype value referencing the metatype of the

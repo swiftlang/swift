@@ -638,10 +638,10 @@ public:
                     ValueMetatypeInst(Loc, Metatype, Base));
   }
   
-  ProtocolMetatypeInst *createProtocolMetatype(SILLocation Loc,
+  ExistentialMetatypeInst *createExistentialMetatype(SILLocation Loc,
                                                SILType Metatype,
                                                SILValue Base) {
-    return insert(new (F.getModule()) ProtocolMetatypeInst(Loc, Metatype,Base));
+    return insert(new (F.getModule()) ExistentialMetatypeInst(Loc, Metatype,Base));
   }
   
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand) {

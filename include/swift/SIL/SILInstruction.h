@@ -1465,13 +1465,13 @@ public:
     : UnaryInstructionBase(Loc, Base, Metatype) {}
 };
 
-/// ProtocolMetatype - Represents loading a dynamic metatype from an
+/// ExistentialMetatype - Represents loading a dynamic metatype from an
 /// existential container.
-class ProtocolMetatypeInst
-  : public UnaryInstructionBase<ValueKind::ProtocolMetatypeInst>
+class ExistentialMetatypeInst
+  : public UnaryInstructionBase<ValueKind::ExistentialMetatypeInst>
 {
 public:
-  ProtocolMetatypeInst(SILLocation Loc, SILType Metatype, SILValue Base)
+  ExistentialMetatypeInst(SILLocation Loc, SILType Metatype, SILValue Base)
     : UnaryInstructionBase(Loc, Base, Metatype) {}
 };
 
