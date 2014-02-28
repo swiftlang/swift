@@ -744,9 +744,9 @@ SILCloner<ImplClass>::visitPeerMethodInst(PeerMethodInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
+SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   doPostProcess(Inst,
-    Builder.createArchetypeMethod(getOpLocation(Inst->getLoc()),
+    Builder.createWitnessMethod(getOpLocation(Inst->getLoc()),
                                   getOpType(Inst->getLookupType()),
                                   getOpConformance(Inst->getLookupType(),
                                                    Inst->getConformance()),

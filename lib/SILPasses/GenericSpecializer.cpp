@@ -110,7 +110,7 @@ private:
    doPostProcess(Inst, N);
  }
 
-  void visitArchetypeMethodInst(ArchetypeMethodInst *Inst) {
+  void visitWitnessMethodInst(WitnessMethodInst *Inst) {
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
     // Specialize the Self substitution of the witness_method.
@@ -122,7 +122,7 @@ private:
            "didn't get conformance from substitution?!");
 
     doPostProcess(Inst,Builder.
-                  createArchetypeMethod(getOpLocation(Inst->getLoc()),
+                  createWitnessMethod(getOpLocation(Inst->getLoc()),
                                         getOpType(Inst->getLookupType()),
                                         getOpConformance(Inst->getLookupType(),
                                                          sub.Conformance[0]),

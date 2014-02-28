@@ -1663,18 +1663,18 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// ArchetypeMethodInst - Given a type, a protocol conformance,
+/// WitnessMethodInst - Given a type, a protocol conformance,
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.
-class ArchetypeMethodInst : public MethodInst {
+class WitnessMethodInst : public MethodInst {
   SILType LookupType;
   ProtocolConformance *Conformance;
 public:
-  ArchetypeMethodInst(SILLocation Loc, SILType LookupType,
+  WitnessMethodInst(SILLocation Loc, SILType LookupType,
                       ProtocolConformance *Conformance,
                       SILDeclRef Member,
                       SILType Ty, bool Volatile = false)
-    : MethodInst(ValueKind::ArchetypeMethodInst, Loc, Ty, Member, Volatile),
+    : MethodInst(ValueKind::WitnessMethodInst, Loc, Ty, Member, Volatile),
       LookupType(LookupType), Conformance(Conformance)
   {}
 
@@ -1696,7 +1696,7 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 
   static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::ArchetypeMethodInst;
+    return V->getKind() == ValueKind::WitnessMethodInst;
   }
 };
 

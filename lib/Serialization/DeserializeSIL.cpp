@@ -1277,7 +1277,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                              ResultTy);
     break;
   }
-  case ValueKind::ArchetypeMethodInst:
+  case ValueKind::WitnessMethodInst:
   case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
@@ -1286,7 +1286,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
     // and an operand.
-    // ArchetypeMethodInst is additionally optionally followed by a
+    // WitnessMethodInst is additionally optionally followed by a
     // ProtocolConformance record.
     unsigned NextValueIndex = 1;
     SILDeclRef DRef = getSILDeclRef(MF, ListOfValues, NextValueIndex);
@@ -1300,13 +1300,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::ArchetypeMethodInst: {
+    case ValueKind::WitnessMethodInst: {
       auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
                                                       SILCursor);
       ProtocolConformance *conformance
         = conformancePair ? conformancePair->second : nullptr;
 
-      ResultVal = Builder.createArchetypeMethod(Loc, Ty,
+      ResultVal = Builder.createWitnessMethod(Loc, Ty,
                                                 conformance, DRef,
                                                 operandTy, IsVolatile);
       break;

@@ -1178,7 +1178,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
-  ArchetypeMethodInst *AMI = dyn_cast<ArchetypeMethodInst>(AI->getCallee());
+  WitnessMethodInst *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee());
   if (AMI && AMI->getConformance() ) {
     // Lookup the function reference in the witness tables.
     std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =

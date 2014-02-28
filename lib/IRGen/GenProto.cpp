@@ -4088,7 +4088,7 @@ static void getWitnessMethodValue(IRGenFunction &IGF,
 }
 
 void
-irgen::emitArchetypeMethodValue(IRGenFunction &IGF,
+irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
                                 SILDeclRef member,
                                 ProtocolConformance *conformance,

@@ -95,7 +95,7 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::AllocBoxInst:
   case ValueKind::AllocArrayInst:
   case ValueKind::MetatypeInst:
-  case ValueKind::ArchetypeMethodInst:
+  case ValueKind::WitnessMethodInst:
     return true;
 
   // DeallocStackInst do not use reference counted values, only local storage

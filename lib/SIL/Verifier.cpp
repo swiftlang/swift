@@ -800,7 +800,7 @@ public:
     return selfTy.getSwiftRValueType();
   }
 
-  void checkArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+  void checkWitnessMethodInst(WitnessMethodInst *AMI) {
     auto methodType = requireObjectType(SILFunctionType, AMI,
                                         "result of witness_method");
 

@@ -1059,10 +1059,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         UI->hasOperand() ? UI->getOperand().getResultNumber() : 0);
     break;
   }
-  case ValueKind::ArchetypeMethodInst: {
+  case ValueKind::WitnessMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.
-    const ArchetypeMethodInst *AMI = cast<ArchetypeMethodInst>(&SI);
+    const WitnessMethodInst *AMI = cast<WitnessMethodInst>(&SI);
     SILType Ty = AMI->getLookupType();
     SILType Ty2 = AMI->getType(0);
 

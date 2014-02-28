@@ -557,7 +557,7 @@ public:
       // Look up the witness for the archetype.
       auto selfType = getProtocolSelfType(gen.SGM);
       auto archetype = getArchetypeForSelf(selfType);
-      SILValue fn = gen.B.createArchetypeMethod(Loc,
+      SILValue fn = gen.B.createWitnessMethod(Loc,
                                   SILType::getPrimitiveObjectType(archetype),
                                   /*conformance*/ nullptr,
                                   constant,

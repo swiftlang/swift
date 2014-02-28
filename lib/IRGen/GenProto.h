@@ -102,7 +102,7 @@ namespace irgen {
 
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
-  void emitArchetypeMethodValue(IRGenFunction &IGF,
+  void emitWitnessMethodValue(IRGenFunction &IGF,
                                 SILType baseTy,
                                 SILDeclRef member,
                                 ProtocolConformance *conformance,

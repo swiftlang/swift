@@ -960,7 +960,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
     .Case("value_metatype", ValueKind::ValueMetatypeInst)
-    .Case("witness_method", ValueKind::ArchetypeMethodInst)
+    .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
     .Case("assign", ValueKind::AssignInst)
     .Case("autorelease_return", ValueKind::AutoreleaseReturnInst)
@@ -1951,7 +1951,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
-  case ValueKind::ArchetypeMethodInst: {
+  case ValueKind::WitnessMethodInst: {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, *this, "volatile"))
       return true;
@@ -1971,7 +1971,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ProtocolDecl *proto
       = dyn_cast<ProtocolDecl>(Member.getDecl()->getDeclContext());
     if (!proto) {
-      P.diagnose(TyLoc, diag::sil_archetype_method_not_protocol);
+      P.diagnose(TyLoc, diag::sil_witness_method_not_protocol);
       return true;
     }
     ProtocolConformance *Conformance = nullptr;
@@ -1979,13 +1979,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       auto lookup = P.SF.getParentModule()->lookupConformance(
                                 LookupTy.getSwiftRValueType(), proto, nullptr);
       if (lookup.getInt() != ConformanceKind::Conforms) {
-        P.diagnose(TyLoc, diag::sil_archetype_method_type_does_not_conform);
+        P.diagnose(TyLoc, diag::sil_witness_method_type_does_not_conform);
         return true;
       }
       Conformance = lookup.getPointer();
     }
     
-    ResultVal = B.createArchetypeMethod(InstLoc, LookupTy, Conformance, Member,
+    ResultVal = B.createWitnessMethod(InstLoc, LookupTy, Conformance, Member,
                                         MethodTy, IsVolatile);
     break;
   }

@@ -923,7 +923,7 @@ public:
     printMethodInst(AMI, AMI->getOperand(), "peer_method");
     OS << " : " << AMI->getType();
   }
-  void visitArchetypeMethodInst(ArchetypeMethodInst *AMI) {
+  void visitWitnessMethodInst(WitnessMethodInst *AMI) {
     OS << "witness_method ";
     if (AMI->isVolatile())
       OS << "[volatile] ";

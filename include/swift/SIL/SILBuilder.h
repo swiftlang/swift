@@ -531,14 +531,14 @@ public:
                   PeerMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
 
-  ArchetypeMethodInst *createArchetypeMethod(SILLocation Loc, SILType LookupTy,
+  WitnessMethodInst *createWitnessMethod(SILLocation Loc, SILType LookupTy,
                                              ProtocolConformance *Conformance,
                                              SILDeclRef Member,
                                              SILType MethodTy,
                                              bool Volatile = false)
   {
     return insert(new (F.getModule())
-                    ArchetypeMethodInst(Loc, LookupTy, Conformance,
+                    WitnessMethodInst(Loc, LookupTy, Conformance,
                                         Member, MethodTy,
                                         Volatile));
   }

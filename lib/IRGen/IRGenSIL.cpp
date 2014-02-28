@@ -585,7 +585,7 @@ public:
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
   void visitPeerMethodInst(PeerMethodInst *i);
-  void visitArchetypeMethodInst(ArchetypeMethodInst *i);
+  void visitWitnessMethodInst(WitnessMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   void visitDynamicMethodInst(DynamicMethodInst *i);
 
@@ -2851,7 +2851,7 @@ void IRGenSILFunction::visitDynamicMethodInst(DynamicMethodInst *i) {
   return;
 }
 
-void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
+void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   // For Objective-C classes we need to arrange for a msgSend
   // to happen when the method is called.
   if (i->getMember().isForeign) {
@@ -2864,7 +2864,7 @@ void IRGenSILFunction::visitArchetypeMethodInst(swift::ArchetypeMethodInst *i) {
   SILDeclRef member = i->getMember();
 
   Explosion lowered(ResilienceExpansion::Maximal);
-  emitArchetypeMethodValue(*this, baseTy, member, conformance, lowered);
+  emitWitnessMethodValue(*this, baseTy, member, conformance, lowered);
   
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
