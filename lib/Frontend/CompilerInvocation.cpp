@@ -647,6 +647,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.VerifyAll = Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll = Args.hasArg(OPT_sil_print_all);
   Opts.TimeTransforms = Args.hasArg(OPT_sil_time_transforms);
+  Opts.DebugSerialization = Args.hasArg(OPT_sil_debug_serialization);
 
   return false;
 }

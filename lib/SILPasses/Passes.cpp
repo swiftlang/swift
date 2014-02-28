@@ -47,7 +47,18 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.registerAnalysis(createCallGraphAnalysis(&Module));
   PM.registerAnalysis(createAliasAnalysis(&Module));
   PM.registerAnalysis(createDominanceAnalysis(&Module));
-  PM.add(createMandatoryInlining());
+
+  // If we are asked do debug serialization, instead of running all diagnostic
+  // passes, just run mandatory inlining with dead transparent function cleanup
+  // disabled.
+  PM.add(createMandatoryInlining(Options.LinkMode,
+                                 !Options.DebugSerialization/*ShouldCleanup*/));
+  if (Options.DebugSerialization) {
+    PM.run();
+    return Ctx.hadError();
+  }
+
+  // Otherwise run the rest of diagnostics.
   PM.add(createCapturePromotion());
   PM.add(createAllocBoxToStack());
   PM.add(createInOutDeshadowing());

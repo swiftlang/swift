@@ -17,8 +17,9 @@
 #ifndef SWIFT_SILPASSES_PASSES_H
 #define SWIFT_SILPASSES_PASSES_H
 
+#include "swift/SIL/SILModule.h"
+
 namespace swift {
-  class SILModule;
   class SILOptions;
   class SILTransform;
 
@@ -51,7 +52,8 @@ namespace swift {
   SILTransform *createPredictableMemoryOptimizations();
   SILTransform *createConstantPropagation();
   SILTransform *createDCE();
-  SILTransform *createMandatoryInlining();
+  SILTransform *createMandatoryInlining(SILModule::LinkingMode Mode,
+                                        bool ShouldCleanup=true);
   SILTransform *createSILCleanup();
   SILTransform *createEmitDFDiagnostics();
 

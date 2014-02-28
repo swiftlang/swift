@@ -201,7 +201,8 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
 static SILFunction *
 getCalleeFunction(ApplyInst* AI, bool &IsThick,
                   SmallVectorImpl<SILValue>& CaptureArgs,
-                  SmallVectorImpl<SILValue>& FullArgs) {
+                  SmallVectorImpl<SILValue>& FullArgs,
+                  SILModule::LinkingMode Mode) {
   if (!AI->isTransparent())
     return nullptr;
 
@@ -278,9 +279,16 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   assert(CalleeValue.getResultNumber() == 0);
 
   SILFunction *CalleeFunction = FRI->getReferencedFunction();
-  if (!CalleeFunction || CalleeFunction->empty() ||
+
+  if (!CalleeFunction ||
       (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
        CalleeFunction->getAbstractCC() != AbstractCC::Method))
+    return nullptr;
+
+  // If CalleeFunction is a declaration, see if we can load it. If we fail to
+  // load it, bail.
+  if (CalleeFunction->empty() && !AI->getModule().linkFunction(CalleeFunction,
+                                                               Mode))
     return nullptr;
   return CalleeFunction;
 }
@@ -301,6 +309,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
 runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
+                         SILModule::LinkingMode Mode,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet) {
@@ -318,7 +327,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
              diag::circular_transparent);
     return false;
   }
-  
+
   // Add to the current inlining set (immutably, so we only affect the set
   // during this call and recursive subcalls).
   CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
@@ -339,15 +348,17 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       SILValue CalleeValue = InnerAI->getCallee();
       bool IsThick;
       SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
-                                                      CaptureArgs, FullArgs);
+                                                      CaptureArgs, FullArgs,
+                                                      Mode);
       if (!CalleeFunction) {
         ++I;
         continue;
       }
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, FullyInlinedSet,
-                                    SetFactory, CurrentInliningSet)) {
+      if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
+                                    FullyInlinedSet, SetFactory,
+                                    CurrentInliningSet)) {
         // If we failed due to circular inlining, then emit some notes to
         // trace back the failure if we have more information.
         // FIXME: possibly it could be worth recovering and attempting other
@@ -363,7 +374,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       }
 
       auto *ApplyBlock = InnerAI->getParent();
-      
+
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
       // process the inlined body after inlining, because the inlining may
@@ -420,52 +431,60 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static void performSILMandatoryInlining(SILModule *M) {
-  DenseFunctionSet FullyInlinedSet;
-  ImmutableFunctionSet::Factory SetFactory;
-  for (auto &F : *M)
-    runOnFunctionRecursively(&F, nullptr, FullyInlinedSet, SetFactory,
-                              SetFactory.getEmptySet());
-
-  // Now that we've inlined some functions, clean up.  If there are any
-  // transparent functions that are deserialized from another module that are
-  // now unused, just remove them from the module.
-  //
-  // We do this with a simple linear scan, because transparent functions that
-  // reference each other have already been flattened.
-  for (auto FI = M->begin(), E = M->end(); FI != E; ) {
-    SILFunction &F = *FI++;
-
-    if (F.getRefCount() != 0) continue;
-
-    // We can always remove transparent functions.  We can also remove functions
-    // that came from closures.
-    if (!F.isTransparent() &&
-        (!F.hasLocation() || !F.getLocation().isASTNode<Expr>() ||
-         !F.getLocation().isASTNode<AbstractClosureExpr>()))
-      continue;
-
-    // We discard functions that don't have external linkage, e.g. deserialized
-    // functions, internal functions, and thunks.  Being marked transparent
-    // controls this.
-    if (isPossiblyUsedExternally(F.getLinkage())) continue;
-
-    // Okay, just erase the function from the module.
-    M->getFunctionList().erase(&F);
-  }
-}
-
 class MandatoryInlining : public SILModuleTransform {
-
+  SILModule::LinkingMode Mode;
+  bool ShouldCleanup;
+public:
+  MandatoryInlining(SILModule::LinkingMode M, bool C) : SILModuleTransform(),
+                                                        Mode(M),
+                                                        ShouldCleanup(C) {}
+private:
   /// The entry point to the transformation.
   void run() {
-    performSILMandatoryInlining(getModule());
+    SILModule *M = getModule();
+    DenseFunctionSet FullyInlinedSet;
+    ImmutableFunctionSet::Factory SetFactory;
+    for (auto &F : *M)
+      runOnFunctionRecursively(&F, nullptr, Mode, FullyInlinedSet, SetFactory,
+                               SetFactory.getEmptySet());
+
+    if (!ShouldCleanup)
+      return;
+
+    // Now that we've inlined some functions, clean up.  If there are any
+    // transparent functions that are deserialized from another module that are
+    // now unused, just remove them from the module.
+    //
+    // We do this with a simple linear scan, because transparent functions that
+    // reference each other have already been flattened.
+    for (auto FI = M->begin(), E = M->end(); FI != E; ) {
+      SILFunction &F = *FI++;
+
+      if (F.getRefCount() != 0) continue;
+
+      // We can always remove transparent functions.  We can also remove functions
+      // that came from closures.
+      if (!F.isTransparent() &&
+          (!F.hasLocation() || !F.getLocation().isASTNode<Expr>() ||
+           !F.getLocation().isASTNode<AbstractClosureExpr>()))
+        continue;
+
+      // We discard functions that don't have external linkage, e.g. deserialized
+      // functions, internal functions, and thunks.  Being marked transparent
+      // controls this.
+      if (isPossiblyUsedExternally(F.getLinkage())) continue;
+
+      // Okay, just erase the function from the module.
+      M->getFunctionList().erase(&F);
+    }
+
     invalidateAnalysis(SILAnalysis::InvalidationKind::All);
   }
 
   StringRef getName() override { return "Mandatory Inlining"; }
 };
 
-SILTransform *swift::createMandatoryInlining() {
-  return new MandatoryInlining();
+SILTransform *swift::createMandatoryInlining(SILModule::LinkingMode Mode,
+                                             bool ShouldCleanup) {
+  return new MandatoryInlining(Mode, ShouldCleanup);
 }

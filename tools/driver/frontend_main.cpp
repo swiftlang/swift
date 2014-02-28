@@ -141,10 +141,6 @@ static bool performCompile(CompilerInstance &Instance,
       SM = performSILGeneration(*PrimarySourceFile);
     else
       SM = performSILGeneration(Instance.getMainModule());
-
-    // Link in transparent functions.
-    if (Invocation.getSILOptions().LinkMode > SILOptions::LinkNone)
-      performSILLinking(SM.get(), false);
   }
 
   // We've been told to emit SIL after SILGen, so write it now.

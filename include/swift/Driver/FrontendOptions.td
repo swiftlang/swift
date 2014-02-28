@@ -128,6 +128,10 @@ def sil_print_all : Flag<["-"], "sil-print-all">,
 def sil_time_transforms : Flag<["-"], "sil-time-transforms">,
   HelpText<"Time each SIL transform invocation">;
 
+def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
+  HelpText<"Only run mandatory inlining and do not allow inlining to eliminate "
+           "dead functions. (for debugging only)">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

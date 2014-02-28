@@ -58,6 +58,9 @@ public:
   
   /// Stop optimizing after the Nth pass. For debugging purposes.
   unsigned NumOptPassesToRun = UINT_MAX;
+
+  /// Are we debugging sil serialization.
+  bool DebugSerialization = false;
 };
 
 } // end namespace swift

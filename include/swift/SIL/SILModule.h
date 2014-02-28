@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -76,6 +77,7 @@ public:
   using GlobalListType = llvm::ilist<SILGlobalVariable>;
   using VTableListType = llvm::ilist<SILVTable>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
+  using LinkingMode = SILOptions::LinkingMode;
 
 private:
   friend class SILBasicBlock;
@@ -316,6 +318,13 @@ public:
   SILFunction *lookUpFunction(StringRef name) {
     return FunctionTable.lookup(name);
   }
+
+  /// Attempt to link the SILFunction. Returns true if linking succeeded, false
+  /// otherwise.
+  ///
+  /// \return false if the linking failed.
+  bool linkFunction(SILFunction *Fun,
+                    LinkingMode LinkAll=LinkingMode::LinkNormal);
 
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
