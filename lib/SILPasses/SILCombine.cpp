@@ -735,6 +735,9 @@ class SILDeadFuncElimination : public SILModuleTransform {
       Changed |= tryToRemoveFunction(F);
     }
 
+    if (Changed)
+      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
+
     // A bottom-up list of functions, leafs first.
     const std::vector<SILFunction*> &Order = CGA->bottomUpCallGraphOrder();
 
