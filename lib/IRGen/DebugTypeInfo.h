@@ -48,26 +48,17 @@ namespace swift {
       llvm::Type *StorageType;
       Size size;
       Alignment align;
-      /// The scope the variable should be emitted in.
-      // FIXME: This does not belong here.
-      SILDebugScope *DebugScope;
 
       DebugTypeInfo()
-        : Type(nullptr), StorageType(nullptr), size(0), align(1),
-          DebugScope(nullptr) {
-      }
+        : Type(nullptr), StorageType(nullptr), size(0), align(1) {}
       DebugTypeInfo(swift::Type Ty, uint64_t SizeInBytes, uint32_t AlignInBytes,
                     DeclContext *DC);
       DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
                     DeclContext *DC);
-      DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC,
-                    SILDebugScope *DS = nullptr);
-      DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
-                    SILDebugScope *DS = nullptr);
-      DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
-                    SILDebugScope *DS = nullptr);
-      DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info,
-                    SILDebugScope *DS = nullptr);
+      DebugTypeInfo(swift::Type Ty, const TypeInfo &Info, DeclContext *DC);
+      DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
+      DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align);
+      DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info);
       TypeBase* getHash() const { return getType(); }
       TypeBase* getType() const { return Type; }
 
@@ -75,7 +66,6 @@ namespace swift {
         return DeclOrContext.dyn_cast<ValueDecl*>();
       }
 
-      SILDebugScope *getDebugScope() const { return DebugScope; }
       DeclContext *getDeclContext() const {
         if (ValueDecl *D = getDecl()) return D->getDeclContext();
         else return DeclOrContext.get<DeclContext*>();

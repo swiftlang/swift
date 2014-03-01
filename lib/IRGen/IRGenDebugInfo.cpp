@@ -689,9 +689,9 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
   auto TName = BumpAllocatedString(("$swift.type."+Name).str());
   DebugTypeInfo DTI(getMetadataType(),
                     (Size)CI.getTargetInfo().getPointerWidth(0),
-                    (Alignment)CI.getTargetInfo().getPointerAlign(0),
-                    IGF.getDebugScope());
+                    (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DTI,
+                          IGF.getDebugScope(),
                           TName, llvm::dwarf::DW_TAG_auto_variable, 0,
                           // swift.type is a already pointer type,
                           // having a shadow copy doesn't add another
@@ -702,9 +702,10 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
 void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
                                                   llvm::Value *Storage,
                                                   DebugTypeInfo Ty,
+                                                  SILDebugScope *DS,
                                                   StringRef Name,
                                                   IndirectionKind Indirection) {
-  emitVariableDeclaration(B, Storage, Ty, Name,
+  emitVariableDeclaration(B, Storage, Ty, DS, Name,
                           llvm::dwarf::DW_TAG_auto_variable,
                           0, Indirection, RealValue);
 }
@@ -713,17 +714,18 @@ void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
 void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
                                                 llvm::Value *Storage,
                                                 DebugTypeInfo Ty,
+                                                SILDebugScope *DS,
                                                 StringRef Name,
                                                 unsigned ArgNo,
                                                 IndirectionKind Indirection,
                                                 ArtificialKind IsArtificial) {
   assert(ArgNo > 0);
   if (Name == IGM.Context.Id_self.str())
-    emitVariableDeclaration(Builder, Storage, Ty, Name,
+    emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
                             llvm::dwarf::DW_TAG_arg_variable, ArgNo,
                             DirectValue, ArtificialValue);
   else
-    emitVariableDeclaration(Builder, Storage, Ty, Name,
+    emitVariableDeclaration(Builder, Storage, Ty, DS, Name,
                             llvm::dwarf::DW_TAG_arg_variable, ArgNo,
                             Indirection, IsArtificial);
 }
@@ -752,6 +754,7 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
 void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              llvm::Value *Storage,
                                              DebugTypeInfo Ty,
+                                             SILDebugScope *DS,
                                              StringRef Name,
                                              unsigned Tag,
                                              unsigned ArgNo,
@@ -763,8 +766,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     Storage = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
 
   // FIXME: enable this assertion.
-  //assert(Ty.getDebugScope());
-  llvm::DIDescriptor Scope = getOrCreateScope(Ty.getDebugScope());
+  //assert(DS);
+  llvm::DIDescriptor Scope = getOrCreateScope(DS);
   Location Loc = getLoc(SM, Ty.getDecl());
 
   // If this is an argument, attach it to the current function scope.

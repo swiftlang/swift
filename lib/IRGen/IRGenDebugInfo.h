@@ -169,6 +169,7 @@ public:
   void emitVariableDeclaration(IRBuilder& Builder,
                                llvm::Value *Storage,
                                DebugTypeInfo Ty,
+                               SILDebugScope *DS,
                                StringRef Name,
                                unsigned Tag,
                                unsigned ArgNo = 0,
@@ -180,6 +181,7 @@ public:
   void emitStackVariableDeclaration(IRBuilder& Builder,
                                     llvm::Value *Storage,
                                     DebugTypeInfo Ty,
+                                    SILDebugScope *DS,
                                     StringRef Name,
                                     IndirectionKind Indirection = DirectValue);
 
@@ -187,6 +189,7 @@ public:
   void emitArgVariableDeclaration(IRBuilder& Builder,
                                   llvm::Value *Storage,
                                   DebugTypeInfo Ty,
+                                  SILDebugScope *DS,
                                   StringRef Name,
                                   unsigned ArgNo,
                                   IndirectionKind = DirectValue,

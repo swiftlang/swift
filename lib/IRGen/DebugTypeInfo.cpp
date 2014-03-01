@@ -32,8 +32,7 @@ DebugTypeInfo::DebugTypeInfo(swift::Type Ty,
     Type(Ty.getPointer()),
     StorageType(nullptr),
     size(SizeInBytes),
-    align(AlignInBytes),
-    DebugScope(nullptr) {
+    align(AlignInBytes) {
   assert(align.getValue() != 0);
 }
 
@@ -43,8 +42,7 @@ DebugTypeInfo::DebugTypeInfo(swift::Type Ty, Size size, Alignment align,
     Type(Ty.getPointer()),
     StorageType(nullptr),
     size(size),
-    align(align),
-    DebugScope(nullptr) {
+    align(align) {
   assert(align.getValue() != 0);
 }
 
@@ -65,17 +63,14 @@ initFromTypeInfo(Size &size, Alignment &align, llvm::Type *&StorageType,
 }
 
 DebugTypeInfo::DebugTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                             DeclContext *DC, SILDebugScope *DS)
+                             DeclContext *DC)
   : DeclOrContext(DC),
-    Type(Ty.getPointer()),
-    DebugScope(DS) {
+    Type(Ty.getPointer()) {
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
-                             SILDebugScope *DS)
-  : DeclOrContext(Decl),
-    DebugScope(DS) {
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info)
+  : DeclOrContext(Decl) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
@@ -85,13 +80,11 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info,
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
-                             SILDebugScope *DS)
+DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align)
   : DeclOrContext(Decl),
     StorageType(nullptr),
     size(size),
-    align(align),
-    DebugScope(DS)  {
+    align(align) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl))
     Type = AliasDecl->getAliasType();
@@ -102,10 +95,8 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align,
 }
 
 DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
-                             const TypeInfo &Info,
-                             SILDebugScope *DS)
-  : DeclOrContext(Decl),
-    DebugScope(DS) {
+                             const TypeInfo &Info)
+  : DeclOrContext(Decl) {
   // Use the sugared version of the type, if there is one.
   if (auto AliasDecl = dyn_cast<TypeAliasDecl>(Decl)) {
     Type = AliasDecl->getAliasType();

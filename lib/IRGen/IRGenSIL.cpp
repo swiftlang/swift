@@ -467,6 +467,7 @@ public:
   void emitDebugVariableDeclaration(IRBuilder &Builder,
                                     StorageType Storage,
                                     DebugTypeInfo Ty,
+                                    SILDebugScope *DS,
                                     StringRef Name) {
     if (!IGM.DebugInfo) return;
     auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
@@ -474,11 +475,11 @@ public:
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
       IGM.DebugInfo->
         emitArgVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
-                                   Ty, Name, N->second, DirectValue);
+                                   Ty, DS, Name, N->second, DirectValue);
     } else
       IGM.DebugInfo->
         emitStackVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
-                                     Ty, Name, DirectValue);
+                                     Ty, DS, Name, DirectValue);
   }
 
   /// Emit the shared trap block for condfail instructions, or reuse one we
@@ -548,8 +549,8 @@ public:
     if (Vals.size() == 1)
       emitDebugVariableDeclaration
         (Builder, Vals[0],
-         DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
-         Name);
+         DebugTypeInfo(Decl, getTypeInfo(SILVal.getType())),
+         i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
     if (!IGM.DebugInfo) return;
@@ -560,8 +561,8 @@ public:
     auto Val = getLoweredAddress(SILVal).getAddress();
     emitDebugVariableDeclaration
       (Builder, Val,
-       DebugTypeInfo(Decl, getTypeInfo(SILVal.getType()), i->getDebugScope()),
-       Name);
+       DebugTypeInfo(Decl, getTypeInfo(SILVal.getType())),
+       i->getDebugScope(), Name);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
@@ -1119,13 +1120,12 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
     auto Name = Arg->getDecl()->getName().str();
     DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
-                      getTypeInfo(Arg->getType()),
-                      getDebugScope());
+                      getTypeInfo(Arg->getType()));
     if (LoweredArg.isAddress())
       IGM.DebugInfo->
         emitArgVariableDeclaration(Builder,
-                                   emitShadowCopy(LoweredArg.getAddress(), Name),
-                                   DTI, Name, N, DirectValue);
+                                   emitShadowCopy(LoweredArg.getAddress(),Name),
+                                   DTI, getDebugScope(), Name, N, DirectValue);
     else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
       // FIXME: Handle multi-value explosions.
       //
@@ -1138,7 +1138,8 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
       // from within a DWARF expression MDNode.
       auto Vals = getLoweredExplosion(Arg).claimAll();
       if (Vals.size() == 1)
-        IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI, Name, N,
+        IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI,
+                                                  getDebugScope(), Name, N,
                                                   DirectValue, RealValue);
     }
   }
@@ -2288,9 +2289,10 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     // be wrong.
     auto DTI = DebugTypeInfo(Decl,
                              Decl->getType()->getLValueOrInOutObjectType(),
-                             type, i->getDebugScope());
+                             type);
     auto Name = Decl->getName().str();
-    emitDebugVariableDeclaration(Builder, addr.getAddress(), DTI, Name);
+    emitDebugVariableDeclaration(Builder, addr.getAddress(),
+                                 DTI, i->getDebugScope(), Name);
   }
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
@@ -2356,10 +2358,10 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     IGM.DebugInfo->emitStackVariableDeclaration
       (Builder,
        emitShadowCopy(addr.getAddress(), Name),
-       Decl ? DebugTypeInfo(Decl, type, i->getDebugScope())
+       Decl ? DebugTypeInfo(Decl, type)
        : DebugTypeInfo(i->getElementType().getSwiftType(), type,
                        i->getFunction()->getDeclContext()),
-       Name, Indirection);
+       i->getDebugScope(), Name, Indirection);
   }
 }
 
