@@ -787,14 +787,7 @@ struct ASTNodeBase {};
         }
       }
 
-      bool looksLikeSuper = false;
-      {
-        Expr *arg = E->getArg()->getSemanticsProvidingExpr();
-        while (auto ice = dyn_cast<ImplicitConversionExpr>(arg))
-          arg = ice->getSubExpr()->getSemanticsProvidingExpr();
-        looksLikeSuper = isa<SuperRefExpr>(arg);
-      }
-      if (E->isSuper() != looksLikeSuper) {
+      if (E->isSuper() != E->getArg()->isSuperExpr()) {
         Out << "Function application's isSuper() bit mismatch.\n";
         E->dump(Out);
         abort();

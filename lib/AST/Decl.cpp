@@ -1088,8 +1088,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     if (!ctor || ctor->isCompleteObjectInit())
       continue;
 
-    // If this subobject initializer wasn't overridden, we don't have any
-    //
+    // If this subobject initializer wasn't overridden, we can't inherit.
     if (overriddenInits.count(ctor) == 0) {
       ClassDeclBits.InheritsSuperclassInits
         = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
@@ -2184,7 +2183,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
         if (isa<OtherConstructorDeclRefExpr>(
               apply->getFn()->getSemanticsProvidingExpr())) {
           BodyInitKind myKind;
-          if (isa<SuperRefExpr>(apply->getArg()->getSemanticsProvidingExpr()))
+          if (apply->getArg()->isSuperExpr())
             myKind = BodyInitKind::Chained;
           else
             myKind = BodyInitKind::Delegating;

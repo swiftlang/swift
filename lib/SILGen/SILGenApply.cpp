@@ -1073,7 +1073,7 @@ public:
     SILValue superMethod;
     if (constant.isForeign) {
       SILValue Input = super.getValue();
-      if (auto *UI = dyn_cast<UpcastInst>(Input))
+      while (auto *UI = dyn_cast<UpcastInst>(Input))
         Input = UI->getOperand();
       // ObjC super calls require dynamic dispatch.
       setCallee(Callee::forSuperMethod(gen, Input, constant,
@@ -2576,7 +2576,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
       return Callee::forClassMethod(gen, self, constant, substAccessorType,
                                     loc);
 
-    if (auto *upcast = dyn_cast<UpcastInst>(self))
+    while (auto *upcast = dyn_cast<UpcastInst>(self))
       self = upcast->getOperand();
     return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
   }

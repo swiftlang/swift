@@ -506,7 +506,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto &context = tc.Context;
 
-      bool isSuper = isa<SuperRefExpr>(base->getSemanticsProvidingExpr());
+      bool isSuper = base->isSuperExpr();
 
       Type baseTy = base->getType()->getRValueType();
 
@@ -923,7 +923,7 @@ namespace {
       auto baseTy = base->getType()->getRValueType();
 
       // Check whether the base is 'super'.
-      bool isSuper = isa<SuperRefExpr>(base->getSemanticsProvidingExpr());
+      bool isSuper = base->isSuperExpr();
 
       // Handle accesses that implicitly look through UncheckedOptional<T>.
       if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
@@ -1453,7 +1453,7 @@ namespace {
       }
 
       // The subexpression must be either 'self' or 'super'.
-      if (!isa<SuperRefExpr>(arg)) {
+      if (!arg->isSuperExpr()) {
         // 'super' references have already been fully checked; handle the
         // 'self' case below.
         bool diagnoseBadInitRef = true;
@@ -3365,9 +3365,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   apply->setFn(fn);
 
   // Check whether the argument is 'super'.
-  bool isSuper =
-    isa<SuperRefExpr>(apply->getArg()->getSemanticsProvidingExpr());
-  
+  bool isSuper = apply->getArg()->isSuperExpr();
+
   // For function application, convert the argument to the input type of
   // the function.
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {

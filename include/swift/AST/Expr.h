@@ -257,7 +257,11 @@ public:
   void setImplicit(bool Implicit = true) {
     ExprBits.Implicit = Implicit;
   }
-  
+
+  /// Determine whether this expression is 'super', possibly converted to
+  /// a base class.
+  bool isSuperExpr() const;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

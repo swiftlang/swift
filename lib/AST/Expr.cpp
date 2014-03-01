@@ -157,6 +157,23 @@ bool Expr::isStaticallyDerivedMetatype() const {
   } while (true);
 }
 
+bool Expr::isSuperExpr() const {
+  const Expr *expr = this;
+  do {
+    expr = expr->getSemanticsProvidingExpr();
+
+    if (isa<SuperRefExpr>(expr))
+      return true;
+
+    if (auto derivedToBase = dyn_cast<DerivedToBaseExpr>(expr)) {
+      expr = derivedToBase->getSubExpr();
+      continue;
+    }
+
+    return false;
+  } while (true);
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//

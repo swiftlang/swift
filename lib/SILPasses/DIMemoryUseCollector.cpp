@@ -871,7 +871,7 @@ static bool isSuperInitUse(UpcastInst *Inst) {
     if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
       continue;
 
-    if (isa<SuperRefExpr>(LocExpr->getArg()))
+    if (LocExpr->getArg()->isSuperExpr())
       return true;
   }
 
