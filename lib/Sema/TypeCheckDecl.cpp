@@ -2701,15 +2701,10 @@ public:
 
     // Look for members with the same name and matching types as this
     // one.
-    LookupResult members;
-    if (isa<ConstructorDecl>(decl)) {
-      members = TC.lookupConstructors(superclass, decl->getDeclContext());
-    } else {
-      auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
-      members = TC.lookupMember(superclassMetaTy, decl->getName(),
-                                decl->getDeclContext(),
-                                /*allowDynamicLookup=*/false);
-    }
+    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
+    LookupResult members = TC.lookupMember(superclassMetaTy, decl->getName(),
+                                           decl->getDeclContext(),
+                                           /*allowDynamicLookup=*/false);
 
     unsigned numExactMatches = 0;
     SmallVector<std::tuple<ValueDecl *, bool, Type>, 2> matches;

@@ -40,12 +40,8 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   // We can't have tuple types here; they need to be handled elsewhere.
   assert(!type->is<TupleType>());
 
-  // Constructor lookup is special.
-  if (name == Context.Id_init) {
-    // Fall through to look for constructors via the normal means.
-    options = NL_Constructor;
-  } else if (name.str().equals("__conversion")) {
-    // Conversion lookups never permit dynamic lookup.
+  // Conversion lookups never permit dynamic lookup.
+  if (name.str().equals("__conversion")) {
     options = options & ~NL_DynamicLookup;
   }
 

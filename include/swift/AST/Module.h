@@ -97,10 +97,7 @@ enum NameLookupOptions {
 
   /// The default set of options used for unqualified name lookup.
   NL_UnqualifiedDefault = NL_VisitSupertypes |
-                          NL_RemoveNonVisible | NL_RemoveOverridden,
-
-  /// The default set of options used for constructor lookup.
-  NL_Constructor = NL_QualifiedDefault
+                          NL_RemoveNonVisible | NL_RemoveOverridden
 };
 
 /// Describes the result of looking for the conformance of a given type
