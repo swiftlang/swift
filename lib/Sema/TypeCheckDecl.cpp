@@ -3157,6 +3157,20 @@ public:
       TC.diagnose(CD->getAttrs().getLoc(AK_mutating),
                   diag::mutating_invalid_init);
 
+    // Complete object initializers are only allowed on classes and in
+    // extensions thereof.
+    if (CD->isCompleteObjectInit()) {
+      if (auto extType = CD->getExtensionType()) {
+        if (!extType->getClassOrBoundGenericClass() &&
+            !extType->is<ErrorType>()) {
+          // FIXME: Add a Fix-It here, which requires source-location
+          // information within the AST for '->' and 'Self'.
+          TC.diagnose(CD->getLoc(), diag::nonclass_complete_object_init,
+                      extType);
+          CD->setCompleteObjectInit(false);
+        }
+      }
+    }
 
     GenericParamList *outerGenericParams;
     Type SelfTy = configureImplicitSelf(CD, outerGenericParams);
