@@ -1572,7 +1572,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   }
 
   case decls_block::FUNC_DECL: {
-    IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
     bool hasSelectorStyleSignature;
@@ -1587,8 +1586,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
+    ArrayRef<uint64_t> nameIDs;
 
-    decls_block::FuncLayout::readRecord(scratch, nameID, contextID, isImplicit,
+    decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         hasSelectorStyleSignature,
                                         isStatic, RawStaticSpelling,
                                         isAssignmentOrConversion,
@@ -1596,8 +1596,33 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
-                                        overriddenID, accessorStorageDeclID);
-
+                                        overriddenID, accessorStorageDeclID,
+                                        nameIDs);
+    
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> names;
+    for (auto nameID : nameIDs)
+      names.push_back(getIdentifier(nameID));
+    
+    // Read in the asmname blob, if present.
+    StringRef asmname;
+    {
+      BCOffsetRAII lastRecordOffset(DeclTypeCursor);
+      
+      auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      if (next.Kind != llvm::BitstreamEntry::Record)
+        goto did_read_asmname;
+      unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &asmname);
+      
+      if (kind != decls_block::FUNC_ASMNAME) {
+        asmname = "";
+        goto did_read_asmname;
+      }
+      
+      lastRecordOffset.reset();
+    }
+  did_read_asmname:
+    
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       break;
@@ -1615,7 +1640,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(),
-        getIdentifier(nameID), SourceLoc(),
+        DeclName(ctx, names), SourceLoc(),
         genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
 
@@ -1656,8 +1681,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->setImplicit();
     if (hasSelectorStyleSignature)
       fn->setHasSelectorStyleSignature();
-    if (!blobData.empty())
-      fn->getMutableAttrs().AsmName = ctx.AllocateCopy(blobData);
+    if (!asmname.empty())
+      fn->getMutableAttrs().AsmName = ctx.AllocateCopy(asmname);
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
         fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());

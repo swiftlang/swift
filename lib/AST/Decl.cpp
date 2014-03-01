@@ -1559,19 +1559,25 @@ SourceRange SubscriptDecl::getSourceRange() const {
 }
 
 DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
-  assert(components.size() > 0 && "must have at least one name component");
-  if (components.size() == 1) {
+  switch (components.size()) {
+  case 0:
+    SimpleOrCompound = Identifier();
+    return;
+      
+  case 1:
     SimpleOrCompound = components.front();
     return;
+      
+  default:
+    auto buf = C.Allocate(sizeof(CompoundDeclName)
+                            + components.size() * sizeof(Identifier),
+                          alignof(CompoundDeclName));
+    auto compoundName = new (buf) CompoundDeclName{components.size()};
+    std::uninitialized_copy(components.begin(), components.end(),
+                            compoundName->getComponents().begin());
+    SimpleOrCompound = compoundName;
+    return;
   }
-  
-  auto buf = C.Allocate(sizeof(CompoundDeclName)
-                          + components.size() * sizeof(Identifier),
-                        alignof(CompoundDeclName));
-  auto compoundName = new (buf) CompoundDeclName{components.size()};
-  std::uninitialized_copy(components.begin(), components.end(),
-                          compoundName->getComponents().begin());
-  SimpleOrCompound = compoundName;
 }
     
 static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,

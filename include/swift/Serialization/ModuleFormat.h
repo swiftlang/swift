@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 10;
+const uint16_t VERSION_MINOR = 11;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -638,7 +638,6 @@ namespace decls_block {
 
   using FuncLayout = BCRecordLayout<
     FUNC_DECL,
-    IdentifierIDField, // name
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // has selector-style signature?
@@ -657,9 +656,16 @@ namespace decls_block {
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
-    BCBlob        // asmname, if any
-    // The record is trailed by its generic parameters, if any, followed by its
-    // argument and body parameter patterns.
+    BCArray<IdentifierIDField> // name components
+    // The record is trailed by:
+    // - its asmname, if any
+    // - its generic parameters, if any
+    // - argument and body parameter patterns
+  >;
+  
+  using FuncAsmNameLayout = BCRecordLayout<
+    FUNC_ASMNAME,
+    BCBlob        // asmname
   >;
 
   using PatternBindingLayout = BCRecordLayout<

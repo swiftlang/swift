@@ -1415,8 +1415,11 @@ void Serializer::writeDecl(const Decl *D) {
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
+    SmallVector<IdentifierID, 4> nameComponents;
+    for (auto component : fn->getFullName().getComponents())
+      nameComponents.push_back(addIdentifierRef(component));
+      
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                           addIdentifierRef(fn->getName()),
                            addDeclRef(DC),
                            fn->isImplicit(),
                            fn->hasSelectorStyleSignature(),
@@ -1436,8 +1439,13 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
-                           fn->getAttrs().AsmName);
-
+                           nameComponents);
+    
+    if (!fn->getAttrs().AsmName.empty())
+      FuncAsmNameLayout::emitRecord(Out, ScratchRecord,
+                                    DeclTypeAbbrCodes[FuncAsmNameLayout::Code],
+                                    fn->getAttrs().AsmName);
+      
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write both argument and body parameters. This is important for proper
@@ -2084,6 +2092,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
     registerDeclTypeAbbr<FuncLayout>();
+    registerDeclTypeAbbr<FuncAsmNameLayout>();
     registerDeclTypeAbbr<PatternBindingLayout>();
     registerDeclTypeAbbr<ProtocolLayout>();
     registerDeclTypeAbbr<PrefixOperatorLayout>();
