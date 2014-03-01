@@ -85,6 +85,9 @@ public:
   /// It does not perform full type-checking, only checks for basic
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
+
+  /// Resolve any implicitly-declared constructors within the given nominal.
+  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 };
 
 

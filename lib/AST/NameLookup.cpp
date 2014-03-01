@@ -876,12 +876,35 @@ bool DeclContext::lookupQualified(Type type,
     }
   }
 
+  // Allow filtering of the visible declarations based on
+  bool onlyCompleteObjectInits = false;
+  auto isAcceptableDecl = [&](Decl *decl) -> bool {
+    // Filter out subobject initializers, if requestred.
+    if (onlyCompleteObjectInits) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+        if (!ctor->isCompleteObjectInit())
+          return false;
+
+        return true;
+      }
+
+      return false;
+    }
+
+    return true;
+  };
+
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
+  auto &ctx = getASTContext();
   llvm::DenseMap<ProtocolDecl *, ProtocolConformance *> knownConformances;
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
+
+    // Make sure we've resolved implicit constructors, if we need them.
+    if (name == ctx.Id_init && typeResolver)
+      typeResolver->resolveImplicitConstructors(current);
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
@@ -895,7 +918,8 @@ bool DeclContext::lookupQualified(Type type,
           continue;
       }
 
-      decls.push_back(decl);
+      if (isAcceptableDecl(decl))
+        decls.push_back(decl);
     }
 
     // If we're not supposed to visit our supertypes, we're done.
@@ -904,6 +928,16 @@ bool DeclContext::lookupQualified(Type type,
 
     // Visit superclass.
     if (auto classDecl = dyn_cast<ClassDecl>(current)) {
+      // If we're looking for initializers, only look at the superclass if the
+      // current class permits inheritance. Even then, only find complete
+      // object initializers.
+      if (name == ctx.Id_init) {
+        if (classDecl->inheritsSuperclassInitializers(typeResolver))
+          onlyCompleteObjectInits = true;
+        else
+          continue;
+      }
+
       if (auto superclassType = classDecl->getSuperclass())
         if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
           if (visited.insert(superclassDecl))

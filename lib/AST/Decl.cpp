@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1021,6 +1022,8 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   ClassDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   ClassDeclBits.RequiresStoredPropertyInits = 0;
+  ClassDeclBits.InheritsSuperclassInits
+    = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -1029,6 +1032,76 @@ DestructorDecl *ClassDecl::getDestructor() {
   assert(!results.empty() && "Class without destructor?");
   assert(results.size() == 1 && "More than one destructor?");
   return cast<DestructorDecl>(results.front());
+}
+
+bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
+  // Check whether we already have a cached answer.
+  switch (static_cast<StoredInheritsSuperclassInits>(
+            ClassDeclBits.InheritsSuperclassInits)) {
+  case StoredInheritsSuperclassInits::Unchecked:
+    // Compute below.
+    break;
+
+  case StoredInheritsSuperclassInits::Inherited:
+    return true;
+
+  case StoredInheritsSuperclassInits::NotInherited:
+    return false;
+  }
+
+  // If there's no superclass, there's nothing to inherit.
+  ClassDecl *superclassDecl;
+  if (!getSuperclass() ||
+      !(superclassDecl = getSuperclass()->getClassOrBoundGenericClass())) {
+    ClassDeclBits.InheritsSuperclassInits
+      = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+    return false;
+  }
+
+  // Look at all of the initializers of the subclass to gather the initializers
+  // they override from the superclass.
+  auto &ctx = getASTContext();
+  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
+  if (resolver)
+    resolver->resolveImplicitConstructors(this);
+  for (auto member : lookupDirect(ctx.Id_init)) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor)
+      continue;
+
+    // Resolve this initializer, if needed.
+    if (!ctor->hasType())
+      resolver->resolveDeclSignature(ctor);
+
+    if (auto overridden = ctor->getOverriddenDecl()) {
+      if (overridden->isSubobjectInit())
+        overriddenInits.insert(overridden);
+    }
+  }
+
+  // Check all of the subobject initializers in the direct superclass.
+  if (resolver)
+    resolver->resolveImplicitConstructors(superclassDecl);
+  for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
+    // We only care about subobject initializers.
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor || ctor->isCompleteObjectInit())
+      continue;
+
+    // If this subobject initializer wasn't overridden, we don't have any
+    //
+    if (overriddenInits.count(ctor) == 0) {
+      ClassDeclBits.InheritsSuperclassInits
+        = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
+      return false;
+    }
+  }
+
+  // All of the direct superclass's subobject initializers have been overridden
+  // by the sublcass. Initializers can be inherited.
+  ClassDeclBits.InheritsSuperclassInits
+    = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
+  return true;
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,

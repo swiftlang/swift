@@ -112,6 +112,17 @@ enum class CircularityCheck {
   Checked
 };
 
+/// Keeps track of whrther a given class inherits initializers from its
+/// superclass.
+enum class StoredInheritsSuperclassInits {
+  /// We have not yet checked.
+  Unchecked,
+  /// Superclass initializers are not inherited.
+  NotInherited,
+  /// Complete object initializers in the superclass are inherited.
+  Inherited
+};
+
 /// Describes which spelling was used in the source for the 'static' or 'class'
 /// keyword.
 enum class StaticSpellingKind : uint8_t {
@@ -326,8 +337,14 @@ class alignas(8) Decl {
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     unsigned RequiresStoredPropertyInits : 1;
+
+    /// Whether this class inherits its superclass's complete object
+    /// initializers.
+    ///
+    /// This is a value of \c StoredInheritsSuperclassInits.
+    unsigned InheritsSuperclassInits : 2;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 3 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 5 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2551,6 +2568,13 @@ public:
   /// Retrieve the destructor for this class.
   DestructorDecl *getDestructor();
 
+  /// Determine whether this class inherits the complete object initializers
+  /// from its superclass.
+  ///
+  /// \param resolver Used to resolve the signatures of initializers, which is
+  /// required for name lookup.
+  bool inheritsSuperclassInitializers(LazyResolver *resolver);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
@@ -3747,6 +3771,11 @@ public:
   /// Set whether this is a complete object initializer.
   void setCompleteObjectInit(bool completeObjectInit) {
     ConstructorDeclBits.CompleteObjectInit = completeObjectInit;
+  }
+
+  /// Whether this is a subobject initializer.
+  bool isSubobjectInit() const {
+    return !isCompleteObjectInit();
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }

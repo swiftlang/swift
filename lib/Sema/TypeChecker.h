@@ -443,6 +443,10 @@ public:
     validateDecl(VD, true);
   }
 
+  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) {
+    addImplicitConstructors(nominal);
+  }
+
   /// Validate the signature of a generic function.
   ///
   /// \param func The generic function.

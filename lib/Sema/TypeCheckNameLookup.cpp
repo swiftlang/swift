@@ -42,23 +42,6 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
 
   // Constructor lookup is special.
   if (name == Context.Id_init) {
-    // For lookup into DynamicSelf, find the constructors of the underlying
-    // self type.
-    if (auto dynSelf = type->getAs<DynamicSelfType>()) {
-      type = dynSelf->getSelfType();
-    }
-
-    // Look through the metatype.
-    if (auto metaTy = type->getAs<MetatypeType>())
-      type = metaTy->getInstanceType();
-
-    // For nominal types, make sure we have the right constructors available.
-    if (auto nominalDecl = type->getAnyNominal()) {
-      // Define implicit default constructor for a struct/class.
-      if (isa<StructDecl>(nominalDecl) || isa<ClassDecl>(nominalDecl))
-        addImplicitConstructors(nominalDecl);
-    }
-
     // Fall through to look for constructors via the normal means.
     options = NL_Constructor;
   } else if (name.str().equals("__conversion")) {

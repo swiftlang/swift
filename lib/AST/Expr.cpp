@@ -425,8 +425,12 @@ SourceRange MetatypeExpr::getSourceRange() const {
   if (auto tyR = getBaseTypeRepr())
     return tyR->getSourceRange();
 
-  if (auto base = getBase())
-    return SourceRange(base->getStartLoc(), MetatypeLoc);
+  if (auto base = getBase()) {
+    if (MetatypeLoc.isValid())
+      return SourceRange(base->getStartLoc(), MetatypeLoc);
+
+    return base->getSourceRange();
+  }
 
   return SourceRange(MetatypeLoc);
 }

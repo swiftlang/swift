@@ -2641,11 +2641,6 @@ public:
       auto parentFunc = cast<FuncDecl>(parentDecl);
       if (func->isStatic() != parentFunc->isStatic())
         return false;
-    } else if (isa<ConstructorDecl>(decl)) {
-      // Specific checking for constructors.
-      auto parentCtor = cast<ConstructorDecl>(parentDecl);
-      if (!parentCtor->isAbstract())
-        return false;
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       auto parentVar = cast<VarDecl>(parentDecl);
       if (var->isStatic() != parentVar->isStatic())
@@ -3616,7 +3611,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 }
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
-  assert(isa<StructDecl>(decl) || isa<ClassDecl>(decl));
+  // We can only synthesize implicit constructors for classes and structs.
+  if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
+    return;
 
   // Don't add constructors to imported Objective-C classes.
   if (decl->hasClangNode() && isa<ClassDecl>(decl))

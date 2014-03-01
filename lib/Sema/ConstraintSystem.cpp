@@ -962,12 +962,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
         });
     }
   }
-  // Alternatively, if this is a constructor referenced from a DynamicSelf base
-  // object, or a constructor within a protocol, replace the result type with
-  // the base object type.
-  else if (isa<ConstructorDecl>(value) &&
-           (baseObjTy->is<DynamicSelfType>() ||
-            isa<ProtocolDecl>(value->getDeclContext()))) {
+  // If this is a construct, replace the result type with the base object type.
+  else if (isa<ConstructorDecl>(value)) {
     auto outerFnType = openedType->castTo<FunctionType>();
     auto innerFnType = outerFnType->getResult()->castTo<FunctionType>();
 

@@ -457,16 +457,21 @@ namespace {
     /// \param base An expression of existential type whose value will
     /// be opened.
     ///
-    /// \returns A pair (opaque-value, archetype) that provides a
-    /// reference to the value stored within the expression
-    /// (opaque-value) and a new archetype that describes the dynamic
-    /// type stored within the existential.
-    std::tuple<OpaqueValueExpr *, ArchetypeType *>
+    /// \returns A pair (expr, type) that provides a reference to the value
+    /// stored within the expression or its metatype (if the base was a
+    /// metatype) and the new archetype that describes the dynamic type stored
+    /// within the existential.
+    std::tuple<Expr *, ArchetypeType *>
     openExistentialReference(Expr *base) {
       auto &tc = cs.getTypeChecker();
       base = tc.coerceToRValue(base);
-      
-      auto baseTy = base->getType()->getRValueInstanceType();
+
+      auto baseTy = base->getType()->getRValueType();
+      bool isMetatype = false;
+      if (auto metaTy = baseTy->getAs<MetatypeType>()) {
+        isMetatype = true;
+        baseTy = metaTy->getInstanceType();
+      }
       assert(baseTy->isExistentialType() && "Type must be existential");
 
       // Create the archetype.
@@ -483,7 +488,14 @@ namespace {
       // Record this opened existential.
       OpenedExistentials[archetype] = { base, archetypeVal };
 
-      return std::make_tuple(archetypeVal, archetype);
+      // If we started with a metatype, produce a metatype.
+      Expr *newBase = archetypeVal;
+      if (isMetatype) {
+        auto metaTy = MetatypeType::get(archetype, ctx);
+        newBase = new (ctx) MetatypeExpr(archetypeVal, SourceLoc(), metaTy);
+      }
+
+      return std::make_tuple(newBase, archetype);
     }
 
     /// \brief Build a new member reference with the given base and member.
@@ -551,12 +563,11 @@ namespace {
                                               /*wantInterfaceType=*/true);
       }
 
-      // If this is a method whose result type is DynamicSelf, or a construction
-      // of a DynamicSelf value, replace DynamicSelf with the actual object
-      // type.
+      // If this is a method whose result type is dynamic Self, or a
+      // construction, replace the result type with the actual object type.
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
-            (baseTy->is<DynamicSelfType>() && isa<ConstructorDecl>(func))) {
+            isa<ConstructorDecl>(func)) {
           // For a DynamicSelf method on an existential, open up the
           // existential.
           if (func->getExtensionType()->is<ProtocolType>() &&
