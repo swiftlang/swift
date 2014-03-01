@@ -1999,7 +1999,7 @@ public:
         }
 
         // Diagnose any abstract constructors from our superclass that have
-        // not been overridden.
+        // not been overridden or inherited.
         bool diagnosed = false;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
           // We only care about abstract constructors.
@@ -2009,6 +2009,12 @@ public:
 
           // If we have an override for this constructor, it's okay.
           if (overriddenCtors.count(superclassCtor) > 0)
+            continue;
+
+          // If the superclass constructor is a complete object initializer
+          // that is inherited into the current class, it's okay.
+          if (superclassCtor->isCompleteObjectInit() &&
+              CD->inheritsSuperclassInitializers(&TC))
             continue;
 
           // Complain that we don't have an overriding constructor.
