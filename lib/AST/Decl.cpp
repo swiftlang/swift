@@ -1838,6 +1838,7 @@ ConstructorDecl::ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
   ConstructorDeclBits.Abstract = 0;
+  ConstructorDeclBits.CompleteObjectInit = 0;
 }
 
 void ConstructorDecl::setArgParams(Pattern *selfPattern, Pattern *argParams) {

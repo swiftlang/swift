@@ -1505,6 +1505,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
                                   ctor->isAbstract(),
+                                  ctor->isCompleteObjectInit(),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()));

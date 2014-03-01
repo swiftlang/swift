@@ -608,6 +608,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,  // transparent?
     BCFixed<1>,  // abstract?
+    BCFixed<1>,  // complete object init?
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField  // overridden decl

@@ -594,6 +594,8 @@ namespace {
       printCommonAFD(CD, "constructor_decl");
       if (CD->isAbstract())
         OS << " abstract";
+      if (CD->isCompleteObjectInit())
+        OS << " complete_object";
 
       printAbstractFunctionDecl(CD);
       OS << ')';

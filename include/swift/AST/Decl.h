@@ -264,8 +264,11 @@ class alignas(8) Decl {
 
     /// Whether this initializer is abstract.
     unsigned Abstract : 1;
+
+    /// Whether this is a complete object initializer.
+    unsigned CompleteObjectInit : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 4 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 5 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -3734,6 +3737,16 @@ public:
   /// Set whether this constructor is abstract.
   void setAbstract(bool abstract) {
     ConstructorDeclBits.Abstract = abstract;
+  }
+
+  /// Whether this is a complete object initializer.
+  bool isCompleteObjectInit() const {
+    return ConstructorDeclBits.CompleteObjectInit;
+  }
+
+  /// Set whether this is a complete object initializer.
+  void setCompleteObjectInit(bool completeObjectInit) {
+    ConstructorDeclBits.CompleteObjectInit = completeObjectInit;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }

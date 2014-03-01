@@ -840,6 +840,13 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                  classModule->Name);
       }
     }
+
+    /// A complete object initializer must always be delegating.
+    if (ctor->isCompleteObjectInit() && !isDelegating) {
+      diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(),
+               diag::non_delegating_complete_object_init,
+               ctor->getDeclContext()->getDeclaredTypeOfContext());
+    }
   }
 
   // If we want a super.init call...

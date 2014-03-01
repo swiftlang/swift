@@ -1415,6 +1415,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID parentID;
     bool isImplicit, hasSelectorStyleSignature, isObjC, isTransparent;
     bool isAbstract;
+    bool isCompleteObjectInit;
     TypeID signatureID;
     TypeID interfaceID;
     DeclID overriddenID;
@@ -1422,8 +1423,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
                                                isObjC, isTransparent,
-                                               isAbstract, signatureID,
-                                               interfaceID, overriddenID);
+                                               isAbstract, isCompleteObjectInit,
+                                               signatureID, interfaceID,
+                                               overriddenID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       break;
@@ -1495,6 +1497,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     if (isAbstract)
       ctor->setAbstract(true);
+    if (isCompleteObjectInit)
+      ctor->setCompleteObjectInit(true);
     if (auto overridden
           = dyn_cast_or_null<ConstructorDecl>(getDecl(overriddenID)))
       ctor->setOverriddenDecl(overridden);

@@ -674,8 +674,10 @@
   <pre class="grammar">
     decl-constructor ::= <a href="#attribute-list">attribute-list</a> 'init' <a href="#generic-params">generic-params</a>? constructor-signature <a href="#brace-item-list">brace-item-list</a>
 
-    constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a>
-    constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a>
+    constructor-signature ::= <a href="#pattern-tuple">pattern-tuple</a> constructor-result?
+    constructor-signature ::= <a href="#identifier">identifier-or-any</a> <a href="#selector-tuple">selector-tuple</a> constructor-result?
+    
+    constructor-result ::= '->' 'Self'
   </pre>
 
   <p>'constructor' declares a constructor for a class, struct, or enum.  Such

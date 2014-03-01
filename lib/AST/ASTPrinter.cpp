@@ -897,6 +897,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     printGenericParams(decl->getGenericParams());
   }
   printFunctionParameters(decl);
+  if (decl->isCompleteObjectInit())
+    Printer << " -> Self";
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }

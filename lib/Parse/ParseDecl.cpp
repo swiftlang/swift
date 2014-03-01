@@ -2902,6 +2902,23 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
     return SignatureStatus;
   }
 
+  // '->' 'Self'
+  // FIXME: Parse as general type, verify semantically.
+  bool isCompleteObjectInit = false;
+  if (Tok.is(tok::arrow)) {
+    consumeToken(tok::arrow);
+    
+    if (Tok.is(tok::kw_Self)) {
+      consumeToken(tok::kw_Self);
+      isCompleteObjectInit = true;
+    } else {
+      diagnose(Tok, diag::init_expected_self);
+      while (!Tok.is(tok::eof) && !Tok.is(tok::l_brace) &&
+             !isStartOfDecl(Tok, peekToken()))
+        skipSingle();
+    }
+  }
+
   VarDecl *SelfDecl;
   auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,
                                                  CurDeclContext, &SelfDecl);
@@ -2911,6 +2928,8 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
                                            SelfPattern, ArgPattern,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
+  CD->setCompleteObjectInit(isCompleteObjectInit);
+
   // No need to setLocalDiscriminator.
 
   if (HasSelectorStyleSignature)

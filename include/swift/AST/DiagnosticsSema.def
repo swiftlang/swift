@@ -590,6 +590,9 @@ NOTE(init_delegation_or_chain,sema_tce,none,
 ERROR(non_delegating_init_outside_module,sema_tce,none,
       "initializer for %0 defined outside module %1 must delegate "
       "(with 'self.init')", (Type, Identifier))
+ERROR(non_delegating_complete_object_init,sema_tce,none,
+      "complete object initializer for %0 must delegate (with 'self.init')",
+      (Type))
 
 ERROR(dynamic_construct_class,sema_tce,none,
       "constructing an object of class type %0 with a metatype value requires "
