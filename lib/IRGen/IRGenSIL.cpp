@@ -2308,8 +2308,10 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
-  // FIXME: Totally wrong, of course.
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC());
+  Explosion metadata = getLoweredExplosion(i->getOperand());
+  auto metadataValue = metadata.claimNext();
+  llvm::Value *alloced = emitClassAllocationDynamic(*this, metadataValue,
+                                                    i->getType(), i->isObjC());
   Explosion e(ResilienceExpansion::Maximal);
   e.add(alloced);
   setLoweredExplosion(SILValue(i, 0), e);

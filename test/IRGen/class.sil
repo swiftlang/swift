@@ -109,3 +109,20 @@ bb0(%0 : $D):
   %1 = tuple ()
   return %1 : $()
 }
+
+// CHECK-LABEL: define %C5class1C* @alloc_ref_dynamic(%swift.type*)
+sil @alloc_ref_dynamic : $@thin (@thick C.Type) -> @owned C {
+bb0(%0 : $@thick C.Type):
+  // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8***
+  // CHECK:   [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8*** [[META_PTR]], i64 6
+  // CHECK:   [[SIZE_AS_PTR:%[0-9]+]] = load i8*** [[SIZE_ADDR]], align 8
+  // CHECK:   [[SIZE:%[0-9]+]] = ptrtoint i8** [[SIZE_AS_PTR]] to i64
+  // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8***
+  // CHECK:   [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8*** [[META_PTR]], i64 7
+  // CHECK:   [[ALIGN_AS_PTR:%[0-9]+]] = load i8*** [[ALIGN_ADDR]], align 8
+  // CHECK:   [[ALIGN:%[0-9]+]] = ptrtoint i8** [[ALIGN_AS_PTR]] to i64
+  // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]]) #0
+  %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
+  return %1 : $C
+}
+

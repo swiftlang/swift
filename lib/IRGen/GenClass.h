@@ -51,6 +51,12 @@ namespace irgen {
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                    bool objc);
 
+  /// Emit an allocation of a class using a metadata value.
+  llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 
+                                          llvm::Value *metadata,
+                                          SILType selfType,
+                                          bool objc);
+
   /// Emit class deallocation.
   void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                              llvm::Value *selfValue);

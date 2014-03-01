@@ -586,6 +586,31 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
+llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
+                                               llvm::Value *metadata,
+                                               SILType selfType,
+                                               bool objc) {
+  // If we need to use Objective-C allocation, do so.
+  if (objc) {
+    return emitObjCAllocObjectCall(IGF, metadata, 
+                                   selfType.getSwiftRValueType());
+  }
+
+  // Otherwise, allocate using Swift's routines.
+  llvm::Value *size, *alignMask;
+  std::tie(size, alignMask)
+    = emitClassResilientInstanceSizeAndAlignMask(IGF,
+                                   selfType.getClassOrBoundGenericClass(),
+                                   metadata);
+  
+  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
+                                             "reference.new");
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &layout = classTI.getLayout(IGF.IGM);
+  llvm::Type *destType = layout.getType()->getPointerTo();
+  return IGF.Builder.CreateBitCast(val, destType);
+}
+
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                                   llvm::Value *selfValue) {
   auto *theClass = selfType.getSwiftType()->getClassOrBoundGenericClass();

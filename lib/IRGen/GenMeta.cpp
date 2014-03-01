@@ -2368,7 +2368,25 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                 ClassDecl *theClass,
-                                                llvm::Value *metadata) {
+                                                llvm::Value *metadata) {  
+  // If the class has fragile fixed layout, return the constant size and
+  // alignment.
+  if (llvm::Constant *size
+        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
+    llvm::Constant *alignMask
+      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
+    assert(alignMask && "static size without static align");
+    return {size, alignMask};
+  }
+ 
+  // Otherwise, load it from the metadata.
+  return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
+}
+
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                                  ClassDecl *theClass,
+                                                  llvm::Value *metadata) {
   class FindClassSize :
     public ClassMetadataScanner<FindClassSize> {
   public:
@@ -2391,18 +2409,7 @@ irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
       InstanceAlignMask = NextIndex++;
     }
   };
-  
-  // If the class has fragile fixed layout, return the constant size and
-  // alignment.
-  if (llvm::Constant *size
-        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
-    llvm::Constant *alignMask
-      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
-    assert(alignMask && "static size without static align");
-    return {size, alignMask};
-  }
-  
-  // Otherwise, load from the metadata.
+
   FindClassSize scanner(IGF.IGM, theClass);
   scanner.layout();
   assert(scanner.InstanceSize != ~0U
