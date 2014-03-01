@@ -156,6 +156,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // The first two are structs; the last is an enum.
   if (auto underlyingTy = type->getAnyOptionalObjectType()) {
     assert((underlyingTy->is<FunctionType>() ||
+            underlyingTy->is<DynamicSelfType>() ||
             underlyingTy->getClassOrBoundGenericClass() ||
             underlyingTy->isClassExistentialType()) &&
            "Unexpected optional type in Clang type generation!");
