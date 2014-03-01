@@ -588,7 +588,6 @@ macro(add_swift_library name)
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTLIB_DEPENDS} )
   llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
-  link_system_libs( ${name} )
 
   if(MSVC)
     get_target_property(cflag ${name} COMPILE_FLAGS)
@@ -687,7 +686,6 @@ macro(add_swift_executable name)
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTEXE_DEPENDS} )
   llvm_config( ${name} ${SWIFTEXE_COMPONENT_DEPENDS} )
   target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
-  link_system_libs( ${name} )
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
   # ASan does not play well with exported_symbol option. This should be fixed soon.
