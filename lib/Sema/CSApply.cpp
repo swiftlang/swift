@@ -2982,6 +2982,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         fromType = expr->getType();
       }
       
+      // Coercion of a SuperRefExpr.  Refine the type of the 'super' reference
+      // instead of inserting a derived-to-base conversion.
+      if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
+        assert(tc.isSubtypeOf(fromType, toType, dc) &&
+               "coercing super expr to non-supertype?!");
+        superRef->setType(toType);
+        return expr;
+      }
+
       // Coercion from subclass to superclass.
       return new (tc.Context) DerivedToBaseExpr(expr, toType);
     }
@@ -3105,6 +3114,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             return expr;
         }
 
+        // Coercion of a SuperRefExpr.  Refine the type of the 'super' reference
+        // instead of inserting a derived-to-base conversion.
+        if (auto superRef = dyn_cast<SuperRefExpr>(expr)) {
+          assert(tc.isSubtypeOf(fromType, toType, dc) &&
+                 "coercing super expr to non-supertype?!");
+          superRef->setType(toType);
+          return expr;
+        }
+        
         // Coercion from subclass to superclass.
         expr = new (tc.Context) DerivedToBaseExpr(expr, toType);
         return expr;
