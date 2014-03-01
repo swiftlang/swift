@@ -1389,6 +1389,24 @@ with retain count 1; its state will be otherwise uninitialized. The
 optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
 
+alloc_ref_dynamic
+`````````````````
+::
+
+  sil-instruction ::= 'alloc_ref_dynamic' ('[' 'objc' ']')? sil-operand ',' sil-type
+
+  %1 = alloc_ref_dynamic %0 : $@thick T.Type, $T
+  %1 = alloc_ref_dynamic [objc] %0 : $@objc_metatype T.Type, $T
+  // $T must be a class type
+  // %1 has type $T
+
+Allocates an object of class type ``T`` or a subclass thereof. The
+dynamic type of the resulting object is specified via the metatype
+value ``%0``. The object will be initialized with retain count 1; its
+state will be otherwise uninitialized. The optional ``objc`` attribute
+indicates that the object should be allocated using Objective-C's
+allocation methods (``+allocWithZone:``).
+
 alloc_box
 `````````
 ::

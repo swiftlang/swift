@@ -959,6 +959,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("address_to_pointer", ValueKind::AddressToPointerInst)
     .Case("alloc_stack", ValueKind::AllocStackInst)
     .Case("alloc_ref", ValueKind::AllocRefInst)
+    .Case("alloc_ref_dynamic", ValueKind::AllocRefDynamicInst)
     .Case("value_metatype", ValueKind::ValueMetatypeInst)
     .Case("witness_method", ValueKind::WitnessMethodInst)
     .Case("apply", ValueKind::ApplyInst)
@@ -1671,6 +1672,19 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   }
+  case ValueKind::AllocRefDynamicInst: {
+    SILType Ty;
+    bool isObjC = false;
+    if (parseSILOptional(isObjC, *this, "objc") ||
+        parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(Ty))
+      return true;
+
+    ResultVal = B.createAllocRefDynamic(InstLoc, Val, Ty, isObjC);
+    break;
+  }
+
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:
     if (parseTypedValueRef(Val))

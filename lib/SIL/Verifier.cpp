@@ -281,6 +281,22 @@ public:
   void checkAllocRefInst(AllocRefInst *AI) {
     requireReferenceValue(AI, "Result of alloc_ref");
   }
+
+  void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
+    requireReferenceValue(ARDI, "Result of alloc_ref_dynamic");
+    require(ARDI->getOperand().getType().is<MetatypeType>(),
+            "operand of alloc_ref_dynamic must be of metatype type");
+    auto metaTy = ARDI->getOperand().getType().castTo<MetatypeType>();
+    require(metaTy->hasRepresentation(),
+            "operand of alloc_ref_dynamic must have a metatype representation");
+    if (ARDI->isObjC()) {
+      require(metaTy->getRepresentation() == MetatypeRepresentation::ObjC,
+              "alloc_ref_dynamic [objc] requires operand of ObjC metatype");
+    } else {
+      require(metaTy->getRepresentation() == MetatypeRepresentation::Thick,
+              "alloc_ref_dynamic requires operand of thick metatype");
+    }
+  }
   
   /// Check the substitutions passed to an apply or partial_apply.
   CanSILFunctionType checkApplySubstitutions(ArrayRef<Substitution> subs,

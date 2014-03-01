@@ -186,6 +186,10 @@ namespace {
       return false;
     }
 
+    bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
+      return false;
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       auto *X = cast<StrongReleaseInst>(LHS);
       return X->getOperand() == RHS->getOperand();

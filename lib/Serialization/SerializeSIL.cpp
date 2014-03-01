@@ -399,6 +399,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                        llvm::makeArrayRef(Args));
     break;
   }
+  case ValueKind::AllocRefDynamicInst: {
+    const AllocRefDynamicInst* ARD = cast<AllocRefDynamicInst>(&SI);
+    unsigned flags = 0;
+    if (ARD->isObjC())
+      flags = 1;
+    SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
+        (unsigned)SI.getKind(), flags,
+        S.addTypeRef(ARD->getType().getSwiftRValueType()),
+        (unsigned)ARD->getType().getCategory(),
+        S.addTypeRef(ARD->getOperand().getType().getSwiftRValueType()),
+        (unsigned)ARD->getOperand().getType().getCategory(),
+        addValueRef(ARD->getOperand()),
+        ARD->getOperand().getResultNumber());
+    break;
+  }
   case ValueKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];

@@ -930,6 +930,7 @@ static SILInstruction *findMetaType(SILValue S, unsigned Depth = 0) {
 
   switch (Inst->getKind()) {
   case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst:
   case ValueKind::MetatypeInst:
     return Inst;
   default:

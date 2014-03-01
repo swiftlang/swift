@@ -171,6 +171,13 @@ public:
     Loc.markAsPrologue();
     return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F, objc));
   }
+
+  AllocRefDynamicInst *createAllocRefDynamic(SILLocation loc, SILValue operand,
+                                             SILType type, bool objc) {
+    loc.markAsPrologue();
+    return insert(new (F.getModule()) AllocRefDynamicInst(loc, operand, type, 
+                                                          objc));
+  }
   
   AllocBoxInst *createAllocBox(SILLocation Loc, SILType ElementType) {
     Loc.markAsPrologue();

@@ -511,6 +511,7 @@ public:
 
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocRefInst(AllocRefInst *i);
+  void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
   void visitAllocArrayInst(AllocArrayInst *i);
 
@@ -2300,6 +2301,14 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC());
+  Explosion e(ResilienceExpansion::Maximal);
+  e.add(alloced);
+  setLoweredExplosion(SILValue(i, 0), e);
+}
+
+void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
+  // FIXME: Totally wrong, of course.
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC());
   Explosion e(ResilienceExpansion::Maximal);
   e.add(alloced);

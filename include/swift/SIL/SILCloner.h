@@ -223,6 +223,16 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAllocRefDynamicInst(AllocRefDynamicInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createAllocRefDynamic(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOperand()),
+                                  getOpType(Inst->getType()),
+                                  Inst->isObjC()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitAllocBoxInst(AllocBoxInst *Inst) {
   doPostProcess(Inst,
     Builder.createAllocBox(getOpLocation(Inst->getLoc()),

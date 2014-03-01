@@ -139,6 +139,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::AllocArrayInst:
   case ValueKind::AllocBoxInst:
   case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst:
   case ValueKind::AllocStackInst:
   case ValueKind::ApplyInst:
   case ValueKind::WitnessMethodInst:

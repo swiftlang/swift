@@ -2110,8 +2110,8 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   B.createReturn(loc, emitEmptyTuple(loc));
 }
 
-static void emitConstructorMetatypeArg(SILGenFunction &gen,
-                                       ValueDecl *ctor) {
+static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
+                                           ValueDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
@@ -2119,8 +2119,8 @@ static void emitConstructorMetatypeArg(SILGenFunction &gen,
   auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
                              AC.getIdentifier("$metatype"), metatype,
                              ctor->getDeclContext());
-  new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
-                                      gen.F.begin(), VD);
+  return new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
+                                             gen.F.begin(), VD);
 }
 
 static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
@@ -2534,7 +2534,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ArgumentForwardVisitor(*this, args, ctor)
     .visit(ctor->getBodyParamPatterns()[1]);
 
-  emitConstructorMetatypeArg(*this, ctor);
+  SILValue selfMetaValue = emitConstructorMetatypeArg(*this, ctor);
 
   // Allocate the "self" value.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
@@ -2549,8 +2549,35 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   auto selfClassDecl =
     cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
 
-  SILValue selfValue = B.createAllocRef(Loc, selfTy,
-                                        usesObjCAllocator(selfClassDecl));
+  SILValue selfValue;
+
+  // Allocate the 'self' valuel
+  bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
+  if (ctor->isCompleteObjectInit() || ctor->hasClangNode()) {
+    // For a complete object initializer or an initializer synthesized
+    // for an Objective-C class, allocate using the metatype.
+    SILValue allocArg = selfMetaValue;
+    
+    // When using Objective-C allocation, convert the metatype
+    // argument to an Objective-C metatype.
+    if (useObjCAllocation) {
+      auto metaTy = allocArg.getType().getSwiftRValueType()
+                      ->castTo<MetatypeType>();
+      metaTy = MetatypeType::get(metaTy->getInstanceType(),
+                                 MetatypeRepresentation::ObjC,
+                                 metaTy->getASTContext());
+      allocArg = B.createThickToObjCMetatype(Loc, allocArg,
+                                             getLoweredType(metaTy));
+    }
+
+    selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy, 
+                                        useObjCAllocation);
+  } else {
+    // For a subobject initializer, we know that the static type being
+    // allocatedis the type of the class that defines the subobject
+    // initializer.
+    selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation);
+  }
   args.push_back(selfValue);
 
   // Call the initializer.

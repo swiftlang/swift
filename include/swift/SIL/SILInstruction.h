@@ -299,6 +299,23 @@ public:
   }
 };
 
+/// AllocRefDynamicInst - This represents the primitive allocation of
+/// an instance of a reference type whose runtime type is provided by
+/// the given metatype value. Aside from the reference count, the
+/// instance is returned uninitialized.
+class AllocRefDynamicInst 
+  : public UnaryInstructionBase<ValueKind::AllocRefDynamicInst, AllocationInst>
+{
+  bool ObjC;
+
+public:
+  AllocRefDynamicInst(SILLocation loc, SILValue operand, SILType ty, bool objc)
+    : UnaryInstructionBase(loc, operand, ty), ObjC(objc) { }
+
+  /// Whether to use Objective-C's allocation mechanism (+allocWithZone:).
+  bool isObjC() const { return ObjC; }
+};
+
 /// This represents the allocation of a heap box for a Swift value of some type.
 /// The instruction returns two values.  The first return value is the object
 /// pointer with Builtin.ObjectPointer type.  The second return value

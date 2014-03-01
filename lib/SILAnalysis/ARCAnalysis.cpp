@@ -92,6 +92,7 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::StringLiteralInst:
   case ValueKind::AllocStackInst:
   case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefDynamicInst:
   case ValueKind::AllocBoxInst:
   case ValueKind::AllocArrayInst:
   case ValueKind::MetatypeInst:

@@ -728,6 +728,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
                   ListOfValues[0]);
     break;
+  case ValueKind::AllocRefDynamicInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isObjC = Attr & 0x01;
+    ResultVal = Builder.createAllocRefDynamic(
+                  Loc,
+                  getLocalValue(ValID, ValResNum,
+                                getSILType(MF->getType(TyID),
+                                           (SILValueCategory)TyCategory)),
+                  getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2),
+                  isObjC);
+    break;
+  }
   case ValueKind::ApplyInst: {
     // Format: attributes such as transparent, the callee's type, a value for
     // the callee and a list of values for the arguments. Each value in the list

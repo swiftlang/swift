@@ -551,6 +551,14 @@ public:
       OS << "[objc] ";
     OS << ARI->getType();
   }
+
+  void visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
+    OS << "alloc_ref_dynamic ";
+    if (ARDI->isObjC())
+      OS << "[objc] ";
+    OS << getIDAndType(ARDI->getOperand());
+    OS << ", " << ARDI->getType();
+  }
   
   void visitAllocBoxInst(AllocBoxInst *ABI) {
     OS << "alloc_box " << ABI->getElementType();
