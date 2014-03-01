@@ -524,9 +524,10 @@ endfunction()
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
+#     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE"
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
@@ -587,7 +588,9 @@ macro(add_swift_library name)
 
   target_link_libraries( ${name} "-L${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}" ${SWIFTLIB_DEPENDS} )
   llvm_config( ${name} ${SWIFTLIB_COMPONENT_DEPENDS} )
-  target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+  if (NOT NO_LLVM_COMMON_LIBS)
+    target_link_libraries( ${name} ${LLVM_COMMON_LIBS} )
+  endif()
 
   if(MSVC)
     get_target_property(cflag ${name} COMPILE_FLAGS)
