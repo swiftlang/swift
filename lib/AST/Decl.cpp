@@ -1562,16 +1562,15 @@ DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
   assert(components.size() > 0 && "must have at least one name component");
   if (components.size() == 1) {
     SimpleOrCompound = components.front();
+    return;
   }
   
   auto buf = C.Allocate(sizeof(CompoundDeclName)
                           + components.size() * sizeof(Identifier),
                         alignof(CompoundDeclName));
   auto compoundName = new (buf) CompoundDeclName{components.size()};
-  
-  for (unsigned i : indices(components))
-    new (&compoundName->getComponents()[i]) Identifier{components[i]};
-  
+  std::uninitialized_copy(components.begin(), components.end(),
+                          compoundName->getComponents().begin());
   SimpleOrCompound = compoundName;
 }
     
