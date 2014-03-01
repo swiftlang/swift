@@ -49,6 +49,8 @@
     ]
     assert(flavorProfiles[.Lemon].sour)
 
+* 'val' has been removed.  Long live 'let'!
+
 
 2014-02-26
 ----------
