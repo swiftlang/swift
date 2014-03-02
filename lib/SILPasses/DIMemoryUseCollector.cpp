@@ -991,7 +991,14 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // peer_method is a method lookup for delegation to a foreign
         // constructor, which is ignored.
         if (isa<PeerMethodInst>(User)) continue;
-
+        
+        // class_method that refers to an initializing constructor is a method
+        // lookup for delegation, which is ignored.
+        if (auto Method = dyn_cast<ClassMethodInst>(User)) {
+          if (Method->getMember().kind == SILDeclRef::Kind::Initializer)
+            continue;
+        }
+        
         // We only track two kinds of uses for delegating initializers:
         // calls to self.init, and "other", which we choose to model as escapes.
         // This intentionally ignores all stores, which (if they got emitted as

@@ -1448,7 +1448,7 @@ namespace {
       assert(it != FinalOverriders.end());
       AbstractFunctionDecl *finalOverrider = it->second;
 
-      fn = SILDeclRef(finalOverrider, fn.getResilienceExpansion(),
+      fn = SILDeclRef(finalOverrider, fn.kind, fn.getResilienceExpansion(),
                       fn.uncurryLevel);
 
       // Add the appropriate method to the module.
@@ -2667,7 +2667,8 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   // Find the metadata.
   llvm::Value *metadata;
   if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
-      isa<ConstructorDecl>(methodDecl)) {
+      (isa<ConstructorDecl>(methodDecl) &&
+       method.kind == SILDeclRef::Kind::Allocator)) {
     metadata = base;
   } else {
     metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,

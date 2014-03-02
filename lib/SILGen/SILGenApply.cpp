@@ -1088,7 +1088,7 @@ public:
       callee->setSubstitutions(gen, fn, substitutions, callDepth-1);
   }
 
-  /// Try to emit the given application as
+  /// Try to emit the given application as initializer delegation.
   bool applyInitDelegation(ApplyExpr *expr) {
     // Dig out the constructor we're delegating to.
     Expr *fn = expr->getFn();
@@ -1122,7 +1122,22 @@ public:
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
     // this is the initializing constructor.
-    if (isa<ClassDecl>(nominal) && ctorRef->getDecl()->hasClangNode()) {
+    // FIXME: the isCompleteObjectInit bit is a hack. Eventually, we'll
+    // always use class_method for delegation because only complete object
+    // initializers will delegate.
+    if (gen.IsCompleteObjectInit) {
+      // If the constructor is a complete object initializer, use
+      // dynamic dispatch to the initializing constructor.
+      setCallee(Callee::forClassMethod(
+                  gen,
+                  self.getValue(),
+                  SILDeclRef(ctorRef->getDecl(),
+                             SILDeclRef::Kind::Initializer,
+                             SILDeclRef::ConstructAtBestResilienceExpansion,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
+                             gen.SGM.requiresObjCDispatch(ctorRef->getDecl())),
+                  getSubstFnType(), fn));
+    } else if (isa<ClassDecl>(nominal) && ctorRef->getDecl()->hasClangNode()) {
       // If the constructor doesn't have a Swift entry point, use peer
       // method dispatch.
       setCallee(Callee::forPeerMethod(

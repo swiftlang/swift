@@ -396,7 +396,6 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   if (isa<ProtocolDecl>(decl->getDeclContext()))
     return;
 
-
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl, decl);
   PrettyStackTraceSILFunction X("silgen emitConstructor", f);

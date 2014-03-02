@@ -2522,6 +2522,9 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
+  // FIXME: Hack until all delegation is dispatched.
+  IsCompleteObjectInit = ctor->isCompleteObjectInit();
+
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
   RegularLocation Loc(ctor);
@@ -2551,7 +2554,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   SILValue selfValue;
 
-  // Allocate the 'self' valuel
+  // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
   if (ctor->isCompleteObjectInit() || ctor->hasClangNode()) {
     // For a complete object initializer or an initializer synthesized
@@ -2635,6 +2638,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
+  // FIXME: Hack until all delegation is dispatched.
+  IsCompleteObjectInit = ctor->isCompleteObjectInit();
+
   // If there's no body, this is the implicit constructor.
   assert(ctor->getBody() && "Class constructor without a body?");
 

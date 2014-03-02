@@ -113,6 +113,10 @@ public:
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
   
+  /// FIXME: Hack to temporarily use dispatched delegation only for
+  /// complete object initializers.
+  bool IsCompleteObjectInit = false;
+
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 

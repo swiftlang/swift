@@ -208,24 +208,26 @@ private:
     auto explosionLevel = ResilienceExpansion::Minimal;
     unsigned uncurryLevel = fn->getNaturalArgumentCount() - 1;
     
-    maybeAddMethod(fn, explosionLevel, uncurryLevel);
+    if (isa<FuncDecl>(fn))
+      maybeAddMethod(fn, SILDeclRef::Kind::Func, explosionLevel, uncurryLevel);
+    else {
+      auto ctor = cast<ConstructorDecl>(fn);
+      if (ctor->isAbstract())
+        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
+                       uncurryLevel);
+      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 
+                     uncurryLevel);      
+    }
   }
 
   void maybeAddMethod(AbstractFunctionDecl *fn,
+                      SILDeclRef::Kind kind,
                       ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
-    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
-
     // FIXME: Ignore getters and setters.  This is probably wrong!
     if (auto func = dyn_cast<FuncDecl>(fn)) {
       if (func->isAccessor())
         return;
-    }
-    // Ignore non-abstract constructors.
-    else if (auto ctor = dyn_cast<ConstructorDecl>(fn)) {
-      if (!ctor->isAbstract())
-        return;
-      kind = SILDeclRef::Kind::Allocator;
     }
 
     // If the method overrides something, we don't need a new entry.
