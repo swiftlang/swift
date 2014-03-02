@@ -150,6 +150,8 @@ private:
   bool handleAttrs(const TypeAttributes &Attrs);
   bool handleAttrLocs(SourceLoc AtLoc, ArrayRef<SourceLoc> Locs);
 
+  bool shouldPassBraceStructureNode(BraceStmt *S);
+
   enum PassNodesBehavior {
     /// Pass all nodes up to but not including the location.
     ExcludeNodeAtLocation,
@@ -214,27 +216,22 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
 }
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
-  if (isa<BraceStmt>(S) && !dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl())) {
-    SourceRange SR = S->getSourceRange();
-    if (SR.isValid()) {
-      // Pass BraceStatement structure node.
-      SyntaxStructureNode SN;
-      SN.Kind = SyntaxStructureKind::BraceStatement;
-      SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
-      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
-                                                         S->getSourceRange());
-      pushStructureNode(SN);
-    }
+  if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S))) {
+    // Pass BraceStatement structure node.
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::BraceStatement;
+    SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                       S->getSourceRange());
+    pushStructureNode(SN);
   }
   return { true, S };
 }
 
 Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
-  if (isa<BraceStmt>(S) && !dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl())) {
-    SourceRange SR = S->getSourceRange();
-    if (SR.isValid())
-      popStructureNode();
-  }
+  if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S)))
+    popStructureNode();
+
   return S;
 }
 
@@ -435,6 +432,11 @@ bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
   }
 
   return true;
+}
+
+bool ModelASTWalker::shouldPassBraceStructureNode(BraceStmt *S) {
+  return (!dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl()) &&
+          S->getSourceRange().isValid());
 }
 
 bool ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
