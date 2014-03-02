@@ -1407,7 +1407,7 @@ public:
     if (Options.SynthesizeSugarOnTypes) {
       auto *NT = T->getDecl();
       auto &Ctx = T->getASTContext();
-      if (NT == Ctx.getSliceDecl()) {
+      if (NT == Ctx.getArrayDecl()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "[]";
         return;

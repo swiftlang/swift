@@ -912,8 +912,8 @@ Type SyntaxSugarType::getImplementationType() {
   NominalTypeDecl *implDecl;
 
   if (isa<ArraySliceType>(this)) {
-    implDecl = ctx.getSliceDecl();
-    assert(implDecl && "Slice type has not been set yet");
+    implDecl = ctx.getArrayDecl();
+    assert(implDecl && "Array type has not been set yet");
   } else if (isa<OptionalType>(this)) {
     implDecl = ctx.getOptionalDecl();
     assert(implDecl && "Optional type has not been set yet");

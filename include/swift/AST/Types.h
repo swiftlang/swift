@@ -2308,7 +2308,7 @@ END_CAN_TYPE_WRAPPER(ArrayType, Type)
 
 /// A type with a special syntax that is always sugar for a library type.
 ///
-/// The prime examples are slices (T[] -> Slice<T>) and
+/// The prime examples are arrays (T[] -> Array<T>) and
 /// optionals (T? -> Optional<T>).
 class SyntaxSugarType : public TypeBase {
   Type Base;
@@ -3198,7 +3198,7 @@ inline Type TupleTypeElt::getVarargBaseTy() const {
   TypeBase *T = getType().getPointer();
   if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
     return AT->getBaseType();
-  // It's the stdlib Slice<T>.
+  // It's the stdlib Array<T>.
   return cast<BoundGenericType>(T)->getGenericArgs()[0];
 }
 

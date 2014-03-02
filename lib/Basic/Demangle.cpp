@@ -1841,7 +1841,7 @@ private:
   enum class SugarType {
     None,
     Optional,
-    Slice
+    Array
   };
   
   SugarType findSugar(NodePointer pointer) {
@@ -1871,7 +1871,7 @@ private:
       if (isIdentifier(unboundType->getChild(1), "Array") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
-        return SugarType::Slice;
+        return SugarType::Array;
       }
     }
 
@@ -1914,7 +1914,7 @@ private:
         Printer << "?";
       }
         break;
-      case SugarType::Slice: {
+      case SugarType::Array: {
         Node *type = pointer->getChild(1)->getChild(0);
         bool needs_parens = false;
         if (findSugar(type) != SugarType::None)

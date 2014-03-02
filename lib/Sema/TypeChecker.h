@@ -340,9 +340,9 @@ public:
   ///
   /// \returns The substituted type, or null if the substitution failed.
   ///
-  /// FIXME: We probably want to have both silent and loud failure modes. However,
-  /// the only possible failure now is from array slice types, which occur
-  /// simply because we don't have Slice<T> yet.
+  /// FIXME: We probably want to have both silent and loud failure modes.
+  /// However, the only possible failure now is from array slice types, which
+  /// occur simply because we don't have Array<T> yet.
   Type substType(Module *module, Type T, TypeSubstitutionMap &Substitutions,
                  bool IgnoreMissing = false);
 

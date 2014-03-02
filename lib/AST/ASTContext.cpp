@@ -60,8 +60,8 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
-  /// The declaration of Swift.Slice<T>.
-  NominalTypeDecl *SliceDecl = nullptr;
+  /// The declaration of Swift.Array<T>.
+  NominalTypeDecl *ArrayDecl = nullptr;
 
   /// The declaration of Swift.Optional<T>.
   EnumDecl *OptionalDecl = nullptr;
@@ -406,11 +406,11 @@ static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,
   return nullptr;
 }
 
-NominalTypeDecl *ASTContext::getSliceDecl() const {
-  if (!Impl.SliceDecl)
-    Impl.SliceDecl = findSyntaxSugarImpl(*this, "Array");
+NominalTypeDecl *ASTContext::getArrayDecl() const {
+  if (!Impl.ArrayDecl)
+    Impl.ArrayDecl = findSyntaxSugarImpl(*this, "Array");
 
-  return Impl.SliceDecl;
+  return Impl.ArrayDecl;
 }
 
 EnumDecl *ASTContext::getOptionalDecl() const {
@@ -766,8 +766,8 @@ ASTContext::getSubstitutions(BoundGenericType* bound) const {
   if (known != boundGenericSubstitutions.end())
     return known->second;
 
-  // We can trivially create substitutions for Slice and Optional.
-  if (bound->getDecl() == getSliceDecl() ||
+  // We can trivially create substitutions for Array and Optional.
+  if (bound->getDecl() == getArrayDecl() ||
       bound->getDecl() == getOptionalDecl())
     return createTrivialSubstitutions(bound);
 

@@ -413,7 +413,7 @@ void StmtBuilder::printReplExpr(VarDecl *Arg, Type SugarT, CanType T,
   }
   
   if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(T)) {
-    // FIXME: We have to hack Slice into here, because replPrint on Slice isn't
+    // FIXME: We have to hack Array into here, because replPrint on Array isn't
     // implementable yet.  We don't want the T argument of the slice to be
     // constrained to being replPrintable.  We need replPrint to be more
     // dynamically reflective in its implementation.
@@ -433,10 +433,10 @@ void StmtBuilder::printReplExpr(VarDecl *Arg, Type SugarT, CanType T,
   }
 
   if (BoundGenericClassType *BGCT = dyn_cast<BoundGenericClassType>(T)) {
-    // FIXME: We have to hack Slice into here, because replPrint on Dictionary
-    // isn't implementable yet.  We don't want the T argument of the dictionary
-    // to be constrained to being replPrintable.  We need replPrint to be more
-    // dynamically reflective in its implementation.
+    // FIXME: We have to hack Dictionary into here, because replPrint on
+    // Dictionary isn't implementable yet.  We don't want the T argument of the
+    // dictionary to be constrained to being replPrintable.  We need replPrint
+    // to be more dynamically reflective in its implementation.
     if (!BGCT->getParent() && BGCT->getDecl()->getName().str() == "Dictionary"){
       printCollection(Arg, BGCT->getGenericArgs()[0],
                       BGCT->getGenericArgs()[1], Loc, EndLoc,

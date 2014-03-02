@@ -1885,7 +1885,7 @@ namespace {
       expr->setElementType(elementType);
 
       // Make sure that the result type is a slice type, even if
-      // canonicalization mapped it down to Slice<T>.
+      // canonicalization mapped it down to Array<T>.
       auto sliceType = dyn_cast<ArraySliceType>(resultType.getPointer());
       if (!sliceType) {
         resultType = tc.getArraySliceType(expr->getLoc(), elementType);

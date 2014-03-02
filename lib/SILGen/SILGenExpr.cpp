@@ -1489,7 +1489,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     assert(field.isVararg() && "Cannot initialize nonvariadic element");
     
     // Okay, we have a varargs tuple element.  All the remaining elements feed
-    // into the varargs portion of this, which is then constructed into a Slice
+    // into the varargs portion of this, which is then constructed into an Array
     // through an informal protocol captured by the InjectionFn in the
     // TupleShuffleExpr.
     assert(E->getVarargsInjectionFunction() &&
@@ -1670,7 +1670,7 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
   // FIXME: We need to initialize the elements of the array that are now
   // allocated.
 
-  // Finally, build and return a Slice instance using the object
+  // Finally, build and return an Array instance using the object
   // header/base/count.
   return RValue(SGF, E,
                 SGF.emitArrayInjectionCall(ObjectPtr, BasePtr, NumElements,

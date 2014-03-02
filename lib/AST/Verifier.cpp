@@ -1560,7 +1560,7 @@ struct ASTNodeBase {};
         auto *LastPattern = TP->getFields().back().getPattern();
         Type T = cast<TypedPattern>(LastPattern)->getType()->getCanonicalType();
         if (auto *BGT = T->getAs<BoundGenericType>()) {
-          if (BGT->getDecl() == Ctx.getSliceDecl())
+          if (BGT->getDecl() == Ctx.getArrayDecl())
             return;
         }
         Out << "a vararg subpattern of a TuplePattern has wrong type";

@@ -94,15 +94,15 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
 Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
                                             ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
-  // Build the expression "Slice<T>".
+  // Build the expression "Array<T>".
   Expr *sliceTypeRef =
     new (Context) MetatypeExpr(nullptr, Loc,
                                MetatypeType::get(sliceType, Context));
 
-  // Build the expression "Slice<T>.convertFromHeapArray".
+  // Build the expression "Array<T>.convertFromHeapArray".
   Expr *injectionFn = new (Context) UnresolvedDotExpr(
                                       sliceTypeRef, Loc,
-                                      Context.getIdentifier("convertFromHeapArray"),
+                                  Context.getIdentifier("convertFromHeapArray"),
                                       Loc, /*Implicit=*/true);
   if (typeCheckExpressionShallow(injectionFn, dc))
     return nullptr;
@@ -530,7 +530,7 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &FloatLiteralType;
     name = "FloatLiteralType";
   }
-  // ArrayLiteralConvertible -> Slice
+  // ArrayLiteralConvertible -> Array
   else if (protocol == getProtocol(SourceLoc(),
                                    KnownProtocolKind::ArrayLiteralConvertible)){
     type = &ArrayLiteralType;

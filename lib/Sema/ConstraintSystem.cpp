@@ -104,7 +104,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
     if (literalProtocol) {
       if (auto defaultType = TC.getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
-        // properly handle Slice vs. Slice<T>.
+        // properly handle Array vs. Array<T>.
         if (defaultType->getAnyNominal() != type->getAnyNominal())
           increaseScore(SK_NonDefaultLiteral);
       }
@@ -587,7 +587,7 @@ Type ConstraintSystem::openType(
 
 Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
   Type result = openType(type, dc);
-  // FIXME: Better way to identify Slice<T>.
+  // FIXME: Better way to identify Array<T>.
   if (auto boundStruct
         = dyn_cast<BoundGenericStructType>(result.getPointer())) {
     if (!boundStruct->getParent() &&

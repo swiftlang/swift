@@ -33,7 +33,7 @@ using namespace swift;
 GenericTypeResolver::~GenericTypeResolver() { }
 
 Type TypeChecker::getArraySliceType(SourceLoc loc, Type elementType) {
-  if (!Context.getSliceDecl()) {
+  if (!Context.getArrayDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 0);
     return Type();
   }
