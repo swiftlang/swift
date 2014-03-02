@@ -79,7 +79,7 @@ void SILBasicBlock::eraseFromParent() {
 /// without a terminator.
 SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
   SILBasicBlock *New = new (Parent->getModule()) SILBasicBlock(Parent);
-  SILFunction::iterator Where = llvm::next(SILFunction::iterator(this));
+  SILFunction::iterator Where = std::next(SILFunction::iterator(this));
   SILFunction::iterator First = SILFunction::iterator(New);
   if (Where != First)
     Parent->getBlocks().splice(Where, Parent->getBlocks(), First);

@@ -63,7 +63,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
-  auto IBI = llvm::next(SILFunction::iterator(I->getParent()));
+  auto IBI = std::next(SILFunction::iterator(I->getParent()));
   InsertBeforeBB = IBI != F.end() ? IBI : nullptr;
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
@@ -79,7 +79,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   BBMap.clear();
   // Do not allow the entry block to be cloned again
   BBMap.insert(std::make_pair(CalleeEntryBB, nullptr));
-  SILBasicBlock::iterator InsertPoint = llvm::next(I);
+  SILBasicBlock::iterator InsertPoint = std::next(I);
   getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.

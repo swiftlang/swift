@@ -1067,7 +1067,7 @@ void IRGenSILFunction::emitSILFunction() {
     // It's not semantically necessary to preserve SIL block order,
     // but we really should.
     if (auto curBB = Builder.GetInsertBlock()) {
-      auto next = llvm::next(SILFunction::iterator(bb));
+      auto next = std::next(SILFunction::iterator(bb));
       if (next != CurSILFn->end()) {
         auto nextBB = LoweredBBs[&*next].bb;
         assert(curBB->getNextNode() == nextBB &&
