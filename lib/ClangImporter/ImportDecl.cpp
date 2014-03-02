@@ -3123,27 +3123,35 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (!Result->getDeclContext()->isModuleScopeContext() ||
       (Result->getModuleContext() != getStdlibModule() &&
        Result->getModuleContext() != getNamedModule(OBJC_MODULE_NAME))) {
-    assert(
-        // Either the Swift declaration was from stdlib,
-        !Result->getClangDecl() ||
-        // or we imported the underlying decl of the typedef,
-        SkippedOverTypedef ||
-        // or the other type is a typedef,
-        (isa<clang::TypedefNameDecl>(Result->getClangDecl()) &&
-         // both types are ValueDecls:
-         (isa<clang::ValueDecl>(Result->getClangDecl()) &&
-          getClangASTContext().hasSameType(
-              cast<clang::ValueDecl>(Result->getClangDecl())->getType(),
-              cast<clang::ValueDecl>(Canon)->getType())) ||
-         // both types are TypeDecls:
-         (isa<clang::TypeDecl>(Result->getClangDecl()) &&
-          getClangASTContext().hasSameUnqualifiedType(
-              getClangASTContext().getTypeDeclType(
-                  cast<clang::TypeDecl>(Result->getClangDecl())),
-              getClangASTContext().getTypeDeclType(
-                  cast<clang::TypeDecl>(Canon))))) ||
-        // or we imported the decl itself.
-        Result->getClangDecl()->getCanonicalDecl() == Canon);
+#ifndef NDEBUG
+    // Either the Swift declaration was from stdlib,
+    // or we imported the underlying decl of the typedef,
+    // or we imported the decl itself.
+    bool ImportedCorrectly =
+        !Result->getClangDecl() || SkippedOverTypedef ||
+        Result->getClangDecl()->getCanonicalDecl() == Canon;
+
+    // Or the other type is a typedef,
+    if (!ImportedCorrectly &&
+        isa<clang::TypedefNameDecl>(Result->getClangDecl())) {
+      // both types are ValueDecls:
+      if (isa<clang::ValueDecl>(Result->getClangDecl())) {
+        ImportedCorrectly =
+            getClangASTContext().hasSameType(
+                cast<clang::ValueDecl>(Result->getClangDecl())->getType(),
+                cast<clang::ValueDecl>(Canon)->getType());
+      } else if (isa<clang::TypeDecl>(Result->getClangDecl())) {
+        // both types are TypeDecls:
+        ImportedCorrectly =
+            getClangASTContext().hasSameUnqualifiedType(
+                getClangASTContext().getTypeDeclType(
+                    cast<clang::TypeDecl>(Result->getClangDecl())),
+                getClangASTContext().getTypeDeclType(
+                    cast<clang::TypeDecl>(Canon)));
+      }
+      assert(ImportedCorrectly);
+    }
+#endif
     (void) SkippedOverTypedef;
     Result->setClangNode(ClangDecl);
   }
