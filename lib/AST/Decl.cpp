@@ -1058,6 +1058,20 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     return false;
   }
 
+  // An Objective-C-defined class with no designated-initializer markup always
+  // inherits initializers.
+  if (hasClangNode()) {
+    auto objcClass = cast<clang::ObjCInterfaceDecl>(getClangDecl());
+    if (!objcClass->hasDesignatedInitializers()) {
+      ClassDeclBits.InheritsSuperclassInits
+        = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
+      return true;
+    }
+
+    // If it does declare or inherit designated initializers, it follows the
+    // Swift rules.
+  }
+
   // Look at all of the initializers of the subclass to gather the initializers
   // they override from the superclass.
   auto &ctx = getASTContext();

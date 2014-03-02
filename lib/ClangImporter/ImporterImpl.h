@@ -48,6 +48,7 @@ namespace swift {
 class ASTContext;
 class ClangModuleUnit;
 class ClassDecl;
+class ConstructorDecl;
 class Decl;
 class DeclContext;
 class ExtensionDecl;
@@ -288,6 +289,10 @@ public:
   /// \brief Keep track of enum constant values that have been imported.
   std::set<std::pair<const clang::EnumDecl *, llvm::APSInt>>
     EnumConstantValues;
+
+  /// \brief Keep track of initializer declarations that correspond to
+  /// imported methods.
+  llvm::DenseMap<FuncDecl *, ConstructorDecl *> Constructors;
 
 private:
   /// \brief NSObject, imported into Swift.

@@ -1667,40 +1667,7 @@ namespace {
         result->setStatic();
 
       // If this method overrides another method, mark it as such.
-
-      // FIXME: We'll eventually have to deal with having multiple overrides
-      // in Swift.
-      if (auto selfClassTy = selfVar->getType()->getAs<ClassType>()) {
-        if (auto superTy = selfClassTy->getDecl()->getSuperclass()) {
-          auto superDecl = superTy->castTo<ClassType>()->getDecl();
-          if (auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                                      superDecl->getClangDecl())) {
-            if (auto superObjCMethod = superObjCClass->lookupMethod(
-                                         decl->getSelector(),
-                                         decl->isInstanceMethod())) {
-              // We found a method that we've overridden. Import it.
-              FuncDecl *superMethod = nullptr;
-              if (isa<clang::ObjCProtocolDecl>(
-                    superObjCMethod->getDeclContext())) {
-                superMethod = cast_or_null<FuncDecl>(
-                                Impl.importMirroredDecl(superObjCMethod,
-                                                        superDecl));
-              } else {
-                superMethod = cast_or_null<FuncDecl>(
-                                Impl.importDecl(superObjCMethod));
-              }
-              
-              if (superMethod) {
-                assert(result->getDeclContext() !=
-                       superMethod->getDeclContext() &&
-                       "can not override method in the same DeclContext");
-                // FIXME: Proper type checking here!
-                result->setOverriddenDecl(superMethod);
-              }
-            }
-          }
-        }
-      }
+      recordObjCMethodOverride(result, decl);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
@@ -1787,13 +1754,79 @@ namespace {
       }
     }
 
+    /// Record the function override by the given Swift method (along with
+    /// it's Objective-C counterpart).
+    void recordObjCMethodOverride(AbstractFunctionDecl *swiftMethod,
+                                  const clang::ObjCMethodDecl *objcMethod) {
+      // If this functio overrides another function, mark it as such.
+      auto classTy = swiftMethod->getExtensionType()->getAs<ClassType>();
+      if (!classTy)
+        return;
+
+      auto superTy = classTy->getSuperclass(nullptr);
+      if (!superTy)
+        return;
+
+      // Dig out the Objective-C superclass.
+      auto superDecl = superTy->getAnyNominal();
+      auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                              superDecl->getClangDecl());
+      if (!superObjCClass)
+        return;
+
+      // Look for an overridden method.
+      auto superObjCMethod = superObjCClass->lookupMethod(
+                               objcMethod->getSelector(),
+                               objcMethod->isInstanceMethod());
+      if (!superObjCMethod)
+        return;
+
+      // We found a method that we've overridden. Import it.
+      AbstractFunctionDecl *superMethod = nullptr;
+      if (isa<clang::ObjCProtocolDecl>(superObjCMethod->getDeclContext())) {
+        superMethod = cast_or_null<AbstractFunctionDecl>(
+                        Impl.importMirroredDecl(superObjCMethod, superDecl));
+      } else {
+        superMethod = cast_or_null<AbstractFunctionDecl>(
+                        Impl.importDecl(superObjCMethod));
+      }
+      if (!superMethod)
+        return;
+
+      assert(swiftMethod->getDeclContext() != superMethod->getDeclContext() &&
+             "can not override method in the same DeclContext");
+
+      // Set function override.
+      // FIXME: Proper type checking here!
+      if (auto swiftFunc = dyn_cast<FuncDecl>(swiftMethod)) {
+        swiftFunc->setOverriddenDecl(cast<FuncDecl>(superMethod));
+        return;
+      }
+
+      // Set constructor override.
+      auto swiftCtor = cast<ConstructorDecl>(swiftMethod);
+
+      // If the superclass lookup found a method, not a constructor, try to
+      // map to the constructor.
+      auto superCtor = dyn_cast<ConstructorDecl>(superMethod);
+      if (!superCtor) {
+        superCtor = dyn_cast_or_null<ConstructorDecl>(
+                      importSpecialMethod(superMethod,
+                                          superMethod->getDeclContext()));
+        if (!superCtor)
+          return;
+      }
+      swiftCtor->setOverriddenDecl(superCtor);
+    }
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
-    /// constructors in Swift, enabling the 'new' syntax, e.g.,
+    /// constructors in Swift, enabling object construction syntax, e.g.,
     ///
     /// \code
-    /// new NSArray(1024) // in objc: [[NSArray alloc] initWithCapacity:1024]
+    /// // in objc: [[NSArray alloc] initWithCapacity:1024]
+    /// NSArray(withCapacity: 1024)
     /// \endcode
     ConstructorDecl *importConstructor(Decl *decl,
                                        const clang::ObjCMethodDecl *objcMethod,
@@ -1804,64 +1837,53 @@ namespace {
 
       // Only methods in the 'init' family can become constructors.
       FuncDecl *alloc = nullptr;
-      switch (objcMethod->getMethodFamily()) {
-      case clang::OMF_alloc:
-      case clang::OMF_autorelease:
-      case clang::OMF_copy:
-      case clang::OMF_dealloc:
-      case clang::OMF_finalize:
-      case clang::OMF_mutableCopy:
-      case clang::OMF_None:
-      case clang::OMF_performSelector:
-      case clang::OMF_release:
-      case clang::OMF_retain:
-      case clang::OMF_retainCount:
-      case clang::OMF_self:
-      case clang::OMF_new:
-        llvm_unreachable("Caller did not filter non-constructor methods");
 
-      case clang::OMF_init: {
-        assert(isReallyInitMethod(objcMethod) && "Caller didn't filter");
+      assert(objcMethod->getMethodFamily() == clang::OMF_init &&
+             "Not an init method");
+      assert(isReallyInitMethod(objcMethod) && "Not a real init method");
 
-        // Make sure we have a usable 'alloc' method. Otherwise, we can't
-        // build this constructor anyway.
-        const clang::ObjCInterfaceDecl *interface;
-        if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
-          // For a protocol method, look into the context in which we'll be
-          // mirroring the method to find 'alloc'.
-          // FIXME: Part of the mirroring hack.
-          auto classDecl = containerTy->getClassOrBoundGenericClass();
-          if (!classDecl)
-            return nullptr;
+      // Check whether we've already created the constructor.
+      FuncDecl *init = cast<FuncDecl>(decl);
+      auto known = Impl.Constructors.find(init);
+      if (known != Impl.Constructors.end())
+        return known->second;
 
-          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                        classDecl->getClangDecl());
-        } else {
-          // For non-protocol methods, just look for the interface.
-          interface = objcMethod->getClassInterface();
-        }
-
-        // If we couldn't find a class, we're done.
-        if (!interface)
+      // Make sure we have a usable 'alloc' method. Otherwise, we can't
+      // build this constructor anyway.
+      const clang::ObjCInterfaceDecl *interface;
+      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
+        // For a protocol method, look into the context in which we'll be
+        // mirroring the method to find 'alloc'.
+        // FIXME: Part of the mirroring hack.
+        auto classDecl = containerTy->getClassOrBoundGenericClass();
+        if (!classDecl)
           return nullptr;
 
-        // Form the Objective-C selector for alloc.
-        auto &clangContext = Impl.getClangASTContext();
-        auto allocId = &clangContext.Idents.get("alloc");
-        auto allocSel = clangContext.Selectors.getNullarySelector(allocId);
-
-        // Find the 'alloc' class method.
-        auto allocMethod = interface->lookupClassMethod(allocSel);
-        if (!allocMethod)
-          return nullptr;
-
-        // Import the 'alloc' class method.
-        alloc = cast_or_null<FuncDecl>(Impl.importDecl(allocMethod));
-        if (!alloc)
-          return nullptr;
-        break;
+        interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                      classDecl->getClangDecl());
+      } else {
+        // For non-protocol methods, just look for the interface.
+        interface = objcMethod->getClassInterface();
       }
-      }
+
+      // If we couldn't find a class, we're done.
+      if (!interface)
+        return nullptr;
+
+      // Form the Objective-C selector for alloc.
+      auto &clangContext = Impl.getClangASTContext();
+      auto allocId = &clangContext.Idents.get("alloc");
+      auto allocSel = clangContext.Selectors.getNullarySelector(allocId);
+
+      // Find the 'alloc' class method.
+      auto allocMethod = interface->lookupClassMethod(allocSel);
+      if (!allocMethod)
+        return nullptr;
+
+      // Import the 'alloc' class method.
+      alloc = cast_or_null<FuncDecl>(Impl.importDecl(allocMethod));
+      if (!alloc)
+        return nullptr;
 
       auto loc = decl->getLoc();
       auto name = Impl.SwiftContext.Id_init;
@@ -1888,6 +1910,11 @@ namespace {
                                           SpecialMethodKind::Constructor);
       assert(type && "Type has already been successfully converted?");
 
+      // Check whether we've already created the constructor.
+      known = Impl.Constructors.find(init);
+      if (known != Impl.Constructors.end())
+        return known->second;
+
       // A constructor returns an object of the type, not 'id'.
       // This is effectively implementing related-result-type semantics.
       // FIXME: Perhaps actually check whether the routine has a related result
@@ -1913,6 +1940,12 @@ namespace {
       
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
+
+      // Record the constructor for future re-use.
+      Impl.Constructors[init] = result;
+
+      // If this method overrides another method, mark it as such.
+      recordObjCMethodOverride(result, objcMethod);
 
       // Inform the context that we have external definitions.
       Impl.registerExternalDecl(result);
@@ -2635,67 +2668,6 @@ namespace {
                 members.push_back(classImport);
             }
           }
-        }
-      }
-    }
-
-    /// \brief Determine whether the given Objective-C class has an instance or
-    /// class method with the given selector directly declared (i.e., not in
-    /// a superclass or protocol).
-    static bool hasMethodShallow(const clang::Selector sel, bool isInstance,
-                                 const clang::ObjCInterfaceDecl *objcClass) {
-      if (objcClass->getMethod(sel, isInstance))
-        return true;
-
-      for (auto cat = objcClass->visible_categories_begin(),
-                catEnd = objcClass->visible_categories_end();
-           cat != catEnd;
-           ++cat) {
-        if ((*cat)->getMethod(sel, isInstance))
-          return true;
-      }
-
-      return false;
-    }
-
-    /// \brief Import constructors from our superclasses (and their
-    /// categories/extensions), effectively "inheriting" constructors.
-    ///
-    /// FIXME: Does it make sense to have inherited constructors as a real
-    /// Swift feature?
-    void importInheritedConstructors(const clang::ObjCInterfaceDecl *objcClass,
-                                     DeclContext *dc,
-                                     SmallVectorImpl<Decl *> &members) {
-      // FIXME: Would like a more robust way to ensure that we aren't creating
-      // duplicates.
-      llvm::SmallSet<clang::Selector, 16> knownSelectors;
-      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container) {
-        for (auto meth = container->meth_begin(),
-                  methEnd = container->meth_end();
-             meth != methEnd; ++meth) {
-          if ((*meth)->getMethodFamily() == clang::OMF_init &&
-              isReallyInitMethod(*meth) &&
-              !hasMethodShallow((*meth)->getSelector(),
-                                (*meth)->isInstanceMethod(),
-                                objcClass) &&
-              knownSelectors.insert((*meth)->getSelector())) {
-                if (auto imported = Impl.importDecl(*meth)) {
-                  if (auto special = importConstructor(imported, *meth, dc)) {
-                    members.push_back(special);
-                  }
-                }
-              }
-        }
-      };
-
-      for (auto curObjCClass = objcClass; curObjCClass;
-           curObjCClass = curObjCClass->getSuperClass()) {
-        inheritConstructors(curObjCClass);
-        for (auto cat = curObjCClass->visible_categories_begin(),
-                  catEnd = curObjCClass->visible_categories_end();
-             cat != catEnd;
-             ++cat) {
-            inheritConstructors(*cat);
         }
       }
     }
@@ -3468,13 +3440,6 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
     DC = swiftClass;
 
     clangDecl = clangClass = clangClass->getDefinition();
-
-    if (clangClass->getName() != "Protocol") {
-      converter.importInheritedConstructors(clangClass,
-                                            const_cast<DeclContext *>(DC),
-                                            members);
-    }
-
   } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
     DC = cast<ProtocolDecl>(D);
     clangDecl = clangProto->getDefinition();

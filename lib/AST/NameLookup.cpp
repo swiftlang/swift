@@ -27,6 +27,8 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
+#include "clang/AST/DeclObjC.h"
+
 #define DEBUG_TYPE "Name lookup"
 
 STATISTIC(NumLazyMembers,
@@ -878,17 +880,26 @@ bool DeclContext::lookupQualified(Type type,
 
   // Allow filtering of the visible declarations based on
   bool onlyCompleteObjectInits = false;
-  auto isAcceptableDecl = [&](Decl *decl) -> bool {
+  auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
     // Filter out subobject initializers, if requestred.
     if (onlyCompleteObjectInits) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isCompleteObjectInit())
-          return false;
-
-        return true;
+      // Allow any initializer in an Objective-C class that neither declares nor
+      // inherits designated initializers.
+      bool assumeCompleteObjectInit = false;
+      if (current->hasClangNode()) {
+        if (auto objcClass
+              = dyn_cast<clang::ObjCInterfaceDecl>(current->getClangDecl())) {
+          if (!objcClass->declaresOrInheritsDesignatedInitializers())
+            assumeCompleteObjectInit = true;
+        }
       }
 
-      return false;
+      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+        if (!ctor->isCompleteObjectInit() && !assumeCompleteObjectInit)
+          return false;
+      } else {
+        return false;
+      }
     }
 
     return true;
@@ -918,7 +929,7 @@ bool DeclContext::lookupQualified(Type type,
           continue;
       }
 
-      if (isAcceptableDecl(decl))
+      if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
     }
 
@@ -1005,8 +1016,22 @@ bool DeclContext::lookupQualified(Type type,
     // Find all of the overridden declarations.
     llvm::SmallPtrSet<ValueDecl*, 8> overridden;
     for (auto decl : decls) {
-      if (auto overrides = decl->getOverriddenDecl())
+      while (auto overrides = decl->getOverriddenDecl()) {
         overridden.insert(overrides);
+
+        // Because initializers from Objective-C base classes have greater
+        // visibility than initializers written in Swift classes, we can
+        // have a "break" in the set of declarations we found, where
+        // C.init overrides B.init overrides A.init, but only C.init and
+        // A.init are in the chain. Make sure we still remove A.init from the
+        // set in this case.
+        if (name == ctx.Id_init) {
+          decl = overrides;
+          continue;
+        }
+
+        break;
+      }
     }
 
     // If any methods were overridden, remove them from the results.
