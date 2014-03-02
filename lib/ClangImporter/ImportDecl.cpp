@@ -136,7 +136,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     if (Name.str() == C_TYPE_NAME) {                               \
       CTypeKind = MappedCTypeKind::C_TYPE_KIND;                    \
       Bitwidth = C_TYPE_BITWIDTH;                                  \
-      if (SWIFT_MODULE_NAME == STDLIB_NAME)                        \
+      if (StringRef(SWIFT_MODULE_NAME) == StringRef(STDLIB_NAME))  \
         IsSwiftModule = true;                                      \
       else {                                                       \
         IsSwiftModule = false;                                     \
