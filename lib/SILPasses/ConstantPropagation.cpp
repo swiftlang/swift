@@ -514,7 +514,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
       // Otherwise, print the Builtin Types.
       } else {
         bool SrcTySigned, DstTySigned;
-        llvm::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+        std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_builtin_types,
                  DstTySigned, DstTy);
@@ -536,7 +536,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
           // Since builtin types are sign-agnostic, print the signdness
           // separately.
           bool SrcTySigned, DstTySigned;
-          llvm::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
+          std::tie(SrcTySigned, DstTySigned) = getTypeSigndness(Builtin);
           diagnose(M.getASTContext(), Loc.getSourceLoc(),
                    diag::integer_conversion_overflow_builtin_types,
                    SrcTySigned, SrcTy, DstTySigned, DstTy);

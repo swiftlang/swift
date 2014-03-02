@@ -142,7 +142,7 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
   while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      llvm::tie(result.status, result.name) =
+      std::tie(result.status, result.name) =
         validateControlBlock(cursor, scratch);
       if (result.status == ModuleStatus::Malformed)
         return result;
@@ -587,7 +587,7 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
     assert(!dependency.isLoaded() && "already loaded?");
 
     StringRef modulePath, scopePath;
-    llvm::tie(modulePath, scopePath) = dependency.RawAccessPath.split('\0');
+    std::tie(modulePath, scopePath) = dependency.RawAccessPath.split('\0');
 
     auto moduleID = ctx.getIdentifier(modulePath);
     assert(!moduleID.empty() &&
@@ -693,7 +693,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
     ASTContext &Ctx = getContext();
     for (auto &Dep : Dependencies) {
       StringRef ModulePath, ScopePath;
-      llvm::tie(ModulePath, ScopePath) = Dep.RawAccessPath.split('\0');
+      std::tie(ModulePath, ScopePath) = Dep.RawAccessPath.split('\0');
 
       auto ModuleID = Ctx.getIdentifier(ModulePath);
       assert(!ModuleID.empty() &&

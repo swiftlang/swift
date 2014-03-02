@@ -646,7 +646,7 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
 
   entity.mangle(result.Name);
 
-  llvm::tie(result.Linkage, result.Visibility) =
+  std::tie(result.Linkage, result.Visibility) =
     getIRLinkage(IGM, entity.getLinkage(isDefinition), isDefinition);
 
   return result;

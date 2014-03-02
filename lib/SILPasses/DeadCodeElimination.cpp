@@ -250,7 +250,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
         const EnumElementDecl *EI;
         SILBasicBlock *BI;
-        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        std::tie(EI, BI) = SUI->getCase(Idx);
         if (EI == TheEnumElem) {
           TheSuccessorBlock = BI;
           ReachableBlockIdx = Idx;
@@ -334,7 +334,7 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
         APInt EI;
         SILBasicBlock *BI;
-        llvm::tie(EI, BI) = SUI->getCase(Idx);
+        std::tie(EI, BI) = SUI->getCase(Idx);
         if (EI == SwitchVal->getValue())
           TheSuccessorBlock = BI;
       }

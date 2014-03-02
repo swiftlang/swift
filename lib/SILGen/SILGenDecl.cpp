@@ -1599,7 +1599,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
 
   Optional<SILValue> maybeReturnValue;
   SILLocation returnLoc(loc);
-  llvm::tie(maybeReturnValue, returnLoc) = emitEpilogBB(loc);
+  std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(loc);
 
   if (!maybeReturnValue)
     return;
