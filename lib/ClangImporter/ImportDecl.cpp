@@ -1941,6 +1941,13 @@ namespace {
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
 
+      // If the owning Objective-C class has designated initializers and this
+      // is not one of them, treat it as a convenience initializer.
+      if (interface && interface->hasDesignatedInitializers() &&
+          !objcMethod->hasAttr<clang::ObjCDesignatedInitializerAttr>()) {
+        result->setCompleteObjectInit(true);
+      }
+
       // Record the constructor for future re-use.
       Impl.Constructors[init] = result;
 

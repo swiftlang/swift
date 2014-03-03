@@ -9,3 +9,8 @@
 // Specifically testing re-adopting a protocol that's adopted by a base class.
 @interface NSWindow : NSResponder <NSAppearanceCustomization>
 @end
+
+@interface NSDocument : NSObject
+- (instancetype)init NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithURL:(NSString*)url;
+@end

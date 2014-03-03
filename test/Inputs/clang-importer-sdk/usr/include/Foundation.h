@@ -139,3 +139,4 @@ typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 @end
 
+#define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
