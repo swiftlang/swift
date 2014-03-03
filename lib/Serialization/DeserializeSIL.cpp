@@ -1693,7 +1693,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
       ArrayRef<uint64_t> ListOfValues;
       DeclID NameID;
       WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
-      SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
+      SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
       if (Func) {
         unsigned NextValueIndex = 0;
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
