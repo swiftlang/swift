@@ -5,7 +5,7 @@ import Builtin
 import Swift
 
 class C {
-  @abstract init()
+  @required init()
 }
 
 // CHECK: [[C:%C6vtable1C]] = type <{ %swift.refcounted }>

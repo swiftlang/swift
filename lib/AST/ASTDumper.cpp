@@ -592,7 +592,7 @@ namespace {
 
     void visitConstructorDecl(ConstructorDecl *CD) {
       printCommonAFD(CD, "constructor_decl");
-      if (CD->isAbstract())
+      if (CD->isRequired())
         OS << " abstract";
       if (CD->isCompleteObjectInit())
         OS << " complete_object";

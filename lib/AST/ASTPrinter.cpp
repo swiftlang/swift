@@ -887,9 +887,9 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
-  if (!Options.SkipImplicit && decl->isAbstract() &&
-      !decl->getAttrs().isAbstract()) {
-    Printer << "/* @abstract(inferred) */ ";
+  if (!Options.SkipImplicit && decl->isRequired() &&
+      !decl->getAttrs().isRequired()) {
+    Printer << "/* @required(inferred) */ ";
   }
 
   Printer << "init";

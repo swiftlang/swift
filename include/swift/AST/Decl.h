@@ -274,8 +274,8 @@ class alignas(8) Decl {
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
 
-    /// Whether this initializer is abstract.
-    unsigned Abstract : 1;
+    /// Whether this initializer is required.
+    unsigned Required : 1;
 
     /// Whether this is a complete object initializer.
     unsigned CompleteObjectInit : 1;
@@ -3756,12 +3756,12 @@ public:
   BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                               ApplyExpr **init = nullptr);
 
-  /// Whether this constructor is abstract,
-  bool isAbstract() const { return ConstructorDeclBits.Abstract; }
+  /// Whether this constructor is required,
+  bool isRequired() const { return ConstructorDeclBits.Required; }
 
   /// Set whether this constructor is abstract.
-  void setAbstract(bool abstract) {
-    ConstructorDeclBits.Abstract = abstract;
+  void setRequired(bool required) {
+    ConstructorDeclBits.Required = required;
   }
 
   /// Whether this is a complete object initializer.

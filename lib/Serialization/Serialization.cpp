@@ -1512,7 +1512,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
-                                  ctor->isAbstract(),
+                                  ctor->isRequired(),
                                   ctor->isCompleteObjectInit(),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),

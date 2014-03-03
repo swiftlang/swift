@@ -607,7 +607,7 @@ namespace decls_block {
     BCFixed<1>,  // has selector-style signature?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // transparent?
-    BCFixed<1>,  // abstract?
+    BCFixed<1>,  // required?
     BCFixed<1>,  // complete object init?
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)

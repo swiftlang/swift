@@ -5,7 +5,7 @@ import Builtin
 import Swift
 
 class C {
-  @abstract init()
+  @required init()
 }
 
 sil @_TFC12dynamic_init1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C

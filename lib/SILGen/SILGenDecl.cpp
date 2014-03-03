@@ -1043,7 +1043,7 @@ public:
   
   void visitConstructorDecl(ConstructorDecl *cd) {
     // Abstract constructors have their allocating entry point in the vtable.
-    if (cd->isAbstract()) {
+    if (cd->isRequired()) {
       addEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
     }
 

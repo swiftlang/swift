@@ -800,7 +800,7 @@ public:
       // is not statically derived.
       else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
         ApplyExpr *thisCallSite = callSites.back();
-        if (ctor->isAbstract() &&
+        if (ctor->isRequired() &&
             thisCallSite->getArg()->getType()->is<MetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
           isDynamicallyDispatched = true;

@@ -2004,7 +2004,7 @@ public:
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
           // We only care about abstract constructors.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
-          if (!superclassCtor->isAbstract())
+          if (!superclassCtor->isRequired())
             continue;
 
           // If we have an override for this constructor, it's okay.
@@ -3265,9 +3265,9 @@ public:
     checkOverrides(CD);
 
     // Determine whether this constructor is abstract.
-    bool isAbstract = CD->getAttrs().isAbstract() ||
-      (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isAbstract());
-    CD->setAbstract(isAbstract);
+    bool isRequired = CD->getAttrs().isRequired() ||
+      (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired());
+    CD->setRequired(isRequired);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -4176,7 +4176,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
   }
 
-  if (Attrs.isAbstract()) {
+  if (Attrs.isRequired()) {
     // The abstract attribute only applies to constructors.
     if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
       if (auto parentTy = ctor->getExtensionType()) {
@@ -4185,24 +4185,24 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
           // The constructor must be declared within the class itself.
           if (!isa<ClassDecl>(ctor->getDeclContext())) {
             TC.diagnose(ctor, diag::abstract_initializer_in_extension, parentTy)
-              .highlight(Attrs.getLoc(AK_abstract));
-            D->getMutableAttrs().clearAttribute(AK_abstract);
+              .highlight(Attrs.getLoc(AK_required));
+            D->getMutableAttrs().clearAttribute(AK_required);
           }
         } else {
           if (!parentTy->is<ErrorType>()) {
             TC.diagnose(ctor, diag::abstract_initializer_nonclass, parentTy)
-              .highlight(Attrs.getLoc(AK_abstract));
+              .highlight(Attrs.getLoc(AK_required));
           }
-          D->getMutableAttrs().clearAttribute(AK_abstract);
+          D->getMutableAttrs().clearAttribute(AK_required);
         }
       } else {
         // Constructor outside of nominal type context; just clear the
         // attribute; we've already complained elsewhere.
-        D->getMutableAttrs().clearAttribute(AK_abstract);
+        D->getMutableAttrs().clearAttribute(AK_required);
       }
     } else {
-      TC.diagnose(Attrs.getLoc(AK_abstract), diag::abstract_non_initializer);
-      D->getMutableAttrs().clearAttribute(AK_abstract);
+      TC.diagnose(Attrs.getLoc(AK_required), diag::abstract_non_initializer);
+      D->getMutableAttrs().clearAttribute(AK_required);
     }
   }
 

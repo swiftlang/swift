@@ -212,7 +212,7 @@ private:
       maybeAddMethod(fn, SILDeclRef::Kind::Func, explosionLevel, uncurryLevel);
     else {
       auto ctor = cast<ConstructorDecl>(fn);
-      if (ctor->isAbstract())
+      if (ctor->isRequired())
         maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
                        uncurryLevel);
       maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 

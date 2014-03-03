@@ -485,7 +485,7 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
     if (isa<ConstructorDecl>(req)) {
       auto ctorWitness = cast_or_null<ConstructorDecl>(
                            getWitness(req, resolver).getDecl());
-      if (ctorWitness && !ctorWitness->isAbstract()) {
+      if (ctorWitness && !ctorWitness->isRequired()) {
         DCAndInheritable.setInt(IsInheritableKind::NotInheritable);
         return false;
       }
