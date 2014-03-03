@@ -1191,15 +1191,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return false;
 }
 
-bool TypeChecker::isTrivialSubtypeOf(Type type1, Type type2, DeclContext *dc) {
-  // FIXME: Egregious hack due to checkClassOverrides being awful.
-  if (type1->is<PolymorphicFunctionType>() ||
-      type2->is<PolymorphicFunctionType>())
-    return false;
-
-  return type1->isTrivialSubtypeOf(type2, nullptr);
-}
-
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
   ConstraintSystem cs(*this, dc);
   cs.addConstraint(ConstraintKind::Subtype, type1, type2);

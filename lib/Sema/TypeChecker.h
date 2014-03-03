@@ -385,15 +385,6 @@ public:
   /// the type has no supertype.
   Type getSuperClassOf(Type type);
 
-  /// \brief Determine whether one type is a trivial subtype of another.
-  ///
-  /// \param t1 The potential trivial subtype.
-  /// \param t2 The potential trivial supertype.
-  /// \param dc The context of the check.
-  ///
-  /// \returns true if \c t1 is a trivial subtype of \c t2.
-  bool isTrivialSubtypeOf(Type t1, Type t2, DeclContext *dc);
-
   /// \brief Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.

@@ -1207,13 +1207,13 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   do {
     if (ty->isEqual(this))
       return true;
-  } while ((ty = ty->getSuperclass(nullptr)));
+  } while ((ty = ty->getSuperclass(resolver)));
   return false;
 }
 
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
-static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
+static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {
   if (t1 == t2) return true;
 
   // Scalar-to-tuple and tuple-to-tuple.
@@ -1223,12 +1223,12 @@ static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
     auto tuple1 = dyn_cast<TupleType>(t1);
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1)
-        return isTrivialSubtypeOf(t1, tuple2.getElementType(0), resolver);
+        return canOverride(t1, tuple2.getElementType(0), resolver);
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
-      if (!isTrivialSubtypeOf(tuple1.getElementType(i),
+      if (!canOverride(tuple1.getElementType(i),
                               tuple2.getElementType(i),
                               resolver))
         return false;
@@ -1242,24 +1242,26 @@ static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
     if (!fn1 || fn1->getExtInfo() != fn2->getExtInfo())
       return false;
     // Inputs are contravariant, results are covariant.
-    return (isTrivialSubtypeOf(fn2.getInput(), fn1.getInput(), resolver) &&
-            isTrivialSubtypeOf(fn1.getResult(), fn2.getResult(), resolver));
+    return (canOverride(fn2.getInput(), fn1.getInput(), resolver) &&
+            canOverride(fn1.getResult(), fn2.getResult(), resolver));
   }
 
   // Class-to-optional and class optional-to-optional.  Note that this
   // is not recursive: T? is not necessarily a trivial subtype of T??,
   // although it is a subtype.
   if (auto bound2 = dyn_cast<BoundGenericType>(t2)) {
-    if (auto optKind2 = bound2->getDecl()->classifyAsOptionalType()) {
+    if (bound2->getDecl()->classifyAsOptionalType()) {
       auto obj2 = bound2.getGenericArgs()[0];
+
+      if (obj2->isEqual(t1))
+        return true;
 
       // Optional-to-optional.
       if (auto bound1 = dyn_cast<BoundGenericType>(t1)) {
-        if (auto optKind1 = bound1->getDecl()->classifyAsOptionalType()) {
+        if (bound1->getDecl()->classifyAsOptionalType()) {
           auto obj1 = bound1.getGenericArgs()[0];
-          // T? is not a subtype of @unchecked T?, but all other
-          // combinations are fine.
-          return (optKind1 >= optKind2 && obj2->isSuperclassOf(obj1, resolver));
+          // Allow T? and @unchecked T? to freely override one another.
+          return canOverride(obj1, obj2, resolver);
         } else if (!isa<BoundGenericClassType>(bound1)) {
           return false;
         }
@@ -1276,9 +1278,8 @@ static bool isTrivialSubtypeOf(CanType t1, CanType t2, LazyResolver *resolver) {
   return t2->isSuperclassOf(t1, resolver);
 }
 
-bool TypeBase::isTrivialSubtypeOf(Type other, LazyResolver *resolver) {
-  return ::isTrivialSubtypeOf(getCanonicalType(), other->getCanonicalType(),
-                              resolver);
+bool TypeBase::canOverride(Type other, LazyResolver *resolver) {
+  return ::canOverride(getCanonicalType(), other->getCanonicalType(), resolver);
 }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default

@@ -2779,8 +2779,7 @@ public:
       }
 
       // Failing that, check for subtyping.
-      if (TC.isTrivialSubtypeOf(uncurriedDeclTy, uncurriedParentDeclTy,
-                                decl->getDeclContext())) {
+      if (uncurriedDeclTy->canOverride(uncurriedParentDeclTy, &TC)) {
         // If the Objective-C selectors match, always call it exact.
         // For subscripts, we perform extra checking below.
         if (objCMatch) {
@@ -2946,8 +2945,7 @@ public:
       }
 
       // Check for subtyping.
-      if (TC.isTrivialSubtypeOf(propertyTy, parentPropertyTy,
-                                property->getDeclContext())) {
+      if (propertyTy->canOverride(parentPropertyTy, &TC)) {
         // The overridden property must not be mutable.
         if (parentProperty->getSetter()) {
           TC.diagnose(property, diag::override_mutable_covariant_property,
