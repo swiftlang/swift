@@ -315,7 +315,7 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
     Parent = File;
 
   llvm::DILexicalBlock DScope =
-    DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col);
+    DBuilder.createLexicalBlock(Parent, File, L.Line, L.Col, 0);
 
   // Cache it.
   ScopeCache[DS] = llvm::WeakVH(DScope);
