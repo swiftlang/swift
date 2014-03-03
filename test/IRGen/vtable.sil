@@ -1,0 +1,35 @@
+// RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {
+  @abstract init()
+}
+
+// CHECK: [[C:%C6vtable1C]] = type <{ %swift.refcounted }>
+
+sil @_TFC6vtable1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
+sil @_TFC6vtable1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C
+sil @_TFC6vtable1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer
+sil @_TFC6vtable1CD : $@cc(method) @thin (@owned C) -> ()
+
+// CHECK: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] { 
+// CHECK: void ([[C]]*)* @_TFC6vtable1CD, 
+// CHECK: i8** @_TWVBo, 
+// CHECK: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64), 
+// CHECK: %objc_class* @"OBJC_CLASS_$_SwiftObject", 
+// CHECK: %swift.opaque* @_objc_empty_cache, 
+// CHECK: %swift.opaque* @_objc_empty_vtable, 
+// CHECK: i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* }* @_DATA_C to i64), i64 1), 
+// CHECK: { i64, i8*, i64, i64, i8*, i64, i64 }* @_TMnC6vtable1C, 
+// CHECK: i64 16, i64 7, 
+// CHECK: [[C]]* (%swift.type*)* @_TFC6vtable1CCfMS0_FT_S0_, 
+// CHECK: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_ 
+// CHECK: }
+
+sil_vtable C {
+  #C.init!allocator.1: _TFC6vtable1CCfMS0_FT_S0_
+  #C.init!initializer.1: _TFC6vtable1CcfMS0_FT_S0_
+}
