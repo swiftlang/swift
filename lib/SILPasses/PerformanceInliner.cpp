@@ -58,16 +58,8 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 
   SILFunction *F = FRI->getReferencedFunction();
   // If F is an external declaration, we can't inline...
-  if (F->isExternalDeclaration()) {
+  if (F->empty() || F->isExternalDeclaration()) {
     DEBUG(llvm::dbgs() << "  Can't inline " << F->getName() << ".\n");
-    return nullptr;
-  }
-
-  // If F is empty attempt to link it. If we fail to link F, we can't
-  // inline... bail.
-  if (F->empty() && !FRI->getModule().linkFunction(F, Mode)) {
-    DEBUG(llvm::dbgs() << "  Failed to link " << F->getName() << ". Can't "
-          "inline.\n");
     return nullptr;
   }
 
@@ -164,12 +156,18 @@ public:
     std::reverse(Worklist.begin(), Worklist.end());
 
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
-                                  getOptions().LinkMode);
+                                  SILModule::LinkingMode::LinkAll);
 
     bool Changed = false;
     while (!Worklist.empty()) {
       SILFunction *F = Worklist.back();
       Worklist.pop_back();
+
+      // If F is empty, attempt to link it. Skip it if we fail to do so.
+      if (F->empty() &&
+          !getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll))
+        continue;
+
       Changed |= inliner.inlineCallsIntoFunction(F);
     }
 
