@@ -805,7 +805,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       
   case tok::kw_self:     // self
   case tok::kw_Self:     // Self
-  case tok::kw_DynamicSelf:     // Self
   case tok::identifier:  // foo
     Result = makeParserResult(parseExprIdentifier());
 
@@ -1290,15 +1289,7 @@ Expr *Parser::parseExprStringLiteral() {
 ///
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
-         Tok.is(tok::kw_Self) || Tok.is(tok::kw_DynamicSelf));
-  if (Tok.is(tok::kw_DynamicSelf)) {
-    diagnose(Tok, diag::dynamic_self_is_self)
-      .fixItReplace(SourceRange(Tok.getLoc()), "Self");
-    SourceLoc Loc = Tok.getLoc();
-    Identifier Name = Context.getIdentifier("Self");
-    consumeToken();
-    return actOnIdentifierExpr(Name, Loc);    
-  }
+         Tok.is(tok::kw_Self));
 
   SourceLoc Loc = Tok.getLoc();
   Identifier Name = Context.getIdentifier(Tok.getText());

@@ -71,7 +71,6 @@ KEYWORD(default)
 KEYWORD(where)
 
 // Expression and type keywords.
-KEYWORD(DynamicSelf)
 KEYWORD(new)
 KEYWORD(as)
 KEYWORD(is)

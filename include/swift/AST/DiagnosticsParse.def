@@ -532,8 +532,6 @@ ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
       "optional array type requires parentheses", ())
 
 // Dynamic Self
-ERROR(dynamic_self_is_self,type_parsing,none,
-      "'DynamicSelf' is now called 'Self'", ())
 ERROR(init_expected_self,type_parsing,PointsToFirstBadToken,
       "initializers can only specify a return type of 'Self'", ())
 

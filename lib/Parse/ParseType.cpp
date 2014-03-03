@@ -67,7 +67,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   switch (Tok.getKind()) {
-  case tok::kw_DynamicSelf:
   case tok::kw_Self:
   case tok::identifier:
     ty = parseTypeIdentifier();
@@ -252,8 +251,7 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self) &&
-      Tok.isNot(tok::kw_DynamicSelf)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeIdentifierWithDot(nullptr);
@@ -272,29 +270,15 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   while (true) {
     SourceLoc Loc;
     Identifier Name;
-    switch (Tok.getKind()) {
-    case tok::kw_DynamicSelf:
-      diagnose(Tok, diag::dynamic_self_is_self)
-        .fixItReplace(SourceRange(Tok.getLoc()), "Self");
-      Name = Context.getIdentifier("Self");
-      Loc = Tok.getLoc();
-      consumeToken();
-      break;
-      
-
-    case tok::kw_Self:
-      Name = Context.getIdentifier(Tok.getText());
-      Loc = Tok.getLoc();
-      consumeToken();
-      break;
-
-    // FIXME: specialize diagnostic for 'Type': type can not start with
-    // 'metatype'
-    // FIXME: offer a fixit: 'self' -> 'Self'
-    default:
+    if (Tok.isNot(tok::kw_Self)) {
+      // FIXME: specialize diagnostic for 'Type': type can not start with
+      // 'metatype'
+      // FIXME: offer a fixit: 'self' -> 'Self'
       if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
         Status.setIsParseError();
-      break;
+    } else {
+      Name = Context.getIdentifier(Tok.getText());
+      Loc = consumeToken(tok::kw_Self);
     }
 
     if (Loc.isValid()) {
@@ -692,7 +676,6 @@ bool Parser::canParseGenericArguments() {
 
 bool Parser::canParseType() {
   switch (Tok.getKind()) {
-  case tok::kw_DynamicSelf:
   case tok::kw_Self:
   case tok::identifier:
     if (!canParseTypeIdentifier())
@@ -752,8 +735,7 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self) &&
-      Tok.isNot(tok::kw_DynamicSelf)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     return false;
   }
   
