@@ -190,16 +190,30 @@ enum TypeResolutionFlags {
   /// Whether we are validating the type for SIL.
   TR_SILType = 0x10,
 
-  /// Whether we are in the input type of a function.
+  /// Whether we are in the input type of a function, or under one level of
+  /// tuple type.  This is not set for multi-level tuple arguments.
   TR_FunctionInput = 0x20,
+  
+  /// Whether this is the immediate input type to a function,
+  TR_ImmediateFunctionInput = 0x40,
 
   /// Whether we are in the result type of a function.
-  TR_FunctionResult = 0x40,
+  TR_FunctionResult = 0x80,
 };
 
 /// Option set describing how type resolution should work.
 typedef OptionSet<TypeResolutionFlags> TypeResolutionOptions;
 
+/// Strip the contextual options from the given type resolution options.
+static inline TypeResolutionOptions
+withoutContext(TypeResolutionOptions options) {
+  options -= TR_ImmediateFunctionInput;
+  options -= TR_FunctionInput;
+  options -= TR_FunctionResult;
+  return options;
+}
+
+  
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker : public ASTMutationListener, public LazyResolver {

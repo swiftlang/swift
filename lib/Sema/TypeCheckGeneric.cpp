@@ -581,7 +581,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the parameter patterns.
   for (auto pattern : func->getArgParamPatterns()) {
     // Check the pattern.
-    if (tc.typeCheckPattern(pattern, func, TR_FunctionInput, &resolver))
+    if (tc.typeCheckPattern(pattern, func, TR_ImmediateFunctionInput,
+                            &resolver))
       badType = true;
 
     // Infer requirements from the pattern.

@@ -2069,7 +2069,7 @@ public:
     for (Pattern *P : argPatterns) {
       if (P->hasType())
         continue;
-      if (TC.typeCheckPattern(P, fd, TR_FunctionInput, resolver))
+      if (TC.typeCheckPattern(P, fd, TR_ImmediateFunctionInput, resolver))
         badType = true;
     }
 
@@ -2089,7 +2089,8 @@ public:
         bodyPat->forEachNode([&](Pattern *P) {
           P->setType(errorType);
         });
-      } else if (TC.typeCheckPattern(bodyPat, fd, TR_FunctionInput, resolver))
+      } else if (TC.typeCheckPattern(bodyPat, fd, TR_ImmediateFunctionInput,
+                                     resolver))
         badType = true;
     }
 

@@ -398,7 +398,7 @@ namespace {
         TypeResolutionOptions options;
         options |= TR_AllowUnspecifiedTypes;
         options |= TR_AllowUnboundGenerics;
-        options |= TR_FunctionInput;
+        options |= TR_ImmediateFunctionInput;
         bool hadParameterError = false;
         if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
           expr->setType(ErrorType::get(TC.Context));

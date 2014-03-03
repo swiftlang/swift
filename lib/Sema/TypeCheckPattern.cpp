@@ -560,12 +560,18 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
+    // If this is the top level of a function input list, peel off the
+    // ImmediateFunctionInput marker and install a FunctionInput one instead.
+    auto elementOptions = withoutContext(subOptions);
+    if (subOptions & TR_ImmediateFunctionInput)
+      elementOptions |= TR_FunctionInput;
+
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getFields().size(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getFields()[i];
       Pattern *pattern = elt.getPattern();
       bool isVararg = tuplePat->hasVararg() && i == e-1;
-      TypeResolutionOptions eltOptions = subOptions;
+      TypeResolutionOptions eltOptions = elementOptions;
       if (isVararg)
         eltOptions |= TR_Variadic;
       if (typeCheckPattern(pattern, dc, eltOptions, resolver)){

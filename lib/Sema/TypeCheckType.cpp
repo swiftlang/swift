@@ -728,12 +728,6 @@ namespace {
     Type resolveType(TypeRepr *repr, TypeResolutionOptions options);
 
   private:
-    /// Strip the contextual options from the given type resolution options.
-    static TypeResolutionOptions withoutContext(TypeResolutionOptions options) {
-      options -= TR_FunctionInput;
-      options -= TR_FunctionResult;
-      return options;
-    }
 
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
@@ -1044,7 +1038,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   }
 
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
-                             options | TR_FunctionInput);
+                             options | TR_ImmediateFunctionInput);
   if (inputTy->is<ErrorType>())
     return inputTy;
   Type outputTy = resolveType(repr->getResultTypeRepr(),
@@ -1073,15 +1067,14 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         elt = named->getTypeRepr();
       }
 
-      SILParameterInfo param = resolveSILParameter(elt,
-                                                   options | TR_FunctionInput);
+      auto param = resolveSILParameter(elt,options | TR_ImmediateFunctionInput);
       params.push_back(param);
       if (param.getType()->is<ErrorType>())
         hasError = true;
     }
   } else {
     SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
-                                                 options | TR_FunctionInput);
+                                           options | TR_ImmediateFunctionInput);
     params.push_back(param);
     if (param.getType()->is<ErrorType>())
       hasError = true;
@@ -1141,7 +1134,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 SILParameterInfo TypeResolver::resolveSILParameter(
                                  TypeRepr *repr,
                                  TypeResolutionOptions options) {
-  assert(options & TR_FunctionInput && "Parameters should be marked as inputs");
+  assert((options & TR_FunctionInput) | (options & TR_ImmediateFunctionInput) &&
+         "Parameters should be marked as inputs");
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
@@ -1211,7 +1205,8 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   if (ty->is<ErrorType>())
     return ty;
 
-  if (!(options & TR_FunctionInput)) {
+  if (!(options & TR_FunctionInput) &&
+      !(options & TR_ImmediateFunctionInput)) {
     TC.diagnose(repr->getInOutLoc(), diag::inout_only_parameter);
     return ty;
   }
@@ -1261,14 +1256,21 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getElements().size());
+  
+  // If this is the top level of a function input list, peel off the
+  // ImmediateFunctionInput marker and install a FunctionInput one instead.
+  auto elementOptions = withoutContext(options);
+  if (options & TR_ImmediateFunctionInput)
+    elementOptions |= TR_FunctionInput;
+  
   for (auto tyR : repr->getElements()) {
     if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
-      Type ty = resolveType(namedTyR->getTypeRepr(), options);
+      Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
       if (ty->is<ErrorType>())
         return ty;
       elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
     } else {
-      Type ty = resolveType(tyR, options);
+      Type ty = resolveType(tyR, elementOptions);
       if (ty->is<ErrorType>())
         return ty;
       elements.push_back(TupleTypeElt(ty));
