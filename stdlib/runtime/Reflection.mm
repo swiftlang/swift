@@ -257,15 +257,34 @@ static const MirrorWitnessTable TupleMirrorWitness{
   Opaque_getIDERepresentation,
 };
   
+// Mirror witnesses for classes.
+OptionalObjectIdentifier Class_getObjectIdentifier(MagicMirrorData *self,
+                                                   const Metadata *Self) {
+  const void *object = *reinterpret_cast<const void * const*>(self->Value);
+  return {object, false};
+}
+  
+static const MirrorWitnessTable ClassMirrorWitness{
+  Opaque_getValue,
+  Opaque_getType,
+  Class_getObjectIdentifier,
+  Opaque_getCount,
+  Opaque_getChild,
+  Opaque_getString,
+  Opaque_getIDERepresentation,
+};
+  
 /// Get the magic mirror witnesses appropriate to a particular type.
 static const MirrorWitnessTable *getWitnessForType(const Metadata *T) {
   switch (T->getKind()) {
   case MetadataKind::Tuple:
     return &TupleMirrorWitness;
       
-  /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
+    return &ClassMirrorWitness;
+      
+  /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Struct:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
