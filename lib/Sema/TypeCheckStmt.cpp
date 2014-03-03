@@ -28,6 +28,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -846,6 +847,18 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(),
                diag::non_delegating_complete_object_init,
                ctor->getDeclContext()->getDeclaredTypeOfContext());
+    }
+
+    // A class subobject initializer must never be delegating.
+    if (ctor->isSubobjectInit() && ClassD && isDelegating) {
+      SourceLoc fixItLoc = ctor->getBodyParamPatterns().back()->getEndLoc();
+      fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
+      diagnose(ctor->getLoc(),
+               diag::delegating_subobject_init,
+               ctor->getDeclContext()->getDeclaredTypeOfContext())
+        .fixItInsert(fixItLoc, " -> Self"); 
+      diagnose(initExpr->getLoc(), diag::delegation_here);
+      ctor->setCompleteObjectInit(true);
     }
   }
 
