@@ -2305,8 +2305,8 @@ public:
 /// MetatypeExpr - Produces a metatype value.
 ///
 /// The metatype value can come either from a evaluating an expression (then
-/// getting its metatype) or from a type that was parsed in the source. If
-/// neither is available, this isn't a parsed form.
+/// getting its metatype) or from a type that was parsed in the source and
+/// suffixed with ".Type".  If neither is available, this isn't a parsed form.
 class MetatypeExpr : public Expr {
   llvm::PointerUnion<Expr *, TypeRepr *> BaseOrType;
   SourceLoc MetatypeLoc;
