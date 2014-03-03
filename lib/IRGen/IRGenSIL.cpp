@@ -591,7 +591,6 @@ public:
 
   void visitClassMethodInst(ClassMethodInst *i);
   void visitSuperMethodInst(SuperMethodInst *i);
-  void visitPeerMethodInst(PeerMethodInst *i);
   void visitWitnessMethodInst(WitnessMethodInst *i);
   void visitProtocolMethodInst(ProtocolMethodInst *i);
   void visitDynamicMethodInst(DynamicMethodInst *i);
@@ -2969,14 +2968,6 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
                               i->getOperand().getType(),
                               /*startAtSuper=*/true);
-}
-
-void IRGenSILFunction::visitPeerMethodInst(swift::PeerMethodInst *i) {
-  assert(i->getMember().isForeign && "peer_method to non_objc callee");
-  // FIXME: Mark as a peer method, so we use objc_msgSendSuper.
-  setLoweredObjCMethodBounded(SILValue(i, 0), i->getMember(),
-                              i->getOperand().getType(),
-                              /*startAtSuper=*/false);
 }
 
 void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {

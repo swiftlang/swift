@@ -64,9 +64,7 @@ public:
       ClassMethod = VirtualMethod_First,
       /// A method call using super method dispatch.
       SuperMethod,
-      /// A method call using peer method dispatch.
-      PeerMethod,
-    VirtualMethod_Last = PeerMethod,
+    VirtualMethod_Last = SuperMethod,
   
     GenericMethod_First,
       /// A method call using archetype dispatch.
@@ -381,13 +379,6 @@ public:
     return Callee(Kind::SuperMethod, gen, selfValue, name,
                   substFormalType, l);
   }
-  static Callee forPeerMethod(SILGenFunction &gen, SILValue selfValue,
-                              SILDeclRef name,
-                              CanAnyFunctionType substFormalType,
-                              SILLocation l) {
-    return Callee(Kind::PeerMethod, gen, selfValue, name,
-                  substFormalType, l);
-  }
   static Callee forArchetype(SILGenFunction &gen, SILValue value,
                              SILDeclRef name,
                              CanAnyFunctionType substFormalType,
@@ -452,7 +443,6 @@ public:
 
     case Kind::ClassMethod:
     case Kind::SuperMethod:
-    case Kind::PeerMethod:
     case Kind::WitnessMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
@@ -524,24 +514,6 @@ public:
                                                    /*volatile*/
                                                      constant.isForeign);
       
-      mv = ManagedValue::forUnmanaged(methodVal);
-      break;
-    }
-    case Kind::PeerMethod: {
-      assert(level <= method.methodName.uncurryLevel
-             && "uncurrying past natural uncurry level of method");
-      assert(level >= 1
-             && "currying 'self' of peer method dispatch not yet supported");
-
-      auto constant = method.methodName.atUncurryLevel(level);
-      constantInfo = gen.getConstantInfo(constant);
-      SILValue methodVal = gen.B.createPeerMethod(Loc,
-                                                   method.selfValue,
-                                                   constant,
-                                                   constantInfo.getSILType(),
-                                                   /*volatile*/
-                                                   constant.isForeign);
-
       mv = ManagedValue::forUnmanaged(methodVal);
       break;
     }
@@ -643,7 +615,6 @@ public:
     case Kind::IndirectValue:
     case Kind::ClassMethod:
     case Kind::SuperMethod:
-    case Kind::PeerMethod:
     case Kind::WitnessMethod:
     case Kind::ProtocolMethod:
     case Kind::DynamicMethod:
@@ -1121,11 +1092,9 @@ public:
 
     // Determine the callee. For structs and enums, this is the allocating
     // constructor (because there is no initializing constructor). For classes,
-    // this is the initializing constructor.
-    // FIXME: the isCompleteObjectInit bit is a hack. Eventually, we'll
-    // always use class_method for delegation because only complete object
-    // initializers will delegate.
-    if (gen.IsCompleteObjectInit) {
+    // this is the initializing constructor, to which we will dynamically
+    // dispatch.
+    if (isa<ClassDecl>(nominal)) {
       // If the constructor is a complete object initializer, use
       // dynamic dispatch to the initializing constructor.
       setCallee(Callee::forClassMethod(
@@ -1136,18 +1105,6 @@ public:
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(ctorRef->getDecl())),
-                  getSubstFnType(), fn));
-    } else if (isa<ClassDecl>(nominal) && ctorRef->getDecl()->hasClangNode()) {
-      // If the constructor doesn't have a Swift entry point, use peer
-      // method dispatch.
-      setCallee(Callee::forPeerMethod(
-                  gen,
-                  self.getValue(),
-                  SILDeclRef(ctorRef->getDecl(),
-                             SILDeclRef::Kind::Initializer,
-                             SILDeclRef::ConstructAtBestResilienceExpansion,
-                             SILDeclRef::ConstructAtNaturalUncurryLevel,
-                             /*isForeign=*/true),
                   getSubstFnType(), fn));
     } else {
       // Directly call the peer constructor.

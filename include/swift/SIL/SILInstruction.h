@@ -1668,18 +1668,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// PeerMethodInst - Given the address of a value of class type and a method
-/// constant, extracts the implementation of that method for the
-/// the static type of the class, not considering overrides in subclasses.
-class PeerMethodInst
-  : public UnaryInstructionBase<ValueKind::PeerMethodInst, MethodInst>
-{
-public:
-  PeerMethodInst(SILLocation Loc, SILValue Operand, SILDeclRef Member,
-                 SILType Ty, bool Volatile = false)
-    : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
-};
-
 /// WitnessMethodInst - Given a type, a protocol conformance,
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.

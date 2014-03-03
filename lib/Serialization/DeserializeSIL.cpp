@@ -1309,7 +1309,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
-  case ValueKind::PeerMethodInst:
   case ValueKind::DynamicMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC),
@@ -1353,12 +1352,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       break;
     case ValueKind::SuperMethodInst:
       ResultVal = Builder.createSuperMethod(Loc,
-                    getLocalValue(ListOfValues[NextValueIndex],
-                                  ListOfValues[NextValueIndex+1], operandTy),
-                    DRef, Ty, IsVolatile);
-      break;
-    case ValueKind::PeerMethodInst:
-      ResultVal = Builder.createPeerMethod(Loc,
                     getLocalValue(ListOfValues[NextValueIndex],
                                   ListOfValues[NextValueIndex+1], operandTy),
                     DRef, Ty, IsVolatile);

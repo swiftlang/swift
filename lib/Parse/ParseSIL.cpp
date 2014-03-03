@@ -1009,7 +1009,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("open_existential", ValueKind::OpenExistentialInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
-    .Case("peer_method", ValueKind::PeerMethodInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
@@ -1925,7 +1924,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ProtocolMethodInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
-  case ValueKind::PeerMethodInst:
   case ValueKind::DynamicMethodInst: {
     bool IsVolatile = false;
     if (parseSILOptional(IsVolatile, *this, "volatile"))
@@ -1953,10 +1951,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::SuperMethodInst:
       ResultVal = B.createSuperMethod(InstLoc, Val, Member, MethodTy,
                                       IsVolatile);
-      break;
-    case ValueKind::PeerMethodInst:
-      ResultVal = B.createPeerMethod(InstLoc, Val, Member, MethodTy,
-                                     IsVolatile);
       break;
     case ValueKind::DynamicMethodInst:
       ResultVal = B.createDynamicMethod(InstLoc, Val, Member, MethodTy,

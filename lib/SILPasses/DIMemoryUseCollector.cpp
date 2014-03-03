@@ -994,10 +994,6 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
           continue;
 
-        // peer_method is a method lookup for delegation to a foreign
-        // constructor, which is ignored.
-        if (isa<PeerMethodInst>(User)) continue;
-        
         // class_method that refers to an initializing constructor is a method
         // lookup for delegation, which is ignored.
         if (auto Method = dyn_cast<ClassMethodInst>(User)) {
