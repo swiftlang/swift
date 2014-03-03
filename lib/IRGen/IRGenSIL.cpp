@@ -28,6 +28,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
@@ -300,6 +301,10 @@ public:
   /// Generate IR for the SIL Function.
   void emitSILFunction();
 
+  bool isAvailableExternally() const {
+    return swift::isAvailableExternally(CurSILFn->getLinkage());
+  }
+
   void setLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = LoweredValues.insert({v, std::move(lv)});
     assert(inserted.second && "already had lowered value for sil value?!");
@@ -469,7 +474,7 @@ public:
                                     DebugTypeInfo Ty,
                                     SILDebugScope *DS,
                                     StringRef Name) {
-    if (!IGM.DebugInfo) return;
+    if (!IGM.DebugInfo || isAvailableExternally()) return;
     auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
     if (N != ArgNo.end()) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
@@ -539,7 +544,7 @@ public:
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
   void visitDebugValueInst(DebugValueInst *i) {
-    if (!IGM.DebugInfo) return;
+    if (!IGM.DebugInfo || isAvailableExternally()) return;
     VarDecl *Decl = i->getDecl();
     if (!Decl) return;
     StringRef Name = Decl->getName().str();
@@ -554,7 +559,7 @@ public:
          i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    if (!IGM.DebugInfo) return;
+    if (!IGM.DebugInfo || isAvailableExternally()) return;
     VarDecl *Decl = i->getDecl();
     if (!Decl) return;
     StringRef Name = Decl->getName().str();
@@ -717,7 +722,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   unsigned predecessors = std::distance(silBB->pred_begin(), silBB->pred_end());
   
   IGF.Builder.SetInsertPoint(llBB);
-  if (IGF.IGM.DebugInfo) {
+  if (IGF.IGM.DebugInfo && !IGF.isAvailableExternally()) {
     // Use the location of the first instruction in the basic block
     // for the φ-nodes.
     if (!silBB->empty()) {
@@ -759,7 +764,7 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
   }
 
   // Since we return to the entry of the function, reset the location.
-  if (IGF.IGM.DebugInfo)
+  if (IGF.IGM.DebugInfo && !IGF.isAvailableExternally())
     IGF.IGM.DebugInfo->clearLoc(IGF.Builder);
 
   return phis;
@@ -1098,7 +1103,7 @@ void IRGenSILFunction::emitSILFunction() {
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   assert(BB->pred_empty());
-  if (!IGM.DebugInfo)
+  if (!IGM.DebugInfo || isAvailableExternally())
     return;
 
   // This is the prologue of a function. Emit debug info for all
@@ -1146,6 +1151,27 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   }
 }
 
+/// This is a hack that should be removed once we serialize debug scopes.
+static bool isValidFileLocWithoutDebugScope(SILLocation Loc) {
+  while (true) {
+    switch (Loc.getKind()) {
+    /// FIXME: InlinedKind/MandatoryInlinedKind should be able to reference
+    /// their parent location so we can check if it is a SILFileKind.
+    case SILLocation::LocationKind::InlinedKind:
+    case SILLocation::LocationKind::MandatoryInlinedKind:
+    case SILLocation::LocationKind::SILFileKind:
+      return true;
+    case SILLocation::LocationKind::NoneKind:
+    case SILLocation::LocationKind::RegularKind:
+    case SILLocation::LocationKind::ReturnKind:
+    case SILLocation::LocationKind::ImplicitReturnKind:
+    case SILLocation::LocationKind::CleanupKind:
+    case SILLocation::LocationKind::ArtificialUnreachableKind:
+      return false;
+    }
+  }
+}
+
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -1174,7 +1200,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
   for (auto InsnIter = BB->begin(); InsnIter != BB->end(); ++InsnIter) {
     auto &I = *InsnIter;
-    if (IGM.DebugInfo) {
+    if (IGM.DebugInfo && !isAvailableExternally()) {
       // Set the debug info location for I, if applicable.
       SILLocation ILoc = I.getLoc();
       // Handle cleanup locations.
@@ -1209,9 +1235,13 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       auto DS = I.getDebugScope();
       if (!DS) DS = CurSILFn->getDebugScope();
       if (!DS)
-        // We don't expect a scope from transparent functions. They
-        // should be elided during IR generation anyway.
-        assert(CurSILFn->isTransparent() && "function without a debug scope");
+        // We don't expect a scope from transparent functions. They should be
+        // elided during IR generation anyway. Additionally until DebugScopes
+        // are properly serialized, if we have a location of SILFileKind it is
+        // ok to not have a debug scope.
+        assert((CurSILFn->isTransparent() ||
+                isValidFileLocWithoutDebugScope(I.getLoc())) &&
+               "function without a debug scope");
       else if (!KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 
@@ -2284,7 +2314,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   auto addr = type.allocateStack(*this,
                                  i->getElementType().getSwiftRValueType(),
                                  dbgname);
-  if (IGM.DebugInfo && Decl) {
+  if (IGM.DebugInfo && Decl && !isAvailableExternally()) {
     // Discard any inout or lvalue qualifiers. Since the object itself
     // is stored in the alloca, emitting it as a reference type would
     // be wrong.
@@ -2358,7 +2388,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredExplosion(SILValue(i, 0), box);
   setLoweredAddress(SILValue(i, 1), addr.getAddress());
 
-  if (IGM.DebugInfo) {
+  if (IGM.DebugInfo && !isAvailableExternally()) {
     auto Indirection = IndirectValue;
     // LValues are implicitly indirect because of their type.
     if (Decl && Decl->getType()->getKind() == TypeKind::LValue)

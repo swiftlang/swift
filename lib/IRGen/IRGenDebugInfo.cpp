@@ -657,6 +657,8 @@ llvm::DIScope IRGenDebugInfo::getOrCreateNamespace(llvm::DIScope Namespace,
 
 
 void IRGenDebugInfo::emitFunction(SILFunction *SILFn, llvm::Function *Fn) {
+  if (isAvailableExternally(SILFn->getLinkage()))
+    return;
   emitFunction(SILFn->getModule(),
                SILFn->getDebugScope(), Fn,
                SILFn->getAbstractCC(),
