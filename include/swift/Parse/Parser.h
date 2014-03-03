@@ -565,7 +565,7 @@ public:
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
   ParserResult<BraceStmt> parseIfConfigStmtBlock(bool isActive,
-                                                 bool IsTopLevel);
+                                                 BraceItemListKind Kind);
 
   void parseTopLevelCodeDeclDelayed();
 
@@ -932,7 +932,8 @@ public:
   ParserResult<Stmt> parseStmtReturn();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<Stmt> parseStmtIf();
-  ParserResult<Stmt> parseStmtIfConfig(bool isTopLevel = false);
+  ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind
+                                        = BraceItemListKind::Brace);
   ParserResult<Stmt> parseStmtWhile();
   ParserResult<Stmt> parseStmtDoWhile();
   ParserResult<Stmt> parseStmtFor();

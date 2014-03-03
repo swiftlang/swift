@@ -253,7 +253,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       
       // We'll want to parse the #if block, but not wrap it in a top-level
       // code declaration immediately.
-      Result = parseStmtIfConfig(IsTopLevel).get();
+      Result = parseStmtIfConfig(Kind).get();
       
       if (!Result) {
         NeedParseErrorRecovery = true;
@@ -276,7 +276,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       }
       
       // Add the #if block itself as a TLCD if necessary
-      if (IsTopLevel) {
+      if (Kind == BraceItemListKind::TopLevelCode) {
         auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
         auto Brace = BraceStmt::create(Context, StartLoc,
                                        {Result}, Tok.getLoc());
@@ -484,7 +484,7 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 /// parseIfConfigStmtBlock - Parse the active or inactive block of an
 /// #if/#else/#endif statement.
 ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
-                                                       bool isTopLevel) {
+                                                       BraceItemListKind Kind) {
   SourceLoc LBloc = Tok.getLoc();
   
   SmallVector<ASTNode, 16> Entries;
@@ -494,9 +494,7 @@ ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
                                   BraceItemListKind::ActiveConfigBlock :
                                   BraceItemListKind::InactiveConfigBlock;
   ParserStatus Status = parseBraceItems(Entries,
-                                        isTopLevel ?
-                                          BraceItemListKind::TopLevelCode :
-                                          BraceItemListKind::Brace,
+                                        Kind,
                                         configKind);
   
   if (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
@@ -778,7 +776,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     return false;
 }
 
-ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {
+ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
   SourceLoc IfLoc = consumeToken(tok::pound_if);
   
   ParserResult<Expr> Configuration;
@@ -796,13 +794,13 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(bool isTopLevel) {
   
   bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
   
-  NormalBody = parseIfConfigStmtBlock(ifBlockIsActive, isTopLevel);
+  NormalBody = parseIfConfigStmtBlock(ifBlockIsActive, Kind);
   
   SourceLoc ElseLoc;
   ParserResult<Stmt> ElseBody;
   if (Tok.is(tok::pound_else)) {
     ElseLoc = consumeToken(tok::pound_else);
-    ElseBody = parseIfConfigStmtBlock(!ifBlockIsActive, isTopLevel);
+    ElseBody = parseIfConfigStmtBlock(!ifBlockIsActive, Kind);
   }
   if (Tok.is(tok::pound_endif)) {
     consumeToken(tok::pound_endif);
