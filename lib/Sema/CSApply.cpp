@@ -1618,25 +1618,25 @@ namespace {
     }
     
   private:
-    struct ValueTypeMemberApplication {
-      unsigned level : 30;
-      // Selector for the partial_application_of_value_type_method diagnostic
+    struct MemberPartialApplication {
+      unsigned level : 31;
+      // Selector for the partial_application_of_method_invalid diagnostic
       // message.
       enum : unsigned {
         Struct,
         Enum,
         Archetype,
         Protocol,
+        ObjC
       };
-      unsigned kind : 2;
+      unsigned kind : 3;
     };
     
-    // A map used to track partial applications of value type methods to
-    // require that they be fully applied. Partial applications of value types
-    // would capture 'self' as an inout and hide any mutation of 'self',
-    // which is surprising.
-    llvm::SmallDenseMap<Expr*, ValueTypeMemberApplication, 2>
-      ValueTypeMemberApplications;
+    // A map used to track partial applications of methods to require that they
+    // be fully applied. Partial applications of value types would capture
+    // 'self' as an inout and hide any mutation of 'self', which is surprising.
+    llvm::SmallDenseMap<Expr*, MemberPartialApplication, 2>
+      InvalidPartialApplications;
     
   public:
     Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
@@ -1671,9 +1671,11 @@ namespace {
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
           if (selfTy->getStructOrBoundGenericStruct())
-            kind = ValueTypeMemberApplication::Struct;
+            kind = MemberPartialApplication::Struct;
           else if (selfTy->getEnumOrBoundGenericEnum())
-            kind = ValueTypeMemberApplication::Enum;
+            kind = MemberPartialApplication::Enum;
+          else if (fnDeclRef->getDecl()->isObjC())
+            kind = MemberPartialApplication::ObjC;
           else
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
@@ -1681,9 +1683,9 @@ namespace {
           if (baseTy->hasReferenceSemantics())
             goto not_value_type_member;
           if (baseTy->isExistentialType()) {
-            kind = ValueTypeMemberApplication::Protocol;
+            kind = MemberPartialApplication::Protocol;
           } else if (isa<FuncDecl>(pmRef->getMember().getDecl()))
-            kind = ValueTypeMemberApplication::Archetype;
+            kind = MemberPartialApplication::Archetype;
           else
             goto not_value_type_member;
           fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
@@ -1691,7 +1693,7 @@ namespace {
         if (!fn)
           goto not_value_type_member;
         if (fn->isInstanceMember())
-          ValueTypeMemberApplications.insert({
+          InvalidPartialApplications.insert({
             member,
             // We need to apply all of the non-self argument clauses.
             {fn->getNaturalArgumentCount() - 1, kind},
@@ -1983,14 +1985,14 @@ namespace {
                            cs.getConstraintLocator(expr)));
 
       // See if this application advanced a partial value type application.
-      auto foundApplication = ValueTypeMemberApplications.find(
+      auto foundApplication = InvalidPartialApplications.find(
                                    expr->getFn()->getSemanticsProvidingExpr());
-      if (foundApplication != ValueTypeMemberApplications.end()) {
+      if (foundApplication != InvalidPartialApplications.end()) {
         unsigned level = foundApplication->second.level;
         assert(level > 0);
-        ValueTypeMemberApplications.erase(foundApplication);
+        InvalidPartialApplications.erase(foundApplication);
         if (level > 1)
-          ValueTypeMemberApplications.insert({
+          InvalidPartialApplications.insert({
             result, {
               level - 1,
               foundApplication->second.kind
@@ -2302,16 +2304,16 @@ namespace {
     void finalize() {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
-      for (auto &unapplied : ValueTypeMemberApplications) {
+      for (auto &unapplied : InvalidPartialApplications) {
         tc.diagnose(unapplied.first->getLoc(),
-                    diag::partial_application_of_value_type_method,
+                    diag::partial_application_of_method_invalid,
                     unapplied.second.kind);
       }
 
       // We should have complained above if there were any
       // existentials that haven't been closed yet.
       assert((OpenedExistentials.empty() || 
-              !ValueTypeMemberApplications.empty()) &&
+              !InvalidPartialApplications.empty()) &&
              "Opened existentials have not been closed");
     }
   };
