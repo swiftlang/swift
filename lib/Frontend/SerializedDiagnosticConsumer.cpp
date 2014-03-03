@@ -29,7 +29,7 @@
 #include "llvm/Bitcode/BitstreamWriter.h"
 
 // For constant values only.
-#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Frontend/SerializedDiagnosticPrinter.h"
 
 using namespace swift;
 
@@ -256,14 +256,14 @@ void SerializedDiagnosticConsumer::addRangeToRecord(CharSourceRange Range,
 
 /// \brief Map a Swift DiagosticKind to the diagnostic level expected
 /// for serialized diagnostics.
-static clang::DiagnosticIDs::Level getDiagnosticLevel(DiagnosticKind Kind) {
+static clang::serialized_diags::Level getDiagnosticLevel(DiagnosticKind Kind) {
   switch (Kind) {
   case DiagnosticKind::Error:
-    return clang::DiagnosticIDs::Error;
+    return clang::serialized_diags::Error;
   case DiagnosticKind::Note:
-    return clang::DiagnosticIDs::Note;
+    return clang::serialized_diags::Note;
   case DiagnosticKind::Warning:
-    return clang::DiagnosticIDs::Warning;
+    return clang::serialized_diags::Warning;
   }
 }
 
