@@ -1291,10 +1291,61 @@ Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
 
-  SourceLoc Loc = Tok.getLoc();
-  Identifier Name = Context.getIdentifier(Tok.getText());
-  consumeToken();
-  return actOnIdentifierExpr(Name, Loc);
+  Identifier name = Context.getIdentifier(Tok.getText());
+  SourceLoc loc = consumeToken();
+  SmallVector<TypeRepr*, 8> args;
+  SourceLoc LAngleLoc, RAngleLoc;
+  bool hasGenericArgumentList = false;
+  
+  if (canParseAsGenericArgumentList()) {
+    hasGenericArgumentList = true;
+    if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
+      diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
+    }
+  }
+  
+  if (CurDeclContext == CurVars.first) {
+    for (auto activeVar : CurVars.second) {
+      if (activeVar->getName() == name) {
+        diagnose(loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(loc);
+      }
+    }
+  }
+  
+  ValueDecl *D = lookupInScope(name);
+  // FIXME: We want this to work: "var x = { x() }", but for now it's better to
+  // disallow it than to crash.
+  if (!D && CurDeclContext != CurVars.first) {
+    for (auto activeVar : CurVars.second) {
+      if (activeVar->getName() == name) {
+        diagnose(loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(loc);
+      }
+    }
+  }
+  
+  Expr *E;
+  if (D == 0) {
+    auto refKind = DeclRefKind::Ordinary;
+    auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
+    unresolved->setSpecialized(hasGenericArgumentList);
+    E = unresolved;
+  } else {
+    auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
+    declRef->setGenericArgs(args);
+    E = declRef;
+  }
+  
+  if (hasGenericArgumentList) {
+    SmallVector<TypeLoc, 8> locArgs;
+    for (auto ty : args)
+      locArgs.push_back(ty);
+    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
+                                               Context.AllocateCopy(locArgs),
+                                               RAngleLoc);
+  }
+  return E;
 }
 
 bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
@@ -1595,62 +1646,6 @@ Expr *Parser::parseExprAnonClosureArg() {
 
   return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc,
                                    /*Implicit=*/false);
-}
-
-Expr *Parser::actOnIdentifierExpr(Identifier text, SourceLoc loc) {
-  SmallVector<TypeRepr*, 8> args;
-  SourceLoc LAngleLoc, RAngleLoc;
-  bool hasGenericArgumentList = false;
-
-  if (canParseAsGenericArgumentList()) {
-    hasGenericArgumentList = true;
-    if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {
-      diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-    }
-  }
-
-  if (CurDeclContext == CurVars.first) {
-    for (auto activeVar : CurVars.second) {
-      if (activeVar->getName() == text) {
-        diagnose(loc, diag::var_init_self_referential);
-        return new (Context) ErrorExpr(loc);
-      }
-    }
-  }
-  
-  ValueDecl *D = lookupInScope(text);
-  // FIXME: We want this to work: "var x = { x() }", but for now it's better to
-  // disallow it than to crash.
-  if (!D && CurDeclContext != CurVars.first) {
-    for (auto activeVar : CurVars.second) {
-      if (activeVar->getName() == text) {
-        diagnose(loc, diag::var_init_self_referential);
-        return new (Context) ErrorExpr(loc);
-      }
-    }
-  }
-
-  Expr *E;
-  if (D == 0) {
-    auto refKind = DeclRefKind::Ordinary;
-    auto unresolved = new (Context) UnresolvedDeclRefExpr(text, refKind, loc);
-    unresolved->setSpecialized(hasGenericArgumentList);
-    E = unresolved;
-  } else {
-    auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-    declRef->setGenericArgs(args);
-    E = declRef;
-  }
-  
-  if (hasGenericArgumentList) {
-    SmallVector<TypeLoc, 8> locArgs;
-    for (auto ty : args)
-      locArgs.push_back(ty);
-    E = new (Context) UnresolvedSpecializeExpr(E, LAngleLoc,
-                                               Context.AllocateCopy(locArgs),
-                                               RAngleLoc);
-  }
-  return E;
 }
 
 

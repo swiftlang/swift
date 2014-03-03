@@ -922,7 +922,6 @@ public:
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);
 
   UnresolvedDeclRefExpr *parseExprOperator();
-  Expr *actOnIdentifierExpr(Identifier Text, SourceLoc Loc);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
