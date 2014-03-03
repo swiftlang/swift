@@ -1897,7 +1897,8 @@ public:
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
-      if (!pbd || pbd->hasInit() || pbd->isInvalid()) continue;
+      if (!pbd || !pbd->hasStorage() || pbd->hasInit() || pbd->isInvalid())
+        continue;
 
       // The variables in this pattern have not been
       // initialized. Diagnose the lack of initial value.
