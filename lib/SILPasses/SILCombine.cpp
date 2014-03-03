@@ -261,6 +261,7 @@ public:
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
+  SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *visitLoadInst(LoadInst *LI);
 
 private:
@@ -442,6 +443,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 //                                  Visitors
 //===----------------------------------------------------------------------===//
+
 
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
@@ -701,11 +703,23 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   //
   // (ref_to_raw_pointer (ref_to_object_pointer x))
   //    -> (ref_to_raw_pointer x)
-  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*RRPI->getOperand())) {
+  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(RRPI->getOperand())) {
     RRPI->setOperand(ROPI->getOperand());
-    return eraseInstFromFunction(*ROPI);
+    return ROPI->use_empty() ? eraseInstFromFunction(*ROPI) : nullptr;
   }
 
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
+  // Ref to raw pointer consumption of other ref casts.
+  //
+  // (upcast (upcast x)) -> (upcast x)
+  if (auto *Op = dyn_cast<UpcastInst>(UCI->getOperand())) {
+    UCI->setOperand(Op->getOperand());
+    return Op->use_empty() ? eraseInstFromFunction(*Op) : nullptr;
+  }
+  
   return nullptr;
 }
 

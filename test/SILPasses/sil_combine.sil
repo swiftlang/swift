@@ -714,3 +714,18 @@ bb0(%0 : $StringCore):
   %5 = tuple()
   return %5 : $()
 }
+
+class C1 {}
+class C2 : C1 {}
+class C3 : C2 {}
+
+// CHECK-LABEL: sil @upcast_upcast_merge
+// CHECK-NEXT: bb0
+// CHECK-NEXT: upcast
+// CHECK-NEXT: return
+sil @upcast_upcast_merge : $@thin(C3) -> C1 {
+bb0(%0 : $C3):
+  %1 = upcast %0 : $C3 to $C2
+  %2 = upcast %1 : $C2 to $C1
+  return %2 : $C1
+}
