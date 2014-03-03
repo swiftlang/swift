@@ -847,6 +847,12 @@ static bool isSuperInitUse(UpcastInst *Inst) {
   // "Inst" is an Upcast instruction.  Check to see if it is used by an apply
   // that came from a call to super.init.
   for (auto UI : Inst->getUses()) {
+    // If this used by another upcast instruction, recursively handle it, we may
+    // have a multiple upcast chain.
+    if (auto *UCIU = dyn_cast<UpcastInst>(UI->getUser()))
+      if (isSuperInitUse(UCIU))
+        return true;
+    
     auto *AI = dyn_cast<ApplyInst>(UI->getUser());
     if (!AI) continue;
 
