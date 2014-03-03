@@ -591,21 +591,21 @@ ERROR(non_delegating_init_outside_module,sema_tce,none,
       "initializer for %0 defined outside module %1 must delegate "
       "(with 'self.init')", (Type, Identifier))
 ERROR(non_delegating_complete_object_init,sema_tce,none,
-      "complete object initializer for %0 must delegate (with 'self.init')",
+      "convenience initializer for %0 must delegate (with 'self.init')",
       (Type))
 ERROR(delegating_subobject_init,sema_tce,none,
-      "subobject initializer for %0 cannot delegate (with 'self.init'); "
-      "did you mean this to be a complete object initializer?",
+      "designated initializer for %0 cannot delegate (with 'self.init'); "
+      "did you mean this to be a convenience initializer?",
       (Type))
 NOTE(delegation_here,sema_tce,none, "delegation occurs here", ())
 ERROR(chain_complete_object_init,sema_tce,none,
-      "must call a subobject initializer of the superclass %0",
+      "must call a designated initializer of the superclass %0",
       (Type))
 NOTE(complete_object_init_here,sema_tce,none,
-     "complete object initializer is declared here", ())
+     "convenience initializer is declared here", ())
 
 ERROR(nonclass_complete_object_init,sema_tce,none,
-      "complete object initializer not allowed in non-class type %0",
+      "convenience initializer not allowed in non-class type %0",
       (Type))
 
 ERROR(dynamic_construct_class,sema_tce,none,
