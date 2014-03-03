@@ -1790,7 +1790,15 @@ void SILVTable::verify(const SILModule &M) const {
 /// Verify that a witness table follows invariants.
 void SILWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
-  // TODO
+  // Currently all witness tables have public conformances, thus witness tables
+  // should not reference SILFunctions without public/public_external linkage.
+  // FIXME: Once we support private conformances, update this.
+  for (const Entry &E : getEntries())
+    if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
+      SILFunction *F = E.getMethodWitness().Witness;
+      assert(isPublic(F->getLinkage()) &&
+             "Public witness tables should only reference public functions.");
+    }
 #endif
 }
 
