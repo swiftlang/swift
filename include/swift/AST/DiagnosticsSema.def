@@ -598,6 +598,11 @@ ERROR(delegating_subobject_init,sema_tce,none,
       "did you mean this to be a complete object initializer?",
       (Type))
 NOTE(delegation_here,sema_tce,none, "delegation occurs here", ())
+ERROR(chain_complete_object_init,sema_tce,none,
+      "must call a subobject initializer of the superclass %0",
+      (Type))
+NOTE(complete_object_init_here,sema_tce,none,
+     "complete object initializer is declared here", ())
 
 ERROR(nonclass_complete_object_init,sema_tce,none,
       "complete object initializer not allowed in non-class type %0",

@@ -43,6 +43,7 @@ namespace clang {
 }
 
 namespace swift {
+  class ApplyExpr;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -3753,7 +3754,7 @@ public:
   /// \c super.init within the body, will be set to point at that
   /// initializer.
   BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
-                                              Expr **init = nullptr);
+                                              ApplyExpr **init = nullptr);
 
   /// Whether this constructor is abstract,
   bool isAbstract() const { return ConstructorDeclBits.Abstract; }

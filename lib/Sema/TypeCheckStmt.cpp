@@ -781,6 +781,26 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   return 0;
 }
 
+/// Check a super.init call.
+///
+/// \returns true if an error occurred.
+static bool checkSuperInit(TypeChecker &tc, ApplyExpr *apply,
+                           bool suppressDiagnostics) {
+  // If we refer to a subobject initializer, we're done.
+  auto otherCtorRef = cast<OtherConstructorDeclRefExpr>(
+                        apply->getFn()->getSemanticsProvidingExpr());
+  auto ctor = otherCtorRef->getDecl();
+  if (ctor->isSubobjectInit())
+    return false;
+
+  if (!suppressDiagnostics) {
+    tc.diagnose(apply->getArg()->getLoc(), diag::chain_complete_object_init,
+                apply->getArg()->getType());
+    tc.diagnose(ctor, diag::complete_object_init_here);
+  }
+  return true;
+}
+
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
@@ -809,13 +829,17 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     wantSuperInitCall = ClassD && ClassD->getSuperclass();
   } else {
     bool isDelegating = false;
-    Expr *initExpr = nullptr;
+    ApplyExpr *initExpr = nullptr;
     switch (ctor->getDelegatingOrChainedInitKind(&Diags, &initExpr)) {
     case ConstructorDecl::BodyInitKind::Delegating:
       isDelegating = true;
-      SWIFT_FALLTHROUGH;
+      wantSuperInitCall = false;
+      break;
 
     case ConstructorDecl::BodyInitKind::Chained:
+      checkSuperInit(*this, initExpr, false);
+      SWIFT_FALLTHROUGH;
+
     case ConstructorDecl::BodyInitKind::None:
       wantSuperInitCall = false;
       break;
@@ -866,9 +890,31 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (wantSuperInitCall) {
     // Find a default initializer in the superclass.
     if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
-      // Store the super.init expression within the constructor declaration
-      // to be emitted during SILGen.
-      ctor->setSuperInitCall(SuperInitCall);
+      // If the initializer we found is a subobject initializer, we're okay.
+      class FindOtherConstructorRef : public ASTWalker {
+      public:
+        ApplyExpr *Found = nullptr;
+
+        std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+          if (auto apply = dyn_cast<ApplyExpr>(E)) {
+            if (isa<OtherConstructorDeclRefExpr>(
+                  apply->getFn()->getSemanticsProvidingExpr())) {
+              Found = apply;
+              return { false, E };
+            }
+          }
+
+          return { Found == nullptr, E };
+        }
+      };
+
+      FindOtherConstructorRef finder;
+      SuperInitCall->walk(finder);
+      if (!checkSuperInit(*this, finder.Found, true)) {
+        // Store the super.init expression within the constructor declaration
+        // to be emitted during SILGen.
+        ctor->setSuperInitCall(SuperInitCall);
+      }
     }
   }
 

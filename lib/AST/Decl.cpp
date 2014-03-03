@@ -2172,7 +2172,7 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
 
 ConstructorDecl::BodyInitKind
 ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
-                                                Expr **init) {
+                                                ApplyExpr **init) {
   assert(hasBody() && "Constructor does not have a definition");
 
   if (init)
@@ -2187,7 +2187,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
   struct FindReferenceToInitializer : ASTWalker {
     BodyInitKind Kind = BodyInitKind::None;
-    Expr *InitExpr = nullptr;
+    ApplyExpr *InitExpr = nullptr;
     DiagnosticEngine *Diags;
 
     FindReferenceToInitializer(DiagnosticEngine *diags) : Diags(diags) { }
@@ -2210,7 +2210,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
               return { false, nullptr };
             }
 
-            InitExpr = E;
+            InitExpr = apply;
             return { true, E };
           }
 
