@@ -231,8 +231,9 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   auto archetype = genericWitness.Archetype;
   for (auto proto : archetype->getConformsTo()) {
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
-                                                    resolver);
-    assert(conforms.getInt() == ConformanceKind::Conforms &&
+                                                        resolver);
+    assert((conforms.getInt() == ConformanceKind::Conforms ||
+            specializedType->is<TypeVariableType>()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms.getPointer());
   }
