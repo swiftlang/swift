@@ -315,6 +315,21 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
   return fn;
 }
 
+/// Helper function to find a SILFunction, given its name and type.
+SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
+  // Check to see if we have a function by this name already.
+  SILFunction *fn = SILMod.lookUpFunction(name);
+  if (fn)
+    return fn;
+
+  // Otherwise, look for a function with this name in the module.
+  auto iter = FuncTable->find(name);
+  if (iter == FuncTable->end())
+    return nullptr;
+
+  return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+}
+
 static
 DeclContext *
 maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
@@ -1545,7 +1560,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
     VTableEntryLayout::readRecord(scratch, NameID, ListOfValues);
-    SILFunction *Func = lookupSILFunction(MF->getIdentifier(NameID).str());
+    SILFunction *Func = getFuncForReference(MF->getIdentifier(NameID).str());
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues,

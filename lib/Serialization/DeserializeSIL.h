@@ -85,6 +85,7 @@ namespace swift {
                            SILType Type);
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty);
+    SILFunction *getFuncForReference(StringRef Name);
     SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *readGlobalVar(StringRef Name);
