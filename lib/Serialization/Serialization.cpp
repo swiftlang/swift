@@ -2308,24 +2308,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   }
 }
 
-namespace {
-  template <size_t N>
-  union AsBytes {
-    uint64_t data;
-    char bytes[N];
-
-    AsBytes(uint64_t data) : data(data) {}
-
-    static_assert(N <= sizeof(data), "size is too big");
-  };
-
-  template <size_t N>
-  static raw_ostream &operator<<(raw_ostream &os, const AsBytes<N> &wrapper) {
-    os.write(wrapper.bytes, N);
-    return os;
-  }
-}
-
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod, bool serializeAllSIL,
                                FilenamesTy inputFiles,
