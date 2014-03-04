@@ -22,6 +22,63 @@
     return x.description() // ...and I accidentally called +description
                            //    instead of -description
 
+* Initializers are now classified as "designated initializers", which
+  are responsible for initializing the current class object and
+  chaining via 'super.init', and "convenience initializers", which
+  delegate to another initializer and can be inherited. For example:
+
+    class A {
+      var str: String
+
+      init() -> Self { // convenience initializer
+        self.init(withString: "hello")
+      }
+
+      init withString(str: String) { // designated initializer
+        self.str = str
+      }
+    }
+
+  When a subclass overrides all of its superclass's designated
+  initializers, the convenience initializers are inherited:
+
+    class B {
+      init withString(str: String) { // designated initializer
+        super.init(withString: str)
+      }
+
+      // inherits A.init()
+    }
+
+  Objective-C classes that provide NS_DESIGNATED_INITIALIZER
+  annotations will have their init methods mapped to designated
+  initializers or convenience initializers as appropriate; Objective-C
+  classes without NS_DESIGNATED_INITIALIZER annotations have all of
+  their init methods imported as designated initializers, which is
+  safe (but can be verbose for subclasses). Note that the syntax and
+  terminology is still somewhat in flux.
+
+* Initializers can now be marked as 'required' with an attribute,
+  meaning that every subclass is required to provide that initializer
+  either directly or by inheriting it from a superclass. To construct
+
+    class View {
+      @required init withFrame(frame: CGRect) { ... }
+    }
+
+    func buildView(subclassObj: View.Type, frame: CGRect) -> View {
+      return subclassObj(withFrame: frame)
+    }
+
+    class MyView : View {
+      @required init withFrame(frame: CGRect) { 
+        super.init(withFrame: frame)
+      }
+    } 
+
+    class MyOtherView : View {
+      // error: must override init withFrame(CGRect).
+    }
 
 * Properties in Objective-C protocols are now correctly imported as properties.
   (Previously the getter and setter were imported as methods.)
