@@ -79,7 +79,7 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(Si),
 
 /// NSDictionary enumerator
 /// (id, id, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
                           DIRECT(PS__),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -87,7 +87,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
 
 /// NSDictionary predicate
 /// (id, id, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
                           DIRECT(PS__),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
@@ -95,7 +95,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
 
 /// NSArray enumerator
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -103,7 +103,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
 
 /// NSArray predicate
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
@@ -117,7 +117,7 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo18NSAnimationContext),
                 
 /// NSAttributedString enumerator
 /// (id, NSRange, UnsafePointer<BOOL>) -> Void  aka attribute string enumerator
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
                           DIRECT(VSC8_NSRange),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -164,7 +164,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo8NSObject),
 /// NSExpression
 /// (id, NSArray, NSMutableDictionary) -> id
 /* FIXME does this shim need to autorelease the return value?
-MAKE_BLOCK_SHIM(_TTbbTPSo13DynamicLookup_CSo7NSArrayCSo19NSMutableDictionary_PS__,
+MAKE_BLOCK_SHIM(_TTbbTPSo9AnyObject_CSo7NSArrayCSo19NSMutableDictionary_PS__,
                 id(id, NSArray *, NSDictionary *)); */
 
 /// NSFileCoordinator accessor
@@ -235,14 +235,14 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo20NSTextCheckingResult),
 
 /// NSSet enumerator
 /// (id, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo9AnyObject_),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, BOOL *));
 
 /// NSSet predicate
 /// (id, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo13DynamicLookup_),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo9AnyObject_),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
                 BOOL(id, BOOL *));

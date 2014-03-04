@@ -214,7 +214,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     skipSecond = true;
     break;
   case ConstraintKind::DynamicLookupValue:
-    Out << " is a DynamicLookup value";
+    Out << " is an AnyObject value";
     skipSecond = true;
     break;
   case ConstraintKind::Conjunction:

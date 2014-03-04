@@ -84,7 +84,7 @@ enum NameLookupOptions {
   /// Remove overridden declarations from the set of results.
   NL_RemoveOverridden = 0x08,
 
-  /// For existentials involving the special \c DynamicLookup protocol,
+  /// For existentials involving the special \c AnyObject protocol,
   /// allow lookups to find members of all classes.
   NL_DynamicLookup    = 0x10,
 

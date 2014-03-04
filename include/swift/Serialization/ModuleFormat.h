@@ -1018,7 +1018,7 @@ namespace index_block {
     BuiltinStringLiteralConvertible,
     BuiltinUTF16StringLiteralConvertible,
 
-    DynamicLookup,
+    AnyObject,
     RawRepresentable,
     Generator,
     RawOptionSet,

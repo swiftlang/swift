@@ -57,7 +57,7 @@ private:
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
   /// This method filters out non-ObjC protocols, along with the special
-  /// DynamicLookup protocol.
+  /// AnyObject protocol.
   void printProtocols(ArrayRef<ProtocolDecl *> protos) {
     SmallVector<ProtocolDecl *, 4> protosToPrint;
     std::copy_if(protos.begin(), protos.end(),
@@ -68,7 +68,7 @@ private:
       auto knownProtocol = PD->getKnownProtocolKind();
       if (!knownProtocol)
         return true;
-      return *knownProtocol != KnownProtocolKind::DynamicLookup;
+      return *knownProtocol != KnownProtocolKind::AnyObject;
     });
 
     if (protosToPrint.empty())
@@ -473,7 +473,7 @@ private:
 
     auto proto = PT->getDecl();
     if (auto knownKind = proto->getKnownProtocolKind())
-      if (*knownKind == KnownProtocolKind::DynamicLookup)
+      if (*knownKind == KnownProtocolKind::AnyObject)
         return;
 
     printProtocols(proto);
@@ -727,7 +727,7 @@ public:
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
-           *PD->getKnownProtocolKind() == KnownProtocolKind::DynamicLookup);
+           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject);
     forwardDeclare(PD, "@protocol");
   }
 
@@ -789,7 +789,7 @@ public:
       return true;
 
     auto knownProtocol = PD->getKnownProtocolKind();
-    if (knownProtocol && *knownProtocol == KnownProtocolKind::DynamicLookup)
+    if (knownProtocol && *knownProtocol == KnownProtocolKind::AnyObject)
       return true;
 
     auto &state = seenTypes[PD];

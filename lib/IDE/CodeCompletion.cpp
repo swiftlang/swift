@@ -868,7 +868,7 @@ public:
         return SemanticContextKind::OtherModule;
 
     case DeclVisibilityKind::DynamicLookup:
-      // DynamicLookup results can come from different modules, including the
+      // AnyObject results can come from different modules, including the
       // current module, but we always assign them the OtherModule semantic
       // context.  These declarations are uniqued by signature, so it is
       // totally random (determined by the hash function) which of the
@@ -982,7 +982,7 @@ public:
       VarType = VarType->getInOutObjectType();
     }
     if (IsDynamicLookup) {
-      // Values of properties that were found on a DynamicLookup have
+      // Values of properties that were found on a AnyObject have
       // Optional<T> type.
       VarType = OptionalType::get(VarType);
     }
@@ -1207,7 +1207,7 @@ public:
     // Add a type annotation.
     Type T = SD->getElementType();
     if (IsDynamicLookup) {
-      // Values of properties that were found on a DynamicLookup have
+      // Values of properties that were found on a AnyObject have
       // Optional<T> type.
       T = OptionalType::get(T);
     }
@@ -1755,7 +1755,7 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
 
 static bool isDynamicLookup(Type T) {
   if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
-    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::DynamicLookup);
+    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
   return false;
 }
 

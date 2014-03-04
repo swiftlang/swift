@@ -1720,7 +1720,7 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty, Member, Volatile) {}
 };
 
-/// Given the address of a value of DynamicLookup protocol type and a method
+/// Given the address of a value of AnyObject protocol type and a method
 /// constant referring to some Objective-C method, performs dynamic method
 /// lookup to extract the implementation of that method. This method lookup
 /// can fail at run-time

@@ -482,18 +482,18 @@ namespace {
         return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
 
-      // Beyond here, we're using DynamicLookup.
+      // Beyond here, we're using AnyObject.
       auto proto = Impl.SwiftContext.getProtocol(
-                     KnownProtocolKind::DynamicLookup);
+                     KnownProtocolKind::AnyObject);
       if (!proto)
         return Type();
 
-      // id maps to DynamicLookup.
+      // id maps to AnyObject.
       if (type->isObjCIdType()) {
         return proto->getDeclaredType();
       }
 
-      // Class maps to DynamicLookup.Type.
+      // Class maps to AnyObject.Type.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
       return MetatypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
     }

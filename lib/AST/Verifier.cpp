@@ -822,10 +822,10 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DynamicMemberRefExpr *E) {
-      // The base type must be DynamicLookup.
+      // The base type must be AnyObject.
       auto baseTy = E->getBase()->getType();
 
-      // The base might be a metatype of DynamicLookup.
+      // The base might be a metatype of AnyObject.
       if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
         baseTy = baseMetaTy->getInstanceType();
       }
@@ -833,8 +833,8 @@ struct ASTNodeBase {};
       auto baseProtoTy = baseTy->getAs<ProtocolType>();
       if (!baseProtoTy ||
           !baseProtoTy->getDecl()->isSpecificProtocol(
-             KnownProtocolKind::DynamicLookup)) {
-        Out << "Dynamic member reference has non-DynamicLookup base\n";
+             KnownProtocolKind::AnyObject)) {
+        Out << "Dynamic member reference has non-AnyObject base\n";
         E->dump(Out);
         abort();
       }

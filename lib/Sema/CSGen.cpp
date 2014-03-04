@@ -1097,7 +1097,7 @@ namespace {
       // The value can be forced in two different ways:
       //   - Either the value is coercible to T? and the result is T, which
       //     retrieves the value stored in the optional
-      //   - The value is of rvalue type DynamicLookup, and the result is
+      //   - The value is of rvalue type AnyObject, and the result is
       //     some class type T.
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding);
@@ -1125,7 +1125,7 @@ namespace {
                            expr->getSubExpr()->getType(), optTy,
                            Identifier(),
                            locator),
-        // The subexpression is a DynamicLookup value and the resulting value
+        // The subexpression is a AnyObject value and the resulting value
         // is of class type.
         Constraint::createConjunction(CS, downcastConstraints, locator)
       };

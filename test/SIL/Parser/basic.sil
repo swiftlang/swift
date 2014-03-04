@@ -886,16 +886,16 @@ class X {
   @objc func f() { }
 }
 
-// CHECK-LABEL: sil @test_dynamic_lookup_br : $@thin (DynamicLookup) -> ()
-sil @test_dynamic_lookup_br : $@thin (DynamicLookup) -> () {
-bb0(%0 : $DynamicLookup):
-  %1 = alloc_box $DynamicLookup
-  store %0 to %1#1 : $*DynamicLookup
+// CHECK-LABEL: sil @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
+sil @test_dynamic_lookup_br : $@thin (AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = alloc_box $AnyObject
+  store %0 to %1#1 : $*AnyObject
   %3 = alloc_box $Optional<() -> ()>
-  %4 = load %1#1 : $*DynamicLookup
-  strong_retain %4 : $DynamicLookup
-  %6 = project_existential_ref %4 : $DynamicLookup to $@sil_self DynamicLookup
-  %7 = ref_to_object_pointer %6 : $@sil_self DynamicLookup to $Builtin.ObjCPointer
+  %4 = load %1#1 : $*AnyObject
+  strong_retain %4 : $AnyObject
+  %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
+  %7 = ref_to_object_pointer %6 : $@sil_self AnyObject to $Builtin.ObjCPointer
   dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
 bb1:
   br bb3

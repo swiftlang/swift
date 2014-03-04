@@ -946,8 +946,8 @@ public:
               "operand must have metatype of protocol type");
       require(operandType.getSwiftType()->castTo<MetatypeType>()
                 ->getInstanceType()->castTo<ProtocolType>()->getDecl()
-                ->isSpecificProtocol(KnownProtocolKind::DynamicLookup),
-              "operand must have metatype of DynamicLookup type");
+                ->isSpecificProtocol(KnownProtocolKind::AnyObject),
+              "operand must have metatype of AnyObject type");
     }
   }
 
@@ -1627,8 +1627,8 @@ public:
               "operand must have metatype of protocol type");
       require(operandType.getSwiftType()->castTo<MetatypeType>()
               ->getInstanceType()->castTo<ProtocolType>()->getDecl()
-              ->isSpecificProtocol(KnownProtocolKind::DynamicLookup),
-              "operand must have metatype of DynamicLookup type");
+              ->isSpecificProtocol(KnownProtocolKind::AnyObject),
+              "operand must have metatype of AnyObject type");
     }
 
     // FIXME: Check branch arguments.

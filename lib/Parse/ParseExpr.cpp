@@ -1280,13 +1280,6 @@ Expr *Parser::parseExprStringLiteral() {
   
 ///   expr-identifier:
 ///     identifier generic-args?
-///   The generic-args case is ambiguous with an expression involving '<'
-///   and '>' operators. The operator expression is favored unless a generic
-///   argument list can be successfully parsed, and the closing bracket is
-///   followed by one of these tokens:
-///     lparen_following rparen lsquare_following rsquare lbrace rbrace
-///     period_following comma semicolon
-///
 Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
@@ -1297,6 +1290,13 @@ Expr *Parser::parseExprIdentifier() {
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
   
+  ///   The generic-args case is ambiguous with an expression involving '<'
+  ///   and '>' operators. The operator expression is favored unless a generic
+  ///   argument list can be successfully parsed, and the closing bracket is
+  ///   followed by one of these tokens:
+  ///     lparen_following rparen lsquare_following rsquare lbrace rbrace
+  ///     period_following comma semicolon
+  ///
   if (canParseAsGenericArgumentList()) {
     hasGenericArgumentList = true;
     if (parseGenericArguments(args, LAngleLoc, RAngleLoc)) {

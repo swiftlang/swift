@@ -837,8 +837,8 @@ namespace {
       for (ProtocolDecl *p : allProtocols) {
         if (!p->isObjC())
           continue;
-        // Don't emit the magic DynamicLookup conformance.
-        if (p == IGM.Context.getProtocol(KnownProtocolKind::DynamicLookup))
+        // Don't emit the magic AnyObject conformance.
+        if (p == IGM.Context.getProtocol(KnownProtocolKind::AnyObject))
           continue;
         Protocols.push_back(buildProtocolRef(p));
       }

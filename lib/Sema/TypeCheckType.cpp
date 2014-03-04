@@ -1304,11 +1304,11 @@ Type TypeResolver::resolveProtocolCompositionType(
       continue;
     }
 
-    // The special DynamicLookup protocol can't be part of a protocol
+    // The special AnyObject protocol can't be part of a protocol
     // composition.
     if (auto protoTy = ty->getAs<ProtocolType>()){
       if (protoTy->getDecl()->isSpecificProtocol(
-              KnownProtocolKind::DynamicLookup)) {
+              KnownProtocolKind::AnyObject)) {
         TC.diagnose(tyR->getStartLoc(),
                     diag::protocol_composition_dynamic_lookup);
         continue;
@@ -1810,14 +1810,14 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
   }
 
-  if (auto *DynamicLookup =
-         Context.getProtocol(KnownProtocolKind::DynamicLookup)) {
-    validateDecl(DynamicLookup);
-    CanType DynamicLookupType =
-        DynamicLookup->getDeclaredType()->getCanonicalType();
-    ObjCMappedTypes.insert(DynamicLookupType);
+  if (auto *AnyObject =
+         Context.getProtocol(KnownProtocolKind::AnyObject)) {
+    validateDecl(AnyObject);
+    CanType AnyObjectType =
+        AnyObject->getDeclaredType()->getCanonicalType();
+    ObjCMappedTypes.insert(AnyObjectType);
     ObjCMappedTypes.insert(
-      MetatypeType::get(DynamicLookupType, Context)->getCanonicalType());
+      MetatypeType::get(AnyObjectType, Context)->getCanonicalType());
   }
 }
 

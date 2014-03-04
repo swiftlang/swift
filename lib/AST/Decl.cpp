@@ -902,9 +902,9 @@ void NominalTypeDecl::getImplicitProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
   // If this is a class, it conforms to the DynamicLookup protocol.
   if (isa<ClassDecl>(this)) {
-    if (auto dynamicLookup
-          = getASTContext().getProtocol(KnownProtocolKind::DynamicLookup)) {
-      protocols.push_back(dynamicLookup);
+    if (auto anyObject
+          = getASTContext().getProtocol(KnownProtocolKind::AnyObject)) {
+      protocols.push_back(anyObject);
     }
   }
   

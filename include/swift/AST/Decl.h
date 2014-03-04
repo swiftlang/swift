@@ -2340,7 +2340,7 @@ public:
   ArrayRef<ValueDecl *> lookupDirect(Identifier name);
 
   /// Collect the set of protocols to which this type should implicitly
-  /// conform, such as DynamicLookup (for classes).
+  /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
   /// \brief True if the type can implicitly derive a conformance for the given

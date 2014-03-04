@@ -322,7 +322,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
-    if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::DynamicLookup)) {
+    if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       // Handle DynamicLookup in a special way.
       doDynamicLookup(Consumer, CurrDC, LS);
       return;

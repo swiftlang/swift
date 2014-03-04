@@ -882,10 +882,10 @@ public:
 ///
 /// \code
 /// class C {
-///   func [objc] foo(i : Int) -> String { ... }
+///   func @objc foo(i : Int) -> String { ... }
 /// };
 ///
-/// var x : DynamicLookup = <some value>
+/// var x : AnyObject = <some value>
 /// print(x.foo!(17)) // x.foo has type ((i : Int) -> String)?
 /// \endcode
 class DynamicMemberRefExpr : public DynamicLookupExpr {

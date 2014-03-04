@@ -624,13 +624,13 @@ public:
   }
 };
 
-/// Get the 'Self' type of a DynamicLookup operand to use as the result type of
+/// Get the 'Self' type of a AnyObject operand to use as the result type of
 /// projecting the object instance handle.
 SILType getSelfTypeForDynamicLookup(SILGenFunction &gen,
                                     SILValue existential) {
   CanType ty = existential.getType().getSwiftRValueType();
   ProtocolDecl *proto = cast<ProtocolType>(ty)->getDecl();
-  // DynamicLookup is a class protocol so its projection should be loadable.
+  // AnyObject is a class protocol so its projection should be loadable.
   return gen.getLoweredLoadableType(proto->getSelf()->getArchetype());
 }
   

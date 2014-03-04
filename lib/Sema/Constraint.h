@@ -94,7 +94,7 @@ enum class ConstraintKind : char {
   /// \brief The first type is a class or an archetype of a class-bound
   /// protocol.
   Class,
-  /// \brief The first type must be DynamicLookup or an implicit lvalue thereof.
+  /// \brief The first type must be AnyObject or an implicit lvalue thereof.
   DynamicLookupValue,
   /// \brief A conjunction constraint that specifies that all of the stored
   /// constraints must hold.

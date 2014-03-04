@@ -470,9 +470,9 @@ void PrintAST::printInherited(const Decl *decl,
   if (inherited.empty() && superclass.isNull()) {
     if (protos.empty())
       return;
-    // If only conforms to DynamicLookup protocol, nothing to print.
+    // If only conforms to AnyObject protocol, nothing to print.
     if (protos.size() == 1) {
-      if (protos.front()->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+      if (protos.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))
         return;
     }
   }
@@ -494,7 +494,7 @@ void PrintAST::printInherited(const Decl *decl,
       PrintedColon = true;
     }
     for (auto Proto : protos) {
-      if (Proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+      if (Proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
         continue;
       if (auto Enum = dyn_cast<EnumDecl>(decl)) {
         // Conformance to RawRepresentable is implied by having a raw type.

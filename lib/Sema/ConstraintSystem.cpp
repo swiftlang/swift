@@ -199,7 +199,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
   if (!*result ||
       !protoTy ||
       !protoTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::DynamicLookup))
+                             KnownProtocolKind::AnyObject))
     return *result;
 
   // We are performing dynamic lookup. Filter out redundant results early.
@@ -1032,10 +1032,10 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   } else if (isDynamicResult && isa<AbstractFunctionDecl>(value)) {
     // For a dynamic result referring to an instance function through
     // an object of metatype type, replace the 'Self' parameter with
-    // a DynamicLookup member.
+    // a AnyObject member.
     auto funcTy = type->castTo<AnyFunctionType>();
     Type resultTy = funcTy->getResult();
-    Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::DynamicLookup)
+    Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::AnyObject)
                      ->getDeclaredTypeOfContext();
     type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
   } else {

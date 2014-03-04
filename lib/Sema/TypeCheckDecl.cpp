@@ -284,10 +284,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     // If this is a protocol or protocol composition type, record the
     // protocols.
     if (inheritedTy->isExistentialType()) {
-      // DynamicLookup cannot be used in a generic constraint.
+      // AnyObject cannot be used in a generic constraint.
       if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
         if (protoTy->getDecl()->isSpecificProtocol(
-                                   KnownProtocolKind::DynamicLookup) &&
+                                   KnownProtocolKind::AnyObject) &&
             !decl->isImplicit()) {
           diagnose(inheritedClause[i].getSourceRange().Start,
                    diag::dynamic_lookup_conformance);
@@ -783,10 +783,10 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
         continue;
       }
 
-      // DynamicLookup cannot be used in a generic constraint.
+      // AnyObject cannot be used in a generic constraint.
       if (auto protoTy = Req.getConstraint()->getAs<ProtocolType>()) {
         if (protoTy->getDecl()->isSpecificProtocol(
-                                  KnownProtocolKind::DynamicLookup)) {
+                                  KnownProtocolKind::AnyObject)) {
           TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
                       diag::dynamic_lookup_conformance);
           Req.setInvalid();

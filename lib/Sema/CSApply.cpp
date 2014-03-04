@@ -630,7 +630,7 @@ namespace {
 
       // If we are referring to an optional member of a protocol.
       if (isArchetypeOrExistentialRef && member->getAttrs().isOptional()) {
-        auto proto =tc.getProtocol(memberLoc, KnownProtocolKind::DynamicLookup);
+        auto proto =tc.getProtocol(memberLoc, KnownProtocolKind::AnyObject);
         if (!proto)
           return nullptr;
 
@@ -954,7 +954,7 @@ namespace {
         // DynamicLookup.
         if (selected.choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
           auto proto = tc.getProtocol(index->getStartLoc(),
-                                      KnownProtocolKind::DynamicLookup);
+                                      KnownProtocolKind::AnyObject);
           if (!proto)
             return nullptr;
 
@@ -2239,7 +2239,7 @@ namespace {
 
       // Check whether this is DynamicLookup.
       return protoTy->getDecl()->isSpecificProtocol(
-                                   KnownProtocolKind::DynamicLookup);
+                                   KnownProtocolKind::AnyObject);
     }
 
     Expr *visitForceValueExpr(ForceValueExpr *expr) {

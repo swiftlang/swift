@@ -831,10 +831,10 @@ bool DeclContext::lookupQualified(Type type,
                           !isa<ProtocolDecl>(nominal);
 
     // If we want dynamic lookup and we're searching in the
-    // DynamicLookup protocol, note this for later.
+    // AnyObject protocol, note this for later.
     if (options & NL_DynamicLookup) {
       if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
           wantLookupInAllClasses = true;
       }
     }
@@ -871,7 +871,7 @@ bool DeclContext::lookupQualified(Type type,
           // If we want dynamic lookup and this is the DynamicLookup
           // protocol, note this for later.
           if ((options & NL_DynamicLookup) &&
-              proto->isSpecificProtocol(KnownProtocolKind::DynamicLookup))
+              proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
             wantLookupInAllClasses = true;
         }
       }

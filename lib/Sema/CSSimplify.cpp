@@ -1512,7 +1512,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   bool isDynamicLookup = false;
   if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
     isDynamicLookup = protoTy->getDecl()->isSpecificProtocol(
-                                            KnownProtocolKind::DynamicLookup);
+                                            KnownProtocolKind::AnyObject);
   }
 
   // Introduce a new overload set to capture the choices.
@@ -1544,7 +1544,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         !result->isInstanceMember())
       continue;
 
-    // If we're doing dynamic lookup into a metatype of DynamicLookup and we've
+    // If we're doing dynamic lookup into a metatype of AnyObject and we've
     // found an instance member, ignore it.
     if (isDynamicLookup && isMetatype && result->isInstanceMember()) {
       // FIXME: Mark as 'unavailable' somehow.
@@ -1664,7 +1664,7 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
 
   if (auto protoTy = baseTy->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(
-                              KnownProtocolKind::DynamicLookup))
+                              KnownProtocolKind::AnyObject))
       return SolutionKind::Solved;
   }
 
