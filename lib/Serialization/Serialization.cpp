@@ -68,7 +68,7 @@ namespace {
 
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
-      static_assert(sizeof(DeclID) <= 32, "DeclID too large");
+      static_assert(sizeof(DeclID) <= 4, "DeclID too large");
       using namespace clang::io;
       for (auto entry : data) {
         Emit8(out, entry.first);
