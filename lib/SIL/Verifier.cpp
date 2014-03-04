@@ -1851,6 +1851,7 @@ void SILModule::verify() const {
     if (!wtableConformances.insert(conformance).second) {
       llvm::errs() << "Witness table redefined: ";
       conformance->printName(llvm::errs());
+      assert(false && "triggering standard assertion failure routine");
     }
     wt.verify(*this);
   }
