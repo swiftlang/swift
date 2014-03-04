@@ -1331,12 +1331,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                       rawProtocolIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      break;
+
+    auto defaultDefinitionType =
+      TypeLoc::withoutLoc(getType(defaultDefinitionID));
 
     if (declOrOffset.isComplete())
       break;
 
-    TypeLoc defaultDefinitionType =
-      TypeLoc::withoutLoc(getType(defaultDefinitionID));
     auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
                                                   getIdentifier(nameID),
                                                   SourceLoc(),
@@ -1371,6 +1374,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
+    if (declOrOffset.isComplete())
+      break;
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), { }, genericParams, DC);
@@ -1431,6 +1436,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto genericParams = maybeReadGenericParams(parent, DeclTypeCursor);
+    if (declOrOffset.isComplete())
+      break;
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
                                           /*argParams=*/nullptr, nullptr,
@@ -1524,8 +1531,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
+    auto type = getType(typeID);
+    if (declOrOffset.isComplete())
+      break;
+
     auto var = new (ctx) VarDecl(isStatic, isLet, SourceLoc(),
-                                 getIdentifier(nameID), getType(typeID), DC);
+                                 getIdentifier(nameID), type, DC);
 
     declOrOffset = var;
 
@@ -1638,6 +1649,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       return nullptr;
     }
 
+    if (declOrOffset.isComplete())
+      break;
+
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(),
         DeclName(ctx, names), SourceLoc(),
@@ -1744,8 +1758,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         /*init=*/nullptr,
         /*storage=*/hasStorage,
         /*conditional=*/false, getDeclContext(contextID));
-    binding->setStatic(isStatic);
     declOrOffset = binding;
+
+    binding->setStatic(isStatic);
 
     if (isImplicit)
       binding->setImplicit();
@@ -1885,6 +1900,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
+    if (declOrOffset.isComplete())
+      break;
 
     auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
                                         SourceLoc(), { }, genericParams, DC);
@@ -1955,6 +1972,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
+    if (declOrOffset.isComplete())
+      break;
 
     auto theEnum = new (ctx) EnumDecl(SourceLoc(), getIdentifier(nameID),
                                       SourceLoc(), { }, genericParams, DC);
@@ -2011,6 +2030,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       break;
 
     auto argTy = getType(argTypeID);
+    if (declOrOffset.isComplete())
+      break;
+
     // FIXME: Deserialize the literal raw value, if any.
     auto elem = new (ctx) EnumElementDecl(SourceLoc(),
                                           getIdentifier(nameID),
@@ -2052,13 +2074,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     assert(indices);
 
     auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
+    if (declOrOffset.isComplete())
+      break;
 
     auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
                                              SourceLoc(), indices, SourceLoc(),
                                              elemTy, DC);
-    subscript->setAccessors(SourceRange(), Getter, Setter);
     declOrOffset = subscript;
 
+    subscript->setAccessors(SourceRange(), Getter, Setter);
     subscript->setType(getType(declTypeID));
     if (auto interfaceType = getType(interfaceTypeID))
       subscript->setInterfaceType(interfaceType);
