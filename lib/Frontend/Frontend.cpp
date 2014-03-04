@@ -262,12 +262,11 @@ void CompilerInstance::performParse() {
   bool hadLoadError = false;
 
   // Parse all the library files first.
-  for (size_t i = 0, e = BufferIDs.size(); i < e; ++i) {
-    auto BufferID = BufferIDs[i];
+  for (auto BufferID : BufferIDs) {
     if (BufferID == MainBufferID)
       continue;
 
-    auto Buffer = SourceMgr.getLLVMSourceMgr().getMemoryBuffer(BufferID);
+    auto Buffer = SourceMgr->getMemoryBuffer(BufferID);
     if (SerializedModuleLoader::isSerializedAST(Buffer->getBuffer())) {
       std::unique_ptr<llvm::MemoryBuffer> Input(
         llvm::MemoryBuffer::getMemBuffer(Buffer->getBuffer(),
