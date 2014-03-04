@@ -33,7 +33,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/CallSite.h"
+#include "llvm/IR/CallSite.h"
 
 #include "Explosion.h"
 #include "GenFunc.h"
