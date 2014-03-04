@@ -408,7 +408,8 @@ ERROR(requires_generic_param_equal,sema_tcd,none,
 ERROR(requires_superclass_conflict,sema_tcd,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
-
+ERROR(recursive_requirement_reference,sema_tcd,none,
+      "type may not reference itself as a requirement",())
 ERROR(override_multiple_decls_base,sema_tcd,none,
       "declaration cannot override more than one superclass declaration", ())
 ERROR(override_multiple_decls_derived,sema_tcd,none,

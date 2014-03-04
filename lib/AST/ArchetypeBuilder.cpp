@@ -400,6 +400,11 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName());
       for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
+        if (Proto == InheritedProto) {
+          Diags.diagnose(Member->getLoc(),
+                         diag::recursive_requirement_reference);
+          return true;
+        }
         if (addConformanceRequirement(AssocPA, InheritedProto))
           return true;
       }
