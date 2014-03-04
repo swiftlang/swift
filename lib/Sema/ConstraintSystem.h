@@ -708,7 +708,7 @@ public:
   /// The set of constraint restrictions used to arrive at this restriction,
   /// which informs constraint application.
   llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
-    constraintRestrictions;
+    ConstraintRestrictions;
 
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -970,6 +970,15 @@ private:
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
 
+  /// \brief The set of constraint restrictions used to reach the
+  /// current constraint system.
+  ///
+  /// Constraint restrictions help describe which path the solver took when
+  /// there are multiple ways in which one type could convert to another, e.g.,
+  /// given class types A and B, the solver might choose either a superclass
+  /// conversion or a user-defined conversion.
+  SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
+      ConstraintRestrictions;
 
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
@@ -1007,15 +1016,6 @@ private:
 
     /// The current set of generated constraints.
     SmallVector<Constraint *, 4> generatedConstraints;
-
-    /// \brief The set of constraint restrictions used to reach this state.
-    ///
-    /// Constraint restrictions help describe which path the solver took when
-    /// there are multiple ways in which one type could convert to another, e.g.,
-    /// given class types A and B, the solver might choose either a superclass
-    /// conversion or a user-defined conversion.
-    SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
-      constraintRestrictions;
 
     /// \brief The set of type variable bindings that have changed while
     /// processing this constraint system.
@@ -1069,7 +1069,7 @@ public:
     /// \brief The last retired constraint in the list.
     ConstraintList::iterator firstRetired;
 
-    /// \brief The length of \c constraintRestrictions.
+    /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
 
     /// The previous score.

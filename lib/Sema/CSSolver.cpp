@@ -117,11 +117,11 @@ Solution ConstraintSystem::finalize(
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
   if (solverState) {
-    for (auto &restriction : solverState->constraintRestrictions) {
+    for (auto &restriction : ConstraintRestrictions) {
       using std::get;
       CanType first = simplifyType(get<0>(restriction))->getCanonicalType();
       CanType second = simplifyType(get<1>(restriction))->getCanonicalType();
-      solution.constraintRestrictions[{first, second}] = get<2>(restriction);
+      solution.ConstraintRestrictions[{first, second}] = get<2>(restriction);
     }
   }
 
@@ -160,8 +160,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto restriction : solution.constraintRestrictions) {
-    solverState->constraintRestrictions.push_back(
+  for (auto restriction : solution.ConstraintRestrictions) {
+    ConstraintRestrictions.push_back(
         std::make_tuple(restriction.first.first, restriction.first.second,
                         restriction.second));
   }
@@ -348,7 +348,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
   firstRetired = cs.solverState->retiredConstraints.begin();
-  numConstraintRestrictions = cs.solverState->constraintRestrictions.size();
+  numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -391,7 +391,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   generatedConstraints.erase(genStart, genEnd);
 
   // Remove any constraint restrictions.
-  truncate(cs.solverState->constraintRestrictions, numConstraintRestrictions);
+  truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;

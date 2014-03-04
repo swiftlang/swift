@@ -879,7 +879,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // a class existential type, or a conversion from any type to an
   // existential type, check whether the first type conforms to each of the
   // protocols in the second type.
-  if (type2->isExistentialType() && kind >= TypeMatchKind::Subtype) {
+  if (concrete && kind >= TypeMatchKind::Subtype &&
+      type2->isExistentialType()) {
     potentialConversions.push_back(ConversionRestrictionKind::Existential);
   }
 
@@ -977,6 +978,10 @@ commit_to_conversions:
 
   // For a single potential conversion, directly recurse, so that we
   // don't allocate a new constraint or constraint locator.
+
+  // Record that we have a conversion restriction on this path.
+  ConstraintRestrictions.push_back({type1, type2, potentialConversions[0]});
+
   switch (potentialConversions[0]) {
   case ConversionRestrictionKind::TupleToTuple:
     return matchTupleTypes(type1->castTo<TupleType>(),
@@ -1922,12 +1927,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         break;
 
       case SolutionKind::Solved:
-        assert(solverState && "Can't record restriction without solver state");
-        if (constraint.getKind() >= ConstraintKind::Conversion) {
-          solverState->constraintRestrictions.push_back(
+        ConstraintRestrictions.push_back(
               std::make_tuple(constraint.getFirstType(),
                               constraint.getSecondType(), *restriction));
-        }
         break;
       }
 

@@ -2924,10 +2924,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return expr;
 
   // If the solver recorded what we should do here, just do it immediately.
-  auto knownRestriction = solution.constraintRestrictions.find(
+  auto knownRestriction = solution.ConstraintRestrictions.find(
                             { fromType->getCanonicalType(),
                               toType->getCanonicalType() });
-  if (knownRestriction != solution.constraintRestrictions.end()) {
+  if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
     case ConversionRestrictionKind::TupleToTuple: {
       auto fromTuple = expr->getType()->castTo<TupleType>();

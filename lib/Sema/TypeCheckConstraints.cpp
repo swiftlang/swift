@@ -1417,7 +1417,7 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
 
   out << "\n";
   out << "Constraint restrictions:\n";
-  for (auto &restriction : constraintRestrictions) {
+  for (auto &restriction : ConstraintRestrictions) {
     out.indent(2) << restriction.first.first
                   << " to " << restriction.first.second
                   << " is " << getName(restriction.second) << "\n";
