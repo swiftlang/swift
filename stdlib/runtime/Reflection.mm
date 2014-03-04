@@ -125,7 +125,8 @@ struct MagicMirrorData {
   HeapObject *Owner;
   /// The pointer to the value. The mirror does not own the referenced value.
   const OpaqueValue *Value;
-  /// The type metadata for the referenced value.
+  /// The type metadata for the referenced value. For an ObjC witness, this is
+  /// the ObjC class.
   const Metadata *Type;
 };
   
@@ -145,6 +146,8 @@ public:
   
   // The data for the mirror.
   MagicMirrorData Data;
+  
+  MagicMirror() = default;
   
   /// Build a new MagicMirror for type T by taking ownership of the referenced
   /// value.
@@ -326,8 +329,7 @@ const Metadata *getMetadataForEncoding(const char *encoding) {
   case 'B': // _Bool
     return &_TMdSb;
       
-  case '@': // id
-  case '#': { // Class
+  case '@': { // Class
     // TODO: Better metadata?
     const OpaqueMetadata *M = &_TMdBO;
     return &M->base;
@@ -356,23 +358,42 @@ const Metadata *ObjC_getType(MagicMirrorData *self, const Metadata *Self) {
 }
   
 intptr_t ObjC_getCount(MagicMirrorData *self, const Metadata *Self) {
-  id object = *reinterpret_cast<const id *>(self->Value);
-  
   // Copying the ivar list just to free it is lame, but we have
   // no room to save it.
+  auto isa = (Class)self->Type;
+  
   unsigned count;
-  Ivar *ivars = class_copyIvarList([object class], &count);
+  Ivar *ivars = class_copyIvarList(isa, &count);
   free(ivars);
+  
+  // The superobject counts as a subobject.
+  if (class_getSuperclass(isa))
+    count += 1;
+  
   return count;
 }
+Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig);
 StringMirrorTuple ObjC_getChild(intptr_t i, MagicMirrorData *self,
                                 const Metadata *Self) {
   id object = *reinterpret_cast<const id *>(self->Value);
+  auto isa = (Class)self->Type;
+  
+  // If there's a superclass, it becomes the first child.
+  if (auto sup = class_getSuperclass(isa)) {
+    if (i == 0) {
+      StringMirrorTuple result;
+      const char *supName = class_getName(sup);
+      result.first = String(supName, strlen(supName));
+      result.second = ObjC_getMirrorForSuperclass(sup, self);
+      return result;
+    }
+    --i;
+  }
   
   // Copying the ivar list just to free it is lame, but we have
   // no room to save it.
   unsigned count;
-  Ivar *ivars = class_copyIvarList([object class], &count);
+  Ivar *ivars = class_copyIvarList(isa, &count);
   
   if (i < 0 || i > count)
     abort();
@@ -413,6 +434,30 @@ static const MirrorWitnessTable ObjCMirrorWitness{
   // We need to settle on the representation of this API first.
   Opaque_getIDERepresentation,
 };
+  
+// For super mirrors, we suppress the object identifier.
+static const MirrorWitnessTable ObjCSuperMirrorWitness{
+  ObjC_getValue,
+  ObjC_getType,
+  Opaque_getObjectIdentifier,
+  ObjC_getCount,
+  ObjC_getChild,
+  ObjC_getString,
+  // TODO: call down to -debugQuickLookObject.
+  // We need to settle on the representation of this API first.
+  Opaque_getIDERepresentation,
+};
+  
+Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig) {
+  Mirror resultBuf;
+  MagicMirror *result = ::new (&resultBuf) MagicMirror;
+  
+  result->MirrorWitness = &ObjCSuperMirrorWitness;
+  result->Data.Owner = swift_retain(orig->Owner);
+  result->Data.Type = reinterpret_cast<ClassMetadata*>(sup);
+  result->Data.Value = orig->Value;
+  return resultBuf;
+}
   
 // -- MagicMirror implementation.
   
