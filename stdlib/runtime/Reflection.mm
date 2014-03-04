@@ -24,6 +24,14 @@
 
 using namespace swift;
 
+// Declare the debugQuickLookObject selector.
+@protocol DeclareQuickLookObject
+
+- (id)debugQuickLookObject;
+
+@end
+
+
 namespace {
   
 /// The layout of protocol<>.
@@ -70,18 +78,37 @@ struct String {
     swift_stringFromUTF8InRawMemory(this, ptr, size);
   }
   
+  explicit String(const char *ptr)
+    : String(ptr, strlen(ptr))
+  {}
+  
   String(const void *data, intptr_t countAndFlags, HeapObject *owner)
     : data(data), countAndFlags(countAndFlags), owner(owner) {
   }
+  
+  explicit String(NSString *s)
+    // FIXME: Use the usual NSString bridging entry point.
+    : String([s UTF8String])
+  {}
+};
+  
+struct QuickLookObject {
+  union {
+    String Text;
+    Any Image;
+  };
+  enum class Tag : bool {
+    Text,
+    Image,
+  } Kind;
 };
   
 struct StringMirrorTuple {
   String first;
   Mirror second;
 };
-struct OptionalIDERepresentable {
-  // FIXME: Not the right existential type, but still the right layout.
-  Mirror existential;
+struct OptionalQuickLookObject {
+  QuickLookObject value;
   bool isNone;
 };
   
@@ -110,7 +137,7 @@ struct MirrorWitnessTable {
   StringReturn (*getString)(MagicMirrorData *self, const Metadata *Self);
   
   /// var IDERepresentation: IDERepresentable? { get }
-  OptionalIDERepresentable (*getIDERepresentation)
+  OptionalQuickLookObject (*getIDERepresentation)
     (MagicMirrorData *self, const Metadata *Self);
 };
   
@@ -195,11 +222,11 @@ StringReturn Opaque_getString(MagicMirrorData *self, const Metadata *Self) {
   
   return swift_returnString(&s);
 }
-OptionalIDERepresentable Opaque_getIDERepresentation(MagicMirrorData *self,
-                                                     const Metadata *Self) {
-  OptionalIDERepresentable result;
-  memset(&result.existential,
-         0, sizeof(result.existential));
+OptionalQuickLookObject Opaque_getIDERepresentation(MagicMirrorData *self,
+                                                    const Metadata *Self) {
+  OptionalQuickLookObject result;
+  memset(&result.value,
+         0, sizeof(result.value));
   result.isNone = true;
   return result;
 }
@@ -423,6 +450,43 @@ StringReturn ObjC_getString(MagicMirrorData *self, const Metadata *Self) {
   return swift_returnString(&s);
 }
   
+OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
+                                                  const Metadata *Self) {
+  OptionalQuickLookObject result;
+  
+  id object = *reinterpret_cast<const id *>(self->Value);
+  if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
+    id quickLook = [object debugQuickLookObject];
+    
+    if ([quickLook isKindOfClass:[NSString class]]) {
+      result.value.Text = String((NSString*)quickLook);
+      result.value.Kind = QuickLookObject::Tag::Text;
+      result.isNone = false;
+      return result;
+    }
+    
+    if ([quickLook isKindOfClass:NSClassFromString(@"NSImage")]
+        || [quickLook isKindOfClass:NSClassFromString(@"UIImage")]
+        || [quickLook isKindOfClass:NSClassFromString(@"NSImageView")]
+        || [quickLook isKindOfClass:NSClassFromString(@"UIImageView")]
+        || [quickLook isKindOfClass:NSClassFromString(@"CIImage")]
+        || [quickLook isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
+      result.value.Image.Self = &_TMdBO.base;
+      *reinterpret_cast<id *>(&result.value.Image.Value) = [quickLook retain];
+      result.value.Kind = QuickLookObject::Tag::Image;
+      result.isNone = false;
+      return result;
+    }
+    
+    // TODO: Handle the other quick look object kinds.
+  }
+  
+  // Return none if we didn't get a suitable object.
+  memset(&result.value, 0, sizeof(QuickLookObject));
+  result.isNone = true;
+  return result;
+}
+  
 static const MirrorWitnessTable ObjCMirrorWitness{
   ObjC_getValue,
   ObjC_getType,
@@ -432,7 +496,7 @@ static const MirrorWitnessTable ObjCMirrorWitness{
   ObjC_getString,
   // TODO: call down to -debugQuickLookObject.
   // We need to settle on the representation of this API first.
-  Opaque_getIDERepresentation,
+  ObjC_getIDERepresentation,
 };
   
 // For super mirrors, we suppress the object identifier.
