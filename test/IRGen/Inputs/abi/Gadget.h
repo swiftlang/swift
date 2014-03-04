@@ -27,7 +27,7 @@ struct NestedInts {
   } b;
 };
 
-@interface StructReturns
+@interface StructReturns : NSObject
 - (struct MyRect)newRect;
 - (struct Trio)newTrio;
 - (struct IntPair)newPair;
