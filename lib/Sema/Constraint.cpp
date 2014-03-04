@@ -53,6 +53,8 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::ConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
+    assert(!First.isNull());
+    assert(!Second.isNull());
     assert(Member.empty() && "Relational constraint cannot have a member");
     break;
   case ConstraintKind::ApplicableFunction:
@@ -104,6 +106,8 @@ Constraint::Constraint(ConstraintKind kind,
       IsActive(false), NumTypeVariables(typeVars.size()), 
       Types{ first, second, Identifier() }, Locator(locator)
 {
+  assert(!first.isNull());
+  assert(!second.isNull());
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 

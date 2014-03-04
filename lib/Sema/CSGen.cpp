@@ -969,6 +969,8 @@ namespace {
 
       // Form the constraints for the checked cast case.
       auto optToType = tc.getOptionalType(expr->getLoc(), toType);
+      if (!optToType)
+        return nullptr;
       Constraint *checkConstraints[2] = {
         Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
                            Identifier(), locator),
