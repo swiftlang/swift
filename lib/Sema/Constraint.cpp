@@ -160,7 +160,37 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
   case ConstraintKind::BindOverload: {
-    // FIXME: Better output here.
+    Out << " bound to ";
+    auto overload = getOverloadChoice();
+    auto printDecl = [&] {
+      auto decl = overload.getDecl();
+      decl->print(Out);
+      if (!sm || !decl->getLoc().isValid()) return;
+      Out << " at ";
+      decl->getLoc().print(Out, *sm);
+    };
+
+    switch (overload.getKind()) {
+    case OverloadChoiceKind::Decl:
+      Out << "decl ";
+      printDecl();
+      break;
+    case OverloadChoiceKind::TypeDecl:
+      Out << "type decl ";
+      printDecl();
+      break;
+    case OverloadChoiceKind::DeclViaDynamic:
+      Out << "decl-via-dynamic ";
+      printDecl();
+      break;
+    case OverloadChoiceKind::BaseType:
+      Out << "base type";
+      break;
+    case OverloadChoiceKind::TupleIndex:
+      Out << "tuple index " << overload.getTupleIndex();
+      break;
+    }
+
     skipSecond = true;
     break;
   }
