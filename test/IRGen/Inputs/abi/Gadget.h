@@ -27,11 +27,16 @@ struct NestedInts {
   } b;
 };
 
+struct BigStruct {
+  char a[32];
+};
+
 @interface StructReturns : NSObject
 - (struct MyRect)newRect;
 - (struct Trio)newTrio;
 - (struct IntPair)newPair;
 - (struct NestedInts)newNestedInts;
+- (struct BigStruct)justReturn:(struct BigStruct) s;
 @end
 
 @interface Gadget : NSObject

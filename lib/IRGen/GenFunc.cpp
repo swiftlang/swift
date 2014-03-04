@@ -917,14 +917,13 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
       ParamIRTypes.push_back(AI.getCoerceToType());
       break;
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(AI.getIndirectByVal()
-             && "Unexpected indirect that is not byval!");
       assert(i >= paramOffset &&
              "Unexpected index for indirect byval argument");
       auto &param = params[i - paramOffset];
       auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(param.getSILType()));
-      addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
-                                 paramTI.getFixedAlignment());
+      if (AI.getIndirectByVal())
+        addByvalArgumentAttributes(IGM, Attrs, getCurParamIndex(),
+                                   paramTI.getFixedAlignment());
       addPointerParameter(paramTI.getStorageType());
       break;
     }
@@ -2147,17 +2146,16 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       break;
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(AI.getIndirectByVal()
-             && "Unexpected indirect that is not byval!");
       assert(i >= paramOffset &&
-             "Unexpected index for indirect byval argument");
+             "Unexpected index for indirect argument");
       auto ty = params[i - paramOffset].getSILType();
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
       Address addr = ti.allocateStack(IGF, ty.getSwiftRValueType(),
-                                      "byval-temporary").getAddress();
+                                      "indirect-temporary").getAddress();
       ti.initialize(IGF, in, addr);
 
-      newByvals.push_back({out.size(), addr.getAlignment()});
+      if (AI.getIndirectByVal())
+        newByvals.push_back({out.size(), addr.getAlignment()});
       out.add(addr.getAddress());
       break;
     }

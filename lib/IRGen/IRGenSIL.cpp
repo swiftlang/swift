@@ -963,10 +963,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       continue;
     }
     case clang::CodeGen::ABIArgInfo::Indirect: {
-      assert(AI.getIndirectByVal()
-             && "Unexpected indirect that is not byval!");
-      Address byval = loadableArgTI.getAddressForPointer(params.claimNext());
-      loadableArgTI.loadAsTake(IGF, byval, argExplosion);
+      Address address = loadableArgTI.getAddressForPointer(params.claimNext());
+      loadableArgTI.loadAsTake(IGF, address, argExplosion);
       IGF.setLoweredExplosion(arg, argExplosion);
       continue;
     }
