@@ -111,6 +111,9 @@ struct ASTContext::Implementation {
   /// \brief Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
 
+  /// \brief Map from Swift declarations to brief comments.
+  llvm::DenseMap<const Decl *, StringRef> BriefComments;
+
   /// \brief Map from local declarations to their discriminators.
   /// Missing entries implicitly have value 0.
   llvm::DenseMap<const ValueDecl *, unsigned> LocalDiscriminators;
@@ -902,6 +905,18 @@ Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
 
 void ASTContext::setRawComment(const Decl *D, RawComment RC) {
   Impl.RawComments[D] = RC;
+}
+
+Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
+  auto Known = Impl.BriefComments.find(D);
+  if (Known == Impl.BriefComments.end())
+    return Nothing;
+
+  return Known->second;
+}
+
+void ASTContext::setBriefComment(const Decl *D, StringRef Comment) {
+  Impl.BriefComments[D] = Comment;
 }
 
 unsigned ValueDecl::getLocalDiscriminator() const {

@@ -15,12 +15,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/RawComment.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
-#include "llvm/ADT/StringRef.h"
 
 using namespace swift;
 
@@ -115,6 +117,44 @@ RawComment Decl::getRawComment() const {
 
   RawComment Result = toRawComment(Context, getAttrs().CommentRange);
   Context.setRawComment(this, Result);
+  return Result;
+}
+
+static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
+                                     const Decl *D) {
+  llvm::SmallString<256> Result;
+  {
+    llvm::raw_svector_ostream OS(Result);
+    // FIXME: extract brief comment.
+    OS << "Brief comment for ";
+    bool HasName = false;
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->hasName()) {
+        HasName = true;
+        OS << VD->getName();
+      }
+    }
+    if (!HasName)
+      OS << "<anonymous>";
+  }
+
+  if (Result.empty())
+    return StringRef();
+  ArrayRef<char> Copy = Context.AllocateCopy(Result);
+  return StringRef(Copy.data(), Copy.size());
+}
+
+StringRef Decl::getBriefComment() const {
+  auto &Context = getASTContext();
+  if (Optional<StringRef> Comment = Context.getBriefComment(this))
+    return Comment.getValue();
+
+  StringRef Result;
+  auto RC = getRawComment();
+  if (!RC.isEmpty())
+    Result = extractBriefComment(Context, RC, this);
+
+  Context.setBriefComment(this, Result);
   return Result;
 }
 

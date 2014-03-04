@@ -515,6 +515,9 @@ public:
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
 
+  /// \returns the brief comment attached to this declaration.
+  StringRef getBriefComment() const;
+
   /// \brief Returns true if there is a Clang AST node associated
   /// with self.
   bool hasClangNode() const {
