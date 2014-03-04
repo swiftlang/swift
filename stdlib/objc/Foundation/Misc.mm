@@ -39,3 +39,19 @@ void* const __swift_cocoaStringBridge = __swift_initializeCocoaStringBridge();
 extern "C" NSDate *swift_createDate(void) {
   return [NSDate date];
 }
+
+
+//===----------------------------------------------------------------------===//
+// Implementation of Hashable and Equatable for NSObject
+//===----------------------------------------------------------------------===//
+
+extern "C" bool swift_compareObjects(id x, id y) {
+  [x release];
+  [y release];
+  return x == y;
+}
+
+extern "C" intptr_t swift_hashObject(id obj) {
+  [obj release];
+  return (intptr_t)obj;
+}
