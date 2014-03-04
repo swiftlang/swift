@@ -900,7 +900,7 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
 
 void NominalTypeDecl::getImplicitProtocols(
        SmallVectorImpl<ProtocolDecl *> &protocols) {
-  // If this is a class, it conforms to the DynamicLookup protocol.
+  // If this is a class, it conforms to the AnyObject protocol.
   if (isa<ClassDecl>(this)) {
     if (auto anyObject
           = getASTContext().getProtocol(KnownProtocolKind::AnyObject)) {

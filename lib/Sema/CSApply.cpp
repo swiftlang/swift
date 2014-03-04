@@ -951,7 +951,7 @@ namespace {
       if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic ||
           subscript->getAttrs().isOptional()) {
         // If we've found an optional method in a protocol, the base type is
-        // DynamicLookup.
+        // AnyObject.
         if (selected.choice.getKind() != OverloadChoiceKind::DeclViaDynamic) {
           auto proto = tc.getProtocol(index->getStartLoc(),
                                       KnownProtocolKind::AnyObject);
@@ -2227,7 +2227,7 @@ namespace {
       return expr;
     }
 
-    /// Whether this type is DynamicLookup or an implicit lvalue thereof.
+    /// Whether this type is AnyObject or an implicit lvalue thereof.
     bool isDynamicLookupType(Type type) {
       // Look through lvalues.
       type = type->getRValueType();
@@ -2237,7 +2237,7 @@ namespace {
       if (!protoTy)
         return false;
 
-      // Check whether this is DynamicLookup.
+      // Check whether this is AnyObject.
       return protoTy->getDecl()->isSpecificProtocol(
                                    KnownProtocolKind::AnyObject);
     }
@@ -2246,7 +2246,7 @@ namespace {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
 
-      // If the subexpression is of DynamicLookup type, introduce a conditional
+      // If the subexpression is of AnyObject type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
       Expr *subExpr = expr->getSubExpr();
       if (isDynamicLookupType(expr->getSubExpr()->getType()) &&

@@ -868,7 +868,7 @@ bool DeclContext::lookupQualified(Type type,
         if (visited.insert(proto)) {
           stack.push_back(proto);
 
-          // If we want dynamic lookup and this is the DynamicLookup
+          // If we want dynamic lookup and this is the AnyObject
           // protocol, note this for later.
           if ((options & NL_DynamicLookup) &&
               proto->isSpecificProtocol(KnownProtocolKind::AnyObject))

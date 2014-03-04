@@ -184,7 +184,7 @@ static void lookupTypeMembers(Type BaseType, VisibleDeclConsumer &Consumer,
     Consumer.foundDecl(VD, Reason);
 }
 
-/// Enumerate DynamicLookup declarations as seen from context \c CurrDC.
+/// Enumerate AnyObject declarations as seen from context \c CurrDC.
 static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                             const DeclContext *CurrDC, LookupState LS) {
   class DynamicLookupConsumer : public VisibleDeclConsumer {
@@ -323,7 +323,7 @@ static void lookupVisibleMemberDeclsImpl(
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      // Handle DynamicLookup in a special way.
+      // Handle AnyObject in a special way.
       doDynamicLookup(Consumer, CurrDC, LS);
       return;
     }
