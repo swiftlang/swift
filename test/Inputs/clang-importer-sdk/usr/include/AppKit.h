@@ -14,3 +14,15 @@
 - (instancetype)init NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithURL:(NSString*)url;
 @end
+
+@interface NSAwesomeDocument : NSDocument
+@end
+
+@interface NSInterestingDesignated
++ (instancetype)alloc;
+- (instancetype)initWithString:(NSString*)str NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithURL:(NSString*)str;
+@end
+
+@interface NSInterestingDesignatedSub : NSInterestingDesignated
+@end

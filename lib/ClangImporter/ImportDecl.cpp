@@ -1734,7 +1734,7 @@ namespace {
       case clang::OMF_init:
         // An init instance method can be a constructor.
         if (isReallyInitMethod(objcMethod))
-          return importConstructor(decl, objcMethod, dc);
+          return importConstructor(decl, objcMethod, dc, false);
         return nullptr;
 
       case clang::OMF_new:
@@ -1830,7 +1830,8 @@ namespace {
     /// \endcode
     ConstructorDecl *importConstructor(Decl *decl,
                                        const clang::ObjCMethodDecl *objcMethod,
-                                       DeclContext *dc) {
+                                       DeclContext *dc,
+                                       bool inherited) {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
@@ -1844,7 +1845,7 @@ namespace {
 
       // Check whether we've already created the constructor.
       FuncDecl *init = cast<FuncDecl>(decl);
-      auto known = Impl.Constructors.find(init);
+      auto known = Impl.Constructors.find({init, dc});
       if (known != Impl.Constructors.end())
         return known->second;
 
@@ -1911,7 +1912,7 @@ namespace {
       assert(type && "Type has already been successfully converted?");
 
       // Check whether we've already created the constructor.
-      known = Impl.Constructors.find(init);
+      known = Impl.Constructors.find({init, dc});
       if (known != Impl.Constructors.end())
         return known->second;
 
@@ -1940,6 +1941,8 @@ namespace {
       
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
+      if (inherited)
+        result->setImplicit();
 
       // If the owning Objective-C class has designated initializers and this
       // is not one of them, treat it as a convenience initializer.
@@ -1949,7 +1952,7 @@ namespace {
       }
 
       // Record the constructor for future re-use.
-      Impl.Constructors[init] = result;
+      Impl.Constructors[{init, dc}] = result;
 
       // If this method overrides another method, mark it as such.
       recordObjCMethodOverride(result, objcMethod);
@@ -2675,6 +2678,70 @@ namespace {
                 members.push_back(classImport);
             }
           }
+        }
+      }
+    }
+
+    /// \brief Determine whether the given Objective-C class has an instance or
+    /// class method with the given selector directly declared (i.e., not in
+    /// a superclass or protocol).
+    static bool hasMethodShallow(const clang::Selector sel, bool isInstance,
+                                 const clang::ObjCInterfaceDecl *objcClass) {
+      if (objcClass->getMethod(sel, isInstance))
+        return true;
+
+      for (auto cat = objcClass->visible_categories_begin(),
+                catEnd = objcClass->visible_categories_end();
+           cat != catEnd;
+           ++cat) {
+        if ((*cat)->getMethod(sel, isInstance))
+          return true;
+      }
+
+      return false;
+    }
+
+    /// \brief Import constructors from our superclasses (and their
+    /// categories/extensions), effectively "inheriting" constructors.
+    void importInheritedConstructors(const clang::ObjCInterfaceDecl *objcClass,
+                                     DeclContext *dc,
+                                     SmallVectorImpl<Decl *> &members) {
+      // FIXME: Would like a more robust way to ensure that we aren't creating
+      // duplicates.
+      llvm::SmallSet<clang::Selector, 16> knownSelectors;
+      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container){
+        for (auto meth = container->meth_begin(),
+                  methEnd = container->meth_end();
+             meth != methEnd; ++meth) {
+          if ((*meth)->getMethodFamily() == clang::OMF_init &&
+              isReallyInitMethod(*meth) &&
+              !hasMethodShallow((*meth)->getSelector(),
+                                (*meth)->isInstanceMethod(),
+                                objcClass) &&
+              knownSelectors.insert((*meth)->getSelector())) {
+                if (auto imported = Impl.importDecl(*meth)) {
+                  if (auto special = importConstructor(imported, *meth, dc,
+                                                       /*inherited=*/true)) {
+                    members.push_back(special);
+                  }
+                }
+              }
+        }
+      };
+
+      for (auto curObjCClass = objcClass; curObjCClass;
+           curObjCClass = curObjCClass->getSuperClass()) {
+        // When we hit a class that does declare it's designated
+        // initializers, we're done.
+        if (curObjCClass->hasDesignatedInitializers())
+          break;
+
+        inheritConstructors(curObjCClass);
+        for (auto cat = curObjCClass->visible_categories_begin(),
+                  catEnd = curObjCClass->visible_categories_end();
+             cat != catEnd;
+             ++cat) {
+            inheritConstructors(*cat);
         }
       }
     }
@@ -3455,6 +3522,16 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
     DC = swiftClass;
 
     clangDecl = clangClass = clangClass->getDefinition();
+
+    // If the class does not inherit any designated initializers, we'll have to
+    // import them.
+    if (!clangClass->hasDesignatedInitializers() &&
+        clangClass->getName() != "Protocol") {
+      converter.importInheritedConstructors(clangClass,
+                                            const_cast<DeclContext *>(DC),
+                                            members);
+    }
+
   } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
     DC = cast<ProtocolDecl>(D);
     clangDecl = clangProto->getDefinition();

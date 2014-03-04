@@ -292,7 +292,8 @@ public:
 
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
-  llvm::DenseMap<FuncDecl *, ConstructorDecl *> Constructors;
+  llvm::DenseMap<std::pair<FuncDecl *, DeclContext *>, ConstructorDecl *> 
+    Constructors;
 
 private:
   /// \brief NSObject, imported into Swift.
