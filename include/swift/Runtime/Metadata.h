@@ -707,9 +707,6 @@ extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
 extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
-  
-// FIXME: The compiler should generate this.
-extern "C" const FullOpaqueMetadata _TMdSb;        // Swift.Bool
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {
