@@ -323,16 +323,13 @@ void CompilerInstance::performParse() {
 
   if (!Invocation.getParseOnly()) {
     // Type-check each top-level input besides the main source file.
-    for (unsigned i = 0, e = BufferIDs.size(); i != e; ++i) {
-      // We need to call getFiles() on every iteration because type checking
-      // can add 'DerivedFileUnit's (which can reallocate the vector).
-      auto File = MainModule->getFiles()[i];
+    auto InputSourceFiles = MainModule->getFiles().slice(0, BufferIDs.size());
+    for (auto File : InputSourceFiles)
       if (auto SF = dyn_cast<SourceFile>(File))
         if (PrimaryBufferID == NO_SUCH_BUFFER ||
             (SF->getBufferID().hasValue() &&
              SF->getBufferID().getValue() == PrimaryBufferID))
           performTypeChecking(*SF, PersistentState.getTopLevelContext());
-    }
 
     // If there were no source files, we should still record known protocols.
     if (Context->getStdlibModule())
