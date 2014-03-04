@@ -2507,7 +2507,9 @@ namespace {
 
       // FIXME: Add static witness tables for type conformances.
       for (auto protocol : ty->getProtocols()) {
-        (void)protocol;
+        if (!requiresProtocolWitnessTable(protocol))
+          continue;
+        
         auto &entry = SILEntries.front();
         (void)entry;
         assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
