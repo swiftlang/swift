@@ -1414,6 +1414,14 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     }
     out << "\n";
   }
+
+  out << "\n";
+  out << "Constraint restrictions:\n";
+  for (auto &restriction : constraintRestrictions) {
+    out.indent(2) << restriction.first.first
+                  << " to " << restriction.first.second
+                  << " is " << getName(restriction.second) << "\n";
+  }
 }
 
 void ConstraintSystem::dump() {

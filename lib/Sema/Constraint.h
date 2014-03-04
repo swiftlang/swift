@@ -155,6 +155,9 @@ enum class ConversionRestrictionKind {
   User
 };
 
+/// Return a string representation of a conversion restriction.
+llvm::StringRef getName(ConversionRestrictionKind kind);
+
 /// \brief A constraint between two type variables.
 class Constraint : public llvm::ilist_node<Constraint> {
   /// \brief The kind of constraint.

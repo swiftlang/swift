@@ -192,51 +192,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Types.Second->print(Out);
 
   if (auto restriction = getRestriction()) {
-    switch (*restriction) {
-    case ConversionRestrictionKind::TupleToTuple:
-      Out << " [tuple-to-tuple]";
-      break;
-
-    case ConversionRestrictionKind::ScalarToTuple:
-      Out << " [scalar-to-tuple]";
-      break;
-
-    case ConversionRestrictionKind::TupleToScalar:
-      Out << " [tuple-to-scalar]";
-      break;
-
-    case ConversionRestrictionKind::DeepEquality:
-      Out << " [deep equality]";
-      break;
-
-    case ConversionRestrictionKind::Superclass:
-      Out << " [superclass]";
-      break;
-
-    case ConversionRestrictionKind::LValueToRValue:
-      Out << " [lvalue-to-rvalue]";
-      break;
-
-    case ConversionRestrictionKind::Existential:
-      Out << " [existential]";
-      break;
-
-    case ConversionRestrictionKind::ValueToOptional:
-      Out << " [value-to-optional]";
-      break;
-
-    case ConversionRestrictionKind::OptionalToOptional:
-      Out << " [optional-to-optional]";
-      break;
-
-    case ConversionRestrictionKind::UncheckedOptionalToOptional:
-      Out << " [unchecked-optional-to-optional]";
-      break;
-      
-    case ConversionRestrictionKind::User:
-      Out << " [user]";
-      break;
-    }
+    Out << ' ' << getName(*restriction);
   }
 
   if (Locator) {
@@ -248,6 +204,34 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
 void Constraint::dump(SourceManager *sm) const {
   print(llvm::errs(), sm);
+}
+
+StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
+  switch (kind) {
+  case ConversionRestrictionKind::TupleToTuple:
+    return "[tuple-to-tuple]";
+  case ConversionRestrictionKind::ScalarToTuple:
+    return "[scalar-to-tuple]";
+  case ConversionRestrictionKind::TupleToScalar:
+    return "[tuple-to-scalar]";
+  case ConversionRestrictionKind::DeepEquality:
+    return "[deep equality]";
+  case ConversionRestrictionKind::Superclass:
+    return "[superclass]";
+  case ConversionRestrictionKind::LValueToRValue:
+    return "[lvalue-to-rvalue]";
+  case ConversionRestrictionKind::Existential:
+    return "[existential]";
+  case ConversionRestrictionKind::ValueToOptional:
+    return "[value-to-optional]";
+  case ConversionRestrictionKind::OptionalToOptional:
+    return "[optional-to-optional]";
+  case ConversionRestrictionKind::UncheckedOptionalToOptional:
+    return "[unchecked-optional-to-optional]";
+  case ConversionRestrictionKind::User:
+    return "[user]";
+  }
+  llvm_unreachable("bad conversion restriction kind");
 }
 
 /// Recursively gather the set of type variables referenced by this constraint.

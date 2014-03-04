@@ -42,6 +42,8 @@ void ConstraintLocator::dump(SourceManager *sm) {
 }
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
+  out << "locator@" << (void*) this << " [";
+
   if (anchor) {
     out << Expr::getKindName(anchor->getKind());
     if (sm) {
@@ -186,5 +188,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
     }
   }
+
+  out << ']';
 }
 
