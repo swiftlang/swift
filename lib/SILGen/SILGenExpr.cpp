@@ -1149,7 +1149,8 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   {
     SGF.B.emitBlock(success);
     SILValue castResult = success->bbarg_begin()[0];
-
+    FullExpr scope(SGF.Cleanups, CleanupLocation(E));
+    
     // Load the BB argument if casting from address-only to loadable type.
     if (castResult.getType().isAddress() && !castTL.isAddressOnly())
       castResult = SGF.B.createLoad(E, castResult);
@@ -1987,8 +1988,9 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
   }
   
   // Emit top-level cleanups into the epilog block.
-  assert(getCleanupsDepth() == ReturnDest.getDepth() &&
-         "emitting epilog in wrong scope");
+  assert(!Cleanups.hasAnyActiveCleanups(getCleanupsDepth(),
+                                        ReturnDest.getDepth())
+         && "emitting epilog in wrong scope");         
 
   auto cleanupLoc = CleanupLocation::getCleanupLocation(TopLevel);
   Cleanups.emitCleanupsForReturn(cleanupLoc);

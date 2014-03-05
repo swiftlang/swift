@@ -164,6 +164,10 @@ public:
   /// Set the state of the cleanup at the given depth.
   /// The transition must be non-trivial and legal.
   void setCleanupState(CleanupHandle depth, CleanupState state);
+  
+  /// True if there are any active cleanups in the scope between the two
+  /// cleanup handles.
+  bool hasAnyActiveCleanups(CleanupsDepth from, CleanupsDepth to);
 };
 
 } // end namespace Lowering

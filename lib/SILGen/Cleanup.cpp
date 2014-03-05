@@ -75,14 +75,20 @@ void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation l) {
   // FIXME: Thread a branch through the cleanups if there are any active
   // cleanups and we have a valid insertion point.
   
-  if (!hasAnyActiveCleanups(Stack.begin(), Stack.find(depth)))
+  if (!::hasAnyActiveCleanups(Stack.begin(), Stack.find(depth))) {
     return;
+  }
   
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
   while (Stack.stable_begin() != depth) {
     popAndEmitTopCleanup(&l);
   }
+}
+
+bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
+                                          CleanupsDepth to) {
+  return ::hasAnyActiveCleanups(Stack.find(from), Stack.find(to));
 }
 
 
