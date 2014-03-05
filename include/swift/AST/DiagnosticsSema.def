@@ -724,6 +724,9 @@ ERROR(self_assignment_var,tce_sema,none,
       "assigning a variable to itself", ())
 ERROR(self_assignment_prop,tce_sema,none,
       "assigning a property to itself", ())
+ERROR(property_use_in_closure_without_explicit_self,tce_sema,none,
+      "reference to property %0 in closure requires explicit 'self.' to make"
+      " capture semantics explicit", (Identifier))
 
 WARNING(recursive_accessor_reference,tce_sema,none,
         "attempting to %select{access|modify}1 %0 within its own "

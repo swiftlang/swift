@@ -345,6 +345,52 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(walker);
 }
 
+/// Look for any property references in closures that lack a "self." qualifier.
+/// Within a closure, we require that the source code contain "self." explicitly
+/// because 'self' is captured, not the property value.  This is a common source
+/// of confusion, so we force an explicit self.
+static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
+  class DiagnoseWalker : public ASTWalker {
+    TypeChecker &TC;
+    unsigned InClosure = 0;
+    
+  public:
+    explicit DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
+    
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // If this is an explicit closure expression - not an autoclosure - then
+      // we keep track of the fact that recursive walks are within the closure.
+      if (isa<ClosureExpr>(E))
+        ++InClosure;
+
+      // If we see a property reference with an implicit base from within a
+      // closure, then reject it as requiring an explicit "self." qualifier.  We
+      // do this in explicit closures, not autoclosures, because otherwise the
+      // transparence of autoclosures is lost.
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E))
+        if (InClosure && MRE->getBase()->isImplicit() &&
+            isa<DeclRefExpr>(MRE->getBase()))
+          TC.diagnose(MRE->getLoc(),
+                      diag::property_use_in_closure_without_explicit_self,
+                      MRE->getMember().getDecl()->getName())
+            .fixItInsert(MRE->getLoc(), "self.");
+    
+      return { true, E };
+    }
+    
+    Expr *walkToExprPost(Expr *E) {
+      if (isa<ClosureExpr>(E)) {
+        assert(InClosure);
+        --InClosure;
+      }
+      
+      return E;
+    }
+  };
+  
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(TC));
+}
+
 //===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
@@ -354,6 +400,7 @@ void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagSelfAssignment(TC, E);
   diagModuleOrMetatypeValue(TC, E);
   diagRecursivePropertyAccess(TC, E, DC);
+  diagnoseImplicitSelfUseInClosure(TC, E);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
