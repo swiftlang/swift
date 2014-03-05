@@ -210,6 +210,8 @@ non-alphanumeric characters are matched as :ref:`operators
 <langref.lexical.operator>`.  Unlike operators, these tokens are not
 overloadable.
 
+.. _langref.lexical.keyword:
+
 Reserved Keywords
 -----------------
 
@@ -229,11 +231,11 @@ Reserved Keywords
   keyword ::= 'import'
   keyword ::= 'init'
   keyword ::= 'func'
-  keyword ::= 'metatype'
   keyword ::= 'enum'
   keyword ::= 'protocol'
   keyword ::= 'struct'
   keyword ::= 'subscript'
+  keyword ::= 'Type'
   keyword ::= 'typealias'
   keyword ::= 'var'
   keyword ::= 'where'
@@ -260,12 +262,14 @@ Reserved Keywords
   keyword ::= 'super'
   keyword ::= 'self'
   keyword ::= 'Self'
+  keyword ::= 'type'
   keyword ::= '__COLUMN__'
   keyword ::= '__FILE__'
   keyword ::= '__LINE__'
 
 
-These are the builtin keywords.
+These are the builtin keywords. Keywords can still be used as names via
+`escaped identifiers <langref.lexical.escapedident>`.
 
 Contextual Keywords
 -------------------
@@ -561,6 +565,28 @@ Implementation Identifier Token
 Tokens that start with a ``$`` are separate class of identifier, which are
 fixed purpose names that are defined by the implementation.
 
+.. _langref.lexical.escapedident:
+
+Escaped Identifiers
+-------------------
+
+.. code-block:: none
+
+  identifier ::= '`' id-start id-continue* '`'
+
+An identifier that would normally be a `keyword <langref.lexical.keyword>` may
+be used as an identifier by wrapping it in backticks '``\```', for example::
+
+  func `class`() { /* ... */ }
+  let `type` = 0.type
+
+Any identifier may be escaped, though only identifiers that would normally be
+parsed as keywords are required to be. The backtick-quoted string must still
+form a valid, non-operator identifier::
+
+  let `0` = 0       // Error, "0" doesn't start with an alphanumeric
+  let `foo-bar` = 0 // Error, '-' isn't an identifier character
+  let `+` = 0       // Error, '+' is an operator
 
 .. _langref.namebind:
 
