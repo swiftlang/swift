@@ -2938,12 +2938,19 @@ public:
       // Check the types.
       auto propertyTy = property->getInterfaceType();
       auto parentPropertyTy = adjustSuperclassMemberDeclType(parentProperty,
-                                                           superclass);
+                                                             superclass);
 
       // An exact match is always fine.
       if (propertyTy->isEqual(parentPropertyTy)) {
         return recordOverride(property, parentProperty);
       }
+
+      // Differing only in Optional vs. UncheckedOptional is fine.
+      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+        if (auto parentPropertyTyNoOptional =
+              parentPropertyTy->getAnyOptionalObjectType())
+          if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
+            return recordOverride(property, parentProperty);
 
       // Check for subtyping.
       if (propertyTy->canOverride(parentPropertyTy, &TC)) {
