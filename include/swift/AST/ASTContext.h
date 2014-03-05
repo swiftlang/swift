@@ -244,7 +244,7 @@ public:
 
   template <typename T>
   T *Allocate(AllocationArena arena = AllocationArena::Permanent) const {
-    T *res = (T*)Allocate(sizeof(T), __alignof__(T), arena);
+    T *res = (T *) Allocate(sizeof(T), alignof(T), arena);
     new (res) T();
     return res;
   }
@@ -252,7 +252,7 @@ public:
   template <typename T>
   MutableArrayRef<T> Allocate(unsigned numElts,
               AllocationArena arena = AllocationArena::Permanent) const {
-    T *res = (T*)Allocate(sizeof(T)*numElts, __alignof__(T), arena);
+    T *res = (T *) Allocate(sizeof(T) * numElts, alignof(T), arena);
     for (unsigned i = 0; i != numElts; ++i)
       new (res+i) T();
     return {res, numElts};
@@ -265,7 +265,7 @@ public:
     // This function can not be named AllocateCopy because it would always win
     // overload resolution over the AllocateCopy(ArrayRef<T>).
     using TNoRef = typename std::remove_reference<T>::type;
-    TNoRef *res = (TNoRef*)Allocate(sizeof(TNoRef), __alignof__(TNoRef), arena);
+    TNoRef *res = (TNoRef *) Allocate(sizeof(TNoRef), alignof(TNoRef), arena);
     new (res) TNoRef(std::forward<T>(t));
     return res;
   }
@@ -273,7 +273,7 @@ public:
   template <typename T, typename It>
   T *AllocateCopy(It start, It end,
                   AllocationArena arena = AllocationArena::Permanent) const {
-    T *res = (T*)Allocate(sizeof(T)*(end-start), __alignof__(T), arena);
+    T *res = (T*)Allocate(sizeof(T)*(end-start), alignof(T), arena);
     for (unsigned i = 0; start != end; ++start, ++i)
       new (res+i) T(*start);
     return res;
