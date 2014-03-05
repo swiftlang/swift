@@ -125,6 +125,14 @@ ERROR(lex_unary_equal_is_reserved,lexing,none,
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 
+ERROR(lex_escaped_identifier_invalid_start,lexing,none,
+      "escaped identifier does not begin with a valid identifier start character", ())
+ERROR(lex_escaped_identifier_not_terminated,lexing,none,
+      "escaped identifier does not have a closing '`'", ())
+ERROR(lex_escaped_identifier_invalid_character,lexing,none,
+      "escaped identifier contains invalid identifier character", ())
+ERROR(lex_escaped_identifier_empty,lexing,none,
+      "escaped identifier cannot be empty", ())
 
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics

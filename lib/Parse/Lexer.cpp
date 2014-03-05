@@ -522,8 +522,6 @@ bool Lexer::isIdentifier(StringRef string) {
 }
 
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
-///
-/// FIXME: We should also allow unicode characters in identifiers.
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
   CurPtr = TokStart;
@@ -1150,7 +1148,7 @@ void Lexer::lexStringLiteral() {
 
   bool wasErroneous = false;
   
-  while (1) {
+  while (true) {
     if (*CurPtr == '\\' && *(CurPtr + 1) == '(') {
       // Consume tokens until we hit the corresponding ')'.
       CurPtr += 2;
@@ -1184,6 +1182,58 @@ void Lexer::lexStringLiteral() {
       return formToken(tok::string_literal, TokStart);
     }
   }
+}
+
+/// lexEscapedIdentifier:
+///   identifier ::= '`' identifier '`'
+void Lexer::lexEscapedIdentifier() {
+  assert(CurPtr[-1] == '`' && "Unexpected start of escaped identifier");
+  
+  const char *Quote = CurPtr-1;
+  // We don't include the escaping quotes in the token.
+  const char *TokStart = CurPtr;
+  
+  if (*CurPtr == '`') {
+    diagnose(Quote, diag::lex_escaped_identifier_empty);
+    ++CurPtr;
+    return formToken(tok::unknown, Quote);
+  }
+  
+  /// Recover by forming an unknown token and skipping ahead to whitespace
+  /// or to a matching '`'.
+  auto invalidEscapedIdentifier = [&]{
+    while (*CurPtr != '\n' && *CurPtr != '\r'
+           && *CurPtr != ' ' && *CurPtr != '\t'
+           && *CurPtr != '`')
+      ++CurPtr;
+    
+    if (*CurPtr == '`')
+      ++CurPtr;
+    
+    formToken(tok::unknown, Quote);
+  };
+  
+  bool didStart = advanceIfValidStartOfIdentifier(CurPtr, BufferEnd);
+  if (!didStart) {
+    diagnose(TokStart, diag::lex_escaped_identifier_invalid_start);
+    return invalidEscapedIdentifier();
+  }
+  
+  while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+  
+  if (*CurPtr == '\n' || *CurPtr == '\r'
+      || *CurPtr == ' ' || *CurPtr == '\t') {
+    diagnose(CurPtr, diag::lex_escaped_identifier_not_terminated);
+    return invalidEscapedIdentifier();
+  }
+  if (*CurPtr != '`') {
+    diagnose(CurPtr, diag::lex_escaped_identifier_invalid_character);
+    return invalidEscapedIdentifier();
+  }
+  assert(*CurPtr == '`');
+  formToken(tok::identifier, TokStart);
+  ++CurPtr;
+  return;
 }
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
@@ -1523,6 +1573,9 @@ Restart:
     return lexCharacterLiteral();
   case '"':
     return lexStringLiteral();
+      
+  case '`':
+    return lexEscapedIdentifier();
   }
 }
 

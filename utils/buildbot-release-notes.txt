@@ -108,6 +108,20 @@
 
 * 'val' has been removed.  Long live 'let'!
 
+* Values whose names clash with Swift keywords, such as Cocoa methods or
+  properties named "class", "protocol", "type", etc., can now be defined and
+  accessed by wrapping reserved keywords in backticks to suppress their builtin
+  meaning:
+
+    let `class` = 0
+    let `type` = 1
+    let `protocol` = 2
+    println(`class`)
+    println(`type`)
+    println(`protocol`)
+
+    func foo(Int) `class`(Int) {}
+    foo(0, `class`: 1)
 
 2014-02-26
 ----------

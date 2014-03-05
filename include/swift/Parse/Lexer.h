@@ -216,7 +216,11 @@ public:
   void restoreState(State S) {
     assert(S.isValid());
     CurPtr = getBufferPtrForSourceLoc(S.Loc);
+    // Don't reemit diagnostics while readvancing the lexer.
+    auto TmpDiags = Diags;
+    Diags = nullptr;
     lexImpl();
+    Diags = TmpDiags;
   }
 
   /// \brief Restore the lexer state to a given state that is located before
@@ -366,6 +370,7 @@ private:
                         bool StopAtDoubleQuote, bool EmitDiagnostics);
   void lexCharacterLiteral();
   void lexStringLiteral();
+  void lexEscapedIdentifier();
 };
   
   
