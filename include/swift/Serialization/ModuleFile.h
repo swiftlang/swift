@@ -133,6 +133,10 @@ public:
       Value = deserialized;
       return *this;
     }
+
+    void unsafeOverwrite(T t) {
+      Value = t;
+    }
   };
 
   /// A class for holding a value that can be partially deserialized.

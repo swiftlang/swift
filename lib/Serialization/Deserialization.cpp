@@ -654,20 +654,59 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
-  unsigned kind = Cursor.readRecord(next.ID, scratch, &blobData);
-
+  // Read the raw archetype IDs into a different scratch buffer
+  // because we need to keep this alive for longer.
+  SmallVector<uint64_t, 4> rawArchetypeIDsBuffer;
+  unsigned kind = Cursor.readRecord(next.ID, rawArchetypeIDsBuffer, &blobData);
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
 
+  // Read in the raw-archetypes buffer, but don't try to consume it yet.
   ArrayRef<uint64_t> rawArchetypeIDs;
-  GenericParamListLayout::readRecord(scratch, rawArchetypeIDs);
-
-  SmallVector<ArchetypeType *, 8> archetypes;
-  for (TypeID next : rawArchetypeIDs)
-    archetypes.push_back(getType(next)->castTo<ArchetypeType>());
+  GenericParamListLayout::readRecord(rawArchetypeIDsBuffer, rawArchetypeIDs);
 
   SmallVector<GenericParam, 8> params;
   SmallVector<RequirementRepr, 8> requirements;
+  SmallVector<ArchetypeType *, 8> archetypes;
+
+  // The GenericTypeParamDecls might be from a different module file.
+  // If so, we need to map the archetype IDs from the serialized
+  // all-archetypes list in this module file over to the corresponding
+  // archetypes from the original generic parameter decls, or else
+  // we'll end up constructing fresh archetypes that don't match the
+  // ones from the generic parameters.
+
+  // We have to do this mapping before we might call getType on one of
+  // those archetypes, but after we've read all the generic parameters.
+  // Therefore we do it lazily.
+  bool haveMappedArchetypes = false;
+  auto mapArchetypes = [&] {
+    if (haveMappedArchetypes) return;
+
+    GenericParamList::deriveAllArchetypes(params, archetypes);
+    assert(rawArchetypeIDs.size() == archetypes.size());
+    for (unsigned index : indices(rawArchetypeIDs)) {
+      TypeID TID = rawArchetypeIDs[index];
+      auto &typeOrOffset = Types[TID-1];
+      if (typeOrOffset.isComplete()) {
+        // FIXME: this assertion is absolutely correct, but it's
+        // currently fouled up by the presence of archetypes in
+        // substitutions.  Those *should* be irrelevant for all the
+        // cases where this is wrong, but...
+
+        //assert(typeOrOffset.get().getPointer() == archetypes[index] &&
+        //       "already deserialized this archetype to a different type!");
+
+        // TODO: remove unsafeOverwrite when this hack goes away
+        typeOrOffset.unsafeOverwrite(archetypes[index]);
+      } else {
+        typeOrOffset = archetypes[index];
+      }
+    }
+
+    haveMappedArchetypes = true;
+  };
+
   while (true) {
     lastRecordOffset.reset();
     bool shouldContinue = true;
@@ -681,6 +720,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
                                                   &blobData);
     switch (recordID) {
     case GENERIC_PARAM: {
+      assert(!haveMappedArchetypes &&
+             "generic parameters interleaved with requirements?");
       DeclID paramDeclID;
       GenericParamLayout::readRecord(scratch, paramDeclID);
       auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID, DC));
@@ -691,6 +732,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       uint8_t rawKind;
       ArrayRef<uint64_t> rawTypeIDs;
       GenericRequirementLayout::readRecord(scratch, rawKind, rawTypeIDs);
+
+      mapArchetypes();
 
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
@@ -745,6 +788,9 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
     if (!shouldContinue)
       break;
   }
+
+  // Make sure we map the archetypes if we haven't yet.
+  mapArchetypes();
 
   auto paramList = GenericParamList::create(getContext(), SourceLoc(),
                                             params, SourceLoc(), requirements,
