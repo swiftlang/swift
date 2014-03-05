@@ -21,25 +21,12 @@ namespace llvm {
 }
 
 namespace swift {
-  class AbstractStorageDecl;
-  class ValueDecl;
-  enum class AccessorKind;
-
 namespace ide {
 
 /// Returns true if the input source is fully formed, or false if, for example,
 /// a closing brace is missing.
 bool isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 bool isSourceInputComplete(StringRef Text);
-
-/// Prints out the USR for the given Decl.
-/// \returns true if it failed, false on success.
-bool printDeclUSR(const ValueDecl *D, raw_ostream &OS);
-
-/// Prints out the accessor USR for the given storage Decl.
-/// \returns true if it failed, false on success.
-bool printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
-                      llvm::raw_ostream &OS);
 
 } // namespace ide
 } // namespace swift

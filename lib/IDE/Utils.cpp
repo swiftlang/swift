@@ -15,13 +15,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/PersistentParserState.h"
-#include "clang/Index/USRGeneration.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
@@ -57,57 +54,3 @@ bool ide::isSourceInputComplete(StringRef Text) {
   return ide::isSourceInputComplete(std::move(InputBuf));
 }
 
-static inline StringRef getUSRSpacePrefix() {
-  return "s:";
-}
-
-bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
-  using namespace Mangle;
-
-  ValueDecl *VD = const_cast<ValueDecl*>(D);
-
-  if (ClangNode ClangN = VD->getClangNode()) {
-    if (auto ClangD = ClangN.getAsDecl()) {
-      llvm::SmallString<128> Buf;
-      bool Ignore = clang::index::generateUSRForDecl(ClangD, Buf);
-      if (!Ignore)
-        OS << Buf.str();
-      return Ignore;
-    }
-    // MacroInfos not handled.
-    return true;
-  }
-
-  if (isa<SubscriptDecl>(VD))
-    return true;
-
-  OS << getUSRSpacePrefix();
-  Mangler Mangler(OS);
-  if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {
-    Mangler.mangleConstructorEntity(Ctor, /*isAllocating=*/false,
-        ResilienceExpansion::Minimal, /*uncurryingLevel=*/0);
-  } else if (auto Dtor = dyn_cast<DestructorDecl>(VD)) {
-    Mangler.mangleDestructorEntity(Dtor, /*isDeallocating=*/false);
-  } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    Mangler.mangleNominalType(NTD, ResilienceExpansion::Minimal,
-                              Mangler::BindGenerics::None);
-  } else if (isa<TypeAliasDecl>(VD) || isa<AssociatedTypeDecl>(VD)) {
-    Mangler.mangleContextOf(VD, Mangler::BindGenerics::None);
-    Mangler.mangleDeclName(VD);
-  } else {
-    Mangler.mangleEntity(VD, ResilienceExpansion::Minimal,
-                         /*uncurryingLevel=*/0);
-  }
-  return false;
-}
-
-bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
-                           llvm::raw_ostream &OS) {
-  using namespace Mangle;
-
-  AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
-  OS << getUSRSpacePrefix();
-  Mangler Mangler(OS);
-  Mangler.mangleAccessorEntity(AccKind, SD, ResilienceExpansion::Minimal);
-  return false;
-}
