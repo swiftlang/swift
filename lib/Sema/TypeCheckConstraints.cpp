@@ -376,18 +376,8 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
     DeclContext *DC;
-    bool RequiresAnotherPass = false;
-
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
-
-    /// Determine whether pre-check requires another pass.
-    bool requiresAnotherPass() const { return RequiresAnotherPass; }
-
-    // Reset internal state for another pass.
-    void reset() {
-      RequiresAnotherPass = false;
-    }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, type-check the patterns and result type as written,
@@ -556,20 +546,15 @@ namespace {
 /// expression and folding sequence expressions.
 static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
   PreCheckExpression preCheck(tc, dc);
-  do {
-    // Perform the pre-check.
-    preCheck.reset();
-    if (auto result = expr->walk(preCheck)) {
-      expr = result;
-      continue;
-    }
+  // Perform the pre-check.
+  if (auto result = expr->walk(preCheck)) {
+    expr = result;
+    return false;
+  }
 
-    // Pre-check failed. Clean up and return.
-    expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
-    return true;
-  } while (preCheck.requiresAnotherPass());
-
-  return false;
+  // Pre-check failed. Clean up and return.
+  expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
+  return true;
 }
 
 ExprTypeCheckListener::~ExprTypeCheckListener() { }
