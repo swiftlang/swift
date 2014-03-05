@@ -410,7 +410,16 @@ namespace {
         if (hadParameterError)
           return { false, expr };
         
-        return { closure->hasSingleExpressionBody(), expr };
+        // If the closure has a multi-statement body, we don't walk into it
+        // here.
+        if (!closure->hasSingleExpressionBody())
+          return { false, expr };
+        
+        // Update the current DeclContext to be the closure we're about to
+        // recurse into.
+        assert(DC == closure->getParent() && "Decl context isn't correct");
+        DC = closure;
+        return { true, expr };
       }
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
@@ -436,6 +445,12 @@ namespace {
           }
         }
         return expr;
+      }
+      
+      // If we're about to step out of a ClosureExpr, restore the DeclContext.
+      if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
+        assert(DC == ce && "DeclContext imbalance");
+        DC = ce->getParent();
       }
 
       return expr;
@@ -893,8 +908,7 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
   }
 
   // Type-check the initializer.
-  bool hadError = typeCheckExpression(init, binding->getDeclContext(), Type(),
-                                      /*discardedExpr=*/false,
+  bool hadError = typeCheckExpression(init, DC, Type(), /*discardedExpr=*/false,
                                       FreeTypeVariableBinding::Disallow,
                                       &listener);
 
