@@ -63,6 +63,7 @@ sil @_TToFCSo10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8
+  // CHECK: [[SGIZMOVAL:%[a-zA-Z0-9]+]] = bitcast i8* %0 to [[SGIZMO]]*
 
   // Call to onDestruct()
   // CHECK: call void @_TF12objc_dealloc10onDestructFT_T_()
@@ -83,7 +84,7 @@ bb0(%0 : $SwiftGizmo):
   destroy_addr %3 : $*X                           // id: %4
 
   // Call super -dealloc.
-  // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast i8* %0 to [[GIZMO]]*
+  // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* [[SGIZMOVAL]] to [[GIZMO]]*
   // CHECK-NEXT: [[SUPER_OBJ:%[a-zA-Z0-9]+]] = bitcast [[GIZMO]]* [[SUPER]] to %objc_object*
   // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8

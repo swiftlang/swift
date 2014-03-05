@@ -875,8 +875,17 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     // Now set the lowered explosion for the self argument and drop
     // the explosion element for the _cmd argument.
     auto &selfType = IGF.getTypeInfo(selfArg->getType());
+    auto &selfTI = cast<LoadableTypeInfo>(selfType);
+    auto selfSchema = selfTI.getSchema(IGF.CurSILFnExplosionLevel);
+    assert(selfSchema.size() == 1 && "Expected self to be a single element!");
+
+    auto *selfValue = params.claimNext();
+    auto *bodyType = selfSchema.begin()->getScalarType();
+    if (selfValue->getType() != bodyType)
+      selfValue = IGF.coerceValue(selfValue, bodyType, IGF.IGM.DataLayout);
+
     Explosion self(IGF.CurSILFnExplosionLevel);
-    cast<LoadableTypeInfo>(selfType).reexplode(IGF, params, self);
+    self.add(selfValue);
     IGF.setLoweredExplosion(selfArg, self);
 
     // Discard the implicit _cmd argument.
@@ -2193,11 +2202,6 @@ void IRGenSILFunction::visitRefElementAddrInst(swift::RefElementAddrInst *i) {
   llvm::Value *value = base.claimNext();
 
   SILType baseTy = i->getOperand().getType();
-
-  // FIXME: rdar://16075395 - We emit a bitcast here in case the exposion's
-  // value type is incorrect.  This should not be necessary.
-  value = Builder.CreateBitCast(value, getTypeInfo(baseTy).StorageType);
-
   Address field = projectPhysicalClassMemberAddress(*this,
                                                     value,
                                                     baseTy,
