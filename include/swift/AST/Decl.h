@@ -975,6 +975,21 @@ public:
   /// Derive a type substitution map for this generic parameter list from a
   /// matching substitution vector.
   TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> Subs) const;
+
+  /// Derive the all-archetypes list for the given list of generic
+  /// parameters.
+  static ArrayRef<ArchetypeType*>
+  deriveAllArchetypes(ArrayRef<GenericParam> params,
+                      SmallVectorImpl<ArchetypeType*> &archetypes);
+
+  /// Collect the nested archetypes of an archetype into the given
+  /// collection.
+  ///
+  /// \param known - the set of archetypes already present in `all`
+  /// \param all - the output list of archetypes
+  static void addNestedArchetypes(ArchetypeType *archetype,
+                                  SmallPtrSetImpl<ArchetypeType*> &known,
+                                  SmallVectorImpl<ArchetypeType*> &all);
   
   void print(raw_ostream &OS);
   void dump();

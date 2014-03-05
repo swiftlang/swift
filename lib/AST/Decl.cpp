@@ -333,6 +333,48 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
   }
 }
 
+/// \brief Add the nested archetypes of the given archetype to the set
+/// of all archetypes.
+void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
+                                      SmallPtrSetImpl<ArchetypeType*> &known,
+                                      SmallVectorImpl<ArchetypeType*> &all) {
+  for (auto nested : archetype->getNestedTypes()) {
+    if (known.insert(nested.second)) {
+      assert(!nested.second->isPrimary() && "Unexpected primary archetype");
+      all.push_back(nested.second);
+      addNestedArchetypes(nested.second, known, all);
+    }
+  }
+}
+
+ArrayRef<ArchetypeType*>
+GenericParamList::deriveAllArchetypes(ArrayRef<GenericParam> params,
+                                      SmallVectorImpl<ArchetypeType*> &all) {
+  // This should be kept in sync with ArchetypeBuilder::getAllArchetypes().
+
+  assert(all.empty());
+  llvm::SmallPtrSet<ArchetypeType*, 8> known;
+
+  // Collect all the primary archetypes.
+  for (auto param : params) {
+    if (auto typeParam = param.getAsTypeParam()) {
+      auto archetype = typeParam->getArchetype();
+      if (archetype->isPrimary() && known.insert(archetype))
+        all.push_back(archetype);
+    }
+  }
+
+  // Collect all the nested archetypes.
+  for (auto param : params) {
+    if (auto typeParam = param.getAsTypeParam()) {
+      auto archetype = typeParam->getArchetype();
+      addNestedArchetypes(archetype, known, all);
+    }
+  }
+
+  return all;
+}
+
 ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc, bool Exported,

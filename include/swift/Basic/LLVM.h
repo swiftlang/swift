@@ -25,6 +25,8 @@ namespace llvm {
   // Containers
   class StringRef;
   class Twine;
+  template <typename T> class SmallPtrSetImpl;
+  template <typename T, unsigned N> class SmallPtrSet;
   template <typename T> class SmallVectorImpl;
   template <typename T, unsigned N> class SmallVector;
   template<typename T> class ArrayRef;
@@ -48,6 +50,8 @@ namespace swift {
   using llvm::cast_or_null;
 
   // Containers
+  using llvm::SmallPtrSetImpl;
+  using llvm::SmallPtrSet;
   using llvm::StringRef;
   using llvm::Twine;
   using llvm::SmallVectorImpl;

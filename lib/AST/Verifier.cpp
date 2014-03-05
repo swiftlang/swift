@@ -1264,6 +1264,17 @@ struct ASTNodeBase {};
       verifyParsedBase(DD);
     }
 
+    bool checkAllArchetypes(const GenericParamList *generics) {
+      ArrayRef<ArchetypeType*> storedArchetypes = generics->getAllArchetypes();
+
+      SmallVector<ArchetypeType*, 16> derivedBuffer;
+      ArrayRef<ArchetypeType*> derivedArchetypes =
+        GenericParamList::deriveAllArchetypes(generics->getParams(),
+                                              derivedBuffer);
+
+      return (storedArchetypes == derivedArchetypes);
+    }
+
     /// Check that the generic requirements line up with the archetypes.
     void checkGenericRequirements(Decl *decl,
                                   DeclContext *dc,
@@ -1273,6 +1284,15 @@ struct ASTNodeBase {};
       auto genericParams = dc->getGenericParamsOfContext();
       if (!genericParams) {
         Out << "Missing generic parameters\n";
+        decl->dump(Out);
+        abort();
+      }
+
+      // Verify that the list of all archetypes matches what we would
+      // derive from the generic params.
+      if (!checkAllArchetypes(genericParams)) {
+        Out << "Archetypes list in generic parameter list doesn't "
+               "match what would have been derived\n";
         decl->dump(Out);
         abort();
       }

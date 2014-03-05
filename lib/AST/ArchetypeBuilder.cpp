@@ -607,20 +607,6 @@ bool ArchetypeBuilder::addImplicitConformance(GenericTypeParamDecl *Param,
   return addConformanceRequirement(Impl->PotentialArchetypes[Key].second, Proto);
 }
 
-/// \brief Add the nested archetypes of the given archetype to the set of
-/// all archetypes.
-static void addNestedArchetypes(ArchetypeType *Archetype,
-                                llvm::SmallPtrSet<ArchetypeType *, 8> &Known,
-                                SmallVectorImpl<ArchetypeType *> &All) {
-  for (auto Nested : Archetype->getNestedTypes()) {
-    if (Known.insert(Nested.second)) {
-      assert(!Nested.second->isPrimary() && "Unexpected primary archetype");
-      All.push_back(Nested.second);
-      addNestedArchetypes(Nested.second, Known, All);
-    }
-  }
-}
-
 /// AST walker that infers requirements from type representations.
 class ArchetypeBuilder::InferRequirementsWalker : public ASTWalker {
   ArchetypeBuilder &Builder;
@@ -724,6 +710,7 @@ ArchetypeBuilder::getArchetype(GenericTypeParamType *GenericParam) const {
 }
 
 ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
+  // This should be kept in sync with GenericParamList::deriveAllArchetypes().
   if (Impl->AllArchetypes.empty()) {
     // Collect the primary archetypes first.
     llvm::SmallPtrSet<ArchetypeType *, 8> KnownArchetypes;
@@ -736,7 +723,8 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
     // Collect all of the remaining archetypes.
     for (auto GP : Impl->GenericParams) {
       auto Archetype = Impl->PrimaryArchetypeMap[GP];
-      addNestedArchetypes(Archetype, KnownArchetypes, Impl->AllArchetypes);
+      GenericParamList::addNestedArchetypes(Archetype, KnownArchetypes,
+                                            Impl->AllArchetypes);
     }
   }
 
