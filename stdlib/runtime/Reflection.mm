@@ -455,31 +455,30 @@ OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
   OptionalQuickLookObject result;
   
   id object = *reinterpret_cast<const id *>(self->Value);
-  if ([object respondsToSelector:@selector(debugQuickLookObject)]) {
-    id quickLook = [object debugQuickLookObject];
+  if ([object respondsToSelector:@selector(debugQuickLookObject)])
+    object = [object debugQuickLookObject];
     
-    if ([quickLook isKindOfClass:[NSString class]]) {
-      result.value.Text = String((NSString*)quickLook);
-      result.value.Kind = QuickLookObject::Tag::Text;
-      result.isNone = false;
-      return result;
-    }
-    
-    if ([quickLook isKindOfClass:NSClassFromString(@"NSImage")]
-        || [quickLook isKindOfClass:NSClassFromString(@"UIImage")]
-        || [quickLook isKindOfClass:NSClassFromString(@"NSImageView")]
-        || [quickLook isKindOfClass:NSClassFromString(@"UIImageView")]
-        || [quickLook isKindOfClass:NSClassFromString(@"CIImage")]
-        || [quickLook isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-      result.value.Image.Self = &_TMdBO.base;
-      *reinterpret_cast<id *>(&result.value.Image.Value) = [quickLook retain];
-      result.value.Kind = QuickLookObject::Tag::Image;
-      result.isNone = false;
-      return result;
-    }
-    
-    // TODO: Handle the other quick look object kinds.
+  if ([object isKindOfClass:[NSString class]]) {
+    result.value.Text = String((NSString*)object);
+    result.value.Kind = QuickLookObject::Tag::Text;
+    result.isNone = false;
+    return result;
   }
+  
+  if ([object isKindOfClass:NSClassFromString(@"NSImage")]
+      || [object isKindOfClass:NSClassFromString(@"UIImage")]
+      || [object isKindOfClass:NSClassFromString(@"NSImageView")]
+      || [object isKindOfClass:NSClassFromString(@"UIImageView")]
+      || [object isKindOfClass:NSClassFromString(@"CIImage")]
+      || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
+    result.value.Image.Self = &_TMdBO.base;
+    *reinterpret_cast<id *>(&result.value.Image.Value) = [object retain];
+    result.value.Kind = QuickLookObject::Tag::Image;
+    result.isNone = false;
+    return result;
+  }
+  
+  // TODO: Handle the other quick look object kinds.
   
   // Return none if we didn't get a suitable object.
   memset(&result.value, 0, sizeof(QuickLookObject));
