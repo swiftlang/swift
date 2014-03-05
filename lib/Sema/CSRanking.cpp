@@ -500,12 +500,34 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If the systems made the same choice, there's nothing interesting here.
     if (sameOverloadChoice(choice1, choice2))
       continue;
+    
+    auto decl1 = choice1.getDecl();
+    auto dc1 = decl1->getDeclContext();
+    auto decl2 = choice2.getDecl();
+    auto dc2 = decl2->getDeclContext();
 
-    // The two systems are not identical.
-    identical = false;
+    // The two systems are not identical. If the decls in question are distinct
+    // protocol members, let the checks below determine if the two choices are
+    // 'identical' or not. This allows us to structurally unify disparate
+    // protocol members during overload resolution.
+    if ((dc1->getContextKind() == DeclContextKind::NominalTypeDecl) &&
+        (dc1->getContextKind() == dc2->getContextKind())) {
+      
+        auto ntd1 = dyn_cast<NominalTypeDecl>(dc1);
+        auto ntd2 = dyn_cast<NominalTypeDecl>(dc2);
+        
+        identical = (ntd1 != ntd2) &&
+                    (ntd1->getKind() == DeclKind::Protocol) &&
+                    (ntd2->getKind() == DeclKind::Protocol);
+      
+    } else {
+      identical = false;
+    }
     
     // If the kinds of overload choice don't match...
     if (choice1.getKind() != choice2.getKind()) {
+      identical = false;
+      
       // A declaration found directly beats any declaration found via dynamic
       // lookup.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
@@ -537,22 +559,20 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
       // Determine whether one declaration is more specialized than the other.
-      if (isDeclAsSpecializedAs(tc, cs.DC,
-                                choice1.getDecl(), choice2.getDecl()))
+      if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2))
         ++score1;
-      if (isDeclAsSpecializedAs(tc, cs.DC,
-                                choice2.getDecl(), choice1.getDecl()))
+      if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1))
         ++score2;
 
       // If both declarations come from Clang, and one is a type and the other
       // is a function, prefer the function.
-      if (choice1.getDecl()->hasClangNode() &&
-          choice2.getDecl()->hasClangNode() &&
-          ((isa<TypeDecl>(choice1.getDecl()) &&
-            isa<AbstractFunctionDecl>(choice2.getDecl())) ||
-           (isa<AbstractFunctionDecl>(choice1.getDecl()) &&
-            isa<TypeDecl>(choice2.getDecl())))) {
-        if (isa<TypeDecl>(choice1.getDecl()))
+      if (decl1->hasClangNode() &&
+          decl2->hasClangNode() &&
+          ((isa<TypeDecl>(decl1) &&
+            isa<AbstractFunctionDecl>(decl2)) ||
+           (isa<AbstractFunctionDecl>(decl1) &&
+            isa<TypeDecl>(decl2)))) {
+        if (isa<TypeDecl>(decl1))
           ++score2;
         else
           ++score1;
