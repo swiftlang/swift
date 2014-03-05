@@ -1255,33 +1255,23 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case ValueKind::InitEnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
-    auto OperandTy = MF->getType(TyID);
-    auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
-                                               Elt,
-                                               nullptr,
-                                               Elt->getArgumentType());
+    SILType OperandTy = getSILType(MF->getType(TyID),
+                                   (SILValueCategory) TyCategory);
+    SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
     ResultVal = Builder.createInitEnumDataAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2,
-                                  getSILType(OperandTy,
-                                             (SILValueCategory)TyCategory)),
-                    Elt,
-                    getSILType(ResultTy, SILValueCategory::Address));
+                    getLocalValue(ValID2, ValResNum2, OperandTy),
+                    Elt, ResultTy);
     break;
   }
   case ValueKind::TakeEnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
-    auto OperandTy = MF->getType(TyID);
-    auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
-                                               Elt,
-                                               nullptr,
-                                               Elt->getArgumentType());
+    SILType OperandTy = getSILType(MF->getType(TyID),
+                                   (SILValueCategory) TyCategory);
+    SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
     ResultVal = Builder.createTakeEnumDataAddr(Loc,
-                    getLocalValue(ValID2, ValResNum2,
-                                  getSILType(OperandTy,
-                                             (SILValueCategory)TyCategory)),
-                    Elt,
-                    getSILType(ResultTy, SILValueCategory::Address));
+                    getLocalValue(ValID2, ValResNum2, OperandTy),
+                    Elt, ResultTy);
     break;
   }
   case ValueKind::InjectEnumAddrInst: {
