@@ -14,3 +14,4 @@
 
 #define VERSION_STRING "Swift 1.0"
 #define UTF8_STRING u8"Swift ✨"
+#define OBJC_STRING @"Swift ✨"

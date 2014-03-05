@@ -54,7 +54,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                          integer->getType()->isUnsignedIntegerType());
 
       // If there was a - sign, negate the value.
-      if (signTok && signTok->getKind() == clang::tok::minus &&
+      if (signTok && signTok->is(clang::tok::minus) &&
           !value.isMinSignedValue()) {
         value = -value;
       }
@@ -72,7 +72,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       llvm::APFloat value = floating->getValue();
 
       // If there was a - sign, negate the value.
-      if (signTok && signTok->getKind() == clang::tok::minus) {
+      if (signTok && signTok->is(clang::tok::minus)) {
         value.changeSign();
       }
 
@@ -85,17 +85,22 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   return nullptr;
 }
 
+static bool isStringToken(const clang::Token &tok) {
+  return tok.is(clang::tok::string_literal) ||
+         tok.is(clang::tok::utf8_string_literal);
+}
+
 static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
                                       Identifier name,
-                                      clang::Token const &tok) {
+                                      clang::Token const &tok,
+                                      bool isObjC) {
   // FIXME: This constant should live in the correct module for the macro.
   DeclContext *dc = Impl.firstClangModule;
 
-  assert(tok.getKind() == clang::tok::string_literal ||
-         tok.getKind() == clang::tok::utf8_string_literal);
+  assert(isStringToken(tok));
 
   clang::ActionResult<clang::Expr*> result =
-    Impl.getClangSema().ActOnStringLiteral(&tok, 1);
+    Impl.getClangSema().ActOnStringLiteral(&tok, /*numToks*/1);
   if (!result.isUsable())
     return nullptr;
 
@@ -103,7 +108,11 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!parsed)
     return nullptr;
 
-  auto importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
+  Type importTy;
+  if (isObjC)
+    importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
+  else
+    importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
   if (!importTy)
     return nullptr;
 
@@ -120,7 +129,7 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
-    return importStringLiteral(Impl, name, tok);
+    return importStringLiteral(Impl, name, tok, /*isObjC*/false);
 
   // TODO: char literals.
   default:
@@ -129,8 +138,7 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
 }
 
 static bool isSignToken(clang::Token const &tok) {
-  return tok.getKind() == clang::tok::plus ||
-         tok.getKind() == clang::tok::minus;
+  return tok.is(clang::tok::plus) || tok.is(clang::tok::minus);
 }
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
@@ -170,13 +178,15 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     //   #define EOF -1
     //   int pred(int x) { return x EOF; }
     // but are pervasive in C headers anyway.
-    clang::Token const &signTok = macro->tokens_begin()[0];
-    clang::Token const &litTok = macro->tokens_begin()[1];
+    clang::Token const &first = macro->tokens_begin()[0];
+    clang::Token const &second = macro->tokens_begin()[1];
     
-    if (isSignToken(signTok) &&
-        litTok.getKind() == clang::tok::numeric_constant) {
-      return importNumericLiteral(impl, name, &signTok, litTok);
-    }
+    if (isSignToken(first) && second.is(clang::tok::numeric_constant))
+      return importNumericLiteral(impl, name, &first, second);
+
+    // We also allow @"string".
+    if (first.is(clang::tok::at) && isStringToken(second))
+      return importStringLiteral(impl, name, second, /*objc*/true);
 
     return nullptr;
   }
@@ -188,10 +198,10 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     clang::Token const &litTok = macro->tokens_begin()[2];
     clang::Token const &rparenTok = macro->tokens_begin()[3];
     
-    if (lparenTok.getKind() == clang::tok::l_paren &&
-        rparenTok.getKind() == clang::tok::r_paren &&
+    if (lparenTok.is(clang::tok::l_paren) &&
+        rparenTok.is(clang::tok::r_paren) &&
         isSignToken(signTok) &&
-        litTok.getKind() == clang::tok::numeric_constant) {
+        litTok.is(clang::tok::numeric_constant)) {
       return importNumericLiteral(impl, name, &signTok, litTok);
     }
   }
