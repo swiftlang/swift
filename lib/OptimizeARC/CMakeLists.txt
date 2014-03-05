@@ -4,3 +4,6 @@ add_swift_library(swiftOptimizeARC
   NO_LLVM_COMMON_LIBS
   )
 
+# FIXME this is probably too low-level a dependency
+# but it makes LLDB build.
+add_dependencies(swiftOptimizeARC intrinsics_gen)
