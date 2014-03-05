@@ -277,12 +277,35 @@ Module::Module(Identifier name, ASTContext &ctx)
 
 
 void Module::addFile(FileUnit &newFile) {
+  assert(!isa<DerivedFileUnit>(newFile) &&
+         "DerivedFileUnits are added automatically");
+
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
          !isa<SourceFile>(newFile) ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
   Files.push_back(&newFile);
+
+  switch (newFile.getKind()) {
+  case FileUnitKind::Source:
+  case FileUnitKind::ClangModule: {
+    for (auto File : Files) {
+      if (isa<DerivedFileUnit>(File))
+        return;
+    }
+    auto DFU = new (Ctx) DerivedFileUnit(*this);
+    Files.push_back(DFU);
+    break;
+  }
+
+  case FileUnitKind::Builtin:
+  case FileUnitKind::SerializedAST:
+    break;
+
+  case FileUnitKind::Derived:
+    llvm_unreachable("DerivedFileUnits are added automatically");
+  }
 }
 
 void Module::removeFile(FileUnit &existingFile) {
@@ -295,6 +318,15 @@ void Module::removeFile(FileUnit &existingFile) {
   // Adjust for the std::reverse_iterator offset.
   ++I;
   Files.erase(I.base());
+}
+
+DerivedFileUnit &Module::getDerivedFileUnit() const {
+  for (auto File : Files) {
+    if (auto DFU = dyn_cast<DerivedFileUnit>(File))
+      return *DFU;
+  }
+  llvm_unreachable("the client should not be calling this function if "
+                   "there is no DerivedFileUnit");
 }
 
 #define FORWARD(name, args) \
@@ -313,6 +345,11 @@ void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, Identifier name,
   getCache().lookupValue(name, lookupKind, *this, result);
 }
 
+DerivedFileUnit::DerivedFileUnit(Module &M)
+    : FileUnit(FileUnitKind::Derived, M) {
+  M.Ctx.addDestructorCleanup(*this);
+}
+
 void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
                                   Identifier name,
                                   NLKind lookupKind,
@@ -324,8 +361,10 @@ void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
   if (accessPath.size() == 1 && accessPath.front().first != name)
     return;
 
-  if (name == DerivedDecl->getName())
-    result.push_back(DerivedDecl);
+  for (auto D : DerivedDecls) {
+    if (name == D->getName())
+      result.push_back(D);
+  }
 }
 
 void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
@@ -333,18 +372,20 @@ void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                          NLKind lookupKind) const {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
 
-  // If this import is specific to some named type or decl ("import Swift.int")
-  // then filter out any lookups that don't match.
-  if (accessPath.size() == 1 &&
-      accessPath.front().first != DerivedDecl->getName())
-    return;
+  Identifier Id;
+  if (!accessPath.empty()) {
+    Id = accessPath.front().first;
+  }
 
-  consumer.foundDecl(DerivedDecl, DeclVisibilityKind::VisibleAtTopLevel);
+  for (auto D : DerivedDecls) {
+    if (Id.empty() || D->getName() == Id)
+      consumer.foundDecl(D, DeclVisibilityKind::VisibleAtTopLevel);
+  }
 }
 
 void DerivedFileUnit::getTopLevelDecls(SmallVectorImpl<swift::Decl *> &results)
 const {
-  results.push_back(DerivedDecl);
+  results.append(DerivedDecls.begin(), DerivedDecls.end());
 }
 
 void SourceFile::lookupValue(Module::AccessPathTy accessPath, Identifier name,
@@ -972,13 +1013,25 @@ bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
 StringRef Module::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
   // per-file names. Modules can consist of more than one file.
-  if (getFiles().size() == 1) {
-    if (auto SF = dyn_cast<SourceFile>(getFiles().front()))
-      return SF->getFilename();
-    if (auto LF = dyn_cast<LoadedFile>(getFiles().front()))
-      return LF->getFilename();
+  StringRef Result;
+  for (auto F : getFiles()) {
+    if (auto SF = dyn_cast<SourceFile>(F)) {
+      if (!Result.empty())
+        return StringRef();
+      Result = SF->getFilename();
+      continue;
+    }
+    if (auto LF = dyn_cast<LoadedFile>(F)) {
+      if (!Result.empty())
+        return StringRef();
+      Result = LF->getFilename();
+      continue;
+    }
+    if (isa<DerivedFileUnit>(F))
+      continue;
+    return StringRef();
   }
-  return StringRef();
+  return Result;
 }
 
 bool Module::isStdlibModule() const {
@@ -988,8 +1041,8 @@ bool Module::isStdlibModule() const {
 bool Module::isSystemModule() const {
   if (isStdlibModule())
     return true;
-  if (getFiles().size() == 1) {
-    if (auto LF = dyn_cast<LoadedFile>(getFiles().front()))
+  for (auto F : getFiles()) {
+    if (auto LF = dyn_cast<LoadedFile>(F))
       return LF->isSystemModule();
   }
   return false;

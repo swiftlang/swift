@@ -1299,25 +1299,23 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
   
   OS << "\n\nimport Builtin\nimport " << STDLIB_NAME << "\n\n";
 
-  // Print the declarations and types from the origin module.
-  // FIXME: What about multi-file modules?
-  if (M && M->getFiles().size() == 1) {
-    // Compute the list of emitted functions, whose AST Decls we do not need to
-    // print.
-    llvm::DenseSet<const Decl*> emittedFunctions;
-    for (const SILFunction &f : *this)
-      if (f.hasLocation())
-        emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
+  // Compute the list of emitted functions, whose AST Decls we do not need to
+  // print.
+  llvm::DenseSet<const Decl*> emittedFunctions;
+  for (const SILFunction &f : *this)
+    if (f.hasLocation())
+      emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
 
+  // Print the declarations and types from the origin module.
+  {
     PrintOptions Options;
     Options.FunctionDefinitions = false;
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
     Options.SkipImplicit = true;
 
-    // FIXME: Use some kind of visitor interface here.
     SmallVector<Decl *, 32> topLevelDecls;
-    M->getFiles().front()->getTopLevelDecls(topLevelDecls);
+    M->getTopLevelDecls(topLevelDecls);
     for (const Decl *D : topLevelDecls) {
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D)) &&
           !emittedFunctions.count(D) &&

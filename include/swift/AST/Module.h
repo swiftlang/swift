@@ -26,6 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -42,6 +43,7 @@ namespace swift {
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class DebuggerClient;
+  class DerivedFileUnit;
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
@@ -172,7 +174,7 @@ private:
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
 
-  TinyPtrVector<FileUnit *> Files;
+  SmallVector<FileUnit *, 2> Files;
 
   Module(Identifier name, ASTContext &ctx);
 public:
@@ -197,6 +199,8 @@ public:
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
   FileUnit &getMainFile(FileUnitKind expectedKind) const;
+
+  DerivedFileUnit &getDerivedFileUnit() const;
 
   DebuggerClient *getDebugClient() const { return DebugClient; }
   void setDebugClient(DebuggerClient *R) {
@@ -555,13 +559,16 @@ public:
 /// A container for a module-level definition derived as part of an implicit
 /// protocol conformance.
 class DerivedFileUnit final : public FileUnit {
-  FuncDecl *const DerivedDecl;
-  
+  TinyPtrVector<FuncDecl *> DerivedDecls;
+
 public:
-  DerivedFileUnit(Module &M, FuncDecl *derivedDecl)
-    : FileUnit(FileUnitKind::Derived, M), DerivedDecl(derivedDecl) {}
-  ~DerivedFileUnit() {}
-  
+  DerivedFileUnit(Module &M);
+  ~DerivedFileUnit() = default;
+
+  void addDerivedDecl(FuncDecl *FD) {
+    DerivedDecls.push_back(FD);
+  }
+
   void lookupValue(Module::AccessPathTy accessPath, Identifier name,
                    NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result) const override;

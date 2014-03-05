@@ -44,10 +44,10 @@ void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
   // Find the module.
   auto &C = scope->getASTContext();
   auto mod = scope->getModuleContext();
-  
+
   // Add it to the module in a DerivedFileUnit.
-  mod->addFile(*new (C) DerivedFileUnit(*mod, cast<FuncDecl>(member)));
-  
+  mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(member));
+
   // Add it as a derived global decl to the nominal type.
   auto oldDerived = scope->getDerivedGlobalDecls();
   auto oldSize = oldDerived.size();
