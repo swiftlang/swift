@@ -108,7 +108,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   // FIXME: Figure out an appropriate OS deployment version to pass along.
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-fobjc-arc", "-fmodules", "-fblocks",
-    "-fsyntax-only", "-w", "-triple", targetTriple.str(),
+    "-fsyntax-only", "-w", "-triple", targetTriple.str(), "-std=gnu11",
     "swift.m"
   };
 

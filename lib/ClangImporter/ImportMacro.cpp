@@ -85,14 +85,44 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   return nullptr;
 }
 
+static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
+                                      Identifier name,
+                                      clang::Token const &tok) {
+  // FIXME: This constant should live in the correct module for the macro.
+  DeclContext *dc = Impl.firstClangModule;
+
+  assert(tok.getKind() == clang::tok::string_literal ||
+         tok.getKind() == clang::tok::utf8_string_literal);
+
+  clang::ActionResult<clang::Expr*> result =
+    Impl.getClangSema().ActOnStringLiteral(&tok, 1);
+  if (!result.isUsable())
+    return nullptr;
+
+  auto parsed = dyn_cast<clang::StringLiteral>(result.get());
+  if (!parsed)
+    return nullptr;
+
+  auto importTy = Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
+  if (!importTy)
+    return nullptr;
+
+  return Impl.createConstant(name, dc, importTy, parsed->getString(),
+                             ConstantConvertKind::Coerce, /*static*/ false);
+}
+
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
                                 Identifier name,
                                 clang::Token const &tok) {  
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
     return importNumericLiteral(Impl, name, /*signTok*/nullptr, tok);
-    
-  // TODO: char and string literals.
+
+  case clang::tok::string_literal:
+  case clang::tok::utf8_string_literal:
+    return importStringLiteral(Impl, name, tok);
+
+  // TODO: char literals.
   default:
     return nullptr;
   }

@@ -51,6 +51,7 @@ class ClassDecl;
 class ConstructorDecl;
 class Decl;
 class DeclContext;
+class Expr;
 class ExtensionDecl;
 class FuncDecl;
 class Identifier;
@@ -473,8 +474,35 @@ public:
   /// \param type The type of the named constant.
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, const clang::APValue &value,
+                            ConstantConvertKind convertKind,
+                            bool isStatic);
+
+  /// \brief Create a new named constant with the given value.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param value The value of the named constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+                            Type type, StringRef value,
+                            ConstantConvertKind convertKind,
+                            bool isStatic);
+
+  /// \brief Create a new named constant using the given expression.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param valueExpr An expression to use as the value of the constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc,
+                            Type type, Expr *valueExpr,
                             ConstantConvertKind convertKind,
                             bool isStatic);
 

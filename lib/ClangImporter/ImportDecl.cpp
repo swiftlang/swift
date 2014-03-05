@@ -3369,44 +3369,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               bool isStatic) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(isStatic, /*IsLet*/ false,
-                                   SourceLoc(), name, type, dc);
-
-  // Form the argument patterns.
-  SmallVector<Pattern *, 3> getterArgs;
-
-  // 'self'
-  if (dc->isTypeContext()) {
-    auto selfTy = dc->getDeclaredTypeInContext();
-    if (isStatic)
-      selfTy = MetatypeType::get(selfTy, context);
-    Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
-    anyP->setType(selfTy);
-    getterArgs.push_back(anyP);
-  }
-  
-  // empty tuple
-  getterArgs.push_back(TuplePattern::create(context, SourceLoc(), { },
-                                            SourceLoc()));
-  getterArgs.back()->setType(TupleType::getEmpty(context));
-
-  // Form the type of the getter.
-  auto getterType = type;
-  for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
-       it != itEnd; ++it) {
-    getterType = FunctionType::get((*it)->getType(), getterType);
-  }
-
-  // Create the getter function declaration.
-  auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
-                               SourceLoc(), Identifier(),
-                               SourceLoc(), nullptr, getterType, getterArgs,
-                               getterArgs, TypeLoc::withoutLoc(type), dc);
-  func->setStatic(isStatic);
-  func->setBodyResultType(type);
-
   // Create the integer literal value.
-  // FIXME: Handle other kinds of values.
   Expr *expr = nullptr;
   switch (value.getKind()) {
   case clang::APValue::AddrLabelDiff:
@@ -3461,6 +3424,66 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     break;
   }
   }
+
+  assert(expr);
+  return createConstant(name, dc, type, expr, convertKind, isStatic);
+}
+
+
+ValueDecl *
+ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+                                              Type type, StringRef value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic) {
+  auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
+  return createConstant(name, dc, type, expr, convertKind, isStatic);
+}
+
+
+ValueDecl *
+ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+                                              Type type, Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic) {
+  auto &context = SwiftContext;
+
+  auto var = new (context) VarDecl(isStatic, /*IsLet*/ false,
+                                   SourceLoc(), name, type, dc);
+
+  // Form the argument patterns.
+  SmallVector<Pattern *, 3> getterArgs;
+
+  // 'self'
+  if (dc->isTypeContext()) {
+    auto selfTy = dc->getDeclaredTypeInContext();
+    if (isStatic)
+      selfTy = MetatypeType::get(selfTy, context);
+    Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
+    anyP->setType(selfTy);
+    getterArgs.push_back(anyP);
+  }
+  
+  // empty tuple
+  getterArgs.push_back(TuplePattern::create(context, SourceLoc(), { },
+                                            SourceLoc()));
+  getterArgs.back()->setType(TupleType::getEmpty(context));
+
+  // Form the type of the getter.
+  auto getterType = type;
+  for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
+       it != itEnd; ++it) {
+    getterType = FunctionType::get((*it)->getType(), getterType);
+  }
+
+  // Create the getter function declaration.
+  auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
+                               SourceLoc(), Identifier(),
+                               SourceLoc(), nullptr, getterType, getterArgs,
+                               getterArgs, TypeLoc::withoutLoc(type), dc);
+  func->setStatic(isStatic);
+  func->setBodyResultType(type);
+
+  auto expr = valueExpr;
 
   // If we need a conversion, add one now.
   switch (convertKind) {
