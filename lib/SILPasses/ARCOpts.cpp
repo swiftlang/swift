@@ -303,7 +303,7 @@ static bool isInterestingInstruction(ValueKind Kind) {
 static void
 processBBTopDown(SILBasicBlock &BB,
                  llvm::MapVector<SILValue, ReferenceCountState> &BBState,
-                 llvm::DenseMap<SILInstruction *,
+                 llvm::MapVector<SILInstruction *,
                                 ReferenceCountState> &DecToIncStateMap,
                  bool &NestingDetected,
                  AliasAnalysis *AA) {
@@ -446,7 +446,7 @@ processBBTopDown(SILBasicBlock &BB,
 //===----------------------------------------------------------------------===//
 
 static bool
-performCodeMotion(llvm::DenseMap<SILInstruction *,
+performCodeMotion(llvm::MapVector<SILInstruction *,
                                  ReferenceCountState> &DecToIncStateMap) {
   llvm::SmallVector<SILInstruction *, 16> DeleteList;
 
@@ -517,7 +517,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   llvm::MapVector<SILValue, ReferenceCountState> BBState;
-  llvm::DenseMap<SILInstruction *, ReferenceCountState> DecToIncStateMap;
+  llvm::MapVector<SILInstruction *, ReferenceCountState> DecToIncStateMap;
   bool Changed = false;
 
   // For each basic block in F...
