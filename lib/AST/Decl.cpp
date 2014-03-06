@@ -1620,28 +1620,6 @@ SourceRange SubscriptDecl::getSourceRange() const {
   return { getSubscriptLoc(), ElementTy.getSourceRange().End };
 }
 
-DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
-  switch (components.size()) {
-  case 0:
-    SimpleOrCompound = Identifier();
-    return;
-      
-  case 1:
-    SimpleOrCompound = components.front();
-    return;
-      
-  default:
-    auto buf = C.Allocate(sizeof(CompoundDeclName)
-                            + components.size() * sizeof(Identifier),
-                          alignof(CompoundDeclName));
-    auto compoundName = new (buf) CompoundDeclName{components.size()};
-    std::uninitialized_copy(components.begin(), components.end(),
-                            compoundName->getComponents().begin());
-    SimpleOrCompound = compoundName;
-    return;
-  }
-}
-    
 static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
                                     bool isInitializingCtor,
                                     bool wantInterfaceType,

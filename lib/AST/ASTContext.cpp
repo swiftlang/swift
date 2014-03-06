@@ -179,6 +179,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
+  llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   std::vector<ArchetypeType *> OpenedExistentialArchetypes;
 
   /// \brief The permanent arena.
@@ -2044,4 +2045,45 @@ CanGenericSignature GenericSignature::getCanonical(
                               reqt.getSecondType().getCanonicalTypeOrNull()));
   }
   return CanGenericSignature(get(canonicalParams, canonicalRequirements));
+}
+
+void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
+                                         ArrayRef<Identifier> components) {
+  id.AddInteger(components.size());
+  for (auto c : components)
+    id.AddPointer(c.get());
+}
+
+DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
+  switch (components.size()) {
+  case 0:
+    SimpleOrCompound = Identifier();
+    return;
+      
+  case 1:
+    SimpleOrCompound = components.front();
+    return;
+      
+  default: {
+    llvm::FoldingSetNodeID id;
+    CompoundDeclName::Profile(id, components);
+    
+    void *insert = nullptr;
+    if (CompoundDeclName *compoundName
+          = C.Impl.CompoundNames.FindNodeOrInsertPos(id, insert)) {
+      SimpleOrCompound = compoundName;
+      return;
+    }
+    
+    auto buf = C.Allocate(sizeof(CompoundDeclName)
+                            + components.size() * sizeof(Identifier),
+                          alignof(CompoundDeclName));
+    auto compoundName = new (buf) CompoundDeclName(components.size());
+    std::uninitialized_copy(components.begin(), components.end(),
+                            compoundName->getComponents().begin());
+    SimpleOrCompound = compoundName;
+    C.Impl.CompoundNames.InsertNode(compoundName, insert);
+    return;
+  }
+  }
 }

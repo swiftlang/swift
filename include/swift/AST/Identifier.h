@@ -18,7 +18,10 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include <cstring>
 
@@ -177,5 +180,88 @@ namespace llvm {
   };
   
 } // end namespace llvm
+
+namespace swift {
+  
+/// A declaration name, which may comprise one or more identifier pieces.
+class DeclName {
+  friend class ASTContext;
+  
+  struct alignas(Identifier*) CompoundDeclName : llvm::FoldingSetNode {
+    size_t Size;
+    
+    explicit CompoundDeclName(size_t Size) : Size(Size) {}
+    
+    ArrayRef<Identifier> getComponents() const {
+      return {reinterpret_cast<const Identifier*>(this + 1), Size};
+    }
+    MutableArrayRef<Identifier> getComponents() {
+      return {reinterpret_cast<Identifier*>(this + 1), Size};
+    }
+      
+    /// Uniquing for the ASTContext.
+    static void Profile(llvm::FoldingSetNodeID &id,
+                        ArrayRef<Identifier> components);
+    
+    void Profile(llvm::FoldingSetNodeID &id) {
+      Profile(id, getComponents());
+    }
+  };
+  
+  // Either a single identifier piece stored inline, or a reference to a
+  // run-length-encoded array of identifier pieces owned by the ASTContext.
+  llvm::PointerUnion<Identifier, CompoundDeclName*> SimpleOrCompound;
+  
+public:
+  /// Build a null name.
+  DeclName() : SimpleOrCompound(Identifier()) {}
+  
+  /// Build a simple value name with one component.
+  /*implicit*/ DeclName(Identifier simpleName)
+    : SimpleOrCompound(simpleName) {}
+  
+  /// Build a compound value name by copying a list of components.
+  DeclName(ASTContext &C, ArrayRef<Identifier> components);
+  
+  /// Get the first name component. This is the name that is looked up in
+  /// "C-style" property accesses, such as 'foo.bar' or 'foo.bar(1, 2)'.
+  ///
+  /// TODO: Eventually compound names should not return a name here.
+  Identifier getSimpleName() const {
+    if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return compound->getComponents()[0];
+    
+    return SimpleOrCompound.get<Identifier>();
+  }
+  
+  /// Get the components array.
+  ArrayRef<Identifier> getComponents() const {
+    if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return compound->getComponents();
+    
+    auto identifier = SimpleOrCompound.get<Identifier>();
+    if (identifier.get())
+      return identifier;
+    return {};
+  }
+  
+  explicit operator bool() const {
+    if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return true;
+    return SimpleOrCompound.get<Identifier>().get();
+  }
+  
+  /// True if this is a simple one-component name.
+  bool isSimpleName() const {
+    return !SimpleOrCompound.dyn_cast<CompoundDeclName*>();
+  }
+  
+  /// True if this name is an operator.
+  bool isOperator() const {
+    return isSimpleName() && getSimpleName().isOperator();
+  }
+};
+  
+} // end namespace swift
 
 #endif
