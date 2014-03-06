@@ -66,12 +66,16 @@ class Token {
   ///
   /// Hopefully 64 Kib is enough.
   unsigned CommentLength : 16;
-
+  
+  /// \brief Whether this token is an escaped `identifier` token.
+  unsigned EscapedIdentifier : 1;
+  
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
   
 public:
-  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0) {}
+  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
+            EscapedIdentifier(false) {}
   
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -102,9 +106,19 @@ public:
 
   /// \brief Set whether this token occurred at the start of a line.
   void setAtStartOfLine(bool value) { AtStartOfLine = value; }
-
+  
+  /// \brief True if this token is an escaped identifier token.
+  bool isEscapedIdentifier() const { return EscapedIdentifier; }
+  /// \brief Set whether this token is an escaped identifier token.
+  void setEscapedIdentifier(bool value) {
+    assert(!value || Kind == tok::identifier
+           && "only identifiers can be escaped identifiers");
+    EscapedIdentifier = value;
+  }
+  
   bool isContextualKeyword(StringRef ContextKW) const {
-    return is(tok::identifier) && Text == ContextKW;
+    return is(tok::identifier) && !isEscapedIdentifier()
+      && Text == ContextKW;
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {

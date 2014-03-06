@@ -1232,6 +1232,7 @@ void Lexer::lexEscapedIdentifier() {
   }
   assert(*CurPtr == '`');
   formToken(tok::identifier, TokStart);
+  NextToken.setEscapedIdentifier(true);
   ++CurPtr;
   return;
 }
