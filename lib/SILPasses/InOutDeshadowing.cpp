@@ -287,7 +287,7 @@ failed:
   return false;
 }
 
-
+namespace {
 class InOutDeshadowing : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -315,6 +315,8 @@ class InOutDeshadowing : public SILFunctionTransform {
 
   StringRef getName() override { return "InOut Deshadowing"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createInOutDeshadowing() {
   return new InOutDeshadowing();

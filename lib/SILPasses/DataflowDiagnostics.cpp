@@ -148,6 +148,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
+namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   virtual ~EmitDFDiagnostics() {}
 
@@ -164,6 +165,8 @@ class EmitDFDiagnostics : public SILFunctionTransform {
       }
   }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createEmitDFDiagnostics() {
   return new EmitDFDiagnostics();

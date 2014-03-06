@@ -52,6 +52,7 @@ void swift::performSILCleanup(SILModule *M) {
     cleanFunction(Fn);
 }
 
+namespace {
 class SILCleanup : public swift::SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -62,6 +63,8 @@ class SILCleanup : public swift::SILFunctionTransform {
 
   StringRef getName() override { return "SIL Cleanup"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createSILCleanup() {
   return new SILCleanup();

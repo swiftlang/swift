@@ -723,10 +723,11 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
   return nullptr;
 }
 
+namespace {
 class SILCombine : public SILFunctionTransform {
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     SILCombiner Combiner;
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
@@ -735,10 +736,13 @@ class SILCombine : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Combine"; }
 };
+} // end anonymous namespace
 
+
+namespace {
 class SILDeadFuncElimination : public SILModuleTransform {
 
-  void run() {
+  void run() override {
     CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
     SILModule *M = getModule();
     bool Changed = false;
@@ -767,6 +771,7 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
   StringRef getName() override { return "Dead Function Elimination"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createSILCombine() {
   return new SILCombine();

@@ -252,6 +252,7 @@ static bool processFunction(SILFunction &Fn) {
   return Changed;
 }
 
+namespace {
 class SILLowerAggregate : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -266,6 +267,8 @@ class SILLowerAggregate : public SILFunctionTransform {
 
   StringRef getName() override { return "Lower Aggregate Instructions"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createLowerAggregate() {
   return new SILLowerAggregate();

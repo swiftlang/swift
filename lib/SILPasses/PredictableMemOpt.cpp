@@ -969,6 +969,7 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
   return Changed;
 }
 
+namespace {
 class PredictableMemoryOptimizations : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -979,6 +980,8 @@ class PredictableMemoryOptimizations : public SILFunctionTransform {
 
   StringRef getName() override { return "Predictable Memory Opts"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createPredictableMemoryOptimizations() {
   return new PredictableMemoryOptimizations();

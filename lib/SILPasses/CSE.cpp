@@ -383,6 +383,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   return Changed;
 }
 
+namespace {
 class SILCSE : public SILFunctionTransform {
   void run() {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
@@ -397,6 +398,7 @@ class SILCSE : public SILFunctionTransform {
 
   StringRef getName() override { return "CSE"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createCSE() {
   return new SILCSE();

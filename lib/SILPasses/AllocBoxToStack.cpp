@@ -328,6 +328,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
   return true;
 }
 
+namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
@@ -357,6 +358,7 @@ class AllocBoxToStack : public SILFunctionTransform {
 
   StringRef getName() override { return "AllocBox-To-Stack Optimization"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createAllocBoxToStack() {
   return new AllocBoxToStack();

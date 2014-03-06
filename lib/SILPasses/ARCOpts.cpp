@@ -549,6 +549,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   return Changed;
 }
 
+namespace {
 class ARCOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
@@ -559,6 +560,8 @@ class ARCOpts : public SILFunctionTransform {
 
   StringRef getName() override { return "ARC Optimization"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createARCOpts() {
   return new ARCOpts();

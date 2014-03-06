@@ -67,17 +67,19 @@ public:
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
+namespace {
 class SILInstCount : public SILFunctionTransform {
-
   InstCountVisitor V;
 
   StringRef getName() override { return "SIL Inst Count"; }
 
   /// The entry point to the transformation.
-  void run() {
+  void run() override {
     V.visitSILFunction(getFunction());
   }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createSILInstCount() {
   return new SILInstCount();

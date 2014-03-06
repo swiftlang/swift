@@ -1575,10 +1575,9 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
 }
 
 
-
-/// performSILDefiniteInitialization - Perform definitive initialization
-/// analysis and promote alloc_box uses into SSA registers for later SSA-based
-/// dataflow passes.
+namespace {
+/// Perform definitive initialization analysis and promote alloc_box uses into
+/// SSA registers for later SSA-based dataflow passes.
 class DefiniteInitialization : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -1596,6 +1595,7 @@ class DefiniteInitialization : public SILFunctionTransform {
 
   StringRef getName() override { return "Definite Initialization"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createDefiniteInitialization() {
   return new DefiniteInitialization();

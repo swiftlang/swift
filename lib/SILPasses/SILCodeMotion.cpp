@@ -172,6 +172,7 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
   return Changed;
 }
 
+namespace {
 class SILCodeMotion : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -192,6 +193,7 @@ class SILCodeMotion : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Code Motion"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createCodeMotion() {
   return new SILCodeMotion();

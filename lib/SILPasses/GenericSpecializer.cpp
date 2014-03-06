@@ -450,8 +450,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   return Changed;
 }
 
+namespace {
 class SILGenericSpecializerTransform : public SILModuleTransform {
-
 public:
   SILGenericSpecializerTransform() {}
 
@@ -474,6 +474,8 @@ public:
 
   StringRef getName() override { return "Generic Specialization"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createGenericSpecializer() {
   return new SILGenericSpecializerTransform();

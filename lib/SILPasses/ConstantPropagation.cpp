@@ -810,6 +810,7 @@ static bool CCPFunctionBody(SILFunction &F) {
   return Changed;
 }
 
+namespace {
 class ConstantPropagation : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
@@ -819,6 +820,7 @@ class ConstantPropagation : public SILFunctionTransform {
 
   StringRef getName() override { return "Constant Propagation"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createConstantPropagation() {
   return new ConstantPropagation();

@@ -726,11 +726,12 @@ bool MemoryToRegisters::run() {
   return Changed;
 }
 
+namespace {
 class SILMem2Reg : public SILFunctionTransform {
 
-  void run() {
+  void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() << " **\n");
+    DEBUG(llvm::dbgs() << "** Mem2Reg on function: " << F->getName() <<" **\n");
 
     DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
 
@@ -742,6 +743,7 @@ class SILMem2Reg : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Mem2Reg"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createMem2Reg() {
   return new SILMem2Reg();

@@ -137,6 +137,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   return Changed;
 }
 
+namespace {
 class SILPerformanceInlinerPass : public SILModuleTransform {
 public:
   SILPerformanceInlinerPass() {}
@@ -178,6 +179,8 @@ public:
 
   StringRef getName() override { return "Performance Inlining"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createPerfInliner() {
   return new SILPerformanceInlinerPass();

@@ -754,6 +754,7 @@ processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
     processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
 }
 
+namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   virtual void run() {
@@ -770,6 +771,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
   StringRef getName() override { return "Capture Promotion"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createCapturePromotion() {
   return new CapturePromotionPass();

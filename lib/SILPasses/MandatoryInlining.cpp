@@ -431,6 +431,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
+namespace {
 class MandatoryInlining : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() {
@@ -479,6 +480,7 @@ class MandatoryInlining : public SILModuleTransform {
 
   StringRef getName() override { return "Mandatory Inlining"; }
 };
+} // end anonymous namespace
 
 SILTransform *swift::createMandatoryInlining() {
   return new MandatoryInlining();

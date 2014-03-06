@@ -33,6 +33,7 @@ static void stripFunction(SILFunction *F) {
     }
 }
 
+namespace {
 class StripDebugInfo : public swift::SILFunctionTransform {
   virtual ~StripDebugInfo() {}
 
@@ -44,6 +45,8 @@ class StripDebugInfo : public swift::SILFunctionTransform {
 
   StringRef getName() override { return "Strip Debug Info"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createStripDebug() {
   return new StripDebugInfo();

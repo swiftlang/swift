@@ -269,6 +269,7 @@ hasUnremoveableUsers(SILInstruction *AllocRef,
   return false;
 }
 
+namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
   llvm::SmallVector<AllocationInst*, 16> Allocations;
@@ -307,6 +308,8 @@ class DeadObjectElimination : public SILFunctionTransform {
 
   StringRef getName() override { return "Dead Object Elimination"; }
 };
+} // end anonymous namespace
+
 
 //===----------------------------------------------------------------------===//
 //                            Function Processing

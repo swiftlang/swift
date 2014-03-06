@@ -294,6 +294,7 @@ static bool runSROAOnFunction(SILFunction &Fn) {
   return Changed;
 }
 
+namespace {
 class SILSROA : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -308,6 +309,8 @@ class SILSROA : public SILFunctionTransform {
 
   StringRef getName() override { return "SROA"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createSROA() {
   return new SILSROA();

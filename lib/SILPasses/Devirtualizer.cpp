@@ -1366,6 +1366,7 @@ bool SILDevirtualizer::run() {
 // that we never query a dead function and can't reuse it's memory.
 void SILSpecializedArgsAnalysis::invalidate(SILAnalysis::InvalidationKind K) {}
 
+namespace {
 class SILDevirtualizationPass : public SILModuleTransform {
 public:
   virtual ~SILDevirtualizationPass() {}
@@ -1384,6 +1385,8 @@ public:
 
   StringRef getName() override { return "Devirtualization"; }
 };
+} // end anonymous namespace
+
 
 SILTransform *swift::createDevirtualization() {
   return new SILDevirtualizationPass();

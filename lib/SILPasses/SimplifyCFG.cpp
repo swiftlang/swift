@@ -537,6 +537,7 @@ bool SimplifyCFG::run() {
   return Changed;
 }
 
+namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -547,6 +548,7 @@ class SimplifyCFGPass : public SILFunctionTransform {
 
   StringRef getName() override { return "Simplify CFG"; }
 };
+} // end anonymous namespace
 
 
 SILTransform *swift::createSimplifyCFG() {
