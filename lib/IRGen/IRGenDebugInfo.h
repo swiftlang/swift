@@ -20,8 +20,8 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/IR/ValueHandle.h"
-#include "llvm/DebugInfo.h"
-#include "llvm/DIBuilder.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/Allocator.h"
 
 #include "swift/SIL/SILLocation.h"

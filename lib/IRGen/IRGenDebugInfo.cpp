@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements IR debug info generatio for Swift.
+//  This file implements IR debug info generation for Swift.
 //
 //===----------------------------------------------------------------------===//
 
@@ -38,7 +38,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Config/config.h"
-#include "llvm/DebugInfo.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
