@@ -24,25 +24,26 @@
 
 using namespace swift;
 
-SILWitnessTable *SILWitnessTable::create(SILModule &M,
-                                     NormalProtocolConformance *Conformance,
-                                     ArrayRef<SILWitnessTable::Entry> entries) {
-  // FIXME: Is it valid to get an empty array ?
-  size_t AdditionalEntriesSize =
-    entries.empty() ? 0 : sizeof(Entry) * (entries.size()-1);
-  void *buf = M.allocate(sizeof(SILWitnessTable) + AdditionalEntriesSize,
+SILWitnessTable *
+SILWitnessTable::
+create(SILModule &M, NormalProtocolConformance *Conformance,
+       ArrayRef<SILWitnessTable::Entry> entries) {
+  void *buf = M.allocate(sizeof(SILWitnessTable),
                          alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(Conformance, entries);
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Conformance, entries);
   M.witnessTables.push_back(wt);
   return wt;
 }
 
-SILWitnessTable::SILWitnessTable(NormalProtocolConformance *Conformance,
+SILWitnessTable::SILWitnessTable(SILModule &M,
+                                 NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
-  : Conformance(Conformance), NumEntries(entries.size())
+  : Conformance(Conformance), Entries()
 {
-  memcpy(Entries, entries.begin(), sizeof(Entry) * NumEntries);
-  
+  void *buf = M.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
+  memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
+  Entries = ArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
+
   // Bump the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {
     switch (entry.getKind()) {

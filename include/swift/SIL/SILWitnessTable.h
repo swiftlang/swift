@@ -141,13 +141,11 @@ public:
   
 private:
   NormalProtocolConformance *Conformance;
-  
-  unsigned NumEntries;
-  
-  // Tail-allocated.
-  Entry Entries[1];
-  
-  SILWitnessTable(NormalProtocolConformance *Conformance,
+
+  ArrayRef<Entry> Entries;
+
+  SILWitnessTable(SILModule &M,
+                  NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
 public:
@@ -162,7 +160,7 @@ public:
   NormalProtocolConformance *getConformance() const { return Conformance; }
   
   /// Return all of the witness table entries.
-  ArrayRef<Entry> getEntries() const { return {Entries, NumEntries}; }
+  ArrayRef<Entry> getEntries() const { return Entries; }
   
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
