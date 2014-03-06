@@ -729,3 +729,22 @@ bb0(%0 : $C3):
   %2 = upcast %1 : $C2 to $C1
   return %2 : $C1
 }
+
+
+struct XS {
+  var m: Int
+  init(x: XS)
+}
+
+//CHECK-LABEL: strc_from_extr
+//CHECK-NOT: struct_extract
+//CHECK-NOT: struct
+//CHECK: return
+sil @strc_from_extr : $@thin (XS, @thin XS.Type) -> XS {
+bb0(%0 : $XS, %1 : $@thin XS.Type):
+  %2 = struct_extract %0 : $XS, #m
+  %3 = struct $XS (%2 : $Int)
+  return %3 : $XS
+}
+
+

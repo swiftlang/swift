@@ -33,9 +33,44 @@ namespace {
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
+    SILValue visitStructInst(StructInst *SI);
   };
 } // end anonymous namespace
 
+SILValue InstSimplifier::visitStructInst(StructInst *SI) {
+  // Ignore empty structs.
+  if (SI->getNumOperands() < 1)
+    return SILValue();
+
+  // Optimize structs that are generated from struct_extract instructions
+  // from structs of the same type.
+  if (auto *Ex0 = dyn_cast<StructExtractInst>(SI->getOperand(0))) {
+    // Check that the constructed struct and the extracted struct are of the
+    // same type.
+    if (SI->getType() != Ex0->getOperand().getType())
+      return SILValue();
+
+    // Check that all of the operands are extracts of the correct kind.
+    for (unsigned i = 0, e = SI->getNumOperands(); i < e; i++) {
+      auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(0));
+      // Must be an extract.
+      if (!Ex)
+        return SILValue();
+
+      // Extract from the same struct as the first extract_inst.
+      if (Ex0->getOperand() != Ex->getOperand())
+        return SILValue();
+
+      // And the order of the field must be identical to the construction order.
+      if (Ex->getFieldNo() != i)
+        return SILValue();
+    }
+
+    return Ex0->getOperand();
+  }
+  
+  return SILValue();
+}
 
 SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
