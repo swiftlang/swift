@@ -29,7 +29,7 @@ void swift::printAsQuotedString(llvm::raw_ostream &out, llvm::StringRef text) {
     default:
       auto c = (unsigned char)C;
       // Other ASCII control characters should get escaped.
-      if (c < 0x20) {
+      if (c < 0x20 || c == 0x7F) {
         static const char hexdigit[] = {
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
           'A', 'B', 'C', 'D', 'E', 'F'
