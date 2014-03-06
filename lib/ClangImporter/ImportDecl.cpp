@@ -1405,6 +1405,7 @@ namespace {
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
+                                          decl->isNoReturn(),
                                           argPatterns, bodyPatterns);
       if (!type)
         return nullptr;
@@ -1592,7 +1593,7 @@ namespace {
       auto type = Impl.importFunctionType(decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
-                                          decl->isVariadic(),
+                                          decl->isVariadic(), /*noreturn*/false,
                                           argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
@@ -1904,6 +1905,7 @@ namespace {
                                           { objcMethod->param_begin(),
                                             objcMethod->param_size() },
                                           objcMethod->isVariadic(),
+                                          /*noreturn*/false,
                                           argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,

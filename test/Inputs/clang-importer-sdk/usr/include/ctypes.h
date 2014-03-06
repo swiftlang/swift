@@ -157,3 +157,8 @@ STDLIB_TYPEDEF(unsigned int, UInt);
 
 // Types from CoreFoundation.
 STDLIB_TYPEDEF(signed long, CFIndex);
+
+
+void noreturnFunction() __attribute__((noreturn));
+void couldReturnFunction() __attribute__((noreturn));
+

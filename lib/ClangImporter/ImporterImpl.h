@@ -575,6 +575,7 @@ public:
   /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
+  /// \param isNoReturn Whether the function is noreturn.
   /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
   /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
@@ -587,7 +588,7 @@ public:
   /// imported.
   Type importFunctionType(clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
-                          bool isVariadic,
+                          bool isVariadic, bool isNoReturn,
                           SmallVectorImpl<Pattern*> &argPatterns,
                           SmallVectorImpl<Pattern*> &bodyPatterns,
                           bool *pHasSelectorStyleSignature = nullptr,

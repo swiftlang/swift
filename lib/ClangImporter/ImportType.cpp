@@ -576,7 +576,7 @@ static StringRef getFirstInitParameterName(StringRef piece,
 Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
-       bool isVariadic,
+       bool isVariadic, bool isNoReturn,
        SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns,
        bool *pHasSelectorStyleSignature,
@@ -740,9 +740,13 @@ Type ClangImporter::Implementation::importFunctionType(
                                              false, SourceLoc(),
                                              /*Implicit=*/true));
   argPatterns.back()->setType(argParamsTy);
-
+  
+  
+  FunctionType::ExtInfo extInfo;
+  extInfo = extInfo.withIsNoReturn(isNoReturn);
+  
   // Form the function type.
-  return FunctionType::get(argParamsTy, swiftResultTy);
+  return FunctionType::get(argParamsTy, swiftResultTy, extInfo);
 }
 
 Module *ClangImporter::Implementation::getStdlibModule() {
