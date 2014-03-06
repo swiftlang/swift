@@ -104,5 +104,11 @@ MAP_STDLIB_TYPE("NSUInteger", UnsignedWord, 0, "Int", ObjC1, false, DoNothing)
 // Note that we're preserving the typealias for CFIndex.
 MAP_STDLIB_TYPE("CFIndex", SignedWord, 0, "Int", All, false, DefineAndUse)
 
+// Foundation types.
+// FIXME: NSStringEncoding currently does not use NS_ENUM 
+// and has values that are out of range of 32-bit Int.
+MAP_STDLIB_TYPE("NSStringEncoding", UnsignedWord, 0, "CUnsignedInt", ObjC1, false, 
+                DefineAndUse)
+
 #undef MAP_STDLIB_TYPE
 #undef MAP_TYPE
