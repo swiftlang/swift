@@ -233,7 +233,8 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
     auto conforms = conformingModule->lookupConformance(specializedType, proto,
                                                         resolver);
     assert((conforms.getInt() == ConformanceKind::Conforms ||
-            specializedType->is<TypeVariableType>()) &&
+            specializedType->is<TypeVariableType>() ||
+            specializedType->is<DependentMemberType>()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms.getPointer());
   }

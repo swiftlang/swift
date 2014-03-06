@@ -508,10 +508,12 @@ namespace {
           return known->second;
 
         // Replace archetypes in the base type.
-        auto base = (*this)(dependentMember->getBase());
-        auto result = getTypeVariable(base, dependentMember->getAssocType());
-        replacements[dependentMember->getCanonicalType()] = result;
-        return result;
+        if (auto base =
+            ((*this)(dependentMember->getBase()))->getAs<TypeVariableType>()) {
+          auto result = getTypeVariable(base, dependentMember->getAssocType());
+          replacements[dependentMember->getCanonicalType()] = result;
+          return result;
+        }
       }
 
       // Create type variables for all of the parameters in a generic function
