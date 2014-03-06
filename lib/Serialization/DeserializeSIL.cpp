@@ -372,6 +372,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
+    MF->error();
     return nullptr;
   }
 
@@ -387,11 +388,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
+    MF->error();
     return nullptr;
   }
   auto ty = getSILType(MF->getType(funcTyID), SILValueCategory::Object);
   if (!ty.is<SILFunctionType>()) {
     DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
+    MF->error();
     return nullptr;
   }
 
@@ -399,6 +402,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                        << " for SILFunction\n");
+    MF->error();
     return nullptr;
   }
 
@@ -414,6 +418,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (fn) {
     if (fn->getLoweredType() != ty) {
       DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      MF->error();
       return nullptr;
     }
 
@@ -493,6 +498,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       // Handle a SILInstruction record.
       if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
+        MF->error();
         return fn;
       }
     }

@@ -246,7 +246,9 @@ private:
   /// Constructs an new module and validates it.
   ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input, bool isFramework);
 
-  /// Convenience function for module loading.
+public:
+  /// Change the status of the current module. Default argument marks the module
+  /// as being malformed.
   void error(ModuleStatus issue = ModuleStatus::Malformed) {
     assert(issue != ModuleStatus::Valid);
     assert((!FileContext || issue != ModuleStatus::Malformed) &&
@@ -254,7 +256,6 @@ private:
     setStatus(issue);
   }
 
-public:
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
     return FileContext->getParentModule()->Ctx;
