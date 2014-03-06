@@ -495,6 +495,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, scratch);
     else {
+      // If CurrentBB is empty, just return fn. The code in readSILInstruction
+      // assumes that such a situation means that fn is a declaration. Thus it
+      // is using return false to mean two different things, error a failure
+      // occured and this is a declaration. Work around that for now.
+      if (!CurrentBB)
+        return fn;
+
       // Handle a SILInstruction record.
       if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
