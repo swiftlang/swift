@@ -2733,11 +2733,6 @@ namespace {
 
       for (auto curObjCClass = objcClass; curObjCClass;
            curObjCClass = curObjCClass->getSuperClass()) {
-        // When we hit a class that does declare it's designated
-        // initializers, we're done.
-        if (curObjCClass->hasDesignatedInitializers())
-          break;
-
         inheritConstructors(curObjCClass);
         for (auto cat = curObjCClass->visible_categories_begin(),
                   catEnd = curObjCClass->visible_categories_end();
@@ -2745,6 +2740,11 @@ namespace {
              ++cat) {
             inheritConstructors(*cat);
         }
+        
+        // When we hit a class that does declare it's designated
+        // initializers, we're done.
+        if (curObjCClass->hasDesignatedInitializers())
+          break;
       }
     }
 
