@@ -65,9 +65,12 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
     // Ok, this apply *MAY* decrement ref counts. Attempt to prove that it
     // cannot decrement Target using alias analysis and knowledge about our
     // calling convention.
-    for (auto Op : AI->getArgumentsWithoutIndirectResult())
-      if (!AA->isNoAlias(Op, Ptr))
-        return true;
+    for (auto Op : AI->getArgumentsWithoutIndirectResult()) {
+      for (int i = 0, e = Ptr.getDef()->getNumTypes(); i < e; i++) {
+        if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
+          return true;
+      }
+    }
 
     return false;
   }
@@ -122,17 +125,25 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
   if (canInstUseRefCountValues(User))
     return false;
 
-  // If Inst is a store and we can prove that it can not write target, return
-  // true.
-  if (isa<StoreInst>(User) &&
-      !AA->mayWriteToMemory(User, Ptr))
+  // If the user is a load or a store and we can prove that it does not access
+  // the object then return true.
+  // Notice that we need to check all of the values of the object.
+  if (isa<StoreInst>(User)) {
+    for (int i = 0, e = Ptr.getDef()->getNumTypes(); i < e; i++) {
+      if (AA->mayWriteToMemory(User, SILValue(Ptr.getDef(), i)))
+        return true;
+    }
     return false;
+  }
 
-  // If Inst is a store and we can prove that it can not write target, return
-  // true.
-  if (isa<LoadInst>(User) &&
-      !AA->mayReadFromMemory(User, Ptr))
+  if (isa<LoadInst>(User) ) {
+    for (int i = 0, e = Ptr.getDef()->getNumTypes(); i < e; i++) {
+      if (AA->mayReadFromMemory(User, SILValue(Ptr.getDef(), i)))
+        return true;
+    }
     return false;
+  }
+
 
   // Otherwise, assume that Inst can use Target.
   return true;

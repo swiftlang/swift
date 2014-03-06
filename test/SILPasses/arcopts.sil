@@ -259,13 +259,17 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Builtin.Int32):
   return %4: $()
 }
 
+// We can't remove the retain-release pair because the apply may be
+// decrementing the refcount on our object.
 // CHECK-LABEL: @simple_alias_load_use_test : $@thin (@inout Builtin.Int32) -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_box
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
+// CHECK-NEXT: strong_retain
 // CHECK-NEXT: apply
 // CHECK-NEXT: load
+// CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
