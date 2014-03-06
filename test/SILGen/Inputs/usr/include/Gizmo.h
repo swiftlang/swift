@@ -49,6 +49,8 @@ typedef long NSInteger;
 - (void) frob;
 + (void) runce;
 - (void) funge;
+@property void (^block)(void);
+@property NSInteger count;
 @end
 
 @interface NSString : NSObject
