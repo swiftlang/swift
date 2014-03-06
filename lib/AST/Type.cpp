@@ -1507,9 +1507,10 @@ static void getReplacementTypes(const GenericParamList &genericParams,
     // FIXME: Only substitute primary archetypes.
     if (!sub.Archetype->isPrimary())
       continue;
-    
-    assert((pi++)->getAsTypeParam()->getArchetype() == sub.Archetype
-           && "substitution doesn't match archetype");
+
+#ifndef NDEBUG
+    ++pi;
+#endif
     replacements.push_back(sub.Replacement);
   }
   
