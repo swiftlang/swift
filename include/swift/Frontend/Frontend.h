@@ -213,8 +213,9 @@ public:
     FrontendOpts.InputFilenames.push_back(Filename);
   }
 
-  void addInputBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
-    FrontendOpts.InputBuffers.push_back(Buffer.release());
+  /// Does not take ownership of \p Buf.
+  void addInputBuffer(llvm::MemoryBuffer *Buf) {
+    FrontendOpts.InputBuffers.push_back(Buf);
   }
 
   void clearInputs() {

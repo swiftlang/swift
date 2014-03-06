@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
+  Invocation.addInputBuffer(InputFile.get());
   bool IsModule = false;
   if (SerializedModuleLoader::isSerializedAST(InputFile->getBuffer())) {
     IsModule = true;
@@ -101,7 +102,6 @@ int main(int argc, char **argv) {
     Invocation.setModuleName("main");
     Invocation.setInputKind(SourceFileKind::SIL);
   }
-  Invocation.addInputBuffer(std::move(InputFile));
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;

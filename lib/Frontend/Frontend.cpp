@@ -147,12 +147,11 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   // Add the memory buffers first, these will be associated with a filename
   // and they can replace the contents of an input filename.
   for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
+    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     auto Buf = Invocation.getInputBuffers()[i];
     unsigned BufferID = SourceMgr.addNewSourceBuffer(
       llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
                                            Buf->getBufferIdentifier()));
-
-    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
     BufferIDs.push_back(BufferID);
 
     if (SILMode)
