@@ -206,10 +206,8 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
     // Validate that any forward-referenced elements have the right type, and
     // RAUW them.
     for (unsigned i = 0, e = Entries.size(); i != e; ++i) {
-      if (!Entries[i]) continue;
-
-      assert(Entries[i]->getType(0) == Value->getType(i) &&
-             "Value Type mismatch?");
+      if (!Entries[i])
+        continue;
       Entries[i].replaceAllUsesWith(SILValue(Value, i));
     }
   }
