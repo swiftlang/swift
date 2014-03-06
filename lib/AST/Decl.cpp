@@ -1539,11 +1539,15 @@ static bool isObjCObjectOrBridgedType(Type type) {
     return true;
 
   // [objc] protocols
-  if (auto protoTy = type->getAs<ProtocolType>()) {
-    auto proto = protoTy->getDecl();
-    return proto->requiresClass() && proto->isObjC();
+  SmallVector<ProtocolDecl *, 2> protocols;
+  if (type->isExistentialType(protocols)) {
+    for (auto proto : protocols) {
+      if (!proto->requiresClass() || !proto->isObjC())
+        return false;
+    }
+    return true;
   }
-
+  
   return false;
 }
 
