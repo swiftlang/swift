@@ -23,8 +23,13 @@
 
 using namespace swift;
 
-static bool parseBareASTs(SerializedModuleLoader *SML, StringRef buf,
-                          SmallVectorImpl<std::string> &foundModules) {
+bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
+                            SmallVectorImpl<std::string> &foundModules) {
+  if (!SerializedModuleLoader::isSerializedAST(buf))
+    return false;
+
+  // An AST section consists of one or more AST modules, optionally with
+  // headers. Iterate over all AST modules.
   while (!buf.empty()) {
     auto info = SerializedModuleLoader::validateSerializedAST(buf);
 
@@ -60,81 +65,4 @@ static bool parseBareASTs(SerializedModuleLoader *SML, StringRef buf,
   }
 
   return true;
-}
-
-static bool parseASTsWithHeaders(SerializedModuleLoader *SML, StringRef buf,
-                                 SmallVectorImpl<std::string> &foundModules) {
-  struct apple_ast_hdr {
-    uint32_t magic;
-    uint32_t version;
-    uint32_t language;
-    uint32_t flags;
-    uint64_t bitstream_ofs;
-    uint64_t bitstream_size;
-    uint32_t name_len;
-    char name[1]; // There's at least a NUL there.
-  };
-
-  while (buf.size() > sizeof(struct apple_ast_hdr)) {
-    auto h = reinterpret_cast<const struct apple_ast_hdr *>(buf.data());
-
-    // Check for fatal errors first.
-    if (h->magic != 0x41535473) {
-      llvm::dbgs() << "Magic number not found.\n";
-      return false;
-    }
-
-    if (h->version != 1) {
-      llvm::dbgs() << "Unsupported __ast section version.\n";
-      return false;
-    }
-
-    if (h->language == dwarf::DW_LANG_Swift) {
-      // Get the access path.
-      if (sizeof(struct apple_ast_hdr)+h->name_len > buf.size()) {
-        llvm::dbgs() << "Impossible access path length. Section corrupted?\n";
-        return false;
-      }
-      assert(h->name_len < (2 << 10) && "path failed sanity check");
-      llvm::StringRef AccessPath(h->name, h->name_len);
-
-      if (h->bitstream_ofs + h->bitstream_size > buf.size())
-        return false;
-
-      // loadModule() wants to take ownership of the input memory
-      // buffer, but we don't let it own the memory, since it's just a
-      // window into the buffer.
-      auto mem = buf.substr(h->bitstream_ofs, h->bitstream_size);
-      std::unique_ptr<llvm::MemoryBuffer> bitstream(
-         llvm::MemoryBuffer::getMemBuffer(mem, AccessPath, false));
-
-      // Register the memory buffer.
-      SML->registerMemoryBuffer(AccessPath, std::move(bitstream));
-      foundModules.push_back(AccessPath);
-    }
-
-    uint64_t skip =
-      llvm::RoundUpToAlignment(h->bitstream_ofs + h->bitstream_size, 32);
-
-    if (skip > buf.size()) {
-      llvm::dbgs() << "AST section too small.\n";
-      return false;
-    }
-
-    buf = buf.substr(skip);
-  }
-
-  return true;
-}
-
-bool swift::parseASTSection(SerializedModuleLoader *SML, StringRef buf,
-                            SmallVectorImpl<std::string> &foundModules) {
-
-  // An AST section consists of one or more AST modules, optionally with
-  // headers. Iterate over all AST modules.
-  // FIXME: Drop header support once we've switched over entirely to bare data.
-  if (SerializedModuleLoader::isSerializedAST(buf))
-    return parseBareASTs(SML, buf, foundModules);
-  else
-    return parseASTsWithHeaders(SML, buf, foundModules);
 }

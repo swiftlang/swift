@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SwiftTargetMachine.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -283,17 +282,8 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   ? llvm::TargetMachine::CGFT_AssemblyFile
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
-    bool fail;
-    if (Opts.DebugInfo && Opts.LegacyDebugInfo) {
-      // Use our own wrapper for TargetMachine which schedules a
-      // SwiftASTStreamerPass to be run after the code generation.
-      swift::irgen::TargetMachine
-        PatchedTargetMachine(TargetMachine, M, IGM.DebugInfo);
-      fail = PatchedTargetMachine.
-        addPassesToEmitFile(EmitPasses, FormattedOS, FileType, !Opts.Verify);
-    } else
-      fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
-                                                FileType, !Opts.Verify);
+    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
+                                                   FileType, !Opts.Verify);
     if (fail) {
       M->Ctx.Diags.diagnose(SourceLoc(), diag::error_codegen_init_fail);
       return nullptr;
