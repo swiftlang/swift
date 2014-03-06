@@ -33,9 +33,7 @@ class OutputFileMap {
 private:
   llvm::StringMap<TypeToPathMap> InputToOutputsMap;
 
-  /// Create a new OutputFileMap with the contents of \p Buffer.
-  /// \note This constructor takes ownership of \p Buffer.
-  OutputFileMap() {};
+  OutputFileMap() {}
 
 public:
   ~OutputFileMap() = default;
