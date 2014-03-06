@@ -45,7 +45,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
     return SILValue();
 
   // Optimize structs that are generated from struct_extract instructions
-  // from structs of the same type.
+  // from the same struct.
   if (auto *Ex0 = dyn_cast<StructExtractInst>(SI->getOperand(0))) {
     // Check that the constructed struct and the extracted struct are of the
     // same type.
