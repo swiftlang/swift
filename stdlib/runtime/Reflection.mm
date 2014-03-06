@@ -108,8 +108,20 @@ struct StringMirrorTuple {
   Mirror second;
 };
 struct OptionalQuickLookObject {
-  QuickLookObject value;
-  bool isNone;
+  union {
+    struct {
+      union {
+        String Text;
+        Any Image;
+      };
+      enum class Tag : bool {
+        Text,
+        Image,
+      } Kind;
+      bool isNone;
+    } optional;
+    QuickLookObject payload;
+  };
 };
   
 /// We can't return String accurately from C on some platforms, so use a Swift
@@ -225,9 +237,8 @@ StringReturn Opaque_getString(MagicMirrorData *self, const Metadata *Self) {
 OptionalQuickLookObject Opaque_getIDERepresentation(MagicMirrorData *self,
                                                     const Metadata *Self) {
   OptionalQuickLookObject result;
-  memset(&result.value,
-         0, sizeof(result.value));
-  result.isNone = true;
+  memset(&result, 0, sizeof(result));
+  result.optional.isNone = true;
   return result;
 }
 static const MirrorWitnessTable OpaqueMirrorWitness{
@@ -453,15 +464,16 @@ StringReturn ObjC_getString(MagicMirrorData *self, const Metadata *Self) {
 OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
                                                   const Metadata *Self) {
   OptionalQuickLookObject result;
+  memset(&result, 0, sizeof(result));
   
   id object = *reinterpret_cast<const id *>(self->Value);
   if ([object respondsToSelector:@selector(debugQuickLookObject)])
     object = [object debugQuickLookObject];
     
   if ([object isKindOfClass:[NSString class]]) {
-    result.value.Text = String((NSString*)object);
-    result.value.Kind = QuickLookObject::Tag::Text;
-    result.isNone = false;
+    result.payload.Text = String((NSString*)object);
+    result.payload.Kind = QuickLookObject::Tag::Text;
+    result.optional.isNone = false;
     return result;
   }
   
@@ -471,18 +483,17 @@ OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
       || [object isKindOfClass:NSClassFromString(@"UIImageView")]
       || [object isKindOfClass:NSClassFromString(@"CIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-    result.value.Image.Self = &_TMdBO.base;
-    *reinterpret_cast<id *>(&result.value.Image.Value) = [object retain];
-    result.value.Kind = QuickLookObject::Tag::Image;
-    result.isNone = false;
+    result.payload.Image.Self = &_TMdBO.base;
+    *reinterpret_cast<id *>(&result.payload.Image.Value) = [object retain];
+    result.payload.Kind = QuickLookObject::Tag::Image;
+    result.optional.isNone = false;
     return result;
   }
   
   // TODO: Handle the other quick look object kinds.
   
   // Return none if we didn't get a suitable object.
-  memset(&result.value, 0, sizeof(QuickLookObject));
-  result.isNone = true;
+  result.optional.isNone = true;
   return result;
 }
   
@@ -493,22 +504,18 @@ static const MirrorWitnessTable ObjCMirrorWitness{
   ObjC_getCount,
   ObjC_getChild,
   ObjC_getString,
-  // TODO: call down to -debugQuickLookObject.
-  // We need to settle on the representation of this API first.
   ObjC_getIDERepresentation,
 };
   
-// For super mirrors, we suppress the object identifier.
 static const MirrorWitnessTable ObjCSuperMirrorWitness{
   ObjC_getValue,
   ObjC_getType,
+  // For super mirrors, we suppress the object identifier.
   Opaque_getObjectIdentifier,
   ObjC_getCount,
   ObjC_getChild,
   ObjC_getString,
-  // TODO: call down to -debugQuickLookObject.
-  // We need to settle on the representation of this API first.
-  Opaque_getIDERepresentation,
+  ObjC_getIDERepresentation,
 };
   
 Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig) {
