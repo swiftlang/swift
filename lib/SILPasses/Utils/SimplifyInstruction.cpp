@@ -52,7 +52,7 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
 
     // Check that all of the operands are extracts of the correct kind.
     for (unsigned i = 0, e = SI->getNumOperands(); i < e; i++) {
-      auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(0));
+      auto *Ex = dyn_cast<StructExtractInst>(SI->getOperand(i));
       // Must be an extract.
       if (!Ex)
         return SILValue();
