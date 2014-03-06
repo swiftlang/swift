@@ -205,14 +205,10 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
     // goto.
     if (!B.hasValidInsertionPoint()) {
       if (StmtType != UnknownStmtType) {
-        diagnose(getASTContext(),
-                 ESD.getStartLoc(),
-                 diag::unreachable_code_after_stmt,
-                 StmtType);
+        diagnose(getASTContext(), ESD.getStartLoc(),
+                 diag::unreachable_code_after_stmt, StmtType);
       } else {
-        diagnose(getASTContext(),
-                 ESD.getStartLoc(),
-                 diag::unreachable_code);
+        diagnose(getASTContext(), ESD.getStartLoc(), diag::unreachable_code);
       }
       return;
     }

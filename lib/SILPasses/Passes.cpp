@@ -61,6 +61,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.add(createCapturePromotion());
   PM.add(createAllocBoxToStack());
   PM.add(createInOutDeshadowing());
+  PM.add(createNoReturnFolding());
   PM.add(createDefiniteInitialization());
   PM.add(createPredictableMemoryOptimizations());
   PM.add(createConstantPropagation());

@@ -51,6 +51,7 @@ namespace swift {
   SILTransform *createDefiniteInitialization();
   SILTransform *createPredictableMemoryOptimizations();
   SILTransform *createConstantPropagation();
+  SILTransform *createNoReturnFolding();
   SILTransform *createDCE();
   SILTransform *createMandatoryInlining();
   SILTransform *createSILCleanup();

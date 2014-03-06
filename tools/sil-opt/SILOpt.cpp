@@ -39,6 +39,7 @@ enum class PassKind {
   CCP,
   CSE,
   DefiniteInit,
+  NoReturn,
   DCE,
   DataflowDiagnostics,
   InOutDeshadowing,
@@ -102,6 +103,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::DataflowDiagnostics,
                                    "dataflow-diagnostics",
                                    "Emit SIL diagnostics"),
+                        clEnumValN(PassKind::NoReturn,
+                                   "noreturn-folding",
+                                   "Add 'unreachable' after noreturn calls"),
                         clEnumValN(PassKind::DCE,
                                    "dead-code-elimination", "Remove dead code"),
                         clEnumValN(PassKind::DefiniteInit,
@@ -309,6 +313,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::CSE:
       PM.add(createCSE());
+      break;
+    case PassKind::NoReturn:
+      PM.add(createNoReturnFolding());
       break;
     case PassKind::DCE:
       PM.add(createDCE());

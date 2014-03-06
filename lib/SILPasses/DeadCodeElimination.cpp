@@ -626,6 +626,24 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
   return true;
 }
 
+/// Scan the function for any calls to noreturn functions.  If we find one,
+/// change the block to have an unreachable instruction right after it, and
+/// diagnose any user code after it as being unreachable.  This pass happens
+/// before the definite initialization pass so that it doesn't see infeasible
+/// control flow edges.
+static void performNoReturnFunctionProcessing(SILModule *M) {
+  for (auto &Fn : *M) {
+    DEBUG(llvm::errs() << "*** No return function processing: "
+          << Fn.getName() << "\n");
+    
+    for (auto &BB : Fn) {
+      // Remove instructions from the basic block after a call to a noreturn
+      // function.
+      simplifyBlocksWithCallsToNoReturn(BB, nullptr);
+    }
+  }
+}
+
 void swift::performSILDeadCodeElimination(SILModule *M) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** Dead Code Elimination processing: "
@@ -667,14 +685,32 @@ void swift::performSILDeadCodeElimination(SILModule *M) {
   }
 }
 
-class DCE : public SILModuleTransform {
-  void run() {
-    performSILDeadCodeElimination(getModule());
-    invalidateAnalysis(SILAnalysis::InvalidationKind::All);
-  }
+namespace {
+  class NoReturnFolding : public SILModuleTransform {
+    void run() {
+      performNoReturnFunctionProcessing(getModule());
+      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+    }
+    
+    StringRef getName() override { return "NoReturnFolding"; }
+  };
+}
 
-  StringRef getName() override { return "DCE"; }
-};
+SILTransform *swift::createNoReturnFolding() {
+  return new NoReturnFolding();
+}
+
+
+namespace {
+  class DCE : public SILModuleTransform {
+    void run() {
+      performSILDeadCodeElimination(getModule());
+      invalidateAnalysis(SILAnalysis::InvalidationKind::All);
+    }
+
+    StringRef getName() override { return "DCE"; }
+  };
+}
 
 SILTransform *swift::createDCE() {
   return new DCE();
