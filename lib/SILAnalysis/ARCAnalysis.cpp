@@ -115,26 +115,25 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   }
 }
 
-/// Can Inst use Target in a manner that requires Target to be alive at Inst?
-bool swift::arc::cannotUseValue(SILInstruction *Inst, SILValue Target,
-                                AliasAnalysis *AA) {
+bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
+                             AliasAnalysis *AA) {
   // If Inst is an instruction that we know can never use values with reference
   // semantics, return true.
-  if (canInstUseRefCountValues(Inst))
-    return true;
+  if (canInstUseRefCountValues(User))
+    return false;
 
   // If Inst is a store and we can prove that it can not write target, return
   // true.
-  if (isa<StoreInst>(Inst) &&
-      !AA->mayWriteToMemory(Inst, Target))
-    return true;
+  if (isa<StoreInst>(User) &&
+      !AA->mayWriteToMemory(User, Ptr))
+    return false;
 
   // If Inst is a store and we can prove that it can not write target, return
   // true.
-  if (isa<LoadInst>(Inst) &&
-      !AA->mayReadFromMemory(Inst, Target))
-    return true;
+  if (isa<LoadInst>(User) &&
+      !AA->mayReadFromMemory(User, Ptr))
+    return false;
 
   // Otherwise, assume that Inst can use Target.
-  return false;
+  return true;
 }

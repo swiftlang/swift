@@ -234,7 +234,7 @@ bool ReferenceCountState::handlePotentialUser(SILInstruction *Other,
 
   // If we can prove that Other can not use the pointer we are tracking,
   // return...
-  if (cannotUseValue(Other, getValue(), AA))
+  if (!canUseValue(Other, getValue(), AA))
     return false;
 
   // Otherwise advance the sequence...

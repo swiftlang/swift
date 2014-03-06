@@ -27,10 +27,9 @@ namespace arc {
 /// \returns True if the user \p User decrement the ref count of pointer \p Ptr.
 bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,AliasAnalysis *AA);
 
-/// Can Inst use Target in a manner that requires Target to be alive
-/// before Inst?
-bool cannotUseValue(SILInstruction *Inst, SILValue Target,
-                    AliasAnalysis *AA);
+/// \returns True if the user \p User can use the pointer \p Ptr in a manner
+/// that requires \p Ptr to be alive before Inst.
+bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 
 } // end namespace arc
 } // end namespace swift
