@@ -84,8 +84,10 @@ SILModule::SILModule(Module *SwiftModule)
   TypeListUniquing = new SILTypeListUniquingType();
   SILLoader = SerializedSILLoader::create(getASTContext(), this,
                                           Callback.get());
-  SILLoader->getAllVTables();
-  SILLoader->getAllWitnessTables();
+
+  // FIXME: Once we have external witnesstables/vtables add this back in.
+  // SILLoader->getAllVTables();
+  // SILLoader->getAllWitnessTables();
 }
 
 SILModule::~SILModule() {
