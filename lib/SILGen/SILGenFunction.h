@@ -81,6 +81,11 @@ public:
     
   /// The SILFunction being constructed.
   SILFunction &F;
+  
+  /// The name of the function currently being emitted, as presented to user
+  /// code by __FUNCTION__.
+  DeclName MagicFunctionName;
+  std::string MagicFunctionString;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }
 
@@ -187,7 +192,7 @@ public:
 
   /// Mapping from active opaque value expressions to their values,
   /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::DenseMap<OpaqueValueExpr *, std::pair<SILValue, bool> > OpaqueValues;
+  llvm::DenseMap<OpaqueValueExpr *, std::pair<SILValue, bool>> OpaqueValues;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///

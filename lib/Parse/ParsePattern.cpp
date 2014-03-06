@@ -38,6 +38,8 @@ static DefaultArgumentKind getDefaultArgKind(ExprHandle *init) {
     return DefaultArgumentKind::File;
   case MagicIdentifierLiteralExpr::Line:
     return DefaultArgumentKind::Line;
+  case MagicIdentifierLiteralExpr::Function:
+    return DefaultArgumentKind::Function;
   }
 }
 

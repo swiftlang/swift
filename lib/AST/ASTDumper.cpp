@@ -1042,6 +1042,11 @@ public:
       printStringEncoding(E->getStringEncoding());
       break;
 
+    case MagicIdentifierLiteralExpr::Function:
+      OS << "__FUNCTION__ encoding=";
+      printStringEncoding(E->getStringEncoding());
+      break;
+        
     case MagicIdentifierLiteralExpr::Line:  OS << "__LINE__"; break;
     case MagicIdentifierLiteralExpr::Column:  OS << "__COLUMN__"; break;
     }

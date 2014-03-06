@@ -1374,6 +1374,7 @@ namespace {
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::Function:
         return handleStringLiteralExpr(expr);
 
       case MagicIdentifierLiteralExpr::Line:
@@ -2391,24 +2392,27 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   auto defArg = owner->getDefaultArg(index);
   MagicIdentifierLiteralExpr::Kind magicKind;
   switch (defArg.first) {
-    case DefaultArgumentKind::None:
-      llvm_unreachable("No default argument here?");
+  case DefaultArgumentKind::None:
+    llvm_unreachable("No default argument here?");
 
-    case DefaultArgumentKind::Normal:
-      return nullptr;
+  case DefaultArgumentKind::Normal:
+    return nullptr;
 
-    case DefaultArgumentKind::Column:
-      magicKind = MagicIdentifierLiteralExpr::Column;
-      break;
+  case DefaultArgumentKind::Column:
+    magicKind = MagicIdentifierLiteralExpr::Column;
+    break;
 
-    case DefaultArgumentKind::File:
-      magicKind = MagicIdentifierLiteralExpr::File;
-      break;
-
-
-    case DefaultArgumentKind::Line:
-      magicKind = MagicIdentifierLiteralExpr::Line;
-      break;
+  case DefaultArgumentKind::File:
+    magicKind = MagicIdentifierLiteralExpr::File;
+    break;
+    
+  case DefaultArgumentKind::Line:
+    magicKind = MagicIdentifierLiteralExpr::Line;
+    break;
+      
+  case DefaultArgumentKind::Function:
+    magicKind = MagicIdentifierLiteralExpr::Function;
+    break;
   }
 
   // Create the default argument, which is a converted magic identifier

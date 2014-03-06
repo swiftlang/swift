@@ -1,3 +1,31 @@
+2014-03-12
+----------
+
+* The magic identifier __FUNCTION__ can now be used to get the name of the
+  current function as a string. Like __FILE__ and __LINE__, if __FUNCTION__
+  is used as a default argument, the function name of the caller is passed as
+  the argument.
+
+    func malkovich() {
+      println(__FUNCTION__)
+    }
+    malkovich() // prints "malkovich"
+
+    func nameCaller(name: String = __FUNCTION__) -> String {
+      return name
+    }
+
+    func foo() {
+      println(nameCaller()) // prints "foo"
+    }
+
+  At top level, __FUNCTION__ gives the module name:
+
+    println(nameCaller()) // prints your module name
+
+  For selector-style declarations, __FUNCTION__ currently only includes the
+  first piece of the name in the string. We plan to fix this.
+
 2014-03-05
 ----------
 

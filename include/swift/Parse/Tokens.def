@@ -84,6 +84,7 @@ KEYWORD(unowned)
 KEYWORD(__FILE__)
 KEYWORD(__LINE__)
 KEYWORD(__COLUMN__)
+KEYWORD(__FUNCTION__)
 
 // Pattern keywords.
 KEYWORD(_)

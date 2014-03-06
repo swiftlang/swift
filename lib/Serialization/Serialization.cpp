@@ -449,6 +449,8 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
     return serialization::DefaultArgumentKind::File;
   case swift::DefaultArgumentKind::Line:
     return serialization::DefaultArgumentKind::Line;
+  case swift::DefaultArgumentKind::Function:
+    return serialization::DefaultArgumentKind::Function;
   }
 }
 

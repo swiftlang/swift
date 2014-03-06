@@ -30,7 +30,9 @@ enum class DefaultArgumentKind {
   /// The __LINE__ default argument, which is expanded at the call site.
   Line,
   /// The __COLUMN__ default argument, which is expanded at the call site.
-  Column
+  Column,
+  /// The __FUNCTION__ default argument, which is expanded at the call site.
+  Function,
 };
 
 } // end namespace swift

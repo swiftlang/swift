@@ -899,7 +899,9 @@ class TupleTypeElt {
     /// It has a caller-provided __LINE__ default argument.
     LineArgument,
     /// It has a caller-provided __COLUMN__ default argument.
-    ColumnArgument
+    ColumnArgument,
+    /// It has a caller-provided __FUNCTION__ default argument.
+    FunctionArgument,
   };
 
   /// \brief This is the type of the field, which is mandatory, along with a bit
@@ -943,6 +945,8 @@ public:
       return DefaultArgumentKind::Line;
     case DefaultArgOrVarArg::ColumnArgument:
       return DefaultArgumentKind::Column;
+    case DefaultArgOrVarArg::FunctionArgument:
+      return DefaultArgumentKind::Function;
     }
   }
 
@@ -3191,6 +3195,11 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
     case DefaultArgumentKind::Column:
       TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::ColumnArgument);
       break;
+        
+    case DefaultArgumentKind::Function:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::FunctionArgument);
+      break;
+        
     }
   }
 }

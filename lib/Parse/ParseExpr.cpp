@@ -697,6 +697,24 @@ static bool isStartOfGetSetAccessor(Parser &P) {
          P.Tok.isContextualKeyword("willSet");
 }
 
+/// Map magic literal tokens such as __FILE__ to their
+/// MagicIdentifierLiteralExpr kind.
+MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
+  switch (Kind) {
+  case tok::kw___COLUMN__:
+    return MagicIdentifierLiteralExpr::Kind::Column;
+  case tok::kw___FILE__:
+    return MagicIdentifierLiteralExpr::Kind::File;
+  case tok::kw___FUNCTION__:
+    return MagicIdentifierLiteralExpr::Kind::Function;
+  case tok::kw___LINE__:
+    return MagicIdentifierLiteralExpr::Kind::Line;
+      
+  default:
+    llvm_unreachable("not a magic literal");
+  }
+}
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -707,6 +725,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
 ///     '__FILE__'
 ///     '__LINE__'
 ///     '__COLUMN__'
+///     '__FUNCTION__'
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -780,24 +799,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::string_literal:  // "foo"
     Result = makeParserResult(parseExprStringLiteral());
     break;
-  case tok::kw___FILE__: {  // __FILE__
-    auto Kind = MagicIdentifierLiteralExpr::File;
-    SourceLoc Loc = consumeToken(tok::kw___FILE__);
-    Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
-    break;
-  }
-  case tok::kw___LINE__: {  // __LINE__
-    auto Kind = MagicIdentifierLiteralExpr::Line;
-    SourceLoc Loc = consumeToken(tok::kw___LINE__);
-    Result = makeParserResult(
-       new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
-    break;
-  }
-
-  case tok::kw___COLUMN__: { // __COLUMN__
-    auto Kind = MagicIdentifierLiteralExpr::Column;
-    SourceLoc Loc = consumeToken(tok::kw___COLUMN__);
+      
+  case tok::kw___FILE__:
+  case tok::kw___LINE__:
+  case tok::kw___COLUMN__:
+  case tok::kw___FUNCTION__: {
+    auto Kind = getMagicIdentifierLiteralKind(Tok.getKind());
+    SourceLoc Loc = consumeToken();
     Result = makeParserResult(
        new (Context) MagicIdentifierLiteralExpr(Kind, Loc, /*Implicit=*/false));
     break;

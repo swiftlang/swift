@@ -728,6 +728,7 @@ public:
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc));
       
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
+      sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
       sgm.TopLevelSGF->prepareEpilog(Type(),
                                  CleanupLocation::getModuleCleanupLocation());
     }

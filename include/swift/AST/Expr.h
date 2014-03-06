@@ -470,7 +470,7 @@ public:
 class MagicIdentifierLiteralExpr : public LiteralExpr {
 public:
   enum Kind : unsigned {
-    File, Line, Column
+    File, Line, Column, Function
   };
 private:
   SourceLoc Loc;
@@ -489,15 +489,27 @@ public:
   }
 
   bool isFile() const { return getKind() == File; }
+  bool isFunction() const { return getKind() == Function; }
   bool isLine() const { return getKind() == Line; }
   bool isColumn() const { return getKind() == Column; }
+  
+  bool isString() const {
+    switch (getKind()) {
+    case File:
+    case Function:
+      return true;
+    case Line:
+    case Column:
+      return false;
+    }
+  }
   
   SourceRange getSourceRange() const { return Loc; }
 
   // For a magic identifier that produces a string literal, retrieve the
   // encoding for that string literal.
   StringLiteralExpr::Encoding getStringEncoding() const {
-    assert(isFile() && "Magic identifier literal has non-string encoding");
+    assert(isString() && "Magic identifier literal has non-string encoding");
     return static_cast<StringLiteralExpr::Encoding>(
              MagicIdentifierLiteralExprBits.StringEncoding);
   }
@@ -505,7 +517,7 @@ public:
   // For a magic identifier that produces a string literal, set the encoding
   // for the string literal.
   void setStringEncoding(StringLiteralExpr::Encoding encoding) {
-    assert(isFile() && "Magic identifier literal has non-string encoding");
+    assert(isString() && "Magic identifier literal has non-string encoding");
     MagicIdentifierLiteralExprBits.StringEncoding
       = static_cast<unsigned>(encoding);
   }
