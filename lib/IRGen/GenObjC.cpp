@@ -1230,10 +1230,10 @@ bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
   if (!property->isObjC())
     return false;
   
-  // Don't expose objc properties for function types. We can't autorelease them,
-  // and eventually we want to map them back to blocks.
-  if (property->getType()->is<AnyFunctionType>())
-    return false;
+  // Don't expose objc properties for non-block function types. We can't
+  // autorelease them, and eventually we want to map them back to blocks.
+  if (auto ft = property->getType()->getAs<AnyFunctionType>())
+    return ft->isBlock();
   
   return true;
 }
@@ -1252,8 +1252,8 @@ bool irgen::requiresObjCSubscriptDescriptor(SubscriptDecl *subscript) {
   
   // Don't expose objc properties for function types. We can't autorelease them,
   // and eventually we want to map them back to blocks.
-  if (subscript->getElementType()->is<AnyFunctionType>())
-    return false;
+  if (auto ft = subscript->getElementType()->getAs<AnyFunctionType>())
+    return ft->isBlock();
   
   return true;
 }
