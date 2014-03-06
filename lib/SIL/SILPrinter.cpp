@@ -1307,7 +1307,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
       emittedFunctions.insert(f.getLocation().getAsASTNode<Decl>());
 
   // Print the declarations and types from the origin module.
-  {
+  if (M) {
     PrintOptions Options;
     Options.FunctionDefinitions = false;
     Options.TypeDefinitions = true;
