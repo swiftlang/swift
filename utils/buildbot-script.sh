@@ -469,6 +469,13 @@ for product in "${SWIFT_BUILD_PRODUCTS[@]}" ; do
     fi
 done
 
+# Trap function to print the current test configuration when tests fail.
+# This is a function so the text is not unnecessarily displayed when running -x.
+tests_busted ()
+{
+    echo "*** Failed while running tests for $1"
+}
+
 # Run the tests for each product
 for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
     PRODUCT=$(toupper "${product}")
@@ -477,7 +484,7 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
     if [[ ! "${!_SKIP_TEST_PRODUCT}" ]]; then
         
         echo "--- Running tests for ${product} ---"
-        trap "echo '*** Failed while running tests for ${product}'" ERR
+        trap "tests_busted ${product}" ERR
         _PRODUCT_SOURCE_DIR=${PRODUCT}_SOURCE_DIR
         _PRODUCT_BUILD_DIR=${PRODUCT}_BUILD_DIR
     
