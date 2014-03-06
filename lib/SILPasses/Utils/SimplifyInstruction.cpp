@@ -34,6 +34,8 @@ namespace {
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
     SILValue visitStructInst(StructInst *SI);
+    SILValue visitTupleInst(TupleInst *SI);
+
   };
 } // end anonymous namespace
 
@@ -69,6 +71,41 @@ SILValue InstSimplifier::visitStructInst(StructInst *SI) {
     return Ex0->getOperand();
   }
   
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
+  // Ignore empty tuples.
+  if (TI->getNumOperands() < 1)
+    return SILValue();
+
+  // Optimize tuples that are generated from tuple_extract instructions
+  // from the same tuple.
+  if (auto *Ex0 = dyn_cast<TupleExtractInst>(TI->getOperand(0))) {
+    // Check that the constructed tuple and the extracted tuple are of the
+    // same type.
+    if (TI->getType() != Ex0->getOperand().getType())
+      return SILValue();
+
+    // Check that all of the operands are extracts of the correct kind.
+    for (unsigned i = 0, e = TI->getNumOperands(); i < e; i++) {
+      auto *Ex = dyn_cast<TupleExtractInst>(TI->getOperand(i));
+      // Must be an extract.
+      if (!Ex)
+        return SILValue();
+
+      // Extract from the same struct as the first extract_inst.
+      if (Ex0->getOperand() != Ex->getOperand())
+        return SILValue();
+
+      // And the order of the field must be identical to the construction order.
+      if (Ex->getFieldNo() != i)
+        return SILValue();
+    }
+
+    return Ex0->getOperand();
+  }
+
   return SILValue();
 }
 

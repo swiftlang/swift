@@ -749,3 +749,18 @@ bb0(%0 : $XS, %1 : $@thin XS.Type):
   return %4 : $XS
 }
 
+//CHECK-LABEL: tup_from_extr_tup
+//CHECK-NOT: tuple_extract
+//CHECK-NOT: tuple
+//CHECK: return
+sil @tup_from_extr_tup : $@thin () -> (Int, Int) {
+bb0:
+  // function_ref x
+  %0 = function_ref @tup_from_extr_tup : $@thin () -> (Int, Int)  // user: %1
+  %1 = apply %0() : $@thin () -> (Int, Int)       // users: %2, %3
+  %2 = tuple_extract %1 : $(Int, Int), 0          // user: %4
+  %3 = tuple_extract %1 : $(Int, Int), 1          // user: %4
+  %4 = tuple (%2 : $Int, %3 : $Int)               // user: %5
+  return %4 : $(Int, Int)                         // id: %5
+}
+
