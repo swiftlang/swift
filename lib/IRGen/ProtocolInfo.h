@@ -101,11 +101,12 @@ public:
     return BeginIndex;
   }
 
-  static WitnessTableEntry forFunction(FuncDecl *func, WitnessIndex index) {
+  static WitnessTableEntry forFunction(AbstractFunctionDecl *func,
+                                       WitnessIndex index) {
     return WitnessTableEntry(func, index);
   }
-
-  bool isFunction() const { return isa<FuncDecl>(Member); }
+  
+  bool isFunction() const { return isa<AbstractFunctionDecl>(Member); }
 
   WitnessIndex getFunctionIndex() const {
     assert(isFunction());

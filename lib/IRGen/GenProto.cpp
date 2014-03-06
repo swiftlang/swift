@@ -214,7 +214,6 @@ namespace {
       case DeclKind::Protocol:
       case DeclKind::EnumCase:
       case DeclKind::EnumElement:
-      case DeclKind::Constructor:
       case DeclKind::Destructor:
       case DeclKind::InfixOperator:
       case DeclKind::PrefixOperator:
@@ -242,7 +241,11 @@ namespace {
           emitFunc(SD->getSetter());
         return;
       }
-
+          
+      case DeclKind::Constructor:
+        // Only the allocating entry point gets a witness.
+        return asDerived().addConstructor(cast<ConstructorDecl>(member));
+          
       case DeclKind::AssociatedType:
         return visitAssociatedType(cast<AssociatedTypeDecl>(member));
       }
@@ -294,6 +297,10 @@ namespace {
 
     void addInstanceMethod(FuncDecl *func) {
       Entries.push_back(WitnessTableEntry::forFunction(func, getNextIndex()));
+    }
+    
+    void addConstructor(ConstructorDecl *ctor) {
+      Entries.push_back(WitnessTableEntry::forFunction(ctor, getNextIndex()));
     }
     
     void addAssociatedType(AssociatedTypeDecl *ty) {
@@ -2461,7 +2468,7 @@ namespace {
       Table.push_back(asOpaquePtr(IGM, baseWitness));
     }
 
-    void addMethodFromSILWitnessTable(FuncDecl *iface) {
+    void addMethodFromSILWitnessTable(AbstractFunctionDecl *iface) {
       auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::Method
              && "sil witness table does not match protocol");
@@ -2483,6 +2490,10 @@ namespace {
     }
 
     void addInstanceMethod(FuncDecl *iface) {
+      return addMethodFromSILWitnessTable(iface);
+    }
+    
+    void addConstructor(ConstructorDecl *iface) {
       return addMethodFromSILWitnessTable(iface);
     }
     
@@ -4070,7 +4081,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 }
 
 static void getWitnessMethodValue(IRGenFunction &IGF,
-                                  FuncDecl *fn,
+                                  AbstractFunctionDecl *fn,
                                   ProtocolDecl *fnProto,
                                   llvm::Value *wtable,
                                   llvm::Value *metadata,
@@ -4095,12 +4106,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
                                 SILDeclRef member,
                                 ProtocolConformance *conformance,
                                 Explosion &out) {
-  // The function we're going to call.
-  // FIXME: Support getters and setters (and curried entry points?)
-  assert(member.kind == SILDeclRef::Kind::Func
-         && "getters and setters not yet supported");
-  ValueDecl *vd = member.getDecl();
-  FuncDecl *fn = cast<FuncDecl>(vd);
+  auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   
   // The protocol we're calling on.
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
@@ -4148,8 +4154,7 @@ irgen::emitOpaqueProtocolMethodValue(IRGenFunction &IGF,
   // FIXME: Support getters and setters (and curried entry points?)
   assert(member.kind == SILDeclRef::Kind::Func
          && "getters and setters not yet supported");
-  ValueDecl *vd = member.getDecl();
-  FuncDecl *fn = cast<FuncDecl>(vd);
+  auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
 
   // Load the witness table.
@@ -4182,8 +4187,7 @@ void irgen::emitClassProtocolMethodValue(IRGenFunction &IGF,
   // FIXME: Support getters and setters (and curried entry points?)
   assert(member.kind == SILDeclRef::Kind::Func
          && "getters and setters not yet supported");
-  ValueDecl *vd = member.getDecl();
-  FuncDecl *fn = cast<FuncDecl>(vd);
+  auto fn = cast<AbstractFunctionDecl>(member.getDecl());
   ProtocolDecl *fnProto = cast<ProtocolDecl>(fn->getDeclContext());
   
   // Load the witness table.
