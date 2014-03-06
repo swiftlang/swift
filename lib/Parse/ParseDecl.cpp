@@ -2104,7 +2104,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (Tok.is(tok::amp_prefix)) {
     Tok.setKind(tok::oper_prefix);
   }
-  Identifier Name;
+  Identifier SimpleName;
   SourceLoc NameLoc = Tok.getLoc();
   if (!(Flags & PD_AllowTopLevel) && 
       !(Flags & PD_InProtocol) &&
@@ -2113,9 +2113,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     diagnose(Tok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
-  if (parseAnyIdentifier(Name, diag::expected_identifier_in_decl, "function")) {
+  if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl, "function")) {
     ParserStatus NameStatus =
-        parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren, tok::arrow,
+        parseIdentifierDeclName(*this, SimpleName, NameLoc, tok::l_paren, tok::arrow,
                                 tok::l_brace, diag::invalid_diagnostic);
     if (NameStatus.isError())
       return nullptr;
@@ -2130,10 +2130,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // is an identifier, split the '<' off as a separate token. This allows things
   // like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type variable
   // '<T>' as expected.
-  if (Name.str().size() > 1 && Name.str().back() == '<'
+  if (SimpleName.str().size() > 1 && SimpleName.str().back() == '<'
       && Tok.is(tok::identifier)) {
-    Name = Context.getIdentifier(Name.str().slice(0, Name.str().size() - 1));
-    SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(Name.str().size());
+    SimpleName = Context.getIdentifier(SimpleName.str().slice(0, SimpleName.str().size() - 1));
+    SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(SimpleName.str().size());
     GenericParams = parseGenericParameters(LAngleLoc);
   } else {
     GenericParams = maybeParseGenericParams();
@@ -2147,7 +2147,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   //
   // This turns an instance function "(int)->int" on FooTy into
   // "(inout self: FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(inout self: FooTy.Type)->(int)->int".
+  // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc, CurDeclContext);
@@ -2158,8 +2158,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   bool HasSelectorStyleSignature;
+  DeclName FullName;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(Name, ArgParams, BodyParams, DefaultArgs,
+      parseFunctionSignature(SimpleName, FullName,
+                             ArgParams, BodyParams, DefaultArgs,
                              FuncRetTy, HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -2176,7 +2178,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
-                          FuncLoc, Name, NameLoc, GenericParams,
+                          FuncLoc, FullName, NameLoc, GenericParams,
                           Type(), ArgParams, BodyParams, FuncRetTy,
                           CurDeclContext);
 

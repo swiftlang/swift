@@ -247,6 +247,7 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
 
 static ParserStatus
 parseSelectorArgument(Parser &P,
+                      SmallVectorImpl<Identifier> &namePieces,
                       SmallVectorImpl<TuplePatternElt> &argElts,
                       SmallVectorImpl<TuplePatternElt> &bodyElts,
                       Parser::DefaultArgumentInfo &defaultArgs,
@@ -269,7 +270,9 @@ parseSelectorArgument(Parser &P,
     // If the selector is named "_", then we ignore it.
     assert(isa<AnyPattern>(ArgPattern) && "Unexpected selector pattern");
   }
-
+  
+  namePieces.push_back(leadingIdent);
+  
   if (!P.Tok.is(tok::l_paren)) {
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
@@ -326,6 +329,7 @@ static Pattern *getFirstSelectorPattern(ASTContext &Context,
 
 static ParserStatus
 parseSelectorFunctionArguments(Parser &P,
+                               SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                Parser::DefaultArgumentInfo &DefaultArgs,
@@ -380,7 +384,8 @@ parseSelectorFunctionArguments(Parser &P,
   ParserStatus Status;
   for (;;) {
     if (P.isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(P, ArgElts, BodyElts, DefaultArgs,
+      Status |= parseSelectorArgument(P, NamePieces,
+                                      ArgElts, BodyElts, DefaultArgs,
                                       RParenLoc);
       continue;
     }
@@ -412,7 +417,7 @@ parseSelectorFunctionArguments(Parser &P,
 ///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
 ///
 ParserStatus
-Parser::parseFunctionArguments(Identifier functionName,
+Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
@@ -421,7 +426,7 @@ Parser::parseFunctionArguments(Identifier functionName,
 
   // Parse the first function argument clause.
   ParserResult<Pattern> ArgPattern =
-    parseArgument(*this, functionName, &DefaultArgs);
+    parseArgument(*this, NamePieces.front(), &DefaultArgs);
 
   if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
     return ArgPattern;
@@ -436,7 +441,8 @@ Parser::parseFunctionArguments(Identifier functionName,
     // argument pattern into a single argument type and parse subsequent
     // selector forms.
     return ParserStatus(ArgPattern) |
-      parseSelectorFunctionArguments(*this, ArgPatterns, BodyPatterns,
+      parseSelectorFunctionArguments(*this, NamePieces,
+                                     ArgPatterns, BodyPatterns,
                                      DefaultArgs, ArgPattern.get());
   }
 
@@ -467,20 +473,27 @@ Parser::parseFunctionArguments(Identifier functionName,
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
-Parser::parseFunctionSignature(Identifier Name,
+Parser::parseFunctionSignature(Identifier SimpleName,
+                               DeclName &FullName,
                                SmallVectorImpl<Pattern *> &argPatterns,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
                                TypeRepr *&retType,
                                bool &HasSelectorStyleSignature) {
   HasSelectorStyleSignature = false;
-
+  
+  SmallVector<Identifier, 4> NamePieces;
+  NamePieces.push_back(SimpleName);
+  FullName = SimpleName;
+  
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    Status = parseFunctionArguments(Name, argPatterns, bodyPatterns,
+    Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
-
+    
+    FullName = DeclName(Context, NamePieces);
+    
     if (bodyPatterns.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking
       // invariants.
@@ -577,9 +590,12 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   SmallVector<TuplePatternElt, 4> ArgElts;
   SmallVector<TuplePatternElt, 4> BodyElts;
   SourceLoc RParenLoc;
+  // NB: Not actually used to form the initializer name.
+  SmallVector<Identifier, 4> NamePieces;
+  
   for (;;) {
     if (isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(*this, ArgElts, BodyElts,
+      Status |= parseSelectorArgument(*this, NamePieces, ArgElts, BodyElts,
                                       DefaultArgs, RParenLoc);
       continue;
     }

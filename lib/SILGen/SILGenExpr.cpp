@@ -3220,7 +3220,8 @@ getMagicFunctionString(SILGenFunction &gen) {
   
   if (gen.MagicFunctionString.empty()) {
     for (Identifier component : gen.MagicFunctionName.getComponents()) {
-      gen.MagicFunctionString += component.str();
+      if (component.get())
+        gen.MagicFunctionString += component.str();
       gen.MagicFunctionString += ':';
     }
   }

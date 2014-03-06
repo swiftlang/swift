@@ -19,12 +19,13 @@
       println(nameCaller()) // prints "foo"
     }
 
+    func foo(x: Int) bar(y: Int) {
+      println(nameCaller()) // prints "foo:bar:"
+    }
+
   At top level, __FUNCTION__ gives the module name:
 
     println(nameCaller()) // prints your module name
-
-  For selector-style declarations, __FUNCTION__ currently only includes the
-  first piece of the name in the string. We plan to fix this.
 
 2014-03-05
 ----------
