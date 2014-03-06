@@ -2869,6 +2869,38 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
+      auto name = Impl.importName(decl->getDeclName());
+      if (name.empty())
+        return nullptr;
+
+      // Special case for Protocol, which gets forward-declared everywhere but
+      // really lives in ObjectiveC.
+      // FIXME: This is a workaround for a Clang modules bug.
+      // See http://llvm.org/bugs/show_bug.cgi?id=19061
+      if (decl->getCanonicalDecl() ==
+          Impl.getClangASTContext().getObjCProtocolDecl()->getCanonicalDecl() &&
+          !decl->hasDefinition()) {
+        Type nsObject = Impl.getNSObjectType();
+        if (!nsObject)
+          return nullptr;
+
+        const ClassDecl *nsObjectDecl = nsObject->getClassOrBoundGenericClass();
+        auto dc = nsObjectDecl->getDeclContext();
+
+        auto result = new (Impl.SwiftContext) ClassDecl(SourceLoc(), name,
+                                                        SourceLoc(), {},
+                                                        nullptr, dc);
+        result->computeType();
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        result->setClangNode(decl);
+        result->setCircularityCheck(CircularityCheck::Checked);
+        result->setSuperclass(nsObject);
+        result->setCheckedInheritanceClause();
+        result->setIsObjC(true);
+        Impl.registerExternalDecl(result);
+        return result;
+      }
+
       // FIXME: Figure out how to deal with incomplete types, since that
       // notion doesn't exist in Swift.
       decl = decl->getDefinition();
@@ -2876,10 +2908,6 @@ namespace {
         forwardDeclaration = true;
         return nullptr;
       }
-
-      auto name = Impl.importName(decl->getDeclName());
-      if (name.empty())
-        return nullptr;
 
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
