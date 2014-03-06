@@ -206,7 +206,7 @@ bool ReferenceCountState::handlePotentialDecrement(SILInstruction *Other,
 
   // If we can prove that Other can not decrement the reference counted
   // instruction we are tracking, return false.
-  if (cannotDecrementRefCount(Other, getValue(), AA))
+  if (!canDecrementRefCount(Other, getValue(), AA))
     return false;
 
   // Otherwise Other could potentially decrement the value we are tracking.

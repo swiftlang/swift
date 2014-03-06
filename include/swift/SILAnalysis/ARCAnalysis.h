@@ -24,9 +24,8 @@ class AliasAnalysis;
 namespace swift {
 namespace arc {
 
-/// Can Inst decrement the ref count of Target?
-bool cannotDecrementRefCount(SILInstruction *Inst, SILValue Target,
-                             AliasAnalysis *AA);
+/// \returns True if the user \p User decrement the ref count of pointer \p Ptr.
+bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,AliasAnalysis *AA);
 
 /// Can Inst use Target in a manner that requires Target to be alive
 /// before Inst?

@@ -24,13 +24,12 @@ using namespace swift;
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 
-/// Could Inst decrement the ref count associated with target?
-bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
-                                         SILValue Target,
-                                         AliasAnalysis *AA) {
+
+bool swift::arc::canDecrementRefCount(SILInstruction *User,
+                                      SILValue Ptr, AliasAnalysis *AA) {
   // Clear up some small cases where MayHaveSideEffects is too broad for our
   // purposes and the instruction does not decrement ref counts.
-  switch (Inst->getKind()) {
+  switch (User->getKind()) {
   case ValueKind::DeallocStackInst:
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongRetainAutoreleasedInst:
@@ -38,42 +37,43 @@ bool swift::arc::cannotDecrementRefCount(SILInstruction *Inst,
   case ValueKind::UnownedRetainInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::CondFailInst:
-    return true;
+    return false;
+
   case ValueKind::CopyAddrInst: {
-    auto *CA = cast<CopyAddrInst>(Inst);
+    auto *CA = cast<CopyAddrInst>(User);
     if (CA->isInitializationOfDest() == IsInitialization_t::IsInitialization)
-      return true;
+      return false;
   }
   SWIFT_FALLTHROUGH;
   default:
     break;
   }
 
-  if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
+  if (auto *AI = dyn_cast<ApplyInst>(User)) {
     // Ignore any thick functions for now due to us not handling the ref-counted
     // nature of its context.
     if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
       if (!FTy->isThin())
-        return false;
+        return true;
 
     // If we have a builtin that is side effect free, we can commute the
     // ApplyInst and the retain.
     if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
       if (isSideEffectFree(BI))
-        return true;
+        return false;
 
     // Ok, this apply *MAY* decrement ref counts. Attempt to prove that it
     // cannot decrement Target using alias analysis and knowledge about our
     // calling convention.
     for (auto Op : AI->getArgumentsWithoutIndirectResult())
-      if (!AA->isNoAlias(Op, Target))
-        return false;
+      if (!AA->isNoAlias(Op, Ptr))
+        return true;
 
-    return true;
+    return false;
   }
 
   // Just make sure that we do not have side effects.
-  return Inst->getMemoryBehavior() !=
+  return User->getMemoryBehavior() ==
     SILInstruction::MemoryBehavior::MayHaveSideEffects;
 }
 
