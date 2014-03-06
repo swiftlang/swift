@@ -1360,6 +1360,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Try to look through UncheckedOptional<T>; the result is always an r-value.
   if (auto objTy = lookThroughUncheckedOptionalType(baseObjTy)) {
+    increaseScore(SK_UncheckedForce);
     baseTy = baseObjTy = objTy;
   }
 

@@ -584,6 +584,8 @@ struct SelectedOverload {
 enum ScoreKind {
   // These values are used as indices into a Score value.
 
+  /// An implicit force of an unchecked optional value.
+  SK_UncheckedForce,
   /// A user-defined conversion.
   SK_UserConversion,
   /// A non-trivial function conversion.
@@ -593,7 +595,7 @@ enum ScoreKind {
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 3;
+const unsigned NumScoreKinds = 4;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
