@@ -16,6 +16,7 @@
 @end
 
 @interface NSAwesomeDocument : NSDocument
+-(void)noReturnMethod:(int)arg  __attribute__((noreturn));
 @end
 
 @interface NSInterestingDesignated
