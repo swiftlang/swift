@@ -199,7 +199,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Bail out if there are any errors.
   if (M->Ctx.hadError()) return nullptr;
 
-  llvm::OwningPtr<raw_fd_ostream> RawOS;
+  std::unique_ptr<raw_fd_ostream> RawOS;
   formatted_raw_ostream FormattedOS;
   if (!Opts.OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.

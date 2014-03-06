@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
   Invocation.setImportSearchPaths(ImportPaths);
 
   // Load the input file.
-  llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
+  std::unique_ptr<llvm::MemoryBuffer> InputFile;
   if (llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
@@ -245,7 +245,6 @@ int main(int argc, char **argv) {
 
   // If it looks like we have an AST, set the source file kind to SIL and the
   // name of the module to the file's name.
-  Invocation.addInputBuffer(InputFile.get());
   bool IsModule = false;
   if (SerializedModuleLoader::isSerializedAST(InputFile.get()->getBuffer())) {
     IsModule = true;
@@ -258,6 +257,7 @@ int main(int argc, char **argv) {
     Invocation.setModuleName("main");
     Invocation.setInputKind(SourceFileKind::SIL);
   }
+  Invocation.addInputBuffer(std::move(InputFile));
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;

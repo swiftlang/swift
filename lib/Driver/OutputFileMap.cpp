@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/OutputFileMap.h"
-
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/system_error.h"
@@ -21,25 +19,25 @@ using namespace swift;
 using namespace swift::driver;
 
 std::unique_ptr<OutputFileMap> OutputFileMap::loadFromPath(StringRef Path) {
-  llvm::OwningPtr<llvm::MemoryBuffer> Buffer;
+  std::unique_ptr<llvm::MemoryBuffer> Buffer;
   llvm::error_code Result = llvm::MemoryBuffer::getFile(Path, Buffer);
   if (Result != 0)
     return nullptr;
-  return loadFromBuffer(Buffer.take());
+  return loadFromBuffer(std::move(Buffer));
 }
 
 std::unique_ptr<OutputFileMap> OutputFileMap::loadFromBuffer(StringRef Data) {
-  llvm::OwningPtr<llvm::MemoryBuffer> Buffer{
+  std::unique_ptr<llvm::MemoryBuffer> Buffer{
     llvm::MemoryBuffer::getMemBuffer(Data)
   };
-  return loadFromBuffer(Buffer.take());
+  return loadFromBuffer(std::move(Buffer));
 }
 
 std::unique_ptr<OutputFileMap>
-OutputFileMap::loadFromBuffer(llvm::MemoryBuffer *Buffer) {
+OutputFileMap::loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   std::unique_ptr<OutputFileMap> OFM(new OutputFileMap());
 
-  if (OFM->parse(Buffer))
+  if (OFM->parse(std::move(Buffer)))
     return nullptr;
 
   return OFM;
@@ -91,9 +89,9 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
   }
 }
 
-bool OutputFileMap::parse(llvm::MemoryBuffer *Buffer) {
+bool OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   llvm::SourceMgr SM;
-  llvm::yaml::Stream YAMLStream(Buffer, SM);
+  llvm::yaml::Stream YAMLStream(Buffer.release(), SM);
   auto I = YAMLStream.begin();
   if (I == YAMLStream.end())
     return true;

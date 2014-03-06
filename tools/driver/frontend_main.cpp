@@ -298,7 +298,7 @@ int frontend_main(ArrayRef<const char *>Args,
       }
 
       SerializedConsumer.reset(
-        serialized_diagnostics::createConsumer(OS.release()));
+          serialized_diagnostics::createConsumer(std::move(OS)));
       Instance.addDiagnosticConsumer(SerializedConsumer.get());
     }
   }

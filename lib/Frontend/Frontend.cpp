@@ -184,7 +184,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     }
 
     // Open the input file.
-    llvm::OwningPtr<llvm::MemoryBuffer> InputFile;
+    std::unique_ptr<llvm::MemoryBuffer> InputFile;
     if (llvm::error_code Err =
           llvm::MemoryBuffer::getFileOrSTDIN(File, InputFile)) {
       Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
@@ -192,7 +192,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       return true;
     }
 
-    unsigned BufferID = SourceMgr.addNewSourceBuffer(InputFile.take());
+    unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(InputFile));
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
     BufferIDs.push_back(BufferID);

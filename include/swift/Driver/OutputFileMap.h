@@ -48,7 +48,7 @@ public:
   /// Loads an OutputFileMap from the given \p Buffer, taking ownership
   /// of the buffer in the process.
   static std::unique_ptr<OutputFileMap>
-  loadFromBuffer(llvm::MemoryBuffer *Buffer);
+  loadFromBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
 
   /// Get the map of outputs for the given \p Input, if present in the
   /// OutputFileMap. (If not present, returns nullptr.)
@@ -62,7 +62,7 @@ private:
   /// of \p Buffer in the process.
   ///
   /// \returns true on error, false on success
-  bool parse(llvm::MemoryBuffer *Buffer);
+  bool parse(std::unique_ptr<llvm::MemoryBuffer> Buffer);
 };
 
 } // end namespace driver

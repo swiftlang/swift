@@ -18,6 +18,8 @@
 #ifndef SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 #define SWIFT_SERIALIZEDDIAGNOSTICCONSUMER_H
 
+#include <memory>
+
 namespace llvm {
   class raw_ostream;
 }
@@ -34,7 +36,7 @@ namespace swift {
     ///        ownership of the stream.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    DiagnosticConsumer *createConsumer(llvm::raw_ostream *OS);
+    DiagnosticConsumer *createConsumer(std::unique_ptr<llvm::raw_ostream> OS);
   }
 }
 

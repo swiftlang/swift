@@ -27,35 +27,7 @@ using namespace swift;
 
 namespace {
 typedef std::pair<Identifier, SourceLoc> AccessPathElem;
-
-/// An adapter class that allows a std::unique_ptr to be used as an
-/// llvm::OwningPtr.
-template <typename T>
-class OwningPtrAdapter {
-  llvm::OwningPtr<T> Owner;
-  std::unique_ptr<T> &Result;
-public:
-  OwningPtrAdapter(std::unique_ptr<T> &result) : Result(result) {
-    Owner.reset(Result.release());
-  }
-
-  OwningPtrAdapter(const OwningPtrAdapter &other) = delete;
-  OwningPtrAdapter &operator=(const OwningPtrAdapter &other) = delete;
-  OwningPtrAdapter(OwningPtrAdapter &&other) = default;
-  OwningPtrAdapter &operator=(OwningPtrAdapter &&other) = default;
-
-  ~OwningPtrAdapter() {
-    Result.reset(Owner.take());
-  }
-  operator llvm::OwningPtr<T> &() { return Owner; }
-};
-
-template <typename T>
-OwningPtrAdapter<T> makeOwningPtrAdapter(std::unique_ptr<T> &result) {
-  return result;
-}
-
-}
+} // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
@@ -74,8 +46,7 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
     inputFilename = path;
     llvm::sys::path::append(inputFilename, moduleFilename.str());
-    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                           makeOwningPtrAdapter(buffer));
+    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
     if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
@@ -96,8 +67,7 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
     inputFilename = path;
     llvm::sys::path::append(inputFilename, moduleFramework.str(),
                             moduleFilename.str(), archFilename.str());
-    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                           makeOwningPtrAdapter(buffer));
+    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
     if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
@@ -106,8 +76,7 @@ static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
   isFramework = false;
   inputFilename = ctx.SearchPathOpts.RuntimeLibraryImportPath;
   llvm::sys::path::append(inputFilename, moduleFilename.str());
-  return llvm::MemoryBuffer::getFile(inputFilename.str(),
-                                     makeOwningPtrAdapter(buffer));
+  return llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
 }
 
 FileUnit *

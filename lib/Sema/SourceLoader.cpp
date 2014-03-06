@@ -22,7 +22,6 @@
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -34,7 +33,7 @@ using namespace swift;
 // FIXME: Basically the same as SerializedModuleLoader.
 static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
                                    SourceLoc importLoc,
-                                   llvm::OwningPtr<llvm::MemoryBuffer> &buffer){
+                                   std::unique_ptr<llvm::MemoryBuffer> &buffer){
   llvm::SmallString<128> inputFilename;
 
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
@@ -71,7 +70,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto moduleID = path[0];
 
-  llvm::OwningPtr<llvm::MemoryBuffer> inputFile;
+  std::unique_ptr<llvm::MemoryBuffer> inputFile;
   if (llvm::error_code err = findModule(Ctx, moduleID.first.str(),
                                         moduleID.second, inputFile)) {
     if (err.value() != llvm::errc::no_such_file_or_directory) {
@@ -91,7 +90,7 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
     bufferID = BufID.getValue();
   else
-    bufferID = Ctx.SourceMgr.addNewSourceBuffer(inputFile.take());
+    bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
   auto *importMod = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importMod;

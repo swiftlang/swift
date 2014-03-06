@@ -98,7 +98,12 @@ public:
     return unsigned(BufferID);
   }
 
+  // FIXME: remove this overload.
   size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer);
+
+  size_t addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+    return addNewSourceBuffer(Buffer.release());
+  }
 
   /// Returns a buffer ID for a previously added buffer with the given
   /// buffer identifier, or Nothing if there is no such buffer.

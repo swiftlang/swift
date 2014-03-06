@@ -21,7 +21,6 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -85,8 +84,8 @@ typedef SmallVector<uint64_t, 64> RecordData;
 typedef SmallVectorImpl<uint64_t> RecordDataImpl;
 
 struct SharedState : llvm::RefCountedBase<SharedState> {
-  SharedState(raw_ostream *os)
-    : Stream(Buffer), OS(os), EmittedAnyDiagBlocks(false) { }
+  SharedState(std::unique_ptr<raw_ostream> OS)
+      : Stream(Buffer), OS(std::move(OS)), EmittedAnyDiagBlocks(false) { }
 
   /// \brief The byte buffer for the serialized content.
   llvm::SmallString<1024> Buffer;
@@ -95,7 +94,7 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   llvm::BitstreamWriter Stream;
 
   /// \brief The name of the diagnostics file.
-  llvm::OwningPtr<raw_ostream> OS;
+  std::unique_ptr<raw_ostream> OS;
 
   /// \brief The set of constructed record abbreviations.
   AbbreviationMap Abbrevs;
@@ -126,7 +125,8 @@ class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// \brief State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
 public:
-  SerializedDiagnosticConsumer(raw_ostream *OS) : State(new SharedState(OS)) {
+  SerializedDiagnosticConsumer(std::unique_ptr<raw_ostream> OS)
+      : State(new SharedState(std::move(OS))) {
     emitPreamble();
   }
 
@@ -195,8 +195,8 @@ private:
 }
 
 namespace swift { namespace serialized_diagnostics {
-  DiagnosticConsumer *createConsumer(llvm::raw_ostream *OS) {
-    return new SerializedDiagnosticConsumer(OS);
+  DiagnosticConsumer *createConsumer(std::unique_ptr<llvm::raw_ostream> OS) {
+    return new SerializedDiagnosticConsumer(std::move(OS));
   }
 }}
 
