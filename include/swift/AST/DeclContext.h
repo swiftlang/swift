@@ -211,7 +211,7 @@ public:
 
   /// Returns the module scope context that contains this context.
   ///
-  /// This is either a Module or a SourceFile.
+  /// This is either a \c Module or a \c FileUnit.
   DeclContext *getModuleScopeContext() const;
 
   /// Returns the source file that contains this context, or null if this
