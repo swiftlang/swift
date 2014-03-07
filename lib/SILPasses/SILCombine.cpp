@@ -756,6 +756,10 @@ class SILDeadFuncElimination : public SILModuleTransform {
     if (Changed)
       CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
 
+    // If we are debugging serialization, don't eliminate any dead functions.
+    if (getOptions().DebugSerialization)
+      return;
+
     // A bottom-up list of functions, leafs first.
     const std::vector<SILFunction*> &Order = CGA->bottomUpCallGraphOrder();
 
