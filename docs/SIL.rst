@@ -958,6 +958,17 @@ Witness tables consist of the following entries:
   type to the protocol conformance that satisfies that requirement for the
   associated type.
 
+Global Variables
+~~~~~~~~~~~~~~~~
+::
+
+  decl ::= sil-global-variable
+  sil-global-variable ::= 'sil_global' sil-linkage identifier ':' sil-type
+
+SIL representation of a global variable.
+
+FIXME: to be written.
+
 Dataflow Errors
 ---------------
 
@@ -2007,6 +2018,17 @@ global_addr
 TODO: Design of global variables subject to change.
 
 Creates a reference to the address of a global variable.
+
+sil_global_addr
+```````````````
+
+::
+
+  sil-instruction ::= 'sil_global_addr' sil-global-name ':' sil-type
+
+  %1 = sil_global_addr @foo : $*Builtin.Word
+
+Creates a reference to the address of a sil global variable.
 
 integer_literal
 ```````````````
