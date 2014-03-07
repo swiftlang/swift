@@ -64,7 +64,7 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     break;
 
   case IsNotDynamicLookup:
-    out << getFirstType().getString() << " is not an dynamic lookup value";
+    out << getFirstType().getString() << " is not a dynamic lookup value";
     break;
 
   case TupleNameMismatch:
