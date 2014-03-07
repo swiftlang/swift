@@ -1414,13 +1414,23 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
 
     // Helper function for whether to emit a function body.
     auto shouldEmitFunctionBody = [&](const SILFunction &F) {
-      // Emit function body if a private function is referenced in this module.
-      // This is needed for body of closure.
+      // If F is a declaration, it has no body to emit...
+      if (F.empty())
+        return false;
+
+      // If F is transparent, we should always emit its body.
+      if (F.isTransparent())
+        return true;
+
+      // Emit the function body if F is a shared function referenced in this
+      // module. This is needed specifically to handle the bodies of closures.
       // FIXME: This is order-dependent.
-      return (!F.empty() &&
-              (ShouldSerializeAll || F.isTransparent()  ||
-               (F.getLinkage() == SILLinkage::Shared &&
-                FuncsToDeclare.count(&F))));
+      if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
+        return true;
+
+      // Otherwise serialize the body of the function only if we are asked to
+      // serialize everything.
+      return ShouldSerializeAll;
     };
 
     // Go through all the SILFunctions in SILMod and write out any
