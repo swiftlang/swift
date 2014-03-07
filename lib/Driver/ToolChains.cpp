@@ -26,12 +26,5 @@ std::unique_ptr<Tool> Darwin::buildLinker() const {
 }
 
 StringRef Darwin::getDarwinArchName(const ArgList &Args) const {
-  switch (getTriple().getArch()) {
-  default:
-    return getArchName();
-  case llvm::Triple::thumb:
-  case llvm::Triple::arm:
-    // FIXME: need to handle -march, -mcpu (if necessary)
-    return "arm";
-  }
+  return getArchName();
 }
