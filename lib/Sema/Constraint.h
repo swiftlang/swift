@@ -151,6 +151,8 @@ enum class ConversionRestrictionKind {
   OptionalToOptional,
   /// @unchecked T? -> U? unchecked-optional to optional conversion
   UncheckedOptionalToOptional,
+  /// Implicit forces of unchecked optionals to their presumed values
+  ForceUnchecked,
   /// User-defined conversions.
   User
 };

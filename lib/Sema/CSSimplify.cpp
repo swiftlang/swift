@@ -917,6 +917,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
+  // A value of type @unchecked T? can be (unsafely) forced to U if T
+  // is convertible to U.
+  {
+    Type objectType1;
+    if (concrete && kind >= TypeMatchKind::Conversion &&
+        (objectType1 = lookThroughUncheckedOptionalType(type1))) {
+      potentialConversions.push_back(
+                          ConversionRestrictionKind::ForceUnchecked);
+    }
+  }
+
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
   if (concrete && kind >= TypeMatchKind::Conversion &&
@@ -1311,7 +1322,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Try to look through UncheckedOptional<T>; the result is always an r-value.
   if (auto objTy = lookThroughUncheckedOptionalType(baseObjTy)) {
-    increaseScore(SK_UncheckedForce);
+    increaseScore(SK_ForceUnchecked);
     baseTy = baseObjTy = objTy;
   }
 
@@ -1861,6 +1872,26 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(generic1->getGenericArgs()[0],
                       generic2->getGenericArgs()[0],
+                      matchKind, flags, locator);
+  }
+
+  // T <c U ===> @unchecked T? <c U
+  //
+  // We don't want to allow this after user-defined conversions:
+  //   - it gets really complex for users to understand why there's
+  //     a dereference in their code
+  //   - it would allow nil to be coerceable to a non-optional type
+  // Fortunately, user-defined conversions only allow subtype
+  // conversions on their results.
+  case ConversionRestrictionKind::ForceUnchecked: {
+    assert(matchKind >= TypeMatchKind::Conversion);
+    auto boundGenericType1 = type1->castTo<BoundGenericType>();
+    assert(boundGenericType1->getDecl()->classifyAsOptionalType()
+             == OTK_UncheckedOptional);
+    assert(boundGenericType1->getGenericArgs().size() == 1);
+    Type valueType1 = boundGenericType1->getGenericArgs()[0];
+    increaseScore(SK_ForceUnchecked);
+    return matchTypes(valueType1, type2,
                       matchKind, flags, locator);
   }
 

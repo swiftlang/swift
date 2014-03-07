@@ -3031,6 +3031,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator);
 
+    case ConversionRestrictionKind::ForceUnchecked: {
+      auto valueTy = fromType->getUncheckedOptionalObjectType();
+      assert(valueTy);
+      expr = coerceUncheckedOptionalToValue(expr, valueTy, locator);
+      if (!expr) return nullptr;
+      return coerceToType(expr, toType, locator);
+    }
+
     case ConversionRestrictionKind::User:
       return coerceViaUserConversion(expr, toType, locator);
     }

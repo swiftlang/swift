@@ -585,7 +585,7 @@ enum ScoreKind {
   // These values are used as indices into a Score value.
 
   /// An implicit force of an unchecked optional value.
-  SK_UncheckedForce,
+  SK_ForceUnchecked,
   /// A user-defined conversion.
   SK_UserConversion,
   /// A non-trivial function conversion.

@@ -262,6 +262,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[optional-to-optional]";
   case ConversionRestrictionKind::UncheckedOptionalToOptional:
     return "[unchecked-optional-to-optional]";
+  case ConversionRestrictionKind::ForceUnchecked:
+    return "[force-unchecked]";
   case ConversionRestrictionKind::User:
     return "[user]";
   }
