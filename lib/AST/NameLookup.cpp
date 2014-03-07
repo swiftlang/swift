@@ -172,10 +172,10 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   const SourceManager &SM;
   SourceLoc Loc;
-  Identifier Name;
+  DeclName Name;
   ValueDecl *MatchingValue;
 
-  FindLocalVal(const SourceManager &SM, SourceLoc Loc, Identifier Name)
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc, DeclName Name)
       : SM(SM), Loc(Loc), Name(Name), MatchingValue(nullptr) {}
 
   bool IntersectsRange(SourceRange R) {
@@ -183,7 +183,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   }
 
   void checkValueDecl(ValueDecl *D) {
-    if (D->getName() == Name) {
+    if (D->getFullName().matchesRef(Name)) {
       assert(!MatchingValue);
       MatchingValue = D;
     }
@@ -318,7 +318,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
 };
 
 
-UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
+UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      SourceLoc Loc, bool IsTypeLookup) {
   typedef UnqualifiedLookupResult Result;
@@ -521,8 +521,10 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     FU->getImportedModules(extraImports, Module::ImportFilter::Private);
 
   DebuggerClient *DebugClient = M.getDebugClient();
-  if (DebugClient && DebugClient->lookupOverrides(Name, DC, Loc,
-                                                  IsTypeLookup, Results))
+  // TODO: Does the debugger client care about compound names?
+  if (Name.isSimpleName()
+      && DebugClient && DebugClient->lookupOverrides(Name.getSimpleName(), DC,
+                                                   Loc, IsTypeLookup, Results))
     return;
 
   using namespace namelookup;
@@ -540,21 +542,22 @@ UnqualifiedLookup::UnqualifiedLookup(Identifier Name, DeclContext *DC,
     return;
 
   // Look for a module with the given name.
-  if (Name == M.Name) {
+  if (Name.isSimpleName(M.Name)) {
     Results.push_back(Result::getModuleName(&M));
     return;
   }
 
   forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
-    if (import.second->Name == Name) {
+    if (Name.isSimpleName(import.second->Name)) {
       Results.push_back(Result::getModuleName(import.second));
       return false;
     }
     return true;
   });
 
-  if (DebugClient && !Results.size())
-    DebugClient->lookupFallbacks(Name, DC, Loc, IsTypeLookup, Results);
+  if (Name.isSimpleName() && DebugClient && !Results.size())
+    DebugClient->lookupFallbacks(Name.getSimpleName(), DC, Loc, IsTypeLookup,
+                                 Results);
 }
 
 Optional<UnqualifiedLookup>
@@ -587,7 +590,7 @@ class swift::MemberLookupTable {
   ExtensionDecl *LastExtensionIncluded = nullptr;
 
   /// The type of the internal lookup table.
-  typedef llvm::DenseMap<Identifier, llvm::TinyPtrVector<ValueDecl *>>
+  typedef llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     LookupTable;
 
   /// Lookup table mapping names to the set of declarations with that name.
@@ -615,7 +618,7 @@ public:
   iterator begin() { return Lookup.begin(); }
   iterator end() { return Lookup.end(); }
 
-  iterator find(Identifier name) {
+  iterator find(DeclName name) {
     return Lookup.find(name);
   }
 };
@@ -639,8 +642,9 @@ void MemberLookupTable::addMembers(ArrayRef<Decl *> members) {
     if (!vd->hasName())
       continue;
 
-    // Add this declaration to the lookup set.
-    Lookup[vd->getName()].push_back(vd);
+    // Add this declaration to the lookup set under its compound name and simple
+    // name.
+    vd->getFullName().addToLookupTable(Lookup, vd);
   }
 }
 
@@ -741,7 +745,7 @@ void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
   ++NumUnloadedLazyMembers;
 }
 
-ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
+ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
   for (auto E : getExtensions())
@@ -775,7 +779,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(Identifier name) {
 }
 
 bool DeclContext::lookupQualified(Type type,
-                                  Identifier name,
+                                  DeclName name,
                                   unsigned options,
                                   LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -914,7 +918,8 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     // Make sure we've resolved implicit constructors, if we need them.
-    if (name == ctx.Id_init && typeResolver)
+    if (name.isSimpleName(ctx.Id_init)
+        && typeResolver)
       typeResolver->resolveImplicitConstructors(current);
 
     // Look for results within the current nominal type and its extensions.
@@ -942,7 +947,7 @@ bool DeclContext::lookupQualified(Type type,
       // If we're looking for initializers, only look at the superclass if the
       // current class permits inheritance. Even then, only find complete
       // object initializers.
-      if (name == ctx.Id_init) {
+      if (name.isSimpleName(ctx.Id_init)) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else
@@ -1025,7 +1030,7 @@ bool DeclContext::lookupQualified(Type type,
         // C.init overrides B.init overrides A.init, but only C.init and
         // A.init are in the chain. Make sure we still remove A.init from the
         // set in this case.
-        if (name == ctx.Id_init) {
+        if (name.isSimpleName(ctx.Id_init)) {
           decl = overrides;
           continue;
         }

@@ -627,24 +627,35 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
 
 ModuleFile::~ModuleFile() = default;
 
-void ModuleFile::lookupValue(Identifier name,
+void ModuleFile::lookupValue(DeclName name,
                              SmallVectorImpl<ValueDecl*> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
 
   if (TopLevelDecls) {
     // Find top-level declarations with the given name.
-    auto iter = TopLevelDecls->find(name);
+    // FIXME: As a bit of a hack, do lookup by the simple name, then filter
+    // compound decls, to avoid having to completely redo how modules are
+    // serialized.
+    auto iter = TopLevelDecls->find(name.getSimpleName());
     if (iter != TopLevelDecls->end()) {
-      for (auto item : *iter) {
-        auto VD = cast<ValueDecl>(getDecl(item.second));
-        results.push_back(VD);
+      if (name.isSimpleName()) {
+        for (auto item : *iter) {
+          auto VD = cast<ValueDecl>(getDecl(item.second));
+          results.push_back(VD);
+        }
+      } else {
+        for (auto item : *iter) {
+          auto VD = cast<ValueDecl>(getDecl(item.second));
+          if (VD->getFullName().matchesRef(name))
+            results.push_back(VD);
+        }
       }
     }
   }
 
   // If the name is an operator name, also look for operator methods.
   if (name.isOperator() && OperatorMethodDecls) {
-    auto iter = OperatorMethodDecls->find(name);
+    auto iter = OperatorMethodDecls->find(name.getSimpleName());
     if (iter != OperatorMethodDecls->end()) {
       for (auto item : *iter) {
         auto VD = cast<ValueDecl>(getDecl(item.second));
@@ -792,7 +803,7 @@ void ModuleFile::loadDeclsConformingTo(KnownProtocolKind kind) {
 }
 
 void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
-                                   Identifier name,
+                                   DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
@@ -800,19 +811,37 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
   if (!ClassMembersByName)
     return;
 
-  auto iter = ClassMembersByName->find(name);
+  auto iter = ClassMembersByName->find(name.getSimpleName());
   if (iter == ClassMembersByName->end())
     return;
 
   if (!accessPath.empty()) {
-    for (auto item : *iter) {
-      auto vd = cast<ValueDecl>(getDecl(item.second));
-      auto dc = vd->getDeclContext();
-      while (!dc->getParent()->isModuleScopeContext())
-        dc = dc->getParent();
-      if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
-        if (nominal->getName() == accessPath.front().first)
-          results.push_back(vd);
+    // As a hack to avoid completely redoing how the module is indexed, we take
+    // the simple-name-based lookup then filter by the compound name if we have
+    // one.
+    if (name.isSimpleName()) {
+      for (auto item : *iter) {
+        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto dc = vd->getDeclContext();
+        while (!dc->getParent()->isModuleScopeContext())
+          dc = dc->getParent();
+        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+          if (nominal->getName() == accessPath.front().first)
+            results.push_back(vd);
+      }
+    } else {
+      for (auto item : *iter) {
+        auto vd = cast<ValueDecl>(getDecl(item.second));
+        if (!vd->getFullName().matchesRef(name))
+          continue;
+        
+        auto dc = vd->getDeclContext();
+        while (!dc->getParent()->isModuleScopeContext())
+          dc = dc->getParent();
+        if (auto nominal = dc->getDeclaredTypeInContext()->getAnyNominal())
+          if (nominal->getName() == accessPath.front().first)
+            results.push_back(vd);
+      }
     }
     return;
   }

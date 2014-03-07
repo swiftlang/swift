@@ -61,9 +61,9 @@ void Parser::DefaultArgumentInfo::setFunctionContext(DeclContext *DC) {
 }
 
 static ParserStatus parseDefaultArgument(Parser &P,
-                                    Parser::DefaultArgumentInfo *defaultArgs,
-                                         unsigned argIndex,
-                                         ExprHandle *&init) {
+                                   Parser::DefaultArgumentInfo *defaultArgs,
+                                   unsigned argIndex,
+                                   ExprHandle *&init) {
   SourceLoc equalLoc = P.consumeToken(tok::equal);
 
   // Enter a fresh default-argument context with a meaningless parent.

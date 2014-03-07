@@ -33,7 +33,7 @@ namespace namelookup {
 ///        type-checked. This is needed for shadowing resolution.
 /// \param extraImports Private imports to include in this search.
 void lookupInModule(Module *module, Module::AccessPathTy accessPath,
-                    Identifier name, SmallVectorImpl<ValueDecl *> &decls,
+                    DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     LazyResolver *typeResolver,
                     ArrayRef<Module::ImportedModule> extraImports = {});

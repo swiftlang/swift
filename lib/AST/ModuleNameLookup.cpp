@@ -220,7 +220,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
 
 void namelookup::lookupInModule(Module *startModule,
                                 Module::AccessPathTy topAccessPath,
-                                Identifier name,
+                                DeclName name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,

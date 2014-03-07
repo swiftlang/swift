@@ -91,9 +91,27 @@ BuiltinUnit::BuiltinUnit(Module &M)
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
 
+/// A lookup map for value decls. When declarations are added they are added
+/// under all variants of the name they can be found under.
+class DeclMap {
+  llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
+  
+public:
+  void add(ValueDecl *VD) {
+    if (!VD->hasName()) return;
+    VD->getFullName().addToLookupTable(Members, VD);
+  }
+  
+  decltype(Members)::const_iterator begin() const  { return Members.begin(); }
+  decltype(Members)::const_iterator end() const { return Members.end(); }
+  decltype(Members)::const_iterator find(DeclName Name) const {
+    return Members.find(Name);
+  }
+};
+
 class SourceFile::LookupCache {
-  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> TopLevelValues;
-  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> ClassMembers;
+  DeclMap TopLevelValues;
+  DeclMap ClassMembers;
   bool MemberCachePopulated = false;
   void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
   void addToMemberCache(ArrayRef<Decl*> decls);
@@ -103,7 +121,7 @@ public:
   
   LookupCache(const SourceFile &SF);
   
-  void lookupValue(AccessPathTy AccessPath, Identifier Name, 
+  void lookupValue(AccessPathTy AccessPath, DeclName Name,
                    NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
   
   void lookupVisibleDecls(AccessPathTy AccessPath,
@@ -115,7 +133,7 @@ public:
                           const SourceFile &SF);
                           
   void lookupClassMember(AccessPathTy accessPath,
-                         Identifier name,
+                         DeclName name,
                          SmallVectorImpl<ValueDecl*> &results,
                          const SourceFile &SF);
 
@@ -135,8 +153,10 @@ void SourceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      if (onlyOperators ? VD->getName().isOperator() : VD->hasName())
-        TopLevelValues[VD->getName()].push_back(VD);
+      if (onlyOperators ? VD->getName().isOperator() : VD->hasName()) {
+        // Cache the value under both its compound name and its full name.
+        TopLevelValues.add(VD);
+      }
     if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
     if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D))
@@ -165,7 +185,7 @@ void SourceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
              "inner types cannot be accessed by dynamic lookup");
       addToMemberCache(NTD->getMembers());
     } else if (VD->canBeAccessedByDynamicLookup()) {
-      ClassMembers[VD->getName()].push_back(VD);
+      ClassMembers.add(VD);
     }
   }
 }
@@ -175,15 +195,12 @@ SourceLookupCache::LookupCache(const SourceFile &SF) {
   doPopulateCache(SF.Decls, false);
 }
 
-
-void SourceLookupCache::lookupValue(AccessPathTy AccessPath, Identifier Name,
+void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,
                                     NLKind LookupKind,
                                     SmallVectorImpl<ValueDecl*> &Result) {
-  assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
-  
   // If this import is specific to some named type or decl ("import Swift.int")
   // then filter out any lookups that don't match.
-  if (AccessPath.size() == 1 && AccessPath.front().first != Name)
+  if (!Module::matchesAccessPath(AccessPath, Name))
     return;
   
   auto I = TopLevelValues.find(Name);
@@ -241,7 +258,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
 }
 
 void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
-                                          Identifier name,
+                                          DeclName name,
                                           SmallVectorImpl<ValueDecl*> &results,
                                           const SourceFile &SF) {
   if (!MemberCachePopulated)
@@ -333,16 +350,27 @@ DerivedFileUnit &Module::getDerivedFileUnit() const {
   for (const FileUnit *file : getFiles()) \
     file->name args;
 
-void Module::lookupValue(AccessPathTy AccessPath, Identifier Name,
+void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
                          NLKind LookupKind, 
                          SmallVectorImpl<ValueDecl*> &Result) const {
   FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
 }
 
-void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, Identifier name,
+void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(name, lookupKind, *this, result);
+  // There are currently no builtins with compound names.
+  if (!name.isSimpleName())
+    return;
+  
+  getCache().lookupValue(name.getSimpleName(), lookupKind, *this, result);
+  
+  #ifndef NDEBUG
+  for (auto r : result) {
+    assert(r->getFullName().isSimpleName()
+         && "please make the builtin lookup cache handle compound name lookup");
+  }
+  #endif
 }
 
 DerivedFileUnit::DerivedFileUnit(Module &M)
@@ -351,18 +379,16 @@ DerivedFileUnit::DerivedFileUnit(Module &M)
 }
 
 void DerivedFileUnit::lookupValue(Module::AccessPathTy accessPath,
-                                  Identifier name,
+                                  DeclName name,
                                   NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &result) const {
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-
   // If this import is specific to some named type or decl ("import Swift.int")
   // then filter out any lookups that don't match.
-  if (accessPath.size() == 1 && accessPath.front().first != name)
+  if (!Module::matchesAccessPath(accessPath, name))
     return;
-
+  
   for (auto D : DerivedDecls) {
-    if (name == D->getName())
+    if (D->getFullName().matchesRef(name))
       result.push_back(D);
   }
 }
@@ -371,7 +397,7 @@ void DerivedFileUnit::lookupVisibleDecls(Module::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
   assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-
+  
   Identifier Id;
   if (!accessPath.empty()) {
     Id = accessPath.front().first;
@@ -388,7 +414,7 @@ const {
   results.append(DerivedDecls.begin(), DerivedDecls.end());
 }
 
-void SourceFile::lookupValue(Module::AccessPathTy accessPath, Identifier name,
+void SourceFile::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                              NLKind lookupKind,
                              SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(accessPath, name, lookupKind, result);
@@ -417,13 +443,13 @@ void SourceFile::lookupClassMembers(Module::AccessPathTy accessPath,
 }
 
 void Module::lookupClassMember(AccessPathTy accessPath,
-                               Identifier name,
+                               DeclName name,
                                SmallVectorImpl<ValueDecl*> &results) const {
   FORWARD(lookupClassMember, (accessPath, name, results));
 }
 
 void SourceFile::lookupClassMember(Module::AccessPathTy accessPath,
-                                   Identifier name,
+                                   DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   getCache().lookupClassMember(accessPath, name, results, *this);
 }

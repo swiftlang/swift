@@ -276,16 +276,11 @@ bool SerializedASTFile::isSystemModule() const {
 }
 
 void SerializedASTFile::lookupValue(Module::AccessPathTy accessPath,
-                                    Identifier name, NLKind lookupKind,
+                                    DeclName name, NLKind lookupKind,
                                     SmallVectorImpl<ValueDecl*> &results) const{
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-
-  // If this import is specific to some named type or decl
-  // ("import typealias Swift.Int"), then filter out any lookups that
-  // don't match.
-  if (accessPath.size() == 1 && accessPath.front().first != name)
+  if (!Module::matchesAccessPath(accessPath, name))
     return;
-
+  
   File.lookupValue(name, results);
 }
 
@@ -307,7 +302,7 @@ void SerializedASTFile::lookupClassMembers(Module::AccessPathTy accessPath,
 
 void
 SerializedASTFile::lookupClassMember(Module::AccessPathTy accessPath,
-                                     Identifier name,
+                                     DeclName name,
                                      SmallVectorImpl<ValueDecl*> &decls) const {
   File.lookupClassMember(accessPath, name, decls);
 }

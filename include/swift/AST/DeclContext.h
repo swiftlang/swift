@@ -248,7 +248,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, Identifier name, unsigned options,
+  bool lookupQualified(Type type, DeclName name, unsigned options,
                        LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 

@@ -43,6 +43,7 @@ namespace swift {
   enum class DeclKind : uint8_t;
   class ExtensionDecl;
   class DebuggerClient;
+  class DeclName;
   class DerivedFileUnit;
   class FileUnit;
   class FuncDecl;
@@ -149,7 +150,14 @@ class Module : public DeclContext {
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<Module::AccessPathTy, Module*> ImportedModule;
-
+  
+  static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
+    assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
+  
+    return AccessPath.empty()
+      || DeclName(AccessPath.front().first).matchesRef(Name);
+  }
+  
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.
   class OrderImportedModules {
   public:
@@ -213,7 +221,7 @@ public:
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(AccessPathTy AccessPath, Identifier Name, NLKind LookupKind,
+  void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
   /// Find ValueDecls in the module and pass them to the given consumer object.
@@ -246,7 +254,7 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   void lookupClassMember(AccessPathTy accessPath,
-                         Identifier name,
+                         DeclName name,
                          SmallVectorImpl<ValueDecl*> &results) const;
 
   /// Look for the conformance of the given type to the given protocol.
@@ -435,7 +443,7 @@ public:
   /// within this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
@@ -456,7 +464,7 @@ public:
   ///
   /// This does a simple local lookup, not recursively looking through imports.
   virtual void lookupClassMember(Module::AccessPathTy accessPath,
-                                 Identifier name,
+                                 DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
 
   /// Finds all top-level decls in this file.
@@ -569,7 +577,7 @@ public:
     DerivedDecls.push_back(FD);
   }
 
-  void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+  void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                    NLKind lookupKind,
                    SmallVectorImpl<ValueDecl*> &result) const override;
   
@@ -663,7 +671,7 @@ public:
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
@@ -674,7 +682,7 @@ public:
   virtual void lookupClassMembers(Module::AccessPathTy accessPath,
                                   VisibleDeclConsumer &consumer) const override;
   virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
+  lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
@@ -762,7 +770,7 @@ private:
 public:
   explicit BuiltinUnit(Module &M);
 
-  virtual void lookupValue(Module::AccessPathTy accessPath, Identifier name,
+  virtual void lookupValue(Module::AccessPathTy accessPath, DeclName name,
                            NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 

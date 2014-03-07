@@ -143,11 +143,14 @@ public:
 private:
   bool isOperatorSlow() const;
 };
-
+  
+class DeclName;
+  
 } // end namespace swift
 
 namespace llvm {
   raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
+  raw_ostream &operator<<(raw_ostream &OS, swift::DeclName I);
   
   // Identifiers hash just like pointers.
   template<> struct DenseMapInfo<swift::Identifier> {
@@ -212,6 +215,10 @@ class DeclName {
   // run-length-encoded array of identifier pieces owned by the ASTContext.
   llvm::PointerUnion<Identifier, CompoundDeclName*> SimpleOrCompound;
   
+  DeclName(void *Opaque)
+    : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
+  {}
+  
 public:
   /// Build a null name.
   DeclName() : SimpleOrCompound(Identifier()) {}
@@ -256,12 +263,65 @@ public:
     return !SimpleOrCompound.dyn_cast<CompoundDeclName*>();
   }
   
+  /// True if this name is a simple one-component name identical to the
+  /// given identifier.
+  bool isSimpleName(Identifier name) const {
+    return isSimpleName() && getSimpleName() == name;
+  }
+  
   /// True if this name is an operator.
   bool isOperator() const {
     return isSimpleName() && getSimpleName().isOperator();
   }
+  
+  /// True if this name should be found by a decl ref or member ref under the
+  /// name specified by 'refName'.
+  ///
+  /// We currently match compound names either when their first component
+  /// matches a simple name lookup or when the full compound name matches.
+  bool matchesRef(DeclName refName) const {
+    // Identical names always match.
+    if (SimpleOrCompound == refName.SimpleOrCompound)
+      return true;
+    // If the reference is a simple name, try simple name matching.
+    if (refName.isSimpleName())
+      return refName.getSimpleName() == getSimpleName();
+    // The names don't match.
+    return false;
+  }
+  
+  /// Add a DeclName to a lookup table so that it can be found by its simple
+  /// name or its compound name.
+  template<typename LookupTable, typename Element>
+  void addToLookupTable(LookupTable &table, const Element &elt) {
+    table[*this].push_back(elt);
+    if (!isSimpleName()) {
+      table[getSimpleName()].push_back(elt);
+    }
+  }
+  
+  void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
+  static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 };
   
 } // end namespace swift
+
+namespace llvm {
+  // DeclNames hash just like pointers.
+  template<> struct DenseMapInfo<swift::DeclName> {
+    static swift::DeclName getEmptyKey() {
+      return swift::Identifier::getEmptyKey();
+    }
+    static swift::DeclName getTombstoneKey() {
+      return swift::Identifier::getTombstoneKey();
+    }
+    static unsigned getHashValue(swift::DeclName Val) {
+      return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
+    }
+    static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
+      return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+    }
+  };  
+} // end namespace llvm
 
 #endif

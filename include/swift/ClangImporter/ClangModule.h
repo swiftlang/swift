@@ -52,7 +52,7 @@ public:
   virtual bool isSystemModule() const;
 
   virtual void lookupValue(Module::AccessPathTy accessPath,
-                           Identifier name, NLKind lookupKind,
+                           DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual void lookupVisibleDecls(Module::AccessPathTy accessPath,
@@ -63,7 +63,7 @@ public:
                                   VisibleDeclConsumer &consumer) const override;
 
   virtual void
-  lookupClassMember(Module::AccessPathTy accessPath, Identifier name,
+  lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;

@@ -25,6 +25,14 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   return OS << I.get();
 }
 
+raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
+  if (I.isSimpleName())
+    return OS << I.getSimpleName();
+  
+  for (auto c : I.getComponents())
+    OS << c.get() << ':';
+  return OS;
+}
 
 bool Identifier::isOperatorSlow() const {
   StringRef data = str();

@@ -2286,7 +2286,7 @@ public:
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.
-  ArrayRef<ValueDecl *> lookupDirect(Identifier name);
+  ArrayRef<ValueDecl *> lookupDirect(DeclName name);
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).

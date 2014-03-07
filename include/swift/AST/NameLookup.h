@@ -27,6 +27,7 @@
 namespace swift {
   class ASTContext;
   class DeclContext;
+  class DeclName;
   class Expr;
   class LazyResolver;
   class Module;
@@ -190,7 +191,7 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(Identifier Name, DeclContext *DC,
+  UnqualifiedLookup(DeclName Name, DeclContext *DC,
                     LazyResolver *TypeResolver,
                     SourceLoc Loc = SourceLoc(),
                     bool IsTypeLookup = false);
@@ -285,8 +286,7 @@ public:
     results.push_back(VD);
   }
 };
-
-
+  
 /// \brief Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///

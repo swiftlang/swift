@@ -367,7 +367,7 @@ public:
   Module *getShadowedModule() const { return ShadowedModule; }
 
   /// Searches the module's top-level decls for the given identifier.
-  void lookupValue(Identifier name, SmallVectorImpl<ValueDecl*> &results);
+  void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's operators for one with the given name and fixity.
   ///
@@ -405,7 +405,7 @@ public:
   ///
   /// This is intended for use with id-style lookup.
   void lookupClassMember(Module::AccessPathTy accessPath,
-                         Identifier name,
+                         DeclName name,
                          SmallVectorImpl<ValueDecl*> &results);
 
   /// Reports all link-time dependencies.

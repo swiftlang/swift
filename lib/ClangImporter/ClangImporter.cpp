@@ -766,15 +766,19 @@ void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
 }
 
 void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
-                                  Identifier name, NLKind lookupKind,
+                                  DeclName name, NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &results) const {
-  assert(accessPath.size() <= 1 && "can only refer to top-level decls");
-  if (accessPath.size() == 1 && accessPath.front().first != name)
+  if (!Module::matchesAccessPath(accessPath, name))
     return;
-
+  
+  // There should be no multi-part top-level decls in a Clang module.
+  if (!name.isSimpleName())
+    return;
+  
   VectorDeclConsumer vectorWriter(results);
   FilteringVisibleDeclConsumer filteringConsumer(vectorWriter, this);
-  owner.lookupValue(name, filteringConsumer);
+  
+  owner.lookupValue(name.getSimpleName(), filteringConsumer);
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
@@ -838,13 +842,21 @@ void ClangModuleUnit::getImportedModules(
 }
 
 /// Returns true if the first selector piece matches the given identifier.
-static bool selectorStartsWithName(clang::Selector sel, Identifier name) {
-  return sel.getNameForSlot(0) == name.str();
+static bool selectorMatchesName(clang::Selector sel, DeclName name) {
+  if (name.isSimpleName())
+    return sel.getNameForSlot(0) == name.getSimpleName().str();
+  
+  if (sel.getNumArgs() != name.getComponents().size())
+    return false;
+  for (unsigned i = 0, e = sel.getNumArgs(); i < e; ++i)
+    if (sel.getNameForSlot(i) != name.getComponents()[i].str())
+      return false;
+  return true;
 }
 
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
                                    VisibleDeclConsumer &consumer,
-                                   Identifier name = Identifier()) {
+                                   DeclName name = DeclName()) {
   clang::Sema &S = Impl.getClangSema();
   clang::ExternalASTSource *source = S.getExternalSource();
 
@@ -855,7 +867,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
   clang::IdentifierInfo *setObjectId = nullptr;
   clang::IdentifierInfo *atIndexedSubscriptId = nullptr;
   clang::IdentifierInfo *forKeyedSubscriptId = nullptr;
-  bool isSubscript = name == Impl.SwiftContext.Id_subscript;
+  bool isSubscript = name.isSimpleName(Impl.SwiftContext.Id_subscript);
   if (isSubscript) {
     auto &identTable = S.Context.Idents;
     objectAtIndexedSubscriptId = &identTable.get("objectAtIndexedSubscript");
@@ -867,7 +879,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
 
   // Function that determines whether the given selector is acceptable.
   auto acceptableSelector = [&](clang::Selector sel) -> bool {
-    if (name.empty())
+    if (!name)
       return true;
 
     switch (sel.getNumArgs()) {
@@ -899,7 +911,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       break;
     }
 
-    return selectorStartsWithName(sel, name);
+    return selectorMatchesName(sel, name);
   };
 
   // Force load all external methods.
@@ -931,14 +943,14 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
           // a getter, return a property.  If we see a setter, we know that
           // there is a getter, and we will visit it and return a property at
           // that time.
-          if (name.empty() && list->Method->param_size() != 0)
+          if (!name && list->Method->param_size() != 0)
             continue;
           searchForDecl = property;
         }
       }
 
       if (auto VD = cast_or_null<ValueDecl>(Impl.importDeclReal(searchForDecl))) {
-        if (isSubscript || name.empty()) {
+        if (isSubscript || !name) {
           // When searching for a subscript, we may have found a getter.  If so,
           // use the subscript instead.
           if (auto func = dyn_cast<FuncDecl>(VD)) {
@@ -972,7 +984,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
 
 void
 ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
-                                   Identifier name,
+                                   DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
   // FIXME: Not limited by module.
   VectorDeclConsumer consumer(results);
