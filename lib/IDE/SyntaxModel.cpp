@@ -437,6 +437,7 @@ bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
 bool ModelASTWalker::shouldPassBraceStructureNode(BraceStmt *S) {
   return (!dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<TopLevelCodeDecl>(Parent.getAsDecl()) &&
+          !dyn_cast_or_null<CaseStmt>(Parent.getAsStmt()) &&
           S->getSourceRange().isValid());
 }
 
