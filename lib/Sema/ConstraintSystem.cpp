@@ -73,6 +73,17 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
                                        bool updateState) {
+  
+  // If the type to be fixed is an optional type that wraps the type parameter
+  // itself, we do not want to go through with the assignment. To do so would
+  // force the type variable to be adjacent to itself.
+  if (type->getKind() == TypeKind::Optional) {
+    auto optType = dyn_cast<OptionalType>(type.getPointer());
+    if (optType->getBaseType()->getDesugaredType() ==
+        typeVar->getDesugaredType())
+      return;
+  }
+  
   typeVar->getImpl().assignFixedType(type, getSavedBindings());
 
   if (!updateState)
