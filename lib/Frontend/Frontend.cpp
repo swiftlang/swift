@@ -33,13 +33,13 @@
 
 using namespace swift;
 
-void swift::CompilerInstance::createSILModule() {
+void CompilerInstance::createSILModule() {
   assert(getMainModule());
   TheSILModule = SILModule::createEmptyModule(getMainModule());
 }
 
-void swift::CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
-                             LangOptions &LangOpts) {
+void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
+                                               LangOptions &LangOpts) {
   
   llvm::Triple triple = llvm::Triple(IRGenOpts.Triple);
   
@@ -72,7 +72,7 @@ void swift::CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   }
 }
 
-bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
+bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
   // Honor -Xllvm.
