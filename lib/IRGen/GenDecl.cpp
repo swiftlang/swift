@@ -852,9 +852,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto &ti = getTypeInfo(var->getLoweredType());
-  // TODO: Debug info needs to be able to use a SILGlobalVariable.
-  // We also ought to have a better debug name.
-  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti, nullptr);
+  // There is no VarDecl for a SILGlobalVariable, and thus also no context.
+  DeclContext *DeclCtx = nullptr;
+  DebugTypeInfo DbgTy(var->getLoweredType().getSwiftRValueType(), ti, DeclCtx);
   Optional<SILLocation> loc;
   if (var->hasLocation())
     loc = var->getLocation();
