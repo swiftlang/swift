@@ -201,7 +201,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 if [[ ! "$SKIP_IOS" ]]; then
     IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64 swift_stdlib_ios_armv7 swift_stdlib_ios_simulator_i386)
     # FIXME: iOS tests for some platforms are not yet clean enough to enable
-    IOS_TEST_PRODUCTS=(swift_stdlib_ios_simulator_x86_64)
+    IOS_TEST_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
         SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
