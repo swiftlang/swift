@@ -161,19 +161,16 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
     // FIXME: Working with filenames is fragile, maybe use the real path
     // or have some kind of FileManager.
     using namespace llvm::sys::path;
-    {
-      Optional<unsigned> ExistingBufferID =
-        SourceMgr.getIDForBufferIdentifier(File);
-      if (ExistingBufferID.hasValue()) {
-        if (SILMode || (MainMode && filename(File) == "main.swift"))
-          MainBufferID = ExistingBufferID.getValue();
+    if (Optional<unsigned> ExistingBufferID =
+            SourceMgr.getIDForBufferIdentifier(File)) {
+      if (SILMode || (MainMode && filename(File) == "main.swift"))
+        MainBufferID = ExistingBufferID.getValue();
 
-        if (PrimaryInput && PrimaryInput->isFilename() &&
-            PrimaryInput->Index == i)
-          PrimaryBufferID = ExistingBufferID.getValue();
+      if (PrimaryInput && PrimaryInput->isFilename() &&
+          PrimaryInput->Index == i)
+        PrimaryBufferID = ExistingBufferID.getValue();
 
-        continue; // replaced by a memory buffer.
-      }
+      continue; // replaced by a memory buffer.
     }
 
     // Open the input file.
