@@ -182,9 +182,9 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
       return true;
     }
 
+    // Transfer ownership of the MemoryBuffer to the SourceMgr.
     unsigned BufferID = SourceMgr.addNewSourceBuffer(std::move(InputFile));
 
-    // Transfer ownership of the MemoryBuffer to the SourceMgr.
     BufferIDs.push_back(BufferID);
 
     if (SILMode || (MainMode && filename(File) == "main.swift"))
