@@ -27,6 +27,20 @@
 
     println(nameCaller()) // prints your module name
 
+* Selector-style methods can now be referenced without applying arguments
+  using member syntax "foo.bar:bas:", for instance, to test for the availability
+  of an optional protocol method:
+
+    func getFrameOfObjectValueForColumn(ds: NSTableViewDataSource,
+                                        tableView: NSTableView,
+                                        column: NSTableColumn,
+                                        row: Int) -> AnyObject? {
+      if let getObjectValue = ds.tableView:objectValueForTableColumn:row: {
+        return getObjectValue(tableView, column, row)
+      }
+      return nil
+    }
+
 2014-03-05
 ----------
 
