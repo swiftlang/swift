@@ -978,61 +978,12 @@ commit_to_conversions:
 
   // For a single potential conversion, directly recurse, so that we
   // don't allocate a new constraint or constraint locator.
+  auto restriction = potentialConversions[0];
 
   // Record that we have a conversion restriction on this path.
-  ConstraintRestrictions.push_back({type1, type2, potentialConversions[0]});
-
-  switch (potentialConversions[0]) {
-  case ConversionRestrictionKind::TupleToTuple:
-    return matchTupleTypes(type1->castTo<TupleType>(),
-                           type2->castTo<TupleType>(),
-                           kind, flags, locator);
-
-  case ConversionRestrictionKind::ScalarToTuple:
-    return matchScalarToTupleTypes(type1, type2->castTo<TupleType>(), kind,
-                                   subFlags, locator);
-
-  case ConversionRestrictionKind::TupleToScalar:
-    return matchTupleToScalarTypes(type1->castTo<TupleType>(), type2,
-                                   kind, subFlags, locator);
-
-  case ConversionRestrictionKind::DeepEquality:
-    return matchDeepEqualityTypes(type1, type2, locator);
-
-  case ConversionRestrictionKind::Superclass:
-    return matchSuperclassTypes(type1, type2, kind, flags, locator);
-
-  case ConversionRestrictionKind::LValueToRValue:
-    return matchTypes(type1->getRValueType(), type2, kind, subFlags, locator);
-
-  case ConversionRestrictionKind::Existential:
-    return matchExistentialTypes(type1, type2, kind, flags, locator);
-
-  case ConversionRestrictionKind::ValueToOptional: {
-    auto boundGenericType2 = type2->castTo<BoundGenericType>();
-    assert(boundGenericType2->getDecl()->classifyAsOptionalType());
-    assert(boundGenericType2->getGenericArgs().size() == 1);
-    return matchTypes(type1, boundGenericType2->getGenericArgs()[0],
-                      kind, subFlags, locator);
-  }
-      
-  case ConversionRestrictionKind::UncheckedOptionalToOptional:
-  case ConversionRestrictionKind::OptionalToOptional: {
-    auto boundGenericType1 = type1->castTo<BoundGenericType>();
-    auto boundGenericType2 = type2->castTo<BoundGenericType>();
-    assert(boundGenericType1->getDecl()->classifyAsOptionalType());
-    assert(boundGenericType1->getGenericArgs().size() == 1);
-    assert(boundGenericType2->getDecl()->classifyAsOptionalType());
-    assert(boundGenericType2->getGenericArgs().size() == 1);
-    return matchTypes(boundGenericType1->getGenericArgs()[0],
-                      boundGenericType2->getGenericArgs()[0],
-                      kind, subFlags, locator);
-  }
-      
-  case ConversionRestrictionKind::User:
-    return tryUserConversion(*this, type1, ConstraintKind::Subtype, type2,
-                              locator);
-  }
+  ConstraintRestrictions.push_back({type1, type2, restriction});
+  return simplifyRestrictedConstraint(restriction, type1, type2,
+                                      kind, subFlags, locator);
 }
 
 ConstraintSystem::SolutionKind
@@ -1840,6 +1791,75 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   }
 }
 
+/// Given that we have a conversion constraint between two types, and
+/// that the given constraint-reduction rule applies between them at
+/// the top level, apply it and generate any necessary recursive
+/// constraints.
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
+                                               Type type1, Type type2,
+                                               TypeMatchKind matchKind,
+                                               unsigned flags,
+                                               ConstraintLocatorBuilder locator) {
+  switch (restriction) {
+  case ConversionRestrictionKind::TupleToTuple:
+    return matchTupleTypes(type1->castTo<TupleType>(),
+                           type2->castTo<TupleType>(),
+                           matchKind, flags, locator);
+
+  case ConversionRestrictionKind::ScalarToTuple:
+    return matchScalarToTupleTypes(type1,
+                                   type2->castTo<TupleType>(),
+                                   matchKind, flags, locator);
+
+  case ConversionRestrictionKind::TupleToScalar:
+    return matchTupleToScalarTypes(type1->castTo<TupleType>(),
+                                   type2,
+                                   matchKind, flags, locator);
+
+  case ConversionRestrictionKind::DeepEquality:
+    return matchDeepEqualityTypes(type1, type2, locator);
+
+  case ConversionRestrictionKind::Superclass:
+    return matchSuperclassTypes(type1, type2, matchKind, flags, locator);
+
+  case ConversionRestrictionKind::LValueToRValue:
+    return matchTypes(type1->getRValueType(), type2,
+                      matchKind, flags, locator);
+
+  case ConversionRestrictionKind::Existential:
+    return matchExistentialTypes(type1, type2,
+                                 matchKind, flags, locator);
+
+  case ConversionRestrictionKind::ValueToOptional: {
+    auto generic2 = type2->castTo<BoundGenericType>();
+    assert(generic2->getDecl()->classifyAsOptionalType());
+    return matchTypes(type1, generic2->getGenericArgs()[0],
+                      matchKind, flags, locator);
+  }
+
+  case ConversionRestrictionKind::UncheckedOptionalToOptional:
+  case ConversionRestrictionKind::OptionalToOptional: {
+    auto generic1 = type1->castTo<BoundGenericType>();
+    auto generic2 = type2->castTo<BoundGenericType>();
+    assert(generic1->getDecl()->classifyAsOptionalType());
+    assert(generic2->getDecl()->classifyAsOptionalType());
+    return matchTypes(generic1->getGenericArgs()[0],
+                      generic2->getGenericArgs()[0],
+                      matchKind, flags, locator);
+  }
+
+  case ConversionRestrictionKind::User:
+    assert(matchKind >= TypeMatchKind::Conversion);
+    return tryUserConversion(*this, type1,
+                             ConstraintKind::Subtype,
+                             type2,
+                             locator);
+  }
+  llvm_unreachable("bad conversion restriction");
+}
+
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
@@ -1854,89 +1874,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // If there is a restriction on this constraint, apply it directly rather
     // than going through the general \c matchTypes() machinery.
     if (auto restriction = constraint.getRestriction()) {
-      SolutionKind result;
-      switch (*restriction) {
-      case ConversionRestrictionKind::TupleToTuple:
-        result = matchTupleTypes(constraint.getFirstType()->castTo<TupleType>(),
-                                 constraint.getSecondType()
-                                   ->castTo<TupleType>(),
-                                 matchKind, TMF_GenerateConstraints,
-                                 constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::ScalarToTuple:
-        result = matchScalarToTupleTypes(constraint.getFirstType(),
-                                         constraint.getSecondType()
-                                           ->castTo<TupleType>(),
-                                         matchKind, TMF_GenerateConstraints,
-                                         constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::TupleToScalar:
-        result = matchTupleToScalarTypes(constraint.getFirstType()
-                                           ->castTo<TupleType>(),
-                                         constraint.getSecondType(),
-                                         matchKind, TMF_GenerateConstraints,
-                                         constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::DeepEquality:
-        return matchDeepEqualityTypes(constraint.getFirstType(),
-                                      constraint.getSecondType(),
-                                      constraint.getLocator());
-
-      case ConversionRestrictionKind::Superclass:
-        result = matchSuperclassTypes(constraint.getFirstType(),
-                                       constraint.getSecondType(),
-                                       matchKind, TMF_GenerateConstraints,
-                                       constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::LValueToRValue:
-        result = matchTypes(constraint.getFirstType()->getRValueType(),
-                            constraint.getSecondType(),
-                            matchKind, TMF_GenerateConstraints,
-                            constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::Existential:
-        result = matchExistentialTypes(constraint.getFirstType(),
-                                       constraint.getSecondType(),
-                                       matchKind, TMF_GenerateConstraints,
-                                       constraint.getLocator());
-        break;
-
-      case ConversionRestrictionKind::ValueToOptional: {
-        auto generic2 = constraint.getSecondType()->castTo<BoundGenericType>();
-        assert(generic2->getDecl()->classifyAsOptionalType());
-        result = matchTypes(constraint.getFirstType(),
-                            generic2->getGenericArgs()[0],
-                            matchKind, TMF_GenerateConstraints,
-                            constraint.getLocator());
-        break;
-      }
-
-      case ConversionRestrictionKind::UncheckedOptionalToOptional:
-      case ConversionRestrictionKind::OptionalToOptional: {
-        auto generic1 = constraint.getFirstType()->castTo<BoundGenericType>();
-        auto generic2 = constraint.getSecondType()->castTo<BoundGenericType>();
-        assert(generic1->getDecl()->classifyAsOptionalType());
-        assert(generic2->getDecl()->classifyAsOptionalType());
-        result = matchTypes(generic1->getGenericArgs()[0],
-                            generic2->getGenericArgs()[0],
-                            matchKind, TMF_GenerateConstraints,
-                            constraint.getLocator());
-        break;
-      }
-          
-      case ConversionRestrictionKind::User:
-        assert(constraint.getKind() >= ConstraintKind::Conversion);
-        result = tryUserConversion(*this, constraint.getFirstType(),
-                                   ConstraintKind::Subtype,
-                                   constraint.getSecondType(),
-                                   constraint.getLocator());
-        break;
-      }
+      SolutionKind result = simplifyRestrictedConstraint(*restriction,
+                                                         constraint.getFirstType(),
+                                                         constraint.getSecondType(),
+                                                         matchKind,
+                                                         TMF_GenerateConstraints,
+                                                         constraint.getLocator());
 
       // If we actually solved something, record what we did.
       switch(result) {

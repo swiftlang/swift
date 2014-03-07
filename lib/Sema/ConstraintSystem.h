@@ -1749,6 +1749,14 @@ private:
   /// \brief Simplify the given constaint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
 
+  /// \brief Simplify a conversion constraint by applying the given
+  /// reduction rule, which is known to apply at the outermost level.
+  SolutionKind simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
+                                            Type type1, Type type2,
+                                            TypeMatchKind matchKind,
+                                            unsigned flags,
+                                            ConstraintLocatorBuilder locator);
+
 public:
   /// \brief Simplify the system of constraints, by breaking down complex
   /// constraints into simpler constraints.
