@@ -24,7 +24,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h" // bad dependency
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -427,16 +426,14 @@ void DiagnosticEngine::flushActiveDiagnostic() {
         }
 
         // Build a buffer with the pretty-printed declaration.
-        auto memBuffer = llvm::MemoryBuffer::getMemBufferCopy(buffer,
-                                                              bufferName);
-        SourceMgr.addNewSourceBuffer(memBuffer);
+        auto bufferID = SourceMgr.addMemBufferCopy(buffer, bufferName);
+        auto memBufferStartLoc = SourceMgr.getLocForBufferStart(bufferID);
 
         // Go through all of the pretty-printed entries and record their
         // locations.
         for (auto entry : entries) {
-          PrettyPrintedDeclarations[entry.first]
-            = SourceLoc(llvm::SMLoc::getFromPointer(memBuffer->getBufferStart()
-                                                    + entry.second));
+          PrettyPrintedDeclarations[entry.first] =
+              memBufferStartLoc.getAdvancedLoc(entry.second);
         }
 
         // Grab the pretty-printed location.

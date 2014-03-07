@@ -115,12 +115,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
+  *BufferID = Ctx.SourceMgr.addMemBufferCopy(AugmentedCode, "<REPL Input>");
 
   const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
-
-  auto Buffer =
-      llvm::MemoryBuffer::getMemBufferCopy(AugmentedCode, "<REPL Input>");
-  *BufferID = Ctx.SourceMgr.addNewSourceBuffer(Buffer);
 
   Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
 

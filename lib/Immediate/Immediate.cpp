@@ -1118,10 +1118,8 @@ public:
         return true;
         
       case REPLInputKind::REPLDirective: {
-        auto Buffer =
-          llvm::MemoryBuffer::getMemBufferCopy(Line, "<REPL Input>");
         unsigned BufferID =
-          CI.getSourceMgr().addNewSourceBuffer(Buffer);
+            CI.getSourceMgr().addMemBufferCopy(Line, "<REPL Input>");
         Lexer L(CI.getASTContext().LangOpts,
                 CI.getSourceMgr(), BufferID, nullptr, false /*not SIL*/);
         Token Tok;

@@ -128,11 +128,7 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   if (CodeCompletePoint.first) {
     auto MemBuf = CodeCompletePoint.first;
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    llvm::MemoryBuffer *CodeCompletionBuffer =
-        llvm::MemoryBuffer::getMemBufferCopy(MemBuf->getBuffer(),
-                                             MemBuf->getBufferIdentifier());
-    unsigned CodeCompletionBufferID =
-        SourceMgr.addNewSourceBuffer(CodeCompletionBuffer);
+    unsigned CodeCompletionBufferID = SourceMgr.addMemBufferCopy(MemBuf);
     BufferIDs.push_back(CodeCompletionBufferID);
     SourceMgr.setCodeCompletionPoint(CodeCompletionBufferID,
                                      CodeCompletePoint.second);
@@ -148,10 +144,8 @@ bool swift::CompilerInstance::setup(const CompilerInvocation &Invok) {
   // and they can replace the contents of an input filename.
   for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    auto Buf = Invocation.getInputBuffers()[i];
-    unsigned BufferID = SourceMgr.addNewSourceBuffer(
-      llvm::MemoryBuffer::getMemBufferCopy(Buf->getBuffer(),
-                                           Buf->getBufferIdentifier()));
+    unsigned BufferID =
+        SourceMgr.addMemBufferCopy(Invocation.getInputBuffers()[i]);
     BufferIDs.push_back(BufferID);
 
     if (SILMode)
