@@ -359,7 +359,7 @@ function(compile_swift_files)
   endif()
 
   if(SWIFTFILE_IS_MAIN)
-    set(module_source_file)
+    set(module_file)
     set(postprocessing)
   else()
     # FIXME: We can control the module output path now.
@@ -370,16 +370,16 @@ function(compile_swift_files)
       set(arch_subdir "/32")
     endif()
 
-    set(module_source_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
+    set(module_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
-    set(module_source_file ${module_source_dir}/${module_source_name}.swiftmodule)
-    set(intermediate_module_source_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
+    set(module_file ${module_dir}/${module_source_name}.swiftmodule)
+    set(intermediate_module_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
     list(APPEND swift_flags -emit-module)
     set(postprocessing
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_source_dir}
-      COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_source_file} ${module_source_file})
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir}
+      COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_file} ${module_file})
 
-    install(FILES ${module_source_file}
+    install(FILES ${module_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}${arch_subdir})
   endif()
 
@@ -390,7 +390,7 @@ function(compile_swift_files)
   endif()
 
   add_custom_command(
-    OUTPUT ${objfile} ${module_source_file}
+    OUTPUT ${objfile} ${module_file}
     COMMAND ${SWIFT_COMPILER} "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
     ${postprocessing} 
     DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files}
@@ -407,7 +407,7 @@ function(compile_swift_files)
 
   # Make sure this object file gets cleaned up.
   set_directory_properties(
-    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile};${module_source_file}")
+    PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES "${objfile};${module_file}")
 endfunction()
 
 # Process the sources within the given variable, pulling out any Swift
