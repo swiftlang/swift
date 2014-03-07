@@ -1534,7 +1534,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
   
   // We can only downcast to an existential if the destination protocols are
-  // objc and the source type is an objc class or an existential bounded by objc
+  // objc and the source type is a class or an existential bounded by objc
   // protocols.
   if (toExistential) {
     if (fromExistential) {
@@ -1544,7 +1544,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
     } else {
       auto fromClass = fromType->getClassOrBoundGenericClass();
-      if (!fromClass || !fromClass->isObjC())
+      if (!fromClass)
         goto unsupported_existential_cast;
     }
 
