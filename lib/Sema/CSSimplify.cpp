@@ -1802,16 +1802,21 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                                                unsigned flags,
                                                ConstraintLocatorBuilder locator) {
   switch (restriction) {
+  // for $< in { <, <c, <oc }:
+  //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::TupleToTuple:
     return matchTupleTypes(type1->castTo<TupleType>(),
                            type2->castTo<TupleType>(),
                            matchKind, flags, locator);
 
+  //   T <c U ===> T <c (U)
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1,
                                    type2->castTo<TupleType>(),
                                    matchKind, flags, locator);
 
+  // for $< in { <, <c, <oc }:
+  //   T $< U ===> (T) $< U
   case ConversionRestrictionKind::TupleToScalar:
     return matchTupleToScalarTypes(type1->castTo<TupleType>(),
                                    type2,
@@ -1827,19 +1832,29 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchTypes(type1->getRValueType(), type2,
                       matchKind, flags, locator);
 
+  // for $< in { <, <c, <oc }:
+  //   T $< U, U : P_i ===> T $< protocol<P_i...>
   case ConversionRestrictionKind::Existential:
     return matchExistentialTypes(type1, type2,
                                  matchKind, flags, locator);
 
+  // for $< in { <, <c, <oc }:
+  //   T $< U ===> T $< U?
   case ConversionRestrictionKind::ValueToOptional: {
+    assert(matchKind >= TypeMatchKind::Subtype);
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
                       matchKind, flags, locator);
   }
 
+  // for $< in { <, <c, <oc }:
+  //   T $< U ===> T? $< U?
+  //   T $< U ===> @unchecked T? $< @unchecked U?
+  //   T $< U ===> @unchecked T? $< U?
   case ConversionRestrictionKind::UncheckedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
+    assert(matchKind >= TypeMatchKind::Subtype);
     auto generic1 = type1->castTo<BoundGenericType>();
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic1->getDecl()->classifyAsOptionalType());
@@ -1849,6 +1864,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       matchKind, flags, locator);
   }
 
+  // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
   case ConversionRestrictionKind::User:
     assert(matchKind >= TypeMatchKind::Conversion);
     return tryUserConversion(*this, type1,
