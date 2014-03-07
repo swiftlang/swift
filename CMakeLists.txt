@@ -360,10 +360,9 @@ function(compile_swift_files)
 
   if(SWIFTFILE_IS_MAIN)
     set(module_file)
-    set(postprocessing)
+    set(create_module_dir)
   else()
-    # FIXME: We can control the module output path now.
-    get_filename_component(module_source_name ${objfile} NAME_WE)
+    get_filename_component(module_name ${objfile} NAME_WE)
 
     set(arch_subdir "")
     if(NOT SWIFT_HOST_TRIPLE MATCHES "64")
@@ -372,12 +371,11 @@ function(compile_swift_files)
 
     set(module_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
-    set(module_file ${module_dir}/${module_source_name}.swiftmodule)
-    set(intermediate_module_file ${CMAKE_CURRENT_BINARY_DIR}/${module_source_name}.swiftmodule)
-    list(APPEND swift_flags -emit-module)
-    set(postprocessing
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir}
-      COMMAND ${CMAKE_COMMAND} -E rename ${intermediate_module_file} ${module_file})
+    set(module_file ${module_dir}/${module_name}.swiftmodule)
+    list(APPEND swift_flags -emit-module -emit-module-path ${module_file})
+
+    set(create_module_dir
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir})
 
     install(FILES ${module_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}${arch_subdir})
@@ -391,8 +389,8 @@ function(compile_swift_files)
 
   add_custom_command(
     OUTPUT ${objfile} ${module_file}
+    ${create_module_dir}
     COMMAND ${SWIFT_COMPILER} "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    ${postprocessing} 
     DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
