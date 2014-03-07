@@ -145,6 +145,9 @@ public:
   /// termination.
   bool PrintStats = false;
 
+  /// Indicates whether the playground transformation should be applied.
+  bool Playground = false;
+
   /// Indicates whether standard help should be shown.
   bool PrintHelp = false;
 

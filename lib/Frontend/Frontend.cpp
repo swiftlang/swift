@@ -308,6 +308,9 @@ void CompilerInstance::performParse() {
                             CurTUElem);
       CurTUElem = MainFile.Decls.size();
     } while (!Done);
+
+    if (Invocation.getFrontendOptions().Playground)
+      performPlaygroundTransform(MainFile);
   }
 
   if (!Invocation.getParseOnly()) {

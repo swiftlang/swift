@@ -115,6 +115,10 @@ namespace swift {
   /// \param StartElem Where to start for incremental name binding in the main
   ///                  source file.
   void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
+
+  /// Once parsing and name-binding are complete, this optionally transforms the
+  /// ASTs to add calls to external logging functions.
+  void performPlaygroundTransform(SourceFile &SF);
   
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.

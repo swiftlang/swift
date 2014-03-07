@@ -101,6 +101,9 @@ def enable_objc_optional : Flag<["-"], "enable-objc-optional">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def playground : Flag<["-"], "playground">,
+  HelpText<"Apply the playground transformation">;
+
 def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
