@@ -455,6 +455,21 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   return SwiftContext.getIdentifier(nameBuf);
 }
 
+DeclName
+ClangImporter::Implementation::importName(clang::Selector selector) {
+  if (selector.isNull())
+    return DeclName();
+  
+  if (selector.isUnarySelector())
+    return importName(selector.getIdentifierInfoForSlot(0));
+  
+  SmallVector<Identifier, 2> components;
+  
+  for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i)
+    components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
+  
+  return DeclName(SwiftContext, components);
+}
 
 #pragma mark Name lookup
 void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){

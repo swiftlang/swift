@@ -388,7 +388,10 @@ public:
   /// the Swift name.
   Identifier importName(clang::DeclarationName name, StringRef suffix = "",
                         StringRef removePrefix = "");
-
+  
+  /// Import the given selector name into Swift.
+  DeclName importName(clang::Selector selector);
+  
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
 
