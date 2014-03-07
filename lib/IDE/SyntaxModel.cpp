@@ -225,12 +225,27 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                                        S->getSourceRange());
     pushStructureNode(SN);
   }
+  else if (SwitchStmt *SW = dyn_cast<SwitchStmt>(S)) {
+    if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid()) {
+      SourceRange BraceRange(SW->getLBraceLoc(), SW->getRBraceLoc());
+      SyntaxStructureNode SN;
+      SN.Kind = SyntaxStructureKind::BraceStatement;
+      SN.Range = charSourceRangeFromSourceRange(SM, BraceRange);
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, BraceRange);
+      pushStructureNode(SN);
+    }
+  }
+
   return { true, S };
 }
 
 Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
   if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S)))
     popStructureNode();
+  else if (SwitchStmt *SW = dyn_cast<SwitchStmt>(S)) {
+    if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid())
+      popStructureNode();
+  }
 
   return S;
 }
