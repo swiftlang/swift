@@ -113,7 +113,9 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "swift.m"
   };
 
-  if (!searchPathOpts.SDKPath.empty()) {
+  if (searchPathOpts.SDKPath.empty()) {
+    invocationArgStrs.push_back("-nostdsysteminc");
+  } else {
     invocationArgStrs.push_back("-isysroot");
     invocationArgStrs.push_back(searchPathOpts.SDKPath);
   }
@@ -245,15 +247,9 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   return importer.release();
 }
 
-bool ClangImporter::Implementation::hasValidSDK() const {
-  return !SwiftContext.SearchPathOpts.SDKPath.empty();
-}
-
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  if (!Impl.hasValidSDK())
-    return nullptr;
 
   // Convert the Swift import path over to a Clang import path.
   // FIXME: Map source locations over. Fun, fun!
