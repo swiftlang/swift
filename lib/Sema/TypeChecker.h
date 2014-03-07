@@ -822,7 +822,7 @@ public:
   /// \param allowDynamicLookup Whether to allow dynamic lookup.
   ///
   /// \returns The result of name lookup.
-  LookupResult lookupMember(Type type, Identifier name, DeclContext *dc,
+  LookupResult lookupMember(Type type, DeclName name, DeclContext *dc,
                             bool allowDynamicLookup = true);
 
   /// \brief Look up a member type within the given type.

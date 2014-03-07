@@ -1639,12 +1639,11 @@ namespace {
     llvm::SmallDenseMap<Expr*, MemberPartialApplication, 2>
       InvalidPartialApplications;
     
-  public:
-    Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
-      llvm_unreachable("not implemented");
-    }
-    
-    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+    Expr *applyMemberRefExpr(Expr *expr,
+                             Expr *base,
+                             SourceLoc dotLoc,
+                             SourceLoc nameLoc,
+                             bool implicit) {
       // Determine the declaration selected for this overloaded reference.
       auto selected = getOverloadChoice(
                         cs.getConstraintLocator(
@@ -1653,14 +1652,14 @@ namespace {
 
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::Decl: {
-        auto member = buildMemberRef(expr->getBase(),
+        auto member = buildMemberRef(base,
                                      selected.openedFullType,
-                                     expr->getDotLoc(),
+                                     dotLoc,
                                      selected.choice.getDecl(),
-                                     expr->getNameLoc(),
+                                     nameLoc,
                                      selected.openedType,
                                      cs.getConstraintLocator(expr),
-                                     expr->isImplicit(), /*direct ivar*/false);
+                                     implicit, /*direct ivar*/false);
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
         FuncDecl *fn = nullptr;
@@ -1705,14 +1704,13 @@ namespace {
       }
 
       case OverloadChoiceKind::DeclViaDynamic:
-        return buildDynamicMemberRef(expr->getBase(), expr->getDotLoc(),
+        return buildDynamicMemberRef(base, dotLoc,
                                      selected.choice.getDecl(),
-                                     expr->getNameLoc(),
+                                     nameLoc,
                                      selected.openedType,
                                      cs.getConstraintLocator(expr));
 
       case OverloadChoiceKind::TupleIndex: {
-        auto base = expr->getBase();
         auto baseTy = base->getType()->getRValueType();
         if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
           base = coerceUncheckedOptionalToValue(base, objTy,
@@ -1722,20 +1720,34 @@ namespace {
 
         return new (cs.getASTContext()) TupleElementExpr(
                                           base,
-                                          expr->getDotLoc(),
+                                          dotLoc,
                                           selected.choice.getTupleIndex(),
-                                          expr->getNameLoc(),
+                                          nameLoc,
                                           simplifyType(expr->getType()));
       }
 
       case OverloadChoiceKind::BaseType: {
         // FIXME: Losing ".0" sugar here.
-        return expr->getBase();
+        return base;
       }
 
       case OverloadChoiceKind::TypeDecl:
         llvm_unreachable("Nonsensical overload choice");
       }
+    }
+    
+  public:
+    Expr *visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
+      return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
+                                expr->getNameRange().Start,
+                                expr->isImplicit());
+      llvm_unreachable("not implemented");
+    }
+    
+    
+    Expr *visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
+                                expr->getNameLoc(), expr->isImplicit());
     }
 
     Expr *visitSequenceExpr(SequenceExpr *expr) {

@@ -168,7 +168,7 @@ ERROR(invalid_tuple_element_unused,sema_tcc,none,
   (Type, Type))
 ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
-  (Type, Identifier))
+  (Type, DeclName))
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",
       (Type, Type))
@@ -573,7 +573,7 @@ ERROR(no_MaxBuiltinFloatType_found,sema_tce,none,
    "standard library error: MaxBuiltinFloatType is not properly defined", ())
 
 ERROR(no_member_of_module,sema_tce,none,
-      "module %0 has no member named %1", (Identifier, Identifier))
+      "module %0 has no member named %1", (Identifier, DeclName))
 
 ERROR(super_with_no_base_class,sema_tce,none,
       "'super' members cannot be referenced in a root class", ())

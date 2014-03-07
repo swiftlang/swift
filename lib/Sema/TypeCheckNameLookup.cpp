@@ -29,7 +29,7 @@ void LookupResult::filter(const std::function<bool(ValueDecl *)> &pred) {
                 Results.end());
 }
 
-LookupResult TypeChecker::lookupMember(Type type, Identifier name,
+LookupResult TypeChecker::lookupMember(Type type, DeclName name,
                                        DeclContext *dc,
                                        bool allowDynamicLookup) {
   LookupResult result;
@@ -41,7 +41,7 @@ LookupResult TypeChecker::lookupMember(Type type, Identifier name,
   assert(!type->is<TupleType>());
 
   // Conversion lookups never permit dynamic lookup.
-  if (name.str().equals("__conversion")) {
+  if (name.isSimpleName("__conversion")) {
     options = options & ~NL_DynamicLookup;
   }
 

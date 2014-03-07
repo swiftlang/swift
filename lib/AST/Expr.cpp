@@ -405,22 +405,29 @@ SourceRange UnresolvedPatternExpr::getSourceRange() const {
 }
 
 UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
-                                               ArrayRef<Component> components)
+                                               DeclName name,
+                                               ArrayRef<ComponentLoc> components)
   : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
-    SubExpr(subExpr), DotLoc(dotLoc), NumComponents(components.size())
+    SubExpr(subExpr), DotLoc(dotLoc), Name(name)
 {
+  assert(name.getComponents().size() == components.size()
+         && "number of component locs does not match number of name components");
   auto buf = getComponentsBuf();
-  for (unsigned i : indices(components)) {
-    new (&buf[i]) Component(components[i]);
-  }
+  std::uninitialized_copy(components.begin(), components.end(),
+                          buf.begin());
 }
 
 UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
-             Expr *subExpr, SourceLoc dotLoc, ArrayRef<Component> components) {
+             Expr *subExpr, SourceLoc dotLoc,
+             DeclName name,
+             ArrayRef<ComponentLoc> components) {
+  assert(name.getComponents().size() == components.size()
+         && "number of component locs does not match number of name components");
+  
   void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
-                           + components.size() * sizeof(Component),
+                           + name.getComponents().size() * sizeof(ComponentLoc),
                          alignof(UnresolvedSelectorExpr));
-  return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, components);
+  return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, name, components);
 }
 
 unsigned ScalarToTupleExpr::getScalarField() const {

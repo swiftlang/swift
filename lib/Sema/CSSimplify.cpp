@@ -1377,10 +1377,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
-  Identifier name = constraint.getMember();
+  DeclName name = constraint.getMember();
   Type memberTy = constraint.getSecondType();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
-    StringRef nameStr = name.str();
+    // Tuples don't have compound-name members.
+    if (!name.isSimpleName()) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+      return SolutionKind::Error;
+    }
+    
+    StringRef nameStr = name.getSimpleName().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
@@ -1388,7 +1395,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         Value < baseTuple->getFields().size()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = baseTuple->getNamedElementId(name);
+      fieldIdx = baseTuple->getNamedElementId(name.getSimpleName());
     }
 
     if (fieldIdx == -1) {
@@ -1408,7 +1415,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // left-hand side of a dot expression before we look for members.
 
   bool isExistential = instanceTy->isExistentialType();
-  if (name == TC.Context.Id_init) {
+  if (name.isSimpleName(TC.Context.Id_init)) {
     // Constructors have their own approach to name lookup.
     auto ctors = TC.lookupConstructors(baseObjTy, DC);
     if (!ctors) {
@@ -1451,7 +1458,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // If we want member types only, use member type lookup.
   if (constraint.getKind() == ConstraintKind::TypeMember) {
-    auto lookup = TC.lookupMemberType(baseObjTy, name, DC);
+    // Types don't have compound names.
+    if (!name.isSimpleName()) {
+      // FIXME: Customize diagnostic to mention types and compound names.
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+
+      return SolutionKind::Error;
+    }
+    
+    auto lookup = TC.lookupMemberType(baseObjTy, name.getSimpleName(), DC);
     if (!lookup) {
       // FIXME: Customize diagnostic to mention types.
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
@@ -1490,7 +1506,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   if (!lookup) {
     // Check whether we actually performed a lookup with an integer value.
     unsigned index;
-    if (!name.str().getAsInteger(10, index)) {
+    if (name.isSimpleName()
+        && !name.getSimpleName().str().getAsInteger(10, index)) {
       // ".0" on a scalar just refers to the underlying scalar value.
       if (index == 0) {
         OverloadChoice identityChoice(baseTy, OverloadChoiceKind::BaseType);

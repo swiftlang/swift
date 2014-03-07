@@ -390,8 +390,8 @@ public:
   }
 
   /// \brief Retrieve the name.
-  Identifier getName() const {
-    return Identifier::getFromOpaquePointer(second.name);
+  DeclName getName() const {
+    return DeclName::getFromOpaqueValue(second.name);
   }
 
   /// \brief Retrieve the value.
@@ -461,11 +461,11 @@ private:
   /// \brief Construct a failure involving a type and a name.
   Failure(ConstraintLocator *locator, FailureKind kind,
           ResolvedOverloadSetListItem *resolvedOverloadSets,
-          Type type, Identifier name)
+          Type type, DeclName name)
     : kind(kind), value(0), locator(locator),
       resolvedOverloadSets(resolvedOverloadSets), first(type)
   {
-    second.name = name.getAsOpaquePointer();
+    second.name = name.getOpaqueValue();
   }
 
   /// \brief Profile a failure involving one type.
@@ -508,12 +508,12 @@ private:
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
                       FailureKind kind,
                       ResolvedOverloadSetListItem *resolvedOverloadSets,
-                      Type type, Identifier name) {
+                      Type type, DeclName name) {
     id.AddPointer(locator);
     id.AddInteger(kind);
     id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type.getPointer());
-    id.AddPointer(name.getAsOpaquePointer());
+    id.AddPointer(name.getOpaqueValue());
   }
 
   /// \brief Create a new Failure object with the given arguments, allocated
@@ -939,7 +939,7 @@ private:
   unsigned TypeCounter = 0;
 
   /// \brief Cached member lookups.
-  llvm::DenseMap<std::pair<Type, Identifier>, Optional<LookupResult>>
+  llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
@@ -1146,7 +1146,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, Identifier name);
+  LookupResult &lookupMember(Type base, DeclName name);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
@@ -1263,7 +1263,7 @@ private:
   }
 
   /// \brief Simplifies an argument to the failure (a no-op).
-  Identifier simplifyFailureArg(Identifier arg) {
+  DeclName simplifyFailureArg(DeclName arg) {
     return arg;
   }
 
@@ -1313,7 +1313,7 @@ public:
                      ConstraintLocator *locator = nullptr) {
     assert(first && "Missing first type");
     assert(second && "Missing second type");
-    addConstraint(Constraint::create(*this, kind, first, second, Identifier(),
+    addConstraint(Constraint::create(*this, kind, first, second, DeclName(),
                                      locator));
   }
 
@@ -1325,11 +1325,11 @@ public:
   }
 
   /// \brief Add a value member constraint to the constraint system.
-  void addValueMemberConstraint(Type baseTy, Identifier name, Type memberTy,
+  void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 ConstraintLocator *locator = nullptr) {
     assert(baseTy);
     assert(memberTy);
-    assert(!name.empty());
+    assert(name);
     addConstraint(Constraint::create(*this, ConstraintKind::ValueMember,
                                      baseTy, memberTy, name, locator));
   }
@@ -1338,7 +1338,7 @@ public:
   void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator = nullptr) {
     assert(baseTy);
     addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
-                                     baseTy, Type(), Identifier(),
+                                     baseTy, Type(), DeclName(),
                                          locator));
   }
 

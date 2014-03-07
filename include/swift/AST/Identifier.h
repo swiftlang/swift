@@ -269,6 +269,12 @@ public:
     return isSimpleName() && getSimpleName() == name;
   }
   
+  /// True if this name is a simple one-component name equal to the
+  /// given string.
+  bool isSimpleName(StringRef name) const {
+    return isSimpleName() && getSimpleName().str().equals(name);
+  }
+  
   /// True if this name is an operator.
   bool isOperator() const {
     return isSimpleName() && getSimpleName().isOperator();

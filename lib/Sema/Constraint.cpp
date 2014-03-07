@@ -37,7 +37,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
-                       Identifier Member, ConstraintLocator *locator,
+                       DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(Kind), HasRestriction(false), IsActive(false), 
     NumTypeVariables(typeVars.size()), Types { First, Second, Member }, 
@@ -55,23 +55,23 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::SelfObjectOfProtocol:
     assert(!First.isNull());
     assert(!Second.isNull());
-    assert(Member.empty() && "Relational constraint cannot have a member");
+    assert(!Member && "Relational constraint cannot have a member");
     break;
   case ConstraintKind::ApplicableFunction:
     assert(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
-    assert(Member.empty() && "Relational constraint cannot have a member");
+    assert(!Member && "Relational constraint cannot have a member");
     break;
 
   case ConstraintKind::TypeMember:
   case ConstraintKind::ValueMember:
-    assert(!Member.empty() && "Member constraint has no member");
+    assert(Member && "Member constraint has no member");
     break;
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::DynamicLookupValue:
-    assert(Member.empty() && "Type property cannot have a member");
+    assert(!Member && "Type property cannot have a member");
     assert(Second.isNull() && "Type property with second type");
     break;
 
@@ -200,10 +200,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   case ConstraintKind::ValueMember:
-    Out << "[." << Types.Member.str() << ": value] == ";
+    Out << "[." << Types.Member << ": value] == ";
     break;
   case ConstraintKind::TypeMember:
-    Out << "[." << Types.Member.str() << ": type] == ";
+    Out << "[." << Types.Member << ": type] == ";
     break;
   case ConstraintKind::Archetype:
     Out << " is an archetype";
@@ -323,7 +323,7 @@ static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
 }
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
-                               Type first, Type second, Identifier member,
+                               Type first, Type second, DeclName member,
                                ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;

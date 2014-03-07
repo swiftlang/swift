@@ -37,7 +37,7 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
 
   case DoesNotHaveMember:
     out << getFirstType().getString() << " does not have a member named '"
-        << getName().str() << "'";
+        << getName() << "'";
     break;
 
   case FunctionTypesMismatch:

@@ -177,7 +177,7 @@ getDynamicResultSignature(ValueDecl *decl,
   return { result, type->getCanonicalType() };
 }
 
-LookupResult &ConstraintSystem::lookupMember(Type base, Identifier name) {
+LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   base = base->getCanonicalType();
 
   // Check whether we've already performed this lookup.

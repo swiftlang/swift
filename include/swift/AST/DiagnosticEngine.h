@@ -96,7 +96,7 @@ namespace swift {
       int IntegerVal;
       unsigned UnsignedVal;
       StringRef StringVal;
-      Identifier IdentifierVal;
+      DeclName IdentifierVal;
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
@@ -116,10 +116,14 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::Unsigned), UnsignedVal(I) {
     }
 
+    DiagnosticArgument(DeclName I)
+      : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
+    }
+    
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
-
+    
     DiagnosticArgument(Type T)
       : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
     }
@@ -165,7 +169,7 @@ namespace swift {
       return UnsignedVal;
     }
 
-    Identifier getAsIdentifier() const {
+    DeclName getAsIdentifier() const {
       assert(Kind == DiagnosticArgumentKind::Identifier);
       return IdentifierVal;
     }

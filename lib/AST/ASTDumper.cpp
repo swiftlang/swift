@@ -1225,13 +1225,7 @@ public:
   }
   void visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *E) {
     printCommon(E, "unresolved_selector_expr")
-      << " selector '";
-    
-    for (auto component : E->getComponents()) {
-      OS << component.Name << ':';
-    }
-    
-    OS << "'";
+      << " selector '" << E->getName() << "'";
     if (E->getBase()) {
       OS << '\n';
       printRec(E->getBase());

@@ -187,7 +187,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
 
       /// \brief If non-null, the name of a member of the first type is that
       /// being related to the second type.
-      Identifier Member;
+      DeclName Member;
     } Types;
 
     /// The set of constraints for a disjunction.
@@ -214,7 +214,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Constraint a new constraint.
-  Constraint(ConstraintKind kind, Type first, Type second, Identifier member,
+  Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new overload-binding constraint.
@@ -234,7 +234,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
 public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
-                            Type First, Type Second, Identifier Member,
+                            Type First, Type Second, DeclName Member,
                             ConstraintLocator *locator);
 
   /// Create an overload-binding constraint.
@@ -337,7 +337,7 @@ public:
   ProtocolDecl *getProtocol() const;
 
   /// \brief Retrieve the name of the member for a member constraint.
-  Identifier getMember() const {
+  DeclName getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::TypeMember);
     return Types.Member;

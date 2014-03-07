@@ -1351,40 +1351,43 @@ public:
 class UnresolvedSelectorExpr : public Expr {
 public:
   // A selector component.
-  struct Component {
+  struct ComponentLoc {
     SourceLoc NameLoc;
     SourceLoc ColonLoc;
-    Identifier Name;
   };
   
 private:
   Expr *SubExpr;
   SourceLoc DotLoc;
-  unsigned NumComponents;
+  DeclName Name;
   
-  MutableArrayRef<Component> getComponentsBuf() {
-    return {reinterpret_cast<Component*>(this+1), NumComponents};
+  MutableArrayRef<ComponentLoc> getComponentsBuf() {
+    return {reinterpret_cast<ComponentLoc*>(this+1),
+            Name.getComponents().size()};
   }
   
   UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
-                         ArrayRef<Component> components);
+                         DeclName name,
+                         ArrayRef<ComponentLoc> components);
   
 public:
   static UnresolvedSelectorExpr *create(ASTContext &C,
                                         Expr *subExpr,
                                         SourceLoc dotLoc,
-                                        ArrayRef<Component> components);
+                                        DeclName name,
+                                        ArrayRef<ComponentLoc> components);
   
-  ArrayRef<Component> getComponents() const {
-    return {reinterpret_cast<const Component*>(this+1), NumComponents};
+  ArrayRef<ComponentLoc> getComponentLocs() const {
+    return {reinterpret_cast<const ComponentLoc*>(this+1),
+            Name.getComponents().size()};
   }
   
   SourceLoc getLoc() const {
-    return getComponents().front().NameLoc;
+    return getComponentLocs().front().NameLoc;
   }
   
   SourceRange getSourceRange() const {
-    return {SubExpr->getStartLoc(), getComponents().back().ColonLoc};
+    return {SubExpr->getStartLoc(), getComponentLocs().back().ColonLoc};
   }
   
   SourceLoc getDotLoc() const { return DotLoc; }
@@ -1392,8 +1395,11 @@ public:
   void setBase(Expr *e) { SubExpr = e; }
   
   SourceRange getNameRange() const {
-    return {getComponents().front().NameLoc, getComponents().back().ColonLoc};
+    return {getComponentLocs().front().NameLoc,
+            getComponentLocs().back().ColonLoc};
   }
+  
+  DeclName getName() const { return Name; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::UnresolvedSelector;
@@ -1407,7 +1413,7 @@ class ModuleExpr : public Expr {
   
 public:
   ModuleExpr(SourceLoc Loc, Type Ty)
-  : Expr(ExprKind::Module, /*Implicit=*/false, Ty), Loc(Loc) {}
+    : Expr(ExprKind::Module, /*Implicit=*/false, Ty), Loc(Loc) {}
   
   SourceRange getSourceRange() const { return SourceRange(Loc, Loc); }
   SourceLoc getLoc() const { return Loc; }

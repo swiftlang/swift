@@ -83,7 +83,7 @@ namespace {
 
     /// \brief Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
-    Type addMemberRefConstraints(Expr *expr, Expr *base, Identifier name) {
+    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name) {
       // The base must have a member of the given name, such that accessing
       // that member through the base returns a value convertible to the type
       // of this expression.
@@ -411,9 +411,7 @@ namespace {
     }
     
     Type visitUnresolvedSelectorExpr(UnresolvedSelectorExpr *expr) {
-      CS.TC.diagnose(expr->getLoc(), diag::not_implemented,
-                     "selector member references");
-      return nullptr;
+      return addMemberRefConstraints(expr, expr->getBase(), expr->getName());
     }
     
     Type visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *expr) {
