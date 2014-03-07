@@ -259,7 +259,7 @@ public:
                                          unsigned Offset);
 
   /// \brief Determines if the given string is a valid non-operator
-  /// identifier.
+  /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
 
   SourceLoc getLocForStartOfBuffer() const {

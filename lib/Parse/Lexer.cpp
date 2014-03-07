@@ -511,7 +511,6 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
   return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
-/// isIdentifier - Checks whether a string matches the identifier regex.
 bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
