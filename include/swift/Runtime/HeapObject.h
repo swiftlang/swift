@@ -62,6 +62,26 @@ extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredAlignmentMask);
   
 /// The structure returned by swift_allocPOD and swift_allocBox.
+#if __arm__
+
+// FIXME: rdar://16257592 arm codegen does't call swift_allocBox correctly.
+
+typedef unsigned long long BoxPair;
+
+static inline BoxPair MakeBoxPair(HeapObject *heapObject, OpaqueValue *value) {
+  return (BoxPair)heapObject | (((BoxPair)value) << 32);
+}
+
+static inline HeapObject *BoxPair_heapObject(const BoxPair& boxpair) {
+  return (HeapObject *)(boxpair & 0xffffffff);
+}
+
+static inline OpaqueValue *BoxPair_value(const BoxPair& boxpair) {
+  return (OpaqueValue *)(boxpair >> 32);
+}
+
+#else
+
 struct BoxPair {
   /// The pointer to the heap object.
   HeapObject *heapObject;
@@ -69,6 +89,20 @@ struct BoxPair {
   /// The pointer to the value inside the box.
   OpaqueValue *value;
 };
+
+static inline BoxPair MakeBoxPair(HeapObject *heapObject, OpaqueValue *value) {
+  return BoxPair{heapObject, value};
+}
+
+static inline HeapObject *BoxPair_heapObject(const BoxPair& boxpair) {
+  return boxpair.heapObject;
+}
+
+static inline OpaqueValue *BoxPair_value(const BoxPair& boxpair) {
+  return boxpair.value;
+}
+
+#endif
 
 /// Allocates a heap object with POD value semantics. The returned memory is
 /// uninitialized outside of the heap object header. The object has an

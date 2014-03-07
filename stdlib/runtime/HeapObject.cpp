@@ -92,7 +92,7 @@ swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
   static_cast<PODBox*>(obj)->allocatedSize = size;
   // Get the address of the value inside.
   auto *data = reinterpret_cast<char*>(obj) + valueOffset;
-  return {obj, reinterpret_cast<OpaqueValue*>(data)};
+  return MakeBoxPair(obj, reinterpret_cast<OpaqueValue*>(data));
 }
 
 namespace {
@@ -183,7 +183,7 @@ swift::swift_allocBox(Metadata const *type) {
   box->type = type;
   
   // Return the box and the value pointer.
-  return {box, box->getValuePointer()};
+  return MakeBoxPair(box, box->getValuePointer());
 }
 
 void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {

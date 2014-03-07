@@ -598,10 +598,10 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
   // we don't need to put it in a box to point into it.
   auto box = swift_allocBox(T);
   
-  T->vw_initializeWithTake(box.value, value);
+  T->vw_initializeWithTake(BoxPair_value(box), value);
   std::tie(T, MirrorWitness) = getWitnessForType(T, value);
   
-  Data = {box.heapObject, box.value, T};
+  Data = {BoxPair_heapObject(box), BoxPair_value(box), T};
 }
   
 /// MagicMirror ownership-sharing subvalue constructor.
