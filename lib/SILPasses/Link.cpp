@@ -137,4 +137,9 @@ void swift::performSILLinking(SILModule *M, bool LinkAll) {
       }
     }
   }
+
+  if (LinkAll) {
+    SILLoader->getAllVTables();
+    SILLoader->getAllWitnessTables();
+  }
 }
