@@ -199,6 +199,9 @@ enum TypeResolutionFlags {
 
   /// Whether we are in the result type of a function.
   TR_FunctionResult = 0x80,
+  
+  // Whether this is a resolution based on a typed pattern.
+  TR_FromTypedPattern = 0x100
 };
 
 /// Option set describing how type resolution should work.
