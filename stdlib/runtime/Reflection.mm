@@ -129,6 +129,12 @@ struct OptionalQuickLookObject {
 using StringReturn = void;
 extern "C" StringReturn swift_returnString(String *s);
   
+/// The enumeration of mirror dispositions.
+enum class MirrorDisposition : bool {
+  Aggregate,
+  Container,
+};
+  
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable {
   /// var value: Any { get }
@@ -151,6 +157,10 @@ struct MirrorWitnessTable {
   /// var IDERepresentation: IDERepresentable? { get }
   OptionalQuickLookObject (*getIDERepresentation)
     (MagicMirrorData *self, const Metadata *Self);
+  
+  /// var disposition: MirrorDisposition { get }
+  MirrorDisposition (*getDisposition)(MagicMirrorData *self,
+                                      const Metadata *Self);
 };
   
 /// The protocol descriptor for Reflectable from the stdlib.
@@ -241,6 +251,11 @@ OptionalQuickLookObject Opaque_getIDERepresentation(MagicMirrorData *self,
   result.optional.isNone = true;
   return result;
 }
+MirrorDisposition Aggregate_getDisposition(MagicMirrorData *self,
+                                           const Metadata *Self) {
+  return MirrorDisposition::Aggregate;
+}
+  
 static const MirrorWitnessTable OpaqueMirrorWitness{
   Opaque_getValue,
   Opaque_getType,
@@ -249,6 +264,7 @@ static const MirrorWitnessTable OpaqueMirrorWitness{
   Opaque_getChild,
   Opaque_getString,
   Opaque_getIDERepresentation,
+  Aggregate_getDisposition,
 };
   
 // -- Mirror witnesses for a tuple type.
@@ -302,6 +318,7 @@ static const MirrorWitnessTable TupleMirrorWitness{
   Tuple_getChild,
   Tuple_getString,
   Opaque_getIDERepresentation,
+  Aggregate_getDisposition,
 };
   
 // -- Mirror witnesses for classes.
@@ -321,6 +338,7 @@ static const MirrorWitnessTable ClassMirrorWitness{
   Opaque_getChild,
   Opaque_getString,
   Opaque_getIDERepresentation,
+  Aggregate_getDisposition,
 };
   
 // -- Mirror witnesses for ObjC classes.
@@ -505,6 +523,7 @@ static const MirrorWitnessTable ObjCMirrorWitness{
   ObjC_getChild,
   ObjC_getString,
   ObjC_getIDERepresentation,
+  Aggregate_getDisposition,
 };
   
 static const MirrorWitnessTable ObjCSuperMirrorWitness{
@@ -516,6 +535,7 @@ static const MirrorWitnessTable ObjCSuperMirrorWitness{
   ObjC_getChild,
   ObjC_getString,
   ObjC_getIDERepresentation,
+  Aggregate_getDisposition,
 };
   
 Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig) {
