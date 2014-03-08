@@ -1,6 +1,20 @@
 2014-03-12
 ----------
 
+* The 'didSet' accessor of an observing property now gets passed in the old value,
+  so you can easily implement an action for when a property changes value.  For
+  example:
+
+     class MyAwesomeView : UIView {
+      var enabled : Bool = false {
+      didSet(oldValue): 
+        if oldValue != enabled {
+          self.needsDisplay = true
+        }
+      }
+      ...
+    }
+
 * The magic identifier __FUNCTION__ can now be used to get the name of the
   current function as a string. Like __FILE__ and __LINE__, if __FUNCTION__
   is used as a default argument, the function name of the caller is passed as
