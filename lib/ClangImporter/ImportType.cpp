@@ -171,12 +171,8 @@ namespace {
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
-      fTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                              fTy->getExtInfo().withIsBlock(true));
-
-      if (Impl.EnableOptional)
-        return UncheckedOptionalType::get(fTy);
-      return fTy;
+      return FunctionType::get(fTy->getInput(), fTy->getResult(),
+                               fTy->getExtInfo().withIsBlock(true));
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {
