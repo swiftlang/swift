@@ -2609,13 +2609,23 @@ class ArchetypeType : public SubstitutableType {
 public:
   typedef llvm::PointerUnion<AssociatedTypeDecl *, ProtocolDecl *>
     AssocTypeOrProtocolType;
-
+  
+  /// A nested type. Either a dependent associated archetype, or a concrete
+  /// type (which may be a bound archetype from an outer context).
+  typedef llvm::PointerUnion<ArchetypeType*, Type> NestedType;
+  
+  static Type getNestedTypeValue(NestedType t) {
+    if (auto ty = t.dyn_cast<Type>())
+      return ty;
+    return t.get<ArchetypeType*>();
+  }
+  
 private:
   llvm::PointerUnion<ArchetypeType *, TypeBase *> ParentOrOpened;
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
   unsigned IndexIfPrimaryOrExistentialID;
-  ArrayRef<std::pair<Identifier, ArchetypeType *>> NestedTypes;
+  ArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
   
 public:
   /// getNew - Create a new archetype with the given name.
@@ -2702,17 +2712,21 @@ public:
   }
 
   /// \brief Retrieve the nested type with the given name.
-  ArchetypeType *getNestedType(Identifier Name) const;
+  NestedType getNestedType(Identifier Name) const;
+  
+  Type getNestedTypeValue(Identifier Name) const {
+    return getNestedTypeValue(getNestedType(Name));
+  }
 
   /// \brief Retrieve the nested types of this archetype.
-  ArrayRef<std::pair<Identifier, ArchetypeType *>> getNestedTypes() const {
+  ArrayRef<std::pair<Identifier, NestedType>> getNestedTypes() const {
     return NestedTypes;
   }
 
   /// \brief Set the nested types to a copy of the given array of
   /// archetypes, which will first be sorted in place.
   void setNestedTypes(ASTContext &Ctx,
-         MutableArrayRef<std::pair<Identifier, ArchetypeType *>> Nested);
+                      MutableArrayRef<std::pair<Identifier, NestedType>> Nested);
 
   /// isPrimary - Determine whether this is the archetype for a 'primary'
   /// archetype, e.g., 

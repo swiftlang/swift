@@ -37,7 +37,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 21;
+const uint16_t VERSION_MINOR = 26;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -427,6 +427,11 @@ namespace decls_block {
 
   using ArchetypeNestedTypesLayout = BCRecordLayout<
     ARCHETYPE_NESTED_TYPES,
+    BCArray<TypeIDField>
+  >;
+  
+  using ArchetypeNestedTypesAreArchetypesLayout = BCRecordLayout<
+    ARCHETYPE_NESTED_TYPES_ARE_ARCHETYPES,
     BCArray<TypeIDField>
   >;
 

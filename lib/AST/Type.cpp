@@ -1380,18 +1380,19 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {
-    bool operator()(std::pair<Identifier, ArchetypeType *> X,
-                    std::pair<Identifier, ArchetypeType *> Y) const {
+    using NestedType = ArchetypeType::NestedType;
+    bool operator()(std::pair<Identifier, NestedType> X,
+                    std::pair<Identifier, NestedType> Y) const {
       return X.first.str() < Y.first.str();
     }
 
-    bool operator()(std::pair<Identifier, ArchetypeType *> X,
+    bool operator()(std::pair<Identifier, NestedType> X,
                     Identifier Y) const {
       return X.first.str() < Y.str();
     }
 
     bool operator()(Identifier X,
-                    std::pair<Identifier, ArchetypeType *> Y) const {
+                    std::pair<Identifier, NestedType> Y) const {
       return X.str() < Y.first.str();
     }
 
@@ -1401,10 +1402,9 @@ namespace {
   };
 }
 
-ArchetypeType *ArchetypeType::getNestedType(Identifier Name) const {
-  ArrayRef<std::pair<Identifier, ArchetypeType *>>::const_iterator Pos
-    = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
-                       OrderArchetypeByName());
+ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
+  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
+                              OrderArchetypeByName());
   assert(Pos != NestedTypes.end() && Pos->first == Name);
   return Pos->second;
 }
@@ -1412,7 +1412,7 @@ ArchetypeType *ArchetypeType::getNestedType(Identifier Name) const {
 void
 ArchetypeType::
 setNestedTypes(ASTContext &Ctx,
-               MutableArrayRef<std::pair<Identifier, ArchetypeType *>> Nested) {
+               MutableArrayRef<std::pair<Identifier, NestedType>> Nested) {
   std::sort(Nested.begin(), Nested.end(), OrderArchetypeByName());
   NestedTypes = Ctx.AllocateCopy(Nested);
 }
@@ -1698,7 +1698,7 @@ static Type getMemberForBaseType(Module *module,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    return archetypeParent->getNestedType(name);
+    return archetypeParent->getNestedTypeValue(name);
   }
 
   // If the parent is a type variable, retrieve its member type

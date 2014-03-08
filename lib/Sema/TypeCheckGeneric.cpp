@@ -166,19 +166,6 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
   return ext->getExtendedType()->getAnyNominal()->getDeclaredInterfaceType();
 }
 
-/// Create a fresh archetype builder.
-static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC, Module *mod) {
-  return ArchetypeBuilder(
-           *mod, TC.Diags,
-           [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
-             return TC.getDirectConformsTo(protocol);
-           },
-           [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
-             TC.checkInheritanceClause(assocType);
-             return assocType->getProtocols();
-           });
-}
-
 /// Add the generic parameters and requirements from the parent context to the
 /// archetype builder.
 static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
@@ -560,8 +547,12 @@ static void collectRequirements(ArchetypeBuilder &builder,
   for (auto req : builder.getSameTypeRequirements()) {
     auto firstType = resolvePotentialArchetypeToType(builder, params,
                                                      req.first);
-    auto secondType = resolvePotentialArchetypeToType(builder, params,
-                                                      req.second);
+    Type secondType;
+    if (auto concrete = req.second.dyn_cast<Type>())
+      secondType = concrete;
+    else if (auto secondPA = req.second.dyn_cast<PotentialArchetype*>())
+      secondType = resolvePotentialArchetypeToType(builder, params,
+                                                   secondPA);
     requirements.push_back(Requirement(RequirementKind::SameType,
                                        firstType, secondType));
   }
@@ -612,8 +603,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
 bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // Create the archetype builder.
-  ArchetypeBuilder builder = createArchetypeBuilder(*this,
-                                                    func->getParentModule());
+  ArchetypeBuilder builder = createArchetypeBuilder(func->getParentModule());
 
   // Type check the function declaration, treating all generic type
   // parameters as dependent, unresolved.
@@ -747,7 +737,7 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
 
   // Create the archetype builder.
   Module *module = nominal->getModuleContext();
-  ArchetypeBuilder builder = createArchetypeBuilder(*this, module);
+  ArchetypeBuilder builder = createArchetypeBuilder(module);
 
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
@@ -874,8 +864,11 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
 
     // Add any nested archetypes to the archetype stack.
     for (auto Nested : archetype->getNestedTypes()) {
-      if (knownArchetypes.insert(Nested.second))
-        archetypeStack.push_back(Nested.second);
+      auto NestedArch = Nested.second.dyn_cast<ArchetypeType*>();
+      if (!NestedArch)
+        continue;
+      if (knownArchetypes.insert(NestedArch))
+        archetypeStack.push_back(NestedArch);
     }
   }
 
@@ -891,7 +884,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   // For an archetype, retrieve the nested type with the appropriate name.
   // There are no conformance tables.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedType(name);
+    return archetype->getNestedTypeValue(name);
   }
 
   // Find the named requirement.

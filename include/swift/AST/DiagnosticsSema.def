@@ -402,14 +402,28 @@ ERROR(requires_not_suitable_archetype,sema_tcd,none,
       "%select{|first |second }0type %1 in %select{conformance|same-type}2 "
       "requirement does not refer to a generic parameter or associated type",
       (int, TypeLoc, int))
-ERROR(requires_generic_param_equal,sema_tcd,none,
+ERROR(requires_no_same_type_archetype,sema_tcd,none,
+      "neither type in same-type refers to a generic parameter or "
+      "associated type",
+      ())
+ERROR(requires_generic_params_made_equal,sema_tcd,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
       (Identifier, Identifier))
+ERROR(requires_generic_param_made_equal_to_concrete,sema_tcd,none,
+      "same-type requirement makes generic parameter %0 non-generic",
+      (Identifier))
 ERROR(requires_superclass_conflict,sema_tcd,none,
       "generic parameter %0 cannot be a subclass of both %1 and %2",
       (Identifier, Type, Type))
 ERROR(recursive_requirement_reference,sema_tcd,none,
       "type may not reference itself as a requirement",())
+ERROR(requires_same_type_conflict,sema_tcd,none,
+      "generic parameter %0 cannot be equal to both %1 and %2",
+      (StringRef, Type, Type))
+ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
+      "same-type constraint type %0 does not conform to required protocol %1",
+      (Type, Identifier))
+
 ERROR(override_multiple_decls_base,sema_tcd,none,
       "declaration cannot override more than one superclass declaration", ())
 ERROR(override_multiple_decls_derived,sema_tcd,none,

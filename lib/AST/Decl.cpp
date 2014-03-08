@@ -339,10 +339,13 @@ void GenericParamList::addNestedArchetypes(ArchetypeType *archetype,
                                       SmallPtrSetImpl<ArchetypeType*> &known,
                                       SmallVectorImpl<ArchetypeType*> &all) {
   for (auto nested : archetype->getNestedTypes()) {
-    if (known.insert(nested.second)) {
-      assert(!nested.second->isPrimary() && "Unexpected primary archetype");
-      all.push_back(nested.second);
-      addNestedArchetypes(nested.second, known, all);
+    auto nestedArch = nested.second.dyn_cast<ArchetypeType*>();
+    if (!nestedArch)
+      continue;
+    if (known.insert(nestedArch)) {
+      assert(!nestedArch->isPrimary() && "Unexpected primary archetype");
+      all.push_back(nestedArch);
+      addNestedArchetypes(nestedArch, known, all);
     }
   }
 }

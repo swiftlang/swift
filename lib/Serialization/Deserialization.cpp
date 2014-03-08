@@ -2555,7 +2555,8 @@ Type ModuleFile::getType(TypeID TID) {
                                            getIdentifier(nameID), conformances,
                                            superclass, index);
     typeOrOffset = archetype;
-
+    
+    // Read the associated type names.
     auto entry = DeclTypeCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
@@ -2568,30 +2569,55 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       break;
     }
-
+    
     ArrayRef<uint64_t> rawNameIDs;
     decls_block::ArchetypeNestedTypeNamesLayout::readRecord(scratch,
                                                             rawNameIDs);
-
+    
+    // Read whether the associated types are dependent archetypes.
+    entry = DeclTypeCursor.advance();
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      error();
+      break;
+    }
+    
+    SmallVector<uint64_t, 16> scratch2;
+    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
+    if (kind != decls_block::ARCHETYPE_NESTED_TYPES_ARE_ARCHETYPES) {
+      error();
+      break;
+    }
+    
+    ArrayRef<uint64_t> areArchetypes;
+    decls_block::ArchetypeNestedTypesAreArchetypesLayout
+      ::readRecord(scratch2, areArchetypes);
+    
+    // Read the associated type ids.
     entry = DeclTypeCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
       break;
     }
 
-    SmallVector<uint64_t, 16> scratch2;
-    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
+    SmallVector<uint64_t, 16> scratch3;
+    kind = DeclTypeCursor.readRecord(entry.ID, scratch3);
     if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
       error();
       break;
     }
 
     ArrayRef<uint64_t> rawTypeIDs;
-    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch2, rawTypeIDs);
-
-    SmallVector<std::pair<Identifier, ArchetypeType *>, 4> nestedTypes;
-    for_each(rawNameIDs, rawTypeIDs, [&](IdentifierID nameID, TypeID nestedID) {
-      auto nestedTy = getType(nestedID)->castTo<ArchetypeType>();
+    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch3, rawTypeIDs);
+    
+    // Build the nested types array.
+    SmallVector<std::pair<Identifier, ArchetypeType::NestedType>, 4>
+      nestedTypes;
+    for_each3(rawNameIDs, areArchetypes, rawTypeIDs,
+              [&](IdentifierID nameID, bool isArchetype, TypeID nestedID) {
+      ArchetypeType::NestedType nestedTy = getType(nestedID);
+      if (isArchetype) {
+        nestedTy = nestedTy.get<Type>()->castTo<ArchetypeType>();
+      }
       nestedTypes.push_back(std::make_pair(getIdentifier(nameID), nestedTy));
     });
     archetype->setNestedTypes(ctx, nestedTypes);

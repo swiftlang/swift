@@ -20,10 +20,11 @@
 #define SWIFT_ARCHETYPEBUILDER_H
 
 #include "swift/AST/Identifier.h"
-#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
 #include <memory>
@@ -41,6 +42,7 @@ class GenericTypeParamDecl;
 class GenericTypeParamType;
 class Module;
 class Pattern;
+class ProtocolConformance;
 class ProtocolDecl;
 class Requirement;
 class RequirementRepr;
@@ -76,7 +78,19 @@ private:
   /// potential archetype conforms to the given protocol.
   bool addConformanceRequirement(PotentialArchetype *T,
                                  ProtocolDecl *Proto);
-
+  
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetypes are equivalent.
+  bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
+                                               SourceLoc EqualLoc,
+                                               PotentialArchetype *T2);
+  
+  /// \brief Add a new conformance requirement specifying that the given
+  /// potential archetype is bound to a concrete type.
+  bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
+                                        SourceLoc EqualLoc,
+                                        Type Concrete);
+  
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
   bool addSuperclassRequirement(PotentialArchetype *T, SourceLoc ColonLoc,
@@ -84,9 +98,7 @@ private:
 
   /// \brief Add a new same-type requirement specifying that the given potential
   /// archetypes should map to the equivalent archetype.
-  bool addSameTypeRequirement(PotentialArchetype *T1,
-                              SourceLoc EqualLoc,
-                              PotentialArchetype *T2);
+  bool addSameTypeRequirement(Type T1, SourceLoc EqualLoc, Type T2);
 
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
@@ -109,7 +121,9 @@ public:
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
     std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
-      getConformsTo);
+      getConformsTo,
+    std::function<ProtocolConformance * (Module &M, Type T, ProtocolDecl* P)>
+      conformsToProtocol);
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
@@ -229,11 +243,14 @@ public:
   /// archetype assignment. The 'primary' archetypes will occur first in this
   /// list.
   ArrayRef<ArchetypeType *> getAllArchetypes();
-
+  
+  using SameTypeRequirement
+    = std::pair<PotentialArchetype *,
+                PointerUnion<Type, PotentialArchetype*>>;
+  
   /// Retrieve the set of same-type requirements that apply to the potential
   /// archetypes known to this builder.
-  ArrayRef<std::pair<PotentialArchetype *, PotentialArchetype *>>
-  getSameTypeRequirements() const;
+  ArrayRef<SameTypeRequirement> getSameTypeRequirements() const;
 
   // FIXME: Compute the set of 'extra' witness tables needed to express this
   // requirement set.
@@ -284,14 +301,15 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief The set of nested typed stores within this archetype.
   llvm::DenseMap<Identifier, PotentialArchetype *> NestedTypes;
 
-  /// \brief The actual archetype, once it has been assigned.
-  ArchetypeType *Archetype;
+  /// \brief The actual archetype, once it has been assigned, or the concrete
+  /// type that the parameter was same-type constrained to.
+  ArchetypeType::NestedType ArchetypeOrConcreteType;
 
   /// \brief Construct a new potential archetype.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name,
                      Optional<unsigned> Index = Nothing)
     : Parent(Parent), Name(Name), Index(Index), Representative(this),
-      Archetype(nullptr) { }
+      ArchetypeOrConcreteType() { }
 
   /// \brief Recursively build the full name.
   void buildFullName(SmallVectorImpl<char> &Result) const;
@@ -333,10 +351,10 @@ public:
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name);
 
-  /// \brief Retrieve (or build) the archetype corresponding to the potential
+  /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
-  ArchetypeType *getArchetype(ProtocolDecl *rootProtocol, Module &mod);
-
+  ArchetypeType::NestedType getType(ProtocolDecl *rootProtocol, Module &mod);
+  
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
 

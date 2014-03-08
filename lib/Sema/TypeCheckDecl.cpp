@@ -585,15 +585,22 @@ static CanType getExtendedType(ExtensionDecl *ED) {
 
 /// Create a fresh archetype builder.
 /// FIXME: Duplicated with TypeCheckGeneric.cpp; this one should go away.
-static ArchetypeBuilder createArchetypeBuilder(TypeChecker &TC, Module *mod) {
+ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
   return ArchetypeBuilder(
-           *mod, TC.Diags,
-           [&](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
-             return TC.getDirectConformsTo(protocol);
+           *mod, Diags,
+           [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
+             return getDirectConformsTo(protocol);
            },
-           [&](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
-             TC.checkInheritanceClause(assocType);
+           [=](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+             checkInheritanceClause(assocType);
              return assocType->getProtocols();
+           },
+           [=](Module &M, Type T, ProtocolDecl *Protocol)
+           -> ProtocolConformance* {
+             ProtocolConformance *c;
+             if (conformsToProtocol(T, Protocol, &M, &c))
+               return c;
+             return nullptr;
            });
 }
 
@@ -2521,7 +2528,7 @@ public:
       else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
-          createArchetypeBuilder(TC, FD->getModuleContext());
+          TC.createArchetypeBuilder(FD->getModuleContext());
         checkGenericParamList(builder, gp, TC, FD->getDeclContext());
 
         // Infer requirements from parameter patterns.
@@ -3219,7 +3226,7 @@ public:
         CD->setInvalid();
       } else {
         ArchetypeBuilder builder =
-          createArchetypeBuilder(TC, CD->getModuleContext());
+          TC.createArchetypeBuilder(CD->getModuleContext());
         checkGenericParamList(builder, gp, TC, CD->getDeclContext());
 
         // Type check the constructor parameters.
@@ -3450,7 +3457,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       revertGenericParamList(nominal->getGenericParams(), nominal);
 
       ArchetypeBuilder builder =
-        createArchetypeBuilder(*this, nominal->getModuleContext());
+        createArchetypeBuilder(nominal->getModuleContext());
       checkGenericParamList(builder, gp, *this, nominal->getDeclContext());
       finalizeGenericParamList(builder, gp, nominal, *this);
     }
@@ -3492,7 +3499,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     revertGenericParamList(proto->getGenericParams(), proto);
 
     ArchetypeBuilder builder =
-      createArchetypeBuilder(*this, proto->getModuleContext());
+      createArchetypeBuilder(proto->getModuleContext());
     checkGenericParamList(builder, proto->getGenericParams(), *this,
                           proto->getDeclContext());
     finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
@@ -3508,7 +3515,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         TypeLoc underlyingTy;
         ArchetypeType *archetype = selfArchetype;
-        archetype = selfArchetype->getNestedType(assocType->getName());
+        archetype = selfArchetype->getNestedType(assocType->getName())
+          .dyn_cast<ArchetypeType*>();
+        if (!archetype)
+          return;
         assocType->setArchetype(archetype);
       }
     }

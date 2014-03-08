@@ -940,6 +940,8 @@ public:
                                           Type T, SourceRange TypeRange);
 
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
+  
+  ArchetypeBuilder createArchetypeBuilder(Module *mod);
 };
 
 } // end namespace swift

@@ -63,7 +63,7 @@ template <typename InputIt1, typename InputIt2, typename BinaryFunction>
 inline void for_each(InputIt1 I1, InputIt1 E1, InputIt2 I2, BinaryFunction f) {
   while (I1 != E1) {
     f(*I1, *I2);
-    ++I1, ++I2;
+    ++I1; ++I2;
   }
 }
 
@@ -72,6 +72,27 @@ inline void for_each(const Container1 &c1, const Container2 &c2,
                      BinaryFunction f) {
   assert(c1.size() == c2.size());
   for_each(c1.begin(), c1.end(), c2.begin(), f);
+}
+
+/// The equivalent of std::for_each, but for three lists at once.
+template <typename InputIt1, typename InputIt2, typename InputIt3,
+          typename TernaryFunction>
+inline void for_each3(InputIt1 I1, InputIt1 E1, InputIt2 I2, InputIt3 I3,
+                      TernaryFunction f) {
+  while (I1 != E1) {
+    f(*I1, *I2, *I3);
+    ++I1; ++I2; ++I3;
+  }
+}
+
+template <typename Container1, typename Container2, typename Container3,
+          typename TernaryFunction>
+inline void for_each3(const Container1 &c1, const Container2 &c2,
+                      const Container3 &c3,
+                     TernaryFunction f) {
+  assert(c1.size() == c2.size());
+  assert(c2.size() == c3.size());
+  for_each3(c1.begin(), c1.end(), c2.begin(), c3.begin(), f);
 }
 
 /// @}

@@ -2970,7 +2970,8 @@ namespace {
       if (!potential)
         return nullptr;
       
-      return potential->getArchetype(nullptr, ParamArchetypes.getModule());
+      return potential->getType(nullptr, ParamArchetypes.getModule())
+        .dyn_cast<ArchetypeType*>();
     }
 
   public:

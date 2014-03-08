@@ -95,67 +95,74 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
   return Result;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getArchetype(
-                                             ProtocolDecl *rootProtocol,
-                                             Module &mod)
-                                                -> ArchetypeType * {
+ArchetypeType::NestedType
+ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
+                                              Module &mod) {
   // Retrieve the archetype from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getArchetype(rootProtocol, mod);
-
+    return getRepresentative()->getType(rootProtocol, mod);
+  
+  // Return a concrete type or archetype we've already resolved.
+  if (ArchetypeOrConcreteType) {
+    return ArchetypeOrConcreteType;
+  }
+  
   ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = rootProtocol;
-  if (!Archetype) {
-    // Allocate a new archetype.
-    ArchetypeType *ParentArchetype = nullptr;
-    if (Parent) {
-      assert(assocTypeOrProto.isNull() &&
-             "root protocol type given for non-root archetype");
-      ParentArchetype = Parent->getArchetype(nullptr, mod);
+  // Allocate a new archetype.
+  ArchetypeType *ParentArchetype = nullptr;
+  if (Parent) {
+    assert(assocTypeOrProto.isNull() &&
+           "root protocol type given for non-root archetype");
+    auto parentTy = Parent->getType(nullptr, mod);
+    if (!parentTy)
+      return {};
+    ParentArchetype = parentTy.dyn_cast<ArchetypeType*>();
+    if (!ParentArchetype)
+      return {};
 
-      if (!ParentArchetype)
-        return nullptr;
-
-      // Find the protocol that has an associated type with this name.
-      for (auto proto : ParentArchetype->getConformsTo()) {
-        SmallVector<ValueDecl *, 2> decls;
-        if (mod.lookupQualified(proto->getDeclaredType(), Name,
-                               NL_VisitSupertypes, nullptr, decls)) {
-          for (auto decl : decls) {
-            if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-              assocTypeOrProto = assocType;
-              break;
-            }
+    // Find the protocol that has an associated type with this name.
+    for (auto proto : ParentArchetype->getConformsTo()) {
+      SmallVector<ValueDecl *, 2> decls;
+      if (mod.lookupQualified(proto->getDeclaredType(), Name,
+                             NL_VisitSupertypes, nullptr, decls)) {
+        for (auto decl : decls) {
+          if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+            assocTypeOrProto = assocType;
+            break;
           }
         }
       }
-
-      // FIXME: If assocTypeOrProto is null, we will diagnose it later.
-      // It would be far nicer to know now, and be able to recover, e.g.,
-      // via typo correction.
     }
 
-    // If we ended up building our parent archetype, then we'll have
-    // already filled in our own archetype.
-    if (Archetype)
-      return Archetype;
-
-    SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
-                                          ConformsTo.end());
-    Archetype = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
-                                      assocTypeOrProto, Name, Protos,
-                                      Superclass, Index);
-
-    // Collect the set of nested types of this archetype, and put them into
-    // the archetype itself.
-    SmallVector<std::pair<Identifier, ArchetypeType *>, 4> FlatNestedTypes;
-    for (auto Nested : NestedTypes) {
-      FlatNestedTypes.push_back({ Nested.first,
-                                  Nested.second->getArchetype(nullptr, mod) });
-    }
-    Archetype->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
+    // FIXME: If assocTypeOrProto is null, we will diagnose it later.
+    // It would be far nicer to know now, and be able to recover, e.g.,
+    // via typo correction.
   }
 
-  return Archetype;
+  // If we ended up building our parent archetype, then we'll have
+  // already filled in our own archetype.
+  if (auto arch = ArchetypeOrConcreteType.get<ArchetypeType*>())
+    return arch;
+
+  SmallVector<ProtocolDecl *, 4> Protos(ConformsTo.begin(),
+                                        ConformsTo.end());
+  auto arch
+    = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
+                            assocTypeOrProto, Name, Protos,
+                            Superclass, Index);
+  ArchetypeOrConcreteType = arch;
+  
+  // Collect the set of nested types of this archetype, and put them into
+  // the archetype itself.
+  SmallVector<std::pair<Identifier, ArchetypeType::NestedType>, 4>
+    FlatNestedTypes;
+  for (auto Nested : NestedTypes) {
+    FlatNestedTypes.push_back({ Nested.first,
+                                Nested.second->getType(nullptr, mod) });
+  }
+  arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
+  
+  return arch;
 }
 
 AssociatedTypeDecl *
@@ -254,14 +261,17 @@ struct DenseMapInfo<GenericTypeParamKey> {
 
 struct ArchetypeBuilder::Implementation {
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
-  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)> getConformsTo;
+  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
+    getConformsTo;
+  std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
+    conformsToProtocol;
   SmallVector<GenericTypeParamKey, 4> GenericParams;
   DenseMap<GenericTypeParamKey, std::pair<ProtocolDecl*, PotentialArchetype*>>
     PotentialArchetypes;
   DenseMap<GenericTypeParamKey, ArchetypeType *> PrimaryArchetypeMap;
   SmallVector<ArchetypeType *, 4> AllArchetypes;
 
-  SmallVector<std::pair<PotentialArchetype *, PotentialArchetype *>, 4>
+  SmallVector<SameTypeRequirement, 4>
     SameTypeRequirements;
 };
 
@@ -275,17 +285,27 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
   Impl->getConformsTo = [](AbstractTypeParamDecl *assocType) {
     return assocType->getProtocols();
   };
+  Impl->conformsToProtocol = [](Module &M, Type t, ProtocolDecl *protocol)
+  -> ProtocolConformance* {
+    auto res = M.lookupConformance(t, protocol, nullptr);
+    if (res.getInt() == ConformanceKind::DoesNotConform)
+      return nullptr;
+    return res.getPointer();
+  };
 }
 
 ArchetypeBuilder::ArchetypeBuilder(
   Module &mod, DiagnosticEngine &diags,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl*)> getConformsTo)
+  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl*)> getConformsTo,
+  std::function<ProtocolConformance * (Module &, Type, ProtocolDecl*)>
+    conformsToProtocol)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
     Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
   Impl->getConformsTo = std::move(getConformsTo);
+  Impl->conformsToProtocol = std::move(conformsToProtocol);
 }
 
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
@@ -439,9 +459,10 @@ bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
   return false;
 }
 
-bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
-                                              SourceLoc EqualLoc,
-                                              PotentialArchetype *T2) {
+bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
+                                             PotentialArchetype *T1,
+                                             SourceLoc EqualLoc,
+                                             PotentialArchetype *T2) {
   auto OrigT1 = T1, OrigT2 = T2;
 
   // Operate on the representatives
@@ -451,7 +472,7 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // If the representives are already the same, we're done.
   if (T1 == T2)
     return false;
-
+  
   // FIXME: Do we want to restrict which potential archetypes can be made
   // equivalent? For example, can two generic parameters T and U be made
   // equivalent? What about a generic parameter and a concrete type?
@@ -465,16 +486,37 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   unsigned T2Depth = T2->getNestingDepth();
   if (T2Depth < T1Depth)
     std::swap(T1, T2);
-
+  
   // Don't allow two generic parameters to be equivalent, because then we
   // don't actually have two parameters.
   // FIXME: Should we simply allow this?
   if (T1Depth == 0 && T2Depth == 0) {
-    Diags.diagnose(EqualLoc, diag::requires_generic_param_equal,
+    Diags.diagnose(EqualLoc, diag::requires_generic_params_made_equal,
                    T1->Name, T2->Name);
     return true;
   }
-
+  
+  // Merge any concrete constraints.
+  Type concrete1 = T1->ArchetypeOrConcreteType.dyn_cast<Type>();
+  Type concrete2 = T2->ArchetypeOrConcreteType.dyn_cast<Type>();
+  
+  if (concrete1 && concrete2) {
+    if (!concrete1->isEqual(concrete2)) {
+      Diags.diagnose(EqualLoc, diag::requires_same_type_conflict,
+                     T1->getName(), concrete1, concrete2);
+      return true;
+      
+    }
+  } else if (concrete1) {
+    assert(!T2->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+           && "already formed archetype for concrete-constrained parameter");
+    T2->ArchetypeOrConcreteType = concrete1;
+  } else if (concrete2) {
+    assert(!T1->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+           && "already formed archetype for concrete-constrained parameter");
+    T1->ArchetypeOrConcreteType = concrete2;
+  }
+  
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
 
@@ -488,11 +530,94 @@ bool ArchetypeBuilder::addSameTypeRequirement(PotentialArchetype *T1,
   // Recursively merge the associated types of T2 into T1.
   for (auto T2Nested : T2->NestedTypes) {
     auto T1Nested = T1->getNestedType(T2Nested.first);
-    if (addSameTypeRequirement(T1Nested, EqualLoc, T2Nested.second))
+    if (addSameTypeRequirementBetweenArchetypes(T1Nested,
+                                                EqualLoc, T2Nested.second))
       return true;
   }
 
   return false;
+}
+
+bool ArchetypeBuilder::addSameTypeRequirementToConcrete(PotentialArchetype *T,
+                                                        SourceLoc EqualLoc,
+                                                        Type Concrete) {
+  // Operate on the representative.
+  auto OrigT = T;
+  T = T->getRepresentative();
+  
+  assert(!T->ArchetypeOrConcreteType.dyn_cast<ArchetypeType*>()
+         && "already formed archetype for concrete-constrained parameter");
+  
+  // If we've already been bound to a type, we're either done, or we have a
+  // problem.
+  if (auto oldConcrete = T->ArchetypeOrConcreteType.dyn_cast<Type>()) {
+    if (!oldConcrete->isEqual(Concrete)) {
+      Diags.diagnose(EqualLoc, diag::requires_same_type_conflict,
+                     T->getName(), oldConcrete, Concrete);
+      return true;
+    }
+    return false;
+  }
+  
+  // Don't allow a generic parameter to be equivalent to a concrete type,
+  // because then we don't actually have a parameter.
+  // FIXME: Should we simply allow this?
+  if (T->getNestingDepth() == 0) {
+    Diags.diagnose(EqualLoc, diag::requires_generic_param_made_equal_to_concrete,
+                   T->Name);
+    return true;
+  }
+  
+  // Make sure the concrete type fulfills the requirements on the archetype.
+  DenseMap<ProtocolDecl *, ProtocolConformance*> conformances;
+  for (auto protocol : T->getConformsTo()) {
+    auto conformance = Impl->conformsToProtocol(Mod, Concrete, protocol);
+    if (!conformance) {
+      Diags.diagnose(EqualLoc,
+                     diag::requires_generic_param_same_type_does_not_conform,
+                     Concrete, protocol->getName());
+      return true;
+    }
+    conformances[protocol] = conformance;
+  }
+  
+  // Record the requirement.
+  T->ArchetypeOrConcreteType = Concrete;
+  Impl->SameTypeRequirements.push_back({OrigT, Concrete});
+  
+  // Recursively resolve the associated types to their concrete types.
+  for (auto nested : T->getNestedTypes()) {
+    AssociatedTypeDecl *assocType = T->getAssociatedType(Mod, nested.first);
+    auto witness = conformances[assocType->getProtocol()]
+          ->getTypeWitness(assocType, nullptr);
+    addSameTypeRequirementToConcrete(nested.second, EqualLoc,
+                                     witness.Replacement->getDesugaredType());
+  }
+  
+  return false;
+}
+                                                               
+bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, SourceLoc EqualLoc,
+                                              Type Reqt2) {
+  // Find the potential archetypes.
+  PotentialArchetype *T1 = resolveArchetype(Reqt1);
+  PotentialArchetype *T2 = resolveArchetype(Reqt2);
+  
+  // Require that at least one side of the requirement be a potential archetype.
+  if (!T1 && !T2) {
+    assert(EqualLoc.isValid() && "reintroducing invalid requirement");
+    Diags.diagnose(EqualLoc, diag::requires_no_same_type_archetype);
+    return true;
+  }
+  
+  // If both sides of the requirement are open archetypes, combine them.
+  if (T1 && T2)
+    return addSameTypeRequirementBetweenArchetypes(T1, EqualLoc, T2);
+  
+  // Otherwise, we're binding an open archetype.
+  if (T1)
+    return addSameTypeRequirementToConcrete(T1, EqualLoc, Reqt2);
+  return addSameTypeRequirementToConcrete(T2, EqualLoc, Reqt1);
 }
 
 bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
@@ -527,7 +652,10 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     return false;
   }
 
-  case RequirementKind::SameType: {
+  case RequirementKind::SameType:
+    return addSameTypeRequirement(Req.getFirstType(), Req.getEqualLoc(),
+                                  Req.getSecondType());
+    /*
     // FIXME: Allow one of the types to not be a potential archetype, e.g.,
     // T.Element == Int?
     PotentialArchetype *FirstPA = resolveArchetype(Req.getFirstType());
@@ -548,8 +676,8 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
       return true;
     }
     return addSameTypeRequirement(FirstPA, Req.getEqualLoc(), SecondPA);
-  }
-
+     */
+      
   case RequirementKind::WitnessMarker:
     llvm_unreachable("Value witness marker in requirement");
   }
@@ -583,16 +711,11 @@ void ArchetypeBuilder::addRequirement(const Requirement &req) {
     return;
   }
 
-  case RequirementKind::SameType: {
-    PotentialArchetype *firstPA = resolveArchetype(req.getFirstType());
-    assert(firstPA && "Re-introducing invalid requirement");
-
-    PotentialArchetype *secondPA = resolveArchetype(req.getSecondType());
-    assert(secondPA && "Re-introducing invalid requirement");
-    addSameTypeRequirement(firstPA, SourceLoc(), secondPA);
+  case RequirementKind::SameType:
+    addSameTypeRequirement(req.getFirstType(), SourceLoc(),
+                           req.getSecondType());
     return;
-  }
-
+    
   case RequirementKind::WitnessMarker:
     return;
   }
@@ -686,10 +809,10 @@ void ArchetypeBuilder::assignArchetypes() {
   // Compute the archetypes for each of the potential archetypes (i.e., the
   // generic parameters).
   for (const auto& PA : Impl->PotentialArchetypes) {
-    auto Archetype = PA.second.second->getArchetype(
-                       PA.second.first,
-                       Mod);
-    Impl->PrimaryArchetypeMap[PA.first] = Archetype;
+    auto Archetype = PA.second.second->getType(PA.second.first, Mod)
+      .dyn_cast<ArchetypeType*>();
+    if (Archetype)
+      Impl->PrimaryArchetypeMap[PA.first] = Archetype;
   }
 }
 
@@ -731,8 +854,7 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
   return Impl->AllArchetypes;
 }
 
-ArrayRef<std::pair<ArchetypeBuilder::PotentialArchetype *,
-                   ArchetypeBuilder::PotentialArchetype *>>
+ArrayRef<ArchetypeBuilder::SameTypeRequirement>
 ArchetypeBuilder::getSameTypeRequirements() const {
   return Impl->SameTypeRequirements;
 }
@@ -831,7 +953,8 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
     auto potentialArchetype = Archetypes.resolveArchetype(depType);
     // If so, use it.
     if (potentialArchetype) {
-      return potentialArchetype->getArchetype(nullptr, M);
+      return ArchetypeType::getNestedTypeValue(
+        potentialArchetype->getType(nullptr, M));
     }
     
     // If not, resolve the base type, then look up the associated type in
@@ -842,7 +965,7 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
     assert(!base->isDependentType());
     
     if (auto baseArch = base->getAs<ArchetypeType>()) {
-      return baseArch->getNestedType(depType->getName());
+      return baseArch->getNestedTypeValue(depType->getName());
     }
     
     auto assocType = depType->getAssocType();

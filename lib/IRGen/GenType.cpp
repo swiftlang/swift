@@ -729,10 +729,17 @@ const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
 
 /// Profile the archetype constraints that may affect type layout into a
 /// folding set node ID.
-static void profileArchetypeConstraints(ArchetypeType *arch,
+static void profileArchetypeConstraints(Type ty,
                                 llvm::FoldingSetNodeID &ID,
                                 llvm::DenseMap<ArchetypeType*, unsigned> &seen,
                                 unsigned depth = 0) {
+  // End recursion if we found a concrete associated type.
+  auto arch = ty->getAs<ArchetypeType>();
+  if (!arch) {
+    ID.AddPointer(ty->getCanonicalType().getPointer());
+    return;
+  }
+  
   auto found = seen.find(arch);
   if (found != seen.end()) {
     ID.AddInteger(found->second);
@@ -756,7 +763,8 @@ static void profileArchetypeConstraints(ArchetypeType *arch,
   
   // Recursively profile nested archetypes.
   for (auto nested : arch->getNestedTypes()) {
-    profileArchetypeConstraints(nested.second, ID, seen, depth + 1);
+    profileArchetypeConstraints(ArchetypeType::getNestedTypeValue(nested.second),
+                                ID, seen, depth + 1);
   }
 }
 

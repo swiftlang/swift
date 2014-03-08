@@ -412,14 +412,15 @@ namespace {
       // FIXME: Premature associated type -> identifier mapping. We should
       // retain the associated type throughout.
       auto baseTypeVar = base->castTo<TypeVariableType>();
-      return CG.getMemberType(baseTypeVar, member->getName(), [&]() {
-        auto archetype = baseTypeVar->getImpl().getArchetype()
+      return CG.getMemberType(baseTypeVar, member->getName(),
+                              [&]() -> TypeVariableType* {
+        auto nestedType = baseTypeVar->getImpl().getArchetype()
                            ->getNestedType(member->getName());
+        auto archetype = nestedType.dyn_cast<ArchetypeType*>();
         auto locator = CS.getConstraintLocator((Expr *)nullptr,
                                                LocatorPathElt(archetype));
         auto memberTypeVar = CS.createTypeVariable(locator,
                                                    TVO_PrefersSubtypeBinding);
-
         // Determine whether we should bind the new type variable as a
         // member of the base type variable, or let it float.
         Type replacementType;
@@ -445,6 +446,16 @@ namespace {
           CS.addConstraint(ConstraintKind::Bind, memberTypeVar, replacementType);
 
         // Add associated type constraints.
+        if (!archetype) {
+          assert(false);
+          // If the nested type is not an archetype (because it was constrained
+          // to a concrete type by a requirement), bind the type variable
+          // to that type.
+          CS.addConstraint(ConstraintKind::Bind, memberTypeVar,
+                           ArchetypeType::getNestedTypeValue(nestedType));
+          return memberTypeVar;
+        }
+                                
         // FIXME: Would be better to walk the requirements of the protocol
         // of which the associated type is a member.
         if (auto superclass = member->getSuperclass()) {
@@ -866,7 +877,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
     // Refer to a member of the archetype directly.
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
-      Type memberTy = archetype->getNestedType(value->getName());
+      Type memberTy = archetype->getNestedTypeValue(value->getName());
       if (!isTypeReference)
         memberTy = MetatypeType::get(memberTy, TC.Context);
 
