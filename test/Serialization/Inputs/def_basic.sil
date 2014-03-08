@@ -5,18 +5,37 @@ import Swift
 import Foundation
 
 // Test SIL Global variable.
-// CHECK: sil_global private @globalinit_token0 : $Builtin.Word
+// CHECK-NOT: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
+
+// CHECK-NOT: sil_global public @public_global : $Builtin.Word
+sil_global public @public_global : $Builtin.Word
 
 var staticProp: Int = 0
 sil @globalinit_func0 : $@thin () -> ()
 
-// CHECK-LABEL: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
+// We should not serialize this since it references the private variable globalinit_token0.
+// CHECK-NOT: sil public_external @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 sil @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer {
 bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
-  // CHECK: sil_global_addr @globalinit_token0 : $*Builtin.Word
   %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = function_ref @globalinit_func0 : $@thin () -> ()
+  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
+  %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %6 = global_addr #staticProp : $*Int
+  %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer
+  return %7 : $Builtin.RawPointer
+}
+
+// This references a public global so we *SHOULD* derserialize this.
+// CHECK-LABEL: sil public_external @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
+sil @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer {
+bb0:
+  %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  // CHECK: sil_global_addr @public_global : $*Builtin.Word
+  %1 = sil_global_addr @public_global : $*Builtin.Word
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@thin () -> ()
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
@@ -1040,6 +1059,7 @@ sil_witness_table InheritedConformance: AnyProtocol module witness_tables {
 
 sil [transparent] @_TF9def_basic13serialize_allFT_T_ : $@thin () -> () {
 bb0:
+  %0 = function_ref @_TFV18lazy_global_access4Type10staticPropSia_public : $@thin () -> Builtin.RawPointer
   %1 = function_ref @_TFV18lazy_global_access4Type10staticPropSia : $@thin () -> Builtin.RawPointer
   %2 = function_ref @test1 : $@thin () -> ()
   %4 = function_ref @test2 : $@thin (Int) -> ()

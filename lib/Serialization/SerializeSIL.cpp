@@ -1351,6 +1351,37 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   }
 }
 
+static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
+  switch (linkage) {
+  case SILLinkage::Public:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::Hidden:
+  case SILLinkage::HiddenExternal:
+    return true;
+  case SILLinkage::Shared:
+  case SILLinkage::Private:
+    return false;
+  }
+}
+
+// Check if F transitively references a global, function, vtable, or witness
+// table with private linkage.
+//
+// FIXME: When vtables/witness tables get linkage, update this.
+static bool
+transitivelyReferencesPotentiallyUnserializableLinkage(const SILFunction &F) {
+  for (auto &BB : F)
+    for (auto &I : BB) {
+      if (auto *GA = dyn_cast<SILGlobalAddrInst>(&I))
+        if (!canAlwaysSerializeLinkage(GA->getReferencedGlobal()->getLinkage()))
+          return true;
+      if (auto *FRI = dyn_cast<FunctionRefInst>(&I))
+        if (!canAlwaysSerializeLinkage(FRI->getReferencedFunction()->getLinkage()))
+          return true;
+    }
+  return false;
+}
+
 void SILSerializer::writeModule(const SILModule *SILMod) {
   {
     BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 6);
@@ -1427,6 +1458,15 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
       // FIXME: This is order-dependent.
       if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
         return true;
+
+      // If F has private linkage or transitively references a global, function,
+      // vtable, or witnesstable with private linkage, do not serialize it.
+      //
+      // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
+      // but will at some point in the near future.
+      if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
+          transitivelyReferencesPotentiallyUnserializableLinkage(F))
+        return false;
 
       // Otherwise serialize the body of the function only if we are asked to
       // serialize everything.
