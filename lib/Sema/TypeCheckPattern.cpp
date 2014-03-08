@@ -672,10 +672,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       NP->getDecl()->setLet(false);
     P->setType(type);
     
-    // If we are inferring a variable to have type AnyObject or "()", then emit
-    // a diagnostic.  In the former case, the coder probably didn't know they
-    // were getting anyobject back and expected a concrete type.  In the later
-    // case, they probably didn't mean to bind to a variable, or there is some
+    // If we are inferring a variable to have type AnyObject, AnyObject.Type, or
+    // "()", then emit a diagnostic.  In the former two cases, the coder
+    // probably forgot a cast and expected a concrete type.  In the later case,
+    // they probably didn't mean to bind to a variable, or there is some
     // other bug.  We always tell them that they can silence the warning with an
     // explicit type annotation (and provide a fixit) as a note.
     bool shouldRequireType = false;
@@ -684,6 +684,11 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     else if (auto protoTy = type->getAs<ProtocolType>()) {
       shouldRequireType =
         protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
+    } else if (auto MTT = type->getAs<MetatypeType>()) {
+      if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
+        shouldRequireType =
+          protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
+      }
     }
     
     if (shouldRequireType && !(options & TR_FromTypedPattern)) {
