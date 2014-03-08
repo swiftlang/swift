@@ -95,8 +95,27 @@ inline bool hasPublicVisibility(SILLinkage linkage) {
     case SILLinkage::Private:
     case SILLinkage::HiddenExternal:
       return false;
-    }
   }
+}
+
+/// Returns true if l1 is less visible than l2.
+inline bool isLessVisibleThan(SILLinkage l1, SILLinkage l2) {
+  if (l1 == SILLinkage::PublicExternal)
+    l1 = SILLinkage::Public;
+  else if (l1 == SILLinkage::HiddenExternal)
+    l1 = SILLinkage::Hidden;
+  else if (l1 == SILLinkage::Shared)
+    l1 = SILLinkage::Public;
+
+  if (l2 == SILLinkage::PublicExternal)
+    l2 = SILLinkage::Public;
+  else if (l2 == SILLinkage::HiddenExternal)
+    l2 = SILLinkage::Hidden;
+  else if (l2 == SILLinkage::Shared)
+    l2 = SILLinkage::Public;
+
+  return unsigned(l1) > unsigned(l2);
+}
 
 } // end swift namespace
 

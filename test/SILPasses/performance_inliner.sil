@@ -597,3 +597,253 @@ entry:
   return %z : $()
 }
 
+// Visiblity Tests
+
+sil_global private @private_global : $Builtin.Word
+sil private @private_function : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_private_global : $@thin () -> () {
+  %0 = sil_global_addr @private_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_private_function : $@thin () -> () {
+  %0 = function_ref @private_function : $@thin () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global shared @shared_global : $Builtin.Word
+sil shared @shared_function : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_shared_global : $@thin () -> () {
+  %0 = sil_global_addr @shared_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_shared_function : $@thin () -> () {
+  %0 = function_ref @shared_function : $@thin () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global hidden @hidden_global : $Builtin.Word
+sil hidden @hidden_function : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_hidden_global : $@thin () -> () {
+  %0 = sil_global_addr @hidden_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_hidden_function : $@thin () -> () {
+  %0 = function_ref @hidden_function : $@thin () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil_global @public_global : $Builtin.Word
+sil @public_function : $@thin () -> () {
+  %0 = integer_literal $Builtin.Int32, 4
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil @references_public_global : $@thin () -> () {
+  %0 = sil_global_addr @public_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil @references_public_function : $@thin () -> () {
+  %0 = function_ref @public_function : $@thin () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil private @private_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK: function_ref @hidden_function
+// CHECK: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK: sil_global_addr @hidden_global
+// CHECK: sil_global_addr @private_global
+sil private @private_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil shared @shared_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK-NOT: function_ref @hidden_function
+// CHECK-NOT: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK-NOT: sil_global_addr @hidden_global
+// CHECK-NOT: sil_global_addr @private_global
+sil shared @shared_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden @hidden_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK: function_ref @hidden_function
+// CHECK-NOT: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK: sil_global_addr @hidden_global
+// CHECK-NOT: sil_global_addr @private_global
+sil hidden @hidden_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @public_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK-NOT: function_ref @hidden_function
+// CHECK-NOT: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK-NOT: sil_global_addr @hidden_global
+// CHECK-NOT: sil_global_addr @private_global
+sil @public_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil hidden_external @hidden_external_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK: function_ref @hidden_function
+// CHECK-NOT: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK: sil_global_addr @hidden_global
+// CHECK-NOT: sil_global_addr @private_global
+sil hidden_external @hidden_external_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil public_external @public_external_function_test : $@thin () -> () {
+// CHECK: function_ref @public_function
+// CHECK: function_ref @shared_function
+// CHECK-NOT: function_ref @hidden_function
+// CHECK-NOT: function_ref @private_function
+// CHECK: sil_global_addr @public_global
+// CHECK: sil_global_addr @shared_global
+// CHECK-NOT: sil_global_addr @hidden_global
+// CHECK-NOT: sil_global_addr @private_global
+sil public_external @public_external_function_test : $@thin () -> () {
+  %0 = function_ref @references_public_function : $@thin () -> ()
+  %1 = function_ref @references_shared_function : $@thin () -> ()
+  %2 = function_ref @references_hidden_function : $@thin () -> ()
+  %3 = function_ref @references_private_function : $@thin () -> ()
+  %4 = function_ref @references_public_global : $@thin () -> ()
+  %5 = function_ref @references_shared_global : $@thin () -> ()
+  %6 = function_ref @references_hidden_global : $@thin () -> ()
+  %7 = function_ref @references_private_global : $@thin () -> ()
+  apply %0() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  apply %2() : $@thin () -> ()
+  apply %3() : $@thin () -> ()
+  apply %4() : $@thin () -> ()
+  apply %5() : $@thin () -> ()
+  apply %6() : $@thin () -> ()
+  apply %7() : $@thin () -> ()
+  %8 = tuple()
+  return %8 : $()
+}

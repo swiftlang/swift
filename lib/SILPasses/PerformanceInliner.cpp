@@ -71,6 +71,26 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
 //                                  Inliner
 //===----------------------------------------------------------------------===//
 
+// Check if F transitively references a global, function, vtable, or witness
+// table with a less visible SILLinkage than linkage.
+//
+// FIXME: When vtables/witness tables get linkage, update this.
+static bool transitivelyReferencesLessVisibleLinkage(const SILFunction &F,
+                                                     SILLinkage linkage) {
+  for (auto &BB : F)
+    for (auto &I : BB) {
+      if (auto *GA = dyn_cast<SILGlobalAddrInst>(&I))
+        if (isLessVisibleThan(GA->getReferencedGlobal()->getLinkage(),
+                              linkage))
+          return true;
+      if (auto *FRI = dyn_cast<FunctionRefInst>(&I))
+        if (isLessVisibleThan(FRI->getReferencedFunction()->getLinkage(),
+                              linkage))
+          return true;
+    }
+  return false;
+}
+
 /// \brief Attempt to inline all calls smaller than our threshold into F until.
 /// returns True if a function was inlined.
 bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
@@ -106,6 +126,14 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // Prevent circular inlining.
     if (Callee == Caller) {
       DEBUG(llvm::dbgs() << "  Skipping recursive calls.\n");
+      continue;
+    }
+
+    // If Callee has a less visible linkage than caller or references something
+    // with a less visible linkage than caller, don't inline Callee into caller.
+    if (transitivelyReferencesLessVisibleLinkage(*Callee,
+                                                 Caller->getLinkage())) {
+      DEBUG(llvm::dbgs() << "  Skipping less visible call.");
       continue;
     }
 
