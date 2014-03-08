@@ -42,9 +42,9 @@
     }
 
  * The compiler now warns about cases where a variable is inferred to have
-   AnyObject or "()" type, since type inferrence can turn a simple mistake
-   (e.g. failing to cast an AnyObject when you meant to) into something with
-   ripple effects.  Here is a simple example:
+   AnyObject, AnyClass, or "()" type, since type inferrence can turn a simple 
+   mistake (e.g. failing to cast an AnyObject when you meant to) into something 
+   with ripple effects.  Here is a simple example:
 
     t.swift:4:5: warning: variable 'fn' inferred to have type '()', which may be unexpected
     var fn = abort()
