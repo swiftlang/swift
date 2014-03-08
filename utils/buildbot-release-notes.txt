@@ -76,6 +76,10 @@
 2014-03-05
 ----------
 
+* C macros that expand to a single constant string are now imported as global
+  constants. Normal string literals are imported as CString; NSString literals
+  are imported as String.
+
 * All values now have a 'self' property, exactly equivalent to the value
   itself:
 
