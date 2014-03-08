@@ -1291,10 +1291,41 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     ValueDecl = VD;
   });
 
-  // The setter invokes willSet with the incoming value, then does a direct
-  // store, then invokes didSet.
-  SmallVector<ASTNode, 3> SetterBody;
+  // The setter loads the oldValue, invokes willSet with the incoming value,
+  // does a direct store, then invokes didSet with the oldValue.
+  SmallVector<ASTNode, 6> SetterBody;
 
+  // If there is a didSet, it will take the old value.  Load it so that we have
+  // it.
+  VarDecl *OldValue = nullptr;
+  if (VD->getDidSetFunc()) {
+    Expr *OldValueExpr;
+    if (SelfDecl) {
+      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+      OldValueExpr = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD,
+                                             SourceLoc(),
+                                     /*implicit*/true, /*direct ivar*/true);
+    } else {
+      OldValueExpr = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                   /*direct ivar*/true);
+    }
+    
+    OldValue = new (Ctx) VarDecl(/*static*/ false, /*isLet*/ true,
+                                 SourceLoc(), Ctx.getIdentifier("tmp"),
+                                 Type(), Set);
+    OldValue->setImplicit();
+    auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
+    auto tmpPBD = new (Ctx) PatternBindingDecl(SourceLoc(),
+                                               StaticSpellingKind::None,
+                                               SourceLoc(),
+                                               tmpPattern, OldValueExpr,
+                                               /*storage*/ true,
+                                               /*conditional*/ false, Set);
+    tmpPBD->setImplicit();
+    SetterBody.push_back(tmpPBD);
+    SetterBody.push_back(OldValue);
+  }
+  
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(willSet)),
   //                                    (decl_ref_expr(self))),
@@ -1304,7 +1335,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   if (VD->getWillSetFunc()) {
     Expr *Callee = new (Ctx) DeclRefExpr(VD->getWillSetFunc(),
                                          SourceLoc(), /*imp*/true);
-    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+    auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), /*imp*/true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
@@ -1331,19 +1362,19 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
   //                                    (decl_ref_expr(self))),
-  //              (tuple_expr()))
+  //              (decl_ref_expr(tmp)))
   // or:
-  //   (call_expr (decl_ref_expr(didSet)), (tuple_expr()))
+  //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
   if (VD->getDidSetFunc()) {
-    auto *Tuple = new (Ctx) TupleExpr(SourceLoc(), {}, nullptr, SourceLoc(),
-                                      /*trailing closure*/false, /*impl*/true);
+    auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, SourceLoc(),
+                                               /*impl*/true);
     Expr *Callee = new (Ctx) DeclRefExpr(VD->getDidSetFunc(),
                                          SourceLoc(), /*imp*/true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
-    SetterBody.push_back(new (Ctx) CallExpr(Callee, Tuple, true));
+    SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
   }
   
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));

@@ -1321,9 +1321,10 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
 static TypedPattern *
 parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
                               Parser &P, AccessorKind Kind) {
-  // Only 'set' and 'willSet' have a (value) parameter.  'get' and 'didSet'
-  // always take a () parameter.
-  if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet)
+  // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
+  // paramter and 'get' and always takes a () parameter.
+  if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet &&
+      Kind != AccessorKind::IsDidSet)
     return nullptr;
 
   SourceLoc StartLoc, NameLoc, EndLoc;
@@ -1345,11 +1346,13 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
       Name = P.Context.getIdentifier(P.Tok.getText());
       NameLoc = P.consumeToken();
 
+      auto DiagID =
+         Kind == AccessorKind::IsSetter ? diag::expected_rparen_set_name :
+         Kind == AccessorKind::IsWillSet ? diag::expected_rparen_willSet_name :
+          diag::expected_rparen_didSet_name;
+      
       // Look for the closing ')'.
-      P.parseMatchingToken(tok::r_paren, EndLoc,
-                           Kind == AccessorKind::IsSetter
-                           ? diag::expected_rparen_set_name
-                           : diag::expected_rparen_willSet_name, StartLoc);
+      P.parseMatchingToken(tok::r_paren, EndLoc, DiagID, StartLoc);
     }
   }
 
@@ -1358,7 +1361,8 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   if (IsNameImplicit) {
-    Name = P.Context.getIdentifier("value");
+    const char *ImplName =Kind == AccessorKind::IsDidSet ? "oldValue" : "value";
+    Name = P.Context.getIdentifier(ImplName);
     NameLoc = SpecifierLoc;
     StartLoc = SourceLoc();
   }

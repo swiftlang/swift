@@ -199,6 +199,8 @@ ERROR(expected_rparen_set_name,decl_parsing,none,
       "expected ')' after setter value name",())
 ERROR(expected_rparen_willSet_name,decl_parsing,none,
       "expected ')' after willSet value name",())
+ERROR(expected_rparen_didSet_name,decl_parsing,none,
+      "expected ')' after didSet value name",())
 ERROR(expected_lbrace_accessor,decl_parsing,PointsToFirstBadToken,
       "expected '{' to start %select{getter|setter|willSet|didSet}0 definition",
      (unsigned))

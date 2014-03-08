@@ -374,7 +374,7 @@ StringRef IRGenDebugInfo::getName(const FuncDecl &FD) {
     if (ValueDecl *VD = FD.getAccessorStorageDecl()) {
       const char *Kind;
       switch (FD.getAccessorKind()) {
-      case AccessorKind::NotAccessor: assert(0 && "we know this is an accessor");
+      case AccessorKind::NotAccessor: assert(0 && "this is an accessor");
       case AccessorKind::IsGetter: Kind = ".get"; break;
       case AccessorKind::IsSetter: Kind = ".set"; break;
       case AccessorKind::IsWillSet: Kind = ".willset"; break;
