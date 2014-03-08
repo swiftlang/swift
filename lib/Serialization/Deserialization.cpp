@@ -1712,6 +1712,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
 
+    if (Decl *associated = getDecl(associatedDeclID)) {
+      if (auto op = dyn_cast<OperatorDecl>(associated)) {
+        fn->setOperatorDecl(op);
+
+        if (isa<PrefixOperatorDecl>(op))
+          fn->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
+        else if (isa<PostfixOperatorDecl>(op))
+          fn->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
+        // Note that an explicit @infix is not required.
+      }
+      // Otherwise, unknown associated decl kind.
+    }
+
     // This must be set after recording the constructor in the map.
     // A polymorphic constructor type needs to refer to the constructor to get
     // its generic parameters.
@@ -1766,19 +1779,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setDynamicSelf(hasDynamicSelf);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-
-    if (Decl *associated = getDecl(associatedDeclID)) {
-      if (auto op = dyn_cast<OperatorDecl>(associated)) {
-        fn->setOperatorDecl(op);
-
-        if (isa<PrefixOperatorDecl>(op))
-          fn->getMutableAttrs().setAttr(AK_prefix, SourceLoc());
-        else if (isa<PostfixOperatorDecl>(op))
-          fn->getMutableAttrs().setAttr(AK_postfix, SourceLoc());
-        // Note that an explicit @infix is not required.
-      }
-      // Otherwise, unknown associated decl kind.
-    }
 
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
