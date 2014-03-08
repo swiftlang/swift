@@ -21,7 +21,6 @@
 #include "swift/AST/ExprHandle.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Parse/Lexer.h"
 #include <utility>
 using namespace swift;
 
@@ -531,8 +530,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     TypedPattern *TP = cast<TypedPattern>(P);
     bool hadError = validateTypedPattern(*this, dc, TP, options, resolver);
     Pattern *subPattern = TP->getSubPattern();
-    if (coercePatternToType(subPattern, dc, P->getType(),
-                            options|TR_FromTypedPattern, resolver))
+    if (coercePatternToType(subPattern, dc, P->getType(), options, resolver))
       hadError = true;
     else
       TP->setSubPattern(subPattern);
@@ -655,8 +653,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
 
     Pattern *sub = TP->getSubPattern();
-    hadError |= coercePatternToType(sub, dc, TP->getType(),
-                                    subOptions | TR_FromTypedPattern,
+    hadError |= coercePatternToType(sub, dc, TP->getType(), subOptions, 
                                     resolver);
     if (!hadError)
       TP->setSubPattern(sub);
@@ -670,37 +667,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
 
     if (type->is<InOutType>())
       NP->getDecl()->setLet(false);
+
     P->setType(type);
-    
-    // If we are inferring a variable to have type AnyObject, AnyObject.Type, or
-    // "()", then emit a diagnostic.  In the former two cases, the coder
-    // probably forgot a cast and expected a concrete type.  In the later case,
-    // they probably didn't mean to bind to a variable, or there is some
-    // other bug.  We always tell them that they can silence the warning with an
-    // explicit type annotation (and provide a fixit) as a note.
-    bool shouldRequireType = false;
-    if (type->getCanonicalType() == Context.TheEmptyTupleType)
-      shouldRequireType = true;
-    else if (auto protoTy = type->getAs<ProtocolType>()) {
-      shouldRequireType =
-        protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-    } else if (auto MTT = type->getAs<MetatypeType>()) {
-      if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
-        shouldRequireType =
-          protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-      }
-    }
-    
-    if (shouldRequireType && !(options & TR_FromTypedPattern)) {
-      diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
-               NP->getDecl()->getName(), type, NP->getDecl()->isLet());
-
-      SourceLoc fixItLoc = NP->getLoc();
-      fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
-      diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-        .fixItInsert(fixItLoc, " : " + type.getString());
-    }
-
     return false;
   }
   case PatternKind::Any:
