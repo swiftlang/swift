@@ -191,7 +191,7 @@ option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
 option(SWIFT_STDLIB_SERIALIZE_ALL
   "Serialize all SIL functions in the stdlib instead of just transparent functions."
-  NO)
+  YES)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
 set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 
