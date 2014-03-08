@@ -839,10 +839,11 @@ static Type substDependentTypes(ArchetypeBuilder &Archetypes, Type ty) {
     Type base = depType->getBase().transform([&](Type t) -> Type {
       return substDependentTypes(Archetypes, t);
     });
-    assert(!base->is<ArchetypeType>()
-           && "archetype base should have been handled above by "
-              "ArchetypeBuilder");
     assert(!base->isDependentType());
+    
+    if (auto baseArch = base->getAs<ArchetypeType>()) {
+      return baseArch->getNestedType(depType->getName());
+    }
     
     auto assocType = depType->getAssocType();
     auto proto = assocType->getProtocol();
