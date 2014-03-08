@@ -1394,16 +1394,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
-    auto defaultDefinitionType =
-      TypeLoc::withoutLoc(getType(defaultDefinitionID));
-
-    if (declOrOffset.isComplete())
-      break;
-
     auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
                                                   getIdentifier(nameID),
-                                                  SourceLoc(),
-                                                  defaultDefinitionType);
+                                                  SourceLoc(), this,
+                                                  defaultDefinitionID);
     declOrOffset = assocType;
 
     assocType->setSuperclass(getType(superclassID));
@@ -2951,4 +2945,10 @@ ArrayRef<Decl *> ModuleFile::loadAllMembers(const Decl *D,
   auto result = readMembers();
   assert(result && "unable to read members");
   return result.getValue();
+}
+
+TypeLoc
+ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
+                                      uint64_t contextData) {
+  return TypeLoc::withoutLoc(getType(contextData));
 }

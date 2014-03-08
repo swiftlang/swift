@@ -1849,9 +1849,15 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   /// The default definition.
   TypeLoc DefaultDefinition;
 
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
+
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc, TypeLoc defaultDefinition);
+  AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
+                     SourceLoc nameLoc, LazyMemberLoader *definitionResolver,
+                     uint64_t resolverData);
 
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
@@ -1859,9 +1865,14 @@ public:
   }
 
   /// Retrieve the default definition type.
-  Type getDefaultDefinitionType() const { return DefaultDefinition.getType(); }
+  Type getDefaultDefinitionType() const {
+    return getDefaultDefinitionLoc().getType();
+  }
 
-  TypeLoc &getDefaultDefinitionLoc() { return DefaultDefinition; }
+  TypeLoc &getDefaultDefinitionLoc();
+  const TypeLoc &getDefaultDefinitionLoc() const {
+    return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+  }
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;

@@ -485,6 +485,9 @@ public:
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;
+
+  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                            uint64_t contextData) override;
 };
 
 } // end namespace swift

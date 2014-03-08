@@ -18,6 +18,7 @@
 #define SWIFT_AST_LAZYRESOLVER_H
 
 #include "swift/Basic/Optional.h"
+#include "swift/AST/TypeLoc.h"
 
 namespace swift {
 
@@ -31,7 +32,6 @@ class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
 class Substitution;
-class Type;
 class ValueDecl;
 
 /// Abstract interface used to lazily resolve aspects of the AST, such as the
@@ -103,6 +103,10 @@ public:
   /// The implementation should \em not call setMembers on \p D.
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) = 0;
+
+  /// Returns the default definition type for \p ATD.
+  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                            uint64_t contextData) = 0;
 };
 
 }
