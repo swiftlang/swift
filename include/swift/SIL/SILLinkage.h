@@ -85,7 +85,7 @@ inline bool isPossiblyUsedExternally(SILLinkage linkage) {
   return linkage <= SILLinkage::Hidden;
 }
 
-inline bool isPublic(SILLinkage linkage) {
+inline bool hasPublicVisibility(SILLinkage linkage) {
   switch (linkage) {
     case SILLinkage::Public:
     case SILLinkage::PublicExternal:
