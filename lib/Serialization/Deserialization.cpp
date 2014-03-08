@@ -1040,6 +1040,16 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     switch (recordID) {
     case XREF_TYPE_PATH_PIECE:
     case XREF_VALUE_PATH_PIECE: {
+      IdentifierID IID;
+      TypeID TID = 0;
+      if (recordID == XREF_TYPE_PATH_PIECE)
+        XRefTypePathPieceLayout::readRecord(scratch, IID);
+      else
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+
+      Identifier memberName = getIdentifier(IID);
+      pathTrace.addValue(memberName);
+
       if (values.size() != 1) {
         error();
         return nullptr;
@@ -1052,16 +1062,6 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
         error();
         return nullptr;
       }
-
-      IdentifierID IID;
-      TypeID TID = 0;
-      if (recordID == XREF_TYPE_PATH_PIECE)
-        XRefTypePathPieceLayout::readRecord(scratch, IID);
-      else
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
-
-      Identifier memberName = getIdentifier(IID);
-      pathTrace.addValue(memberName);
 
       auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
