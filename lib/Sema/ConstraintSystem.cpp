@@ -77,8 +77,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   // If the type to be fixed is an optional type that wraps the type parameter
   // itself, we do not want to go through with the assignment. To do so would
   // force the type variable to be adjacent to itself.
-  if (auto optType = type->getOptionalObjectType()) {
-    if (optType->getDesugaredType() == typeVar->getDesugaredType())
+  if (auto optValueType = type->getOptionalObjectType()) {
+    if (optValueType->isEqual(typeVar))
       return;
   }
   
