@@ -124,13 +124,16 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
   }
 }
 
-DeclID Serializer::addDeclRef(const Decl *D) {
+DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   if (!D)
     return 0;
 
-  DeclID &id = DeclIDs[D];
-  if (id != 0)
-    return id;
+  DeclIDAndForce &id = DeclIDs[D];
+  if (id.first != 0) {
+    if (forceSerialization && !id.second)
+      id.second = true;
+    return id.first;
+  }
 
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
@@ -154,22 +157,22 @@ DeclID Serializer::addDeclRef(const Decl *D) {
   if (paramList)
     GenericContexts[paramList] = D;
 
-  id = ++LastDeclID;
+  id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
-  return id;
+  return id.first;
 }
 
 TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 
-  TypeID &id = DeclIDs[ty];
-  if (id != 0)
-    return id;
+  auto &id = DeclIDs[ty];
+  if (id.first != 0)
+    return id.first;
 
-  id = ++LastTypeID;
+  id = { ++LastTypeID, true };
   DeclsAndTypesToWrite.push(ty);
-  return id;
+  return id.first;
 }
 
 IdentifierID Serializer::addIdentifierRef(Identifier ident) {
@@ -1076,12 +1079,25 @@ static void checkAllowedAttributes(const Decl *D) {
 #endif
 }
 
+static bool isForced(const Decl *D,
+                     const llvm::DenseMap<Serializer::DeclTypeUnion,
+                                          Serializer::DeclIDAndForce> &table) {
+  if (table.lookup(D).second)
+    return true;
+  for (const DeclContext *DC = D->getDeclContext(); !DC->isModuleScopeContext();
+       DC = DC->getParent())
+    if (table.lookup(getDeclForContext(DC)).second)
+      return true;
+  return false;
+}
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   assert(!D->isInvalid() && "cannot create a module with an invalid decl");
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
-  if (SF ? (topLevel != SF) : (topLevel->getParentModule() != M)) {
+  if (topLevel->getParentModule() != M ||
+      (SF && topLevel != SF && !isForced(D, DeclIDs))) {
     writeCrossReference(D);
     return;
   }
@@ -2138,7 +2154,7 @@ void Serializer::writeAllDeclsAndTypes() {
     DeclTypeUnion next = DeclsAndTypesToWrite.front();
     DeclsAndTypesToWrite.pop();
 
-    DeclID id = DeclIDs[next];
+    auto id = DeclIDs[next].first;
     assert(id != 0 && "decl or type not referenced properly");
     (void)id;
 
@@ -2224,21 +2240,40 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
   AdopterList.emit(scratch, getRawStableKnownProtocolKind(kind), adopters);
 }
 
-/// Add operator methods to the given declaration type.
-static void addOperatorMethodDecls(Serializer &S, ArrayRef<Decl *> members,
-                                   Serializer::DeclTable &operatorMethodDecls) {
-  for (auto member : members) {
-    // Add operator methods.
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      if (func->hasName() && func->getName().isOperator())
-        operatorMethodDecls[func->getName()]
-          .push_back({0, S.addDeclRef(func)});
+/// Add operator methods from the given declaration type.
+///
+/// Recursively walks the members and derived global decls of any nested
+/// nominal types.
+static void addOperatorsAndTopLevel(Serializer &S, ArrayRef<Decl *> members,
+                                    Serializer::DeclTable &operatorMethodDecls,
+                                    Serializer::DeclTable &topLevelDecls,
+                                    bool isDerivedTopLevel) {
+  for (const Decl *member : members) {
+    auto memberValue = dyn_cast<ValueDecl>(member);
+    if (!memberValue)
       continue;
+
+    if (isDerivedTopLevel) {
+      topLevelDecls[memberValue->getName()].push_back({
+        /*ignored*/0,
+        S.addDeclRef(memberValue, /*force=*/true)
+      });
+    } else if (memberValue->isOperator()) {
+      // Add operator methods.
+      // Note that we don't have to add operators that are already in the
+      // top-level list.
+      operatorMethodDecls[memberValue->getName()].push_back({
+        /*ignored*/0,
+        S.addDeclRef(memberValue)
+      });
     }
 
     // Recurse into nested types.
     if (auto nominal = dyn_cast<NominalTypeDecl>(member)) {
-      addOperatorMethodDecls(S, nominal->getMembers(), operatorMethodDecls);
+      addOperatorsAndTopLevel(S, nominal->getMembers(),
+                             operatorMethodDecls, topLevelDecls, false);
+      addOperatorsAndTopLevel(S, nominal->getDerivedGlobalDecls(),
+                             operatorMethodDecls, topLevelDecls, true);
     }
   }
 }
@@ -2262,8 +2297,10 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
         // Add operator methods from nominal types.
         if (auto nominal = dyn_cast<NominalTypeDecl>(VD)) {
-          addOperatorMethodDecls(*this, nominal->getMembers(),
-                                 operatorMethodDecls);
+          addOperatorsAndTopLevel(*this, nominal->getMembers(),
+                                 operatorMethodDecls, topLevelDecls, false);
+          addOperatorsAndTopLevel(*this, nominal->getDerivedGlobalDecls(),
+                                 operatorMethodDecls, topLevelDecls, true);
         }
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
@@ -2272,7 +2309,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
           .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
 
         // Add operator methods from extensions.
-        addOperatorMethodDecls(*this, ED->getMembers(), operatorMethodDecls);
+        addOperatorsAndTopLevel(*this, ED->getMembers(),
+                               operatorMethodDecls, topLevelDecls, false);
+
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
