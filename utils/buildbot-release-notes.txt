@@ -41,6 +41,24 @@
       return nil
     }
 
+ * The compiler now warns about cases where a variable is inferred to have
+   AnyObject or "()" type, since type inferrence can turn a simple mistake
+   (e.g. failing to cast an AnyObject when you meant to) into something with
+   ripple effects.  Here is a simple example:
+
+    t.swift:4:5: warning: variable 'fn' inferred to have type '()', which may be unexpected
+    var fn = abort()
+        ^
+    t.swift:4:5: note: add an explicit type annotation to silence this warning
+    var fn = abort()
+        ^
+          : ()
+ 
+   If you actually did intend to declare a variable of one of these types, you
+   can silence this warning by adding an explicit type (indicated by the Fixit).
+   See rdar://15263687 and rdar://16252090 for more rationale.
+
+
 2014-03-05
 ----------
 
