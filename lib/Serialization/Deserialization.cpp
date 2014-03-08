@@ -24,6 +24,16 @@ using ConformancePair = std::pair<ProtocolDecl *, ProtocolConformance *>;
 
 
 namespace {
+  struct IDAndKind {
+    const Decl *D;
+    DeclID ID;
+  };
+
+  static raw_ostream &operator<<(raw_ostream &os, IDAndKind &&pair) {
+    return os << Decl::getKindName(pair.D->getKind())
+              << "Decl #" << pair.ID;
+  }
+
   class PrettyDeclDeserialization : public llvm::PrettyStackTraceEntry {
     const ModuleFile::Serialized<Decl*> &DeclOrOffset;
     DeclID ID;
@@ -49,12 +59,14 @@ namespace {
       }
 
       os << "While deserializing ";
+
       if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-        os << "'" << VD->getName() << "' ("
-           << Decl::getKindName(VD->getKind()) << "Decl) \n";
+        os << "'" << VD->getName() << "' (" << IDAndKind{VD, ID} << ") \n";
+      } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
+        os << "extension of '" << ED->getExtendedType() << "' ("
+           << IDAndKind{ED, ID} << ") \n";
       } else {
-        os << Decl::getKindName(DeclOrOffset.get()->getKind())
-           << "Decl #" << ID << "\n";
+        os << IDAndKind{DeclOrOffset.get(), ID} << "\n";
       }
     }
   };
