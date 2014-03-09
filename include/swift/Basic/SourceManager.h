@@ -101,22 +101,22 @@ public:
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   ///
   /// FIXME: remove this overload.
-  size_t addNewSourceBuffer(llvm::MemoryBuffer *Buffer);
+  unsigned addNewSourceBuffer(llvm::MemoryBuffer *Buffer);
 
-  size_t addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
+  unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     return addNewSourceBuffer(Buffer.release());
   }
 
   /// Creates a copy of a \c MemoryBuffer and adds it to the \c SourceManager,
   /// taking ownership of the copy.
-  size_t addMemBufferCopy(llvm::MemoryBuffer *Buffer);
+  unsigned addMemBufferCopy(llvm::MemoryBuffer *Buffer);
 
   /// Creates and adds a memory buffer to the \c SourceManager, taking
   /// ownership of the newly created copy.
   ///
   /// \p InputData and \p BufIdentifier are copied, so that this memory can go
   /// away as soon as this function returns.
-  size_t addMemBufferCopy(StringRef InputData, StringRef BufIdentifier = "");
+  unsigned addMemBufferCopy(StringRef InputData, StringRef BufIdentifier = "");
 
   /// Returns a buffer ID for a previously added buffer with the given
   /// buffer identifier, or Nothing if there is no such buffer.

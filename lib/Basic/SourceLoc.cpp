@@ -22,19 +22,19 @@ SourceLoc SourceManager::getCodeCompletionLoc() const {
       .getAdvancedLoc(CodeCompletionOffset);
 }
 
-size_t SourceManager::addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
+unsigned SourceManager::addNewSourceBuffer(llvm::MemoryBuffer *Buffer) {
   assert(Buffer);
   auto ID = LLVMSourceMgr.AddNewSourceBuffer(Buffer, llvm::SMLoc());
   BufIdentIDMap[Buffer->getBufferIdentifier()] = ID;
   return ID;
 }
 
-size_t SourceManager::addMemBufferCopy(llvm::MemoryBuffer *Buffer) {
+unsigned SourceManager::addMemBufferCopy(llvm::MemoryBuffer *Buffer) {
   return addMemBufferCopy(Buffer->getBuffer(), Buffer->getBufferIdentifier());
 }
 
-size_t SourceManager::addMemBufferCopy(StringRef InputData,
-                                       StringRef BufIdentifier) {
+unsigned SourceManager::addMemBufferCopy(StringRef InputData,
+                                         StringRef BufIdentifier) {
   auto Buffer = llvm::MemoryBuffer::getMemBufferCopy(InputData, BufIdentifier);
   return addNewSourceBuffer(Buffer);
 }
