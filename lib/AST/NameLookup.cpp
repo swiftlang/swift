@@ -885,10 +885,9 @@ bool DeclContext::lookupQualified(Type type,
   // Allow filtering of the visible declarations based on
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
-    // Filter out subobject initializers, if requestred.
+    // Filter out subobject initializers, if requested.
     if (onlyCompleteObjectInits) {
-      // Allow any initializer in an Objective-C class that neither declares nor
-      // inherits designated initializers.
+      // Allow any initializer in an Objective-C class.
       bool assumeCompleteObjectInit = false;
       if (current->hasClangNode()) {
         if (auto objcClass
@@ -904,6 +903,12 @@ bool DeclContext::lookupQualified(Type type,
       } else {
         return false;
       }
+    }
+
+    // Ignore stub implementations.
+    if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+      if (ctor->hasStubImplementation())
+        return false;
     }
 
     return true;

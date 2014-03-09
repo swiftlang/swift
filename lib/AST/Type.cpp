@@ -491,6 +491,32 @@ Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
+Type TypeBase::replaceResultType(Type newResultType, unsigned uncurryLevel) {
+  if (uncurryLevel == 0)
+    return newResultType;
+
+  // Determine the input and result types of this function.
+  auto fnType = this->castTo<AnyFunctionType>();
+  Type inputType = fnType->getInput();
+  Type resultType = fnType->getResult()->replaceResultType(newResultType, 
+                                                           uncurryLevel - 1);
+  
+  // Produce the resulting function type.
+  if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFn->getGenericSignature(),
+                                    inputType, resultType,
+                                    fnType->getExtInfo());
+  }
+  
+  if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
+    return PolymorphicFunctionType::get(inputType, resultType,
+                                        &polyFn->getGenericParams(),
+                                        fnType->getExtInfo());
+  }
+  
+  return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+}
+
 /// Retrieve the object type for a 'self' parameter, digging into one-element
 /// tuples, lvalue types, and metatypes.
 Type TypeBase::getRValueInstanceType() {

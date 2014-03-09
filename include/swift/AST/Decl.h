@@ -279,8 +279,17 @@ class alignas(8) Decl {
 
     /// Whether this is a complete object initializer.
     unsigned CompleteObjectInit : 1;
+
+    /// Whether this initializer is a stub placed into a subclass to
+    /// catch invalid delegations to a subobject initializer not
+    /// overridden by the subclass. A stub will always trap at runtime.
+    ///
+    /// Initializer stubs can be invoked from Objective-C or through
+    /// the Objective-C runtime; there is no way to directly express
+    /// an object construction that will invoke a stub.
+    unsigned HasStubImplementation : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 5 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 6 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -3740,6 +3749,17 @@ public:
   /// Whether this is a subobject initializer.
   bool isSubobjectInit() const {
     return !isCompleteObjectInit();
+  }
+
+  /// Whether the implementation of this method is a stub that traps at runtime.
+  bool hasStubImplementation() const {
+    return ConstructorDeclBits.HasStubImplementation;
+  }
+
+  /// Set whether the implementation of this method is a stub that
+  /// traps at runtime.
+  void setStubImplementation(bool stub) {
+    ConstructorDeclBits.HasStubImplementation = stub;
   }
 
   ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }

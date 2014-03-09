@@ -1998,6 +1998,78 @@ public:
     }
   }
 
+  /// Create a new initializer that overrides the given subobject
+  /// initializer.
+  ///
+  /// \param classDecl The subclass in which the new initializer will
+  /// be declared.
+  ///
+  /// \param superclassCtor The superclass initializer for which this
+  /// routine will create an override.
+  ///
+  /// \returns the newly-created initializer that overrides \p
+  /// superclassCtor.
+  ConstructorDecl *
+  createSubobjectInitOverride(ClassDecl *classDecl, 
+                              ConstructorDecl *superclassCtor) {
+    // Determine the initializer parameters.
+    Type superInitType = superclassCtor->getInitializerInterfaceType();
+    if (superInitType->is<GenericFunctionType>() ||
+        classDecl->getGenericParamsOfContext()) {
+      // FIXME: Handle generic initializers as well.
+      return nullptr;
+    }
+
+    auto &ctx = TC.Context;
+
+    // Create the 'self' declaration and patterns.
+    auto *selfDecl = new (ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                       SourceLoc(), ctx.Id_self,
+                                       Type(), classDecl);
+    selfDecl->setImplicit();
+    Pattern *selfArgPattern 
+      = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
+    selfArgPattern = new (ctx) TypedPattern(selfArgPattern, TypeLoc());
+    Pattern *selfBodyPattern 
+      = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
+    selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
+
+    // Create the initializer parameter patterns.
+    Pattern *argParamPatterns
+      = superclassCtor->getArgParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+    Pattern *bodyParamPatterns
+      = superclassCtor->getBodyParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+
+    // Create the initializer declaration.
+    auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
+                                          selfArgPattern, argParamPatterns,
+                                          selfBodyPattern, bodyParamPatterns,
+                                          nullptr, classDecl);
+    ctor->setImplicit();
+    if (superclassCtor->hasSelectorStyleSignature())
+      ctor->setHasSelectorStyleSignature();
+
+    // Configure 'self'.
+    GenericParamList *outerGenericParams = nullptr;
+    Type selfType = configureImplicitSelf(ctor, outerGenericParams);
+    selfArgPattern->setType(selfType);
+    selfBodyPattern->setType(selfType);
+    cast<TypedPattern>(selfArgPattern)->getSubPattern()->setType(selfType);
+    cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
+
+    // Set the type of the initializer.
+    configureConstructorType(ctor, outerGenericParams, selfType, 
+                             argParamPatterns->getType());
+    if (superclassCtor->isObjC())
+      ctor->setIsObjC(true);
+    checkOverrides(ctor);
+
+    // Mark this as a stub implementation.
+    ctor->setStubImplementation(true);
+    
+    return ctor;
+  }
+
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       TC.validateDecl(CD);
@@ -2025,10 +2097,10 @@ public:
       TC.addImplicitConstructors(CD);
       TC.addImplicitDestructor(CD);
 
-      // Check whether the superclass has any abstract initializers and whether
-      // they have been implemented.
+      // Check for inconsistencies between the initializers of our
+      // superclass and our own initializers.
       if (auto superclassTy = CD->getSuperclass()) {
-        // Collect the set of constructors we override in the base class.
+        // Collect the set of initializers we override in superclass.
         llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
         for (auto member : TC.lookupConstructors(CD->getDeclaredTypeInContext(),
                                                  CD)) {
@@ -2037,13 +2109,19 @@ public:
             overriddenCtors.insert(overridden);
         }
 
-        // Diagnose any abstract constructors from our superclass that have
-        // not been overridden or inherited.
+        // Look for any required constructors or subobject initializers in the
+        // subclass that have not been overridden or otherwise provided.
         bool diagnosed = false;
+        llvm::SmallVector<ConstructorDecl *, 2> synthesizedCtors;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
-          // We only care about abstract constructors.
+          // We only care about required or subobject initializers.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
-          if (!superclassCtor->isRequired())
+          if (!superclassCtor->isRequired() && 
+              !superclassCtor->isSubobjectInit())
+            continue;
+
+          // Skip invalid superclass initializers.
+          if (superclassCtor->isInvalid())
             continue;
 
           // If we have an override for this constructor, it's okay.
@@ -2053,20 +2131,53 @@ public:
           // If the superclass constructor is a complete object initializer
           // that is inherited into the current class, it's okay.
           if (superclassCtor->isCompleteObjectInit() &&
-              CD->inheritsSuperclassInitializers(&TC))
+              CD->inheritsSuperclassInitializers(&TC)) {
+            assert(superclassCtor->isRequired());
             continue;
-
-          // Complain that we don't have an overriding constructor.
-          if (!diagnosed) {
-            TC.diagnose(CD, diag::abstract_incomplete_implementation,
-                        CD->getDeclaredInterfaceType());
-            diagnosed = true;
           }
 
-          // FIXME: Using the type here is awful. We want to use the selector
-          // name and provide a nice Fix-It with that declaration.
-          TC.diagnose(superclassCtor, diag::abstract_initializer_not_overridden,
-                      superclassCtor->getArgumentType());
+          // Diagnose a missing override of a required initializer.
+          if (superclassCtor->isRequired()) {
+            // Complain that we don't have an overriding constructor.
+            if (!diagnosed) {
+              TC.diagnose(CD, diag::abstract_incomplete_implementation,
+                          CD->getDeclaredInterfaceType());
+              diagnosed = true;
+            }
+
+            // FIXME: Using the type here is awful. We want to use the selector
+            // name and provide a nice Fix-It with that declaration.
+            TC.diagnose(superclassCtor, 
+                        diag::abstract_initializer_not_overridden,
+                        superclassCtor->getArgumentType());
+            continue;
+          }
+
+          // A subobject initializer has not been overridden. 
+
+          // Skip this subobject initializer if it's in an extension.
+          // FIXME: We shouldn't allow this.
+          if (isa<ExtensionDecl>(superclassCtor->getDeclContext()))
+            continue;
+
+          // Create an override for it.
+          if (auto ctor = createSubobjectInitOverride(CD, superclassCtor)) {
+            assert(ctor->getOverriddenDecl() == superclassCtor && 
+                   "Not an override?");
+            synthesizedCtors.push_back(ctor);
+          }
+        }
+
+        // If we synthesized any initializers, add them.
+        if (!synthesizedCtors.empty()) {
+          auto members = CD->getMembers();
+          unsigned numMembers = members.size();
+          MutableArrayRef<Decl *> newMembers
+            = TC.Context.Allocate<Decl*>(numMembers + synthesizedCtors.size());
+          std::copy(members.begin(), members.end(), newMembers.begin());
+          std::copy(synthesizedCtors.begin(), synthesizedCtors.end(),
+                    newMembers.begin() + numMembers);
+          CD->setMembers(newMembers, CD->getBraces());
         }
       }
     }
@@ -2633,6 +2744,8 @@ public:
             return type;
         });
       }
+    } else if (isa<ConstructorDecl>(decl)) {
+      type = type->replaceResultType(subclass, /*uncurryLevel=*/2);
     }
 
     return type;
@@ -2796,7 +2909,7 @@ public:
 
       // Check whether the types are identical.
       // FIXME: It's wrong to use the uncurried types here for methods.
-      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl,superclass);
+      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl,owningTy);
       auto uncurriedParentDeclTy = parentDeclTy;
       if (method) {
         uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
@@ -3171,6 +3284,37 @@ public:
     // their enclosing declaration.
   }
 
+  /// Compute the allocating and initializing constructor types for
+  /// the given constructor.
+  void configureConstructorType(ConstructorDecl *ctor, 
+                                GenericParamList *outerGenericParams,
+                                Type selfType,
+                                Type argType) {
+    Type fnType;
+    Type allocFnType;
+    Type initFnType;
+    Type resultType = selfType->getInOutObjectType();
+    
+    if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
+      innerGenericParams->setOuterParameters(outerGenericParams);
+      fnType = PolymorphicFunctionType::get(argType, resultType,
+                                            innerGenericParams);
+    } else
+      fnType = FunctionType::get(argType, resultType);
+    Type selfMetaType = MetatypeType::get(resultType, TC.Context);
+    if (outerGenericParams) {
+      allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
+                                                 outerGenericParams);
+      initFnType = PolymorphicFunctionType::get(selfType, fnType,
+                                                outerGenericParams);
+    } else {
+      allocFnType = FunctionType::get(selfMetaType, fnType);
+      initFnType = FunctionType::get(selfType, fnType);
+    }
+    ctor->setType(allocFnType);
+    ctor->setInitializerType(initFnType);
+  }
+
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
       CD->overwriteType(ErrorType::get(TC.Context));
@@ -3260,30 +3404,8 @@ public:
       CD->overwriteType(ErrorType::get(TC.Context));
       CD->setInvalid();
     } else {
-      Type FnTy;
-      Type AllocFnTy;
-      Type InitFnTy;
-      Type ArgType = CD->getArgParamPatterns()[1]->getType();
-      Type ResultTy = SelfTy->getInOutObjectType();
-
-      if (GenericParamList *innerGenericParams = CD->getGenericParams()) {
-        innerGenericParams->setOuterParameters(outerGenericParams);
-        FnTy = PolymorphicFunctionType::get(ArgType, ResultTy,
-                                            innerGenericParams);
-      } else
-        FnTy = FunctionType::get(ArgType, ResultTy);
-      Type SelfMetaTy = MetatypeType::get(ResultTy, TC.Context);
-      if (outerGenericParams) {
-        AllocFnTy = PolymorphicFunctionType::get(SelfMetaTy, FnTy,
-                                                outerGenericParams);
-        InitFnTy = PolymorphicFunctionType::get(SelfTy, FnTy,
-                                                outerGenericParams);
-      } else {
-        AllocFnTy = FunctionType::get(SelfMetaTy, FnTy);
-        InitFnTy = FunctionType::get(SelfTy, FnTy);
-      }
-      CD->setType(AllocFnTy);
-      CD->setInitializerType(InitFnTy);
+      configureConstructorType(CD, outerGenericParams, SelfTy, 
+                               CD->getArgParamPatterns()[1]->getType());
     }
 
     validateAttributes(TC, CD);

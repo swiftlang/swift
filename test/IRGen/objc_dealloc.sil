@@ -17,6 +17,7 @@ func onDestruct() { }
 
 class SwiftGizmo : Gizmo {
   var x : X
+  init()
   deinit
 }
 sil @_TFCSo10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
@@ -89,7 +90,7 @@ bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8
   // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 1
-  // CHECK-NEXT: store %objc_class* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({ void ([[SGIZMO]]*)*, i8**, i64, %objc_class*, %swift.opaque*, %swift.opaque*, i64, { i64, i8*, i64, i64, i8*, i64, i64 }*, i64, i64 }* @_TMdCSo10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to %objc_class*), %objc_class** [[OBJC_SUPER_CLASS]], align 8
+  // CHECK-NEXT: store %objc_class* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdCSo10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to %objc_class*), %objc_class** [[OBJC_SUPER_CLASS]], align 8
   // CHECK-NEXT: [[DEALLOC_SEL:%[a-zA-Z0-9]+]] = load i8** @"\01L_selector(dealloc)", align 8
   // CHECK-NEXT: call void bitcast (void ()* @objc_msgSendSuper2 to void (%objc_super*, i8*)*)(%objc_super* [[OBJC_SUPER]], i8* [[DEALLOC_SEL]])
   %5 = super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : $@cc(objc_method) @thin (Gizmo) -> () // user: %7
@@ -106,4 +107,14 @@ sil @_TToFCSo10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   %3 = tuple ()
   return %3 : $()                                 // id: %4
+}
+
+sil @_TToFCSo10SwiftGizmocfMS_FT_S_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $SwiftGizmo):
+  return %0 : $SwiftGizmo
+}
+
+sil @_TToFCSo10SwiftGizmocfMS_FT11withBellsOnSi_S_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $Int, %1 : $SwiftGizmo):
+  return %1 : $SwiftGizmo
 }

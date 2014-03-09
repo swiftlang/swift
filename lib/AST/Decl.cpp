@@ -1155,6 +1155,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     if (!ctor->hasType())
       resolver->resolveDeclSignature(ctor);
 
+    // Ignore any stub implementations.
+    if (ctor->hasStubImplementation())
+      continue;
+
     if (auto overridden = ctor->getOverriddenDecl()) {
       if (overridden->isSubobjectInit())
         overriddenInits.insert(overridden);
@@ -1983,6 +1987,7 @@ ConstructorDecl::ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
   ConstructorDeclBits.ComputedBodyInitKind = 0;
   ConstructorDeclBits.Required = 0;
   ConstructorDeclBits.CompleteObjectInit = 0;
+  ConstructorDeclBits.HasStubImplementation = 0;
 }
 
 void ConstructorDecl::setArgParams(Pattern *selfPattern, Pattern *argParams) {

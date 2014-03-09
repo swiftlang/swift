@@ -873,6 +873,12 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::EnumCase:
     return false;
 
+  case DeclKind::Constructor: {
+    // Never serialize a constructor with a stub implementation.
+    auto ctor = cast<ConstructorDecl>(D);
+    return !ctor->hasStubImplementation();
+  }
+
   case DeclKind::EnumElement:
   case DeclKind::Protocol:
   case DeclKind::Destructor:
@@ -886,7 +892,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Class:
   case DeclKind::Var:
   case DeclKind::Func:
-  case DeclKind::Constructor:
     return true;
   }
 }

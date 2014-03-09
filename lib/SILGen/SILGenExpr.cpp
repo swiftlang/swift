@@ -2717,11 +2717,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // FIXME: Hack until all delegation is dispatched.
   IsCompleteObjectInit = ctor->isCompleteObjectInit();
 
-  assert(ctor->getBody() && "Class constructor without a body?");
+  assert((ctor->getBody() || ctor->hasStubImplementation()) && 
+         "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
-  bool isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
-    ConstructorDecl::BodyInitKind::Delegating;
+  bool isDelegating = false;
+  if (!ctor->hasStubImplementation()) {
+    isDelegating = ctor->getDelegatingOrChainedInitKind(nullptr) ==
+      ConstructorDecl::BodyInitKind::Delegating;
+  }
 
   // FIXME: The (potentially partially initialized) value here would need to be
   // cleaned up on a constructor failure unwinding.
@@ -2738,7 +2742,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   auto selfTypeContext = ctor->getDeclContext()->getDeclaredTypeInContext();
   auto selfClassDecl =
     cast<ClassDecl>(selfTypeContext->getNominalOrBoundGenericNominal());
-  bool NeedsBoxForSelf = isDelegating || selfClassDecl->hasSuperclass();
+  bool NeedsBoxForSelf = isDelegating ||
+    (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
 
   if (NeedsBoxForSelf)
     emitLocalVariable(selfDecl);
@@ -2754,33 +2759,37 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (!NeedsBoxForSelf)
     B.createDebugValue(selfDecl, selfArg);
   
-  // If needed, mark 'self' as uninitialized so that DI knows to enforce its DI
-  // properties on stored properties.
-  MarkUninitializedInst::Kind MUKind;
-  
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
-  if (isDelegating)
-    MUKind = MarkUninitializedInst::DelegatingSelf;
-  else if (selfClassDecl->requiresStoredPropertyInits() && usesObjCAllocator) {
-    // Stored properties will be initialized in a separate .cxx_construct method
-    // called by the Objective-C runtime.
-    assert(selfClassDecl->hasSuperclass() &&
-           "Cannot use ObjC allocation without a superclass");
-    MUKind = MarkUninitializedInst::DerivedSelfOnly;
-  } else if (selfClassDecl->hasSuperclass())
-    MUKind = MarkUninitializedInst::DerivedSelf;
-  else
-    MUKind = MarkUninitializedInst::RootSelf;
+  if (!ctor->hasStubImplementation()) {
+    // If needed, mark 'self' as uninitialized so that DI knows to
+    // enforce its DI properties on stored properties.
+    MarkUninitializedInst::Kind MUKind;
+  
+    if (isDelegating)
+      MUKind = MarkUninitializedInst::DelegatingSelf;
+    else if (selfClassDecl->requiresStoredPropertyInits() && 
+             usesObjCAllocator) {
+      // Stored properties will be initialized in a separate
+      // .cxx_construct method called by the Objective-C runtime.
+      assert(selfClassDecl->hasSuperclass() &&
+             "Cannot use ObjC allocation without a superclass");
+      MUKind = MarkUninitializedInst::DerivedSelfOnly;
+    } else if (selfClassDecl->hasSuperclass())
+      MUKind = MarkUninitializedInst::DerivedSelf;
+    else
+      MUKind = MarkUninitializedInst::RootSelf;
 
-  selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
-  assert(selfTy.hasReferenceSemantics() && "can't emit a value type ctor here");
+    selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
+    assert(selfTy.hasReferenceSemantics() && 
+           "can't emit a value type ctor here");
 
-  if (NeedsBoxForSelf) {
-    SILLocation prologueLoc = RegularLocation(ctor);
-    prologueLoc.markAsPrologue();
-    B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].getAddress());
-  } else {
-    VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
+    if (NeedsBoxForSelf) {
+      SILLocation prologueLoc = RegularLocation(ctor);
+      prologueLoc.markAsPrologue();
+      B.createStore(prologueLoc, selfArg, VarLocs[selfDecl].getAddress());
+    } else {
+      VarLocs[selfDecl] = VarLoc::getConstant(selfArg);
+    }
   }
 
   // Prepare the end of initializer location.
@@ -2795,7 +2804,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (isDelegating) {
     // A delegating initializer does not initialize instance
     // variables.
-  } else if (selfClassDecl->requiresStoredPropertyInits() && usesObjCAllocator) {
+  } else if (ctor->hasStubImplementation()) {
+    // Nor does a stub implementation.
+  } else if (selfClassDecl->requiresStoredPropertyInits() &&
+             usesObjCAllocator) {
     // When the class requires all stored properties to have initial
     // values and we're using Objective-C's allocation, stored
     // properties are initialized via the .cxx_construct method, which
@@ -2808,7 +2820,14 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 
   // Emit the constructor body.
-  visit(ctor->getBody());
+  if (ctor->hasStubImplementation()) {
+    auto int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    auto *trueInst = B.createIntegerLiteral(endOfInitLoc, int1Ty, 1);
+    auto *failInst = B.createCondFail(endOfInitLoc, trueInst);
+    (void)failInst;
+  } else {
+    visit(ctor->getBody());
+  }
 
   // Return 'self' in the epilog.
   Optional<SILValue> maybeReturnValue;
