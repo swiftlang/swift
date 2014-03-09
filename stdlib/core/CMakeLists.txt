@@ -42,6 +42,7 @@ set(SWIFTLIB_ESSENTIAL
   Misc.swift
   Nil.swift
   NumericOperations.swift
+  OpaqueString.swift
   Optional.swift
   OutputStream.swift
   Policy.swift
@@ -78,7 +79,6 @@ set(SWIFTLIB_SOURCES
   Bit.swift
   CollectionOfOne.swift
   InputStream.swift
-  OpaqueString.swift
   Process.swift
   VarArgs.swift
   Zip.swift
