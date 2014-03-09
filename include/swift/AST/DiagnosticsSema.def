@@ -845,6 +845,9 @@ ERROR(nominal_type_pattern_property_ambiguous,sema_tcp,none,
       "property name '%0' in type %1 is ambiguous", (StringRef, Type))
 ERROR(nominal_type_pattern_not_property,sema_tcp,none,
       "member '%0' of type %1 is not a property", (StringRef, Type))
+ERROR(nominal_type_pattern_static_property,sema_tcp,none,
+      "cannot match type property '%0' of type %1 in a 'case' pattern",
+      (StringRef, Type))
 ERROR(nominal_type_subpattern_without_property_name,pattern_parsing,none,
       "subpattern of a struct or class pattern must have a keyword name", ())
 WARNING(type_inferred_to_undesirable_type,sema_tcp,none,

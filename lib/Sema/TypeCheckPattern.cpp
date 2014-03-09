@@ -971,6 +971,12 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
           return true;
         }
         
+        if (prop->isStatic()) {
+          diagnose(elt.getSubPattern()->getLoc(),
+                   diag::nominal_type_pattern_static_property,
+                   elt.getPropertyName().str(), patTy);
+        }
+        
         elt.setProperty(prop);
       }
       
