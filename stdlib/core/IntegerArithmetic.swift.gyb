@@ -1,0 +1,79 @@
+%# -*- mode: swift -*-
+//===--- IntegerArithmetic.swift.gyb --------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%# Ignore the following admonition; it applies to the resulting .swift file only
+
+// Automatically Generated From IntegerArithmetic.swift.gyb.  Do Not
+// Edit Directly!
+
+% integerBinaryOps = [
+%    (x[:-1], x[-1]) for x in 
+%     'Add+ Subtract- Multiply* Divide/ Modulus%'.split()]
+
+protocol _NumericOperations {
+% for name,_ in integerBinaryOps:
+  class func unchecked${name}(lhs: Self, rhs: Self) -> (Self, Bool)
+% end
+}
+
+protocol NumericOperations : _NumericOperations, Comparable {
+  // Checked arithmetic functions.  Specific implementations in
+  // FixedPoint.swift.gyb support static checking for integer types.
+% for _,op in integerBinaryOps:
+  func ${op} (lhs: Self, rhs: Self) -> Self
+% end
+  
+  // Explicitly convert to IntMax, trapping on overflow
+  func toIntMax() -> IntMax
+}
+
+% for name,op in integerBinaryOps:
+@transparent
+func ${op} <T: _NumericOperations>(lhs: T, rhs: T) -> T {
+  return overflowChecked(T.unchecked${name}(lhs, rhs))
+}
+
+@transparent
+func &${op} <T: _NumericOperations>(lhs: T, rhs: T) -> T {
+  return T.unchecked${name}(lhs, rhs).0
+}
+
+@assignment @transparent
+func ${op}= <T: _NumericOperations>(inout lhs: T, rhs: T) {
+  lhs = lhs ${op} rhs
+}
+% end
+
+protocol SignedNumber {
+  class func uncheckedNegate(_: Self) -> (Self, Bool)
+  class func uncheckedAbs(_: Self) -> (Self, Bool)
+  func isNegative() -> Bool
+}
+
+@transparent
+func abs <T: SignedNumber>(x: T) -> T {
+  return overflowChecked(T.uncheckedAbs(x))
+}
+
+@prefix @transparent
+func - <T: SignedNumber>(x: T) -> T {
+  return overflowChecked(T.uncheckedNegate(x))
+}
+
+@prefix @transparent
+func + <T: SignedNumber>(x: T) -> T {
+  return x
+}
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

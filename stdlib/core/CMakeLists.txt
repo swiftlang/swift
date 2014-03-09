@@ -37,11 +37,11 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointOperations.swift
   HeapBuffer.swift
   Index.swift
+  IntegerArithmetic.swift.gyb
   LifetimeManager.swift
   LogicValue.swift
   Misc.swift
   Nil.swift
-  NumericOperations.swift
   OpaqueString.swift
   Optional.swift
   OutputStream.swift
