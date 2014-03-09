@@ -1735,7 +1735,8 @@ namespace {
       case clang::OMF_init:
         // An init instance method can be a constructor.
         if (isReallyInitMethod(objcMethod))
-          return importConstructor(decl, objcMethod, dc, false);
+          return importConstructor(decl, objcMethod, dc, /*implicit=*/false,
+                                   /*isConvenienceInit=*/false);
         return nullptr;
 
       case clang::OMF_new:
@@ -1759,7 +1760,10 @@ namespace {
     /// it's Objective-C counterpart).
     void recordObjCMethodOverride(AbstractFunctionDecl *swiftMethod,
                                   const clang::ObjCMethodDecl *objcMethod) {
-      // If this functio overrides another function, mark it as such.
+      // FIXME: Rework this using Swift lookup and semantics, to
+      // properly cope with mirrored members.
+
+      // If this function overrides another function, mark it as such.
       auto classTy = swiftMethod->getExtensionType()->getAs<ClassType>();
       if (!classTy)
         return;
@@ -1832,7 +1836,8 @@ namespace {
     ConstructorDecl *importConstructor(Decl *decl,
                                        const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
-                                       bool inherited) {
+                                       bool implicit,
+                                       bool isConvenienceInit) {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
@@ -1943,20 +1948,21 @@ namespace {
       
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
-      if (inherited)
+      if (implicit)
         result->setImplicit();
 
       // If the owning Objective-C class has designated initializers and this
       // is not one of them, treat it as a convenience initializer.
-      if (interface && interface->hasDesignatedInitializers() &&
-          !objcMethod->hasAttr<clang::ObjCDesignatedInitializerAttr>()) {
+      if (isConvenienceInit ||
+          (interface && interface->hasDesignatedInitializers() &&
+           !objcMethod->hasAttr<clang::ObjCDesignatedInitializerAttr>())) {
         result->setCompleteObjectInit(true);
       }
 
       // Record the constructor for future re-use.
       Impl.Constructors[{init, dc}] = result;
 
-      // If this method overrides another method, mark it as such.
+      // If this constructor overrides another constructor, mark it as such.
       recordObjCMethodOverride(result, objcMethod);
 
       // Inform the context that we have external definitions.
@@ -2711,7 +2717,8 @@ namespace {
       // FIXME: Would like a more robust way to ensure that we aren't creating
       // duplicates.
       llvm::SmallSet<clang::Selector, 16> knownSelectors;
-      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container){
+      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container,
+                                     bool isConvenienceInit){
         for (auto meth = container->meth_begin(),
                   methEnd = container->meth_end();
              meth != methEnd; ++meth) {
@@ -2723,7 +2730,8 @@ namespace {
               knownSelectors.insert((*meth)->getSelector())) {
                 if (auto imported = Impl.importDecl(*meth)) {
                   if (auto special = importConstructor(imported, *meth, dc,
-                                                       /*inherited=*/true)) {
+                                                       /*implicit=*/true,
+                                                       isConvenienceInit)) {
                     members.push_back(special);
                   }
                 }
@@ -2731,20 +2739,22 @@ namespace {
         }
       };
 
-      for (auto curObjCClass = objcClass; curObjCClass;
+      bool isConvenienceInit = false;
+      for (auto curObjCClass = objcClass->getSuperClass(); curObjCClass;
            curObjCClass = curObjCClass->getSuperClass()) {
-        inheritConstructors(curObjCClass);
+        inheritConstructors(curObjCClass, isConvenienceInit);
         for (auto cat = curObjCClass->visible_categories_begin(),
                   catEnd = curObjCClass->visible_categories_end();
              cat != catEnd;
              ++cat) {
-            inheritConstructors(*cat);
+          inheritConstructors(*cat, isConvenienceInit);
         }
         
         // When we hit a class that does declare it's designated
-        // initializers, we're done.
+        // initializers, any initializers above it are convenience
+        // initializers.
         if (curObjCClass->hasDesignatedInitializers())
-          break;
+          isConvenienceInit = true;
       }
     }
 
@@ -3576,10 +3586,8 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
 
     clangDecl = clangClass = clangClass->getDefinition();
 
-    // If the class does not inherit any designated initializers, we'll have to
-    // import them.
-    if (!clangClass->hasDesignatedInitializers() &&
-        clangClass->getName() != "Protocol") {
+    // Imported inherited initializers.
+    if (clangClass->getName() != "Protocol") {
       converter.importInheritedConstructors(clangClass,
                                             const_cast<DeclContext *>(DC),
                                             members);

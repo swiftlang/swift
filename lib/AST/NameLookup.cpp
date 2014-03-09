@@ -27,8 +27,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
-#include "clang/AST/DeclObjC.h"
-
 #define DEBUG_TYPE "Name lookup"
 
 STATISTIC(NumLazyMembers,
@@ -887,18 +885,8 @@ bool DeclContext::lookupQualified(Type type,
   auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
     // Filter out subobject initializers, if requested.
     if (onlyCompleteObjectInits) {
-      // Allow any initializer in an Objective-C class.
-      bool assumeCompleteObjectInit = false;
-      if (current->hasClangNode()) {
-        if (auto objcClass
-              = dyn_cast<clang::ObjCInterfaceDecl>(current->getClangDecl())) {
-          if (!objcClass->declaresOrInheritsDesignatedInitializers())
-            assumeCompleteObjectInit = true;
-        }
-      }
-
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isCompleteObjectInit() && !assumeCompleteObjectInit)
+        if (!ctor->isCompleteObjectInit())
           return false;
       } else {
         return false;
@@ -953,7 +941,8 @@ bool DeclContext::lookupQualified(Type type,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       if (name.isSimpleName(ctx.Id_init)) {
-        if (classDecl->inheritsSuperclassInitializers(typeResolver))
+        if (classDecl->inheritsSuperclassInitializers(typeResolver) &&
+            !classDecl->hasClangNode())
           onlyCompleteObjectInits = true;
         else
           continue;

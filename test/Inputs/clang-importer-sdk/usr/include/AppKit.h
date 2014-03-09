@@ -19,7 +19,7 @@
 -(void)noReturnMethod:(int)arg  __attribute__((noreturn));
 @end
 
-@interface NSInterestingDesignated
+@interface NSInterestingDesignated : NSObject
 + (instancetype)alloc;
 - (instancetype)initWithString:(NSString*)str NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithURL:(NSString*)str;
