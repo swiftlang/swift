@@ -398,43 +398,6 @@ namespace {
                                    type);
     }
 
-    /// Replace the result type for the given function with the given, new
-    /// result type.
-    ///
-    /// \param func The function whose type should be transformed.
-    /// \param type The function type to transform.
-    /// \param newResultType The replacement result type.
-    /// \param uncurried The number of levels that have already been uncurried.
-    static Type replaceFunctionResultType(AbstractFunctionDecl *func,
-                                          Type type,
-                                          Type newResultType,
-                                          unsigned uncurried = 0) {
-      // If we've unwrapped the last pattern, return the new result type.
-      if (uncurried == func->getNumParamPatterns())
-        return newResultType;
-
-      // Determine the input and result types of this function.
-      auto fnType = type->castTo<AnyFunctionType>();
-      Type inputType = fnType->getInput();
-      Type resultType = replaceFunctionResultType(func, fnType->getResult(),
-                                                  newResultType, uncurried + 1);
-
-      // Produce the resulting function type.
-      if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
-        return GenericFunctionType::get(genericFn->getGenericSignature(),
-                                        inputType, resultType,
-                                        fnType->getExtInfo());
-      }
-
-      if (auto polyFn = dyn_cast<PolymorphicFunctionType>(fnType)) {
-        return PolymorphicFunctionType::get(inputType, resultType,
-                                            &polyFn->getGenericParams(),
-                                            fnType->getExtInfo());
-      }
-
-      return FunctionType::get(inputType, resultType, fnType->getExtInfo());
-    }
-
     /// Describes an opened existential that has not yet been closed.
     struct OpenedExistential {
       /// The existential value being opened.
@@ -574,7 +537,9 @@ namespace {
               baseTy->isExistentialType()) {
             std::tie(base, baseTy) = openExistentialReference(base);
             containerTy = baseTy;
-            openedType = replaceFunctionResultType(func, openedType, baseTy, 1);
+            openedType = openedType->replaceResultType(
+                           baseTy,
+                           func->getNumParamPatterns()-1);
 
             // The member reference is a specialized declaration
             // reference that replaces the Self of the protocol with
@@ -600,8 +565,11 @@ namespace {
                                         newSubstitutions);
           }
 
-          refTy = replaceFunctionResultType(func, refTy, containerTy);
-          dynamicSelfFnType = replaceFunctionResultType(func, refTy, baseTy);
+          refTy = refTy->replaceResultType(containerTy,
+                                           func->getNumParamPatterns());
+          dynamicSelfFnType = refTy->replaceResultType(
+                                baseTy,
+                                func->getNumParamPatterns());
 
           // If the type after replacing DynamicSelf with the provided base
           // type is no different, we don't need to perform a conversion here.
