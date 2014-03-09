@@ -251,7 +251,7 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   // If we are not linking anything bail.
   if (Mode == LinkingMode::LinkNone)
-    return nullptr;
+    return false;
 
   bool LinkAll = Mode == LinkingMode::LinkAll;
   // First attempt to link in Fun. If we fail, bail.
