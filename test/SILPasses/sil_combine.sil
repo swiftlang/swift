@@ -764,26 +764,3 @@ bb0:
   return %4 : $(Int, Int)                         // id: %5
 }
 
-//CHECK-LABEL: apply_and_pa_merge
-//CHECK-NOT: partial_apply
-//CHECK:  %1 = function_ref @some_closure
-//CHECK:  %2 = function_ref @print_a_number
-//CHECK:  %3 = apply %1
-//CHECK:  %4 = apply %2
-//CHECK: return
-sil @apply_and_pa_merge : $@thin (Int) -> () {
-bb0(%0 : $Int):
-  %1 = function_ref @some_closure : $@thin (Int) -> Int // user: %2
-  %2 = partial_apply %1(%0) : $@thin (Int) -> Int // users: %4, %5, %7
-  %3 = function_ref @print_a_number : $@thin (Int) -> () // user: %6
-  strong_retain %2 : $@callee_owned () -> Int     // id: %4
-  %5 = apply %2() : $@callee_owned () -> Int      // user: %6
-  %6 = apply %3(%5) : $@thin (Int) -> ()
-  strong_release %2 : $@callee_owned () -> Int    // id: %7
-  %8 = tuple ()                                   // user: %9
-  return %8 : $()                                 // id: %9
-}
-
-sil @some_closure : $@thin (Int) -> Int
-sil @print_a_number : $@thin (Int) -> ()
-
