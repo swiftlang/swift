@@ -258,6 +258,7 @@ public:
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
+  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -625,6 +626,42 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
   // Delete the partial_apply.
   return eraseInstFromFunction(*PAI);
+}
+
+SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee())) {
+    // Don't handle generic applys.
+    if (AI->hasSubstitutions() || PAI->hasSubstitutions())
+      return nullptr;
+
+    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+    if (!FRI)
+      return nullptr;
+
+    // Prepare the args.
+    SmallVector<SILValue, 8> Args;
+    // First the ApplyInst args.
+    for (auto Op : AI->getArguments())
+      Args.push_back(Op);
+    // Next, the partial apply args.
+    for (auto Op : PAI->getArguments())
+      Args.push_back(Op);
+
+    // Add a retain of each non-address type capture argument, because it will
+    // be consumed by the closure body.
+    for (auto Arg : PAI->getArguments())
+      if (!Arg.getType().isAddress())
+        Builder->emitCopyValueOperation(PAI->getLoc(), Arg);
+
+    ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, Args,
+                                          AI->isTransparent());
+
+    replaceInstUsesWith(*AI, NAI);
+    return eraseInstFromFunction(*AI);
+  }
+
+  return nullptr;
 }
 
 bool tryToRemoveFunction(SILFunction *F) {
