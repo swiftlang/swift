@@ -2962,7 +2962,7 @@ namespace {
     // Retrieve a representative archetype for a dependent type if it refers to
     // a generic parameter or a member of a generic parameter, or return null
     // if it does not.
-    ArchetypeType *getRepresentativeArchetype(Type depType) {
+    ArchetypeType::NestedType getRepresentativeArchetype(Type depType) {
       assert(depType->isDependentType()
              && "considering non-dependent type?!");
       
@@ -2970,8 +2970,7 @@ namespace {
       if (!potential)
         return nullptr;
       
-      return potential->getType(nullptr, ParamArchetypes.getModule())
-        .dyn_cast<ArchetypeType*>();
+      return potential->getType(nullptr, ParamArchetypes.getModule());
     }
 
   public:
@@ -3189,13 +3188,16 @@ namespace {
       auto representative = getRepresentativeArchetype(arg);
       if (!representative)
         return;
+      auto arch = representative.dyn_cast<ArchetypeType*>();
+      if (!arch)
+        return;
       
       // First, record that we can find this dependent type at this point.
       addFulfillment(arg, nullptr, depth, index);
 
       // Now consider each of the protocols that the parameter guarantees.
       for (auto protocol : param->getConformsTo()) {
-        if (requiresFulfillment(representative, protocol))
+        if (requiresFulfillment(arch, protocol))
           addFulfillment(arg, protocol, depth, index);
       }
     }
@@ -3203,8 +3205,13 @@ namespace {
     /// We're binding an archetype for a protocol witness.
     void considerWitnessParamType(CanGenericTypeParamType arg) {
       assert(arg->getDepth() == 0 && arg->getIndex() == 0);
-      // First of all, the archetype fulfills its own requirements.
-      considerDependentType(arg, getRepresentativeArchetype(arg), 0, 0);
+      auto representative = getRepresentativeArchetype(arg);
+      assert(representative && "no representative for dependent type?!");
+      
+      // First of all, the archetype or concrete type fulfills its own
+      // requirements.
+      if (auto arch = representative.dyn_cast<ArchetypeType*>())
+        considerDependentType(arg, arch, 0, 0);
       
       // FIXME: We can't pass associated types of Self through the witness
       // CC, so as a hack, fake up impossible fulfillments for the associated
@@ -3231,9 +3238,10 @@ namespace {
         // If so, suppress providing metadata for the type by making up a bogus
         // fulfillment.
         if (rootParamTy == arg) {
-          considerDependentType(depTy,
-                                getRepresentativeArchetype(depTy),
-                                ~0u, ~0u);
+          auto depRep = getRepresentativeArchetype(depTy);
+          assert(depRep && "no representative for dependent type?!");
+          if (auto depArch = depRep.dyn_cast<ArchetypeType*>())
+            considerDependentType(depTy, depArch, ~0u, ~0u);
         }
       }
     }
@@ -3373,7 +3381,9 @@ EmitPolymorphicParameters::emitWithSourceBound(Explosion &in) {
     auto contextTy
       = ArchetypeBuilder::mapTypeIntoContext(IGF.IGM.SILMod->getSwiftModule(),
                                              ContextParams, depTy)
-        ->castTo<ArchetypeType>();
+        ->getAs<ArchetypeType>();
+    if (!contextTy)
+      continue;
   
     // Derive the appropriate metadata reference.
     llvm::Value *metadata;
@@ -3698,14 +3708,22 @@ void EmitPolymorphicArguments::emit(CanType substInputType,
     subs = subs.slice(1);
     
     CanType argType = sub.Replacement->getCanonicalType();
-
+    
+    // If same-type constraints have eliminated the genericity of this
+    // parameter, it doesn't need an independent metadata parameter.
+    auto type = getRepresentativeArchetype(depTy);
+    assert(type && "no potential archetype for dependent type?!");
+    auto arch = type.dyn_cast<ArchetypeType*>();
+    if (!arch)
+      continue;
+    
     // Add the metadata reference unless it's fulfilled.
     if (!Fulfillments.count(FulfillmentKey(depTy, nullptr))) {
       out.add(IGF.emitTypeMetadataRef(argType));
     }
 
     // Nothing else to do if there aren't any protocols to witness.
-    auto protocols = getRepresentativeArchetype(depTy)->getConformsTo();
+    auto protocols = arch->getConformsTo();
     if (protocols.empty())
       continue;
 
@@ -3768,15 +3786,21 @@ namespace {
       addSource(out);
 
       for (auto depTy : getAllDependentTypes()) {
+        // Only emit parameters for independent parameters that haven't been
+        // constrained to concrete types.
+        auto representative = getRepresentativeArchetype(depTy);
+        assert(representative && "no representative archetype for param?!");
+        auto arch = representative.dyn_cast<ArchetypeType*>();
+        if (!arch)
+          continue;
+        
         // Pass the type argument if not fulfilled.
         if (!Fulfillments.count(FulfillmentKey(depTy, nullptr)))
           out.push_back(IGM.TypeMetadataPtrTy);
 
         // Pass each signature requirement that needs a witness table
         // separately (unless fulfilled).
-        auto representative = getRepresentativeArchetype(depTy);
-        assert(representative && "no representative archetype for param?!");
-        for (auto protocol : representative->getConformsTo()) {
+        for (auto protocol : arch->getConformsTo()) {
           if (!requiresProtocolWitnessTable(protocol))
             continue;
           
