@@ -19,6 +19,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Allocator.h"
 
@@ -747,9 +748,10 @@ namespace llvm {
               swift::CanType(), 0};
     }
     static unsigned getHashValue(TypeKey val) {
-      return DenseMapInfo<swift::CanType>::getHashValue(val.OrigType)
-           ^ DenseMapInfo<swift::CanType>::getHashValue(val.SubstType)
-           ^ val.UncurryLevel;
+      auto hashOrig = DenseMapInfo<swift::CanType>::getHashValue(val.OrigType);
+      auto hashSubst =
+        DenseMapInfo<swift::CanType>::getHashValue(val.SubstType);
+      return hash_combine(hashOrig, hashSubst, val.UncurryLevel);
     }
     static bool isEqual(TypeKey LHS, TypeKey RHS) {
       return LHS == RHS;
