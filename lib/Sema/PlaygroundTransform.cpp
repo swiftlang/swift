@@ -123,48 +123,69 @@ public:
   }
 
   Expr *buildLoggerCall(ValueDecl *VD) {
+    Expr *Name = new (Context) StringLiteralExpr("", SourceRange());
     Expr *Header = new (Context) StringLiteralExpr("", SourceRange());
     Header->setImplicit(true);
 
-    Expr *MaxChildren = new (Context) IntegerLiteralExpr("0", SourceLoc(),
-                                                         true);
-
-    Expr *MaxDepth = new (Context) IntegerLiteralExpr("0", SourceLoc(),
-                                                      true);
-
-    Expr *ArgExprs[] = {
+    Expr *LoggerArgExprs[] = {
         new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                   SourceLoc(),
                                   true, // implicit
                                   false, // uses direct property access
                                   Type()),
-        Header,
-        MaxChildren,
-        MaxDepth
+        Name,
+        Header
       };
 
-    TupleExpr *Args = new (Context) TupleExpr(SourceLoc(),
-                                              Context.AllocateCopy(ArgExprs),
-                                              (Identifier*)nullptr,
-                                              SourceLoc(),
-                                              false, // hasTrailingClosure
-                                              true, // implicit
-                                              Type());
+    TupleExpr *LoggerArgs = new (Context) TupleExpr(
+      SourceLoc(),
+      Context.AllocateCopy(LoggerArgExprs),
+      (Identifier*)nullptr,
+      SourceLoc(),
+      false, // hasTrailingClosure
+      true, // implicit
+      Type());
 
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("playground_log"),
         DeclRefKind::Ordinary,
         SourceLoc());
+
     LoggerRef->setImplicit(true);
 
-    Expr *Call = new (Context) CallExpr(LoggerRef, Args, true, Type());
+    Expr *LoggerCall = new (Context) CallExpr(LoggerRef, LoggerArgs, true,
+                                              Type());
 
-    if (!typeCheckCompletionContextExpr(Context, TypeCheckDC, Call)) {
+    Expr *SendDataArgExprs[] = {
+        LoggerCall
+      };
+
+    TupleExpr *SendDataArgs = new (Context) TupleExpr(
+      SourceLoc(),
+      Context.AllocateCopy(SendDataArgExprs),
+      (Identifier*)nullptr,
+      SourceLoc(),
+      false, // hasTrailingClosure
+      true, // implicit
+      Type());
+
+    UnresolvedDeclRefExpr *SendDataRef = 
+      new (Context) UnresolvedDeclRefExpr(
+        Context.getIdentifier("DVTSendPlaygroundLogDataToHost"),
+        DeclRefKind::Ordinary,
+        SourceLoc());
+
+    SendDataRef->setImplicit(true);
+
+    Expr *SendDataCall = new (Context) CallExpr(SendDataRef, SendDataArgs, true,
+                                                Type());
+
+    if (!typeCheckCompletionContextExpr(Context, TypeCheckDC, SendDataCall)) {
       return nullptr;
     }
 
-    return Call;
+    return SendDataCall;
   }
 };
 
@@ -206,16 +227,36 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
         std::make_pair(Context.getIdentifier("PlaygroundLoggerLibrary"),
                        SourceLoc()));
 
-      if (LoggerModule)
+      Module *CommModule = Context.getModule(
+        std::make_pair(Context.getIdentifier("DVTPlaygroundCommunication"),
+                       SourceLoc()));
+
+      if (LoggerModule && CommModule)
       {
-        SmallVector<ValueDecl*, 1> LoggerDecls;
+        SmallVector<ValueDecl*, 1> Decls;
+
+        bool OK = true;
 
         LoggerModule->lookupValue(Module::AccessPathTy(),
                                   Context.getIdentifier("playground_log"),
                                   NLKind::UnqualifiedLookup,
-                                  LoggerDecls);
+                                  Decls);
 
-        if (LoggerDecls.size() == 1) {
+        if (Decls.size() != 1)
+          OK = false;
+
+        Decls.clear();
+
+        CommModule->lookupValue(
+          Module::AccessPathTy(),
+          Context.getIdentifier("DVTSendPlaygroundLogDataToHost"),
+          NLKind::UnqualifiedLookup,
+          Decls);
+
+        if (Decls.size() != 1)
+          OK = false;
+
+        if (OK) {
           Instrumenter I(Context, FuncToTransform);
           BraceStmt *NewBody = I.transformBraceStmt(Body);
           if (NewBody != Body) {
