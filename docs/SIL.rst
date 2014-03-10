@@ -896,8 +896,8 @@ Witness Tables
 ::
 
   decl ::= sil-witness-table
-  sil-witness-table ::= 'sil_witness_table' normal-protocol-conformance
-                        '{' sil-witness-entry* '}'
+  sil-witness-table ::= 'sil_witness_table' sil-linkage?
+                        normal-protocol-conformance '{' sil-witness-entry* '}'
 
 SIL encodes the information needed for dynamic dispatch of generic types into
 witness tables. This information is used to produce runtime dispatch tables when

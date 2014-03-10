@@ -56,11 +56,11 @@ sil_witness_table InheritedConformance: InheritedProtocol1 module witness_tables
   base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
 }
 
-// CHECK-LABEL: sil_witness_table InheritedConformance: AnyProtocol module
+// CHECK-LABEL: sil_witness_table shared InheritedConformance: AnyProtocol module
 // CHECK: associated_type AssocType: SomeAssoc
 // CHECK: associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module
 // CHECK: }
-sil_witness_table InheritedConformance: AnyProtocol module witness_tables {
+sil_witness_table shared InheritedConformance: AnyProtocol module witness_tables {
   associated_type AssocType: SomeAssoc
   associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }

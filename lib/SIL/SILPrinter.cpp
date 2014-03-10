@@ -1365,6 +1365,8 @@ void SILVTable::dump() const {
 
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_witness_table ";
+  // TODO: sil_witness_table declarations
+  printLinkage(OS, getLinkage(), /*isDefinition*/ true);
   getConformance()->printName(OS);
   OS << " {\n";
   

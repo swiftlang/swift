@@ -1304,8 +1304,9 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
   WitnessTableLayout::emitRecord(Out, ScratchRecord,
                            SILAbbrCodes[WitnessTableLayout::Code],
-                           S.addTypeRef(wt.getConformance()->getType()));
-
+                           S.addTypeRef(wt.getConformance()->getType()),
+                           toStableSILLinkage(wt.getLinkage()));
+  
   S.writeConformance(wt.getConformance()->getProtocol(), wt.getConformance(),
                      nullptr, SILAbbrCodes);
   for (auto &entry : wt.getEntries()) {

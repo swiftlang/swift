@@ -560,8 +560,7 @@ static bool parseSILLinkage(Optional<SILLinkage> &Result, Parser &P) {
     Result = SILLinkage::HiddenExternal;
     P.consumeToken(tok::identifier);
   } else {
-    P.diagnose(P.Tok, diag::expected_sil_linkage_or_function);
-    return true;
+    Result = Nothing;
   }
   return false;
 }
@@ -2828,7 +2827,7 @@ static ProtocolConformance *parseProtocolConformance(Parser &P, SILParser &SP,
 }
 
 /// decl-sil-witness: [[only in SIL mode]]
-///   'sil_witness_table' normal-conformance decl-sil-witness-body
+///   'sil_witness_table' sil-linkage? normal-conformance decl-sil-witness-body
 /// normal-conformance:
 ///   [generic params] type: protocol module ModuleName
 /// decl-sil-witness-body:
@@ -2842,7 +2841,11 @@ static ProtocolConformance *parseProtocolConformance(Parser &P, SILParser &SP,
 bool Parser::parseSILWitnessTable() {
   consumeToken(tok::kw_sil_witness_table);
   SILParser WitnessState(*this);
-
+  
+  // Parse the linkage.
+  Optional<SILLinkage> Linkage;
+  parseSILLinkage(Linkage, *this);
+  
   // Parse the protocol conformance.
   ProtocolDecl *proto;
   NormalProtocolConformance *theConformance =
@@ -2963,7 +2966,13 @@ bool Parser::parseSILWitnessTable() {
   SourceLoc RBraceLoc;
   parseMatchingToken(tok::r_brace, RBraceLoc, diag::expected_sil_rbrace,
                      LBraceLoc);
+  
+  // Default to public linkage.
+  // FIXME: When we have witness table declarations, default to public_external
+  // for a declaration.
+  if (!Linkage)
+    Linkage = SILLinkage::Public;
 
-  SILWitnessTable::create(*SIL->M, theConformance, witnessEntries);
+  SILWitnessTable::create(*SIL->M, *Linkage, theConformance, witnessEntries);
   return false;
 }

@@ -1771,7 +1771,13 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
   
   return IsNotFreeFunctionWitness;
 }
-
+  
+static SILLinkage
+getLinkageForProtocolConformance(NormalProtocolConformance *C) {
+  // TODO
+  return SILLinkage::Public;
+}
+  
 /// Emit a witness table for a protocol conformance.
 class SILGenConformance : public Lowering::ASTVisitor<SILGenConformance> {
 public:
@@ -1803,7 +1809,9 @@ public:
       visit(reqt);
     
     // Create the witness table.
-    return SILWitnessTable::create(SGM.M, Conformance, Entries);
+    return SILWitnessTable::create(SGM.M,
+                                 getLinkageForProtocolConformance(Conformance),
+                                 Conformance, Entries);
   }
   
   void emitBaseProtocolWitness(ProtocolDecl *baseProtocol) {

@@ -138,7 +138,8 @@ namespace sil_block {
 
   using WitnessTableLayout = BCRecordLayout<
     SIL_WITNESSTABLE,
-    TypeIDField          // Conforming Type.
+    TypeIDField,         // Conforming Type.
+    SILLinkageField      // Linkage
     // Normal Protocol Conformance will be serialized immediately after.
   >;
 

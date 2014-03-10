@@ -140,17 +140,19 @@ public:
   };
   
 private:
+  SILLinkage Linkage;
   NormalProtocolConformance *Conformance;
-
   ArrayRef<Entry> Entries;
 
   SILWitnessTable(SILModule &M,
+                  SILLinkage Linkage,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
 public:
   /// Create a new SILWitnessTable with the given entries.
   static SILWitnessTable *create(SILModule &M,
+                                 SILLinkage Linkage,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
@@ -165,6 +167,10 @@ public:
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
   
+  /// Get the linkage of the witness table.
+  SILLinkage getLinkage() const { return Linkage; }
+  void setLinkage(SILLinkage l) { Linkage = l; }
+  
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
   void dump() const;
@@ -173,7 +179,7 @@ public:
 }
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILVTable
+// ilist_traits for SILWitnessTable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {

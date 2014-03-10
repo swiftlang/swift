@@ -1620,12 +1620,21 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
   (void)kind;
 
   TypeID TyID;
-  WitnessTableLayout::readRecord(scratch, TyID);
+  unsigned RawLinkage;
+  WitnessTableLayout::readRecord(scratch, TyID, RawLinkage);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
     return nullptr;
   }
-
+  
+  auto Linkage = fromStableSILLinkage(RawLinkage);
+  if (!Linkage) {
+    DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+                       << " for SILFunction\n");
+    MF->error();
+    return nullptr;
+  }
+  
   // Deserialize Conformance.
   auto conformancePair = MF->maybeReadConformance(MF->getType(TyID),
                                                   SILCursor);
@@ -1704,7 +1713,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
       break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
-  SILWitnessTable *wT = SILWitnessTable::create(SILMod, theConformance,
+  SILWitnessTable *wT = SILWitnessTable::create(SILMod, *Linkage, theConformance,
                                                 witnessEntries);
   wTableOrOffset = wT;
 

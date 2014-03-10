@@ -25,20 +25,23 @@
 using namespace swift;
 
 SILWitnessTable *
-SILWitnessTable::
-create(SILModule &M, NormalProtocolConformance *Conformance,
-       ArrayRef<SILWitnessTable::Entry> entries) {
+SILWitnessTable::create(SILModule &M,
+                        SILLinkage Linkage,
+                        NormalProtocolConformance *Conformance,
+                        ArrayRef<SILWitnessTable::Entry> entries) {
   void *buf = M.allocate(sizeof(SILWitnessTable),
                          alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Conformance, entries);
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance,
+                                                    entries);
   M.witnessTables.push_back(wt);
   return wt;
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M,
+                                 SILLinkage Linkage,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
-  : Conformance(Conformance), Entries()
+  : Linkage(Linkage), Conformance(Conformance), Entries()
 {
   void *buf = M.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
@@ -63,14 +66,14 @@ SILWitnessTable::~SILWitnessTable() {
   // Drop the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {
     switch (entry.getKind()) {
-      case Method:
-        entry.getMethodWitness().Witness->RefCount--;
-        break;
-      case AssociatedType:
-      case AssociatedTypeProtocol:
-      case BaseProtocol:
-      case Invalid:
-        break;
+    case Method:
+      entry.getMethodWitness().Witness->RefCount--;
+      break;
+    case AssociatedType:
+    case AssociatedTypeProtocol:
+    case BaseProtocol:
+    case Invalid:
+      break;
     }
   }
 }
