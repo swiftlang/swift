@@ -141,13 +141,13 @@ private:
       // Specializations of public or hidden symbols can be shared by all TUs
       // that specialize the definition.
       return SILLinkage::Shared;
-        
+
     case SILLinkage::Private:
       // Specializations of private symbols should remain so.
       return SILLinkage::Private;
     }
   }
-  
+
   /// Create a new empty function with the correct arguments and a unique name.
   static SILFunction *initCloned(SILFunction *Orig,
                                  TypeSubstitutionMap &InterfaceSubs,
@@ -392,7 +392,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     TypeSubstitutionMap InterfaceSubs
       = F->getLoweredFunctionType()->getGenericSignature()
          ->getSubstitutionMap(Bucket[0]->getSubstitutions());
-    
+
     TypeSubstitutionMap ContextSubs
       = F->getContextGenericParams()
          ->getSubstitutionMap(Bucket[0]->getSubstitutions());
@@ -406,7 +406,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       buffer << "_TTS";
 
       Mangle::Mangler mangle(buffer);
-      
+
       for (auto &Sub : Bucket[0]->getSubstitutions()) {
         mangle.mangleType(Sub.Replacement->getCanonicalType(),
                           ResilienceExpansion::Minimal, 0);
@@ -418,10 +418,10 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       null_conformances:;
         buffer << '_';
       }
-      
+
       buffer << '_' << F->getName();
     }
-    
+
     SILFunction *NewF;
     bool createdFunction;
     // If we already have this specialization, reuse it.
