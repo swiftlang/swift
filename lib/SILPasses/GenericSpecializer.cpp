@@ -358,12 +358,16 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   if (!canSpecializeFunction(F))
     return false;
 
+  DEBUG(llvm::dbgs() << "*** Processing: " << F->getName() << "\n");
+
   SmallVector<AIList, 4> Buckets;
 
   // Sort the incoming ApplyInst instructions into multiple buckets of AI with
   // exactly the same substitution lists.
   for (auto &AI : List) {
     bool Placed = false;
+
+    DEBUG(llvm::dbgs() << "Function: " << AI->getFunction()->getName() << "; ApplyInst: " << *AI);
 
     // Scan the existing buckets and search for a bucket of the right type.
     for (int i = 0, e = Buckets.size(); i < e; ++i) {
@@ -388,6 +392,11 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
   for (auto &Bucket : Buckets) {
     assert(Bucket.size() && "Empty bucket!");
 
+    DEBUG(llvm::dbgs() << "    Bucket: \n");
+    DEBUG(for (auto *AI : Bucket) {
+      llvm::dbgs() << "        ApplyInst: " << *AI;
+    });
+
     // Create the substitution maps.
     TypeSubstitutionMap InterfaceSubs
       = F->getLoweredFunctionType()->getGenericSignature()
@@ -397,8 +406,10 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       = F->getContextGenericParams()
          ->getSubstitutionMap(Bucket[0]->getSubstitutions());
 
-    if (!canSpecializeFunctionWithSubList(F, InterfaceSubs))
+    if (!canSpecializeFunctionWithSubList(F, InterfaceSubs)) {
+      DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
       continue;
+    }
 
     llvm::SmallString<64> ClonedName;
     {
@@ -408,6 +419,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       Mangle::Mangler mangle(buffer);
 
       for (auto &Sub : Bucket[0]->getSubstitutions()) {
+        DEBUG(llvm::dbgs() << "  Replacement Type: "; Sub.Replacement->getCanonicalType().dump());
         mangle.mangleType(Sub.Replacement->getCanonicalType(),
                           ResilienceExpansion::Minimal, 0);
         for (auto C : Sub.Conformance) {
