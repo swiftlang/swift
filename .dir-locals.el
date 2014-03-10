@@ -36,6 +36,9 @@
  (c++-mode
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
+ (swift-mode
+  (whitespace-style . (face lines indentation:space))
+  (eval . (whitespace-mode)))
  (objc-mode
   (whitespace-style . (face lines indentation:space))
   (eval . (whitespace-mode)))
