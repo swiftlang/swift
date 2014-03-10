@@ -1,0 +1,4 @@
+module SwiftShims {
+  header "shims.h"
+  export *
+}
