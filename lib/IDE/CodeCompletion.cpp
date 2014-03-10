@@ -1874,13 +1874,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       // FIXME: actually check imports.
       StringRef ModuleFilename = Request.TheModule->getModuleFilename();
-      assert(!ModuleFilename.empty() && "should have a filename");
-      CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                     Request.TheModule->Name.str(),
-                                     {}, Request.NeedLeadingDot};
-      CompletionContext.Cache.Impl->getResults(
-          K, CompletionContext.getResultSink(), Request.OnlyTypes,
-          FillCacheCallback);
+      // ModuleFilename can be empty if something strange happened during
+      // module loading, for example, the module file is corrupted.
+      if (!ModuleFilename.empty()) {
+        CodeCompletionCacheImpl::Key K{ModuleFilename,
+                                       Request.TheModule->Name.str(),
+                                       {}, Request.NeedLeadingDot};
+        CompletionContext.Cache.Impl->getResults(
+            K, CompletionContext.getResultSink(), Request.OnlyTypes,
+            FillCacheCallback);
+      }
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
@@ -1907,13 +1910,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         }
         Module *TheModule = Imported.first.second;
         StringRef ModuleFilename = TheModule->getModuleFilename();
-        assert(!ModuleFilename.empty() && "should have a filename");
-        CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                       TheModule->Name.str(),
-                                       AccessPath, false};
-        CompletionContext.Cache.Impl->getResults(
-            K, CompletionContext.getResultSink(), Request.OnlyTypes,
-            FillCacheCallback);
+        // ModuleFilename can be empty if something strange happened during
+        // module loading, for example, the module file is corrupted.
+        if (!ModuleFilename.empty()) {
+          CodeCompletionCacheImpl::Key K{ModuleFilename,
+                                         TheModule->Name.str(),
+                                         AccessPath, false};
+          CompletionContext.Cache.Impl->getResults(
+              K, CompletionContext.getResultSink(), Request.OnlyTypes,
+              FillCacheCallback);
+        }
       }
     }
     Lookup.RequestedCachedResults.reset();
