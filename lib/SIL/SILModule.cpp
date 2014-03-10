@@ -305,6 +305,7 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
         // The ExternalSource may wish to rewrite non-empty bodies.
         if (ExternalSource)
           if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
+            NewFn->verify();
             Worklist.push_back(NewFn);
             ++NumFuncLinked;
             continue;
@@ -317,6 +318,7 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
           // currently empty.
           if (TryLinking)
             if (auto NewFn = SILLoader->lookupSILFunction(CalleeFunction)) {
+              NewFn->verify();
               Worklist.push_back(NewFn);
               ++NumFuncLinked;
               continue;
