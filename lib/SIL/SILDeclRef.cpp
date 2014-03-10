@@ -183,16 +183,25 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   
   // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
+  const SILLinkage ClangLinkage = SILLinkage::Shared;
+  
   if (isa<ClangModuleUnit>(dc)) {
     if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
-      return SILLinkage::Shared;
+      return ClangLinkage;
 
     if (auto *FD = dyn_cast<FuncDecl>(d))
       if (FD->isGetterOrSetter() || isa<EnumDecl>(d->getDeclContext()) ||
           isa<StructDecl>(d->getDeclContext()))
-        return SILLinkage::Shared;
+        return ClangLinkage;
   }
-
+  // Declarations that were derived on behalf of types in Clang modules get
+  // shared linkage.
+  if (auto *FD = dyn_cast<FuncDecl>(d)) {
+    if (auto derivedFor = FD->getDerivedForTypeDecl())
+      if (isa<ClangModuleUnit>(derivedFor->getModuleScopeContext()))
+        return ClangLinkage;
+  }
+  
   // Otherwise, we have external linkage.
   // FIXME: access control
   return (forDefinition ? SILLinkage::Public : SILLinkage::PublicExternal);

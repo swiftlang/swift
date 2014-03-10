@@ -1181,12 +1181,16 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     break;
   }
   case DeclKind::Enum: {
-    // Emit the enum cases and RawRepresentable methods.
+    // Emit the enum cases and derived conformance methods for the type.
     for (auto member : cast<EnumDecl>(d)->getMembers()) {
       if (auto elt = dyn_cast<EnumElementDecl>(member))
         emitEnumConstructor(elt);
       else if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
+    }
+    // Emit derived global decls.
+    for (auto derived : cast<EnumDecl>(d)->getDerivedGlobalDecls()) {
+      emitFunction(cast<FuncDecl>(derived));
     }
     break;
   }

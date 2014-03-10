@@ -3302,7 +3302,7 @@ class FuncDecl : public AbstractFunctionDecl {
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 2, AccessorKind> AccessorDecl;
-  FuncDecl *OverriddenDecl;
+  llvm::PointerUnion<FuncDecl *, NominalTypeDecl*> OverriddenOrDerivedForDecl;
   OperatorDecl *Operator;
 
   FuncDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
@@ -3312,7 +3312,7 @@ class FuncDecl : public AbstractFunctionDecl {
     : AbstractFunctionDecl(DeclKind::Func, Parent, Name, NameLoc,
                            NumParamPatterns, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc),
-      OverriddenDecl(nullptr), Operator(nullptr) {
+      OverriddenOrDerivedForDecl(), Operator(nullptr) {
     FuncDeclBits.IsStatic = StaticLoc.isValid() || getName().isOperator();
     FuncDeclBits.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     assert(NumParamPatterns > 0 && "Must have at least an empty tuple arg");
@@ -3480,9 +3480,33 @@ public:
                            LocalCaptureTy> &Result) const {
     return getCaptureInfo().getLocalCaptures(this, Result);
   }
-
-  FuncDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(FuncDecl *over) { OverriddenDecl = over; }
+  
+  /// Get the supertype method this method overrides, if any.
+  FuncDecl *getOverriddenDecl() const {
+    return OverriddenOrDerivedForDecl.dyn_cast<FuncDecl *>();
+  }
+  void setOverriddenDecl(FuncDecl *over) {
+    // A function cannot be an override if it is also a derived global decl
+    // (since derived decls are at global scope).
+    assert((!OverriddenOrDerivedForDecl
+            || !OverriddenOrDerivedForDecl.is<FuncDecl*>())
+           && "function cannot be both override and derived global");
+    OverriddenOrDerivedForDecl = over;
+  }
+  
+  /// Get the type this function was implicitly generated on the behalf of for
+  /// a derived protocol conformance, if any.
+  NominalTypeDecl *getDerivedForTypeDecl() const {
+    return OverriddenOrDerivedForDecl.dyn_cast<NominalTypeDecl *>();
+  }
+  void setDerivedForTypeDecl(NominalTypeDecl *ntd) {
+    // A function cannot be an override if it is also a derived global decl
+    // (since derived decls are at global scope).
+    assert((!OverriddenOrDerivedForDecl
+            || !OverriddenOrDerivedForDecl.is<NominalTypeDecl *>())
+           && "function cannot be both override and derived global");
+    OverriddenOrDerivedForDecl = ntd;
+  }
   
   OperatorDecl *getOperatorDecl() const { return Operator; }
   void setOperatorDecl(OperatorDecl *o) {

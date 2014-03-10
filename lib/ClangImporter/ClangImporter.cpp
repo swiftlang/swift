@@ -1062,6 +1062,14 @@ ClangModuleUnit::ClangModuleUnit(Module &M, ClangImporter &owner,
     clangModule(clangModule) {
 }
 
+bool ClangModuleUnit::hasClangModule(Module *M) {
+  for (auto F : M->getFiles()) {
+    if (isa<ClangModuleUnit>(F))
+      return true;
+  }
+  return false;
+}
+
 bool ClangModuleUnit::isTopLevel() const {
   return !clangModule->isSubModule();
 }

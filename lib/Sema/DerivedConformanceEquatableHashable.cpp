@@ -120,12 +120,12 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   
   auto id_eq = C.getIdentifier("==");
   auto eqDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                 SourceLoc(), id_eq,
-                                 SourceLoc(),
-                                 genericParams,
-                                 Type(), argParams, params,
-                                 TypeLoc::withoutLoc(boolTy),
-                                 enumDecl->getModuleContext());
+                           SourceLoc(), id_eq,
+                           SourceLoc(),
+                           genericParams,
+                           Type(), argParams, params,
+                           TypeLoc::withoutLoc(boolTy),
+                           &enumDecl->getModuleContext()->getDerivedFileUnit());
   eqDecl->setImplicit();
   eqDecl->getMutableAttrs().setAttr(AttrKind::AK_infix, SourceLoc());
   auto op = C.getStdlibModule()->lookupInfixOperator(id_eq);
@@ -135,6 +135,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
     return nullptr;
   }
   eqDecl->setOperatorDecl(op);
+  eqDecl->setDerivedForTypeDecl(enumDecl);
   
   SmallVector<CaseStmt*, 4> cases;
   SmallVector<CaseLabel*, 4> caseLabels;

@@ -40,6 +40,9 @@ class ClangModuleUnit final : public LoadedFile {
   ~ClangModuleUnit() = default;
 
 public:
+  /// True if the given Module contains an imported Clang module unit.
+  static bool hasClangModule(Module *M);
+  
   ClangModuleUnit(Module &M, ClangImporter &owner,
                   clang::Module *clangModule);
 
