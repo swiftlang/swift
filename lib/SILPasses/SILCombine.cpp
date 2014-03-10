@@ -606,6 +606,12 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     assert(Delta <= Params.size() && "Error, more Args to partial apply than "
            "params in its interface.");
 
+    // Set the insertion point of the destroy_value to be that of the release,
+    // which is the end of the lifetime of the partial_apply.
+    auto OrigInsertPoint = Builder->getInsertionPoint();
+    SILInstruction *SingleUser = PAI->use_begin()->getUser();
+    Builder->setInsertionPoint(SingleUser);
+
     for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
       SILValue Arg = Args[AI];
       auto Param = Params[AI + Delta];
@@ -614,6 +620,8 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
         if (!Arg.getType().isAddress())
           Builder->createDestroyValue(Loc, Arg);
     }
+
+    Builder->setInsertionPoint(OrigInsertPoint);
 
     // Delete the strong_release.
     eraseInstFromFunction(*SRI);
