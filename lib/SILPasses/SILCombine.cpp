@@ -586,45 +586,41 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // %X = partial_apply %x(...)    // has 1 use.
   // strong_release %X;
 
-
-  // Check if all of the uses of the partial_apply are retains or releases.
-  SmallVector<SILInstruction*, 4> Users;
-  for (auto UI = PAI->use_begin(), UE = PAI->use_end(); UI != UE; ++UI) {
-    if (isa<StrongReleaseInst>(UI->getUser()) ||
-        isa<StrongRetainInst>(UI->getUser())) {
-      Users.push_back(UI->getUser());
-    } else {
-      return nullptr;
-    }
-  }
-
-  SILFunctionType *ClosureTy =
-    dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
-  if (!ClosureTy)
+  // Only handle PartialApplyInst with one use.
+  if (!PAI->hasOneUse())
     return nullptr;
 
-  // Emit a destroy value for each captured closure argument.
-  auto Params = ClosureTy->getInterfaceParameters();
-  auto Args = PAI->getArguments();
-  unsigned Delta = Params.size() - Args.size();
-  assert(Delta <= Params.size() && "Error, more Args to the partial_apply than "
-         "params in its interface.");
+  SILLocation Loc = PAI->getLoc();
 
-  for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
-    SILValue Arg = Args[AI];
-    auto Param = Params[AI + Delta];
+  // The single user must be the StrongReleaseInst.
+  if (auto *SRI = dyn_cast<StrongReleaseInst>(PAI->use_begin()->getUser())) {
+    SILFunctionType *ClosureTy =
+      dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+    if (!ClosureTy)
+      return nullptr;
 
-    if (!Param.isIndirect() && Param.isConsumed())
-      if (!Arg.getType().isAddress())
-        Builder->createDestroyValue(PAI->getLoc(), Arg);
+    // Emit a destroy value for each captured closure argument.
+    auto Params = ClosureTy->getInterfaceParameters();
+    auto Args = PAI->getArguments();
+    unsigned Delta = Params.size() - Args.size();
+    assert(Delta <= Params.size() && "Error, more Args to partial apply than "
+           "params in its interface.");
+
+    for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
+      SILValue Arg = Args[AI];
+      auto Param = Params[AI + Delta];
+
+      if (!Param.isIndirect() && Param.isConsumed())
+        if (!Arg.getType().isAddress())
+          Builder->createDestroyValue(Loc, Arg);
+    }
+
+    // Delete the strong_release.
+    eraseInstFromFunction(*SRI);
+    // Delete the partial_apply.
+    return eraseInstFromFunction(*PAI);
   }
-
-  // Erase all of the retain and release instructions.
-  for (auto I : Users)
-    eraseInstFromFunction(*I);
-
-  // Delete the partial_apply.
-  return eraseInstFromFunction(*PAI);
+  return nullptr;
 }
 
 bool tryToRemoveFunction(SILFunction *F) {
