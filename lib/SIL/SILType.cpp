@@ -54,7 +54,7 @@ SILType SILType::getBuiltinWordType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(SILModule &M) const {
-  return M.isTrivialType(*this);
+  return M.getTypeLowering(*this).isTrivial();
 }
 
 std::string SILType::getAsString() const {
@@ -94,5 +94,5 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
 /// address-only. For example, it could be a resilient struct or something of
 /// unknown size.
 bool SILType::isAddressOnly(SILModule &M) const {
-  return M.isAddressOnlyType(*this);
+  return M.getTypeLowering(*this).isAddressOnly();
 }
