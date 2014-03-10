@@ -1567,7 +1567,6 @@ namespace {
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc, bool forceClassMethod = false) {
-      // The name of the method is the first part of the selector.
       DeclName name = Impl.importName(decl->getSelector());
       if (!name)
         return nullptr;
