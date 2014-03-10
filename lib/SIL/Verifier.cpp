@@ -277,7 +277,7 @@ public:
               == AI->getElementType().getSwiftRValueType(),
             "container storage must be for allocated type");
   }
-  
+
   void checkAllocRefInst(AllocRefInst *AI) {
     requireReferenceValue(AI, "Result of alloc_ref");
   }
@@ -297,7 +297,7 @@ public:
               "alloc_ref_dynamic requires operand of thick metatype");
     }
   }
-  
+
   /// Check the substitutions passed to an apply or partial_apply.
   CanSILFunctionType checkApplySubstitutions(ArrayRef<Substitution> subs,
                                              SILType calleeTy) {
@@ -311,24 +311,24 @@ public:
     }
     require(fnTy->isPolymorphic(),
             "callee of apply with substitutions must be polymorphic");
-    
+
     // Apply the substitutions.
     return fnTy->substInterfaceGenericArgs(F.getModule(), M, subs);
   }
-  
+
   void checkApplyInst(ApplyInst *AI) {
     auto substTy = checkApplySubstitutions(AI->getSubstitutions(),
                                       AI->getCallee().getType());
     require(AI->getOrigCalleeType()->getAbstractCC() ==
             AI->getSubstCalleeType()->getAbstractCC(),
             "calling convention difference between types");
-    
+
     require(!AI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
-    
+
     require(substTy == AI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
-    
+
     // Check that the arguments and result match.
     require(AI->getArguments().size() ==
             substTy->getInterfaceParameters().size(),
@@ -341,7 +341,7 @@ public:
     require(AI->getType() == substTy->getInterfaceResult().getSILType(),
             "type of apply instruction doesn't match function result type");
   }
-  
+
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
@@ -353,7 +353,7 @@ public:
 
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
             "substituted callee type should not be generic");
-    
+
     require(substTy == PAI->getSubstCalleeType(),
             "substituted callee type does not match substitutions");
 
@@ -364,17 +364,17 @@ public:
               == substTy->getInterfaceParameters().size(),
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
-    
+
     unsigned offset =
       substTy->getInterfaceParameters().size() - PAI->getArguments().size();
-    
+
     for (unsigned i = 0, size = PAI->getArguments().size(); i < size; ++i) {
       require(PAI->getArguments()[i].getType()
                 == substTy->getInterfaceParameters()[i + offset].getSILType(),
               "applied argument types do not match suffix of function type's "
               "inputs");
     }
-    
+
     // The arguments to the result function type must match the prefix of the
     // original function's input types.
     for (unsigned i = 0, size = resultInfo->getInterfaceParameters().size();
@@ -395,7 +395,7 @@ public:
     require(fnType->isThin(),
             "builtin_function_ref should have a thin function result");
   }
-  
+
   bool isValidLinkageForTransparentRef(SILLinkage linkage) {
     switch (linkage) {
     case SILLinkage::Private:
@@ -407,10 +407,10 @@ public:
     case SILLinkage::PublicExternal:
     case SILLinkage::Shared:
       return true;
-        
+
     }
   }
-  
+
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
@@ -424,7 +424,7 @@ public:
               "reference a private or hidden symbol");
     }
   }
-  
+
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "GlobalAddr must have an address result type");
@@ -433,7 +433,7 @@ public:
     require(!GAI->getGlobal()->getDeclContext()->isLocalContext(),
             "GlobalAddr cannot take the address of a local var");
   }
-  
+
   void checkSILGlobalAddrInst(SILGlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
             "SILGlobalAddr must have an address result type");
@@ -536,7 +536,7 @@ public:
       ++opi;
     }
   }
-  
+
   void checkEnumInst(EnumInst *UI) {
     EnumDecl *ud = UI->getType().getEnumOrBoundGenericEnum();
     require(ud, "EnumInst must return an enum");
@@ -546,7 +546,7 @@ public:
             "EnumInst must produce an object");
     require(UI->hasOperand() == UI->getElement()->hasArgumentType(),
             "EnumInst must take an argument iff the element does");
-    
+
     if (UI->getElement()->hasArgumentType()) {
       require(UI->getOperand().getType().isObject(),
               "EnumInst operand must be an object");
@@ -568,14 +568,14 @@ public:
             "InitEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
             "InitEnumDataAddrInst must produce an address");
-    
+
     SILType caseTy =
       UI->getOperand().getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     require(caseTy == UI->getType(),
             "InitEnumDataAddrInst result does not match type of enum case");
   }
-  
+
   void checkTakeEnumDataAddrInst(TakeEnumDataAddrInst *UI) {
     EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
     require(ud, "TakeEnumDataAddrInst must take an enum operand");
@@ -587,14 +587,14 @@ public:
             "TakeEnumDataAddrInst must take an address operand");
     require(UI->getType().isAddress(),
             "TakeEnumDataAddrInst must produce an address");
-    
+
     SILType caseTy =
       UI->getOperand().getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
     require(caseTy == UI->getType(),
             "TakeEnumDataAddrInst result does not match type of enum case");
   }
-  
+
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
     require(IUAI->getOperand().getType().is<EnumType>()
               || IUAI->getOperand().getType().is<BoundGenericEnumType>(),
@@ -605,20 +605,20 @@ public:
     require(IUAI->getOperand().getType().isAddress(),
             "InjectEnumAddrInst must take an address operand");
   }
-  
+
   void checkTupleInst(TupleInst *TI) {
     CanTupleType ResTy = requireObjectType(TupleType, TI, "Result of tuple");
 
     require(TI->getElements().size() == ResTy->getFields().size(),
             "Tuple field count mismatch!");
-    
+
     for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
       require(TI->getElements()[i].getType().getSwiftType()
                ->isEqual(ResTy.getElementType(i)),
               "Tuple element arguments do not match tuple type!");
     }
   }
-  
+
   void checkMetatypeInst(MetatypeInst *MI) {
     require(MI->getType(0).is<MetatypeType>(),
             "metatype instruction must be of metatype type");
@@ -645,7 +645,7 @@ public:
             CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
             "existential_metatype result must be metatype of operand type");
   }
-  
+
   void checkStrongRetainInst(StrongRetainInst *RI) {
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
   }
@@ -699,7 +699,7 @@ public:
     require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
             "index_addr index must be of a builtin integer type");
   }
-  
+
   void checkIndexRawPointerInst(IndexRawPointerInst *IAI) {
     require(IAI->getType().is<BuiltinRawPointerType>(),
             "index_raw_pointer must produce a RawPointer");
@@ -708,13 +708,13 @@ public:
     require(IAI->getIndex().getType().is<BuiltinIntegerType>(),
             "index_raw_pointer index must be of a builtin integer type");
   }
-  
+
   void checkTupleExtractInst(TupleExtractInst *EI) {
     CanTupleType operandTy = requireObjectType(TupleType, EI->getOperand(),
                                                "Operand of tuple_extract");
     require(EI->getType().isObject(),
             "result of tuple_extract must be object");
-    
+
     require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for element_addr instruction");
     require(EI->getType().getSwiftRValueType()
@@ -743,7 +743,7 @@ public:
     require(loweredFieldTy == EI->getType(),
             "result of struct_extract does not match type of field");
   }
-  
+
   void checkTupleElementAddrInst(TupleElementAddrInst *EI) {
     SILType operandTy = EI->getOperand().getType();
     require(operandTy.isAddress(),
@@ -796,7 +796,7 @@ public:
     SILType operandTy = EI->getOperand().getType();
     ClassDecl *cd = operandTy.getClassOrBoundGenericClass();
     require(cd, "ref_element_addr operand must be a class instance");
-    
+
     require(EI->getField()->getDeclContext() == cd,
             "ref_element_addr field must be a member of the class");
 
@@ -805,7 +805,7 @@ public:
     require(loweredFieldTy == EI->getType(),
             "result of ref_element_addr does not match type of field");
   }
-  
+
   SILType getMethodSelfType(CanSILFunctionType ft) {
     return ft->getInterfaceParameters().back().getSILType();
   }
@@ -827,7 +827,7 @@ public:
 
     require(methodType->isThin(),
             "result of witness_method must be thin function");
-    
+
     require(methodType->getAbstractCC()
               == F.getModule().Types.getProtocolWitnessCC(protocol),
             "result of witness_method must have correct @cc for protocol");
@@ -852,7 +852,7 @@ public:
             && selfRequirement.getSecondType()->getAs<ProtocolType>()
               ->getDecl() == protocol,
             "method's Self parameter should be constrained by protocol");
-    
+
     if (AMI->getLookupType().is<ArchetypeType>()) {
       require(AMI->getConformance() == nullptr,
               "archetype lookup should have null conformance");
@@ -864,7 +864,7 @@ public:
               "concrete type lookup requires conformance that matches type");
     }
   }
-  
+
   bool isSelfArchetype(CanType t, ArrayRef<ProtocolDecl*> protocols) {
     ArchetypeType *archetype = dyn_cast<ArchetypeType>(t);
     if (!archetype)
@@ -878,7 +878,7 @@ public:
       if (checkProto == selfProto || checkProto->inheritsFrom(selfProto))
         return true;
     }
-    
+
     return false;
   }
 
@@ -893,18 +893,18 @@ public:
   void checkProtocolMethodInst(ProtocolMethodInst *EMI) {
     auto methodType = requireObjectType(SILFunctionType, EMI,
                                         "result of protocol_method");
-    
+
     auto proto = dyn_cast<ProtocolDecl>(EMI->getMember().getDecl()
                                         ->getDeclContext());
     require(proto, "protocol_method must take a method of a protocol");
     SILType operandType = EMI->getOperand().getType();
-    
+
     require(methodType->getAbstractCC()
               == F.getModule().Types.getProtocolWitnessCC(proto),
             "result of protocol_method must have correct @cc for protocol");
     require(methodType->isThin() == EMI->getMember().isForeign,
             "result of protocol_method must be thick unless foreign");
-    
+
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential");
@@ -962,7 +962,7 @@ public:
   static bool isClassOrClassMetatype(SILType t) {
     return t.isObject() && isClassOrClassMetatype(t.getSwiftRValueType());
   }
-  
+
   void checkClassMethodInst(ClassMethodInst *CMI) {
     require(CMI->getType() == TC.getConstantType(CMI->getMember()),
             "result type of class_method must match type of method");
@@ -976,7 +976,7 @@ public:
     require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
   }
-  
+
   void checkSuperMethodInst(SuperMethodInst *CMI) {
     require(CMI->getType() == TC.getConstantType(CMI->getMember()),
             "result type of super_method must match type of method");
@@ -989,14 +989,14 @@ public:
             "operand must be of a class type");
     require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
-    
+
     Type methodClass;
     auto decl = CMI->getMember().getDecl();
     if (auto classDecl = dyn_cast<ClassDecl>(decl))
       methodClass = classDecl->getDeclaredTypeInContext();
     else
       methodClass = decl->getDeclContext()->getDeclaredTypeInContext();
-    
+
     require(methodClass->getClassOrBoundGenericClass(),
             "super_method must look up a class method");
     require(!methodClass->isEqual(operandType.getSwiftType()),
@@ -1008,18 +1008,18 @@ public:
     SILType operandType = PEI->getOperand().getType();
     require(operandType.isAddress(),
             "project_existential must be applied to address");
-    
+
     SmallVector<ProtocolDecl*, 4> protocols;
     require(operandType.getSwiftRValueType()->isExistentialType(protocols),
             "project_existential must be applied to address of existential");
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
-    
+
     require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
             "project_existential result must be Self archetype of one of "
             "its protocols");
   }
-  
+
   void checkProjectExistentialRefInst(ProjectExistentialRefInst *PEI) {
     SILType operandType = PEI->getOperand().getType();
     require(operandType.isObject(),
@@ -1029,7 +1029,7 @@ public:
             "project_existential must be applied to existential");
     require(operandType.isClassExistentialType(),
             "project_existential_ref operand must be class existential");
-    
+
     require(isSelfArchetype(PEI->getType().getSwiftRValueType(), protocols),
             "project_existential_ref result must be Self archetype of one of "
             "its protocols");
@@ -1039,17 +1039,17 @@ public:
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isAddress(),
             "open_existential must be applied to address");
-    
+
     SmallVector<ProtocolDecl*, 4> protocols;
     require(operandType.getSwiftRValueType()->isExistentialType(protocols),
             "open_existential must be applied to address of existential");
     require(OEI->getType().isAddress(),
             "open_existential result must be an address");
-    
+
     require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
             "open_existential result must be an opened existential archetype");
   }
-  
+
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isObject(),
@@ -1059,7 +1059,7 @@ public:
             "open_existential must be applied to existential");
     require(operandType.isClassExistentialType(),
             "open_existential_ref operand must be class existential");
-    
+
     require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
             "open_existential_ref result must be an opened existential "
             "archetype");
@@ -1077,7 +1077,7 @@ public:
             "init_existential cannot put an existential container inside "
             "an existential container");
   }
-  
+
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand().getType();
     require(concreteType.getSwiftType()->mayHaveSuperclass(),
@@ -1087,7 +1087,7 @@ public:
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
   }
-  
+
   void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
     SILType srcType = UEI->getSrcExistential().getType();
     SILType destType = UEI->getDestExistential().getType();
@@ -1102,7 +1102,7 @@ public:
     require(!destType.isClassExistentialType(),
             "upcast_existential dest must be non-class existential");
   }
-  
+
   void checkUpcastExistentialRefInst(UpcastExistentialRefInst *UEI) {
     require(UEI->getOperand().getType() != UEI->getType(),
             "can't upcast_existential_ref to same type");
@@ -1115,7 +1115,7 @@ public:
     require(UEI->getType().isClassExistentialType(),
             "upcast_existential_ref result must be class existential");
   }
-  
+
   void checkDeinitExistentialInst(DeinitExistentialInst *DEI) {
     SILType exType = DEI->getOperand().getType();
     require(exType.isAddress(),
@@ -1125,13 +1125,13 @@ public:
     require(!exType.isClassExistentialType(),
             "deinit_existential must be applied to non-class existential");
   }
-  
+
   void verifyCheckedCast(CheckedCastKind kind, SILType fromTy, SILType toTy) {
     // Verify common invariants.
     require(fromTy != toTy, "can't checked cast to same type");
     require(fromTy.isAddress() == toTy.isAddress(),
             "address-ness of checked cast src and dest must match");
-    
+
     switch (kind) {
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
@@ -1194,18 +1194,18 @@ public:
     }
     }
   }
-  
+
   void checkUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     verifyCheckedCast(CI->getCastKind(),
                       CI->getOperand().getType(),
                       CI->getType());
   }
-  
+
   void checkCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
     verifyCheckedCast(CBI->getCastKind(),
                       CBI->getOperand().getType(),
                       CBI->getCastType());
-    
+
     require(CBI->getSuccessBB()->bbarg_size() == 1,
             "success dest of checked_cast_br must take one argument");
     require(CBI->getSuccessBB()->bbarg_begin()[0]->getType()
@@ -1214,7 +1214,7 @@ public:
     require(CBI->getFailureBB()->bbarg_empty(),
             "failure dest of checked_cast_br must take no arguments");
   }
-  
+
   void checkBridgeToBlockInst(BridgeToBlockInst *BBI) {
     auto operandFTy = requireObjectType(SILFunctionType, BBI->getOperand(),
                                         "bridge_to_block operand");
@@ -1225,7 +1225,7 @@ public:
             "bridge_to_block operand cannot be @objc_block");
     require(resultFTy->isBlock(),
             "bridge_to_block result must be @objc_block");
-    
+
     // FIXME: The mapping from a native function type to a block type is no
     // longer trivial, since it involves bridging and ownership convention
     // changes.
@@ -1240,7 +1240,7 @@ public:
             "operand and result of bridge_to_block must agree in particulars");
 #endif
   }
-  
+
   void checkThinToThickFunctionInst(ThinToThickFunctionInst *TTFI) {
     auto opFTy = requireObjectType(SILFunctionType, TTFI->getOperand(),
                                    "thin_to_thick_function operand");
@@ -1259,13 +1259,13 @@ public:
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }
-  
+
   void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {
     auto opTy = requireObjectType(MetatypeType, TTOCI->getOperand(),
                                   "thick_to_objc_metatype operand");
     auto resTy = requireObjectType(MetatypeType, TTOCI,
                                    "thick_to_objc_metatype result");
-    
+
     require(opTy->getRepresentation() == MetatypeRepresentation::Thick,
             "operand of thick_to_objc_metatype must be thick");
     require(resTy->getRepresentation() == MetatypeRepresentation::ObjC,
@@ -1280,7 +1280,7 @@ public:
                                   "objc_to_thick_metatype operand");
     auto resTy = requireObjectType(MetatypeType, OCTTI,
                                    "objc_to_thick_metatype result");
-    
+
     require(opTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "operand of objc_to_thick_metatype must be ObjC");
     require(resTy->getRepresentation() == MetatypeRepresentation::Thick,
@@ -1310,11 +1310,11 @@ public:
             "Operand of unowned_to_ref does not have the "
             "operand's type as its referent type");
   }
-  
+
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand().getType(),
             "can't upcast to same type");
-    
+
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
       require(UI->getOperand().getType().is<MetatypeType>(),
@@ -1334,7 +1334,7 @@ public:
               "upcast must cast to a superclass");
     }
   }
-  
+
   void checkIsNonnullInst(IsNonnullInst *II) {
     require(II->getOperand().getType().getSwiftType()
               ->mayHaveSuperclass(),
@@ -1359,7 +1359,7 @@ public:
             || destType->isEqual(C.TheObjCPointerType),
           "ref-to-object-pointer result must be ObjectPointer or ObjCPointer");
   }
-  
+
   void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
     require(AI->getType()
               .getSwiftType()->mayHaveSuperclass(),
@@ -1370,7 +1370,7 @@ public:
             || srcType->isEqual(C.TheObjCPointerType),
           "object-pointer-to-ref operand must be ObjectPointer or ObjCPointer");
   }
-  
+
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
     require(AI->getOperand().getType()
               .getSwiftType()->mayHaveSuperclass() ||
@@ -1382,7 +1382,7 @@ public:
                             AI->getType().getASTContext().TheRawPointerType),
             "ref-to-raw-pointer result must be RawPointer");
   }
-  
+
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
     require(AI->getType()
               .getSwiftType()->mayHaveSuperclass() ||
@@ -1393,7 +1393,7 @@ public:
                             AI->getType().getASTContext().TheRawPointerType),
             "raw-pointer-to-ref operand must be ObjectPointer");
   }
-  
+
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
                                   "convert_function operand");
@@ -1413,10 +1413,10 @@ public:
               == SILType::getBuiltinIntegerType(1, F.getASTContext()),
             "cond_fail operand must be a Builtin.Int1");
   }
-  
+
   void checkReturnInst(ReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
-    
+
     CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType
       = F.mapTypeIntoContext(ti->getInterfaceResult().getSILType());
@@ -1428,10 +1428,10 @@ public:
     require(functionResultType == instResultType,
             "return value type does not match return type of function");
   }
-  
+
   void checkAutoreleaseReturnInst(AutoreleaseReturnInst *RI) {
     DEBUG(RI->print(llvm::dbgs()));
-    
+
     CanSILFunctionType ti = F.getLoweredFunctionType();
     SILType functionResultType
       = F.mapTypeIntoContext(ti->getInterfaceResult().getSILType());
@@ -1447,23 +1447,23 @@ public:
     require(instResultType.hasReferenceSemantics(),
             "autoreleased return value must be a reference type");
   }
-  
+
   void checkSwitchIntInst(SwitchIntInst *SII) {
     requireObjectType(BuiltinIntegerType, SII->getOperand(),
                       "switch_int operand");
-    
+
     auto ult = [](const APInt &a, const APInt &b) { return a.ult(b); };
     std::set<APInt, decltype(ult)> cases(ult);
-    
+
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {
       APInt value;
       SILBasicBlock *dest;
       std::tie(value, dest) = SII->getCase(i);
-      
+
       require(!cases.count(value),
               "multiple switch_int cases for same value");
       cases.insert(value);
-      
+
       require(dest->bbarg_empty(),
               "switch_int case destination cannot take arguments");
     }
@@ -1475,31 +1475,31 @@ public:
   void checkSwitchEnumInst(SwitchEnumInst *SOI) {
     require(SOI->getOperand().getType().isObject(),
             "switch_enum operand must be an object");
-    
+
     SILType uTy = SOI->getOperand().getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum operand is not an enum");
-    
+
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
     // FIXME: We also need to consider if the enum is resilient, in which case
     // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
-    
+
     // Verify the set of enum cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
-      
+
       require(elt->getDeclContext() == uDecl,
               "switch_enum dispatches on enum element that is not part of "
               "its type");
       require(unswitchedElts.count(elt),
               "switch_enum dispatches on same enum element more than once");
       unswitchedElts.erase(elt);
-      
+
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->hasArgumentType()) {
@@ -1516,14 +1516,14 @@ public:
           require(!dest->getBBArgs()[0]->getType().isAddress(),
                   "switch_enum destination bbarg type must not be an address");
         }
-        
+
       } else {
         require(dest->getBBArgs().size() == 0,
                 "switch_enum destination for no-argument case must take no "
                 "arguments");
       }
     }
-    
+
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
@@ -1531,28 +1531,28 @@ public:
       require(SOI->getDefaultBB()->bbarg_empty(),
               "switch_enum default destination must take no arguments");
   }
-  
+
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI){
     require(SOI->getOperand().getType().isAddress(),
             "switch_enum_addr operand must be an object");
-    
+
     SILType uTy = SOI->getOperand().getType();
     EnumDecl *uDecl = uTy.getEnumOrBoundGenericEnum();
     require(uDecl, "switch_enum_addr operand must be an enum");
-    
+
     // Find the set of enum elements for the type so we can verify
     // exhaustiveness.
     // FIXME: We also need to consider if the enum is resilient, in which case
     // we're never guaranteed to be exhaustive.
     llvm::DenseSet<EnumElementDecl*> unswitchedElts;
     uDecl->getAllElements(unswitchedElts);
-    
+
     // Verify the set of enum cases we dispatch on.
     for (unsigned i = 0, e = SOI->getNumCases(); i < e; ++i) {
       EnumElementDecl *elt;
       SILBasicBlock *dest;
       std::tie(elt, dest) = SOI->getCase(i);
-      
+
       require(elt->getDeclContext() == uDecl,
               "switch_enum_addr dispatches on enum element that "
               "is not part of its type");
@@ -1560,12 +1560,12 @@ public:
               "switch_enum_addr dispatches on same enum element "
               "more than once");
       unswitchedElts.erase(elt);
-      
+
       // The destination BB must not have BB arguments.
       require(dest->getBBArgs().size() == 0,
               "switch_enum_addr destination must take no BB args");
     }
-    
+
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum_addr must have a default "
@@ -1575,7 +1575,7 @@ public:
               "switch_enum_addr default destination must take "
               "no arguments");
   }
-  
+
   void checkBranchInst(BranchInst *BI) {
     require(BI->getArgs().size() == BI->getDestBB()->bbarg_size(),
             "branch has wrong number of arguments for dest bb");
@@ -1586,13 +1586,13 @@ public:
                       }),
             "branch argument types do not match arguments for dest bb");
   }
-  
+
   void checkCondBranchInst(CondBranchInst *CBI) {
     require(CBI->getCondition().getType() ==
              SILType::getBuiltinIntegerType(1,
                                  CBI->getCondition().getType().getASTContext()),
             "condition of conditional branch must have Int1 type");
-    
+
     require(CBI->getTrueArgs().size() == CBI->getTrueBB()->bbarg_size(),
             "true branch has wrong number of arguments for dest bb");
     require(std::equal(CBI->getTrueArgs().begin(), CBI->getTrueArgs().end(),
@@ -1636,7 +1636,7 @@ public:
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILFunctionType *ti = F.getLoweredFunctionType();
-    
+
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";
           for (auto *arg : make_range(entry->bbarg_begin(), entry->bbarg_end()))
             arg->getType().dump();
@@ -1645,11 +1645,11 @@ public:
           llvm::dbgs() << ":\n";
           for (auto input : ti->getInterfaceParameters())
             input.getSILType().dump(););
-    
+
     require(entry->bbarg_size() == ti->getInterfaceParameters().size(),
             "entry point has wrong number of arguments");
-    
-    
+
+
     require(std::equal(entry->bbarg_begin(), entry->bbarg_end(),
                       ti->getInterfaceParameterSILTypes().begin(),
                       [&](SILArgument *bbarg, SILType ty) {
@@ -1668,11 +1668,11 @@ public:
       }
     }
   }
-  
+
   void verifyStackHeight(SILBasicBlock *BB,
        llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> &visitedBBs,
        std::vector<AllocStackInst*> stack) {
-    
+
     auto found = visitedBBs.find(BB);
     if (found != visitedBBs.end()) {
       // Check that the stack height is consistent coming from all entry points
@@ -1683,10 +1683,10 @@ public:
     } else {
       visitedBBs.insert({BB, stack});
     }
-    
+
     for (SILInstruction &i : *BB) {
       CurInstruction = &i;
-      
+
       if (auto alloc = dyn_cast<AllocStackInst>(&i)) {
         stack.push_back(alloc);
       }
@@ -1711,7 +1711,7 @@ public:
       }
     }
   }
-  
+
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
@@ -1719,16 +1719,16 @@ public:
       require(F->getContextGenericParams(),
               "generic function definition must have context archetypes");
     }
-    
+
     verifyEntryPointArguments(F->getBlocks().begin());
     verifyEpilogBlock(F);
-    
+
     llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> visitedBBs;
     verifyStackHeight(F->begin(), visitedBBs, {});
 
     SILVisitor::visitSILFunction(F);
   }
-  
+
   void verify() {
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
@@ -1761,7 +1761,7 @@ void SILVTable::verify(const SILModule &M) const {
     ValueDecl *decl = entry.first.getDecl();
     auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
     assert(theClass && "vtable entry must refer to a class member");
-    
+
     // The class context must be the vtable's class, or a superclass thereof.
     auto c = getClass();
     do {
@@ -1773,14 +1773,14 @@ void SILVTable::verify(const SILModule &M) const {
         c = nullptr;
     } while (c);
     assert(c && "vtable entry must refer to a member of the vtable's class");
-    
+
     // All function vtable entries must be at their natural uncurry level.
     // FIXME: We should change this to uncurry level 1.
     assert(!entry.first.isCurried && "vtable entry must not be curried");
-    
+
     // Foreign entry points shouldn't appear in vtables.
     assert(!entry.first.isForeign && "vtable entry must not be foreign");
-    
+
     // TODO: Verify that property entries are dynamically dispatched under our
     // finalized property dynamic dispatch rules.
   }
@@ -1824,7 +1824,7 @@ void SILModule::verify() const {
     }
     f.verify();
   }
-  
+
   // Check all globals.
   for (const SILGlobalVariable &g : getSILGlobals()) {
     if (!symbolNames.insert(g.getName())) {
@@ -1833,7 +1833,7 @@ void SILModule::verify() const {
     }
     g.verify();
   }
-  
+
   // Check all vtables.
   llvm::DenseSet<ClassDecl*> vtableClasses;
   for (const SILVTable &vt : getVTables()) {
@@ -1843,7 +1843,7 @@ void SILModule::verify() const {
     }
     vt.verify(*this);
   }
-  
+
   // Check all witness tables.
   llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
