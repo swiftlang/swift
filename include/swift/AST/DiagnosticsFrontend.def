@@ -99,6 +99,8 @@ ERROR(repl_must_be_initialized,sema,none,
       "variables currently must have an initial value when entered at the "
       "top level of the REPL", ())
 
+ERROR(error_doing_code_completion,frontend,none,
+      "compiler is in code completion mode (benign diagnostic)", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
