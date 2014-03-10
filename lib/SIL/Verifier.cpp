@@ -317,6 +317,30 @@ public:
   }
 
   void checkApplyInst(ApplyInst *AI) {
+    // If we have a substitution whose replacement type is an archetype, make
+    // sure that the replacement archetype is in the context generic params of
+    // the caller function.
+    GenericParamList *gp = AI->getFunction()->getContextGenericParams();
+    // For each substitution Sub in AI...
+    for (auto &Sub : AI->getSubstitutions()) {
+      // If Sub's replacement is not an archetype type or is from an opened
+      // existential type, skip it...
+      auto Arch = Sub.Replacement->getAs<ArchetypeType>();
+      if (!Arch || !Arch->getOpenedExistentialType().isNull())
+        continue;
+
+      // Ok, we have an archetype, make sure it is in the nested archetypes of
+      // our caller.
+      bool foundMatch = false;
+      for (auto Iter : gp->getAllNestedArchetypes())
+        if ((foundMatch = Arch->isEqual(&*Iter)))
+          break;
+      require(foundMatch, "Archetype to be substituted in AI does not exist in"
+              " Caller's generic param list");
+    }
+
+    // Then make sure that we have a type that can be substituted for the
+    // callee.
     auto substTy = checkApplySubstitutions(AI->getSubstitutions(),
                                       AI->getCallee().getType());
     require(AI->getOrigCalleeType()->getAbstractCC() ==
