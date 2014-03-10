@@ -1025,6 +1025,10 @@ public:
       stack.push_back(params);
       params = params->getOuterParameters();
     }
+    // If the stack is empty, be like the 'end' iterator.
+    if (stack.empty())
+      return;
+
     elements = (stack.back()->*accessor)();
     refreshElements();
   }
