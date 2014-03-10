@@ -1999,6 +1999,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
                                                            TP->getTypeLoc());
+          NewTP->setPropagatedType();
           PrevPBD->setPattern(NewTP);
         }
       }

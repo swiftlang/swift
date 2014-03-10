@@ -49,6 +49,8 @@ private:
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
   Stmt *walkToStmtPost(Stmt *S) override;
 
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
+
   bool passReference(ValueDecl *D, SourceLoc Loc);
 
   TypeDecl *getTypeDecl(Type Ty);
@@ -214,6 +216,17 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
   if (isDone())
     return false;
   return true;
+}
+
+std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
+  auto *TP = dyn_cast<TypedPattern>(P);
+  if (!TP || !TP->isPropagatedType())
+    return { true, P };
+
+  // If the typed pattern was propagated from somewhere, just walk the
+  // subpattern.  The type will be walked as a part of another TypedPattern.
+  TP->getSubPattern()->walk(*this);
+  return { false, P };
 }
 
 bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {

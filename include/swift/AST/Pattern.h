@@ -58,10 +58,17 @@ class alignas(8) Pattern {
     unsigned NumFields : NumBitsAllocated - NumPatternBits - 1;
   };
 
+  class TypedPatternBitfields {
+    friend class TypedPattern;
+    unsigned : NumPatternBits;
+    unsigned IsPropagatedType : 1;
+  };
+
 protected:
   union {
     PatternBitfields PatternBits;
     TuplePatternBitfields TuplePatternBits;
+    TypedPatternBitfields TypedPatternBits;
   };
 
   Pattern(PatternKind kind) {
@@ -336,6 +343,22 @@ public:
     : Pattern(PatternKind::Typed), SubPattern(pattern), PatType(tl) {
     if (implicit.hasValue() ? *implicit : !tl.hasLocation())
       setImplicit();
+    TypedPatternBits.IsPropagatedType = false;
+  }
+
+  /// True if the type in this \c TypedPattern was propagated from a different
+  /// \c TypedPattern.
+  ///
+  /// For example, in:
+  /// \code
+  ///   var a, b: Int, c, d: Double
+  /// \endcode
+  /// 'a' and 'c' will have this bit set to true.
+  bool isPropagatedType() const {
+    return TypedPatternBits.IsPropagatedType;
+  }
+  void setPropagatedType() {
+    TypedPatternBits.IsPropagatedType = true;
   }
 
   Pattern *getSubPattern() { return SubPattern; }
