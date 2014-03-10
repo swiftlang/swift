@@ -844,7 +844,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // short-cut the classification scheme above.
       if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
         // If this is a store *to* the object, we can zap it.
-        if (UI.getOperandNo() == StoreInst::getPointerOperandIndex()) {
+        if (UI->getOperandNo() == StoreInst::getPointerOperandIndex()) {
           InvolvedInstructions.insert(SI);
           continue;
         }
@@ -853,7 +853,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       }
       if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(User)) {
         // If this is a memset/memcpy/memmove *to* the object, we can zap it.
-        if (UI.getOperandNo() == 0) {
+        if (UI->getOperandNo() == 0) {
           InvolvedInstructions.insert(MI);
           continue;
         }
@@ -1260,7 +1260,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
     for (auto UI = Ptr->use_begin(), E = Ptr->use_end(); UI != E; ) {
       // Make sure to increment the use iterator before potentially rewriting
       // it.
-      Use &U = UI.getUse();
+      Use &U = *UI;
       ++UI;
       
       // If the use is in the same block that defines it and the User is not a
