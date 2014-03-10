@@ -22,22 +22,6 @@ add_swift_library(swiftObjectiveC INSTALL
   ${SWIFTOBJC_SOURCES}
   DEPENDS swift_stdlib_core)
 
-if(SWIFT_MODULE_CACHE_PATH)
-  set(module_cache "${SWIFT_MODULE_CACHE_PATH}")
-elseif(APPLE)
-  execute_process(COMMAND getconf DARWIN_USER_CACHE_DIR
-    OUTPUT_VARIABLE user_cache_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(user_cache_dir)
-    set(module_cache "${user_cache_dir}/org.llvm.clang/ModuleCache")
-  endif()
-endif()
-  
-if(module_cache)
-  add_custom_command(TARGET swiftObjectiveC PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E remove_directory "${module_cache}"
-    COMMENT "Clearing Clang module cache")
-endif()
-
 add_subdirectory(Foundation)
 
 if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
