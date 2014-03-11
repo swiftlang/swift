@@ -207,3 +207,66 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   SILValue(AI, 0).replaceAllUsesWith(SILValue(NAI, 0));
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
+
+/// \brief Returns True if the operand or one of its users is captured.
+static bool useCaptured(Operand *UI) {
+  auto *User = UI->getUser();
+
+  // These instructions do not cause the address to escape.
+  if (isa<CopyAddrInst>(User) ||
+      isa<LoadInst>(User) ||
+      isa<ProtocolMethodInst>(User) ||
+      (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
+      (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {
+    return false;
+  }
+
+  if ((isa<AddressToPointerInst>(User) || isa<PointerToAddressInst>(User)) &&
+      User->hasOneUse()) {
+    return useCaptured(*User->use_begin());
+  }
+
+  return true;
+}
+
+bool
+swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
+  for (auto UI : V.getUses()) {
+    auto *User = UI->getUser();
+
+    // These instructions do not cause the address to escape.
+    if (!useCaptured(UI)) {
+      Users.push_back(User);
+      continue;
+    }
+
+    // These instructions only cause the value to escape if they are used in
+    // a way that escapes.  Recursively check that the uses of the instruction
+    // don't escape and collect all of the uses of the value.
+    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
+        isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
+        isa<MarkUninitializedInst>(User)) {
+      Users.push_back(User);
+      if (canValueEscape(User, Users))
+        return true;
+      continue;
+    }
+
+    // apply and partial_apply instructions do not capture the pointer when
+    // it is passed through inout arguments or for indirect returns.
+    if (auto apply = dyn_cast<ApplyInst>(User)) {
+      if (apply->getSubstCalleeType()
+          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+        continue;
+    }
+    if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
+      if (partialApply->getSubstCalleeType()
+          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+        continue;
+    }
+
+    return true;
+  }
+  
+  return false;
+}

@@ -155,79 +155,6 @@ static SILInstruction *getLastRelease(AllocBoxInst *ABI,
   return LastRelease;
 }
 
-/// \brief Returns True if the operand or one of its users is captured.
-static bool useCaptured(Operand *UI) {
-  auto *User = UI->getUser();
-
-  // These instructions do not cause the box's address to escape.
-  if (isa<CopyAddrInst>(User) ||
-      isa<LoadInst>(User) ||
-      isa<ProtocolMethodInst>(User) ||
-      (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
-      (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {
-    return false;
-  }
-
-  if ((isa<AddressToPointerInst>(User) || isa<PointerToAddressInst>(User)) &&
-      User->hasOneUse()) {
-    return useCaptured(*User->use_begin());
-  }
-
-  return true;
-}
-
-/// checkAllocBoxUses - Recursively scan all of the uses of the
-/// specified alloc_box, returning true if a use escapes, or false
-/// otherwise.
-static bool checkAllocBoxUses(AllocBoxInst *ABI, SILValue V,
-                              SmallVectorImpl<SILInstruction*> &Users) {
-  for (auto UI : V.getUses()) {
-    auto *User = UI->getUser();
-
-    // These instructions do not cause the box's address to escape.
-    if (!useCaptured(UI)) {
-      Users.push_back(User);
-      continue;
-    }
-
-    // These instructions only cause the alloc_box to escape if they are used in
-    // a way that escapes.  Recursively check that the uses of the instruction
-    // don't escape and collect all of the uses of the value.
-    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
-        isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
-        isa<MarkUninitializedInst>(User)) {
-      Users.push_back(User);
-      if (checkAllocBoxUses(ABI, User, Users))
-        return true;
-      continue;
-    }
-
-    // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through inout arguments or for indirect returns.
-    if (auto apply = dyn_cast<ApplyInst>(User)) {
-      if (apply->getSubstCalleeType()
-            ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
-        continue;
-    }
-    if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
-      if (partialApply->getSubstCalleeType()
-            ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
-        continue;
-
-    }
-
-    // Otherwise, this looks like it escapes.
-    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
-          << ABI->getFunction()->getName() << ": " << *ABI
-          << "    Due to user: " << *User << "\n");
-
-    return true;
-  }
-
-  return false;
-}
-
-
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
 /// alloc_stack.  On success, this updates the IR and returns true, but does not
 /// remove the alloc_box itself.
@@ -237,7 +164,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
   // not, we can turn it into an alloc_stack.
   SmallVector<SILInstruction*, 32> Users;
-  if (checkAllocBoxUses(ABI, SILValue(ABI, 1), Users))
+  if (canValueEscape(SILValue(ABI, 1), Users))
     return false;
 
   // Scan all of the uses of the retain count value, collecting all the releases

@@ -67,6 +67,12 @@ namespace swift {
   // Rewrite a call, which may previously have been a dynmaic dispath, to a
   // known function reference.
   void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);
+
+  /// \brief - Recursively scan all of the uses of the
+  /// specified value, returning true if a use may escape, or false
+  /// otherwise.
+  bool canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users);
+
 } // end namespace swift
 
 #endif
