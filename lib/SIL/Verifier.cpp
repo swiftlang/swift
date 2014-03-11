@@ -1821,8 +1821,7 @@ void SILWitnessTable::verify(const SILModule &M) const {
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
       assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
-             "Witness tables should not reference less visible
-             functions.");
+             "Witness tables should not reference less visible functions.");
     }
 #endif
 }
