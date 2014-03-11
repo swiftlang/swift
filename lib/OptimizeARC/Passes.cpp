@@ -239,7 +239,7 @@ static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
     // Both the input and result should be i64's.  
     assert(Extract->getType() == Op->getType() && "Should have i64's here");
 
-    for (auto UI2 = Extract->use_begin(), E = Extract->use_end(); UI2 != E; ) {
+    for (auto UI2 = Extract->user_begin(), E = Extract->user_end(); UI2 != E; ){
       IntToPtrInst *ExtractUser = dyn_cast<IntToPtrInst>(*UI2++);
       PtrToIntInst *OpCast = dyn_cast<PtrToIntInst>(Op);
       if (ExtractUser && OpCast &&
