@@ -1456,19 +1456,26 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     StringRef BuiltinName =
       getBuiltinBaseName(IGF.IGM.Context, FnId.str(), Types);
     BuiltinName = BuiltinName.drop_front(strlen("cmpxchg_"));
-    // Decode the ordering argument, which is required.
-    auto underscore = BuiltinName.find('_');
-    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
-    BuiltinName = BuiltinName.substr(underscore);
-    
+
+    // Decode the success- and failure-ordering arguments, which are required.
+    SmallVector<StringRef, 4> Parts;
+    BuiltinName.split(Parts, "_");
+    assert(Parts.size() >= 2 && "Mismatch with sema");
+    auto successOrdering = decodeLLVMAtomicOrdering(Parts[0]);
+    auto failureOrdering = decodeLLVMAtomicOrdering(Parts[1]);
+    auto NextPart = Parts.begin() + 2;
+
     // Accept volatile and singlethread if present.
-    bool isVolatile = BuiltinName.startswith("_volatile");
-    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
-    
-    bool isSingleThread = BuiltinName.startswith("_singlethread");
-    if (isSingleThread)
-      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
-    assert(BuiltinName.empty() && "Mismatch with sema");
+    bool isVolatile = false, isSingleThread = false;
+    if (NextPart != Parts.end() && *NextPart == "volatile") {
+      isVolatile = true;
+      NextPart++;
+    }
+    if (NextPart != Parts.end() && *NextPart == "singlethread") {
+      isSingleThread = true;
+      NextPart++;
+    }
+    assert(NextPart == Parts.end() && "Mismatch with sema");
 
     auto pointer = args.claimNext();
     auto cmp = args.claimNext();
@@ -1483,8 +1490,9 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     pointer = IGF.Builder.CreateBitCast(pointer,
                                   llvm::PointerType::getUnqual(cmp->getType()));
     llvm::Value *value = IGF.Builder.CreateAtomicCmpXchg(pointer, cmp, newval,
-                                                          ordering,
-                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+                                                         successOrdering,
+                                                         failureOrdering,
+                                                         isSingleThread ? llvm::SingleThread : llvm::CrossThread);
     cast<llvm::AtomicCmpXchgInst>(value)->setVolatile(isVolatile);
 
     if (origTy->isPointerTy())

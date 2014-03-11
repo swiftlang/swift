@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include <cstring>
@@ -901,10 +902,42 @@ static bool isValidFenceOrdering(StringRef Ordering) {
          Ordering == "acqrel" || Ordering == "seqcst";
 }
 
-static bool isValidAtomicOrdering(StringRef Ordering) {
+static bool isValidRMWOrdering(StringRef Ordering) {
   return Ordering == "unordered" || Ordering == "monotonic" ||
          Ordering == "acquire" || Ordering == "release" ||
          Ordering == "acqrel" || Ordering == "seqcst";
+}
+
+/// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
+static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
+  using namespace llvm;
+  return StringSwitch<AtomicOrdering>(O)
+    .Case("unordered", Unordered)
+    .Case("monotonic", Monotonic)
+    .Case("acquire", Acquire)
+    .Case("release", Release)
+    .Case("acqrel", AcquireRelease)
+    .Case("seqcst", SequentiallyConsistent)
+    .Default(NotAtomic);
+}
+
+static bool isValidCmpXChgOrdering(StringRef SuccessString, 
+                                   StringRef FailureString) {
+  using namespace llvm;
+  AtomicOrdering SuccessOrdering = decodeLLVMAtomicOrdering(SuccessString);
+  AtomicOrdering FailureOrdering = decodeLLVMAtomicOrdering(FailureString);
+
+  // Unordered and unknown values are not allowed.
+  if (SuccessOrdering <= Unordered  ||  FailureOrdering <= Unordered)
+    return false;
+  // Success must be at least as strong as failure.
+  if (SuccessOrdering < FailureOrdering)
+    return false;
+  // Failure may not release because no store occurred.
+  if (FailureOrdering == Release  ||  FailureOrdering == AcquireRelease)
+    return false;
+
+  return true;
 }
 
 ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
@@ -955,19 +988,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
         !T->is<BuiltinFloatType>())
       return nullptr;
 
-    // Get and validate the ordering argument, which is required.
-    auto Underscore = OperationName.find('_');
-    if (!isValidAtomicOrdering(OperationName.substr(0, Underscore)))
+    // Get and validate the ordering arguments, which are both required.
+    SmallVector<StringRef, 4> Parts;
+    OperationName.split(Parts, "_");
+    if (Parts.size() < 2)
       return nullptr;
-    OperationName = OperationName.substr(Underscore);
-    
+    if (!isValidCmpXChgOrdering(Parts[0], Parts[1]))
+      return nullptr;
+    auto NextPart = Parts.begin() + 2;
+
     // Accept volatile and singlethread if present.
-    if (OperationName.startswith("_volatile"))
-      OperationName = OperationName.drop_front(strlen("_volatile"));
-    if (OperationName.startswith("_singlethread"))
-      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    if (NextPart != Parts.end() && *NextPart == "volatile")
+      NextPart++;
+    if (NextPart != Parts.end() && *NextPart == "singlethread")
+      NextPart++;
     // Nothing else is allowed in the name.
-    if (!OperationName.empty())
+    if (NextPart != Parts.end())
       return nullptr;
     return getCmpXChgOperation(Context, Id, T);
   }
@@ -994,7 +1030,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     
     // Get and validate the ordering argument, which is required.
     Underscore = OperationName.find('_');
-    if (!isValidAtomicOrdering(OperationName.substr(0, Underscore)))
+    if (!isValidRMWOrdering(OperationName.substr(0, Underscore)))
       return nullptr;
     OperationName = OperationName.substr(Underscore);
     
