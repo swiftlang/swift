@@ -44,6 +44,7 @@ namespace clang {
 
 namespace swift {
   class ApplyExpr;
+  class ArchetypeBuilder;
   class ArchetypeType;
   class ASTContext;
   class ASTPrinter;
@@ -762,6 +763,9 @@ class GenericParamList {
 
   GenericParamList *OuterParameters;
 
+  /// The builder used to build archetypes for this list.
+  ArchetypeBuilder *Builder;
+
   GenericParamList(SourceLoc LAngleLoc,
                    ArrayRef<GenericParam> Params,
                    SourceLoc WhereLoc,
@@ -990,6 +994,14 @@ public:
   static ArrayRef<ArchetypeType*>
   deriveAllArchetypes(ArrayRef<GenericParam> params,
                       SmallVectorImpl<ArchetypeType*> &archetypes);
+
+  void setBuilder(ArchetypeBuilder *builder) {
+    Builder = builder;
+  }
+
+  ArchetypeBuilder *getBuilder() const {
+    return Builder;
+  }
 
   /// Collect the nested archetypes of an archetype into the given
   /// collection.

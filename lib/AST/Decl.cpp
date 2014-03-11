@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -154,7 +155,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    SourceLoc RAngleLoc)
   : Brackets(LAngleLoc, RAngleLoc), NumParams(Params.size()),
     WhereLoc(WhereLoc), Requirements(Requirements),
-    OuterParameters(nullptr)
+    OuterParameters(nullptr), Builder(nullptr)
 {
   memcpy(this + 1, Params.data(), NumParams * sizeof(GenericParam));
 }
@@ -327,6 +328,22 @@ GenericParamList::getAsGenericSignatureElements(ASTContext &C,
                                        depTy, depTy));
   }
   
+  // Add all of the same-type requirements.
+  if (Builder) {
+    for (auto req : Builder->getSameTypeRequirements()) {
+      auto firstType = resolvePotentialArchetypeToType(*Builder, genericParams,
+                                                       req.first);
+      Type secondType;
+      if (auto concrete = req.second.dyn_cast<Type>())
+        secondType = concrete;
+      else if (auto secondPA =
+               req.second.dyn_cast<ArchetypeBuilder::PotentialArchetype*>())
+        secondType = resolvePotentialArchetypeToType(*Builder, genericParams,
+                                                     secondPA);
+      requirements.push_back(Requirement(RequirementKind::SameType,
+                                         firstType, secondType));
+    }
+  }
   // Collect requirements from the 'where' clause.
   for (const auto &repr : getRequirements()) {
     addRequirementForRepr(requirements, repr, archetypeMap);

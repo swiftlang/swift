@@ -30,6 +30,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class ArchetypeBuilder;
   class ASTContext;
   class CodeCompletionCallbacksFactory;
   class Decl;
@@ -137,6 +138,10 @@ namespace swift {
   bool performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
                               bool isSILType, DeclContext *DC,
                               bool ProduceDiagnostics = true);
+
+  /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
+  bool handleSILGenericParams(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
+                              ArchetypeBuilder *builder);
 
   /// Turn the given module into SIL IR.
   ///

@@ -86,8 +86,6 @@ namespace {
     llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
-    /// Construct ArchetypeType from Generic Params.
-    bool handleGenericParams(GenericParamList *GenericParams);
     bool performTypeLocChecking(TypeLoc &T);
   public:
 
@@ -592,59 +590,6 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
-/// Construct ArchetypeType from Generic Params.
-bool SILParser::handleGenericParams(GenericParamList *GenericParams) {
-  ArchetypeBuilder Builder(*P.SF.getParentModule(), P.Diags);
-  unsigned Index = 0;
-  for (auto GP : *GenericParams) {
-    auto TypeParam = GP.getAsTypeParam();
-    // Do some type checking / name binding for Inherited.
-    // FIXME: This is a hack. We shouldn't ever have to build these.
-    SmallVector<ProtocolDecl *, 4> allProtocols;
-    llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
-    for (auto &Inherited : TypeParam->getInherited()) {
-      if (performTypeLocChecking(Inherited))
-        return true;
-
-      // Collect the protocols mentioned by this existential type.
-      SmallVector<ProtocolDecl *, 4> protocols;
-      if (Inherited.getType()->isExistentialType(protocols)) {
-        for (auto proto : protocols) {
-          if (knownProtocols.insert(proto))
-            allProtocols.push_back(proto);
-        }
-      }
-      // Set the superclass.
-      else if (Inherited.getType()->getClassOrBoundGenericClass()) {
-        TypeParam->setSuperclass(Inherited.getType());
-      }
-    }
-
-    // Set this list of all protocols.
-    TypeParam->setProtocols(P.Context.AllocateCopy(allProtocols));
-
-    // Add the generic parameter to the builder.
-    Builder.addGenericParameter(TypeParam, Index++);
-  }
-  // Add the requirements clause to the builder.
-  for (auto &Req : GenericParams->getRequirements()) {
-    if (Req.isInvalid())
-      continue;
-
-    if (Builder.addRequirement(Req))
-      Req.setInvalid();
-  }
-  // Wire up the archetypes.
-  Builder.assignArchetypes();
-  for (auto GP : *GenericParams) {
-    auto TypeParam = GP.getAsTypeParam();
-    TypeParam->setArchetype(Builder.getArchetype(TypeParam));
-  }
-  GenericParams->setAllArchetypes(
-    P.Context.AllocateCopy(Builder.getAllArchetypes()));
-  return false;
-}
-
 bool SILParser::performTypeLocChecking(TypeLoc &T) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
@@ -693,9 +638,12 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
   if (TyR.isNull())
     return true;
 
+  ArchetypeBuilder builder(*P.SF.getParentModule(), P.Diags);
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
     if (auto generics = fnType->getGenericParams()) {
-      handleGenericParams(generics);
+      generics->setBuilder(&builder);
+      TypeLoc TyLoc = TyR.get();
+      handleSILGenericParams(P.Context, TyLoc, &P.SF, &builder);
       GenericParams = generics;
     }
   }
@@ -703,7 +651,11 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs);
 
-  if (performTypeLocChecking(Ty))
+  // We need the builder to be live here for generating GenericSignature.
+  bool retCode = performTypeLocChecking(Ty);
+  if (GenericParams)
+    GenericParams->setBuilder(nullptr);
+  if (retCode)
     return true;
 
   Result = SILType::getPrimitiveType(Ty.getType()->getCanonicalType(),

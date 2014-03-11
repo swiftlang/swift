@@ -363,6 +363,12 @@ public:
   friend class ArchetypeBuilder;
 };
 
+/// Resolve the given potential archetype to a dependent type.
+Type resolvePotentialArchetypeToType(
+              ArchetypeBuilder &builder,
+              ArrayRef<GenericTypeParamType *> params,
+              ArchetypeBuilder::PotentialArchetype *pa);
+
 } // end namespace swift
 
 #endif

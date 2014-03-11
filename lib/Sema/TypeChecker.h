@@ -319,6 +319,10 @@ public:
                     TypeResolutionOptions options = None,
                     GenericTypeResolver *resolver = nullptr);
 
+  /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
+  bool handleSILGenericParams(ArchetypeBuilder *builder, TypeLoc &T,
+                              DeclContext *DC);
+
   /// \brief Resolves a TypeRepr to a type.
   ///
   /// Performs name binding, checking of generic arguments, and so on in order
