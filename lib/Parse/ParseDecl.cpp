@@ -880,7 +880,6 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   SourceLoc KindLoc;
   if (Tok.isKeyword()) {
     switch (Tok.getKind()) {
-    case tok::kw_type:
     case tok::kw_typealias:
       Kind = ImportKind::Type;
       break;

@@ -72,6 +72,8 @@
    can silence this warning by adding an explicit type (indicated by the Fixit).
    See rdar://15263687 and rdar://16252090 for more rationale.
 
+* 'x.type' has been renamed to 'x.dynamicType', and you can use 'type' as a
+  regular identifier again.
 
 2014-03-05
 ----------

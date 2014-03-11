@@ -766,7 +766,7 @@ NOTE(add_self_to_type,tce_sema,none,
      "use '.self' to reference the type object", ())
 
 ERROR(type_of_metatype,tce_sema,none,
-      "'.type' is not allowed after a type name", ())
+      "'.dynamicType' is not allowed after a type name", ())
 
 //------------------------------------------------------------------------------
 // Type Check Statements

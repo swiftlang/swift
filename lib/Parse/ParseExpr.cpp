@@ -917,7 +917,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       // Non-identifier cases.
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         // A metatype expr.
-        if (Tok.is(tok::kw_type)) {
+        if (Tok.is(tok::kw_dynamicType)) {
           Result = makeParserResult(
             new (Context) MetatypeExpr(Result.get(), consumeToken(),
                                        Type()));

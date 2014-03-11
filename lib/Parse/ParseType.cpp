@@ -67,7 +67,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return makeParserCodeCompletionResult<TypeRepr>();
   }
   case tok::kw_super:
-  case tok::kw_type:
+  case tok::kw_dynamicType:
   case tok::kw_Type:
   case tok::kw_self:
   case tok::kw_weak:
