@@ -417,9 +417,11 @@ namespace {
         auto nestedType = baseTypeVar->getImpl().getArchetype()
                            ->getNestedType(member->getName());
         auto archetype = nestedType.dyn_cast<ArchetypeType*>();
+
         auto locator = archetype
            ? CS.getConstraintLocator((Expr *)nullptr, LocatorPathElt(archetype))
            : nullptr;
+                                
         auto memberTypeVar = CS.createTypeVariable(locator,
                                                    TVO_PrefersSubtypeBinding);
         // Determine whether we should bind the new type variable as a

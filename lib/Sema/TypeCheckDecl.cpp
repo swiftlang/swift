@@ -3729,6 +3729,22 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         setBoundVarsTypeError(PBD->getPattern(), Context);
         return;
       }
+    } else if (VD->isImplicit() &&
+               (VD->getName() == Context.Id_self)) {
+      // If the variable declaration is for a 'self' parameter, it may be
+      // because the self variable was reverted whilst validating the function
+      // signature.  In that case, reset the type.
+      if (dyn_cast<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
+        if (auto funcDeclContext =
+                dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
+          GenericParamList *outerGenericParams = nullptr;
+          DeclChecker(*this, false, false).
+          configureImplicitSelf(funcDeclContext, outerGenericParams);
+        }
+      } else {
+        D->setType(ErrorType::get(Context));
+      }
+      
     } else {
       // FIXME: This case is hit when code completion occurs in a function
       // parameter list. Previous parameters are definitely in scope, but
