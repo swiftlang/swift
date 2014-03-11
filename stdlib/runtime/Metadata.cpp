@@ -270,9 +270,8 @@ swift::swift_dynamicCastClass(const void *object,
   // If the object is an Objective-C object then we 
   // must not dereference it or its isa field directly.
   // FIXME: optimize this for objects that have no ObjC inheritance.
-  return swift_dynamicCastObjCClass(object, targetType);      
-#endif
-
+  return swift_dynamicCastObjCClass(object, targetType);
+#else
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -281,6 +280,7 @@ swift::swift_dynamicCastClass(const void *object,
     isa = isa->SuperClass;
   } while (isa);
   return NULL;
+#endif
 }
 
 /// The primary entrypoint.
@@ -291,9 +291,8 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
   // If the object is an Objective-C object then we 
   // must not dereference it or its isa field directly.
   // FIXME: optimize this for objects that have no ObjC inheritance.
-  return swift_dynamicCastObjCClassUnconditional(object, targetType);      
-#endif
-
+  return swift_dynamicCastObjCClassUnconditional(object, targetType);
+#else
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -302,6 +301,7 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
     isa = isa->SuperClass;
   } while (isa);
   abort();
+#endif
 }
 
 const void *
