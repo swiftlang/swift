@@ -19,8 +19,10 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include <iterator>
 using namespace swift;
 using namespace Mangle;
@@ -1181,21 +1183,30 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     break;
   }
   case DeclKind::Enum: {
+    auto ed = cast<EnumDecl>(d);
     // Emit the enum cases and derived conformance methods for the type.
-    for (auto member : cast<EnumDecl>(d)->getMembers()) {
+    for (auto member : ed->getMembers()) {
       if (auto elt = dyn_cast<EnumElementDecl>(member))
         emitEnumConstructor(elt);
       else if (auto func = dyn_cast<FuncDecl>(member))
         emitFunction(func);
     }
     // Emit derived global decls.
-    for (auto derived : cast<EnumDecl>(d)->getDerivedGlobalDecls()) {
+    for (auto derived : ed->getDerivedGlobalDecls()) {
       emitFunction(cast<FuncDecl>(derived));
+    }
+    SWIFT_FALLTHROUGH;
+  }
+  case DeclKind::Struct:
+  case DeclKind::Class: {
+    // Emit witness tables.
+    for (auto c : cast<NominalTypeDecl>(d)->getConformances()) {
+      if (Types.protocolRequiresWitnessTable(c->getProtocol()))
+        getWitnessTable(c);
     }
     break;
   }
-  case DeclKind::Struct:
-  case DeclKind::Class:
+      
   case DeclKind::Protocol:
     // Nothing to do in SILGen for other external types.
     break;
@@ -1774,7 +1785,14 @@ static IsFreeFunctionWitness_t isFreeFunctionWitness(ValueDecl *requirement,
   
 static SILLinkage
 getLinkageForProtocolConformance(NormalProtocolConformance *C) {
-  // TODO
+  // If the conformance is imported from Clang, give it shared linkage.
+  auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
+  auto typeUnit = typeDecl->getModuleScopeContext();
+  if (isa<ClangModuleUnit>(typeUnit)
+      && C->getDeclContext()->getParentModule() == typeUnit->getParentModule())
+    return SILLinkage::Shared;
+  
+  // TODO Access control
   return SILLinkage::Public;
 }
   
@@ -1784,10 +1802,12 @@ public:
   SILGenModule &SGM;
   NormalProtocolConformance *Conformance;
   std::vector<SILWitnessTable::Entry> Entries;
+  SILLinkage Linkage;
 
   SILGenConformance(SILGenModule &SGM, ProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
-    : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C))
+    : SGM(SGM), Conformance(dyn_cast<NormalProtocolConformance>(C)),
+      Linkage(getLinkageForProtocolConformance(Conformance))
   {
     // Not all protocols use witness tables.
     if (!SGM.Types.protocolRequiresWitnessTable(Conformance->getProtocol()))
@@ -1809,8 +1829,7 @@ public:
       visit(reqt);
     
     // Create the witness table.
-    return SILWitnessTable::create(SGM.M,
-                                 getLinkageForProtocolConformance(Conformance),
+    return SILWitnessTable::create(SGM.M, Linkage,
                                  Conformance, Entries);
   }
   
@@ -1866,7 +1885,7 @@ public:
                           witnessUncurryLevel);
 
     SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, requirementRef, witnessRef,
+      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
                               isFree, WitnessSubstitutions);
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
@@ -1881,7 +1900,7 @@ public:
                           SILDeclRef::ConstructAtBestResilienceExpansion,
                           requirementRef.uncurryLevel);
     SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, requirementRef, witnessRef,
+      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
                               IsNotFreeFunctionWitness,
                               witness.getSubstitutions());
     Entries.push_back(
@@ -2005,6 +2024,7 @@ getWitnessFunctionType(SILModule &M,
 
 SILFunction *
 SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
+                                  SILLinkage linkage,
                                   SILDeclRef requirement,
                                   SILDeclRef witness,
                                   IsFreeFunctionWitness_t isFree,
@@ -2135,9 +2155,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                               witnessSubstTy,
                                               witnessSubstIfaceTy,
                                               requirement.uncurryLevel);
-
-  // TODO: emit with private or hidden linkage if the conformance is local.
-  SILLinkage linkage = SILLinkage::Public;
 
   // Mangle the name of the witness thunk.
   llvm::SmallString<128> nameBuffer;

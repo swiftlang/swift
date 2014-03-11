@@ -87,7 +87,6 @@ inline FormalLinkage &operator^=(FormalLinkage &lhs, FormalLinkage rhs) {
 
 FormalLinkage getTypeLinkage(CanType type);
 FormalLinkage getDeclLinkage(Decl *decl);
-FormalLinkage getConformanceLinkage(const ProtocolConformance *conf);
 
 } // end swift namespace
 

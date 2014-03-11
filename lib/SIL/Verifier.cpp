@@ -1820,8 +1820,9 @@ void SILWitnessTable::verify(const SILModule &M) const {
   for (const Entry &E : getEntries())
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
-      assert(hasPublicVisibility(F->getLinkage()) &&
-             "Public witness tables should only reference public functions.");
+      assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
+             "Witness tables should not reference less visible
+             functions.");
     }
 #endif
 }

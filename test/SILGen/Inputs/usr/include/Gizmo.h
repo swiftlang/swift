@@ -77,3 +77,10 @@ typedef  NS_ENUM(NSInteger, NSRuncingOptions) {
   NSRuncingQuinceDiced = 6789
 };
 
+#define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
+
+typedef NS_OPTIONS(NSInteger, NSFungingMask) {
+  NSFungingAsset = 1,
+  NSFungingLiability = 2,
+};

@@ -103,11 +103,6 @@ FormalLinkage swift::getTypeLinkage(CanType type) {
   return result;
 }
 
-FormalLinkage swift::getConformanceLinkage(const ProtocolConformance *conf) {
-  // FIXME
-  return FormalLinkage::PublicUnique;
-}
-
 /// Returns true if we are able to find an address projection path from V1 to
 /// V2. Inserts the found path into Path.
 bool

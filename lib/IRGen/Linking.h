@@ -41,7 +41,10 @@ namespace swift {
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
-
+  
+SILLinkage getProtocolConformanceLinkage(IRGenModule &IGM,
+                                         ProtocolConformance *C);
+  
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
 /// of the declaration from each other.
@@ -70,6 +73,9 @@ class LinkEntity {
     // These fields appear in the TypeMetadata kind.
     IsIndirectShift = 8, IsIndirectMask = 0x0100,
     IsPatternShift = 9, IsPatternMask = 0x0200,
+    
+    // This field appears in ProtocolConformance kinds.
+    ConformanceLinkageShift = 8, ConformanceLinkageMask = 0x0700,
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -193,10 +199,13 @@ class LinkEntity {
   }
 
   void setForProtocolConformance(Kind kind,
-                                 ProtocolConformance *c) {
+                                 ProtocolConformance *c,
+                                 IRGenModule &IGM) {
     assert(isProtocolConformanceKind(kind));
     Pointer = c;
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
+         | LINKENTITY_SET_FIELD(ConformanceLinkage,
+                       unsigned(irgen::getProtocolConformanceLinkage(IGM, c)));
   }
 
   void setForType(Kind kind, CanType type) {
@@ -317,11 +326,11 @@ public:
     return entity;
   }
   
-  static LinkEntity forDirectProtocolWitnessTable(const ProtocolConformance *C){
+  static LinkEntity forDirectProtocolWitnessTable(ProtocolConformance *C,
+                                                  IRGenModule &IGM) {
     LinkEntity entity;
-    entity.Pointer = const_cast<ProtocolConformance*>(C);
-    entity.Data
-      = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::DirectProtocolWitnessTable));
+    entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable,
+                                     C, IGM);
     return entity;
   }
 
@@ -347,6 +356,12 @@ public:
   ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
     return reinterpret_cast<ProtocolConformance*>(Pointer);
+  }
+  
+  SILLinkage getProtocolConformanceLinkage() const {
+    assert(isProtocolConformanceKind(getKind()));
+    
+    return SILLinkage(LINKENTITY_GET_FIELD(Data, ConformanceLinkage));
   }
   
   ResilienceExpansion getResilienceExpansion() const {

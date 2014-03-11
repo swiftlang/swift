@@ -503,6 +503,16 @@ void IRGenModule::emitLazyDefinitions() {
   }
 }
 
+/// As a kludge, try to find the linkage of a SILWitnessTable in the current
+/// SIL module, falling back to public_external if there is none.
+SILLinkage irgen::getProtocolConformanceLinkage(IRGenModule &IGM,
+                                                ProtocolConformance *C) {
+  auto wt = IGM.SILMod->lookUpWitnessTable(C);
+  if (!wt.first)
+    return SILLinkage::PublicExternal;
+  return wt.first->getLinkage();
+}
+
 static SILLinkage getSILLinkage(FormalLinkage linkage,
                                 ForDefinition_t forDefinition) {
   switch (linkage) {
@@ -572,8 +582,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DirectProtocolWitnessTable:
   case Kind::LazyProtocolWitnessTableAccessor:
   case Kind::DependentProtocolWitnessTableGenerator:
-    return getSILLinkage(getConformanceLinkage(getProtocolConformance()),
-                         forDefinition);
+    return getProtocolConformanceLinkage();
 
   case Kind::LazyProtocolWitnessTableTemplate:
   case Kind::DependentProtocolWitnessTableTemplate:
@@ -1599,7 +1608,8 @@ bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                    llvm::Type *storageTy) {
-  auto entity = LinkEntity::forDirectProtocolWitnessTable(C);
+  auto entity = LinkEntity::forDirectProtocolWitnessTable(
+                              const_cast<NormalProtocolConformance*>(C), *this);
   return getAddrOfLLVMVariable(*this, GlobalVars, entity,
                                storageTy, WitnessTableTy, WitnessTablePtrTy,
                                DebugTypeInfo());
