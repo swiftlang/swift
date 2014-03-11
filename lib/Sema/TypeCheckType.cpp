@@ -1383,6 +1383,14 @@ static void lookupLibraryTypes(TypeChecker &TC,
   }
 }
 
+/// Emit an additional diagnostic describing why we are applying @objc to the
+/// decl, if this is not obvious from the decl itself.
+static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
+                               ObjCReason Reason) {
+  if (Reason == ObjCReason::MemberOfObjCProtocol)
+    TC.diagnose(VD->getLoc(), diag::objc_inferring_on_objc_protocol_member);
+}
+
 static bool isClassOrObjCProtocol(Type T) {
   if (T->is<ClassType>())
     return true;
@@ -1430,7 +1438,10 @@ static bool isParamRepresentableInObjC(TypeChecker &TC,
 
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
-    unsigned ParamIndex, const Pattern *P) {
+    unsigned ParamIndex, const Pattern *P, ObjCReason Reason) {
+  if (Reason == ObjCReason::DontDiagnose)
+    return;
+
   if (NumParams == 1) {
     TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type);
   } else {
@@ -1441,12 +1452,14 @@ static void diagnoseFunctionParamNotRepresentable(
     SourceRange SR = getFunctionParamTypeSourceRange(P);
     TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
+  describeObjCReason(TC, AFD, Reason);
 }
 
 static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
                                               const AbstractFunctionDecl *AFD,
                                               const Pattern *P,
-                                              bool Diagnose) {
+                                              ObjCReason Reason) {
+  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
     auto Fields = TP->getFields();
     unsigned NumParams = Fields.size();
@@ -1476,19 +1489,20 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
       if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
         IsObjC = false;
         if (!Diagnose) {
-          // Return as soon as possible if we are not producing diagnostics.
+          // Save some work and return as soon as possible if we are not
+          // producing diagnostics.
           return IsObjC;
         }
         diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
-                                              TupleElt.getPattern());
+                                              TupleElt.getPattern(), Reason);
       }
     }
     return IsObjC;
   }
   auto *PP = cast<ParenPattern>(P);
   if (!isParamRepresentableInObjC(TC, AFD, PP->getSubPattern())) {
-    if (Diagnose)
-      diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern());
+    diagnoseFunctionParamNotRepresentable(TC, AFD, 1, 1, PP->getSubPattern(),
+                                          Reason);
     return false;
   }
   return true;
@@ -1521,15 +1535,18 @@ static bool checkObjCInGenericContext(TypeChecker &tc,
 }
 
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                                        bool Diagnose) {
+                                        ObjCReason Reason) {
+  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (!FD->isGetterOrSetter()) {
       unsigned ExpectedParamPatterns = 1;
       if (FD->getImplicitSelfDecl())
         ExpectedParamPatterns++;
       if (FD->getBodyParamPatterns().size() != ExpectedParamPatterns) {
-        if (Diagnose)
+        if (Diagnose) {
           diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried);
+          describeObjCReason(*this, AFD, Reason);
+        }
         return false;
       }
     }
@@ -1537,15 +1554,17 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
     // willSet/didSet implementations are never exposed to objc, they are always
     // directly dispatched from the synthesized setter.
     if (FD->isObservingAccessor()) {
-      if (Diagnose)
+      if (Diagnose) {
         diagnose(AFD->getLoc(), diag::objc_observing_accessor);
+        describeObjCReason(*this, AFD, Reason);
+      }
       return false;
     }
   }
 
   if (!isParamPatternRepresentableInObjC(*this, AFD,
                                          AFD->getBodyParamPatterns()[1],
-                                         Diagnose)) {
+                                         Reason)) {
     if (!Diagnose) {
       // Return as soon as possible if we are not producing diagnostics.
       return false;
@@ -1560,6 +1579,7 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
         SourceRange Range =
             FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
         diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
+        describeObjCReason(*this, FD, Reason);
       }
       return false;
     }
@@ -1571,8 +1591,9 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
   return true;
 }
 
-bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
+bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   bool Result = isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
 
   if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
     return false;
@@ -1585,18 +1606,23 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, bool Diagnose) {
     DiagnoseAsIBOutlet = 1
   };
 
-  unsigned AttrKind = VD->getAttrs().isObjC() ? DiagnoseAsAtObjC
-                                              : DiagnoseAsIBOutlet;
+  unsigned AttrKind = (Reason == ObjCReason::ExplicitlyIBOutlet)
+                          ? DiagnoseAsIBOutlet
+                          : DiagnoseAsAtObjC;
   SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
   diagnose(VD->getLoc(), diag::objc_invalid_on_var, AttrKind)
       .highlight(TypeRange);
   diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(), VD->getType(),
                                      TypeRange);
+  describeObjCReason(*this, VD, Reason);
 
   return Result;
 }
 
-bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose){
+bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
+                                        ObjCReason Reason) {
+  bool Diagnose = (Reason != ObjCReason::DontDiagnose);
+
   // Figure out the type of the indices.
   Type IndicesType = SD->getIndices()->getType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {
@@ -1635,6 +1661,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose){
                                      !IndicesResult? IndicesType
                                                    : SD->getElementType(),
                                      TypeRange);
+  describeObjCReason(*this, SD, Reason);
 
   return Result;
 }

@@ -216,7 +216,16 @@ withoutContext(TypeResolutionOptions options) {
   return options;
 }
 
-  
+/// Describes the reason why are we tring to apply @objc to a declaration.
+///
+/// Should only affect diagnostics.
+enum class ObjCReason {
+  DontDiagnose,
+  ExplicitlyObjC,
+  ExplicitlyIBOutlet,
+  MemberOfObjCProtocol
+};
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker : public ASTMutationListener, public LazyResolver {
@@ -930,9 +939,10 @@ public:
   virtual Type resolveMemberType(DeclContext *dc, Type type,
                                  Identifier name) override;
 
-  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD, bool Diagnose);
-  bool isRepresentableInObjC(const VarDecl *VD, bool Diagnose);
-  bool isRepresentableInObjC(const SubscriptDecl *SD, bool Diagnose);
+  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
+                             ObjCReason Reason);
+  bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
+  bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
   bool isTriviallyRepresentableInObjC(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const DeclContext *DC, Type T);
 
