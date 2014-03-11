@@ -145,6 +145,7 @@ static bool isStartOfEntity(char c) {
   case 'I':
   case 'v':
   case 'P':
+  case 's':
     return true;
   default:
     return isStartOfNominalType(c);
@@ -945,6 +946,8 @@ private:
       entityBasicKind = Node::Kind::Variable;
     } else if (Mangled.nextIf('I')) {
       entityBasicKind = Node::Kind::Initializer;
+    } else if (Mangled.nextIf('s')) {
+      entityBasicKind = Node::Kind::Subscript;
     } else {
       return demangleNominalType();
     }
@@ -2007,6 +2010,7 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::Variable:
   case Node::Kind::Function:
+  case Node::Kind::Subscript:
     printEntity(true, true, "");
     return;
   case Node::Kind::ExplicitClosure:

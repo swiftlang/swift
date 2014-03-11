@@ -1250,6 +1250,8 @@ void Mangler::mangleEntity(ValueDecl *decl, ResilienceExpansion explosion,
   // entity ::= entity-kind context entity-name
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
+  } else if (isa<SubscriptDecl>(decl)) {
+    Buffer << 's';
   } else {
     assert(isa<AbstractFunctionDecl>(decl) ||
            isa<EnumElementDecl>(decl));

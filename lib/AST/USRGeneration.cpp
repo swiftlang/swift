@@ -41,9 +41,6 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return true;
   }
 
-  if (isa<SubscriptDecl>(VD))
-    return true;
-
   OS << getUSRSpacePrefix();
   Mangler Mangler(OS);
   if (auto Ctor = dyn_cast<ConstructorDecl>(VD)) {

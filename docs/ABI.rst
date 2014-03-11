@@ -680,6 +680,7 @@ Globals
   entity ::= entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
   entity-kind ::= 'v'                    // variable (let/var)
+  entity-kind ::= 's'                    // subscript itself (not the individual accessors)
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
   entity-name ::= 'A' index              // default argument generator
@@ -702,7 +703,7 @@ Globals
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
 substitution (``[S]``) of a nominal type, or an ``entity-kind``
-(``[FIv]``).
+(``[FIsv]``).
 
 An ``entity-name`` starts with ``[AaCcDggis]`` or a ``decl-name``.
 A ``decl-name`` starts with a ``[L]`` or an ``identifier`` (``[0-9oX]``).
