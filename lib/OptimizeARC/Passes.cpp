@@ -228,7 +228,7 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
 ///
 static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
   Value *Op = CI.getArgOperand(1+EltNo);
-  for (auto UI = CI.use_begin(), E = CI.use_end(); UI != E; ++UI) {
+  for (auto UI = CI.user_begin(), E = CI.user_end(); UI != E; ++UI) {
     ExtractValueInst *Extract = dyn_cast<ExtractValueInst>(*UI);
 
     // Make sure this extract is relevant to EltNo.
