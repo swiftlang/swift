@@ -70,6 +70,7 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
     assert(!var->getDeclContext()->isLocalContext() &&
            "can't reference local var as global var");
     assert(var->hasStorage() && "can't reference computed var as global var");
+    (void)var;
   } else {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }

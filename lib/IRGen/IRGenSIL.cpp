@@ -1157,6 +1157,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   }
 }
 
+#ifndef NDEBUG
 /// This is a hack that should be removed once we serialize debug scopes.
 static bool isValidFileLocWithoutDebugScope(SILLocation Loc) {
   while (true) {
@@ -1177,6 +1178,7 @@ static bool isValidFileLocWithoutDebugScope(SILLocation Loc) {
     }
   }
 }
+#endif
 
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.

@@ -336,7 +336,7 @@ processBBTopDown(SILBasicBlock &BB,
 
       if (P != ParameterConvention::Direct_Owned)
         continue;
-      BBState[SILValue(Args[i])].initWithArg(Args[i]);
+      BBState[SILValue(Args[i])].initWithArg(A);
     }
   }
 
