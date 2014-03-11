@@ -85,6 +85,12 @@ SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
                                 bool isFramework) {
   assert(input);
 
+  if (input->getBufferSize() % 4 != 0) {
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
+    return nullptr;
+  }
+
   std::unique_ptr<ModuleFile> loadedModuleFile;
   ModuleStatus err = ModuleFile::load(std::move(input), loadedModuleFile,
                                       isFramework);

@@ -128,12 +128,15 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
 SerializedModuleLoader::ValidationInfo
 SerializedModuleLoader::validateSerializedAST(StringRef data) {
+  ValidationInfo result = { {}, 0, ModuleStatus::Malformed };
+
+  if (data.size() % 4 != 0)
+    return result;
+
   llvm::BitstreamReader reader(reinterpret_cast<const uint8_t *>(data.begin()),
                                reinterpret_cast<const uint8_t *>(data.end()));
   llvm::BitstreamCursor cursor(reader);
   SmallVector<uint64_t, 32> scratch;
-
-  ValidationInfo result = { {}, 0, ModuleStatus::Malformed };
 
   if (!checkSignature(cursor) || !enterTopLevelModuleBlock(cursor, false))
     return result;
