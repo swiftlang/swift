@@ -67,7 +67,7 @@ static void registerZone() {
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
-  return malloc_size(pointer);
+  return 0;
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
