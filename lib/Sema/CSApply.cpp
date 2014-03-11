@@ -71,13 +71,20 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
   }
 
   for (const auto &req : requirements) {
+    // Drop requirements for parameters that have been constrained away to
+    // concrete types.
+    auto firstArchetype
+      = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
+        ->getAs<ArchetypeType>();
+    if (!firstArchetype)
+      continue;
+    
     switch (req.getKind()) {
     case RequirementKind::Conformance:
       // If this is a protocol conformance requirement, get the conformance
       // and record it.
       if (auto protoType = req.getSecondType()->getAs<ProtocolType>()) {
-        assert(ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
-                 ->castTo<ArchetypeType>()
+        assert(firstArchetype
                == substitutions.back().Archetype && "Archetype out-of-sync");
         ProtocolConformance *conformance = nullptr;
         Type replacement = substitutions.back().Replacement;
@@ -114,9 +121,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
 
       // Each value witness marker starts a new substitution.
       substitutions.push_back(Substitution());
-      substitutions.back().Archetype
-        = ArchetypeBuilder::mapTypeIntoContext(dc, req.getFirstType())
-            ->castTo<ArchetypeType>();
+      substitutions.back().Archetype = firstArchetype;
       substitutions.back().Replacement =
       tc.substType(currentModule, substitutions.back().Archetype,
                    typeSubstitutions);
