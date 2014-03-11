@@ -62,47 +62,46 @@ extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredAlignmentMask);
   
 /// The structure returned by swift_allocPOD and swift_allocBox.
-#if __arm__
-
-// FIXME: rdar://16257592 arm codegen does't call swift_allocBox correctly.
-
-typedef unsigned long long BoxPair;
-
-static inline BoxPair MakeBoxPair(HeapObject *heapObject, OpaqueValue *value) {
-  return (BoxPair)heapObject | (((BoxPair)value) << 32);
-}
-
-static inline HeapObject *BoxPair_heapObject(const BoxPair& boxpair) {
-  return (HeapObject *)(boxpair & 0xffffffff);
-}
-
-static inline OpaqueValue *BoxPair_value(const BoxPair& boxpair) {
-  return (OpaqueValue *)(boxpair >> 32);
-}
-
-#else
-
 struct BoxPair {
   /// The pointer to the heap object.
   HeapObject *heapObject;
   
   /// The pointer to the value inside the box.
   OpaqueValue *value;
-};
-
-static inline BoxPair MakeBoxPair(HeapObject *heapObject, OpaqueValue *value) {
-  return BoxPair{heapObject, value};
-}
-
-static inline HeapObject *BoxPair_heapObject(const BoxPair& boxpair) {
-  return boxpair.heapObject;
-}
-
-static inline OpaqueValue *BoxPair_value(const BoxPair& boxpair) {
-  return boxpair.value;
-}
-
+  
+  // FIXME: rdar://16257592 arm codegen does't call swift_allocBox correctly.
+  // Structs are returned indirectly on these platforms, but we want to return
+  // in registers, so cram the result into an unsigned long long.
+  // Use an enum class with implicit conversions so we don't dirty C callers
+  // too much.
+#if __arm__ || __i386__
+  enum class Return : unsigned long long {};
+  
+  operator Return() const {
+    union {
+      BoxPair value;
+      Return mangled;
+    } reinterpret = {*this};
+    
+    return reinterpret.mangled;
+  }
+  
+  BoxPair() = default;
+  BoxPair(HeapObject *h, OpaqueValue *v)
+    : heapObject(h), value(v) {}
+  
+  /*implicit*/ BoxPair(Return r) {
+    union {
+      Return mangled;
+      BoxPair value;
+    } reinterpret = {r};
+    
+    *this = reinterpret.value;
+  }
+#else
+  using Return = BoxPair;
 #endif
+};
 
 /// Allocates a heap object with POD value semantics. The returned memory is
 /// uninitialized outside of the heap object header. The object has an
@@ -117,7 +116,8 @@ static inline OpaqueValue *BoxPair_value(const BoxPair& boxpair) {
 ///          HeapObject and the value field points to the data area inside the
 ///          allocation. The value pointer will have the alignment specified
 ///          by the dataAlignmentMask and point to dataSize bytes of memory.
-extern "C" BoxPair swift_allocPOD(size_t dataSize, size_t dataAlignmentMask);
+extern "C" BoxPair::Return
+swift_allocPOD(size_t dataSize, size_t dataAlignmentMask);
 
 /// Deallocates a heap object known to have been allocated by swift_allocPOD and
 /// to have no remaining owners.
@@ -130,7 +130,7 @@ extern "C" void swift_deallocPOD(HeapObject *obj);
 /// appropriate to store a value of the given type.
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
-extern "C" BoxPair swift_allocBox(Metadata const *type);
+extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 
 // Allocate plain old memory, this is the generalized entry point
 //

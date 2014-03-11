@@ -82,7 +82,7 @@ namespace {
   };
 }
 
-BoxPair
+BoxPair::Return
 swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
   // Allocate the heap object.
   size_t valueOffset = PODBox::getValueOffset(dataSize, dataAlignmentMask);
@@ -92,7 +92,7 @@ swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
   static_cast<PODBox*>(obj)->allocatedSize = size;
   // Get the address of the value inside.
   auto *data = reinterpret_cast<char*>(obj) + valueOffset;
-  return MakeBoxPair(obj, reinterpret_cast<OpaqueValue*>(data));
+  return BoxPair{obj, reinterpret_cast<OpaqueValue*>(data)};
 }
 
 namespace {
@@ -161,7 +161,7 @@ static const FullMetadata<HeapMetadata> GenericBoxHeapMetadata{
   HeapMetadata{{MetadataKind::HeapLocalVariable}}
 };
 
-BoxPair
+BoxPair::Return
 swift::swift_allocBox(Metadata const *type) {
   // NB: Special cases here need to also be checked for and handled in
   // swift_deallocBox.
@@ -183,7 +183,7 @@ swift::swift_allocBox(Metadata const *type) {
   box->type = type;
   
   // Return the box and the value pointer.
-  return MakeBoxPair(box, box->getValuePointer());
+  return BoxPair{box, box->getValuePointer()};
 }
 
 void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {

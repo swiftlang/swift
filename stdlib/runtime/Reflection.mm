@@ -616,12 +616,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
   // Put value types into a box so we can take stable interior pointers.
   // TODO: Specialize behavior here. If the value is a swift-refcounted class
   // we don't need to put it in a box to point into it.
-  auto box = swift_allocBox(T);
+  BoxPair box = swift_allocBox(T);
   
-  T->vw_initializeWithTake(BoxPair_value(box), value);
+  T->vw_initializeWithTake(box.value, value);
   std::tie(T, MirrorWitness) = getWitnessForType(T, value);
   
-  Data = {BoxPair_heapObject(box), BoxPair_value(box), T};
+  Data = {box.heapObject, box.value, T};
 }
   
 /// MagicMirror ownership-sharing subvalue constructor.
