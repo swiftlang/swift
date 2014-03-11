@@ -3739,12 +3739,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
                 dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
           GenericParamList *outerGenericParams = nullptr;
           DeclChecker(*this, false, false).
-          configureImplicitSelf(funcDeclContext, outerGenericParams);
+              configureImplicitSelf(funcDeclContext, outerGenericParams);
         }
       } else {
         D->setType(ErrorType::get(Context));
-      }
-      
+      }      
     } else {
       // FIXME: This case is hit when code completion occurs in a function
       // parameter list. Previous parameters are definitely in scope, but

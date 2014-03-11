@@ -1748,7 +1748,8 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
               TC.Context.getConformsTo(canT, InheritedProto)) {
         // Check to see if the conformance is in an incomplete state.  If it is,
         // the inherited protocol has an indirectly recursive requirement.
-        if (knownConformance->getInt() &&
+        if (ComplainLoc.isValid() &&
+            knownConformance->getInt() &&
             (knownConformance->getPointer()->getState() ==
                 ProtocolConformanceState::Incomplete)) {
           TC.diagnose(InheritedProto, diag::recursive_requirement_reference);
