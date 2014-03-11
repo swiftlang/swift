@@ -285,7 +285,7 @@ StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
   
   // The name is the stringized element number '.0'.
   char buf[32];
-  snprintf(buf, 31, ".%td", i);
+  snprintf(buf, 31, ".%zd", i);
   buf[31] = 0;
   result.first = String(buf, strlen(buf));
   
@@ -302,7 +302,7 @@ StringReturn Tuple_getString(MagicMirrorData *self, const Metadata *Self) {
   auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
   
   auto buf = reinterpret_cast<char*>(malloc(128));
-  snprintf(buf, 127, "(%td elements)", Tuple->NumElements);
+  snprintf(buf, 127, "(%zu elements)", Tuple->NumElements);
   buf[127] = 0;
   
   String s(buf, intptr_t(strlen(buf)));
@@ -451,7 +451,7 @@ StringMirrorTuple ObjC_getChild(intptr_t i, MagicMirrorData *self,
   unsigned count;
   Ivar *ivars = class_copyIvarList(isa, &count);
   
-  if (i < 0 || i > count)
+  if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
     abort();
   
   const char *name = ivar_getName(ivars[i]);
