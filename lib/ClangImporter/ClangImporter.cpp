@@ -109,7 +109,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w", "-triple", targetTriple.str(),
-    "-isystem", searchPathOpts.RuntimeResourcePath,
+    "-I", searchPathOpts.RuntimeResourcePath,
     "swift.m"
   };
 
