@@ -275,10 +275,11 @@ endif()
 #   compile_swift_files(OUTPUT objfile  # Name of the resulting object file
 #     SOURCES swift_src [swift_src...]  # Swift source files to compile
 #     FLAGS -module-name foo            # Flags to add to the compilation
+#     [DEPENDS cmake_target...]         # CMake targets on which the object file depends
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB_CORE])                 # This is the core standard library
 function(compile_swift_files)
-  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS" "IS_MAIN;IS_STDLIB_CORE"
+  parse_arguments(SWIFTFILE "OUTPUT;SOURCES;FLAGS;DEPENDS" "IS_MAIN;IS_STDLIB_CORE"
     ${ARGN})
   
   if(SWIFTFILE_IS_MAIN AND SWIFTFILE_IS_STDLIB_CORE)
@@ -391,7 +392,7 @@ function(compile_swift_files)
     OUTPUT ${objfile} ${module_file}
     ${create_module_dir}
     COMMAND ${SWIFT_COMPILER} "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files}
+    DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
@@ -416,7 +417,7 @@ endfunction()
 # Usage:
 #   handle_swift_sources(sourcesvar externalvar target)
 function(handle_swift_sources sourcesvar externalvar target)
-  parse_arguments(SWIFTSOURCES  "" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
+  parse_arguments(SWIFTSOURCES  "DEPENDS" "IS_MAIN;IS_STDLIB_CORE" ${ARGN})
 
   set(result)
   set(swift_sources)
@@ -457,6 +458,7 @@ function(handle_swift_sources sourcesvar externalvar target)
     set(swift_obj "${swift_obj_base}${CMAKE_C_OUTPUT_EXTENSION}")
     compile_swift_files(OUTPUT ${swift_obj}
       SOURCES ${swift_sources}
+      DEPENDS ${SWIFTSOURCES_DEPENDS}
       FLAGS ${swift_flags}
       ${IS_MAIN_arg} ${IS_STDLIB_CORE_arg})
     list(APPEND result ${swift_obj})
@@ -520,12 +522,13 @@ endfunction()
 #   add_swift_library(name           # Name of the library (e.g., swiftParse)
 #     [DEPENDS dep1 ...]             # Libraries this library depends on
 #     [COMPONENT_DEPENDS comp1 ...]  # LLVM components this library depends on
+#     [FILE_DEPENDS target1 ...]     # Additional files this library depends on
 #     [INSTALL]                      # Install library to lib/swift
 #     [IS_STDLIB_CORE]               # Compile as the standard library core
 #     [NO_LLVM_COMMON_LIBS]          # Turn off linking of LLVM Common Libs.
 #     source1 [source2 source3 ...]) # Sources to add into this library
 macro(add_swift_library name)
-  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
+  parse_arguments(SWIFTLIB "DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS" "INSTALL;IS_STDLIB_CORE;NO_LLVM_COMMON_LIBS"
     ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
 
@@ -559,13 +562,18 @@ macro(add_swift_library name)
   endif()
   
   handle_swift_sources(SWIFTLIB_SOURCES SWIFTLIB_EXTERNAL_SOURCES ${name}
+    DEPENDS ${SWIFTLIB_FILE_DEPENDS}
     ${IS_STDLIB_CORE_arg})
 
   add_library( ${name} ${libkind}
     ${SWIFTLIB_SOURCES}
     ${SWIFTLIB_EXTERNAL_SOURCES})
+  set_source_files_properties(
+    ${SWIFTLIB_SOURCES}
+    PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_FILE_DEPENDS}")
+  
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
-
+  
   if (MODULE)
     set_target_properties(${name} PROPERTIES
       PREFIX ""
@@ -653,6 +661,8 @@ endmacro(add_swift_library)
 #     [DEPENDS dep1 ...]              # Libraries this executable depends on
 #     [COMPONENT_DEPENDS comp1 ...]   # LLVM components this executable 
 #                                     # depends on
+#     [FILE_DEPENDS target1 ...]      # Additional files this executable
+#                                     # depends on
 #     [EXCLUDE_FROM_ALL]              # Whether to exclude this executable from
 #                                     # the ALL_BUILD target
 #     source1 [source2 source3 ...])  # Sources to add into this library
@@ -662,7 +672,9 @@ macro(add_swift_executable name)
     ${ARGN})
   set(SWIFTEXE)
   
-  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name} IS_MAIN)
+  handle_swift_sources(SWIFTEXE_DEFAULT_ARGS SWIFTEXE_EXTERNAL_SOURCES ${name}
+    DEPENDS ${SWIFTEXE_FILE_DEPENDS}
+    IS_MAIN)
 
   # Add the executable
   if (${SWIFTEXE_EXCLUDE_FROM_ALL})
@@ -670,6 +682,9 @@ macro(add_swift_executable name)
   else()
     add_executable(${name} ${SWIFTEXE_DEFAULT_ARGS} ${SWIFTEXE_EXTERNAL_SOURCES})
   endif()
+  set_source_files_properties(
+    ${SWIFTEXE_DEFAULT_ARGS}
+    PROPERTIES OBJECT_DEPENDS "${SWIFTEXE_FILE_DEPENDS}")
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   # Add Swift source files to the project.

@@ -100,7 +100,9 @@ endif()
 set(SHARED_LIBRARY ON)
 add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
-  DEPENDS swift_runtime)
+  DEPENDS swift_runtime
+  FILE_DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
+  )
 add_dependencies(swift_stdlib_core swift)
 
 add_swift_optimization_flags(swift_stdlib_core)
