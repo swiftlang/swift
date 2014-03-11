@@ -732,8 +732,6 @@ public:
   parseTypeIdentifierWithRecovery(Diag<> MessageID,
                                   Diag<TypeLoc> NonIdentifierTypeMessageID);
 
-  ParserResult<TypeRepr> parseTypeAnnotation();
-  ParserResult<TypeRepr> parseTypeAnnotation(Diag<> ID);
   ParserResult<TypeRepr> parseTypeSimple();
   ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,

@@ -624,14 +624,14 @@ Import Declarations
   decl-var       ::= decl-var-head pattern initializer?  (',' pattern initializer?)*
 
   // 'get' is implicit in this syntax.
-  decl-var       ::= decl-var-head identifier ':' type-annotation brace-item-list
+  decl-var       ::= decl-var-head identifier ':' type brace-item-list
 
-  decl-var       ::= decl-var-head identifier ':' type-annotation '{' get-set '}'
+  decl-var       ::= decl-var-head identifier ':' type '{' get-set '}'
 
-  decl-var       ::= decl-var-head identifier ':' type-annotation initializer? '{' willset-didset '}'
+  decl-var       ::= decl-var-head identifier ':' type initializer? '{' willset-didset '}'
 
   // For use in protocols.
-  decl-var       ::= decl-var-head identifier ':' type-annotation '{' get-set-kw '}'
+  decl-var       ::= decl-var-head identifier ':' type '{' get-set-kw '}'
 
   get-set        ::= get set?
   get-set        ::= set get

@@ -254,7 +254,7 @@
     func-arguments ::= <a href="#pattern-tuple">pattern-tuple</a>+
     func-arguments ::= selector-tuple
     <a id="selector-tuple">selector-tuple</a> ::= '(' <a href="#pattern-tuple">pattern-tuple-element</a> ')' (<a href="#identifier">identifier-or-any</a> '(' pattern-tuple-element ')')+
-    func-signature-result ::= '-&gt;' <a href="#type">type-annotation</a>
+    func-signature-result ::= '-&gt;' <a href="#type">type</a>
   </pre>
 
   <p>A function signature specifies one or more sets of parameter
@@ -814,7 +814,7 @@
     attribute-inout ::= 'inout'
   </pre>
 
-  <p><tt>inout</tt> is only valid in a <tt>type-annotation</tt> that
+  <p><tt>inout</tt> is only valid in a <tt>type</tt> that
     appears within either a <a href="#pattern"><tt>pattern</tt></a> of
     a <tt>function-signature</tt> or the input type of a function
     type.
@@ -896,7 +896,7 @@
   closure over this expression.  This is typically useful for function arguments
   that want to capture computation that can be run lazily.</p>
   
-  <p><tt>auto_closure</tt> is only valid in a <tt>type-annotation</tt> of a
+  <p><tt>auto_closure</tt> is only valid in a <tt>type</tt> of a
   syntactic function type that is defined to take a syntactic empty tuple.
   </p>
 
@@ -926,7 +926,7 @@
   </pre>
 
   <p>Attribute <tt>noreturn</tt> is only valid in the attribute list of a 
-	function declaration or in the attribute list of a <tt>type-annotation</tt> 
+	function declaration or in the attribute list of a <tt>type</tt> 
 	that describes a syntactic function type.
   </p>
 
@@ -947,16 +947,14 @@
   <!-- ********************************************************************* -->
   
   <pre class="grammar">
-    type ::= <a href="#type-function">type-function</a>
-    type ::= <a href="#type-array">type-array</a>
+    type ::= <a href="#attribute-list">attribute-list</a> <a href="#type-function">type-function</a>
+    type ::= <a href="#attribute-list">attribute-list</a> <a href="#type-array">type-array</a>
     
     type-simple ::= <a href="#type-identifier">type-identifier</a>
     type-simple ::= <a href="#type-tuple">type-tuple</a>
     type-simple ::= <a href="#type-composition">type-composition</a>
     type-simple ::= <a href="#type-metatype">type-metatype</a>
     type-simple ::= <a href="#type-optional">type-optional</a>
-
-    type-annotation ::= <a href="#attribute-list">attribute-list</a> type
   </pre>
 
   <p>Swift has a small collection of core datatypes that are built into the
@@ -1067,8 +1065,8 @@
   <pre class="grammar">
     type-tuple ::= '(' type-tuple-body? ')'
     type-tuple-body ::= type-tuple-element (',' type-tuple-element)* '...'?
-    type-tuple-element ::= identifier ':' <a href="#type">type-annotation</a>
-    type-tuple-element ::= <a href="#type">type-annotation</a>
+    type-tuple-element ::= identifier ':' <a href="#type">type</a>
+    type-tuple-element ::= <a href="#type">type</a>
   </pre>
 
   <p>Syntactically, tuple types are simply a (possibly empty) list of
@@ -1119,7 +1117,7 @@
   <!-- ===================================================================== -->
 
   <pre class="grammar">
-    type-function ::= <a href="#type">type-tuple</a> '-&gt;' <a href="#type">type-annotation</a>
+    type-function ::= <a href="#type">type-tuple</a> '-&gt;' <a href="#type">type</a>
   </pre>
 
   <p>Function types have a single input and single result type, separated by
@@ -1521,7 +1519,7 @@ ill-formed if the type does not conform to the protocol.</p>
   <!-- ********************************************************************* -->
 
   <pre class="grammar">
-    pattern-typed ::= pattern-atom ':' <a href="#type">type-annotation</a>
+    pattern-typed ::= pattern-atom ':' <a href="#type">type</a>
   </pre>
 
   <p>A type annotation constrains a pattern to have a specific type.

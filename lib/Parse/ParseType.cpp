@@ -26,25 +26,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-ParserResult<TypeRepr> Parser::parseTypeAnnotation() {
-  return parseTypeAnnotation(diag::expected_type);
-}
-
-/// parseTypeAnnotation
-///   type-annotation:
-///     attribute-list type
-ParserResult<TypeRepr> Parser::parseTypeAnnotation(Diag<> message) {
-  // Parse attributes.
-  TypeAttributes attrs;
-  parseTypeAttributeList(attrs);
-
-  // Parse the type.
-  ParserResult<TypeRepr> Ty = parseType(message);
-  if (Ty.isNull() || Ty.hasCodeCompletion())
-    return Ty;
-  return makeParserResult(applyAttributeToType(Ty.getPtrOrNull(), attrs));
-}
-
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs) {
   // Apply those attributes that do apply.
@@ -131,13 +112,17 @@ ParserResult<TypeRepr> Parser::parseType() {
 
 /// parseType
 ///   type:
-///     type-function
-///     type-array
+///     attribute-list type-function
+///     attribute-list type-array
 ///
 ///   type-function:
-///     type-simple '->' type-annotation
+///     type-simple '->' type
 ///
 ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
+  // Parse attributes.
+  TypeAttributes attrs;
+  parseTypeAttributeList(attrs);
+
   // Parse Generic Parameters. Generic Parameters are visible in the function
   // body.
   GenericParamList *generics = maybeParseGenericParams();
@@ -152,13 +137,14 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   // Handle type-function if we have an arrow.
   if (consumeIf(tok::arrow)) {
     ParserResult<TypeRepr> SecondHalf =
-        parseTypeAnnotation(diag::expected_type_function_result);
+      parseType(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
       return nullptr;
-    return makeParserResult(
-        new (Context) FunctionTypeRepr(generics, ty.get(), SecondHalf.get()));
+    auto fnTy = new (Context) FunctionTypeRepr(generics, ty.get(),
+                                               SecondHalf.get());
+    return makeParserResult(applyAttributeToType(fnTy, attrs));
   }
 
   if (generics) {
@@ -186,6 +172,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     }
   }
 
+  if (ty.isNonNull() && !ty.hasCodeCompletion()) {
+    ty = makeParserResult(applyAttributeToType(ty.get(), attrs));
+  }
   return ty;
 }
 
@@ -193,7 +182,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifierWithRecovery(
     Diag<> MessageID, Diag<TypeLoc> NonIdentifierTypeMessageID) {
   ParserResult<TypeRepr> Ty = parseType(MessageID);
 
-  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get())) {
+  if (!Ty.isParseError() && !isa<IdentTypeRepr>(Ty.get()) &&
+      !isa<ErrorTypeRepr>(Ty.get())) {
     diagnose(Ty.get()->getStartLoc(), NonIdentifierTypeMessageID, Ty.get())
         .highlight(Ty.get()->getSourceRange());
     Ty.setIsParseError();
@@ -409,8 +399,8 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
 ///   type-tuple-body:
 ///     type-tuple-element (',' type-tuple-element)* '...'?
 ///   type-tuple-element:
-///     identifier ':' type-annotation
-///     type-annotation
+///     identifier ':' type
+///     type
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
@@ -441,7 +431,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       consumeToken(tok::colon);
 
       // Parse the type annotation.
-      ParserResult<TypeRepr> type = parseTypeAnnotation(diag::expected_type);
+      ParserResult<TypeRepr> type = parseType(diag::expected_type);
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())
@@ -459,7 +449,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
           new (Context) NamedTypeRepr(name, type.get(), nameLoc));
     } else {
       // Otherwise, this has to be a type.
-      ParserResult<TypeRepr> type = parseTypeAnnotation();
+      ParserResult<TypeRepr> type = parseType();
       if (type.hasCodeCompletion())
         return makeParserCodeCompletionStatus();
       if (type.isNull())

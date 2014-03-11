@@ -2799,8 +2799,7 @@ ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
   SourceLoc ArrowLoc = consumeToken();
   
   // type
-  ParserResult<TypeRepr> ElementTy =
-      parseTypeAnnotation(diag::expected_type_subscript);
+  ParserResult<TypeRepr> ElementTy = parseType(diag::expected_type_subscript);
   if (ElementTy.isNull() || ElementTy.hasCodeCompletion())
     return ElementTy;
 

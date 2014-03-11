@@ -414,7 +414,7 @@ parseSelectorFunctionArguments(Parser &P,
 ///   selector-arguments:
 ///     '(' selector-element ')' (identifier '(' selector-element ')')+
 ///   selector-element:
-///      identifier '(' pattern-atom (':' type-annotation)? ('=' expr)? ')'
+///      identifier '(' pattern-atom (':' type)? ('=' expr)? ')'
 ///
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
@@ -469,7 +469,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///   func-signature:
 ///     func-arguments func-signature-result?
 ///   func-signature-result:
-///     '->' type-annotation
+///     '->' type
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -524,7 +524,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     }
 
     ParserResult<TypeRepr> ResultType =
-        parseTypeAnnotation(diag::expected_type_function_result);
+      parseType(diag::expected_type_function_result);
     if (ResultType.hasCodeCompletion())
       return ResultType;
     retType = ResultType.getPtrOrNull();
@@ -618,7 +618,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 
 /// Parse a pattern.
 ///   pattern ::= pattern-atom
-///   pattern ::= pattern-atom ':' type-annotation
+///   pattern ::= pattern-atom ':' type
 ///   pattern ::= 'var' pattern
 ///   pattern ::= 'let' pattern
 ParserResult<Pattern> Parser::parsePattern(bool isLet) {
@@ -636,7 +636,7 @@ ParserResult<Pattern> Parser::parsePattern(bool isLet) {
       Result = makeParserErrorResult(new (Context) AnyPattern(PreviousLoc));
     }
 
-    ParserResult<TypeRepr> Ty = parseTypeAnnotation();
+    ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
 
@@ -762,7 +762,7 @@ Parser::parsePatternTupleElement(bool isLet, bool isArgumentList,
     if (pattern.isNull())
       return std::make_pair(makeParserError(), Nothing);
   } else {
-    ParserResult<TypeRepr> Ty = parseTypeAnnotation();
+    ParserResult<TypeRepr> Ty = parseType();
     if (Ty.hasCodeCompletion())
       return std::make_pair(makeParserCodeCompletionStatus(), Nothing);
     if (Ty.isNull())
