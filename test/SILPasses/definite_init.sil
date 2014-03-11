@@ -560,13 +560,13 @@ sil @rootclass_test1 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @o
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
-  %10 = ref_element_addr %3 : $RootClassWithIVars, #x
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
   assign %1 to %10 : $*Int
 
-  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
 
-  %12 = ref_element_addr %3 : $RootClassWithIVars, #z
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
   %13 = tuple_element_addr %12 : $*(Int, Int), 0
   assign %1 to %13 : $*Int
   %14 = tuple_element_addr %12 : $*(Int, Int), 1
@@ -580,13 +580,13 @@ sil @rootclass_test2 : $@cc(method) @thin (@owned RootClassWithIVars, Int) -> @o
 bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
 
-  %10 = ref_element_addr %3 : $RootClassWithIVars, #x
+  %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
   assign %1 to %10 : $*Int
 
-  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
 
-  %12 = ref_element_addr %3 : $RootClassWithIVars, #z
+  %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
   %13 = tuple_element_addr %12 : $*(Int, Int), 0
   assign %1 to %13 : $*Int
 
@@ -599,7 +599,7 @@ bb0(%0 : $RootClassWithIVars, %1 : $Int):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars  
 
   strong_retain %3 : $RootClassWithIVars             // id: %11
-  %11 = ref_element_addr %3 : $RootClassWithIVars, #y
+  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Int
   strong_release %3 : $RootClassWithIVars            // id: %14
 
@@ -626,7 +626,7 @@ bb0(%0 : $DerivedClassWithIVars):
 
   // Initialize the 'a' ivar with the int.
   %8 = load %1#1 : $*DerivedClassWithIVars
-  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #a
+  %9 = ref_element_addr %8 : $DerivedClassWithIVars, #DerivedClassWithIVars.a
   assign %7 to %9 : $*Int
   
 

@@ -187,6 +187,7 @@ namespace {
       return parseSILTypeWithoutQualifiers(Result, category, attrs, Junk);
     }
 
+    bool parseSILDottedPath(ValueDecl *&Decl);
     bool parseSILDeclRef(SILDeclRef &Result);
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
@@ -741,21 +742,7 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams){
   return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams);
 }
 
-///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
-///  sil-decl-subref ::= '!' sil-decl-lang
-///  sil-decl-subref-part ::= 'getter'
-///  sil-decl-subref-part ::= 'setter'
-///  sil-decl-subref-part ::= 'allocator'
-///  sil-decl-subref-part ::= 'initializer'
-///  sil-decl-subref-part ::= 'enumelt'
-///  sil-decl-subref-part ::= 'destroyer'
-///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
-///  sil-decl-lang ::= 'foreign'
-bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
+bool SILParser::parseSILDottedPath(ValueDecl *&Decl) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
     return true;
 
@@ -783,6 +770,28 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
     for (unsigned I = 1, E = FullName.size(); I < E; I++)
       VD = lookupMember(P, VD->getType(), FullName[I]);
   }
+  Decl = VD;
+  return false;
+}
+
+///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
+///                      ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-lang
+///  sil-decl-subref-part ::= 'getter'
+///  sil-decl-subref-part ::= 'setter'
+///  sil-decl-subref-part ::= 'allocator'
+///  sil-decl-subref-part ::= 'initializer'
+///  sil-decl-subref-part ::= 'enumelt'
+///  sil-decl-subref-part ::= 'destroyer'
+///  sil-decl-subref-part ::= 'globalaccessor'
+///  sil-decl-uncurry-level ::= [0-9]+
+///  sil-decl-lang ::= 'foreign'
+bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
+  ValueDecl *VD;
+  if (parseSILDottedPath(VD))
+    return true;
 
   // Initialize Kind, uncurryLevel and IsObjC.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
@@ -803,6 +812,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
   // 0; accept foreign or an integer when ParseState is 1; accept foreign when
   // ParseState is 2.
   unsigned ParseState = 0;
+  Identifier Id;
   do {
     if (P.Tok.is(tok::identifier)) {
       auto IdLoc = P.Tok.getLoc();
@@ -2094,15 +2104,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::RefElementAddrInst: {
-    Identifier ElemId;
+    ValueDecl *FieldV;
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        parseSILIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
+        parseSILDottedPath(FieldV))
       return true;
-    ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
-                                     ElemId);
     if (!FieldV || !isa<VarDecl>(FieldV)) {
       P.diagnose(NameLoc, diag::sil_ref_inst_wrong_field);
       return true;

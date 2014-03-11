@@ -25,7 +25,7 @@ class B {
 
 sil @test2 : $@thin (B) -> () {
 bb0(%0 : $B):
-  %1 = ref_element_addr %0 : $B, #f
+  %1 = ref_element_addr %0 : $B, #B.f
   %5 = tuple()
   return %5 : $()
 }

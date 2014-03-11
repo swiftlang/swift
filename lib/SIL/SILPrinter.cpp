@@ -906,8 +906,9 @@ public:
     << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
-    OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #"
-       << EI->getField()->getName().get();
+    OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #";
+    printFullContext(EI->getField()->getDeclContext(), OS);
+    OS << EI->getField()->getName().get();
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand, StringRef Name) {

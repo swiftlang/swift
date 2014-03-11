@@ -236,7 +236,7 @@ entry:
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]]* %0, i32 0, i32 1
 sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
-  %p = ref_element_addr %c : $RootGeneric<F>, #x
+  %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
   %x = load %p : $*UInt8
   return %x : $UInt8
 }
@@ -252,7 +252,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   bitcast i8* [[Y_ADDR]] to %swift.opaque*
 sil @RootGeneric_concrete_fragile_dependent_member_access_y : $<F> (@out F, RootGeneric<F>) -> () {
 entry(%z : $*F, %c : $RootGeneric<F>):
-  %p = ref_element_addr %c : $RootGeneric<F>, #y
+  %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.y
   copy_addr %p to [initialization] %z : $*F
   %t = tuple ()
   return %t : $()
@@ -269,7 +269,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 // CHECK:   bitcast i8* [[Z_ADDR]] to %VSs5UInt8*
 sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
-  %p = ref_element_addr %c : $RootGeneric<F>, #z
+  %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
   %z = load %p : $*UInt8
   return %z : $UInt8
 }
@@ -278,11 +278,11 @@ entry(%c : $RootGeneric<F>):
  * fixed-layout access
 sil @RootGeneric_concrete_fragile_fixed_member_access : $RootGeneric<Int32> -> (UInt8, Int32, UInt8) {
 entry(%c : $RootGeneric<Int32>):
-  %p = ref_element_addr %c : $RootGeneric<Int32>, #x
+  %p = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.x
   %x = load %p : $*UInt8
-  %q = ref_element_addr %c : $RootGeneric<Int32>, #y
+  %q = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.y
   %y = load %q : $*Int32
-  %r = ref_element_addr %c : $RootGeneric<Int32>, #z
+  %r = ref_element_addr %c : $RootGeneric<Int32>, #RootGeneric.z
   %z = load %r : $*UInt8
   %t = tuple (%x : $UInt8, %y : $Int32, %z : $UInt8)
   return %t : $(UInt8, Int32, UInt8)
@@ -305,7 +305,7 @@ entry:
 // CHECK: }
 sil @NonGenericInheritsGeneric_fragile_fixed_member_access : $NonGenericInheritsGeneric -> Int {
 entry(%c : $NonGenericInheritsGeneric):
-  %p = ref_element_addr %c : $NonGenericInheritsGeneric, #w
+  %p = ref_element_addr %c : $NonGenericInheritsGeneric, #NonGenericInheritsGeneric.w
   %w = load %p : $*Int
   return %w : $Int
 }

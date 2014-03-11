@@ -445,8 +445,8 @@ bb0(%0 : $Int, %1 : $M):
   %6 = load %2#1 : $*Int  // CHECK: load {{.*}} : $*Int
   %7 = load %4#1 : $*M      // CHECK: load {{.*}} : $*M
   %8 = strong_retain %7 : $M
-  // CHECK: ref_element_addr {{%.*}} : $M, #member
-  %9 = ref_element_addr %7 : $M, #member
+  // CHECK: ref_element_addr {{%.*}} : $M, #M.member
+  %9 = ref_element_addr %7 : $M, #M.member
   %10 = store %6 to %9 : $*Int
   %11 = strong_release %7 : $M
   %12 = tuple ()
@@ -462,8 +462,8 @@ class GenericClass<Q> {
 // CHECK: sil @bound_generic_class_ref_element_addr : $@thin (GenericClass<Int>) -> Int {
 sil @bound_generic_class_ref_element_addr : $@thin GenericClass<Int> -> Int {
 entry(%0 : $GenericClass<Int>):
-  // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int>, #member
-  %1 = ref_element_addr %0 : $GenericClass<Int>, #member
+  // CHECK: %1 = ref_element_addr %0 : $GenericClass<Int>, #GenericClass.member
+  %1 = ref_element_addr %0 : $GenericClass<Int>, #GenericClass.member
   // CHECK: %2 = load %1 : $*Int
   %2 = load %1 : $*Int
   return %2 : $Int
