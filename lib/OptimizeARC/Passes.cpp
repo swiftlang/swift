@@ -835,7 +835,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     // Okay, if we got here, the instruction can be eaten so-long as all of its
     // uses can be.  Scan through the uses and add them to the worklist for
     // recursive processing.
-    for (auto UI = I->use_begin(), E = I->use_end(); UI != E; ++UI) {
+    for (auto UI = I->user_begin(), E = I->user_end(); UI != E; ++UI) {
       Instruction *User = cast<Instruction>(*UI);
       
       // Handle stores as a special case here: we want to make sure that the
@@ -844,7 +844,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // short-cut the classification scheme above.
       if (StoreInst *SI = dyn_cast<StoreInst>(User)) {
         // If this is a store *to* the object, we can zap it.
-        if (UI->getOperandNo() == StoreInst::getPointerOperandIndex()) {
+        if (UI.getOperandNo() == StoreInst::getPointerOperandIndex()) {
           InvolvedInstructions.insert(SI);
           continue;
         }
@@ -853,7 +853,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       }
       if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(User)) {
         // If this is a memset/memcpy/memmove *to* the object, we can zap it.
-        if (UI->getOperandNo() == 0) {
+        if (UI.getOperandNo() == 0) {
           InvolvedInstructions.insert(MI);
           continue;
         }
@@ -1257,10 +1257,10 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       
 
     // Rewrite uses of Ptr to their optimized forms.
-    for (auto UI = Ptr->use_begin(), E = Ptr->use_end(); UI != E; ) {
+    for (auto UI = Ptr->user_begin(), E = Ptr->user_end(); UI != E; ) {
       // Make sure to increment the use iterator before potentially rewriting
       // it.
-      Use &U = *UI;
+      Use &U = UI.getUse();
       ++UI;
       
       // If the use is in the same block that defines it and the User is not a
