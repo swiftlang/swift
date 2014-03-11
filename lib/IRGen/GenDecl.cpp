@@ -523,7 +523,6 @@ static SILLinkage getSILLinkage(FormalLinkage linkage,
     // FIXME: any place we have to do this that actually requires
     // uniqueness is buggy.
     return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
-    return SILLinkage::Shared;
 
   case FormalLinkage::HiddenUnique:
     return (forDefinition ? SILLinkage::Hidden : SILLinkage::HiddenExternal);
