@@ -852,7 +852,7 @@ void Parser::parseDeclDelayed() {
 ///   decl-import:
 ///     'import' attribute-list import-kind? import-path
 ///   import-kind:
-///     ('type'|'typealias')
+///     'typealias'
 ///     'struct'
 ///     'class'
 ///     'enum'
