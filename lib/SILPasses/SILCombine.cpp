@@ -258,6 +258,7 @@ public:
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
   SILInstruction *visitCopyValueInst(CopyValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
+  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -628,6 +629,50 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     // Delete the partial_apply.
     return eraseInstFromFunction(*PAI);
   }
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
+  // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee())) {
+    // Don't handle generic applys.
+    if (AI->hasSubstitutions() || PAI->hasSubstitutions())
+      return nullptr;
+
+    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+    if (!FRI)
+      return nullptr;
+
+    // Prepare the args.
+    SmallVector<SILValue, 8> Args;
+    // First the ApplyInst args.
+    for (auto Op : AI->getArguments())
+      Args.push_back(Op);
+    // Next, the partial apply args.
+    for (auto Op : PAI->getArguments())
+      Args.push_back(Op);
+
+    // The thunk that implements the partial apply calls the closure function
+    // that expects all arguments to be consumed by the function. However, the
+    // captured arguments are not arguments of *this* apply, so they are not
+    // pre-incremented. When we combine the partial_apply and this apply into
+    // a new apply we need to retain all of the closure non-address type
+    // arguments.
+    for (auto Arg : PAI->getArguments())
+      if (!Arg.getType().isAddress())
+        Builder->emitCopyValueOperation(PAI->getLoc(), Arg);
+
+    ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, Args,
+                                          AI->isTransparent());
+
+    // We also need to release the partial_apply instruction itself because it
+    // is consumed by the apply_instruction.
+    Builder->createStrongRelease(AI->getLoc(), PAI);
+
+    replaceInstUsesWith(*AI, NAI);
+    return eraseInstFromFunction(*AI);
+  }
+
   return nullptr;
 }
 
