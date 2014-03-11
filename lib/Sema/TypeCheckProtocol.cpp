@@ -1738,12 +1738,23 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getProtocols()) {
     ProtocolConformance *InheritedConformance = nullptr;
-    if (TC.conformsToProtocol(T, InheritedProto, DC, &InheritedConformance,
+    if (TC.conformsToProtocol(T, InheritedProto, DC,
+                              &InheritedConformance,
                               ComplainLoc, ExplicitConformance)) {
       if (!conformance->hasInheritedConformance(InheritedProto))
         conformance->setInheritedConformance(InheritedProto,
                                              InheritedConformance);
     } else {
+      if (auto knownConformance =
+              TC.Context.getConformsTo(canT, InheritedProto)) {
+        // Check to see if the conformance is in an incomplete state.  If it is,
+        // the inherited protocol has an indirectly recursive requirement.
+        if (knownConformance->getInt() &&
+            (knownConformance->getPointer()->getState() ==
+                ProtocolConformanceState::Incomplete)) {
+          TC.diagnose(InheritedProto, diag::recursive_requirement_reference);
+        }
+      }
       // Recursive call already diagnosed this problem, but tack on a note
       // to establish the relationship.
       if (ComplainLoc.isValid()) {
@@ -1751,7 +1762,7 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     diag::inherited_protocol_does_not_conform, T,
                     InheritedProto->getDeclaredType());
       }
-
+      
       conformance->setState(ProtocolConformanceState::Invalid);
       return conformance;
     }
