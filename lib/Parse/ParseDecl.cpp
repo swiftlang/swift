@@ -294,14 +294,24 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
   return false;
 }
 
+bool Parser::canParseTypeAttribute() {
+  TypeAttributes attrs; // ignored
+  return !parseTypeAttribute(attrs, /*justChecking*/ true);
+}
+
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
 /// \endverbatim
-bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
+///
+/// \param justChecking - if true, we're just checking whether we
+///   canParseTypeAttribute; don't emit any diagnostics, and there's
+///   no need to actually record the attribute
+bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) && !Tok.is(tok::kw_in)) {
-    diagnose(Tok, diag::expected_attribute_name);
+    if (!justChecking)
+      diagnose(Tok, diag::expected_attribute_name);
     return true;
   }
   
@@ -309,6 +319,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   TypeAttrKind attr = getTypeAttrFromString(Tok.getText());
 
   if (attr == TAK_Count) {
+    if (justChecking) return true;
+
     StringRef Text = Tok.getText();
     bool isDeclAttribute = false
 #define ATTR(X) || Text == #X
@@ -339,12 +351,21 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
   SourceLoc Loc = consumeToken();
   
   // Diagnose duplicated attributes.
-  if (Attributes.has(attr))
+  if (justChecking) {
+    // do nothing
+  } else if (Attributes.has(attr)) {
     diagnose(Loc, diag::duplicate_attribute);
-  else
+  } else {
     Attributes.setAttr(attr, Loc);
+  }
   
   // Handle any attribute-specific processing logic.
+
+  // In just-checking mode, we only need additional parsing for the "cc"
+  // attribute.  (Note that we're never in just-checking mode in SIL mode.)
+  if (justChecking && attr != TAK_cc)
+    return false;
+
   switch (attr) {
   default: break;
   case TAK_local_storage:
@@ -376,7 +397,8 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
       diagnose(Loc, diag::duplicate_attribute);
       break;
     }
-    Attributes.setAttr(attr, Loc);
+    if (!justChecking)
+      Attributes.setAttr(attr, Loc);
     break;
 
   // 'inout' attribute.
@@ -388,7 +410,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
     break;
       
   case TAK_opened: {
-    // Parse the opened existential ID in parents
+    // Parse the opened existential ID in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     Attributes.setAttr(TAK_opened, beginLoc);
     if (consumeIfNotAtStartOfLine(tok::l_paren)) {
@@ -429,15 +451,26 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes) {
         nameLoc = Tok.getLoc();
         name = Tok.getText();
         consumeToken();
-      } else {
+      } else if (!justChecking) {
         diagnose(Tok, diag::cc_attribute_expected_name);
       }
-      parseMatchingToken(tok::r_paren, endLoc,
-                         diag::cc_attribute_expected_rparen,
-                         beginLoc);
-    } else {
+
+      // Parse the ')'.  We can't use parseMatchingToken if we're in
+      // just-checking mode.
+      if (!justChecking) {
+        if (parseMatchingToken(tok::r_paren, endLoc,
+                               diag::cc_attribute_expected_rparen,
+                               beginLoc))
+          return true;
+      } else if (!consumeIf(tok::r_paren)) {
+        return true;
+      }
+    } else if (!justChecking) {
       diagnose(Tok, diag::cc_attribute_expected_lparen);
     }
+
+    // Don't validate the CC in just-checking mode.
+    if (justChecking) return false;
     
     if (!name.empty()) {
       Attributes.cc = llvm::StringSwitch<Optional<AbstractCC>>(name)

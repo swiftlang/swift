@@ -681,6 +681,12 @@ bool Parser::canParseType() {
       return false;
     break;
   }
+  case tok::at_sign: {
+    consumeToken();
+    if (!canParseTypeAttribute())
+      return false;
+    return canParseType();
+  }
   default:
     return false;
   }

@@ -627,7 +627,8 @@ public:
     return false;
   }
   bool parseTypeAttributeListPresent(TypeAttributes &Attributes);
-  bool parseTypeAttribute(TypeAttributes &Attributes);
+  bool parseTypeAttribute(TypeAttributes &Attributes,
+                          bool justChecking = false);
   
   
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
@@ -848,6 +849,7 @@ public:
   bool canParseTypeIdentifier();
   bool canParseTypeComposition();
   bool canParseTypeTupleBody();
+  bool canParseTypeAttribute();
   bool canParseTypeArray();
   bool canParseGenericArguments();
 
