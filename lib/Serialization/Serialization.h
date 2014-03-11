@@ -164,8 +164,11 @@ private:
     llvm_unreachable("unknown offset kind");
   }
 
-  /// Writes the BLOCKINFO block.
+  /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
+
+  /// Writes the BLOCKINFO block for the module documentation file.
+  void writeDocBlockInfoBlock();
 
   /// Writes the Swift module file header, BLOCKINFO block, and
   /// non-module-specific metadata, other than the module name.
@@ -268,6 +271,9 @@ public:
   void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                      const SILModule *M, bool serializeAllSIL,
                      FilenamesTy inputFiles, StringRef moduleLinkName);
+
+  /// Serialize module documentation to the given stream.
+  void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);
 
   /// Records the use of the given Type.
   ///

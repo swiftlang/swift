@@ -17,6 +17,7 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/Subsystems.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
@@ -90,6 +91,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   setTargetConfigurations(Invocation.getIRGenOptions(),
                           Invocation.getLangOptions());
 
+  // If we are asked to emit a module documentation file, configure lexing and
+  // parsing to remember comments.
+  if (!Invocation.getFrontendOptions().ModuleDocOutputPath.empty())
+    Invocation.getLangOptions().AttachCommentsToDecls = true;
+
   Context.reset(new ASTContext(Invocation.getLangOptions(),
                                Invocation.getSearchPathOptions(),
                                SourceMgr, Diagnostics));
@@ -144,15 +150,22 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // and they can replace the contents of an input filename.
   for (unsigned i = 0, e = Invocation.getInputBuffers().size(); i != e; ++i) {
     // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    unsigned BufferID =
-        SourceMgr.addMemBufferCopy(Invocation.getInputBuffers()[i]);
-    BufferIDs.push_back(BufferID);
+    auto *InputBuffer = Invocation.getInputBuffers()[i];
+    auto *Copy = llvm::MemoryBuffer::getMemBufferCopy(
+        InputBuffer->getBuffer(), InputBuffer->getBufferIdentifier());
+    if (SerializedModuleLoader::isSerializedAST(Copy->getBuffer())) {
+      PartialModules.push_back({ std::unique_ptr<llvm::MemoryBuffer>(Copy),
+                                 nullptr });
+    } else {
+      unsigned BufferID = SourceMgr.addNewSourceBuffer(Copy);
+      BufferIDs.push_back(BufferID);
 
-    if (SILMode)
-      MainBufferID = BufferID;
+      if (SILMode)
+        MainBufferID = BufferID;
 
-    if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
-      PrimaryBufferID = BufferID;
+      if (PrimaryInput && PrimaryInput->isBuffer() && PrimaryInput->Index == i)
+        PrimaryBufferID = BufferID;
+    }
   }
 
   for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
@@ -180,6 +193,23 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                            File, Err.message());
       return true;
+    }
+
+    if (SerializedModuleLoader::isSerializedAST(InputFile->getBuffer())) {
+      llvm::SmallString<128> ModuleDocFilePath(File);
+      llvm::sys::path::replace_extension(ModuleDocFilePath,
+                                         SERIALIZED_MODULE_DOC_EXTENSION);
+      std::unique_ptr<llvm::MemoryBuffer> ModuleDocFile;
+      auto Err = llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath,
+                                                    ModuleDocFile);
+      if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
+                             File, Err.message());
+        return true;
+      }
+      PartialModules.push_back({ std::move(InputFile),
+                                 std::move(ModuleDocFile) });
+      continue;
     }
 
     // Transfer ownership of the MemoryBuffer to the SourceMgr.
@@ -251,21 +281,18 @@ void CompilerInstance::performParse() {
 
   bool hadLoadError = false;
 
-  // Parse all the library files first.
+  // Parse all the partial modules first.
+  for (auto &PM : PartialModules) {
+    assert(PM.ModuleBuffer);
+    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
+                      std::move(PM.ModuleDocBuffer)))
+      hadLoadError = true;
+  }
+
+  // Then parse all the library files.
   for (auto BufferID : BufferIDs) {
     if (BufferID == MainBufferID)
       continue;
-
-    auto Buffer = SourceMgr->getMemoryBuffer(BufferID);
-    if (SerializedModuleLoader::isSerializedAST(Buffer->getBuffer())) {
-      std::unique_ptr<llvm::MemoryBuffer> Input(
-        llvm::MemoryBuffer::getMemBuffer(Buffer->getBuffer(),
-                                         Buffer->getBufferIdentifier(),
-                                         false));
-      if (!SML->loadAST(*MainModule, SourceLoc(), std::move(Input)))
-        hadLoadError = true;
-      continue;
-    }
 
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,

@@ -174,11 +174,16 @@ static bool performCompile(CompilerInstance &Instance,
   if (!opts.ObjCHeaderOutputPath.empty())
     (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule());
 
-  if (!opts.ModuleOutputPath.empty()) {
+  if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
-    serialize(DC, opts.ModuleOutputPath.c_str(), SM.get(),
-              opts.SILSerializeAll, opts.InputFilenames, opts.ModuleLinkName);
+    if (!opts.ModuleOutputPath.empty())
+      serialize(DC, opts.ModuleOutputPath.c_str(), SM.get(),
+                opts.SILSerializeAll, opts.InputFilenames,
+                opts.ModuleLinkName);
+
+    if (!opts.ModuleDocOutputPath.empty())
+      serializeModuleDoc(DC, opts.ModuleDocOutputPath.c_str());
 
     if (Action == FrontendOptions::EmitModuleOnly)
       return false;

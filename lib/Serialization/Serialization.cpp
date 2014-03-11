@@ -14,9 +14,12 @@
 #include "Serialization.h"
 #include "SILFormat.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/RawComment.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
@@ -29,6 +32,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -76,6 +80,7 @@ namespace {
       }
     }
   };
+
 } // end anonymous namespace
 
 namespace llvm {
@@ -322,6 +327,26 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK(KNOWN_PROTOCOL_BLOCK);
 #define PROTOCOL(Id) BLOCK_RECORD(index_block, Id);
 #include "swift/AST/KnownProtocols.def"
+
+#undef BLOCK
+#undef BLOCK_RECORD
+}
+
+void Serializer::writeDocBlockInfoBlock() {
+  BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
+  SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
+
+  BLOCK(MODULE_DOC_BLOCK);
+
+  BLOCK(CONTROL_BLOCK);
+  BLOCK_RECORD(control_block, METADATA);
+  BLOCK_RECORD(control_block, MODULE_NAME);
+
+  BLOCK(COMMENT_BLOCK);
+  BLOCK_RECORD(comment_block, DECL_COMMENTS);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -2231,6 +2256,120 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
   DeclList.emit(scratch, kind, tableOffset, hashTableBlob);
 }
 
+namespace {
+
+struct DeclCommentTableData {
+  StringRef Brief;
+  RawComment Raw;
+};
+
+class DeclCommentTableInfo {
+public:
+  using key_type = StringRef;
+  using key_type_ref = key_type;
+  using data_type = DeclCommentTableData;
+  using data_type_ref = const data_type &;
+
+  uint32_t ComputeHash(key_type_ref key) {
+    assert(!key.empty());
+    return llvm::HashString(key);
+  }
+
+  std::pair<unsigned, unsigned>
+  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+    using namespace clang::io;
+    uint32_t keyLength = key.size();
+
+    // Data consists of brief comment length and brief comment text,
+    uint32_t dataLength = 4 + data.Brief.size();
+    // number of raw comments,
+    dataLength += 4;
+    // length of each raw comment and its text.
+    for (auto C : data.Raw.Comments)
+      dataLength += 4 + C.RawText.size();
+
+    Emit32(out, keyLength);
+    Emit32(out, dataLength);
+    return { keyLength, dataLength };
+  }
+
+  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    out << key;
+  }
+
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                unsigned len) {
+    using namespace clang::io;
+    Emit32(out, data.Brief.size());
+    out << data.Brief;
+    Emit32(out, data.Raw.Comments.size());
+    for (auto C : data.Raw.Comments) {
+      Emit32(out, C.RawText.size());
+      out << C.RawText;
+    }
+  }
+};
+
+} // end unnamed namespace
+
+static void writeDeclCommentTable(
+    const comment_block::DeclCommentListLayout &DeclCommentList,
+    const SourceFile *SF, const Module *M) {
+
+  struct DeclCommentTableWriter : public ASTWalker {
+    llvm::BumpPtrAllocator Arena;
+    llvm::SmallString<512> USRBuffer;
+    OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
+
+    StringRef copyString(StringRef String) {
+      char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
+      std::copy(String.begin(), String.end(), Mem);
+      return StringRef(Mem, String.size());
+    }
+
+    bool walkToDeclPre(Decl *D) override {
+      auto *VD = dyn_cast<ValueDecl>(D);
+      if (!VD)
+        return true;
+
+      // Skip the decl if it does not have a comment.
+      RawComment Raw = VD->getRawComment();
+      if (Raw.Comments.empty())
+        return true;
+
+      // Compute USR.
+      {
+        USRBuffer.clear();
+        llvm::raw_svector_ostream OS(USRBuffer);
+        if (ide::printDeclUSR(VD, OS))
+          return true;
+      }
+
+      generator.insert(copyString(USRBuffer.str()),
+                       { VD->getBriefComment(), Raw });
+      return true;
+    }
+  };
+
+  DeclCommentTableWriter Writer;
+
+  ArrayRef<const FileUnit *> files = SF ? SF : M->getFiles();
+  for (auto nextFile : files)
+    const_cast<FileUnit *>(nextFile)->walk(Writer);
+
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<32> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    clang::io::Emit32(blobStream, 0);
+    tableOffset = Writer.generator.Emit(blobStream);
+  }
+
+  DeclCommentList.emit(scratch, tableOffset, hashTableBlob);
+}
+
 /// Translate from the AST known protocol enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableKnownProtocolKind(KnownProtocolKind kind) {
@@ -2367,7 +2506,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
   // Write the signature through the BitstreamWriter for alignment purposes.
-  for (unsigned char byte : SIGNATURE)
+  for (unsigned char byte : MODULE_SIGNATURE)
     Out.Emit(byte, 8);
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -2383,6 +2522,40 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
     writeInputFiles(M, inputFiles, moduleLinkName);
     writeSIL(SILMod, serializeAllSIL);
     writeAST(DC);
+    Out.FlushToWord();
+
+#ifndef NDEBUG
+    this->M = nullptr;
+    this->SF = nullptr;
+#endif
+  }
+
+  os.write(Buffer.data(), Buffer.size());
+  os.flush();
+  Buffer.clear();
+}
+
+void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+  // Write the signature through the BitstreamWriter for alignment purposes.
+  for (unsigned char byte : MODULE_DOC_SIGNATURE)
+    Out.Emit(byte, 8);
+
+  // FIXME: This is only really needed for debugging. We don't actually use it.
+  writeDocBlockInfoBlock();
+
+  {
+    assert(!this->M && "already serializing a module");
+    this->M = getModule(DC);
+    this->SF = DC.dyn_cast<SourceFile *>();
+
+    BCBlockRAII moduleBlock(Out, MODULE_DOC_BLOCK_ID, 2);
+    writeHeader(M);
+    {
+      BCBlockRAII restoreBlock(Out, COMMENT_BLOCK_ID, 4);
+
+      comment_block::DeclCommentListLayout DeclCommentList(Out);
+      writeDeclCommentTable(DeclCommentList, SF, M);
+    }
     Out.FlushToWord();
 
 #ifndef NDEBUG
@@ -2419,3 +2592,19 @@ void swift::serializeToStream(ModuleOrSourceFile DC, raw_ostream &out,
   Serializer S;
   S.writeToStream(out, DC, M, serializeAllSIL, inputFiles, moduleLinkName);
 }
+
+void swift::serializeModuleDoc(ModuleOrSourceFile DC, const char *outputPath) {
+  std::string errorInfo;
+  llvm::raw_fd_ostream out(outputPath, errorInfo, llvm::sys::fs::F_None);
+
+  if (out.has_error() || !errorInfo.empty()) {
+    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                  outputPath, errorInfo);
+    out.clear_error();
+    return;
+  }
+
+  Serializer S;
+  S.writeDocToStream(out, DC);
+}
+

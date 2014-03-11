@@ -15,14 +15,15 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/RawComment.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/RawComment.h"
-#include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -54,6 +55,16 @@ SingleRawComment::SingleRawComment(CharSourceRange Range,
       Kind(getCommentKind(RawText)),
       StartLine(SourceMgr.getLineNumber(Range.getStart())),
       EndLine(SourceMgr.getLineNumber(Range.getEnd())) {}
+
+SingleRawComment::SingleRawComment(StringRef RawText)
+    : RawText(RawText), Kind(getCommentKind(RawText)),
+      StartLine(0), EndLine(0) {}
+
+static bool canHaveComment(const Decl *D) {
+  return !D->hasClangNode() &&
+         isa<ValueDecl>(D) &&
+         (!isa<AbstractTypeParamDecl>(D) || isa<AssociatedTypeDecl>(D));
+}
 
 static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
                              const SingleRawComment &SRC) {
@@ -108,16 +119,33 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
 }
 
 RawComment Decl::getRawComment() const {
+  if (!canHaveComment(this))
+    return RawComment();
+
+  // Check the cache in ASTContext.
   auto &Context = getASTContext();
   if (Optional<RawComment> RC = Context.getRawComment(this))
     return RC.getValue();
 
-  if (!getAttrs().has(AK_raw_doc_comment))
-    return RawComment();
+  // Check the declaration itself.
+  if (getAttrs().has(AK_raw_doc_comment)) {
+    RawComment Result = toRawComment(Context, getAttrs().CommentRange);
+    Context.setRawComment(this, Result);
+    return Result;
+  }
 
-  RawComment Result = toRawComment(Context, getAttrs().CommentRange);
-  Context.setRawComment(this, Result);
-  return Result;
+  // Ask the parent module.
+  if (auto *Unit =
+          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+    if (Optional<BriefAndRawComment> C = Unit->getCommentForDecl(this)) {
+      Context.setBriefComment(this, C->Brief);
+      Context.setRawComment(this, C->Raw);
+      return C->Raw;
+    }
+  }
+
+  // Give up.
+  return RawComment();
 }
 
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
@@ -145,6 +173,9 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
 }
 
 StringRef Decl::getBriefComment() const {
+  if (!canHaveComment(this))
+    return StringRef();
+
   auto &Context = getASTContext();
   if (Optional<StringRef> Comment = Context.getBriefComment(this))
     return Comment.getValue();

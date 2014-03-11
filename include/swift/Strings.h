@@ -16,6 +16,8 @@
 namespace swift {
   /// The extension for serialized modules.
   static const char SERIALIZED_MODULE_EXTENSION[] = "swiftmodule";
+  /// The extension for serialized documentation comments.
+  static const char SERIALIZED_MODULE_DOC_EXTENSION[] = "swiftdoc";
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
   /// The name of the standard library, which is a reserved module name.

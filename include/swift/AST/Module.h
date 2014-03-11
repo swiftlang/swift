@@ -19,6 +19,7 @@
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
@@ -466,6 +467,16 @@ public:
   virtual void lookupClassMember(Module::AccessPathTy accessPath,
                                  DeclName name,
                                  SmallVectorImpl<ValueDecl*> &results) const {}
+
+  /// Returns the comment attached to the given declaration.
+  ///
+  /// This function is an implementation detail for comment serialization.
+  /// If you just want to get a comment attached to a decl, use
+  /// \c Decl::getRawComment() or \c Decl::getBriefComment().
+  virtual Optional<BriefAndRawComment>
+  getCommentForDecl(const Decl *D) const {
+    return Nothing;
+  }
 
   /// Finds all top-level decls in this file.
   ///

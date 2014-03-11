@@ -34,6 +34,7 @@ struct SingleRawComment {
   const unsigned EndLine;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
+  SingleRawComment(StringRef RawText);
 
   SingleRawComment(const SingleRawComment &) = default;
   SingleRawComment &operator=(const SingleRawComment &) = default;
@@ -56,6 +57,11 @@ struct RawComment {
   bool isEmpty() const {
     return Comments.empty();
   }
+};
+
+struct BriefAndRawComment {
+  StringRef Brief;
+  RawComment Raw;
 };
 
 } // namespace swift

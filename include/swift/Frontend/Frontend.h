@@ -38,12 +38,9 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 #include <memory>
-
-namespace llvm {
-  class MemoryBuffer;
-}
 
 namespace swift {
 
@@ -279,7 +276,17 @@ class CompilerInstance {
   Module *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
 
+  /// Contains buffer IDs for input source code files.
   std::vector<unsigned> BufferIDs;
+
+  struct PartialModuleInputs {
+    std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
+  };
+
+  /// Contains \c MemoryBuffers for partial serialized module files and
+  /// corresponding partial serialized module documentation files.
+  std::vector<PartialModuleInputs> PartialModules;
 
   enum : unsigned { NO_SUCH_BUFFER = ~0U };
   unsigned MainBufferID = NO_SUCH_BUFFER;

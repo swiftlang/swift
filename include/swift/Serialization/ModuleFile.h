@@ -19,6 +19,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/RawComment.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/ModuleFormat.h"
@@ -54,10 +55,14 @@ class ModuleFile : public LazyMemberLoader {
   Module *ShadowedModule = nullptr;
 
   /// The module file data.
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> ModuleDocInputBuffer;
 
-  /// The reader attached to InputFile.
-  llvm::BitstreamReader InputReader;
+  /// The reader attached to \c ModuleInputBuffer.
+  llvm::BitstreamReader ModuleInputReader;
+
+  /// The reader attached to \c ModuleDocInputBuffer.
+  llvm::BitstreamReader ModuleDocInputReader;
 
   /// The cursor used to lazily load things from the file.
   llvm::BitstreamCursor DeclTypeCursor;
@@ -224,6 +229,12 @@ private:
   DeclIDVector KnownProtocolAdopters[NumKnownProtocols];
   DeclIDVector EagerDeserializationDecls;
 
+  class DeclCommentTableInfo;
+  using SerializedDeclCommentTable =
+      clang::OnDiskChainedHashTable<DeclCommentTableInfo>;
+
+  std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
+
   struct {
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
@@ -243,7 +254,9 @@ private:
   }
 
   /// Constructs an new module and validates it.
-  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input, bool isFramework);
+  ModuleFile(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+             std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+             bool isFramework);
 
 public:
   /// Change the status of the current module. Default argument marks the module
@@ -278,6 +291,16 @@ private:
   ///
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
+
+  /// Read an on-disk decl hash table stored in
+  /// \c comment_block::DeclCommentListLayout format.
+  std::unique_ptr<SerializedDeclCommentTable>
+  readDeclCommentTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  /// Reads the comment block, which contains USR to comment mappings.
+  ///
+  /// Returns false if there was an error.
+  bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
   ///
@@ -326,17 +349,20 @@ public:
 
   /// Loads a module from the given memory buffer.
   ///
-  /// \param input A memory buffer containing the serialized module data.
-  ///              The created module takes ownership of the buffer, even if
-  ///              there's an error in loading.
-  /// \param[out] module The loaded module.
+  /// \param moduleInputBuffer A memory buffer containing the serialized module
+  /// data.  The created module takes ownership of the buffer, even if there's
+  /// an error in loading.
+  /// \param[out] theModule The loaded module.
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
-  static ModuleStatus load(std::unique_ptr<llvm::MemoryBuffer> input,
-                           std::unique_ptr<ModuleFile> &module,
-                           bool isFramework) {
-    module.reset(new ModuleFile(std::move(input), isFramework));
-    return module->getStatus();
+  static ModuleStatus
+  load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+       bool isFramework, std::unique_ptr<ModuleFile> &theModule) {
+    theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
+                                   std::move(moduleDocInputBuffer),
+                                   isFramework));
+    return theModule->getStatus();
   }
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
@@ -423,7 +449,7 @@ public:
 
   StringRef getModuleFilename() const {
     // FIXME: This seems fragile, maybe store the filename separately ?
-    return InputFile->getBufferIdentifier();
+    return ModuleInputBuffer->getBufferIdentifier();
   }
 
   llvm::BitstreamCursor getSILCursor() const {
@@ -488,6 +514,9 @@ public:
 
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;
+
+   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
+   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
 };
 
 } // end namespace swift

@@ -27,7 +27,10 @@ namespace swift {
 namespace serialization {
 
 /// Magic number for serialized module files.
-const unsigned char SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
+const unsigned char MODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
+
+/// Magic number for serialized documentation files.
+const unsigned char MODULE_DOC_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x07 };
 
 /// Serialized module format major version number.
 ///
@@ -37,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 29;
+const uint16_t VERSION_MINOR = 32;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -260,6 +263,15 @@ enum BlockID {
   /// This contains lists of decls known to conform to each compiler-known
   /// protocol.
   KNOWN_PROTOCOL_BLOCK_ID = 64,
+
+  /// The module documentation container block, which contains all other
+  /// documentation blocks.
+  MODULE_DOC_BLOCK_ID = 96,
+
+  /// The comment block, which contains documentation comments.
+  ///
+  /// \sa comment_block
+  COMMENT_BLOCK_ID,
 };
 
 /// The record types within the control block.
@@ -1038,6 +1050,19 @@ namespace index_block {
     BCArray<DeclIDField> // list of conforming decls
   >;
 }
+
+/// \sa COMMENT_BLOCK_ID
+namespace comment_block {
+  enum RecordKind {
+    DECL_COMMENTS = 1,
+  };
+
+  using DeclCommentListLayout = BCRecordLayout<
+    DECL_COMMENTS, // record ID
+    BCVBR<16>,     // table offset within the blob (see below)
+    BCBlob         // map from Decl IDs to comments
+  >;
+} // namespace comment_block
 
 } // end namespace serialization
 } // end namespace swift

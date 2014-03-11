@@ -26,6 +26,16 @@ def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
 def primary_file_EQ : Joined<["-"], "primary-file=">, Alias<primary_file>;
 
+def emit_module_doc : Flag<["-"], "emit-module-doc">,
+  HelpText<"Emit a module documentation file based on documentation "
+           "comments">;
+def emit_module_doc_path
+  : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
+    HelpText<"Output module documentation file <path>">;
+def emit_module_doc_path_EQ
+  : Joined<["-"], "emit-module-doc-path=">,
+    Alias<emit_module_doc_path_EQ>;
+
 def serialize_diagnostics_path
   : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
     HelpText<"Output serialized diagnostics to <path>">;

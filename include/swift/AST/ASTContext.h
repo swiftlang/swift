@@ -250,6 +250,13 @@ public:
   }
 
   template <typename T>
+  MutableArrayRef<T> AllocateUninitialized(unsigned NumElts,
+              AllocationArena Arena = AllocationArena::Permanent) const {
+    T *Data = (T *) Allocate(sizeof(T) * NumElts, alignof(T), Arena);
+    return { Data, NumElts };
+  }
+
+  template <typename T>
   MutableArrayRef<T> Allocate(unsigned numElts,
               AllocationArena arena = AllocationArena::Permanent) const {
     T *res = (T *) Allocate(sizeof(T) * numElts, alignof(T), arena);

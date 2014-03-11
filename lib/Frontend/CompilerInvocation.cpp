@@ -433,6 +433,12 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                             SERIALIZED_MODULE_EXTENSION,
                             canUseMainOutputForModule);
 
+  Opts.ModuleDocOutputPath =
+    determineOutputFilename(OPT_emit_module_doc,
+                            OPT_emit_module_doc_path,
+                            SERIALIZED_MODULE_DOC_EXTENSION,
+                            false);
+
   if (!Opts.ObjCHeaderOutputPath.empty()) {
     switch (Opts.RequestedAction) {
     case FrontendOptions::DumpParse:
@@ -454,7 +460,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  if (!Opts.ModuleOutputPath.empty()) {
+  if (!Opts.ModuleOutputPath.empty() ||
+      !Opts.ModuleDocOutputPath.empty()) {
     switch (Opts.RequestedAction) {
     case FrontendOptions::Parse:
     case FrontendOptions::DumpParse:
@@ -463,7 +470,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
-      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+      if (!Opts.ModuleOutputPath.empty())
+        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
+      else
+        Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_doc);
       return true;
     case FrontendOptions::EmitModuleOnly:
     case FrontendOptions::EmitSIL:

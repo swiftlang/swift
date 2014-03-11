@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
@@ -28,14 +29,22 @@
 using namespace swift;
 using namespace swift::serialization;
 
-static bool checkSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : SIGNATURE)
+static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
+  for (unsigned char byte : MODULE_SIGNATURE)
+    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
+      return false;
+  return true;
+}
+
+static bool checkModuleDocSignature(llvm::BitstreamCursor &cursor) {
+  for (unsigned char byte : MODULE_DOC_SIGNATURE)
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
       return false;
   return true;
 }
 
 static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
+                                     unsigned ID,
                                      bool shouldReadBlockInfo = true) {
   auto next = cursor.advance();
 
@@ -50,13 +59,13 @@ static bool enterTopLevelModuleBlock(llvm::BitstreamCursor &cursor,
       if (cursor.SkipBlock())
         return false;
     }
-    return enterTopLevelModuleBlock(cursor, false);
+    return enterTopLevelModuleBlock(cursor, ID, false);
   }
 
-  if (next.ID != MODULE_BLOCK_ID)
+  if (next.ID != ID)
     return false;
 
-  cursor.EnterSubBlock(MODULE_BLOCK_ID);
+  cursor.EnterSubBlock(ID);
   return true;
 }
 
@@ -138,7 +147,8 @@ SerializedModuleLoader::validateSerializedAST(StringRef data) {
   llvm::BitstreamCursor cursor(reader);
   SmallVector<uint64_t, 32> scratch;
 
-  if (!checkSignature(cursor) || !enterTopLevelModuleBlock(cursor, false))
+  if (!checkModuleSignature(cursor) ||
+      !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID, false))
     return result;
 
   auto topLevelEntry = cursor.advance();
@@ -260,7 +270,7 @@ bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
 
   SmallVector<uint64_t, 8> scratch;
 
-  do {
+  while (true) {
     auto next = cursor.advanceSkippingSubblocks();
     switch (next.Kind) {
     case llvm::BitstreamEntry::EndBlock:
@@ -289,7 +299,7 @@ bool ModuleFile::readKnownProtocolsBlock(llvm::BitstreamCursor &cursor) {
       break;
     }
     }
-  } while (true);
+  }
 }
 
 bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
@@ -298,7 +308,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
   SmallVector<uint64_t, 4> scratch;
   StringRef blobData;
 
-  do {
+  while (true) {
     auto next = cursor.advance();
     switch (next.Kind) {
     case llvm::BitstreamEntry::EndBlock:
@@ -359,7 +369,119 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       }
       break;
     }
-  } while (true);
+  }
+}
+
+class ModuleFile::DeclCommentTableInfo {
+  ModuleFile &F;
+
+public:
+  using internal_key_type = StringRef;
+  using external_key_type = StringRef;
+  using data_type = BriefAndRawComment;
+
+  DeclCommentTableInfo(ModuleFile &F) : F(F) {}
+
+  internal_key_type GetInternalKey(external_key_type key) {
+    return key;
+  }
+
+  uint32_t ComputeHash(internal_key_type key) {
+    assert(!key.empty());
+    return llvm::HashString(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    using namespace clang::io;
+    unsigned keyLength = ReadUnalignedLE32(data);
+    unsigned dataLength = ReadUnalignedLE32(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    using namespace clang::io;
+    return StringRef(reinterpret_cast<const char *>(data), length);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data,
+                     unsigned length) {
+    using namespace clang::io;
+    data_type result;
+
+    {
+      unsigned BriefSize = ReadUnalignedLE32(data);
+      result.Brief = StringRef(reinterpret_cast<const char *>(data), BriefSize);
+      data += BriefSize;
+    }
+
+    unsigned NumComments = ReadUnalignedLE32(data);
+    MutableArrayRef<SingleRawComment> Comments =
+        F.getContext().AllocateUninitialized<SingleRawComment>(NumComments);
+
+    for (unsigned i = 0; i != NumComments; ++i) {
+      unsigned RawSize = ReadUnalignedLE32(data);
+      auto RawText = StringRef(reinterpret_cast<const char *>(data), RawSize);
+      data += RawSize;
+
+      new (&Comments[i]) SingleRawComment(RawText);
+    }
+    result.Raw = RawComment(Comments);
+    return result;
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedDeclCommentTable>
+ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
+                                 StringRef blobData) {
+  uint32_t tableOffset;
+  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+
+  return std::unique_ptr<SerializedDeclCommentTable>(
+      SerializedDeclCommentTable::Create(base + tableOffset, base,
+          DeclCommentTableInfo(*this)));
+}
+
+bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
+  cursor.EnterSubBlock(COMMENT_BLOCK_ID);
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  while (true) {
+    auto next = cursor.advance();
+    switch (next.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unknown sub-block, which this version of the compiler won't use.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record:
+      scratch.clear();
+      unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+
+      switch (kind) {
+      case comment_block::DECL_COMMENTS:
+        DeclCommentTable = readDeclCommentTable(scratch, blobData);
+        break;
+      default:
+        // Unknown index kind, which this version of the compiler won't use.
+        break;
+      }
+      break;
+    }
+  }
 }
 
 static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
@@ -378,22 +500,39 @@ static Optional<swift::LibraryKind> getActualLibraryKind(unsigned rawKind) {
   return Nothing;
 }
 
+static const uint8_t *getStartBytePtr(llvm::MemoryBuffer *buffer) {
+  if (!buffer)
+    return nullptr;
+  return reinterpret_cast<const uint8_t *>(buffer->getBufferStart());
+}
 
-ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input,
-                       bool isFramework)
-  : FileContext(nullptr),
-    InputFile(std::move(input)),
-    InputReader(reinterpret_cast<const uint8_t *>(InputFile->getBufferStart()),
-                reinterpret_cast<const uint8_t *>(InputFile->getBufferEnd())),
-    Bits() {
+static const uint8_t *getEndBytePtr(llvm::MemoryBuffer *buffer) {
+  if (!buffer)
+    return nullptr;
+  return reinterpret_cast<const uint8_t *>(buffer->getBufferEnd());
+}
+
+ModuleFile::ModuleFile(
+    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    bool isFramework)
+    : FileContext(nullptr),
+      ModuleInputBuffer(std::move(moduleInputBuffer)),
+      ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
+      ModuleInputReader(getStartBytePtr(this->ModuleInputBuffer.get()),
+                        getEndBytePtr(this->ModuleInputBuffer.get())),
+      ModuleDocInputReader(getStartBytePtr(this->ModuleDocInputBuffer.get()),
+                           getEndBytePtr(this->ModuleDocInputBuffer.get())),
+      Bits() {
   assert(getStatus() == ModuleStatus::Valid);
   Bits.IsFramework = isFramework;
 
   PrettyModuleFileDeserialization stackEntry(*this);
 
-  llvm::BitstreamCursor cursor{InputReader};
+  llvm::BitstreamCursor cursor{ModuleInputReader};
 
-  if (!checkSignature(cursor) || !enterTopLevelModuleBlock(cursor)) {
+  if (!checkModuleSignature(cursor) ||
+      !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
     error();
     return;
   }
@@ -569,6 +708,45 @@ ModuleFile::ModuleFile(std::unique_ptr<llvm::MemoryBuffer> input,
     }
 
     topLevelEntry = cursor.advance(AF_DontPopBlockAtEnd);
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+    error();
+    return;
+  }
+
+  if (!this->ModuleDocInputBuffer)
+    return;
+
+  llvm::BitstreamCursor docCursor{ModuleDocInputReader};
+  if (!checkModuleDocSignature(docCursor) ||
+      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
+    error();
+    return;
+  }
+
+  topLevelEntry = docCursor.advance();
+  while (topLevelEntry.Kind == llvm::BitstreamEntry::SubBlock) {
+    switch (topLevelEntry.ID) {
+    case COMMENT_BLOCK_ID: {
+      if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
+        error();
+        return;
+      }
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (docCursor.SkipBlock()) {
+        error();
+        return;
+      }
+      break;
+    }
+
+    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
@@ -931,3 +1109,46 @@ void ModuleFile::getDisplayDecls(SmallVectorImpl<Decl *> &results) {
   getImportDecls(results);
   getTopLevelDecls(results);
 }
+
+Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
+  assert(D);
+
+  // Keep these as assertions instead of early exits to ensure that we are not
+  // doing extra work.  These cases should be handled by clients of this API.
+  assert(!D->hasClangNode() &&
+         "can not find comments for Clang decls in Swift modules");
+  assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
+         "Decl is from a different serialized file");
+
+  if (!DeclCommentTable)
+    return Nothing;
+
+  if (D->isImplicit())
+    return Nothing;
+
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD)
+    return Nothing;
+
+  // Compute the USR.
+  llvm::SmallString<128> USRBuffer;
+  {
+    llvm::raw_svector_ostream OS(USRBuffer);
+    if (ide::printDeclUSR(VD, OS))
+      return Nothing;
+  }
+
+  return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
+  if (!DeclCommentTable)
+    return Nothing;
+
+  auto I = DeclCommentTable->find(USR);
+  if (I == DeclCommentTable->end())
+    return Nothing;
+
+  return *I;
+}
+

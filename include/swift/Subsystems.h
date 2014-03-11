@@ -164,6 +164,9 @@ namespace swift {
                          ArrayRef<std::string> inputFilenames = {},
                          StringRef moduleLinkName = {});
 
+  /// Writes a module documentation file.
+  void serializeModuleDoc(ModuleOrSourceFile DC, const char *outputPath);
+
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
   std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,

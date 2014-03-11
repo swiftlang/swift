@@ -33,67 +33,112 @@ typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
-static llvm::error_code findModule(ASTContext &ctx, AccessPathElem moduleID,
-                                   std::unique_ptr<llvm::MemoryBuffer> &buffer,
-                                   bool &isFramework) {
+static llvm::error_code
+openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+                StringRef ModuleDocFilename,
+                std::unique_ptr<llvm::MemoryBuffer> &ModuleBuffer,
+                std::unique_ptr<llvm::MemoryBuffer> &ModuleDocBuffer,
+                llvm::SmallVectorImpl<char> &Scratch) {
+  // Try to open the module file first.  If we fail, don't even look for the
+  // module documentation file.
+  Scratch.clear();
+  llvm::sys::path::append(Scratch, DirName, ModuleFilename);
+  if (auto Err = llvm::MemoryBuffer::getFile(
+          StringRef(Scratch.data(), Scratch.size()), ModuleBuffer))
+    return Err;
+
+  // Try to open the module documentation file.  If it does not exist, ignore
+  // the error.  However, pass though all other errors.
+  Scratch.clear();
+  llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
+  auto Err = llvm::MemoryBuffer::getFile(
+      StringRef(Scratch.data(), Scratch.size()), ModuleDocBuffer);
+  if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
+    ModuleBuffer.reset(nullptr);
+    return Err;
+  }
+  return llvm::error_code();
+}
+
+static llvm::error_code
+findModule(ASTContext &ctx, AccessPathElem moduleID,
+           std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer,
+           std::unique_ptr<llvm::MemoryBuffer> &moduleDocBuffer,
+           bool &isFramework) {
   llvm::SmallString<64> moduleFilename(moduleID.first.str());
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
-  llvm::SmallString<128> inputFilename;
+  llvm::SmallString<64> moduleDocFilename(moduleID.first.str());
+  moduleDocFilename += '.';
+  moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
+
+  llvm::SmallString<128> scratch;
 
   isFramework = false;
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
-    inputFilename = path;
-    llvm::sys::path::append(inputFilename, moduleFilename.str());
-    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
+    auto err = openModuleFiles(path, moduleFilename.str(),
+                               moduleDocFilename.str(), moduleBuffer,
+                               moduleDocBuffer, scratch);
     if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
 
-  llvm::SmallString<64> moduleFramework(moduleID.first.str());
-  moduleFramework += ".framework";
-  isFramework = true;
+  {
+    llvm::SmallString<64> moduleFramework(moduleID.first.str());
+    moduleFramework += ".framework";
+    isFramework = true;
 
-  // FIXME: Which name should we be using here? Do we care about CPU subtypes?
-  // FIXME: At the very least, don't hardcode "arch".
-  llvm::SmallString<16> archFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
-  if (!archFilename.empty()) {
-    archFilename += '.';
-    archFilename += SERIALIZED_MODULE_EXTENSION;
-  }
+    // FIXME: Which name should we be using here? Do we care about CPU subtypes?
+    // FIXME: At the very least, don't hardcode "arch".
+    llvm::SmallString<16> archFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
+    llvm::SmallString<16> archDocFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
+    if (!archFilename.empty()) {
+      archFilename += '.';
+      archFilename += SERIALIZED_MODULE_EXTENSION;
 
-  for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
-    inputFilename = path;
-    llvm::sys::path::append(inputFilename, moduleFramework.str(),
-                            moduleFilename.str(), archFilename.str());
-    auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
-      return err;
+      moduleDocFilename = ctx.LangOpts.TargetConfigOptions["arch"];
+      moduleDocFilename += '.';
+      moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
+    }
+
+    llvm::SmallString<128> currPath;
+    for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
+      currPath.clear();
+      llvm::sys::path::append(currPath, path, moduleFramework.str(),
+                              moduleFilename.str());
+      auto err = openModuleFiles(currPath, archFilename.str(),
+                                 archDocFilename.str(), moduleBuffer,
+                                 moduleDocBuffer, scratch);
+      if (!err || err.value() != llvm::errc::no_such_file_or_directory)
+        return err;
+    }
   }
 
   // Search the runtime import path.
   isFramework = false;
-  inputFilename = ctx.SearchPathOpts.RuntimeLibraryImportPath;
-  llvm::sys::path::append(inputFilename, moduleFilename.str());
-  return llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
+  return openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
+                         moduleFilename.str(), moduleDocFilename.str(),
+                         moduleBuffer, moduleDocBuffer, scratch);
 }
 
-FileUnit *
-SerializedModuleLoader::loadAST(Module &M, Optional<SourceLoc> diagLoc,
-                                std::unique_ptr<llvm::MemoryBuffer> input,
-                                bool isFramework) {
-  assert(input);
+FileUnit *SerializedModuleLoader::loadAST(
+    Module &M, Optional<SourceLoc> diagLoc,
+    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    bool isFramework) {
+  assert(moduleInputBuffer);
 
-  if (input->getBufferSize() % 4 != 0) {
+  if (moduleInputBuffer->getBufferSize() % 4 != 0) {
     if (diagLoc)
       Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
     return nullptr;
   }
 
   std::unique_ptr<ModuleFile> loadedModuleFile;
-  ModuleStatus err = ModuleFile::load(std::move(input), loadedModuleFile,
-                                      isFramework);
+  ModuleStatus err = ModuleFile::load(std::move(moduleInputBuffer),
+                                      std::move(moduleDocInputBuffer),
+                                      isFramework, loadedModuleFile);
   switch (err) {
   case ModuleStatus::Valid:
     Ctx.bumpGeneration();
@@ -196,7 +241,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
   auto moduleID = path[0];
   bool isFramework = false;
 
-  std::unique_ptr<llvm::MemoryBuffer> inputFile;
+  std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer;
   // First see if we find it in the registered memory buffers.
   if (!MemoryBuffers.empty()) {
     // FIXME: Right now this works only with access paths of length 1.
@@ -208,12 +254,13 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
     auto bs = MemoryBuffers.find(spath.str());
     if (bs != MemoryBuffers.end())
-      inputFile.reset(bs->second.release());
+      moduleInputBuffer.reset(bs->second.release());
   }
 
   // Otherwise look on disk.
-  if (!inputFile) {
-    if (llvm::error_code err = findModule(Ctx, moduleID, inputFile,
+  if (!moduleInputBuffer) {
+    if (llvm::error_code err = findModule(Ctx, moduleID, moduleInputBuffer,
+                                          moduleDocInputBuffer,
                                           isFramework)) {
       if (err.value() != llvm::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
@@ -224,12 +271,13 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
     }
   }
 
-  assert(inputFile);
+  assert(moduleInputBuffer);
 
   auto M = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = M;
 
-  (void)loadAST(*M, moduleID.second, std::move(inputFile), isFramework);
+  (void)loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
+                std::move(moduleDocInputBuffer), isFramework);
   return M;
 }
 
@@ -253,9 +301,9 @@ SerializedModuleLoader::loadDeclsConformingTo(KnownProtocolKind kind,
 }
 
 bool SerializedModuleLoader::isSerializedAST(StringRef data) {
-  using serialization::SIGNATURE;
-  StringRef signatureStr(reinterpret_cast<const char *>(SIGNATURE),
-                         llvm::array_lengthof(SIGNATURE));
+  using serialization::MODULE_SIGNATURE;
+  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
+                         llvm::array_lengthof(MODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 
@@ -313,6 +361,10 @@ SerializedASTFile::lookupClassMember(Module::AccessPathTy accessPath,
   File.lookupClassMember(accessPath, name, decls);
 }
 
+Optional<BriefAndRawComment>
+SerializedASTFile::getCommentForDecl(const Decl *D) const {
+  return File.getCommentForDecl(D);
+}
 
 void SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const{
   File.getTopLevelDecls(results);

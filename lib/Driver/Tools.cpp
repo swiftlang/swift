@@ -93,6 +93,7 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
 /// module-merging, etc).
 static void addCommonFrontendArgs(const ToolChain &TC,
                                   const OutputInfo &OI,
+                                  CommandOutput *output,
                                   const ArgList &inputArgs,
                                   ArgStringList &arguments) {
   arguments.push_back("-target");
@@ -119,8 +120,15 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   // Pass through any -Xllvm flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
-}
 
+  const std::string &moduleDocOutputPath =
+      output->getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
+  if (!moduleDocOutputPath.empty()) {
+    arguments.push_back("-emit-module-doc");
+    arguments.push_back("-emit-module-doc-path");
+    arguments.push_back(moduleDocOutputPath.c_str());
+  }
+}
 
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
@@ -172,6 +180,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     case types::TY_Swift:
     case types::TY_dSYM:
     case types::TY_Dependencies:
+    case types::TY_SwiftModuleDocFile:
     case types::TY_ClangModuleFile:
     case types::TY_SerializedDiagnostics:
     case types::TY_ObjCHeader:
@@ -239,7 +248,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
   }
 
-  addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
+  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 
   Args.AddLastArg(Arguments, options::OPT_module_link_name);
 
@@ -323,7 +332,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
   // serialized ASTs.
   Arguments.push_back("-parse-as-library");
 
-  addCommonFrontendArgs(getToolChain(), OI, Args, Arguments);
+  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 
   assert(Output->getPrimaryOutputType() == types::TY_SwiftModuleFile &&
          "The MergeModule tool only produces swiftmodule files!");

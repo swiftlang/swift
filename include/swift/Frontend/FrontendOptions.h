@@ -79,6 +79,9 @@ public:
   /// The path to which we should emit a serialized module.
   std::string ModuleOutputPath;
 
+  /// The path to which we should emit a module documentation file.
+  std::string ModuleDocOutputPath;
+
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
 

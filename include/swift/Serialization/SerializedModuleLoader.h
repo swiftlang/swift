@@ -87,7 +87,8 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   FileUnit *loadAST(Module &M, Optional<SourceLoc> diagLoc,
-                    std::unique_ptr<llvm::MemoryBuffer> input,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                     bool isFramework = false);
 
   /// \brief Register a memory buffer that contains the serialized
@@ -164,6 +165,8 @@ public:
   virtual void
   lookupClassMember(Module::AccessPathTy accessPath, DeclName name,
                     SmallVectorImpl<ValueDecl*> &decls) const override;
+
+  Optional<BriefAndRawComment> getCommentForDecl(const Decl *D) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 

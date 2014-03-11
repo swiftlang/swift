@@ -373,12 +373,13 @@ function(compile_swift_files)
     set(module_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
     set(module_file ${module_dir}/${module_name}.swiftmodule)
+    set(module_doc_file ${module_source_dir}/${module_name}.swiftdoc)
     list(APPEND swift_flags -emit-module -emit-module-path ${module_file})
 
     set(create_module_dir
       COMMAND ${CMAKE_COMMAND} -E make_directory ${module_dir})
 
-    install(FILES ${module_file}
+    install(FILES ${module_file} ${module_doc_file}
       DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}${arch_subdir})
   endif()
 

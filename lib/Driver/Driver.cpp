@@ -874,6 +874,29 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     }
   }
 
+  // Choose the swiftdoc output path.
+  if (OI.ShouldGenerateModule &&
+      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
+    StringRef OFMModuleDocOutputPath;
+    if (OutputMap) {
+      auto iter = OutputMap->find(types::TY_SwiftModuleDocFile);
+      if (iter != OutputMap->end())
+        OFMModuleDocOutputPath = iter->second;
+    }
+    if (!OFMModuleDocOutputPath.empty()) {
+      // Prefer a path from the OutputMap.
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile,
+                                         OFMModuleDocOutputPath);
+    } else {
+      // Otherwise, put it next to the swiftmodule file.
+      llvm::SmallString<128> Path(
+          Output->getAnyOutputForType(types::TY_SwiftModuleFile));
+      llvm::sys::path::replace_extension(Path,
+                                         SERIALIZED_MODULE_DOC_EXTENSION);
+      Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
+    }
+  }
+
   // Choose the serialized diagnostics output path.
   if (C.getArgs().hasArg(options::OPT_serialize_diagnostics) &&
       isa<CompileJobAction>(JA)) {
