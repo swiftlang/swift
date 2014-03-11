@@ -101,7 +101,13 @@ set(SHARED_LIBRARY ON)
 add_swift_library(swift_stdlib_core INSTALL IS_STDLIB_CORE
   ${SWIFTLIB_SOURCES}
   DEPENDS swift_runtime
-  FILE_DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
+  # The copy_shim_headers target dependency is required to let the
+  # Makefile build know that there's a rule to produce the shims
+  # directory, but is not sufficient to cause Swift.o to be rebuilt
+  # when the shim header changes.  Therefore, we pass both the target
+  # and the generated directory as dependencies
+  FILE_DEPENDS
+    copy_shim_headers ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims
   )
 add_dependencies(swift_stdlib_core swift)
 
