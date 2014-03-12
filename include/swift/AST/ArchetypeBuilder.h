@@ -357,7 +357,13 @@ public:
   
   /// Retrieve the associated type declaration for a given nested type.
   AssociatedTypeDecl *getAssociatedType(Module &mod, Identifier name);
-
+  
+  /// True if the potential archetype has been bound by a concrete type
+  /// constraint.
+  bool isConcreteType() const {
+    return ArchetypeOrConcreteType.is<Type>();
+  }
+  
   void dump(llvm::raw_ostream &Out, unsigned Indent);
 
   friend class ArchetypeBuilder;
