@@ -60,9 +60,8 @@ extern "C" void swift_stringFromUTF8InRawMemory(String *out,
                                                 intptr_t len);
   
 struct String {
-  const void *data;
-  intptr_t countAndFlags;
-  HeapObject *owner;
+  // Keep the details of String's implementation opaque to the runtime.
+  const void *x, *y, *z;
   
   /// Keep String trivial on the C++ side so we can control its instantiation.
   String() = default;
@@ -81,10 +80,6 @@ struct String {
   explicit String(const char *ptr)
     : String(ptr, strlen(ptr))
   {}
-  
-  String(const void *data, intptr_t countAndFlags, HeapObject *owner)
-    : data(data), countAndFlags(countAndFlags), owner(owner) {
-  }
   
   explicit String(NSString *s)
     // FIXME: Use the usual NSString bridging entry point.
