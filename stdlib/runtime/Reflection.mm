@@ -87,14 +87,29 @@ struct String {
   {}
 };
   
+struct Array {
+  // Keep the details of Array's implementation opaque to the runtime.
+  const void *x, *y, *z;
+};
+  
 struct QuickLookObject {
+  struct RawData {
+    Array Data;
+    String Type;
+  };
+  
   union {
     String Text;
-    Any Image;
+    Any Any;
+    RawData Raw;
   };
-  enum class Tag : bool {
+  enum class Tag : uint8_t {
     Text,
     Image,
+    Sound,
+    Color,
+    BezierPath,
+    Raw,
   } Kind;
 };
   
@@ -107,12 +122,10 @@ struct OptionalQuickLookObject {
     struct {
       union {
         String Text;
-        Any Image;
+        Any Any;
+        QuickLookObject::RawData Raw;
       };
-      enum class Tag : bool {
-        Text,
-        Image,
-      } Kind;
+      QuickLookObject::Tag Kind;
       bool isNone;
     } optional;
     QuickLookObject payload;
@@ -490,20 +503,35 @@ OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
     return result;
   }
   
+  /// Store an ObjC reference into an Any.
+  auto setAnyToObject = [](Any &any, id obj) {
+    any.Self = &_TMdBO.base;
+    *reinterpret_cast<id *>(&any.Value) = [obj retain];
+  };
+  
   if ([object isKindOfClass:NSClassFromString(@"NSImage")]
       || [object isKindOfClass:NSClassFromString(@"UIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSImageView")]
       || [object isKindOfClass:NSClassFromString(@"UIImageView")]
       || [object isKindOfClass:NSClassFromString(@"CIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
-    result.payload.Image.Self = &_TMdBO.base;
-    *reinterpret_cast<id *>(&result.payload.Image.Value) = [object retain];
+    setAnyToObject(result.payload.Any, object);
     result.payload.Kind = QuickLookObject::Tag::Image;
     result.optional.isNone = false;
     return result;
+  } else if ([object isKindOfClass:NSClassFromString(@"NSColor")]
+             || [object isKindOfClass:NSClassFromString(@"UIColor")]) {
+    setAnyToObject(result.payload.Any, object);
+    result.payload.Kind = QuickLookObject::Tag::Color;
+    result.optional.isNone = false;
+    return result;
+  } else if ([object isKindOfClass:NSClassFromString(@"NSBezierPath")]
+             || [object isKindOfClass:NSClassFromString(@"UIBezierPath")]) {
+    setAnyToObject(result.payload.Any, object);
+    result.payload.Kind = QuickLookObject::Tag::BezierPath;
+    result.optional.isNone = false;
+    return result;
   }
-  
-  // TODO: Handle the other quick look object kinds.
   
   // Return none if we didn't get a suitable object.
   result.optional.isNone = true;
