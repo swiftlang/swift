@@ -46,6 +46,10 @@ static llvm::cl::opt<bool>
 DumpModule("dump-module",
            llvm::cl::desc("Dump the imported module after checking it imports just fine"));
 
+static llvm::cl::opt<std::string>
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
+                llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+
 
 void anchorForGetMainExecutable() {}
 
@@ -75,6 +79,7 @@ int main(int argc, char **argv) {
   Invocation.setSDKPath(SDK);
   Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
   Invocation.setModuleName("lldbtest");
+  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
 
   if (CI.setup(Invocation))
     return 1;

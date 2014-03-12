@@ -207,6 +207,10 @@ static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
                llvm::cl::desc("Emit locations during sil emission."));
 
+static llvm::cl::opt<std::string>
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
+                llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -235,6 +239,7 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
 
   // Load the input file.
   std::unique_ptr<llvm::MemoryBuffer> InputFile;

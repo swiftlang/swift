@@ -12,8 +12,7 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 target_link_libraries(swift edit ${CORE_FOUNDATION})
 
 if(MODULES_SDK)
-  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}"
-                   -DSWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH}" )
+  add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
 endif()
 
 install(TARGETS swift
