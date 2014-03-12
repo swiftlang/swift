@@ -771,7 +771,7 @@ class GenericParamList {
                    SourceLoc WhereLoc,
                    MutableArrayRef<RequirementRepr> Requirements,
                    SourceLoc RAngleLoc);
-
+  
   void getAsGenericSignatureElements(ASTContext &C,
                          llvm::DenseMap<ArchetypeType*, Type> &archetypeMap,
                          SmallVectorImpl<GenericTypeParamType*> &genericParams,
@@ -2113,18 +2113,8 @@ public:
   /// the generic parameters in this generic signature. The order of primary
   /// archetypes in the substitution vector must match the order of generic
   /// parameters in getGenericParams().
-  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const {
-    return getSubstitutionMap(getGenericParams(), args);
-  }
+  TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
   
-  /// Build a substitution map from a vector of Substitutions that correspond to
-  /// the generic parameters in the given generic parameter vector. The order of
-  /// primary archetypes in the substitution vector must match the order of
-  /// generic parameters in genericParams.
-  static TypeSubstitutionMap
-  getSubstitutionMap(ArrayRef<GenericTypeParamType *> genericParams,
-                     ArrayRef<Substitution> args);
-
   /// Return a range that iterates through first all of the generic parameters
   /// of the signature, followed by all of their recursive member types exposed
   /// through protocol requirements.
@@ -2152,6 +2142,9 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
+  
+  void print(raw_ostream &OS) const;
+  void dump() const;
 };
   
 inline

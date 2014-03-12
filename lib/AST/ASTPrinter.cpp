@@ -1761,6 +1761,16 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
     TypePrinter(Printer, PO).visit(*this);
 }
 
+void GenericSignature::print(raw_ostream &OS) const {
+  StreamPrinter Printer(OS);
+  TypePrinter(Printer, PrintOptions())
+    .printGenericSignature(getGenericParams(), getRequirements());
+}
+void GenericSignature::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
 static StringRef getStringForParameterConvention(ParameterConvention conv) {
   switch (conv) {
   case ParameterConvention::Indirect_In: return "@in ";
