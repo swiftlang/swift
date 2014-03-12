@@ -1549,7 +1549,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-    checkAllowedAttributes<AK_objc, AK_transparent>(ctor);
+    checkAllowedAttributes<AK_objc, AK_required, AK_transparent>(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
 
