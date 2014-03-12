@@ -367,15 +367,17 @@ namespace {
         printGenericParameters(OS, NTD->getGenericParams());
 
       OS << " type='";
-      if (VD->hasType()) {
+      if (VD->hasType())
         VD->getType().print(OS);
-
-        if (VD->getInterfaceType().getPointer() != VD->getType().getPointer()) {
-          OS << "' interface type='";
-          VD->getInterfaceType()->getCanonicalType().print(OS);
-        }
-      } else
+      else
         OS << "<null type>";
+
+      if (VD->hasInterfaceType() &&
+          (!VD->hasType() ||
+           VD->getInterfaceType().getPointer() != VD->getType().getPointer())) {
+        OS << "' interface type='";
+        VD->getInterfaceType().print(OS);
+      }
 
       OS << '\'';
 

@@ -1573,6 +1573,7 @@ public:
   /// we will substitute in the appropriate archetypes within a particular
   /// context.
   Type getInterfaceType() const;
+  bool hasInterfaceType() const { return !!InterfaceTy; }
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
