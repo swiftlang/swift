@@ -373,7 +373,7 @@ function(compile_swift_files)
     set(module_dir ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}${arch_subdir})
 
     set(module_file ${module_dir}/${module_name}.swiftmodule)
-    set(module_doc_file ${module_source_dir}/${module_name}.swiftdoc)
+    set(module_doc_file ${module_dir}/${module_name}.swiftdoc)
     list(APPEND swift_flags -emit-module -emit-module-path ${module_file})
 
     set(create_module_dir
