@@ -2824,6 +2824,7 @@ namespace {
                                    name,
                                    { });
       result->computeType();
+      
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Create the archetype for the implicit 'Self'.
@@ -2835,6 +2836,12 @@ namespace {
                                                  Type(), /*Index=*/0);
       selfDecl->setArchetype(selfArchetype);
 
+      // Set AllArchetypes of the protocol. ObjC protocols don't have associated
+      // types so only the Self archetype is present.
+      
+      result->getGenericParams()->setAllArchetypes(
+             Impl.SwiftContext.AllocateCopy(llvm::makeArrayRef(selfArchetype)));
+      
       // Set the generic parameters and requirements.
       auto genericParam = selfDecl->getDeclaredType()
                             ->castTo<GenericTypeParamType>();
