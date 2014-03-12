@@ -6,7 +6,6 @@ import Swift
 import gizmo
 
 // CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %VSs5UInt8 }>
-// CHECK: [[NONGENERICINHERITSGENERIC:%C15generic_classes25NonGenericInheritsGeneric]] = type <{ %swift.refcounted, %VSs5UInt8, [7 x i8], <{ %Si, %VSs5UInt8 }>, %VSs5UInt8, [6 x i8], %Si }>
 
 // -- offset of RootGeneric<T>.x
 // CHECK: @_TWvdvC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
@@ -79,56 +78,6 @@ import gizmo
 // CHECK:   i64 7
 // CHECK: }
 
-// -- NonGenericInheritsGeneric instantiates its generic base class, giving
-//    fixed offsets for its own ivars
-// -- offset of NonGenericInheritsGeneric.w
-// CHECK: @_TWvdvC15generic_classes25NonGenericInheritsGeneric1wSi = global i64 40, align 8
-// CHECK: [[NONGENERICINHERITSGENERIC_W_NAME:@.*]] = private unnamed_addr constant [2 x i8] c"w\00"
-// -- ivars for NonGenericInheritsGeneric
-// CHECK: @_IVARS_NonGenericInheritsGeneric = private constant { {{.*}} }] } {
-// --       entsize
-// CHECK:   i32 32,
-// --       count
-// CHECK:   i32 1,
-// CHECK:   [{
-// --       NonGenericInheritsGeneric.w
-// --         offset ptr
-// CHECK:     i64* @_TWvdvC15generic_classes25NonGenericInheritsGeneric1wSi,
-// --         name
-// CHECK:     i8* getelementptr inbounds ([2 x i8]* [[NONGENERICINHERITSGENERIC_W_NAME]], i64 0, i64 0),
-// --         type encoding (FIXME)
-// CHECK:     i8* null,
-// --         align
-// CHECK:     i32 8,
-// --         size
-// CHECK:     i32 8
-// CHECK:   }]
-// CHECK: }
-// -- rodata for NonGenericInheritsGeneric
-// CHECK: @_DATA_NonGenericInheritsGeneric = private constant { {{.*}}* } {
-// --       flags (128 = compiled by ARC)
-// CHECK:   i32 128,
-// --       instanceStart
-// CHECK:   i32 40,
-// --       instanceSize
-// CHECK:   i32 48,
-// CHECK: }
-
-// CHECK: @_TMdC15generic_classes25NonGenericInheritsGeneric = global { {{.*}} i64 } {
-// --       RootGeneric vtable
-//          @_TC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-//          @_TC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-//          @_TC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
-// --       RootGeneric field offsets
-// CHECK:   i64 16, i64 24, i64 33,
-// --       NonGenericInheritsGeneric vtable
-// CHECK:   @_TFC15generic_classes25NonGenericInheritsGeneric3zimfS0_FT_T_,
-// CHECK:   @_TFC15generic_classes25NonGenericInheritsGeneric4zangfS0_FT_T_,
-// --       NonGenericInheritsGeneric field offsets
-//          FIXME: We shouldn't emit this
-// CHECK:   i64 40
-// CHECK: }
-
 // CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}} i64 } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_GENERICINHERITSGENERIC:@fill_generic_metadata[0-9]*]],
@@ -180,14 +129,6 @@ class RootNonGeneric {
   var z : UInt8
 }
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
-
-class NonGenericInheritsGeneric : RootGeneric<(Int, UInt8)> {
-  var w : Int
-
-  func zim()
-  func zang()
-}
-sil @_TFC15generic_classes25NonGenericInheritsGenericD : $@cc(method) @thin (NonGenericInheritsGeneric) -> ()
 
 class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   var w : B
@@ -289,26 +230,6 @@ entry(%c : $RootGeneric<Int32>):
 }
  */
 
-// CHECK: define [[NONGENERICINHERITSGENERIC]]* @NonGenericInheritsGeneric_fragile_fixed_alloc()
-// CHECK:   call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} @_TMdC15generic_classes25NonGenericInheritsGeneric {{.*}}), i64 48, i64 7)
-sil @NonGenericInheritsGeneric_fragile_fixed_alloc : $() -> NonGenericInheritsGeneric {
-entry:
-  %x = alloc_ref $NonGenericInheritsGeneric
-  return %x : $NonGenericInheritsGeneric
-}
-
-// CHECK: define i64 @NonGenericInheritsGeneric_fragile_fixed_member_access([[NONGENERICINHERITSGENERIC]]*) {
-// CHECK:   %1 = getelementptr inbounds [[NONGENERICINHERITSGENERIC]]* %0, i32 0, i32 6
-// CHECK:   %.value = getelementptr inbounds %Si* %1, i32 0, i32 0
-// CHECK:   %2 = load i64* %.value, align 8
-// CHECK:   ret i64 %2
-// CHECK: }
-sil @NonGenericInheritsGeneric_fragile_fixed_member_access : $NonGenericInheritsGeneric -> Int {
-entry(%c : $NonGenericInheritsGeneric):
-  %p = ref_element_addr %c : $NonGenericInheritsGeneric, #NonGenericInheritsGeneric.w
-  %w = load %p : $*Int
-  return %w : $Int
-}
 // CHECK: define internal void [[FILL_ROOTGENERIC]](i8*, i8*) {
 // -- initialize the dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* null, i64 3, %swift.type** {{%.*}}, i64* {{%.*}})

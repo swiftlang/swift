@@ -874,6 +874,8 @@ ERROR(unchecked_not_optional_type,sema_tct,none,
 ERROR(self_in_nominal,sema_tct,none,
       "'Self' is only available in a protocol or as the result of a class "
       "method; did you mean %0?", (Identifier))
+ERROR(non_generic_class_with_generic_superclass,sema_tct,none,
+      "classes derived from generic classes must also be generic", ())
 
 // Ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,

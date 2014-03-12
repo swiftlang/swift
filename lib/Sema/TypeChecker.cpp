@@ -289,7 +289,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       for (auto D : SF->Decls) {
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
           bindExtensionDecl(ED, TC);
-          if (mayConformToKnownProtocol(ED))
+          if (mayConformToKnownProtocol(ED) &&
+              ED->getExtendedType()->getAnyNominal())
             TC.validateDecl(ED->getExtendedType()->getAnyNominal());
         } else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
           if (mayConformToKnownProtocol(nominal))

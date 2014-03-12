@@ -2129,6 +2129,14 @@ public:
       // Check for inconsistencies between the initializers of our
       // superclass and our own initializers.
       if (auto superclassTy = CD->getSuperclass()) {
+        // Verify that if the super class is generic, the derived class is as
+        // well.
+        if (superclassTy->getAs<BoundGenericClassType>() &&
+            !CD->getDeclaredTypeInContext()->getAs<BoundGenericClassType>())
+          TC.diagnose(CD, diag::non_generic_class_with_generic_superclass);
+              
+        // Look for any required constructors or subobject initializers in the
+        // subclass that have not been overridden or otherwise provided.
         // Collect the set of initializers we override in superclass.
         llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
         for (auto member : TC.lookupConstructors(CD->getDeclaredTypeInContext(),
@@ -2137,9 +2145,7 @@ public:
           if (auto overridden = ctor->getOverriddenDecl())
             overriddenCtors.insert(overridden);
         }
-
-        // Look for any required constructors or subobject initializers in the
-        // subclass that have not been overridden or otherwise provided.
+        
         bool diagnosed = false;
         llvm::SmallVector<ConstructorDecl *, 2> synthesizedCtors;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
