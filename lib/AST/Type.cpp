@@ -1657,9 +1657,6 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   }
   
   for (auto depTy : getAllDependentTypes()) {
-    depTy->dump();
-    #warning ""
-    args.front().Archetype->dump();
     auto replacement = args.front().Replacement;
     args = args.slice(1);
     // FIXME: DependentMemberTypes aren't SubstitutableTypes.
