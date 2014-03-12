@@ -116,12 +116,3 @@ add_swift_optimization_flags(swift_stdlib_core)
 # Link against Foundation, for ObjC bridging.
 set_target_properties(swift_stdlib_core PROPERTIES
                                         LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
-
-# Install Clang headers under the Swift library so that an installed swift's
-# module importer can find the compiler headers corresponding to its clang.
-install(
-  DIRECTORY
-    "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/swift"
-  PATTERN "*.h")
-

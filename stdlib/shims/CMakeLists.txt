@@ -31,3 +31,11 @@ add_custom_command(TARGET copy_shim_headers POST_BUILD
   COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 
 install(FILES ${sources} DESTINATION "lib/swift/shims")
+
+# Install Clang headers under the Swift library so that an installed swift's
+# module importer can find the compiler headers corresponding to its clang.
+install(
+  DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+  DESTINATION "lib/swift"
+  PATTERN "*.h")
+
