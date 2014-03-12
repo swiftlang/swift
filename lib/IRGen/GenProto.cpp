@@ -3156,8 +3156,6 @@ namespace {
 
       for (unsigned i = 0, e = substitutions.size(); i != e; ++i) {
         auto sub = substitutions[i];
-        assert(sub.Archetype == params[i] &&
-               "substitution does not match archetype!");
         CanType arg = sub.Replacement->getCanonicalType();
 
         // Right now, we can only pull things out of the direct

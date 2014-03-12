@@ -206,12 +206,11 @@ const Substitution &SpecializedProtocolConformance::getTypeWitness(
   }
 
   // Otherwise, perform substitutions to create this witness now.
-  TypeSubstitutionMap substitutionMap;
-  for (const auto &substitution : GenericSubstitutions) {
-    substitutionMap[substitution.Archetype] = substitution.Replacement;
-  }
-
-  auto &genericWitness = GenericConformance->getTypeWitness(assocType, resolver);
+  TypeSubstitutionMap substitutionMap = GenericConformance->getGenericParams()
+    ->getSubstitutionMap(GenericSubstitutions);
+  
+  auto &genericWitness
+    = GenericConformance->getTypeWitness(assocType, resolver);
   auto conformingDC = getDeclContext();
   auto conformingModule = conformingDC->getParentModule();
   auto specializedType
