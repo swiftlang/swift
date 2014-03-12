@@ -78,7 +78,7 @@ bb0:
 
   %2 = function_ref @returns_generic_struct : $@thin (@out AddressOnlyStruct) -> ()
   %3 = apply %2(%1) : $@thin (@out AddressOnlyStruct) -> ()
-  %4 = struct_element_addr %1 : $*AddressOnlyStruct, #b
+  %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
   %5 = load %4 : $*Int
   strong_release %0#0 : $Builtin.ObjectPointer
   return %5 : $Int

@@ -161,7 +161,7 @@ bb0(%0 : $Int):
   // CHECK-NOT: alloc_stack
 
   store %18 to %22#1 : $*Int
-  %24 = struct_element_addr %22#1 : $*Int, #value
+  %24 = struct_element_addr %22#1 : $*Int, #Int.value
   %25 = load %24 : $*Builtin.Word
   dealloc_stack %22#0 : $*@local_storage Int
   // CHECK-NEXT: return [[IL]]
@@ -236,14 +236,14 @@ bb0(%0 : $Int, %2 : $Int):
   %9 = apply %7() : $@thin () -> XYStruct
   store %9 to %1#1 : $*XYStruct
 
-  %11 = struct_element_addr %1#1 : $*XYStruct, #y
+  %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.y
   store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
-  %13 = struct_element_addr %1#1 : $*XYStruct, #x
+  %13 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
   store %2 to %13 : $*Int
   br bb5
 
@@ -267,14 +267,14 @@ bb0(%0 : $Int, %2 : $Int):
   %9 = apply %7() : $@thin () -> XYStruct
   store %9 to %1#1 : $*XYStruct
 
-  %11 = struct_element_addr %1#1 : $*XYStruct, #x
+  %11 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
   store %0 to %11 : $*Int
 
   %12 = integer_literal $Builtin.Int1, 1          // user: %3
   cond_br %12, bb1, bb2
 
 bb1:                                              // Preds: bb3
-  %13 = struct_element_addr %1#1 : $*XYStruct, #x
+  %13 = struct_element_addr %1#1 : $*XYStruct, #XYStruct.x
   store %0 to %13 : $*Int
   br bb5
 
@@ -337,7 +337,7 @@ sil @init_existential_crash : $() -> () {
   %105 = integer_literal $Builtin.Int1, 0
   %106 = struct $Bool (%105 : $Builtin.Int1)
   store %106 to %100 : $*Bool
-  %108 = struct_element_addr %100 : $*Bool, #value
+  %108 = struct_element_addr %100 : $*Bool, #Bool.value
   %109 = load %108 : $*Builtin.Int1
   dealloc_stack %99#0 : $*@local_storage LogicValue
   return undef : $()

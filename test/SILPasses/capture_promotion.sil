@@ -91,7 +91,7 @@ bb0:
 // CHECK-NEXT: [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]({{.*}}) : $@cc(method) @thin (@owned Foo) -> Int
 
 // The struct_element_addr of %3 followed by a load is replaced by a struct_extract of the Baz argument
-// CHECK-NEXT: [[EXTRACT_BAZ_X:%.*]] = struct_extract {{.*}} : $Baz, #x
+// CHECK-NEXT: [[EXTRACT_BAZ_X:%.*]] = struct_extract {{.*}} : $Baz, #Baz.x
 
 // CHECK-NEXT: [[RETVAL:%.*]] = apply [[DUMMY_FUNC]]([[APPLY_FOO]], [[EXTRACT_BAZ_X]], {{.*}}) : $@thin (Int, Int, Int) -> Int
 
@@ -116,7 +116,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $*Foo, %2 : $Builtin.ObjectPointer, %3 : $
   strong_retain %8 : $Foo
   %10 = class_method %8 : $Foo, #Foo.foo!1 : $@cc(method) @thin (@owned Foo) -> Int
   %11 = apply %10(%8) : $@cc(method) @thin (@owned Foo) -> Int
-  %12 = struct_element_addr %3 : $*Baz, #x
+  %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load %12 : $*Int
   %14 = load %5 : $*Int
   %15 = apply %7(%11, %13, %14) : $@thin (Int, Int, Int) -> Int

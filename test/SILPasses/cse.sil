@@ -450,12 +450,12 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 sil @sadd_with_address : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
 
 // CHECK-LABEL: structelementaddr_test
-// CHECK: struct_element_addr {{%[0-9]+}} : $*Interval, #start
-// CHECK-NOT: struct_element_addr {{%[0-9]+}} : $*Interval, #start
+// CHECK: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
+// CHECK-NOT: struct_element_addr {{%[0-9]+}} : $*Interval, #Interval.start
 sil @structelementaddr_test : $@thin (@inout Interval) -> (Builtin.Int32) {
 bb0(%0 : $*Interval):
-  %1 = struct_element_addr %0 : $*Interval, #start
-  %2 = struct_element_addr %0 : $*Interval, #start
+  %1 = struct_element_addr %0 : $*Interval, #Interval.start
+  %2 = struct_element_addr %0 : $*Interval, #Interval.start
   %3 = function_ref @sadd_with_address : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
   %4 = apply %3(%1, %2) : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32)
   return %4 : $(Builtin.Int32)
@@ -542,7 +542,7 @@ sil @sil_extract_of_string : $@thin () -> Builtin.Word {
   %0 = string_literal utf8 ""
   %l1 = integer_literal $Builtin.Word, 0
   %1 = struct $StringData (%l1 : $Builtin.Word)
-  %2 = struct_extract %1 : $StringData, #size  
+  %2 = struct_extract %1 : $StringData, #StringData.size
   return %2 : $Builtin.Word
 }
 

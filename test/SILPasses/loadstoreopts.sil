@@ -162,8 +162,8 @@ struct Agg1 {
 sil @load_store_forwarding_from_aggregate_to_field : $@thin (@inout Agg1) -> (Builtin.Int32) {
 bb0(%0 : $*Agg1):
   %1 = load %0 : $*Agg1
-  %2 = struct_element_addr %0 : $*Agg1, #a
-  %3 = struct_element_addr %2 : $*Agg2, #t
+  %2 = struct_element_addr %0 : $*Agg1, #Agg1.a
+  %3 = struct_element_addr %2 : $*Agg2, #Agg2.t
   %4 = tuple_element_addr %3 : $*(Builtin.Int64, Builtin.Int32), 1
   %5 = load %4 : $*Builtin.Int32
   return %5 : $Builtin.Int32
@@ -181,7 +181,7 @@ bb0(%0 : $Int):
   %1 = alloc_stack $Wrapper
   %2 = struct $Wrapper (%0 : $Int)
   store %2 to %1#1 : $*Wrapper
-  %3 = struct_element_addr %1#1 : $*Wrapper, #value
+  %3 = struct_element_addr %1#1 : $*Wrapper, #Wrapper.value
   %4 = load %3 : $*Int
   dealloc_stack %1#0 : $*@local_storage Wrapper
   return %4 : $Int

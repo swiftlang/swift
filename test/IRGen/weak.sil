@@ -25,7 +25,7 @@ struct A {
 
 sil @test_weak_load_store : $@thin (@inout A, C) -> () {
 bb0(%0 : $*A, %1 : $C):
-  %2 = struct_element_addr %0 : $*A, #x
+  %2 = struct_element_addr %0 : $*A, #A.x
   %3 = load_weak %2 : $*@sil_weak C
   store_weak %1 to %2 : $*@sil_weak C
   strong_release %3 : $C
@@ -45,7 +45,7 @@ struct B {
 
 sil @test_weak_load_store_proto : $@thin (@inout B, P) -> () {
 bb0(%0 : $*B, %1 : $P):
-  %2 = struct_element_addr %0 : $*B, #x
+  %2 = struct_element_addr %0 : $*B, #B.x
   %3 = load_weak %2 : $*@sil_weak P
   store_weak %1 to %2 : $*@sil_weak P
   strong_release %3 : $P

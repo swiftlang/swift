@@ -340,13 +340,13 @@ sil @_TV6struct5AlephCfMS0_FT_S0_ : $@thin (@thin Aleph.Type) -> Aleph {
 bb0(%0 : $@thin Aleph.Type):
   %1 = tuple ()
   %2 = alloc_box $Aleph       // CHECK: alloc_box
-  // CHECK: struct_element_addr {{.*}} : $*Aleph, #a
-  %5 = struct_element_addr %2#1 : $*Aleph, #a
+  // CHECK: struct_element_addr {{.*}} : $*Aleph, #Aleph.a
+  %5 = struct_element_addr %2#1 : $*Aleph, #Aleph.a
   %6 = load %5 : $*Ref
   %8 = strong_release %6 : $Ref
   %14 = load %2#1 : $*Aleph
-  // CHECK: struct_extract {{%.*}} : $Aleph, #a
-  %15 = struct_extract %14 : $Aleph, #a
+  // CHECK: struct_extract {{%.*}} : $Aleph, #Aleph.a
+  %15 = struct_extract %14 : $Aleph, #Aleph.a
   %16 = strong_retain %15 : $Ref
   %17 = strong_release %2#0 : $Builtin.ObjectPointer
   %18 = return %14 : $Aleph
@@ -940,8 +940,8 @@ struct GenericStruct<T> {
 // CHECK-LABEL: sil @extract_generic_struct
 sil @extract_generic_struct : $GenericStruct<Int> -> Int {
 entry(%0 : $GenericStruct<Int>):
-  // CHECK: %1 = struct_extract %0 : $GenericStruct<Int>, #x
-  %1 = struct_extract %0 : $GenericStruct<Int>, #x
+  // CHECK: %1 = struct_extract %0 : $GenericStruct<Int>, #GenericStruct.x
+  %1 = struct_extract %0 : $GenericStruct<Int>, #GenericStruct.x
   // CHECK: return %1 : $Int
   return %1 : $Int
 }

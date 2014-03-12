@@ -22,11 +22,11 @@ sil @use_int32 : $@thin (Builtin.Int32) -> ()
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK:   [[VAR_2:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int64
-// CHECK:   [[VAR_4:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #x
+// CHECK:   [[VAR_4:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.x
 // CHECK:   store [[VAR_4]] to [[VAR_1]]#1 : $*Builtin.Int1
-// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #y
+// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.y
 // CHECK:   store [[VAR_6]] to [[VAR_2]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #z
+// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S1, #S1.z
 // CHECK:   store [[VAR_8]] to [[VAR_3]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_10:%[0-9]+]] = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
 // CHECK:   [[VAR_11:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
@@ -45,7 +45,7 @@ bb0(%0 : $S1):
   %1 = alloc_stack $S1
   store %0 to %1#1 : $*S1
   %2 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
-  %3 = struct_element_addr %1#1 : $*S1, #y
+  %3 = struct_element_addr %1#1 : $*S1, #S1.y
   %4 = load %3 : $*Builtin.Int32
   apply %2(%4) : $@thin (Builtin.Int32) -> ()
   %5 = load %1#1 : $*S1
@@ -71,14 +71,14 @@ struct S2 {
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int1
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_5:%[0-9]+]] = alloc_stack $Builtin.Int64
-// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #alpha
+// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #S2.alpha
 // CHECK:   store [[VAR_6]] to [[VAR_2]]#1 : $*Builtin.FPIEEE32
-// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #beta
-// CHECK:   [[VAR_9:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #x
+// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_0]] : $S2, #S2.beta
+// CHECK:   [[VAR_9:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.x
 // CHECK:   store [[VAR_9]] to [[VAR_3]]#1 : $*Builtin.Int1
-// CHECK:   [[VAR_11:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #y
+// CHECK:   [[VAR_11:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.y
 // CHECK:   store [[VAR_11]] to [[VAR_4]]#1 : $*Builtin.Int32
-// CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #z
+// CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_8]] : $S1, #S1.z
 // CHECK:   store [[VAR_13]] to [[VAR_5]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_15:%[0-9]+]] = load [[VAR_3]]#1 : $*Builtin.Int1
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_4]]#1 : $*Builtin.Int32
@@ -106,16 +106,16 @@ sil @struct_with_struct_fields : $@thin (S2, Builtin.Int64) -> () {
 bb0(%0 : $S2, %1 : $Builtin.Int64):
   %2 = alloc_stack $S2
   store %0 to %2#1 : $*S2
-  %3 = struct_element_addr %2#1 : $*S2, #beta
+  %3 = struct_element_addr %2#1 : $*S2, #S2.beta
   %4 = load %3 : $*S1
   %5 = function_ref @use_s1 : $@thin (S1) -> ()
   apply %5(%4) : $@thin (S1) -> ()
-  %6 = struct_element_addr %3 : $*S1, #y
+  %6 = struct_element_addr %3 : $*S1, #S1.y
   %7 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
   %8 = load %6 : $*Builtin.Int32
   apply %7(%8) : $@thin (Builtin.Int32) -> ()
   %9 = load %2#1 : $*S2
-  %10 = struct_element_addr %3 : $*S1, #z
+  %10 = struct_element_addr %3 : $*S1, #S1.z
   store %1 to %10 : $*Builtin.Int64
   dealloc_stack %2#0 : $*@local_storage S2
   %11 = tuple()
@@ -139,14 +139,14 @@ struct S3 {
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int64
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:   [[VAR_5:%[0-9]+]] = alloc_stack $Builtin.FPIEEE32
-// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #gamma
+// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #S3.gamma
 // CHECK:   [[VAR_7:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 0
 // CHECK:   store [[VAR_7]] to [[VAR_2]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_9:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 1
 // CHECK:   store [[VAR_9]] to [[VAR_3]]#1 : $*Builtin.Int64
 // CHECK:   [[VAR_11:%[0-9]+]] = tuple_extract [[VAR_6]] : $(Builtin.Int32, Builtin.Int64, Builtin.Int16), 2
 // CHECK:   store [[VAR_11]] to [[VAR_4]]#1 : $*Builtin.Int16
-// CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #delta
+// CHECK:   [[VAR_13:%[0-9]+]] = struct_extract [[VAR_0]] : $S3, #S3.delta
 // CHECK:   store [[VAR_13]] to [[VAR_5]]#1 : $*Builtin.FPIEEE32
 // CHECK:   [[VAR_15:%[0-9]+]] = function_ref @use_tup : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
 // CHECK:   [[VAR_16:%[0-9]+]] = load [[VAR_2]]#1 : $*Builtin.Int32
@@ -175,7 +175,7 @@ bb0(%0 : $S3, %1 : $Builtin.Int64):
   %2 = alloc_stack $S3
   store %0 to %2#1 : $*S3
   %3 = function_ref @use_tup : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
-  %4 = struct_element_addr %2#1 : $*S3, #gamma
+  %4 = struct_element_addr %2#1 : $*S3, #S3.gamma
   %5 = load %4 : $*(Builtin.Int32, Builtin.Int64, Builtin.Int16)
   apply %3(%5) : $@thin ((Builtin.Int32, Builtin.Int64, Builtin.Int16)) -> ()
   %6 = tuple_element_addr %4 : $*(Builtin.Int32, Builtin.Int64, Builtin.Int16), 0
@@ -248,9 +248,9 @@ sil @use_str4 : $@thin (S4) -> ()
 // CHECK:   [[VAR_3:%[0-9]+]] = alloc_stack $Builtin.Int32
 // CHECK:   [[VAR_4:%[0-9]+]] = alloc_stack $Builtin.Int16
 // CHECK:   [[VAR_5:%[0-9]+]] = tuple_extract [[VAR_0]] : $(S4, Builtin.Int16), 0
-// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #aleph
+// CHECK:   [[VAR_6:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.aleph
 // CHECK:   store [[VAR_6]] to [[VAR_2]]#1 : $*Builtin.Int64
-// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #bet
+// CHECK:   [[VAR_8:%[0-9]+]] = struct_extract [[VAR_5]] : $S4, #S4.bet
 // CHECK:   store [[VAR_8]] to [[VAR_3]]#1 : $*Builtin.Int32
 // CHECK:   [[VAR_10:%[0-9]+]] = tuple_extract [[VAR_0]] : $(S4, Builtin.Int16), 1
 // CHECK:   store [[VAR_10]] to [[VAR_4]]#1 : $*Builtin.Int16
@@ -281,7 +281,7 @@ bb0(%0 : $(S4, Builtin.Int16), %1 : $Builtin.Int16):
   %4 = tuple_element_addr %2#1 : $*(S4, Builtin.Int16), 0
   %5 = load %4 : $*S4
   apply %3(%5) : $@thin (S4) -> ()
-  %6 = struct_element_addr %4 : $*S4, #bet
+  %6 = struct_element_addr %4 : $*S4, #S4.bet
   %7 = load %6 : $*Builtin.Int32
   %8 = function_ref @use_int32 : $@thin (Builtin.Int32) -> ()
   apply %8(%7) : $@thin (Builtin.Int32) -> ()
@@ -365,7 +365,7 @@ sil @use_capturedstruct : $@thin (@inout CapturedS) -> ()
 // CHECK: bb0([[VAR_0:%[0-9]+]] : $CapturedS):
 // CHECK:   [[VAR_1:%[0-9]+]] = alloc_stack $CapturedS
 // CHECK:   store [[VAR_0]] to [[VAR_1]]#1 : $*CapturedS
-// CHECK:   [[VAR_3:%[0-9]+]] = struct_element_addr [[VAR_1]]#1 : $*CapturedS, #x
+// CHECK:   [[VAR_3:%[0-9]+]] = struct_element_addr [[VAR_1]]#1 : $*CapturedS, #CapturedS.x
 // CHECK:   [[VAR_4:%[0-9]+]] = load [[VAR_3]] : $*Builtin.Int32
 // CHECK:   [[VAR_5:%[0-9]+]] = function_ref @use_capturedstruct : $@thin (@inout CapturedS) -> ()
 // CHECK:   [[VAR_6:%[0-9]+]] = apply [[VAR_5]]([[VAR_1]]#1) : $@thin (@inout CapturedS) -> ()
@@ -377,7 +377,7 @@ sil @captured_struct : $@thin (CapturedS) -> () {
 bb0(%0 : $CapturedS):
   %1 = alloc_stack $CapturedS
   store %0 to %1#1 : $*CapturedS
-  %3 = struct_element_addr %1#1 : $*CapturedS, #x
+  %3 = struct_element_addr %1#1 : $*CapturedS, #CapturedS.x
   %4 = load %3 : $*Builtin.Int32
   %5 = function_ref @use_capturedstruct : $@thin (@inout CapturedS) -> ()
   %6 = apply %5(%1#1) : $@thin (@inout CapturedS) -> ()

@@ -18,7 +18,7 @@ bb0(%0 : $Int, %1 : $*Triple):
   %4 = alloc_box $Triple
   %5 = load %1 : $*Triple
   store %5 to %4#1 : $*Triple
-  %8 = struct_element_addr %4#1 : $*Triple, #b
+  %8 = struct_element_addr %4#1 : $*Triple, #Triple.b
   store %0 to %8 : $*Int
   %10 = load %4#1 : $*Triple
   strong_release %4#0 : $Builtin.ObjectPointer
@@ -37,7 +37,7 @@ bb0(%0 : $*Single, %1 : $Int):
   %5 = load %0 : $*Single
   store %5 to %4#1 : $*Single
   
-  %8 = struct_element_addr %4#1 : $*Single, #a
+  %8 = struct_element_addr %4#1 : $*Single, #Single.a
   store %1 to %8 : $*Int
 
   %10 = load %4#1 : $*Single

@@ -79,7 +79,7 @@ sil @test_struct_extract_folding_first : $@thin () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 2
   %1 = struct $Int64 (%0 : $Builtin.Int64)
-  %2 = struct_extract %1 : $Int64, #value
+  %2 = struct_extract %1 : $Int64, #Int64.value
   return %2 : $Builtin.Int64
 // CHECK-LABEL: sil @test_struct_extract_folding_first
 // CHECK: bb0:
@@ -98,7 +98,7 @@ bb0:
   %0 = integer_literal $Builtin.Int64, 2
   %1 = integer_literal $Builtin.Int64, 20
   %2 = struct $TwoValueStruct (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
-  %3 = struct_extract %2 : $TwoValueStruct, #b
+  %3 = struct_extract %2 : $TwoValueStruct, #TwoValueStruct.b
   return %3 : $Builtin.Int64
 // CHECK-LABEL: sil @test_struct_extract_folding_second
 // CHECK: bb0:
@@ -129,7 +129,7 @@ bb0:
   %1 = builtin_function_ref "trunc_Int64_Int1" : $@thin Builtin.Int64 -> Builtin.Int1
   %2 = integer_literal $Builtin.Int64, 0
   %3 = struct $Int64 (%2 : $Builtin.Int64)
-  %4 = struct_extract %3 : $Int64, #value
+  %4 = struct_extract %3 : $Int64, #Int64.value
   %5 = apply %1(%4) : $@thin Builtin.Int64 -> Builtin.Int1
   return %5 : $Builtin.Int1
 
@@ -285,8 +285,8 @@ bb0:
   %10 = struct $Int64 (%9 : $Builtin.Int64)       // users: %15, %11
   %12 = integer_literal $Builtin.Int1, -1         // user: %16
   %13 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // user: %16
-  %14 = struct_extract %4 : $Int64, #value        // user: %16
-  %15 = struct_extract %10 : $Int64, #value       // user: %16
+  %14 = struct_extract %4 : $Int64, #Int64.value  // user: %16
+  %15 = struct_extract %10 : $Int64, #Int64.value // user: %16
   %16 = apply %13(%14, %15, %12) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // users: %18, %17
   %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 0 // user: %19
   %18 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1 // user: %20

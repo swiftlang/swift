@@ -541,8 +541,8 @@ bb0(%0 : $Builtin.ObjectPointer):
 sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@thin (UWord, UWord) -> UWord {
 bb0(%0 : $UWord, %1 : $UWord):
   %2 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %5
-  %3 = struct_extract %0 : $UWord, #value         // user: %5
-  %4 = struct_extract %1 : $UWord, #value         // user: %5
+  %3 = struct_extract %0 : $UWord, #UWord.value   // user: %5
+  %4 = struct_extract %1 : $UWord, #UWord.value   // user: %5
   %5 = apply %2(%3, %4) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %6
   %6 = struct $UWord (%5 : $Builtin.Word)         // user: %7
   return %6 : $UWord                              // id: %7

@@ -58,7 +58,7 @@ bb0(%0 : $Int64):
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
   store %5 to %3#1 : $*Int64                      // id: %6
   %7 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %9
-  %8 = struct_extract %0 : $Int64, #value         // user: %9
+  %8 = struct_extract %0 : $Int64, #Int64.value   // user: %9
   %9 = apply %7(%8, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // users: %15, %10
   cond_br %9, bb1, bb2                            // id: %10
 
@@ -89,7 +89,7 @@ bb0(%0 : $Int64):
   %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
   store %5 to %3#1 : $*Int64                      // id: %6
   %7 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %9
-  %8 = struct_extract %0 : $Int64, #value         // user: %9
+  %8 = struct_extract %0 : $Int64, #Int64.value   // user: %9
   %9 = apply %7(%8, %4) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // users: %15, %10
   cond_br %9, bb1, bb2                            // id: %10
 
@@ -126,7 +126,7 @@ bb0(%0 : $Int64):
   store %5 to %3#1 : $*Int64                      // id: %6
   %7 = integer_literal $Builtin.Int64, 3          // user: %10
   %8 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %10
-  %9 = struct_extract %0 : $Int64, #value         // user: %10
+  %9 = struct_extract %0 : $Int64, #Int64.value   // user: %10
   %10 = apply %8(%9, %7) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %11
   %11 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %10
 

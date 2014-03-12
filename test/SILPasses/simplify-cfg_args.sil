@@ -25,7 +25,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.ObjectPointer, %2 : $Builtin.Word, %
   %13 = thin_to_thick_function %12 : $@thin () -> () to $@callee_owned () -> () // user: %14
   %14 = apply %9(%11, %13) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
   %15 = alloc_stack $Int                          // users: %38, %40, %41
-  %16 = struct_element_addr %15#1 : $*Int, #value // users: %28, %17
+  %16 = struct_element_addr %15#1 : $*Int, #Int.value // users: %28, %17
   %17 = load %16 : $*Builtin.Word                 // user: %20
   %18 = integer_literal $Builtin.Word, -1         // user: %20
   %19 = builtin_function_ref "xor_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word // user: %20

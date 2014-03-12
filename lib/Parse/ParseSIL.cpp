@@ -2029,15 +2029,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst: {
-    Identifier ElemId;
+    ValueDecl *FieldV;
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
-        parseSILIdentifier(ElemId, NameLoc, diag::expected_sil_constant))
+        parseSILDottedPath(FieldV))
       return true;
-    ValueDecl *FieldV = lookupMember(P, Val.getType().getSwiftRValueType(),
-                                     ElemId);
     if (!FieldV || !isa<VarDecl>(FieldV)) {
       P.diagnose(NameLoc, diag::sil_struct_inst_wrong_field);
       return true;

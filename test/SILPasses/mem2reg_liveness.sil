@@ -13,7 +13,7 @@ bb0(%0 : $Int64):
   store %0 to %1#1 : $*Int64                      // id: %2
   %3 = integer_literal $Builtin.Int64, 10         // user: %6
   %4 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %6
-  %5 = struct_extract %0 : $Int64, #value         // user: %6
+  %5 = struct_extract %0 : $Int64, #Int64.value   // user: %6
   %6 = apply %4(%5, %3) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %7
   cond_br %6, bb1, bb5                            // id: %7
 
@@ -24,7 +24,7 @@ bb1:                                              // Preds: bb0
   store %10 to %8#1 : $*Int64                     // id: %11
   %12 = integer_literal $Builtin.Int64, 3         // user: %15
   %13 = builtin_function_ref "cmp_sgt_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %15
-  %14 = struct_extract %0 : $Int64, #value        // user: %15
+  %14 = struct_extract %0 : $Int64, #Int64.value  // user: %15
   %15 = apply %13(%14, %12) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 // user: %16
   cond_br %15, bb2, bb3                           // id: %16
 
@@ -47,7 +47,7 @@ bb4:                                              // Preds: bb3 bb2
   %27 = integer_literal $Builtin.Int64, 2         // user: %31
   %28 = integer_literal $Builtin.Int1, -1         // user: %31
   %29 = builtin_function_ref "sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // user: %31
-  %30 = struct_extract %26 : $Int64, #value       // user: %31
+  %30 = struct_extract %26 : $Int64, #Int64.value // user: %31
   %31 = apply %29(%30, %27, %28) : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> (Builtin.Int64, Builtin.Int1) // users: %33, %32
   %32 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 0 // user: %34
   %33 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 1 // user: %35

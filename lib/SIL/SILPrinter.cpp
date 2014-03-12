@@ -898,12 +898,14 @@ public:
        << EI->getFieldNo();
   }
   void visitStructExtractInst(StructExtractInst *EI) {
-    OS << "struct_extract " << getIDAndType(EI->getOperand()) << ", #"
-       << EI->getField()->getName().get();
+    OS << "struct_extract " << getIDAndType(EI->getOperand()) << ", #";
+    printFullContext(EI->getField()->getDeclContext(), OS);
+    OS << EI->getField()->getName().get();
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
-    OS << "struct_element_addr " << getIDAndType(EI->getOperand()) << ", #"
-    << EI->getField()->getName().get();
+    OS << "struct_element_addr " << getIDAndType(EI->getOperand()) << ", #";
+    printFullContext(EI->getField()->getDeclContext(), OS);
+    OS << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     OS << "ref_element_addr " << getIDAndType(EI->getOperand()) << ", #";
