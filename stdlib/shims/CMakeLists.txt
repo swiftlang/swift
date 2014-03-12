@@ -21,6 +21,7 @@ add_custom_command(OUTPUT "${output_dir}" ${outputs}
 add_custom_target(
   copy_shim_headers
   DEPENDS "${output_dir}" ${outputs}
+  SOURCES ${sources}
   )
 
 # Symlink in the Clang headers.
