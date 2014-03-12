@@ -15,6 +15,18 @@
       ...
     }
 
+* The implicit argument name for set and willSet property specifiers has been 
+  renamed from "(value)" to "(newValue)".  For example:
+
+    var i : Int {
+      get {
+        return 42
+      }
+      set {  // defaults to (newValue) instead of (value)
+        print(newValue)
+      }
+    }
+
 * The magic identifier __FUNCTION__ can now be used to get the name of the
   current function as a string. Like __FILE__ and __LINE__, if __FUNCTION__
   is used as a default argument, the function name of the caller is passed as

@@ -1393,7 +1393,8 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   if (IsNameImplicit) {
-    const char *ImplName =Kind == AccessorKind::IsDidSet ? "oldValue" : "value";
+    const char *ImplName =
+      Kind == AccessorKind::IsDidSet ? "oldValue" : "newValue";
     Name = P.Context.getIdentifier(ImplName);
     NameLoc = SpecifierLoc;
     StartLoc = SourceLoc();
