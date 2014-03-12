@@ -36,8 +36,31 @@ using ArchetypeConformanceMap
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
 public:
+  /// FIXME: An archetype that looks like the archetype or dependent generic
+  /// parameter type that should be substituted by this substitution, but
+  /// which is not guaranteed to map to any particular context. All that is
+  /// guaranteed:
+  ///
+  /// - Archetype will conform to the same protocols as the substituted
+  ///   type.
+  /// - Archetype will appear at the same point in the generic parameter
+  ///   hierarchy as the substituted type; that is, if the substituted type
+  ///   is a generic parameter, it will be a primary archetype, or if the
+  ///   substituted type is a dependent member type, it will be a nested
+  ///   archetype with the same name path--if T0.Foo.Bar is being substituted,
+  ///   this will be some archetype X.Foo.Bar.
+  /// - If the substituted type represents a Self or associated type of a
+  ///   protocol requirement, this Archetype will be that archetype from the
+  ///   protocol context.
+  ///
+  /// You really shouldn't use the value of this field for anything new.
   ArchetypeType *Archetype;
+  
+  /// The replacement type.
   Type Replacement;
+  
+  /// The protocol conformances for the replacement. These appear in the same
+  /// order as Archetype->getConformsTo().
   ArrayRef<ProtocolConformance *> Conformance;
 
   bool operator!=(const Substitution &Other) const;
