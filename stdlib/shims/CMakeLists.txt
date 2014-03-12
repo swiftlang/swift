@@ -15,11 +15,12 @@ add_custom_command(OUTPUT "${output_dir}" ${outputs}
   ${commands}
   DEPENDS ${sources}
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+  COMMENT "Copying SwiftShims module to ${output_dir}"
   )
 
 add_custom_target(
   copy_shim_headers
-  DEPENDS "${output_dir}"
+  DEPENDS "${output_dir}" ${outputs}
   )
 
 install(FILES ${sources} DESTINATION "lib/swift/shims")
