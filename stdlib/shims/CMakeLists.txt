@@ -1,4 +1,4 @@
-set(sources shims.h module.map)
+set(sources shims.h HeapObject.h RefCount.h module.map)
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
 set(commands)

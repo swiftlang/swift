@@ -18,13 +18,13 @@
 #define SWIFT_RUNTIME_FASTENTRYPOINTS_H
 
 #include <TargetConditionals.h>
+#include "../../../stdlib/shims/RefCount.h"
 
 #define ALLOC_CACHE_COUNT 64
 
 // Note: This file is #included in assembly files.
 
 #define RC_OFFSET 0x8
-#define RC_INTERVAL 4
 #define RC_MASK 0xfffffffc
 #define RC_ATOMIC_BIT 0x1
 #define RC_DEALLOCATING_BIT 0x2

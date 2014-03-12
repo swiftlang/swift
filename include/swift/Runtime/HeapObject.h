@@ -22,21 +22,14 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/FastEntryPoints.h"
 
+// Bring in the definition of HeapObject 
+#include "../../../stdlib/shims/HeapObject.h"
+
 namespace swift {
 
 struct Metadata;
 struct HeapMetadata;
 struct OpaqueValue;
-
-/// The Swift heap-object header.
-struct HeapObject {
-  /// This is always a valid pointer to a metadata object.
-  HeapMetadata const *metadata;
-
-  uint32_t refCount;
-  uint32_t weakRefCount;
-  // FIXME: allocate two words of metadata on 32-bit platforms
-};
 
 /// Allocates a new heap object.  The returned memory is
 /// uninitialized outside of the heap-object header.  The object

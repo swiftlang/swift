@@ -9,6 +9,9 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#ifndef SWIFT_STDLIB_SHIMS_SHIMS_H_
+#define SWIFT_STDLIB_SHIMS_SHIMS_H_
+
 #include <stdint.h>
 
 // This struct is layout-compatible with NSRange.  Using the name
@@ -21,12 +24,17 @@ typedef struct {
   intptr_t length;
 } _SwiftNSRange;
 
-#ifndef __OBJC_SUPERCLASS_HACK__
-#define __OBJC_SUPERCLASS_HACK__
+// A base class we can use to create classes in Swift whose
+// inheritance can be changed at run-time with class_setSuperclass.
+// This technique is used in bridging: for example, to avoid coupling
+// the core standard library to Cocoa, we derive the native Swift
+// Array buffer from this class, and then make that derive from
+// NSArray when Foundation is loaded.
 __attribute__((objc_root_class))
 @interface _ObjCSuperClassHack
 {
   void *isa;
 }
 @end
+
 #endif
