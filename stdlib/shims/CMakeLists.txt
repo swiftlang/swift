@@ -1,5 +1,5 @@
 set(sources shims.h module.map)
-set(output_dir "${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/shims")
+set(output_dir "${SWIFTLIB_DIR}/shims")
 
 set(commands)
 set(outputs)
@@ -22,5 +22,12 @@ add_custom_target(
   copy_shim_headers
   DEPENDS "${output_dir}" ${outputs}
   )
+
+# Symlink in the Clang headers.
+add_custom_command(TARGET copy_shim_headers POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
+    "${SWIFTLIB_DIR}/clang"
+  COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 
 install(FILES ${sources} DESTINATION "lib/swift/shims")

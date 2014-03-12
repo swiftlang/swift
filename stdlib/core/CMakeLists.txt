@@ -117,13 +117,6 @@ add_swift_optimization_flags(swift_stdlib_core)
 set_target_properties(swift_stdlib_core PROPERTIES
                                         LINK_FLAGS "-all_load -Xlinker -reexport-lobjc")
 
-# Create some output directories and symlink in the Clang headers.
-add_custom_command(TARGET swift_stdlib_core PRE_BUILD
-  COMMAND mkdir "-p" "${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}"
-  COMMAND ln "-fns"
-    "${SWIFT_PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib/clang"
-    "${SWIFTLIB_DIR}/clang")
-
 # Install Clang headers under the Swift library so that an installed swift's
 # module importer can find the compiler headers corresponding to its clang.
 install(
