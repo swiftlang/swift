@@ -9,6 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+#include <stdint.h>
 
 // This struct is layout-compatible with NSRange.  Using the name
 // "NSRange" here could eliminate some horrible reinterpretCast
@@ -16,8 +17,8 @@
 // yet tolerant of the same struct coming in from two different Clang
 // modules. <rdar://problem/16294674>
 typedef struct {
-  long location;
-  long length;
+  intptr_t location;
+  intptr_t length;
 } _SwiftNSRange;
 
 #ifndef __OBJC_SUPERCLASS_HACK__
