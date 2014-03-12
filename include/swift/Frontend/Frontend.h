@@ -76,7 +76,8 @@ public:
   /// to DWARF and inject SDKPath if necessary.
   static void buildDWARFDebugFlags(std::string &Output,
                                    const ArrayRef<const char*> &Args,
-                                   StringRef SDKPath);
+                                   StringRef SDKPath,
+                                   StringRef ResourceDir);
 
   void setTargetTriple(StringRef Triple);
 

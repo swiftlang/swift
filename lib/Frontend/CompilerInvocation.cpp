@@ -668,25 +668,39 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
 void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
                                               const ArrayRef<const char*> &Args,
-                                              StringRef SDKPath) {
+                                              StringRef SDKPath,
+                                              StringRef ResourceDir) {
   llvm::raw_string_ostream OS(Output);
   interleave(Args,
              [&](const char *Argument) { PrintArg(OS, Argument, false); },
              [&] { OS << " "; });
 
-  // Inject the SDK path if it is missing.
+  // Inject the SDK path and resource dir if they are nonempty and missing.
+  bool haveSDKPath = SDKPath.empty();
+  bool haveResourceDir = ResourceDir.empty();
   for (auto A : Args) {
-    if (StringRef(A).startswith("-sdk"))
-      return;
+    StringRef Arg(A);
+    // FIXME: this should distinguish between key and value.
+    if (!haveSDKPath && Arg.equals("-sdk"))
+      haveSDKPath = true;
+    if (!haveResourceDir && Arg.equals("-resource-dir"))
+      haveResourceDir = true;
   }
-  OS << " -sdk ";
-  PrintArg(OS, SDKPath.data(), false);
+  if (!haveSDKPath) {
+    OS << " -sdk ";
+    PrintArg(OS, SDKPath.data(), false);
+  }
+  if (!haveResourceDir) {
+    OS << " -resource-dir ";
+    PrintArg(OS, ResourceDir.data(), false);
+  }
 }
 
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
-                           StringRef SDKPath) {
+                           StringRef SDKPath,
+                           StringRef ResourceDir) {
   using namespace options;
 
   if (Args.hasArg(OPT_g)) {
@@ -695,7 +709,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     for (auto A : Args)
       A->render(Args, RenderedArgs);
     CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                             RenderedArgs, SDKPath);
+                                             RenderedArgs, SDKPath,
+                                             ResourceDir);
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_l, OPT_framework),
@@ -815,7 +830,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts,
-                     getSDKPath())) {
+                     getSDKPath(), SearchPathOpts.RuntimeResourcePath)) {
     return true;
   }
 
