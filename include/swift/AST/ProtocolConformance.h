@@ -238,7 +238,8 @@ private:
   ProtocolConformance *subst(Module *module,
                              Type substType,
                              ArrayRef<Substitution> subs,
-                             TypeSubstitutionMap &subMap);
+                             TypeSubstitutionMap &subMap,
+                             ArchetypeConformanceMap &conformanceMap);
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol

@@ -2372,26 +2372,39 @@ bool Type::findIf(const std::function<bool(Type)> &pred) const {
   return walk(Walker(pred));
 }
 
-static TypeSubstitutionMap getSubstitutionMap(ArrayRef<Substitution> subs) {
-  TypeSubstitutionMap r;
-  
-  for (auto sub : subs) {
-    if (sub.Archetype->isPrimary())
-      r[sub.Archetype] = sub.Replacement;
+static void
+getSubstitutionMaps(GenericParamList *context,
+                    ArrayRef<Substitution> subs,
+                    TypeSubstitutionMap &typeMap,
+                    ArchetypeConformanceMap &conformanceMap) {
+  for (auto arch : context->getAllNestedArchetypes()) {
+    auto sub = subs.front();
+    subs = subs.slice(1);
+    
+    // Save the conformances from the substitution so that we can substitute
+    // them into substitutions that map between archetypes.
+    conformanceMap[arch] = sub.Conformance;
+    
+    if (arch->isPrimary())
+      typeMap[arch] = sub.Replacement;
   }
-  
-  return r;
+  assert(subs.empty() && "did not use all substitutions?!");
 }
 
 Substitution Substitution::subst(Module *module,
+                                 GenericParamList *context,
                                  ArrayRef<Substitution> subs) const {
-  TypeSubstitutionMap subMap = getSubstitutionMap(subs);
-  return subst(module, subs, subMap);
+  TypeSubstitutionMap subMap;
+  ArchetypeConformanceMap conformanceMap;
+  getSubstitutionMaps(context, subs,
+                      subMap, conformanceMap);
+  return subst(module, subs, subMap, conformanceMap);
 }
 
 Substitution Substitution::subst(Module *module,
                                  ArrayRef<Substitution> subs,
-                                 TypeSubstitutionMap &subMap) const {
+                                 TypeSubstitutionMap &subMap,
+                                 ArchetypeConformanceMap &conformanceMap) const {
   // Substitute the replacement.
   Type substReplacement
     = Replacement.subst(module, subMap, /*ignoreMissing*/false, nullptr);
@@ -2409,15 +2422,15 @@ Substitution Substitution::subst(Module *module,
   if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
     if (!substReplacement->is<ArchetypeType>()) {
       conformancesChanged = true;
-      // Find the substitution that satisfied the archetype.
-      auto archetypeSub = std::find_if(subs.begin(), subs.end(),
-         [&](const Substitution &s) { return s.Archetype == replacementArch; });
-      assert(archetypeSub != subs.end()
-             && "no substitution for substituted archetype?!");
+      // Find the conformances mapped to the archetype.
+      auto foundConformances = conformanceMap.find(replacementArch);
+      assert(foundConformances != conformanceMap.end()
+             && "no conformances for replaced archetype?!");
+      
       // Get the conformances for the type that apply to the original
       // substituted archetype.
       for (auto proto : Archetype->getConformsTo()) {
-        for (auto c : archetypeSub->Conformance) {
+        for (auto c : foundConformances->second) {
           if (c->getProtocol() == proto) {
             substConformance.push_back(c);
             goto found_conformance;
@@ -2435,7 +2448,8 @@ found_conformance:;
     // If we substituted a concrete type for another, we need to substitute the
     // conformance to apply to the new type.
     for (auto c : Conformance) {
-      auto substC = c->subst(module, substReplacement, subs, subMap);
+      auto substC = c->subst(module, substReplacement, subs,
+                             subMap, conformanceMap);
       if (c != substC)
         conformancesChanged = true;
       substConformance.push_back(substC);

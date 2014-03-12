@@ -28,6 +28,11 @@ namespace swift {
   class ArchetypeType;
   class ProtocolConformance;
   
+/// DenseMap type used internally by Substitution::subst to track conformances
+/// applied to archetypes.
+using ArchetypeConformanceMap
+  = llvm::DenseMap<ArchetypeType*, ArrayRef<ProtocolConformance*>>;
+  
 /// Substitution - A substitution into a generic specialization.
 class Substitution {
 public:
@@ -42,10 +47,16 @@ public:
   /// Substitute the replacement and conformance types with the given
   /// substitution vector.
   Substitution subst(Module *module,
+                     GenericParamList *context,
                      ArrayRef<Substitution> subs) const;
+  
+private:
+  friend class ProtocolConformance;
+  
   Substitution subst(Module *module,
                      ArrayRef<Substitution> subs,
-                     TypeSubstitutionMap &subMap) const;
+                     TypeSubstitutionMap &subMap,
+                     ArchetypeConformanceMap &conformanceMap) const;
 };
 
 } // end namespace swift

@@ -101,6 +101,7 @@ private:
    SmallVector<Substitution, 16> TempSubstList;
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
+                                       OrigFunc->getContextGenericParams(),
                                        CallerInst->getSubstitutions()));
 
    ApplyInst *N = Builder.createApply(
@@ -115,8 +116,9 @@ private:
 
     // Specialize the Self substitution of the witness_method.
     auto sub =
-    Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
-                                      CallerInst->getSubstitutions());
+      Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
+                                        OrigFunc->getContextGenericParams(),
+                                        CallerInst->getSubstitutions());
 
     assert(sub.Conformance.size() == 1 &&
            "didn't get conformance from substitution?!");

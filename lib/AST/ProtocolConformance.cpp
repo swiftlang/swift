@@ -278,10 +278,13 @@ bool ProtocolConformance::isInheritable(LazyResolver *resolver) const {
 }
 
 ProtocolConformance *ProtocolConformance::subst(Module *module,
-                                                Type substType,
-                                                ArrayRef<Substitution> subs,
-                                                TypeSubstitutionMap &subMap) {
-  if (getType()->isEqual(substType)) return this;
+                                      Type substType,
+                                      ArrayRef<Substitution> subs,
+                                      TypeSubstitutionMap &subMap,
+                                      ArchetypeConformanceMap &conformanceMap) {
+  if (getType()->isEqual(substType))
+    return this;
+  
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
     if (substType->isSpecialized()) {
@@ -302,7 +305,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     // Substitute the base.
     ProtocolConformance *newBase
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance()
-        ->subst(module, substType, subs, subMap);
+        ->subst(module, substType, subs, subMap, conformanceMap);
     return module->getASTContext()
       .getInheritedConformance(substType, newBase);
   }
@@ -312,7 +315,7 @@ ProtocolConformance *ProtocolConformance::subst(Module *module,
     SmallVector<Substitution, 8> newSubs;
     newSubs.reserve(spec->getGenericSubstitutions().size());
     for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subs, subMap));
+      newSubs.push_back(sub.subst(module, subs, subMap, conformanceMap));
     
     auto ctxNewSubs = module->getASTContext().AllocateCopy(newSubs);
     
