@@ -70,6 +70,8 @@ WARNING(lex_missing_newline_eof,lexing,none,
 ERROR(lex_utf16_bom_marker,lexing,none,
       "input files must be encoded as UTF-8 instead of UTF-16", ())
 
+ERROR(lex_extra_tokens_config_directive,lexing,none,
+      "extra tokens at the end of the build configuration directive", ())
 ERROR(lex_hashbang_not_allowed,lexing,none,
       "hashbang line is allowed only in the main file", ())
 

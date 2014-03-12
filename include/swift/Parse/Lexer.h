@@ -347,6 +347,14 @@ private:
     return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
   }
 
+  StringRef getSubstring(const char *Start, unsigned Length) const {
+    assert(Start >= BufferStart && Start <= BufferEnd);
+    unsigned BytesUntilBufferEnd = BufferEnd - Start;
+    if (Length > BytesUntilBufferEnd)
+      Length = BytesUntilBufferEnd;
+    return StringRef(Start, Length);
+  }
+
   void lexImpl();
   InFlightDiagnostic diagnose(const char *Loc, Diag<> ID);
   void formToken(tok Kind, const char *TokStart);

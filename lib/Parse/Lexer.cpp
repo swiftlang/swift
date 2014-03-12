@@ -158,6 +158,29 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   return EncodedBytes == 4 ? CharValue : ~0U;
 }
 
+/// Returns pointer to the first newline character in the string.
+const char *findNewline(const char *BufferPtr, const char *BufferEnd) {
+  for ( ; BufferPtr != BufferEnd; ++BufferPtr) {
+    if (isVerticalWhitespace(*BufferPtr))
+      return BufferPtr;
+  }
+  return BufferEnd;
+}
+
+static bool isOnlyWhitespaceUntilNewline(const char *BufferPtr,
+                                         const char *BufferEnd,
+                                         const char *&NonWhitespace) {
+  for ( ; BufferPtr != BufferEnd; ++BufferPtr) {
+    char C = *BufferPtr;
+    if (isVerticalWhitespace(C))
+      return true;
+    if (!isHorizontalWhitespace(C)) {
+      NonWhitespace = BufferPtr;
+      return false;
+    }
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
@@ -1371,11 +1394,6 @@ void Lexer::getStringLiteralSegments(
   }
 }
 
-/// \brief Determines if a given character is a valid whitespace character.
-static bool isWhitespace(char c) {
-  return c == '\n' || c == '\r' || c == ' ' || c == '\t' || c == '\0';
-}
-
 //===----------------------------------------------------------------------===//
 // Main Lexer Loop
 //===----------------------------------------------------------------------===//
@@ -1474,28 +1492,34 @@ Restart:
                                ? tok::question_postfix : tok::question_infix,
                              TokStart);
 
-  case '#':
+  case '#': {
     // # is only a token in SIL mode.
     if (InSILMode)
       return formToken(tok::sil_pound, TokStart);
-      
-    if (StringRef(TokStart + 1, 2).equals("if") &&
-       isWhitespace(CurPtr[2]) &&
-       NextToken.isAtStartOfLine()) {
+
+    tok Kind = tok::unknown;
+    if (getSubstring(TokStart + 1, 2).equals("if") &&
+        isHorizontalWhitespace(CurPtr[2])) {
       CurPtr += 2;
       return formToken(tok::pound_if, TokStart);
-    } else if (StringRef(TokStart + 1, 4).equals("else") &&
-               isWhitespace(CurPtr[4]) &&
-               NextToken.isAtStartOfLine()) {
+    } else if (getSubstring(TokStart + 1, 4).equals("else") &&
+               isWhitespace(CurPtr[4])) {
       CurPtr += 4;
-      return formToken(tok::pound_else, TokStart);
-    } else if(StringRef(TokStart + 1, 5).equals("endif") &&
-              isWhitespace(CurPtr[5]) &&
-              NextToken.isAtStartOfLine()) {
+      Kind = tok::pound_else;
+    } else if(getSubstring(TokStart + 1, 5).equals("endif") &&
+              isWhitespace(CurPtr[5])) {
       CurPtr += 5;
-      return formToken(tok::pound_endif, TokStart);
+      Kind = tok::pound_endif;
     }
-      
+    if (Kind != tok::unknown) {
+      const char *NonWhitespace = nullptr;
+      if (!isOnlyWhitespaceUntilNewline(CurPtr, BufferEnd, NonWhitespace)) {
+        diagnose(NonWhitespace, diag::lex_extra_tokens_config_directive);
+        CurPtr = findNewline(CurPtr, BufferEnd);
+      }
+      return formToken(Kind, TokStart);
+    }
+
     // Allow a hashbang #! line at the beginning of the file.
     if (CurPtr - 1 == BufferStart && *CurPtr == '!') {
       CurPtr--;
@@ -1503,11 +1527,11 @@ Restart:
         diagnose(CurPtr, diag::lex_hashbang_not_allowed);
       skipHashbang();
       goto Restart;
-    }
-    else {
-        diagnose(CurPtr-1, diag::lex_invalid_character);
+    } else {
+      diagnose(CurPtr-1, diag::lex_invalid_character);
     }
     goto Restart;
+  }
 
   // Operator characters.
   case '/':
