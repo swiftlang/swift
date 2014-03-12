@@ -675,9 +675,8 @@ Similarly, the setter function, whose body is part of the ``var-set`` clause
 
 If the ``var-set`` or ``willset`` clause contains a ``set-name`` clause, the
 identifier of that clause is used as the name of the parameter to the setter or
-the observing accessor.  Otherwise, the parameter name is ``value``.
-Same applies to ``didset`` clause, but the default parameter name is
-``oldValue``.
+the observing accessor.  Otherwise, the parameter name is ``newValue``.  Same
+applies to ``didset`` clause, but the default parameter name is ``oldValue``.
 
 FIXME: Should the type of a pattern which isn't fully typed affect the
 type-checking of the expression (i.e. should we compute a structured dependent
