@@ -18,8 +18,3 @@ endif()
 
 install(TARGETS swift
   RUNTIME DESTINATION bin)
-
-# Keep the name "swift_driver" around for a bit longer.
-add_custom_command(TARGET swift POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E create_symlink swift swift_driver
-  WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
