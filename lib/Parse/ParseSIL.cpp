@@ -158,7 +158,8 @@ namespace {
     /// @}
 
     // Parsing logic.
-    bool parseSILType(SILType &Result, GenericParamList *&genericParams);
+    bool parseSILType(SILType &Result, GenericParamList *&genericParams,
+                      bool IsFuncDecl = false);
     bool parseSILType(SILType &Result) {
       GenericParamList *Junk;
       return parseSILType(Result, Junk);
@@ -177,7 +178,8 @@ namespace {
     bool parseSILTypeWithoutQualifiers(SILType &Result,
                                        SILValueCategory category,
                                        const TypeAttributes &attrs,
-                                       GenericParamList *&genericParams);
+                                       GenericParamList *&genericParams,
+                                       bool IsFuncDecl = false);
     bool parseSILTypeWithoutQualifiers(SILType &Result,
                                        SILValueCategory category,
                                        const TypeAttributes &attrs) {
@@ -658,9 +660,22 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
 bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
                                               SILValueCategory category,
                                               const TypeAttributes &attrs,
-                                              GenericParamList *&GenericParams){
+                                              GenericParamList *&GenericParams,
+                                              bool IsFuncDecl){
   GenericParams = nullptr;
+
+  // If this is part of a function decl, generic parameters are visible in the
+  // function body; otherwise, they are visible when parsing the type.
+  Optional<Scope> GenericsScope;
+  if (!IsFuncDecl)
+    GenericsScope.emplace(&P, ScopeKind::Generics); 
+
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
+
+  // Exit the scope introduced for the generic parameters.
+  if (!IsFuncDecl)
+    GenericsScope.reset();
+
   if (TyR.isNull())
     return true;
 
@@ -693,7 +708,8 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
 ///   sil-type:
 ///     '$' '*'? attribute-list (generic-params)? type
 ///
-bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams){
+bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
+                             bool IsFuncDecl){
   if (P.parseToken(tok::sil_dollar, diag::expected_sil_type))
     return true;
 
@@ -717,7 +733,8 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams){
     category = SILValueCategory::LocalStorage;
     attrs.clearAttribute(TAK_local_storage);
   }
-  return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams);
+  return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams,
+                                       IsFuncDecl);
 }
 
 bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
@@ -2589,7 +2606,7 @@ bool Parser::parseDeclSIL() {
     // the scope.
     Scope Body(this, ScopeKind::FunctionBody);
     GenericParamList *ContextParams;
-    if (FunctionState.parseSILType(FnType, ContextParams))
+    if (FunctionState.parseSILType(FnType, ContextParams, true/*IsFuncDecl*/))
       return true;
     auto SILFnType = FnType.getAs<SILFunctionType>();
     if (!SILFnType || !FnType.isObject()) {
@@ -2680,6 +2697,7 @@ bool Parser::parseSILGlobal() {
 
   // Inform the lexer that we're lexing the body of the SIL declaration.
   Lexer::SILBodyRAII Tmp(*L);
+  Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
@@ -2737,6 +2755,7 @@ bool Parser::parseSILVTable() {
 
   // We need to turn on InSILBody to parse SILDeclRef.
   Lexer::SILBodyRAII Tmp(*L);
+  Scope S(this, ScopeKind::TopLevel);
   // Parse the entry list.
   std::vector<SILVTable::Pair> vtableEntries;
   if (Tok.isNot(tok::r_brace)) {
@@ -2868,6 +2887,7 @@ bool Parser::parseSILWitnessTable() {
   Optional<SILLinkage> Linkage;
   parseSILLinkage(Linkage, *this);
   
+  Scope S(this, ScopeKind::TopLevel);
   // Parse the protocol conformance.
   ProtocolDecl *proto;
   NormalProtocolConformance *theConformance =
