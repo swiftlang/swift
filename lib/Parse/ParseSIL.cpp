@@ -86,7 +86,7 @@ namespace {
     llvm::StringMap<std::vector<SILValue>> ForwardMRVLocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
-    bool performTypeLocChecking(TypeLoc &T);
+    bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -185,8 +185,22 @@ namespace {
       return parseSILTypeWithoutQualifiers(Result, category, attrs, Junk);
     }
 
-    bool parseSILDottedPath(ValueDecl *&Decl);
-    bool parseSILDeclRef(SILDeclRef &Result);
+    bool parseSILDottedPath(ValueDecl *&Decl,
+                            SmallVectorImpl<ValueDecl *> &values);
+    bool parseSILDottedPath(ValueDecl *&Decl) {
+      SmallVector<ValueDecl *, 4> values;
+      return parseSILDottedPath(Decl, values);
+    }
+    /// At the time of calling this function, we may not have the type of the
+    /// Decl yet. So we return a SILDeclRef on the first lookup result and also
+    /// return all the lookup results. After parsing the expected type, the
+    /// caller of this function can choose the one that has the expected type.
+    bool parseSILDeclRef(SILDeclRef &Result,
+                         SmallVectorImpl<ValueDecl *> &values);
+    bool parseSILDeclRef(SILDeclRef &Result) {
+      SmallVector<ValueDecl *, 4> values;
+      return parseSILDeclRef(Result, values);
+    }
     bool parseGlobalName(Identifier &Name);
     bool parseValueName(UnresolvedValueName &Name);
     bool parseValueRef(SILValue &Result, SILType Ty, SILLocation Loc);
@@ -590,11 +604,11 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
-bool SILParser::performTypeLocChecking(TypeLoc &T) {
+bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSIL) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
-  return swift::performTypeLocChecking(P.Context, T, /*SIL*/ true, &P.SF);
+  return swift::performTypeLocChecking(P.Context, T, /*SIL*/ IsSIL, &P.SF);
 }
 
 /// Find the top-level ValueDecl or Module given a name.
@@ -618,15 +632,27 @@ static llvm::PointerUnion<ValueDecl*, Module*> lookupTopDecl(Parser &P,
 }
 
 /// Find the ValueDecl given a type and a member name.
-static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
-  SmallVector<ValueDecl *, 4> Lookup;
+static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name,
+                               SmallVectorImpl<ValueDecl *> &Lookup,
+                               bool ExpectMultipleResults) {
   unsigned options = NL_QualifiedDefault;
   // FIXME: a bit of a hack.
   if (Name == P.Context.Id_deinit || Name == P.Context.Id_init)
     options = options & ~NL_VisitSupertypes;
   P.SF.lookupQualified(Ty, Name, options, nullptr, Lookup);
-  assert(Lookup.size() == 1);
+
+  assert(Lookup.size() >= 1 && "Can't find member for a given type!");
+  if (!ExpectMultipleResults)
+    assert(Lookup.size() == 1 && "Expect a single lookup result!");
   return Lookup[0];
+}
+
+/// Find the ValueDecl given a type and a member name. This helper function
+/// expects a single lookup result.
+static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
+  SmallVector<ValueDecl *, 4> values;
+  return lookupMember(P, Ty, Name, values,
+                      false/*ExpectMultipleResults*/);
 }
 
 bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
@@ -694,7 +720,8 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams){
   return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams);
 }
 
-bool SILParser::parseSILDottedPath(ValueDecl *&Decl) {
+bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
+                                   SmallVectorImpl<ValueDecl *> &values) {
   if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
     return true;
 
@@ -710,17 +737,22 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl) {
   // Look up ValueDecl from a dotted path.
   ValueDecl *VD;
   llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, FullName[0]);
+  // It is possible that the last member lookup can return multiple lookup
+  // results. One example is the overloaded member functions.
   if (Res.is<Module*>()) {
     assert(FullName.size() > 1 &&
            "A single module is not a full path to SILDeclRef");
     auto Mod = Res.get<Module*>();
-    VD = lookupMember(P, ModuleType::get(Mod), FullName[1]);
+    VD = lookupMember(P, ModuleType::get(Mod), FullName[1], values,
+                      FullName.size() == 2/*ExpectMultipleResults*/);
     for (unsigned I = 2, E = FullName.size(); I < E; I++)
-      VD = lookupMember(P, VD->getType(), FullName[I]);
+      VD = lookupMember(P, VD->getType(), FullName[I], values,
+                        I == FullName.size() - 1/*ExpectMultipleResults*/);
   } else {
     VD = Res.get<ValueDecl*>();
     for (unsigned I = 1, E = FullName.size(); I < E; I++)
-      VD = lookupMember(P, VD->getType(), FullName[I]);
+      VD = lookupMember(P, VD->getType(), FullName[I], values,
+                        I == FullName.size() - 1/*ExpectMultipleResults*/);
   }
   Decl = VD;
   return false;
@@ -740,9 +772,10 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl) {
 ///  sil-decl-subref-part ::= 'globalaccessor'
 ///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
-bool SILParser::parseSILDeclRef(SILDeclRef &Result) {
+bool SILParser::parseSILDeclRef(SILDeclRef &Result,
+                                SmallVectorImpl<ValueDecl *> &values) {
   ValueDecl *VD;
-  if (parseSILDottedPath(VD))
+  if (parseSILDottedPath(VD, values))
     return true;
 
   // Initialize Kind, uncurryLevel and IsObjC.
@@ -1892,13 +1925,46 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILDeclRef Member;
     SILType MethodTy;
     SourceLoc TyLoc;
+    SmallVector<ValueDecl *, 4> values;
     if (parseTypedValueRef(Val) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-        parseSILDeclRef(Member) ||
-        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
-        parseSILType(MethodTy, TyLoc)
-       )
+        parseSILDeclRef(Member, values) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":"))
       return true;
+
+    // TODO: we need to handle overloaded members for other MethodInsts as well.
+    // The majority of work is in updating testing cases.
+    if (Opcode == ValueKind::ClassMethodInst) {
+      // Parse the type for SILDeclRef.
+      ParserResult<TypeRepr> TyR = P.parseType();
+      if (TyR.isNull())
+        return true;
+      TypeLoc Ty = TyR.get();
+      if (performTypeLocChecking(Ty, false))
+        return true;
+
+      if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+          parseSILType(MethodTy, TyLoc)
+         )
+        return true;
+
+      // Pick the ValueDecl that has the right type.
+      ValueDecl *TheDecl = nullptr;
+      for (unsigned I = 0, E = values.size(); I < E; I++) {
+        if (values[I]->getType()->getCanonicalType() ==
+            Ty.getType()->getCanonicalType()) {
+          TheDecl = values[I];
+          // Update SILDeclRef to point to the right Decl.
+          Member.loc = TheDecl;
+          break;
+        }
+      }
+      assert(TheDecl && "Can't find a member with the right type");
+    } else {
+      if (parseSILType(MethodTy, TyLoc))
+        return true;
+    }
+
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::ProtocolMethodInst:

@@ -97,7 +97,7 @@ entry(%f : $(Builtin.Word) -> (), %x : $Builtin.Word):
 
 sil @objc_partial_apply : $@thin ObjCClass -> @callee_owned Int -> () {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : $@cc(objc_method) @thin (Int, ObjCClass) -> ()
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.method!1.foreign : ObjCClass -> (x: Int) -> () , $@cc(objc_method) @thin (Int, ObjCClass) -> ()
   %p = partial_apply %m(%c) : $@cc(objc_method) @thin (Int, ObjCClass) -> ()
   return %p : $@callee_owned Int -> ()
 }
@@ -118,7 +118,7 @@ entry(%c : $ObjCClass):
 
 sil @objc_partial_apply_consumes_self : $@thin ObjCClass -> @callee_owned () -> @owned ObjCClass {
 entry(%c : $ObjCClass):
-  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.initFamily!1.foreign : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass
+  %m = class_method [volatile] %c : $ObjCClass, #ObjCClass.initFamily!1.foreign : ObjCClass -> () -> ObjCClass , $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass
   %p = partial_apply %m(%c) : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass
   return %p : $@callee_owned () -> @owned ObjCClass
 }

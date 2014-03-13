@@ -924,7 +924,8 @@ public:
   
   void visitClassMethodInst(ClassMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "class_method");
-    OS << " : " << AMI->getType();
+    OS << " : " << AMI->getMember().getDecl()->getType() << " , ";
+    OS << AMI->getType();
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "super_method");
