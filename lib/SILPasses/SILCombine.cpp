@@ -264,6 +264,7 @@ public:
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitAllocStackInst(AllocStackInst *AS);
 
 private:
   /// Perform one SILCombine iteration.
@@ -444,7 +445,78 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 //                                  Visitors
 //===----------------------------------------------------------------------===//
+SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
+  // init_existential instructions behave like memory allocation within
+  // the allocated object. We can promote the init_existential allocation
+  // into a dedicated allocation.
 
+  // Detect this pattern
+  // %0 = alloc_stack $LogicValue
+  // %1 = init_existential %0#1 : $*LogicValue, $*Bool
+  // ...
+  // use of %1
+  // ...
+  // destroy_addr %0#1 : $*LogicValue
+  // dealloc_stack %0#0 : $*@local_storage LogicValue
+  bool LegalUsers = true;
+  InitExistentialInst *IEI = nullptr;
+  // Scan all of the uses of the AllocStack and check if it is not used for
+  // anything other than the init_existential container.
+  for (Operand *Op: AS->getUses()) {
+    // Destroy and dealloc are both fine.
+    if (isa<DestroyAddrInst>(Op->getUser()) ||
+        isa<DeallocStackInst>(Op->getUser()))
+      continue;
+
+    // Make sure there is exactly one init_existential.
+    if (auto *I = dyn_cast<InitExistentialInst>(Op->getUser())) {
+      if (IEI) {
+        LegalUsers = false;
+        break;
+      }
+      IEI = I;
+      continue;
+    }
+
+    // All other instructions are illegal.
+    LegalUsers = false;
+    break;
+  }
+
+  // Save the original insertion point.
+  auto OrigInsertionPoint = Builder->getInsertionPoint();
+
+  // If the only users of the alloc_stack are alloc, destroy and
+  // init_existential then we can promote the allocation of the init
+  // existential.
+  if (LegalUsers && IEI) {
+    auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
+                                                IEI->getConcreteType());
+    SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
+    eraseInstFromFunction(*IEI);
+
+
+    for (Operand *Op: AS->getUses()) {
+      if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
+        Builder->setInsertionPoint(DA);
+        Builder->createDestroyAddr(DA->getLoc(), ConcAlloc);
+        eraseInstFromFunction(*DA);
+
+      }
+      if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
+        Builder->setInsertionPoint(DS);
+        Builder->createDeallocStack(DS->getLoc(), ConcAlloc);
+        eraseInstFromFunction(*DS);
+      }
+    }
+
+    eraseInstFromFunction(*AS);
+    // Restore the insertion point.
+    Builder->setInsertionPoint(OrigInsertionPoint);
+  }
+
+  return nullptr;
+}
 
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Given a load with multiple struct_extracts/tuple_extracts and no other
