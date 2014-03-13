@@ -39,9 +39,9 @@
 #error "Do not try to override SWIFT_HAVE_FAST_ENTRY_POINTS"
 #endif
 
-#if __x86_64__ && !TARGET_IPHONE_SIMULATOR
-# define SWIFT_HAVE_FAST_ENTRY_POINTS 1
-#endif
+//#if __x86_64__ && !TARGET_IPHONE_SIMULATOR
+//# define SWIFT_HAVE_FAST_ENTRY_POINTS 1
+//#endif
 
 #endif // SWIFT_RUNTIME_FASTENTRYPOINTS_H
 
