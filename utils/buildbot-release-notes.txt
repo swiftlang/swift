@@ -1,3 +1,10 @@
+2014-03-19
+----------
+
+* 'nil' may now be used as a Selector value. This also allows calls to 
+  Cocoa methods that accept `nil` selectors.
+
+
 2014-03-12
 ----------
 
