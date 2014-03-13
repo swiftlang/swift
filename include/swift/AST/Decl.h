@@ -354,8 +354,12 @@ class alignas(8) Decl {
     ///
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
+
+    /// Whether we have already added implicitly-defined initializers
+    /// to this class.
+    unsigned AddedImplicitInitializers : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 5 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 6 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2557,6 +2561,17 @@ public:
   /// \param resolver Used to resolve the signatures of initializers, which is
   /// required for name lookup.
   bool inheritsSuperclassInitializers(LazyResolver *resolver);
+
+  /// Determine whether we have already attempted to add any
+  /// implicitly-defined initializers to this class.
+  bool addedImplicitInitializers() const { 
+    return ClassDeclBits.AddedImplicitInitializers; 
+  }
+
+  /// Note that we have attempted
+  void setAddedImplicitInitializers() {
+    ClassDeclBits.AddedImplicitInitializers = true;
+  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

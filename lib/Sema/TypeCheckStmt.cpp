@@ -824,10 +824,8 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   auto nominalDecl = ctor->getDeclContext()->getDeclaredTypeInContext()
     ->getNominalOrBoundGenericNominal();
   ClassDecl *ClassD = dyn_cast<ClassDecl>(nominalDecl);
-  bool wantSuperInitCall;
-  if (ctor->isImplicit()) {
-    wantSuperInitCall = ClassD && ClassD->getSuperclass();
-  } else {
+  bool wantSuperInitCall = false;
+  if (ClassD) {
     bool isDelegating = false;
     ApplyExpr *initExpr = nullptr;
     switch (ctor->getDelegatingOrChainedInitKind(&Diags, &initExpr)) {

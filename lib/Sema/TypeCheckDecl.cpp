@@ -160,6 +160,40 @@ public:
   
 } // end llvm namespace
 
+/// Append the new set of members to the nominal declaration.
+static void appendMembers(NominalTypeDecl *nominal,
+                          ArrayRef<Decl *> newMembers) {
+  if (newMembers.empty())
+    return;
+
+  auto members = nominal->getMembers();
+  unsigned numMembers = members.size();
+  auto &ctx = nominal->getASTContext();
+  MutableArrayRef<Decl *> newMembersCopy
+    = ctx.Allocate<Decl*>(numMembers + newMembers.size());
+  std::copy(members.begin(), members.end(), newMembersCopy.begin());
+  std::copy(newMembers.begin(), newMembers.end(),
+            newMembersCopy.begin() + numMembers);
+  nominal->setMembers(newMembersCopy, nominal->getBraces());
+}
+
+/// Append the new set of members to the extension declaration.
+static void appendMembers(ExtensionDecl *extension,
+                          ArrayRef<Decl *> newMembers) {
+  if (newMembers.empty())
+    return;
+
+  auto members = extension->getMembers();
+  unsigned numMembers = members.size();
+  auto &ctx = extension->getASTContext();
+  MutableArrayRef<Decl *> newMembersCopy
+  = ctx.Allocate<Decl*>(numMembers + newMembers.size());
+  std::copy(members.begin(), members.end(), newMembersCopy.begin());
+  std::copy(newMembers.begin(), newMembers.end(),
+            newMembersCopy.begin() + numMembers);
+  extension->setMembers(newMembersCopy, extension->getBraces());
+}
+
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
   // Classes can inherit from a class.
@@ -1180,10 +1214,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
   // We've added some members to our containing class, add them to the members
   // list.
   ProtocolDecl *PD = cast<ProtocolDecl>(VD->getDeclContext());
-  SmallVector<Decl*, 4> members(PD->getMembers().begin(),
-                                PD->getMembers().end());
-  members.push_back(Get);
-  PD->setMembers(PD->getASTContext().AllocateCopy(members), PD->getBraces());
+  appendMembers(PD, Get);
 }
 
 /// Given a "Stored" property that needs to be converted to
@@ -1229,29 +1260,26 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
   // We've added some members to our containing class, add them to the members
   // list.
   if (auto *CD = dyn_cast<ClassDecl>(VD->getDeclContext())) {
-    SmallVector<Decl*, 4> members(CD->getMembers().begin(),
-                                  CD->getMembers().end());
-    members.push_back(Get);
-    if (Set) members.push_back(Set);
-    CD->setMembers(Context.AllocateCopy(members), CD->getBraces());
+    SmallVector<Decl*, 2> newMembers;
+    newMembers.push_back(Get);
+    if (Set) newMembers.push_back(Set);
+    appendMembers(CD, newMembers);
     return;
   }
   
   if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-    SmallVector<Decl*, 4> members(ED->getMembers().begin(),
-                                  ED->getMembers().end());
-    members.push_back(Get);
-    if (Set) members.push_back(Set);
-    ED->setMembers(Context.AllocateCopy(members), ED->getBraces());
+    SmallVector<Decl *, 2> newMembers;
+    newMembers.push_back(Get);
+    if (Set) newMembers.push_back(Set);
+    appendMembers(ED, newMembers);
     return;
   }
   
   auto *SD = cast<StructDecl>(VD->getDeclContext());
-  SmallVector<Decl*, 4> members(SD->getMembers().begin(),
-                                SD->getMembers().end());
-  members.push_back(Get);
-  if (Set) members.push_back(Set);
-  SD->setMembers(Context.AllocateCopy(members), SD->getBraces());
+  SmallVector<Decl*, 2> newMembers;
+  newMembers.push_back(Get);
+  if (Set) newMembers.push_back(Set);
+  appendMembers(SD, newMembers);
 }
 
 /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
@@ -1403,6 +1431,105 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
 }
 
+namespace {
+
+/// The kind of subobject initializer to synthesize.
+enum class SubobjectInitKind {
+  /// A stub initializer, which is not visible to name lookup and
+  /// merely aborts at runtime.
+  Stub,
+
+  /// An initializer that simply chains to the corresponding
+  /// superclass initializer.
+  Chaining
+};
+
+}
+
+/// Create a new initializer that overrides the given subobject
+/// initializer.
+///
+/// \param classDecl The subclass in which the new initializer will
+/// be declared.
+///
+/// \param superclassCtor The superclass initializer for which this
+/// routine will create an override.
+///
+/// \param kind The kind of initializer to synthesize.
+///
+/// \returns the newly-created initializer that overrides \p
+/// superclassCtor.
+static ConstructorDecl *
+createSubobjectInitOverride(TypeChecker &tc,
+                            ClassDecl *classDecl,
+                            ConstructorDecl *superclassCtor,
+                            SubobjectInitKind kind);
+
+/// Configure the implicit 'self' parameter of a function, setting its type,
+/// pattern, etc.
+///
+/// \param func The function whose 'self' is being configured.
+/// \param outerGenericParams The generic parameters from the outer scope.
+///
+/// \returns the type of 'self'.
+static Type configureImplicitSelf(AbstractFunctionDecl *func,
+                                  GenericParamList *&outerGenericParams) {
+  outerGenericParams = nullptr;
+
+  auto selfDecl = func->getImplicitSelfDecl();
+
+  // Compute the type of self.
+  Type selfTy = func->computeSelfType(&outerGenericParams);
+  assert(selfDecl && selfTy && "Not a method");
+
+  // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
+  // neither inout.
+  selfDecl->setLet(!selfTy->is<InOutType>());
+  selfDecl->setType(selfTy);
+
+  auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
+  if (!argPattern->getTypeLoc().getTypeRepr())
+    argPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
+
+  auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
+  if (!bodyPattern->getTypeLoc().getTypeRepr())
+    bodyPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
+
+  return selfTy;
+}
+
+/// Compute the allocating and initializing constructor types for
+/// the given constructor.
+static void configureConstructorType(ConstructorDecl *ctor,
+                                     GenericParamList *outerGenericParams,
+                                     Type selfType,
+                                     Type argType) {
+  Type fnType;
+  Type allocFnType;
+  Type initFnType;
+  Type resultType = selfType->getInOutObjectType();
+
+  if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
+    innerGenericParams->setOuterParameters(outerGenericParams);
+    fnType = PolymorphicFunctionType::get(argType, resultType,
+                                          innerGenericParams);
+  } else {
+    fnType = FunctionType::get(argType, resultType);
+  }
+  auto &ctx = ctor->getASTContext();
+  Type selfMetaType = MetatypeType::get(resultType, ctx);
+  if (outerGenericParams) {
+    allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
+                                               outerGenericParams);
+    initFnType = PolymorphicFunctionType::get(selfType, fnType,
+                                              outerGenericParams);
+  } else {
+    allocFnType = FunctionType::get(selfMetaType, fnType);
+    initFnType = FunctionType::get(selfType, fnType);
+  }
+  ctor->setType(allocFnType);
+  ctor->setInitializerType(initFnType);
+}
 
 namespace {
 
@@ -1916,13 +2043,13 @@ public:
         TC.ValidatedTypes.pop_back();
     }
 
+    if (!IsSecondPass) {
+      TC.addImplicitConstructors(SD);
+    }
+
     // Visit each of the members.
     for (Decl *Member : SD->getMembers()) {
       visit(Member);
-    }
-
-    if (!IsSecondPass) {
-      TC.addImplicitConstructors(SD);
     }
 
     if (!IsFirstPass) {
@@ -2027,78 +2154,6 @@ public:
     }
   }
 
-  /// Create a new initializer that overrides the given subobject
-  /// initializer.
-  ///
-  /// \param classDecl The subclass in which the new initializer will
-  /// be declared.
-  ///
-  /// \param superclassCtor The superclass initializer for which this
-  /// routine will create an override.
-  ///
-  /// \returns the newly-created initializer that overrides \p
-  /// superclassCtor.
-  ConstructorDecl *
-  createSubobjectInitOverride(ClassDecl *classDecl, 
-                              ConstructorDecl *superclassCtor) {
-    // Determine the initializer parameters.
-    Type superInitType = superclassCtor->getInitializerInterfaceType();
-    if (superInitType->is<GenericFunctionType>() ||
-        classDecl->getGenericParamsOfContext()) {
-      // FIXME: Handle generic initializers as well.
-      return nullptr;
-    }
-
-    auto &ctx = TC.Context;
-
-    // Create the 'self' declaration and patterns.
-    auto *selfDecl = new (ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                       SourceLoc(), ctx.Id_self,
-                                       Type(), classDecl);
-    selfDecl->setImplicit();
-    Pattern *selfArgPattern 
-      = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
-    selfArgPattern = new (ctx) TypedPattern(selfArgPattern, TypeLoc());
-    Pattern *selfBodyPattern 
-      = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
-    selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
-
-    // Create the initializer parameter patterns.
-    Pattern *argParamPatterns
-      = superclassCtor->getArgParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
-    Pattern *bodyParamPatterns
-      = superclassCtor->getBodyParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
-
-    // Create the initializer declaration.
-    auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
-                                          selfArgPattern, argParamPatterns,
-                                          selfBodyPattern, bodyParamPatterns,
-                                          nullptr, classDecl);
-    ctor->setImplicit();
-    if (superclassCtor->hasSelectorStyleSignature())
-      ctor->setHasSelectorStyleSignature();
-
-    // Configure 'self'.
-    GenericParamList *outerGenericParams = nullptr;
-    Type selfType = configureImplicitSelf(ctor, outerGenericParams);
-    selfArgPattern->setType(selfType);
-    selfBodyPattern->setType(selfType);
-    cast<TypedPattern>(selfArgPattern)->getSubPattern()->setType(selfType);
-    cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
-
-    // Set the type of the initializer.
-    configureConstructorType(ctor, outerGenericParams, selfType, 
-                             argParamPatterns->getType());
-    if (superclassCtor->isObjC())
-      ctor->setIsObjC(true);
-    checkOverrides(ctor);
-
-    // Mark this as a stub implementation.
-    ctor->setStubImplementation(true);
-    
-    return ctor;
-  }
-
   void visitClassDecl(ClassDecl *CD) {
     if (!IsSecondPass) {
       TC.validateDecl(CD);
@@ -2114,6 +2169,11 @@ public:
       }
     }
 
+    if (!IsFirstPass) {
+      TC.addImplicitConstructors(CD);
+      TC.addImplicitDestructor(CD);
+    }
+
     for (Decl *Member : CD->getMembers())
       visit(Member);
 
@@ -2122,10 +2182,7 @@ public:
     if (CD->requiresStoredPropertyInits())
       checkRequiredInClassInits(CD);
 
-    if (!IsSecondPass) {
-      TC.addImplicitConstructors(CD);
-      TC.addImplicitDestructor(CD);
-
+    if (!IsFirstPass) {
       // Check for inconsistencies between the initializers of our
       // superclass and our own initializers.
       if (auto superclassTy = CD->getSuperclass()) {
@@ -2147,7 +2204,7 @@ public:
         }
         
         bool diagnosed = false;
-        llvm::SmallVector<ConstructorDecl *, 2> synthesizedCtors;
+        llvm::SmallVector<Decl *, 2> synthesizedCtors;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
           // We only care about required or subobject initializers.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
@@ -2196,7 +2253,9 @@ public:
             continue;
 
           // Create an override for it.
-          if (auto ctor = createSubobjectInitOverride(CD, superclassCtor)) {
+          if (auto ctor = createSubobjectInitOverride(
+                            TC, CD, superclassCtor,
+                            SubobjectInitKind::Stub)) {
             assert(ctor->getOverriddenDecl() == superclassCtor && 
                    "Not an override?");
             synthesizedCtors.push_back(ctor);
@@ -2204,16 +2263,7 @@ public:
         }
 
         // If we synthesized any initializers, add them.
-        if (!synthesizedCtors.empty()) {
-          auto members = CD->getMembers();
-          unsigned numMembers = members.size();
-          MutableArrayRef<Decl *> newMembers
-            = TC.Context.Allocate<Decl*>(numMembers + synthesizedCtors.size());
-          std::copy(members.begin(), members.end(), newMembers.begin());
-          std::copy(synthesizedCtors.begin(), synthesizedCtors.end(),
-                    newMembers.begin() + numMembers);
-          CD->setMembers(newMembers, CD->getBraces());
-        }
+        appendMembers(CD, synthesizedCtors);
       }
     }
     if (!IsFirstPass) {
@@ -2565,39 +2615,6 @@ public:
     auto dynamicSelfType = func->getDynamicSelf();
     simpleRepr->setValue(dynamicSelfType);
     return false;
-  }
-
-  /// Configure the implicit 'self' parameter of a function, setting its type,
-  /// pattern, etc.
-  ///
-  /// \param func The function whose 'self' is being configured.
-  /// \param outerGenericParams The generic parameters from the outer scope.
-  ///
-  /// \returns the type of 'self'.
-  Type configureImplicitSelf(AbstractFunctionDecl *func,
-                             GenericParamList *&outerGenericParams) {
-    outerGenericParams = nullptr;
-
-    auto selfDecl = func->getImplicitSelfDecl();
-
-    // Compute the type of self.
-    Type selfTy = func->computeSelfType(&outerGenericParams);
-    assert(selfDecl && selfTy && "Not a method");
-
-    // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
-    // neither inout.
-    selfDecl->setLet(!selfTy->is<InOutType>());
-    selfDecl->setType(selfTy);
-    
-    auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
-    if (!argPattern->getTypeLoc().getTypeRepr())
-      argPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
-
-    auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
-    if (!bodyPattern->getTypeLoc().getTypeRepr())
-      bodyPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
-
-    return selfTy;
   }
 
   void visitFuncDecl(FuncDecl *FD) {
@@ -3329,37 +3346,6 @@ public:
     // their enclosing declaration.
   }
 
-  /// Compute the allocating and initializing constructor types for
-  /// the given constructor.
-  void configureConstructorType(ConstructorDecl *ctor, 
-                                GenericParamList *outerGenericParams,
-                                Type selfType,
-                                Type argType) {
-    Type fnType;
-    Type allocFnType;
-    Type initFnType;
-    Type resultType = selfType->getInOutObjectType();
-    
-    if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
-      innerGenericParams->setOuterParameters(outerGenericParams);
-      fnType = PolymorphicFunctionType::get(argType, resultType,
-                                            innerGenericParams);
-    } else
-      fnType = FunctionType::get(argType, resultType);
-    Type selfMetaType = MetatypeType::get(resultType, TC.Context);
-    if (outerGenericParams) {
-      allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
-                                                 outerGenericParams);
-      initFnType = PolymorphicFunctionType::get(selfType, fnType,
-                                                outerGenericParams);
-    } else {
-      allocFnType = FunctionType::get(selfMetaType, fnType);
-      initFnType = FunctionType::get(selfType, fnType);
-    }
-    ctor->setType(allocFnType);
-    ctor->setInitializerType(initFnType);
-  }
-
   void visitConstructorDecl(ConstructorDecl *CD) {
     if (CD->isInvalid()) {
       CD->overwriteType(ErrorType::get(TC.Context));
@@ -3744,8 +3730,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (auto funcDeclContext =
                 dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
           GenericParamList *outerGenericParams = nullptr;
-          DeclChecker(*this, false, false).
-              configureImplicitSelf(funcDeclContext, outerGenericParams);
+          configureImplicitSelf(funcDeclContext, outerGenericParams);
         }
       } else {
         D->setType(ErrorType::get(Context));
@@ -3845,60 +3830,313 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   return ctor;
 }
 
+/// Create an expression that references the variables in the given
+/// pattern for, e.g., forwarding of these variables to another
+/// function with the same signature.
+static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern, 
+                              Pattern *bodyPattern) {
+  switch (argPattern->getKind()) {
+#define PATTERN(Id, Parent)
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#include "swift/AST/PatternNodes.def"
+    return nullptr;
+    
+  case PatternKind::Paren:
+    if (auto subExpr = forwardArguments(
+                         tc,
+                         cast<ParenPattern>(argPattern)->getSubPattern(),
+                         cast<ParenPattern>(bodyPattern)->getSubPattern())) {
+      return new (tc.Context) ParenExpr(SourceLoc(), subExpr, SourceLoc(),
+                                        /*hasTrailingClosure=*/false);
+    }
+
+    return nullptr;
+
+  case PatternKind::Tuple: {
+    auto argTuple = cast<TuplePattern>(argPattern);
+    auto bodyTuple = cast<TuplePattern>(bodyPattern);
+    SmallVector<Identifier, 4> labels;
+    SmallVector<Expr *, 4> values;
+    bool hasName = false;
+
+    // FIXME: Can't forward varargs yet.
+    if (argTuple->hasVararg())
+      return nullptr;
+
+    for (unsigned i = 0, n = argTuple->getNumFields(); i != n; ++i) {
+      // Forward the value.
+      auto subExpr = forwardArguments(tc,
+                                      argTuple->getFields()[i].getPattern(),
+                                      bodyTuple->getFields()[i].getPattern());
+      if (!subExpr)
+        return nullptr;
+      values.push_back(subExpr);
+      
+      // Dig out the name.
+      auto subPattern = argTuple->getFields()[i].getPattern();
+      do {
+        if (auto typed = dyn_cast<TypedPattern>(subPattern)) {
+          subPattern = typed->getSubPattern();
+          continue;
+        }
+
+        if (auto paren = dyn_cast<ParenPattern>(subPattern)) {
+          subPattern = paren->getSubPattern();
+          continue;
+        }
+
+        break;
+      } while (true);
+
+      if (auto named = dyn_cast<NamedPattern>(subPattern)) {
+        if (named->getDecl()->hasName()) {
+          hasName = true;
+          labels.push_back(named->getDecl()->getName());
+          continue;
+        }
+      }
+
+      labels.push_back(Identifier());
+    }
+
+    if (values.size() == 1 && !hasName)
+      return new (tc.Context) ParenExpr(SourceLoc(), values[0], SourceLoc(),
+                                        /*hasTrailingClosure=*/false);
+
+    Identifier *labelsCopy = nullptr;
+    if (hasName)
+      labelsCopy = tc.Context.AllocateCopy(labels).data();
+    return new (tc.Context) TupleExpr(SourceLoc(),
+                                      tc.Context.AllocateCopy(values),
+                                      labelsCopy,
+                                      SourceLoc(),
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/true);
+  }
+
+  case PatternKind::Named: {
+    auto decl = cast<NamedPattern>(bodyPattern)->getDecl();
+    Expr *declRef = new (tc.Context) DeclRefExpr(decl, SourceLoc(),
+                                                 /*Implicit=*/true);
+    if (decl->getType()->is<InOutType>()) {
+      declRef = new (tc.Context) AddressOfExpr(SourceLoc(), declRef,
+                                               Type(), /*isImplicit=*/true);
+    }
+    return declRef;
+  }
+
+  case PatternKind::Any:
+    // FIXME: We still need to create a decl for these.
+    return nullptr;
+
+  case PatternKind::Typed:
+    return forwardArguments(tc,
+                            cast<TypedPattern>(argPattern)->getSubPattern(),
+                            cast<TypedPattern>(bodyPattern)->getSubPattern());
+
+  case PatternKind::Var:
+    return forwardArguments(tc,
+                            cast<VarPattern>(argPattern)->getSubPattern(),
+                            cast<VarPattern>(bodyPattern)->getSubPattern());
+
+  }
+}
+
+static ConstructorDecl *
+createSubobjectInitOverride(TypeChecker &tc,
+                            ClassDecl *classDecl,
+                            ConstructorDecl *superclassCtor,
+                            SubobjectInitKind kind) {
+  // Determine the initializer parameters.
+  Type superInitType = superclassCtor->getInitializerInterfaceType();
+  if (superInitType->is<GenericFunctionType>() ||
+      classDecl->getGenericParamsOfContext()) {
+    // FIXME: Handle generic initializers as well.
+    return nullptr;
+  }
+
+  auto &ctx = tc.Context;
+
+  // Create the 'self' declaration and patterns.
+  auto *selfDecl = new (ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
+                                     SourceLoc(), ctx.Id_self,
+                                     Type(), classDecl);
+  selfDecl->setImplicit();
+  Pattern *selfArgPattern 
+    = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
+  selfArgPattern = new (ctx) TypedPattern(selfArgPattern, TypeLoc());
+  Pattern *selfBodyPattern 
+    = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
+  selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
+
+  // Create the initializer parameter patterns.
+  Pattern *argParamPatterns
+    = superclassCtor->getArgParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+  Pattern *bodyParamPatterns
+    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+
+  // Create the initializer declaration.
+  auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
+                                        selfArgPattern, argParamPatterns,
+                                        selfBodyPattern, bodyParamPatterns,
+                                        nullptr, classDecl);
+  ctor->setImplicit();
+  if (superclassCtor->hasSelectorStyleSignature())
+    ctor->setHasSelectorStyleSignature();
+
+  // Configure 'self'.
+  GenericParamList *outerGenericParams = nullptr;
+  Type selfType = configureImplicitSelf(ctor, outerGenericParams);
+  selfArgPattern->setType(selfType);
+  selfBodyPattern->setType(selfType);
+  cast<TypedPattern>(selfArgPattern)->getSubPattern()->setType(selfType);
+  cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
+
+  // Set the type of the initializer.
+  configureConstructorType(ctor, outerGenericParams, selfType, 
+                           argParamPatterns->getType());
+  if (superclassCtor->isObjC())
+    ctor->setIsObjC(true);
+
+  // Wire up the overides.
+  DeclChecker(tc, false, false).checkOverrides(ctor);
+
+  if (kind == SubobjectInitKind::Stub) {
+    // Mark this as a stub implementation. We're done here.
+    ctor->setStubImplementation(true);
+    return ctor;
+  }
+
+  // Form the body of a chaining subobject initializer.
+  assert(kind == SubobjectInitKind::Chaining);
+
+  // Reference to super.init.
+  Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
+                                          /*Implicit=*/true);
+  Expr *ctorRef  = new (ctx) UnresolvedConstructorExpr(superRef,
+                                                       SourceLoc(),
+                                                       SourceLoc(),
+                                                       /*Implicit=*/true);
+
+  Expr *ctorArgs = forwardArguments(tc,
+                                    ctor->getArgParamPatterns()[1],
+                                    ctor->getBodyParamPatterns()[1]);
+  if (!ctorArgs) {
+    // FIXME: We should be able to assert that this never happens,
+    // but there are currently holes when dealing with vararg
+    // initializers and _ parameters. Fail somewhat gracefully by
+    // generating a stub here.
+    ctor->setStubImplementation(true);
+    return ctor;
+  }
+
+  Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
+  superCall = new (ctx) RebindSelfInConstructorExpr(superCall, selfDecl);
+  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
+                                  ASTNode(superCall),
+                                  SourceLoc(),
+                                  /*Implicit=*/true));
+
+  return ctor;
+}
+
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // We can only synthesize implicit constructors for classes and structs.
   if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
     return;
 
-  // Don't add constructors to imported Objective-C classes.
-  if (decl->hasClangNode() && isa<ClassDecl>(decl))
+  // If we already added implicit initializers to the class, we're done.
+  auto classDecl = dyn_cast<ClassDecl>(decl);
+  if (classDecl && classDecl->addedImplicitInitializers())
     return;
 
   // Check whether there is a user-declared constructor or an instance
   // variable.
-  bool FoundConstructor = false;
   bool FoundInstanceVar = false;
+  bool FoundUninitializedVars = false;
+  bool FoundSubobjectInit = false;
 
   for (auto member : decl->getMembers()) {
-    if (isa<ConstructorDecl>(member)) {
-      FoundConstructor = true;
-      break;
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      if (ctor->isSubobjectInit()) {
+        FoundSubobjectInit = true;
+        break;
+      }
+      continue;
     }
 
-    if (auto var = dyn_cast<VarDecl>(member))
+    if (auto var = dyn_cast<VarDecl>(member)) {
       if (var->hasStorage() && !var->isStatic())
         FoundInstanceVar = true;
+      continue;
+    }
+
+    if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
+      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->hasInit())
+        FoundUninitializedVars = true;
+      continue;
+    }
   }
 
-  // If we found a constructor, don't add any implicit constructors.
-  if (FoundConstructor)
+  // If we found a subobject initializer, don't add any implicit
+  // initializers.
+  if (FoundSubobjectInit)
     return;
 
-  // If we didn't find such a constructor, add the implicit one(s).
-
-  // For a struct, we add a memberwise constructor.
   if (isa<StructDecl>(decl)) {
-    // Copy the list of members, so we can add to it.
-    // FIXME: Painfully inefficient to do the copy here.
-    SmallVector<Decl *, 4> members(decl->getMembers().begin(),
-                                   decl->getMembers().end());
+    // For a struct, we add a memberwise constructor.
 
     // Create the implicit memberwise constructor.
     auto ctor = createImplicitConstructor(*this, decl,
                                           ImplicitConstructorKind::Memberwise);
-    members.push_back(ctor);
+    appendMembers(decl, ctor);
 
-    // Set the members of the struct.
-    decl->setMembers(Context.AllocateCopy(members), decl->getBraces());
+    // If we found a stored property, add a default constructor.
+    if (FoundInstanceVar && !FoundUninitializedVars)
+      defineDefaultConstructor(decl);
 
-    // If we didn't find any instance variables, the default
-    // constructor will be the same as the memberwise constructor, so
-    // we're done.
-    if (!FoundInstanceVar)
+    return;
+  }
+ 
+  // For a class with a superclass, automatically define overrides
+  // for all of the superclass's subobject initializers.
+  // FIXME: Currently skipping generic classes.
+  assert(classDecl && "We have a class here");
+  classDecl->setAddedImplicitInitializers();
+  if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
+      !classDecl->getSuperclass()->isSpecialized()) {
+    // We can't define these overrides if we have any uninitialized
+    // stored properties.
+    if (FoundUninitializedVars)
       return;
+
+    auto superclassTy = classDecl->getSuperclass();
+    SmallVector<Decl *, 4> newInits;
+    for (auto member : lookupConstructors(superclassTy, classDecl)) {
+      auto superclassCtor = dyn_cast<ConstructorDecl>(member);
+      if (!superclassCtor || superclassCtor->isCompleteObjectInit() 
+          || superclassCtor->isRequired())
+        continue;
+
+      // We have a subobject initializer. Create an override of it.
+      if (auto ctor = createSubobjectInitOverride(
+                        *this, classDecl, superclassCtor,
+                        SubobjectInitKind::Chaining)) {
+        newInits.push_back(ctor);
+      }
+    }
+
+    appendMembers(classDecl, newInits);
+    return;
   }
 
-  // Try to build a default constructor.
+  // For a class with no superclass, automatically define a default
+  // constructor.
+
+  // ... unless there are uninitialized stored properties.
+  if (FoundUninitializedVars)
+    return;
+
   defineDefaultConstructor(decl);
 }
 
@@ -3925,16 +4163,10 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   // Type-check the constructor declaration.
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
-  // Copy the list of members, so we can add to it.
-  // FIXME: Painfully inefficient to do the copy here.
-  SmallVector<Decl *, 4> Members(CD->getMembers().begin(),
-                                 CD->getMembers().end());
-  Members.push_back(DD);
-
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
 
-  CD->setMembers(Context.AllocateCopy(Members), CD->getBraces());
+  appendMembers(CD, DD);
 }
 
 void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
@@ -4041,16 +4273,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   auto ctor = createImplicitConstructor(
                 *this, decl, ImplicitConstructorKind::Default);
 
-  // Copy the list of members, so we can add to it.
-  // FIXME: Painfully inefficient to do the copy here.
-  SmallVector<Decl *, 4> members(decl->getMembers().begin(),
-                                 decl->getMembers().end());
-
   // Add the constructor.
-  members.push_back(ctor);
-
-  // Set the members of the type.
-  decl->setMembers(Context.AllocateCopy(members), decl->getBraces());
+  appendMembers(decl, ctor);
 
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.

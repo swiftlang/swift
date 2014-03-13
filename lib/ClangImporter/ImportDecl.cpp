@@ -2932,6 +2932,7 @@ namespace {
         auto result = new (Impl.SwiftContext) ClassDecl(SourceLoc(), name,
                                                         SourceLoc(), {},
                                                         nullptr, dc);
+        result->setAddedImplicitInitializers();
         result->computeType();
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         result->setClangNode(decl);

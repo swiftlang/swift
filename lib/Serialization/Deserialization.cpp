@@ -1965,6 +1965,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DidRecord = nullptr;
     }
 
+    theClass->setAddedImplicitInitializers();
     if (isImplicit)
       theClass->setImplicit();
     if (superclassID)
