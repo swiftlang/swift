@@ -505,7 +505,8 @@ OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
   
   /// Store an ObjC reference into an Any.
   auto setAnyToObject = [](Any &any, id obj) {
-    any.Self = &_TMdBO.base;
+    any.Self = swift_getObjCClassMetadata(
+                  reinterpret_cast<const ClassMetadata*>(object_getClass(obj)));
     *reinterpret_cast<id *>(&any.Value) = [obj retain];
   };
   
