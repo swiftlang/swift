@@ -1055,13 +1055,13 @@ public:
   }
   
   void visitVarDecl(VarDecl *vd) {
-    // FIXME: If this is a dynamically-dispatched property, add its getter and
-    // setter to the vtable.
+    // Note: dynamically-dispatched properties have their getter and setter
+    // added to the vtable when they are visited.
   }
   
   void visitSubscriptDecl(SubscriptDecl *sd) {
-    // FIXME: If this is a dynamically-dispatched property, add its getter and
-    // setter to the vtable.
+    // Note: dynamically-dispatched properties have their getter and setter
+    // added to the vtable when they are visited.
   }
 };
 
@@ -1090,7 +1090,6 @@ public:
     }
     
     for (Decl *member : theType->getDerivedGlobalDecls()) {
-      
       SGM.visit(member);
     }
     
