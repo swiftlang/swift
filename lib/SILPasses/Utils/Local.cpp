@@ -245,7 +245,8 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
     // don't escape and collect all of the uses of the value.
     if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
         isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
-        isa<MarkUninitializedInst>(User)) {
+        isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
+        isa<PointerToAddressInst>(User)) {
       Users.push_back(User);
       if (canValueEscape(User, Users))
         return true;
