@@ -1,7 +1,5 @@
 // RUN: %sil-opt %s -module-name=witness_tables -verify | %sil-opt -verify -module-name=witness_tables | FileCheck %s
 
-//sil_stage canonical
-
 protocol AssocReqt {
   func requiredMethod()
 }
@@ -77,7 +75,7 @@ sil_witness_table shared InheritedConformance: AnyProtocol module witness_tables
 
 // CHECK-LABEL: sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
 // CHECK-NOT: }
-sil_witness_table InheritedConformance2: InheritedProtocol1 module witness_tables
-// CHECK-LABEL: sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
+sil_witness_table public_external InheritedConformance2: InheritedProtocol1 module witness_tables
+// CHECK-LABEL: sil_witness_table public InheritedConformance2: AnyProtocol module witness_tables
 // CHECK-NOT: }
-sil_witness_table InheritedConformance2: AnyProtocol module witness_tables
+sil_witness_table public InheritedConformance2: AnyProtocol module witness_tables
