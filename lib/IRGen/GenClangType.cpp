@@ -150,6 +150,13 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   return getClangIdType(getClangASTContext());
 }
 
+clang::CanQualType GenClangType::visitBoundGenericClassType(
+                                                CanBoundGenericClassType type) {
+  // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
+  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
+  return getClangIdType(getClangASTContext());
+}
+
 clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect UnsafePointer<T>, UncheckedOptional<T>, and Optional<T>.
