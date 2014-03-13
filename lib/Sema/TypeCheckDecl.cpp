@@ -1138,7 +1138,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
   auto Get = FuncDecl::create(
       Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
       /*GenericParams=*/nullptr, Type(), GetterParams, GetterParams,
-      TypeLoc::withoutLoc(VD->getType()), VD -> getDeclContext());
+      TypeLoc::withoutLoc(VD->getType()), VD->getDeclContext());
   Get->setImplicit();
   return Get;
 }
