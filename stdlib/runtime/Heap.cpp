@@ -203,18 +203,6 @@ struct AllocCacheEntry {
 };
 
 static AllocCacheEntry *
-getAllocCacheEntry(unsigned long idx) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  return (AllocCacheEntry *)_os_tsd_get_direct(idx + _swift_alloc_offset);
-}
-
-static void
-setAllocCacheEntry(unsigned long idx, AllocCacheEntry *entry) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  _os_tsd_set_direct(idx + _swift_alloc_offset, entry);
-}
-
-static AllocCacheEntry *
 getRawAllocCacheEntry(unsigned long idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   return (AllocCacheEntry *)_os_tsd_get_direct(idx + _swift_alloc_offset);
