@@ -57,7 +57,7 @@ static void registerZone() {
   (void)r;
   prev_key = key;
   _swift_alloc_offset = key;
-  for (unsigned i = 0; i < 64; i++) {
+  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     int r = pthread_key_create(&key, NULL);
     assert(r == 0);
     (void)r;
@@ -218,6 +218,7 @@ setRawAllocCacheEntry(unsigned long idx, AllocCacheEntry *entry) {
 }
 
 void *swift::swift_rawAlloc(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry *r = getRawAllocCacheEntry(idx);
   if (r) {
     setRawAllocCacheEntry(idx, r->next);
@@ -227,6 +228,7 @@ void *swift::swift_rawAlloc(AllocIndex idx) {
 }
 
 void *swift::swift_tryRawAlloc(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry *r = getRawAllocCacheEntry(idx);
   if (r) {
     setRawAllocCacheEntry(idx, r->next);
@@ -236,6 +238,7 @@ void *swift::swift_tryRawAlloc(AllocIndex idx) {
 }
 
 void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
   auto cur = static_cast<AllocCacheEntry *>(ptr);
   AllocCacheEntry *prev = getRawAllocCacheEntry(idx);
   cur->next = prev;

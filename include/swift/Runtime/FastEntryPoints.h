@@ -20,7 +20,11 @@
 #include <TargetConditionals.h>
 #include "../../../stdlib/shims/RefCount.h"
 
+#ifdef __LP64__
+#define ALLOC_CACHE_COUNT 56
+#else
 #define ALLOC_CACHE_COUNT 64
+#endif
 
 // Note: This file is #included in assembly files.
 
