@@ -300,3 +300,9 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(V10ObjectiveC8ObjCBool),
 MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo8NSObject),
                      VOID),
                 void(id));
+
+// Another custom XPC handler.
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo7NSError),
+                          DIRECT(CSo8NSString)),
+                     VOID),
+                void(id, id));
