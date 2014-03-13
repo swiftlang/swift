@@ -604,11 +604,22 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   Type initFuncTy;
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     funcTy = fn->getBodyResultTypeLoc().getType();
+    
     if (!funcTy) {
       funcTy = TupleType::getEmpty(Context);
     } else if (funcTy->is<DynamicSelfType>()) {
       funcTy = fn->getDynamicSelfInterface();
+    } else if (!fn->getBodyResultTypeLoc().hasLocation() &&
+               func->isGenericContext()) {
+      // FIXME: This should not be rewrited.  This is only needed in cases where
+      // we synthesize a function which returns a generic value.  In that case,
+      // the return type is specified in terms of archetypes, but has no TypeLoc
+      // in the TypeRepr.  Because of this, Sema isn't able to rebuild it in
+      // terms of interface types.  When interface types prevail, this should be
+      // removed.  Until then, we hack the mapping here.
+      funcTy = getInterfaceTypeFromInternalType(func, funcTy);
     }
+
   } else if (auto ctor = dyn_cast<ConstructorDecl>(func)) {
     if (auto proto = dyn_cast<ProtocolDecl>(ctor->getDeclContext())) {
       funcTy = proto->getSelf()->getDeclaredType();
