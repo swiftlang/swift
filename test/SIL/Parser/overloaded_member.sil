@@ -2,7 +2,7 @@
 // rdar://15763213
 // Make sure that we can parse SILDeclRef to an overloaded member.
 
-import swift
+import Swift
 import Builtin
 
 struct A {
