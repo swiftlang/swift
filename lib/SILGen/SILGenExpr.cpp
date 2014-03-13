@@ -2581,11 +2581,6 @@ SILGenFunction::buildForwardingSubstitutions(GenericParamList *params) {
 
 bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   while (true) {
-    // If any class in the hierarchy is generic, it's not exported to
-    // Objective-C anyway.
-    if (theClass->getGenericParams())
-      return false;
-
     // If the root class was implemented in Objective-C, use Objective-C's
     // allocation methods because they may have been overridden.
     if (!theClass->hasSuperclass())
