@@ -140,6 +140,8 @@ enum class SpecialMethodKind {
   NSDictionarySubscriptGetter
 };
 
+#define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
+
 /// \brief Implementation of the Clang importer.
 class ClangImporter::Implementation : public LazyMemberLoader {
   friend class ClangImporter;

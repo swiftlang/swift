@@ -2788,6 +2788,30 @@ namespace {
       return result;
     }
 
+    template <typename T, typename U>
+    T *resolveSwiftDecl(const U *decl, Identifier name, const DeclContext *dc) {
+      using clang::AnnotateAttr;
+      for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
+        if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
+          auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
+          SmallVector<ValueDecl *, 4> results;
+          wrapperUnit->getAdapterModule()->lookupValue({}, name,
+                                                       NLKind::QualifiedLookup,
+                                                       results);
+          if (results.size() == 1) {
+            if (auto singleResult = dyn_cast<T>(results.front())) {
+              Impl.ImportedDecls[decl->getCanonicalDecl()] = singleResult;
+              return singleResult;
+            }
+          }
+
+          break;
+        }
+      }
+
+      return nullptr;
+    }
+
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
@@ -2815,6 +2839,9 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
+
+      if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name, dc))
+        return native;
 
       // Create the protocol declaration and record it.
       auto result = new (Impl.SwiftContext)
@@ -2928,23 +2955,8 @@ namespace {
       if (!dc)
         return nullptr;
 
-      for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
-        if (annotation->getAnnotation() == "__swift class__") {
-          auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-          SmallVector<ValueDecl *, 4> results;
-          wrapperUnit->getAdapterModule()->lookupValue({}, name,
-                                                       NLKind::QualifiedLookup,
-                                                       results);
-          if (results.size() == 1) {
-            if (isa<ClassDecl>(results.front())) {
-              Impl.ImportedDecls[decl->getCanonicalDecl()] = results.front();
-              return results.front();
-            }
-          }
-
-          break;
-        }
-      }
+      if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, dc))
+        return native;
 
       // Create the class declaration and record it.
       auto result = new (Impl.SwiftContext)

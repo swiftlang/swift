@@ -136,6 +136,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w", "-triple", targetTriple.str(),
     "-I", searchPathOpts.RuntimeResourcePath,
+    "-DSWIFT_PROTOCOL=__attribute__((annotate(\""
+      SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "swift.m"
   };
 
@@ -144,10 +146,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   if (hasObjCCompleteDefinitionAttr()) {
     invocationArgStrs.push_back("-DSWIFT_CLASS="
       "__attribute__((objc_complete_definition)) "
-      "__attribute__((annotate(\"__swift class__\")))");
+      "__attribute__((annotate(\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))");
   } else {
     invocationArgStrs.push_back("-DSWIFT_CLASS="
-      "__attribute__((annotate(\"__swift class__\")))");
+      "__attribute__((annotate(\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))");
   }
 
   if (searchPathOpts.SDKPath.empty()) {

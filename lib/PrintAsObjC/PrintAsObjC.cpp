@@ -119,7 +119,7 @@ private:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    os << "@protocol " << PD->getName();
+    os << "SWIFT_PROTOCOL\n@protocol " << PD->getName();
     printProtocols(PD->getProtocols());
     os << "\n";
     assert(!protocolMembersOptional && "protocols start @required");
@@ -864,6 +864,10 @@ public:
            "# else\n"
            "#  define SWIFT_CLASS\n"
            "# endif\n"
+           "#endif\n"
+           "\n"
+           "#if !defined(SWIFT_PROTOCOL)\n"
+           "# define SWIFT_PROTOCOL\n"
            "#endif\n"
            "\n"
            "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"
