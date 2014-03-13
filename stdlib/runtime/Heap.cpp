@@ -190,13 +190,16 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   return r;
 }
 
-// These are implemented in FastEntryPoints.s on some platforms.
-#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
-
 #if __has_include(<os/tsd.h>)
 // OS X and iOS internal version
-
 #include <os/tsd.h>
+#else
+#define _os_tsd_get_direct pthread_getspecific
+#define _os_tsd_set_direct pthread_setspecific
+#endif
+
+// These are implemented in FastEntryPoints.s on some platforms.
+#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
 
 struct AllocCacheEntry {
   struct AllocCacheEntry *next;
@@ -238,12 +241,6 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
   cur->next = prev;
   setRawAllocCacheEntry(idx, cur);
 }
-
-#else
-
-# error no thread-local cache implementation for this platform
-
-#endif
 
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
