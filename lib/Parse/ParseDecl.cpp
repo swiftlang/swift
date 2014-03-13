@@ -1612,9 +1612,14 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
     SourceLoc LBLoc = Tok.getLoc();
     // FIXME: Use outer '{' loc if isImplicitGet.
+    bool ExternalAsmName = false;
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
-      diagnose(Tok, diag::expected_lbrace_accessor, (unsigned)Kind);
-      return true;
+      // asmname'd accessors don't need bodies.
+      if (Attributes.AsmName.empty()) {
+        diagnose(Tok, diag::expected_lbrace_accessor, (unsigned)Kind);
+        return true;
+      }
+      ExternalAsmName = true;
     }
 
     // Set up a function declaration.
@@ -1624,33 +1629,37 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     if (Attributes.shouldSaveInAST())
       TheDecl->getMutableAttrs() = Attributes;
 
-    // Parse the body.
-    Scope S(this, ScopeKind::FunctionBody);
-    addPatternVariablesToScope(TheDecl->getBodyParamPatterns());
+    // Parse the body, if any.
+    if (ExternalAsmName) {
+      LastValidLoc = Loc;
+    } else {
+      Scope S(this, ScopeKind::FunctionBody);
+      addPatternVariablesToScope(TheDecl->getBodyParamPatterns());
 
-    // Establish the new context.
-    ParseFunctionBody CC(*this, TheDecl);
+      // Establish the new context.
+      ParseFunctionBody CC(*this, TheDecl);
 
-    // Parse the body.
-    SmallVector<ASTNode, 16> Entries;
-    if (!isDelayedParsingEnabled())
-      parseBraceItems(Entries);
-    else
-      consumeGetSetBody(TheDecl, LBLoc);
+      // Parse the body.
+      SmallVector<ASTNode, 16> Entries;
+      if (!isDelayedParsingEnabled())
+        parseBraceItems(Entries);
+      else
+        consumeGetSetBody(TheDecl, LBLoc);
 
-    SourceLoc RBLoc = Tok.getLoc();
-    if (!isImplicitGet &&
-        parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                           LBLoc))
-      RBLoc = PreviousLoc;
+      SourceLoc RBLoc = Tok.getLoc();
+      if (!isImplicitGet &&
+          parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                             LBLoc))
+        RBLoc = PreviousLoc;
 
-    if (!isDelayedParsingEnabled()) {
-      BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
-      TheDecl->setBody(Body);
+      if (!isDelayedParsingEnabled()) {
+        BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
+        TheDecl->setBody(Body);
+      }
+      LastValidLoc = RBLoc;
     }
 
     Decls.push_back(TheDecl);
-    LastValidLoc = RBLoc;
   }
 
   return false;
