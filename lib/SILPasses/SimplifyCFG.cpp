@@ -26,6 +26,7 @@ STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
 STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
 STATISTIC(NumJumpThreads,    "Number of jumps threaded");
 STATISTIC(NumConstantFolded, "Number of terminators constant folded");
+STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
@@ -98,7 +99,7 @@ namespace {
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
-
+    bool simplifyArgs(SILBasicBlock *BB);
   };
 } // end anonymous namespace
 
@@ -533,7 +534,80 @@ bool SimplifyCFG::run() {
       (void)SII;
     else if (auto *SEI = dyn_cast<SwitchEnumInst>(TI))
       Changed |= simplifySwitchEnumBlock(SEI);
+
+    // Simplify the block argument list.
+    Changed |= simplifyArgs(BB);
   }
+  return Changed;
+}
+
+static void
+removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest, int idx) {
+  TermInst *Branch = BB->getTerminator();
+  SILBuilder Builder(Branch);
+
+  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
+    DEBUG(llvm::dbgs() << "*** Fixing CondBranchInst.\n");
+
+    SmallVector<SILValue, 8> TrueArgs;
+    SmallVector<SILValue, 8> FalseArgs;
+
+    for (auto A : CBI->getTrueArgs())
+      TrueArgs.push_back(A);
+
+    for (auto A : CBI->getFalseArgs())
+      FalseArgs.push_back(A);
+
+    if (Dest == CBI->getTrueBB())
+      TrueArgs.erase(TrueArgs.begin() + idx);
+    else
+      FalseArgs.erase(FalseArgs.begin() + idx);
+
+    Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
+                             CBI->getTrueBB(), TrueArgs,
+                             CBI->getFalseBB(), FalseArgs);
+    Branch->eraseFromParent();
+    return;
+  }
+
+  if (BranchInst *BI = dyn_cast<BranchInst>(Branch)) {
+    DEBUG(llvm::dbgs() << "*** Fixing BranchInst.\n");
+    SmallVector<SILValue, 8> Args;
+
+    for (auto A : BI->getArgs())
+      Args.push_back(A);
+
+    Args.erase(Args.begin() + idx);
+    Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
+    Branch->eraseFromParent();
+    return;
+  }
+  llvm_unreachable("unsupported terminator");
+}
+
+bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
+
+  // Ignore the entry block.
+  if (BB->pred_begin() == BB->pred_end())
+    return false;
+
+  bool Changed = false;
+  for (int i = BB->getNumBBArg() - 1; i >= 0; --i) {
+    SILArgument *A = BB->getBBArg(i);
+
+    // Ignore used arguments.
+    if (A->use_begin() != A->use_end())
+      continue;
+
+    DEBUG(llvm::dbgs() << "*** Erasing " << i <<"th BB argument.\n");
+    NumDeadArguments++;
+    Changed = true;
+    BB->eraseArgument(i);
+
+    for (auto *Pred : BB->getPreds())
+      removeArgumentFromTerminator(Pred, BB, i);
+  }
+
   return Changed;
 }
 

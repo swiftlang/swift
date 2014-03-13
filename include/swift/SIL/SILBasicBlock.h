@@ -194,6 +194,9 @@ public:
     return &SILBasicBlock::InstList;
   }
 
+  /// Erase a specific argument from the arg list.
+  void eraseArgument(int idx) { BBArgList.erase(BBArgList.begin() + idx); }
+
 private:
   friend class SILArgument;
   /// BBArgument's ctor adds it to the argument list of this block.

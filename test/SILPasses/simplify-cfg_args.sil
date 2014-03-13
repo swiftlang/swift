@@ -64,3 +64,33 @@ bb3(%35 : $()):                                   // Preds: bb2
   return %37 : $StringByteData                    // id: %41
 }
 
+
+//CHECK-LABLE: remove_dead_args
+//CHECK-NOT: br bb2([[VAR_21:%[0-9]+]] : $Bool)
+//CHECK: bb2:
+//CHECK-NEXT: tuple ()
+//CHECK-NEXT: return
+sil @remove_dead_args: $@thin (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 37
+  %2 = builtin_function_ref "cmp_ne_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %3 = struct_extract %0 : $Int, #Int.value
+  %4 = apply %2(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %5 = struct $Bool (%4 : $Builtin.Int1)
+  cond_br %4, bb1, bb3
+
+bb1:
+  %7 = integer_literal $Builtin.Word, 42
+  %8 = apply %2(%3, %7) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+  br bb2(%9 : $Bool)
+
+// Remove this ARG.
+bb2(%11 : $Bool):                                 // Preds: bb1 bb3
+  %12 = tuple ()                                  // user: %13
+  return %12 : $()                                // id: %13
+
+bb3:                                              // Preds: bb0
+  br bb2(%5 : $Bool)                              // id: %14
+}
+
