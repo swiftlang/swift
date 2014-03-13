@@ -1814,6 +1814,10 @@ void SILVTable::verify(const SILModule &M) const {
 /// Verify that a witness table follows invariants.
 void SILWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
+  if (isDeclaration())
+    assert(getEntries().size() == 0 &&
+           "A witness table declaration should not have any entries.");
+
   // Currently all witness tables have public conformances, thus witness tables
   // should not reference SILFunctions without public/public_external linkage.
   // FIXME: Once we support private conformances, update this.

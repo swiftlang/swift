@@ -1621,7 +1621,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
 
   TypeID TyID;
   unsigned RawLinkage;
-  WitnessTableLayout::readRecord(scratch, TyID, RawLinkage);
+  unsigned IsDeclaration;
+  WitnessTableLayout::readRecord(scratch, TyID, RawLinkage, IsDeclaration);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
     return nullptr;
@@ -1645,11 +1646,21 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
   NormalProtocolConformance *theConformance =
       cast<NormalProtocolConformance>(conformance);
 
+  // If we have a declaration, create the witness table declaration and bail.
+  if (IsDeclaration) {
+    // This witnesstable has no contents and thus is a declaration.
+    SILWitnessTable *wT = SILWitnessTable::create(SILMod, *Linkage,
+                                                  theConformance);
+    wTableOrOffset = wT;
+
+    if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), wT);
+    return wT;
+  }
+
   // Fetch the next record.
   scratch.clear();
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
-    // This witnesstable has no contents.
     return nullptr;
   kind = SILCursor.readRecord(entry.ID, scratch);
 

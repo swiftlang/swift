@@ -143,11 +143,16 @@ private:
   SILLinkage Linkage;
   NormalProtocolConformance *Conformance;
   ArrayRef<Entry> Entries;
+  bool IsDeclaration;
 
   SILWitnessTable(SILModule &M,
                   SILLinkage Linkage,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
+
+  SILWitnessTable(SILModule &M,
+                  SILLinkage Linkage,
+                  NormalProtocolConformance *Conformance);
 
 public:
   /// Create a new SILWitnessTable with the given entries.
@@ -156,14 +161,21 @@ public:
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
+  static SILWitnessTable *create(SILModule &M,
+                                 SILLinkage Linkage,
+                                 NormalProtocolConformance *Conformance);
+
   ~SILWitnessTable();
   
   /// Return the AST ProtocolConformance this witness table represents.
   NormalProtocolConformance *getConformance() const { return Conformance; }
-  
+
+  bool isDeclaration() const { return IsDeclaration; }
+  bool isDefinition() const { return !isDeclaration(); }
+
   /// Return all of the witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
-  
+
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
   

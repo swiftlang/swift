@@ -260,7 +260,8 @@ int main(int argc, char **argv) {
     Invocation.setModuleName(Stem);
     Invocation.setInputKind(SourceFileKind::Library);
   } else {
-    Invocation.setModuleName("main");
+    const StringRef Name = ModuleName.size() ? StringRef(ModuleName) : "main";
+    Invocation.setModuleName(Name);
     Invocation.setInputKind(SourceFileKind::SIL);
   }
 

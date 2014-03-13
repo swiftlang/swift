@@ -1,6 +1,4 @@
-// RUN: %sil-opt %s -module-name=witness_tables -verify | %sil-opt -verify -module-name=witness_tables | FileCheck %s
-
-//sil_stage canonical
+// RUN: %swift -parse-as-library -sil-serialize-all -module-name witness_tables -emit-module -o - %s -verify | %sil-opt -module-name witness_tables -verify | FileCheck %s
 
 protocol AssocReqt {
   func requiredMethod()
@@ -59,10 +57,10 @@ struct InheritedConformance2 : InheritedProtocol1 {
 }
 
 
-// CHECK-LABEL: sil_witness_table InheritedConformance: InheritedProtocol1 module
+// CHECK-LABEL: sil_witness_table shared InheritedConformance: InheritedProtocol1 module
 // CHECK: base_protocol AnyProtocol: InheritedConformance: AnyProtocol module
 // CHECK: }
-sil_witness_table InheritedConformance: InheritedProtocol1 module witness_tables {
+sil_witness_table shared InheritedConformance: InheritedProtocol1 module witness_tables {
   base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
 }
 

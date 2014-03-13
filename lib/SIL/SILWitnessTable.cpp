@@ -37,11 +37,21 @@ SILWitnessTable::create(SILModule &M,
   return wt;
 }
 
+SILWitnessTable *
+SILWitnessTable::create(SILModule &M,
+                        SILLinkage Linkage,
+                        NormalProtocolConformance *Conformance) {
+  void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance);
+  M.witnessTables.push_back(wt);
+  return wt;
+}
+
 SILWitnessTable::SILWitnessTable(SILModule &M,
                                  SILLinkage Linkage,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
-  : Linkage(Linkage), Conformance(Conformance), Entries()
+  : Linkage(Linkage), Conformance(Conformance), Entries(), IsDeclaration(false)
 {
   void *buf = M.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
@@ -62,7 +72,16 @@ SILWitnessTable::SILWitnessTable(SILModule &M,
   }
 }
 
+SILWitnessTable::SILWitnessTable(SILModule &M,
+                                 SILLinkage Linkage,
+                                 NormalProtocolConformance *Conformance)
+  : Linkage(Linkage), Conformance(Conformance), Entries(), IsDeclaration(true)
+{}
+
 SILWitnessTable::~SILWitnessTable() {
+  if (isDeclaration())
+    return;
+
   // Drop the reference count of witness functions referenced by this table.
   for (auto entry : getEntries()) {
     switch (entry.getKind()) {

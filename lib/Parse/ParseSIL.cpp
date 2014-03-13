@@ -2894,6 +2894,15 @@ bool Parser::parseSILWitnessTable() {
       dyn_cast<NormalProtocolConformance>(
           parseProtocolConformance(*this, WitnessState, proto));
 
+  // If we don't have an lbrace, then this witness table is a declaration.
+  if (Tok.getKind() != tok::l_brace) {
+    // Default to public external linkage.
+    if (!Linkage)
+      Linkage = SILLinkage::PublicExternal;
+    SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+    return false;
+  }
+
   SourceLoc LBraceLoc = Tok.getLoc();
   consumeToken(tok::l_brace);
 
@@ -3010,8 +3019,6 @@ bool Parser::parseSILWitnessTable() {
                      LBraceLoc);
   
   // Default to public linkage.
-  // FIXME: When we have witness table declarations, default to public_external
-  // for a declaration.
   if (!Linkage)
     Linkage = SILLinkage::Public;
 

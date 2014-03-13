@@ -1305,10 +1305,16 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   WitnessTableLayout::emitRecord(Out, ScratchRecord,
                            SILAbbrCodes[WitnessTableLayout::Code],
                            S.addTypeRef(wt.getConformance()->getType()),
-                           toStableSILLinkage(wt.getLinkage()));
-  
+                           toStableSILLinkage(wt.getLinkage()),
+                           unsigned(wt.isDeclaration()));
+
   S.writeConformance(wt.getConformance()->getProtocol(), wt.getConformance(),
                      nullptr, SILAbbrCodes);
+
+  // If we have a declaration, do not attempt to deserialize entries.
+  if (wt.isDeclaration())
+    return;
+
   for (auto &entry : wt.getEntries()) {
     if (entry.getKind() == SILWitnessTable::BaseProtocol) {
       auto &baseWitness = entry.getBaseProtocolWitness();
