@@ -2928,6 +2928,24 @@ namespace {
       if (!dc)
         return nullptr;
 
+      for (auto annotation : decl->specific_attrs<clang::AnnotateAttr>()) {
+        if (annotation->getAnnotation() == "__swift class__") {
+          auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
+          SmallVector<ValueDecl *, 4> results;
+          wrapperUnit->getAdapterModule()->lookupValue({}, name,
+                                                       NLKind::QualifiedLookup,
+                                                       results);
+          if (results.size() == 1) {
+            if (isa<ClassDecl>(results.front())) {
+              Impl.ImportedDecls[decl->getCanonicalDecl()] = results.front();
+              return results.front();
+            }
+          }
+
+          break;
+        }
+      }
+
       // Create the class declaration and record it.
       auto result = new (Impl.SwiftContext)
                       ClassDecl(Impl.importSourceLoc(decl->getLocStart()),

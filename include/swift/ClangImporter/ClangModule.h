@@ -35,14 +35,12 @@ class ClangModuleUnit final : public LoadedFile {
   clang::Module *clangModule;
   llvm::PointerIntPair<Module *, 1, bool> adapterModule;
 
-  Module *getAdapterModule() const;
-
   ~ClangModuleUnit() = default;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
   static bool hasClangModule(Module *M);
-  
+
   ClangModuleUnit(Module &M, ClangImporter &owner,
                   clang::Module *clangModule);
 
@@ -51,6 +49,9 @@ public:
 
   /// Returns true if this is a top-level Clang module (not a submodule).
   bool isTopLevel() const;
+
+  /// Returns the Swift module that overlays this Clang module.
+  Module *getAdapterModule() const;
 
   virtual bool isSystemModule() const;
 

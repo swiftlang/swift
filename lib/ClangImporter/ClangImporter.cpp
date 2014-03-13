@@ -78,6 +78,32 @@ ClangImporter::~ClangImporter() {
   delete &Impl;
 }
 
+namespace {
+  namespace attr_fallback {}
+}
+namespace clang {
+  using namespace ::attr_fallback;
+}
+
+/// Hack: returns true if Clang has a particular attribute.
+#define MAKE_HAS_ATTR(NAME) \
+namespace { \
+  namespace attr_fallback { \
+    class NAME##Attr; \
+  } \
+} \
+static constexpr bool has##NAME##Attr() { \
+  return !std::is_same<clang::NAME##Attr, attr_fallback::NAME##Attr>::value; \
+}
+
+MAKE_HAS_ATTR(ObjCRootClass)
+MAKE_HAS_ATTR(NotAnAttributeClangWillEverImplement)
+static_assert(hasObjCRootClassAttr(), "MAKE_HAS_ATTR is broken");
+static_assert(!hasNotAnAttributeClangWillEverImplementAttr(),
+              "MAKE_HAS_ATTR is broken");
+
+MAKE_HAS_ATTR(ObjCCompleteDefinition)
+
 #pragma mark Module loading
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
@@ -112,6 +138,17 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-I", searchPathOpts.RuntimeResourcePath,
     "swift.m"
   };
+
+  // FIXME: Once we're all building with the internal Clang, remove this guard.
+  // It might also make more sense to put this in a header.
+  if (hasObjCCompleteDefinitionAttr()) {
+    invocationArgStrs.push_back("-DSWIFT_CLASS="
+      "__attribute__((objc_complete_definition)) "
+      "__attribute__((annotate(\"__swift class__\")))");
+  } else {
+    invocationArgStrs.push_back("-DSWIFT_CLASS="
+      "__attribute__((annotate(\"__swift class__\")))");
+  }
 
   if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-nostdsysteminc");
