@@ -1249,28 +1249,34 @@ public:
     : SGM(SGM) {}
   
   /// Emit ObjC thunks necessary for an ObjC protocol conformance.
-  void emitObjCConformanceThunks(ProtocolDecl *protocol,
+  void emitObjCConformanceThunks(ExtensionDecl *extension,
+                                 ProtocolDecl *protocol,
                                  ProtocolConformance *conformance) {
     assert(conformance);
     if (protocol->isObjC()) {
       conformance->forEachValueWitness(nullptr,
-                                       [&](ValueDecl *req,
-                                           ConcreteDeclRef witness) {
-        if (!witness)
-          return;
-        
-        ValueDecl *vd = witness.getDecl();
-        if (auto *method = dyn_cast<FuncDecl>(vd))
-          SGM.emitObjCMethodThunk(method);
-        else if (auto *prop = dyn_cast<VarDecl>(vd))
-          SGM.emitObjCPropertyMethodThunks(prop);
-        else
-          llvm_unreachable("unexpected conformance mapping");
-      });
+        [&](ValueDecl *req, ConcreteDeclRef witness) {
+          if (!witness)
+            return;
+          
+          ValueDecl *vd = witness.getDecl();
+          // Don't rethunk definitions from the original class or other
+          // extensions that are already @objc.
+          if (vd->getDeclContext() != extension && vd->isObjC())
+            return;
+          
+          if (auto *method = dyn_cast<FuncDecl>(vd))
+            SGM.emitObjCMethodThunk(method);
+          else if (auto *prop = dyn_cast<VarDecl>(vd))
+            SGM.emitObjCPropertyMethodThunks(prop);
+          else
+            llvm_unreachable("unexpected conformance mapping");
+        });
     }
 
     for (auto &inherited : conformance->getInheritedConformances())
-      emitObjCConformanceThunks(inherited.first, inherited.second);
+      emitObjCConformanceThunks(extension,
+                                inherited.first, inherited.second);
   }
   
   /// Emit SIL functions for all the members of the extension.
@@ -1288,7 +1294,8 @@ public:
     // ObjC protocol conformances may require ObjC thunks to be introduced for
     // definitions from other contexts.
     for (unsigned i = 0, size = e->getProtocols().size(); i < size; ++i)
-      emitObjCConformanceThunks(e->getProtocols()[i],
+      emitObjCConformanceThunks(e,
+                                e->getProtocols()[i],
                                 e->getConformances()[i]);
   }
   

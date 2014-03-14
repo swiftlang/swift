@@ -52,6 +52,7 @@ typedef long NSInteger;
 - (void) frob;
 + (void) runce;
 - (void) funge;
+- (void) foo;
 @property void (^block)(void);
 @property NSInteger count;
 @end

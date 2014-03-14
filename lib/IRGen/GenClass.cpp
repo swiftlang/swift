@@ -857,7 +857,7 @@ namespace {
             return;
 
           ValueDecl *vd = witness.getDecl();
-          if (vd->getDeclContext() != TheExtension)
+          if (vd->getDeclContext() != TheExtension && !vd->isObjC())
             visit(vd);
         });
       }
