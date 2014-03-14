@@ -2091,7 +2091,8 @@ public:
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
-      if (!pbd || !pbd->hasStorage() || pbd->hasInit() || pbd->isInvalid())
+      if (!pbd || pbd->isStatic() || !pbd->hasStorage() || pbd->hasInit() ||
+          pbd->isInvalid())
         continue;
 
       // The variables in this pattern have not been
@@ -4040,6 +4041,150 @@ createSubobjectInitOverride(TypeChecker &tc,
   return ctor;
 }
 
+/// Build a default initializer string for the given pattern.
+///
+/// This string is suitable for display in diagnostics.
+static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
+                                                           DeclContext *dc,
+                                                           Pattern *pattern) {
+  switch (pattern->getKind()) {
+#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
+#define PATTERN(Id, Parent)
+#include "swift/AST/PatternNodes.def"
+    return Nothing;
+  case PatternKind::Any:
+    return Nothing;
+
+  case PatternKind::Named: {
+    if (!pattern->hasType())
+      return Nothing;
+
+    // Special-case the various types we might see here.
+    auto type = pattern->getType();
+
+    // For literal-convertible types, form the corresponding literal.
+#define CHECK_LITERAL_PROTOCOL(Kind, String)                            \
+    if (auto proto = tc.getProtocol(SourceLoc(), KnownProtocolKind::Kind)) { \
+      if (tc.conformsToProtocol(type, proto, dc))                       \
+        return String;                                                  \
+    }
+    CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
+    CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[]")
+    CHECK_LITERAL_PROTOCOL(FloatLiteralConvertible, "0.0")
+    CHECK_LITERAL_PROTOCOL(IntegerLiteralConvertible, "0")
+    CHECK_LITERAL_PROTOCOL(StringLiteralConvertible, "\"\"")
+#undef CHECK_LITERAL_PROTOCOL
+
+    // For optional types, use 'nil'.
+    if (type->getAnyOptionalObjectType())
+      return "nil";
+
+    return Nothing;
+  }
+
+  case PatternKind::Paren: {
+    if (auto sub = buildDefaultInitializerString(
+                     tc, dc, cast<ParenPattern>(pattern)->getSubPattern())) {
+      return "(" + *sub + ")";
+    }
+
+    return Nothing;
+  }
+
+  case PatternKind::Tuple: {
+    std::string result = "(";
+    bool first = true;
+    for (auto elt : cast<TuplePattern>(pattern)->getFields()) {
+      if (auto sub = buildDefaultInitializerString(tc, dc, elt.getPattern())) {
+        if (first) {
+          first = false;
+        } else {
+          result += ", ";
+        }
+
+        result += *sub;
+      } else {
+        return Nothing;
+      }
+    }
+    result += ")";
+    return result;
+  }
+
+  case PatternKind::Typed:
+    return buildDefaultInitializerString(
+             tc, dc, cast<TypedPattern>(pattern)->getSubPattern());
+
+  case PatternKind::Var:
+    return buildDefaultInitializerString(
+             tc, dc, cast<VarPattern>(pattern)->getSubPattern());
+  }
+}
+
+/// Diagnose a class that does not have any initializers.
+static void diagnoseClassWithoutInitializers(TypeChecker &tc,
+                                             ClassDecl *classDecl) {
+  tc.diagnose(classDecl, diag::class_without_init,
+              classDecl->getDeclaredType());
+
+  SourceLoc lastLoc;
+  for (auto member : classDecl->getMembers()) {
+    auto pbd = dyn_cast<PatternBindingDecl>(member);
+    if (!pbd || pbd->isStatic() || !pbd->hasStorage() || pbd->hasInit() ||
+        pbd->isInvalid())
+      continue;
+
+    // FIXME: When we parse "var a, b: Int" we create multiple
+    // PatternBindingDecls, which is convenience elsewhere but
+    // unfortunate here, where it causes us to emit multiple
+    // initializers.
+    if (pbd->getLoc() == lastLoc)
+      continue;
+
+    lastLoc = pbd->getLoc();
+    SmallVector<VarDecl *, 4> vars;
+    pbd->getPattern()->collectVariables(vars);
+    Optional<InFlightDiagnostic> diag;
+    switch (vars.size()) {
+    case 0:
+      break;
+
+    case 1: {
+      diag.emplace(tc.diagnose(vars[0]->getLoc(), diag::note_no_in_class_init_1,
+                               vars[0]->getName()));
+      break;
+    }
+
+    case 2:
+      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_2,
+                               vars[0]->getName(), vars[1]->getName()));
+      break;
+
+    case 3:
+      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_3plus,
+                               vars[0]->getName(), vars[1]->getName(), 
+                               vars[2]->getName(), false));
+      break;
+
+    default:
+      diag.emplace(tc.diagnose(pbd->getLoc(), diag::note_no_in_class_init_3plus,
+                               vars[0]->getName(), vars[1]->getName(), 
+                               vars[2]->getName(), true));
+      break;
+    }
+
+    if (diag) {
+      if (auto defaultValueSuggestion
+                 = buildDefaultInitializerString(tc, classDecl, 
+                                                 pbd->getPattern())) {
+        SourceLoc afterLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                        pbd->getEndLoc());
+        diag->fixItInsert(afterLoc, " = " + *defaultValueSuggestion);
+      }
+    }
+  }
+}
+
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // We can only synthesize implicit constructors for classes and structs.
   if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
@@ -4107,8 +4252,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       !classDecl->getSuperclass()->isSpecialized()) {
     // We can't define these overrides if we have any uninitialized
     // stored properties.
-    if (FoundUninitializedVars)
+    if (FoundUninitializedVars) {
+      diagnoseClassWithoutInitializers(*this, classDecl);
       return;
+    }
 
     auto superclassTy = classDecl->getSuperclass();
     SmallVector<Decl *, 4> newInits;
@@ -4134,8 +4281,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // constructor.
 
   // ... unless there are uninitialized stored properties.
-  if (FoundUninitializedVars)
+  if (FoundUninitializedVars) {
+    diagnoseClassWithoutInitializers(*this, classDecl);
     return;
+  }
 
   defineDefaultConstructor(decl);
 }

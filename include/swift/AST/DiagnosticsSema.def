@@ -297,7 +297,20 @@ NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "initial values", (Type, bool))
 ERROR(implied_name_no_argument,sema_tcd,none,
       "no name specified for first argument, name it '_' to ignore it", ())
-
+ERROR(class_without_init,sema_tcd,none,
+      "class %0 has no initializers", (Type))
+NOTE(note_no_in_class_init_1,sema_tcd,none,
+     "stored property %0 without initial value prevents synthesized "
+     "initializers",
+     (Identifier))
+NOTE(note_no_in_class_init_2,sema_tcd,none,
+     "stored properties %0 and %1 without initial values prevent synthesized "
+     "initializers",
+     (Identifier, Identifier))
+NOTE(note_no_in_class_init_3plus,sema_tcd,none,
+     "stored properties %0, %1, %select{and %2|%2, and others}3 "
+     "without initial values prevent synthesized initializers",
+     (Identifier, Identifier, Identifier, bool))
 
 
 // Variables (var and let).

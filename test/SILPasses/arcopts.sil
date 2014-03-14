@@ -306,6 +306,8 @@ bb0(%0 : $Builtin.ObjectPointer):
 
 class Cls {
   var random : Builtin.Int32
+
+  init()
 }
 
 // CHECK-LABEL: sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> ()

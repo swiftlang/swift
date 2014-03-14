@@ -27,8 +27,14 @@ bb0:
 // Type references
 
 // Some cyclic type references between SIL function bodies.
-class Class1 { var a : Class2 }
-class Class2 { var b : Class1 }
+class Class1 { 
+  var a : Class2 
+  init()
+}
+class Class2 { 
+  var b : Class1 
+  init()
+}
 
 sil @type_ref1 : $(Class1, Int) -> ()  // CHECK: $(Class1, Int)
 
@@ -433,6 +439,7 @@ bb0(%0 : $Int, %1 : $Float32):
 
 class M {
   var member: Int
+  init()
 }
 
 // CHECK: $@cc(method) @thin (Int, M) -> ()
@@ -457,6 +464,7 @@ bb0(%0 : $Int, %1 : $M):
 
 class GenericClass<Q> {
   var member: Q
+  init()
 }
 
 // CHECK: sil @bound_generic_class_ref_element_addr : $@thin (GenericClass<Int>) -> Int {
@@ -950,6 +958,7 @@ class Foo {
   subscript (x: Int, y: Int) -> Int { get set }
   var x: Int
   var y: Int
+  init()
 }
 
 sil @_TC3tmp3Foo9subscriptFT1xSi1ySi_Sig : $@cc(method) @thin (Int, Int, Foo) -> Int {

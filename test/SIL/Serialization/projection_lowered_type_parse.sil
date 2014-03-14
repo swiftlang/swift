@@ -19,6 +19,7 @@ bb0(%0 : $*A):
 
 class B {
   var f : @callee_owned () -> ()
+  init()
 }
 
 sil @test2 : $@thin (B) -> () {

@@ -19,7 +19,7 @@ import gizmo
 // --       num fields
 // CHECK:   i64 3,
 // --       field offset vector offset
-// CHECK:   i64 12,
+// CHECK:   i64 13,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       generic parameter vector offset
@@ -65,7 +65,7 @@ import gizmo
 // CHECK:   i64 0
 // CHECK: }
 
-// CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} i64 } {
+// CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {
 // CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
@@ -102,6 +102,8 @@ import gizmo
 class RootGeneric<T> {
   var x : UInt8
 
+  init()
+
   // Test that declaration order doesn't cause the field offset vector to end
   // up interleaved with the vtable.
   func foo()
@@ -120,6 +122,8 @@ class RootGenericFixedLayout<T> {
   var x : UInt8
   var y : T[]
   var z : UInt8
+
+  init()
 }
 sil @_TFC15generic_classes22RootGenericFixedLayoutD : $@cc(method) @thin <T> (RootGenericFixedLayout<T>) -> ()
 
@@ -127,6 +131,8 @@ class RootNonGeneric {
   var x : UInt8
   var y : Int
   var z : UInt8
+
+  init()
 }
 sil @_TFC15generic_classes14RootNonGenericD : $@cc(method) @thin (RootNonGeneric) -> ()
 
@@ -136,16 +142,22 @@ class GenericInheritsGeneric<A, B> : RootGeneric<A> {
   func zippity()
   func doo()
   func dah()
+
+  init()
 }
 sil @_TFC15generic_classes22GenericInheritsGenericD : $@cc(method) @thin <T,U> (GenericInheritsGeneric<T,U>) -> ()
 
 class GenericInheritsNonGeneric<C> : RootNonGeneric {
   var w : UInt8
+
+  init()
 }
 sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
 
 class GenericInheritsObjC<D> : Gizmo {
   var x : D
+
+  init()
 }
 sil @_TFCSo19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
 
@@ -153,6 +165,8 @@ class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
   var y : E
   var z : UInt8
+
+  init()
 }
 sil @_TFCSo20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
 
@@ -185,7 +199,7 @@ entry(%c : $RootGeneric<F>):
 // RootGeneric.y has dependent layout; load the offset from the metadata
 // CHECK: define void @RootGeneric_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 13
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 14
 // CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8*** [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -202,7 +216,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 // RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK: define i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 14
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8*** [[TYPE_METADATA_ARRAY]], i64 15
 // CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8*** [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -237,11 +251,11 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK: define internal void [[FILL_GENERICINHERITSGENERIC]](i8*, i8*) {
 // -- initialize our generic parameters
-// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE:%.*]], i32 17
+// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE:%.*]], i32 18
 // CHECK:   [[A_ARG_ADDR:%.*]] = getelementptr inbounds i64* [[GENERIC_ARGS:%.*]], i32 0
 // CHECK:   [[A:%.*]] = load i64* [[A_ARG_ADDR]], align 8
 // CHECK:   store i64 [[A]], i64* [[A_ADDR]], align 8
-// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE]], i32 18
+// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i64* [[SELF_TEMPLATE]], i32 19
 // CHECK:   [[B_ARG_ADDR:%.*]] = getelementptr inbounds i64* [[GENERIC_ARGS]], i32 1
 // CHECK:   [[B:%.*]] = load i64* [[B_ARG_ADDR]], align 8
 // CHECK:   store i64 [[B]], i64* [[B_ADDR]], align 8
@@ -251,8 +265,8 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T:%.*]] = load i64* [[SUPER_T_ADDR]], align 8
 // CHECK:   store i64 [[T]], i64* [[SELF_T_ADDR]], align 8
 // -- copy super field offsets from super metadata
-// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SUPER]], i32 12
-// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SELF]], i32 12
+// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SUPER]], i32 13
+// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64* [[SELF]], i32 13
 // CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
 // CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)

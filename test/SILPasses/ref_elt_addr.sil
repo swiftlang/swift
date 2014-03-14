@@ -6,6 +6,7 @@ import Swift
 
 class X {
  var x : Int64 
+  init()
 }
 
 //CHECK: _RefElementAddr

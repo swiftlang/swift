@@ -48,8 +48,14 @@ bb0:
 // Type references
 
 // Some cyclic type references between SIL function bodies.
-class Class1 { var a : Class2 }
-class Class2 { var b : Class1 }
+class Class1 { 
+  var a : Class2 
+  init()
+}
+class Class2 { 
+  var b : Class1 
+  init()
+}
 
 // Instructions
 
@@ -406,6 +412,7 @@ bb0(%0 : $Int, %1 : $Float32):
 
 class M {
   var member : Int
+  init()
 }
 
 // CHECK-LABEL: @_TFC3ref1C3foofS0_FT1xSi_T_ : $@cc(method) @thin (Int, M) -> ()
@@ -595,6 +602,7 @@ bb3(%4 : $Int):
 
 class Bas : NSObject {
   var strRealProp : String
+  init()
 }
 sil @test_autorelease_return : $@cc(objc_method) @thin (Bas) -> NSString 
 sil @test_super_method : $@cc(method) @thin (Bas) -> Bas
@@ -935,6 +943,7 @@ class Foo {
   subscript (x: Int, y: Int) -> Int { get set }
   var x: Int
   var y: Int
+  init()
 }
 
 // CHECK-LABEL: sil @_TFC3tmp3Foog9subscriptFT1xSi1ySi_Si : $@cc(method) @thin (Int, Int, Foo) -> Int

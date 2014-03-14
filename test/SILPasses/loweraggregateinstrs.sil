@@ -7,14 +7,17 @@ import Builtin
 
 class C1 {
   var data : Builtin.Int64
+  init()
 }
 
 class C2 {
   var data : Builtin.FPIEEE32
+  init()
 }
 
 class C3 {
   var data : Builtin.FPIEEE64
+  init()
 }
 
 struct S2 {

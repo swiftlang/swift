@@ -10,6 +10,7 @@ import Builtin
 class TrivialDestructor {
   var int : Builtin.Int32
   var ptr : Builtin.ObjectPointer
+  init()
   deinit { }
 }
 
@@ -184,6 +185,7 @@ sil @trivial_destructor_side_effect_use
 class NonTrivialDestructor {
   var ptr : Builtin.ObjectPointer
 
+  init()
   deinit { }
 }
 
@@ -216,6 +218,7 @@ sil @non_trivial_destructor_refcount_on_different_value : $@thin () -> () {
 class NonTrivialDestructor2 {
   var ptr : NonTrivialDestructor
 
+  init()
   deinit { }
 }
 
@@ -246,6 +249,7 @@ sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
 class NonTrivialDestructor3 {
   var ptr : Builtin.ObjectPointer
 
+  init()
   deinit { }
 }
 
@@ -277,6 +281,7 @@ sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
 class NonTrivialObjCDestructor {
   var ptr : Builtin.ObjectPointer
 
+  init() { }
   deinit { }
 }
 
