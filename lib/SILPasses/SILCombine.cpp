@@ -265,6 +265,7 @@ public:
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
   SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
+  SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -445,6 +446,30 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 //                                  Visitors
 //===----------------------------------------------------------------------===//
+SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
+  // Promote switch_enum_addr to switch_enum. Detect the pattern:
+  //store %X to %Y#1 : $*Optional<SomeClass>
+  //switch_enum_addr %Y#1 : $*Optional<SomeClass>, case ...
+  if (SEAI == SEAI->getParent()->begin())
+    return nullptr;
+
+  SILBasicBlock::iterator it = SEAI;
+  if (StoreInst *SI = dyn_cast<StoreInst>(--it)) {
+    SILValue EnumVal = SI->getSrc();
+
+    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
+      Cases.push_back(SEAI->getCase(i));
+
+    SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
+    Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases);
+    eraseInstFromFunction(*SEAI);
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // init_existential instructions behave like memory allocation within
   // the allocated object. We can promote the init_existential allocation

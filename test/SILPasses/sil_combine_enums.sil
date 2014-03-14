@@ -1,0 +1,44 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class SomeClass {
+  func hash() -> Int
+}
+
+//CHECK-LABLE: eliminate_sw_enum_addr
+//CHECK-NOT: switch_enum_addr
+//CHECK: switch_enum
+//CHECK: return
+sil @eliminate_sw_enum_addr : $@thin () -> Int {
+bb0:
+  %0 = alloc_stack $Optional<SomeClass>  // var x // users: %2, %4, %5, %17, %19
+  %1 = alloc_ref $SomeClass                       // user: %3
+  %2 = init_enum_data_addr %0#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %3
+  store %1 to %2 : $*SomeClass                    // id: %3
+  inject_enum_addr %0#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // id: %4
+  %5 = load %0#1 : $*Optional<SomeClass>          // users: %6, %8, %9, %14
+  %6 = copy_value %5 : $Optional<SomeClass>
+  %7 = alloc_stack $Optional<SomeClass>           // users: %9, %10, %11, %13
+  %8 = copy_value %5 : $Optional<SomeClass>
+  store %5 to %7#1 : $*Optional<SomeClass>        // id: %9
+  switch_enum_addr %7#1 : $*Optional<SomeClass>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2 // id: %10
+
+bb1:                                              // Preds: bb0
+  %11 = take_enum_data_addr %7#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %12
+  %12 = load %11 : $*SomeClass                    // users: %15, %16
+  dealloc_stack %7#0 : $*@local_storage Optional<SomeClass> // id: %13
+  destroy_value %5 : $Optional<SomeClass>         // id: %14
+  %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int // user: %16
+  %16 = apply %15(%12) : $@cc(method) @thin (@owned SomeClass) -> Int // user: %20
+  %17 = load %0#1 : $*Optional<SomeClass>         // user: %18
+  destroy_value %17 : $Optional<SomeClass>        // id: %18
+  dealloc_stack %0#0 : $*@local_storage Optional<SomeClass> // id: %19
+  return %16 : $Int                               // id: %20
+
+bb2:                                              // Preds: bb0
+  unreachable                                     // id: %23
+}
+
