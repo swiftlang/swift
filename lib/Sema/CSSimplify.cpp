@@ -908,6 +908,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             assert(boundGenericType1->getGenericArgs().size() == 1);
             potentialConversions.push_back(
                        ConversionRestrictionKind::UncheckedOptionalToOptional);
+          } else if (optionalKind2 == OTK_UncheckedOptional &&
+                     kind >= TypeMatchKind::Conversion &&
+                     decl1 == TC.Context.getOptionalDecl()) {
+            assert(boundGenericType1->getGenericArgs().size() == 1);
+            potentialConversions.push_back(
+                       ConversionRestrictionKind::OptionalToUncheckedOptional);
           }
         }
         
@@ -1863,6 +1869,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   //   T $< U ===> T? $< U?
   //   T $< U ===> @unchecked T? $< @unchecked U?
   //   T $< U ===> @unchecked T? $< U?
+  // also:
+  //   T <c U ===> T? <c @unchecked U?
+  case ConversionRestrictionKind::OptionalToUncheckedOptional:
   case ConversionRestrictionKind::UncheckedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     assert(matchKind >= TypeMatchKind::Subtype);

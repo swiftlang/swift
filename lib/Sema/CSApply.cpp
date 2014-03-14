@@ -2999,6 +2999,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
     }
 
+    case ConversionRestrictionKind::OptionalToUncheckedOptional:
     case ConversionRestrictionKind::UncheckedOptionalToOptional:
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator);

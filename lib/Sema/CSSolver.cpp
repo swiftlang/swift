@@ -1126,7 +1126,8 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint) {
   // conversions.
   if (auto restriction = constraint->getRestriction()) {
     if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
-        *restriction == ConversionRestrictionKind::UncheckedOptionalToOptional)
+        *restriction == ConversionRestrictionKind::UncheckedOptionalToOptional ||
+        *restriction == ConversionRestrictionKind::OptionalToUncheckedOptional)
       return true;
   }
 
