@@ -3100,8 +3100,14 @@ public:
     // attribute on it, complain.
     if (!overriding->getAttrs().isOverride() &&
         !isa<ConstructorDecl>(overriding)) {
-      TC.diagnose(overriding, diag::missing_override)
-      .fixItInsert(overriding->getStartLoc(), "@override ");
+      // FIXME: rdar://16320042 - For properties, we don't have a useful
+      // location for the 'var' token.  Instead of emitting a bogus fixit, only
+      // emit the fixit for 'func's.
+      if (!isa<VarDecl>(overriding))
+        TC.diagnose(overriding, diag::missing_override)
+          .fixItInsert(overriding->getStartLoc(), "@override ");
+      else
+        TC.diagnose(overriding, diag::missing_override);
       TC.diagnose(overridden, diag::overridden_here);
     }
     
