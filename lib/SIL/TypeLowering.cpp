@@ -1442,28 +1442,26 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
                                             bool isForeign) {
   auto classType = dd->getDeclContext()->getDeclaredTypeInContext()
                      ->getCanonicalType();
-
+  
+  AnyFunctionType::ExtInfo extInfo;
   if (isForeign) {
     assert(isDeallocating && "There are no foreign destroying destructors");
-    auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
-                                            /*thin*/ true,
-                                            /*noreturn*/ false);
-    return CanFunctionType::get(classType,
-                                TupleType::getEmpty(C)->getCanonicalType(),
-                                extInfo);
+    extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
+                                       /*thin*/ true,
+                                       /*noreturn*/ false);
+  } else {
+    extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
+                                       /*thin*/ true,
+                                       /*noreturn*/ false);
   }
-
-  auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
-                                          /*thin*/ true,
-                                          /*noreturn*/ false);
+  
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
                                    : CanType(C.TheObjectPointerType);
 
-  auto selfType = classType;
   if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
-    return CanPolymorphicFunctionType::get(selfType, resultTy, params, extInfo);
+    return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
 
-  return CanFunctionType::get(selfType, resultTy, extInfo);
+  return CanFunctionType::get(classType, resultTy, extInfo);
 }
 
 /// Get the type of a destructor function.
@@ -1474,29 +1472,27 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   auto classType = dd->getDeclContext()->getDeclaredInterfaceType()
                      ->getCanonicalType();
 
+  AnyFunctionType::ExtInfo extInfo;
   if (isForeign) {
     assert(isDeallocating && "There are no foreign destroying destructors");
-    auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
-                                            /*thin*/ true,
-                                            /*noreturn*/ false);
-    return CanFunctionType::get(classType,
-                                TupleType::getEmpty(C)->getCanonicalType(),
-                                extInfo);
+    extInfo = AnyFunctionType::ExtInfo(AbstractCC::ObjCMethod,
+                                       /*thin*/ true,
+                                       /*noreturn*/ false);
+  } else {
+    extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
+                                       /*thin*/ true,
+                                       /*noreturn*/ false);
   }
-
-  auto extInfo = AnyFunctionType::ExtInfo(AbstractCC::Method,
-                                          /*thin*/ true,
-                                          /*noreturn*/ false);
+  
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
                                    : CanType(C.TheObjectPointerType);
 
-  auto selfType = classType;
   auto sig = dd->getDeclContext()->getGenericSignatureOfContext();
   if (sig)
     return cast<GenericFunctionType>(
-      GenericFunctionType::get(sig, selfType, resultTy, extInfo)
+      GenericFunctionType::get(sig, classType, resultTy, extInfo)
       ->getCanonicalType());
-  return CanFunctionType::get(selfType, resultTy, extInfo);
+  return CanFunctionType::get(classType, resultTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
