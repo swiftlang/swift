@@ -257,6 +257,9 @@ if( CXX_SUPPORTS_DOCUMENTATION_FLAG )
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdocumentation" )
 endif()
 
+check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
+append_if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG "-Wimplicit-fallthrough" CMAKE_CXX_FLAGS)
+
 # Set sizeof(void*) if cross-compiling.
 if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "64$")
