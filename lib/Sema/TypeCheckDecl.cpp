@@ -2814,46 +2814,6 @@ public:
     return type;
   }
 
-  /// Record that the \c overriding declarations overrides the \c
-  /// overridden declaration.
-  ///
-  /// \returns true if an error occurred.
-  bool recordOverride(ValueDecl *overriding, ValueDecl *overridden) {
-    // Non-Objective-C declarations in extensions cannot override or
-    // be overridden.
-    if ((overridden->getDeclContext()->isExtensionContext() ||
-         overriding->getDeclContext()->isExtensionContext()) &&
-        !overridden->isObjC()) {
-      TC.diagnose(overriding, diag::override_decl_extension,
-                  !overriding->getDeclContext()->isExtensionContext());
-      TC.diagnose(overridden, diag::overridden_here);
-      return true;
-    }
-
-    // If the overriding declaration does not have the @override
-    // attribute on it, complain.
-    if (!overriding->getAttrs().isOverride() &&
-        !isa<ConstructorDecl>(overriding)) {
-      TC.diagnose(overriding, diag::missing_override)
-        .fixItInsert(overriding->getStartLoc(), "@override ");
-      TC.diagnose(overridden, diag::overridden_here);
-    }
-
-    if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
-      overridingFunc->setOverriddenDecl(cast<FuncDecl>(overridden));
-    } else if (auto overridingVar = dyn_cast<VarDecl>(overriding)) {
-      overridingVar->setOverriddenDecl(cast<VarDecl>(overridden));
-    } else if (auto overridingSubscript = dyn_cast<SubscriptDecl>(overriding)) {
-      overridingSubscript->setOverriddenDecl(cast<SubscriptDecl>(overridden));
-    } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(overriding)) {
-      overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(overridden));
-    } else {
-      llvm_unreachable("Unexpected decl");
-    }
-
-    return false;
-  }
-
   /// Perform basic checking to determine whether a declaration can override a
   /// declaration in a superclass.
   static bool areOverrideCompatibleSimple(ValueDecl *decl,
@@ -2892,14 +2852,15 @@ public:
     if (!superclass)
       return false;
 
+    // Ignore accessor methods (e.g. getters and setters), they will be handled
+    // when their storage decl is processed.
+    if (auto *fd = dyn_cast<FuncDecl>(decl))
+      if (fd->isAccessor())
+        return false;
+    
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
     auto abstractStorage = dyn_cast<AbstractStorageDecl>(decl);
     assert((method || abstractStorage) && "Not a method or abstractStorage?");
-
-    // Only named methods are permitted.
-    // FIXME: Should this be a check for an accessor.
-    if (method && !method->hasName())
-      return false;
 
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType();
@@ -3113,6 +3074,46 @@ public:
     for (auto match : matches)
       TC.diagnose(std::get<0>(match), diag::overridden_here);
     return true;
+  }
+
+  /// Record that the \c overriding declarations overrides the \c
+  /// overridden declaration.
+  ///
+  /// \returns true if an error occurred.
+  bool recordOverride(ValueDecl *overriding, ValueDecl *overridden) {
+    // Non-Objective-C declarations in extensions cannot override or
+    // be overridden.
+    if ((overridden->getDeclContext()->isExtensionContext() ||
+         overriding->getDeclContext()->isExtensionContext()) &&
+        !overridden->isObjC()) {
+      TC.diagnose(overriding, diag::override_decl_extension,
+                  !overriding->getDeclContext()->isExtensionContext());
+      TC.diagnose(overridden, diag::overridden_here);
+      return true;
+    }
+    
+    // If the overriding declaration does not have the @override
+    // attribute on it, complain.
+    if (!overriding->getAttrs().isOverride() &&
+        !isa<ConstructorDecl>(overriding)) {
+      TC.diagnose(overriding, diag::missing_override)
+      .fixItInsert(overriding->getStartLoc(), "@override ");
+      TC.diagnose(overridden, diag::overridden_here);
+    }
+    
+    if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
+      overridingFunc->setOverriddenDecl(cast<FuncDecl>(overridden));
+    } else if (auto overridingVar = dyn_cast<VarDecl>(overriding)) {
+      overridingVar->setOverriddenDecl(cast<VarDecl>(overridden));
+    } else if (auto overridingSubscript = dyn_cast<SubscriptDecl>(overriding)) {
+      overridingSubscript->setOverriddenDecl(cast<SubscriptDecl>(overridden));
+    } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(overriding)) {
+      overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(overridden));
+    } else {
+      llvm_unreachable("Unexpected decl");
+    }
+    
+    return false;
   }
 
   /// Compute the interface type of the given enum element.
