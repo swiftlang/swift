@@ -250,11 +250,9 @@ else ()
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -stdlib=libc++")
 endif ()
 
-# Compile with -Wdocumentation.
+# Add additional warnings.
 check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)
-if( CXX_SUPPORTS_DOCUMENTATION_FLAG )
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdocumentation" )
-endif()
+append_if(CXX_SUPPORTS_DOCUMENTATION_FLAG "-Wdocumentation" CMAKE_CXX_FLAGS)
 
 check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
 append_if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG "-Wimplicit-fallthrough" CMAKE_CXX_FLAGS)
