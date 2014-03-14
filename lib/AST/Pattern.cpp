@@ -185,7 +185,8 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
 
 
 
-Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
+Pattern *Pattern::clone(ASTContext &context,
+                        OptionSet<CloneFlags> options) const {
   Pattern *result;
   switch (getKind()) {
   case PatternKind::Any:
@@ -202,7 +203,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
                                            ? named->getDecl()->getType()
                                            : Type(),
                                          named->getDecl()->getDeclContext());
-    if (Implicit || var->isImplicit())
+    if ((options & Implicit) || var->isImplicit())
       var->setImplicit();
     result = new (context) NamedPattern(var);
     break;
@@ -212,7 +213,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     auto paren = cast<ParenPattern>(this);
     result = new (context) ParenPattern(paren->getLParenLoc(),
                                         paren->getSubPattern()->clone(context,
-                                                                      Implicit),
+                                                                      options),
                                         paren->getRParenLoc());
     break;
   }
@@ -222,7 +223,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     SmallVector<TuplePatternElt, 2> elts;
     elts.reserve(tuple->getNumFields());
     for (const auto &elt : tuple->getFields())
-      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context, Implicit),
+      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context, options),
                                      elt.getInit(),
                                      elt.getDefaultArgKind()));
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
@@ -235,7 +236,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
   case PatternKind::Typed: {
     auto typed = cast<TypedPattern>(this);
     result = new(context) TypedPattern(typed->getSubPattern()->clone(context,
-                                                                     Implicit),
+                                                                     options),
                                        typed->getTypeLoc().clone(context));
     break;
   }
@@ -257,7 +258,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
                                          elt.getProperty(),
                                          elt.getColonLoc(),
                                          elt.getSubPattern()->clone(context,
-                                                                    Implicit)));
+                                                                    options)));
     }
     
     result = NominalTypePattern::create(nom->getCastTypeLoc().clone(context),
@@ -271,7 +272,7 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     auto oof = cast<EnumElementPattern>(this);
     Pattern *sub = nullptr;
     if (oof->hasSubPattern())
-      sub = oof->getSubPattern()->clone(context, Implicit);
+      sub = oof->getSubPattern()->clone(context, options);
     result = new (context) EnumElementPattern(oof->getParentType()
                                                 .clone(context),
                                               oof->getLoc(),
@@ -295,13 +296,13 @@ Pattern *Pattern::clone(ASTContext &context, bool Implicit) const {
     auto var = cast<VarPattern>(this);
     result = new(context) VarPattern(var->getLoc(),
                                      var->getSubPattern()->clone(context,
-                                                                 Implicit));
+                                                                 options));
   }
   }
 
   if (hasType())
     result->setType(getType());
-  if (Implicit || isImplicit())
+  if ((options & Implicit) || isImplicit())
     result->setImplicit();
 
   return result;

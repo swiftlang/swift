@@ -3943,9 +3943,9 @@ createSubobjectInitOverride(TypeChecker &tc,
 
   // Create the initializer parameter patterns.
   Pattern *argParamPatterns
-    = superclassCtor->getArgParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+    = superclassCtor->getArgParamPatterns()[1]->clone(ctx, Pattern::Implicit);
   Pattern *bodyParamPatterns
-    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx,/*Implicit=*/true);
+    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, Pattern::Implicit);
 
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),

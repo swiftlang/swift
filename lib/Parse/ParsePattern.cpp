@@ -110,7 +110,7 @@ static ParserStatus parseDefaultArgument(Parser &P,
 static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
                                              ASTContext &C) {
   // We'll return a cloned copy of the pattern.
-  Pattern *Result = P->clone(C, /*isImplicit*/true);
+  Pattern *Result = P->clone(C, Pattern::Implicit);
 
   class ReplaceRoot : public ASTWalker {
     Pattern *NewRoot;

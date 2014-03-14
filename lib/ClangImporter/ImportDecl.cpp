@@ -359,8 +359,8 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   rawParam->setImplicit();
   rawParam->setType(rawArgType);
 
-  Pattern *argParams[] = {selfParam->clone(C, /*Implicit=*/true),
-                          rawParam->clone(C, /*Implicit=*/true)};
+  Pattern *argParams[] = {selfParam->clone(C, Pattern::Implicit),
+                          rawParam->clone(C, Pattern::Implicit)};
   Pattern *bodyParams[] = {selfParam, rawParam};
   
   Type retType;

@@ -1294,7 +1294,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     }
 
     if (Indices) {
-      Indices = Indices->clone(P->Context, /*Implicit=*/true);
+      Indices = Indices->clone(P->Context, Pattern::Implicit);
       if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
         ValueArgElements.push_back(TuplePatternElt(PP->getSubPattern()));
       } else {

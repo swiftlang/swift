@@ -26,6 +26,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/OptionSet.h"
 
 namespace swift {
   class ASTContext;
@@ -136,8 +137,13 @@ public:
   /// this pattern.  This is a pre-order traversal.
   void forEachNode(const std::function<void(Pattern*)> &f);
 
+  /// Flags used to indicate how pattern cloning should operate.
+  enum CloneFlags {
+    Implicit = 0x01,
+  };
 
-  Pattern *clone(ASTContext &context, bool Implicit = false) const;
+  Pattern *clone(ASTContext &context,
+                 OptionSet<CloneFlags> options = None) const;
   
   static bool classof(const Pattern *P) { return true; }
   

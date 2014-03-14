@@ -112,7 +112,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   params->setImplicit();
   params->setType(paramsTy);
   
-  Pattern *argParams = params->clone(C, /*implicit*/ true);
+  Pattern *argParams = params->clone(C, Pattern::Implicit);
   
   auto genericParams = enumDecl->getGenericParamsOfContext();
   
@@ -148,7 +148,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
                                            Identifier(), elt,
                                            nullptr);
     aPat->setImplicit();
-    auto bPat = aPat->clone(C, /*implicit*/ true);
+    auto bPat = aPat->clone(C, Pattern::Implicit);
     
     TuplePatternElt tupleElts[] = {
       TuplePatternElt(aPat),
