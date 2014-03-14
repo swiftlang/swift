@@ -10,3 +10,8 @@ void useBaseClassObjC(BaseClass *);
 id <BaseProto> getBaseProtoObjC();
 void useBaseProtoObjC(id <BaseProto>);
 
+
+@interface BaseClass (ObjCExtensions)
+- (void)categoryMethod;
+@end
+
