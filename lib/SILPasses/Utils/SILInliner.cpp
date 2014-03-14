@@ -271,18 +271,11 @@ static InlineCost instructionInlineCost(SILInstruction &I,
       }
       return InlineCost::Free;
 
+    // Typed GEPs are free.
     case ValueKind::TupleElementAddrInst:
-    case ValueKind::StructElementAddrInst: {
-      // A gep whose operand is a gep with no other users will get folded by
-      // LLVM into one gep implying the second should be free.
-      SILValue Op = I.getOperand(0);
-      if ((Op->getKind() == ValueKind::TupleElementAddrInst ||
-           Op->getKind() == ValueKind::StructElementAddrInst) &&
-          Op->hasOneUse())
-        return InlineCost::Free;
-      
+    case ValueKind::StructElementAddrInst:
       return InlineCost::Free;
-    }
+
     // Aggregates are exploded at the IR level; these are effectively no-ops.
     case ValueKind::TupleInst:
     case ValueKind::StructInst:
