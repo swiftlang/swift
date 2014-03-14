@@ -1,6 +1,7 @@
 // RUN: %swift %s -emit-silgen | FileCheck %s
 
 sil_stage raw
+import Builtin
 
 // CHECK-LABEL: sil @foo : $@thin <T> (@out T, @in T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
@@ -56,3 +57,33 @@ entry:
   dealloc_stack %i#0 : $*@local_storage Bas
   return %g : $@callee_owned (@out Bas) -> ()
 }
+
+var zero: Builtin.Int64
+var f: (Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @test_apply
+sil @test_apply : $@thin () -> () {
+bb0:
+  %0 = global_addr #zero : $*Builtin.Int64
+  %1 = mark_uninitialized [var] %0 : $*Builtin.Int64
+  %2 = global_addr #f : $*@callee_owned (Builtin.Int32) -> ()
+  %3 = function_ref @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %4 = load %1 : $*Builtin.Int64
+  %5 = alloc_stack $Builtin.Int64
+  store %4 to %5#1 : $*Builtin.Int64
+  // CHECK: apply %{{[0-9]+}}<{{.*}}Builtin.Int64, {{.*}}Builtin.Int32>(%{{.*}}) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %7 = apply %3<T = Builtin.Int64, U = Builtin.Int32>(%5#1) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  %9 = partial_apply %8(%7) : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+  store %9 to %2 : $*@callee_owned (Builtin.Int32) -> ()
+  dealloc_stack %5#0 : $*@local_storage Builtin.Int64
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// generic_closures.generic_curried_function <A, B>(x : A) -> (y : B) -> ()
+sil @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+
+// reabstraction thunk helper from @callee_owned (@in Builtin.Int32) -> (@unowned ()) to @callee_owned (@unowned Builtin.Int32) -> (@unowned ())
+sil [transparent] @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()

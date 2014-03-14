@@ -1143,13 +1143,12 @@ bool getApplySubstitutionsFromParsed(
                              SmallVectorImpl<Substitution> &subs) {
   // Find the corresponding ArchetypeType for ArcheId in PTy.
   ArrayRef<ArchetypeType *> allArchetypes = params->getAllArchetypes();
+  assert(parses.size() <= params->getNumPrimaryArchetypes());
+  unsigned Id = 0;
   for (auto &parsed : parses) {
     Substitution sub{nullptr, nullptr, nullptr};
-    for (auto archetype : allArchetypes)
-      if (archetype->getName() == parsed.name) {
-        sub.Archetype = archetype;
-        break;
-      }
+    // The replacement is for the corresponding archetype by ordering.
+    sub.Archetype = allArchetypes[Id++];
     if (!sub.Archetype) {
       SP.P.diagnose(parsed.loc, diag::sil_apply_archetype_not_found);
       return true;
