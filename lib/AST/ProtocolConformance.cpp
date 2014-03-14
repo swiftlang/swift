@@ -508,7 +508,8 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
       if (func && func->hasDynamicSelf())
         continue;
 
-      // Fall through
+      // Fall through.
+      [[clang::fallthrough]];
     }
 
     case SelfReferenceKind::Yes: {

@@ -83,6 +83,7 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
       os << '\\';
       // Fall-through to the default case, since we still need to print the
       // character.
+      [[clang::fallthrough]];
     default:
       os << c;
     }

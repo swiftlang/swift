@@ -239,8 +239,8 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::kw_destructor:
     P.diagnose(P.Tok, diag::destructor_is_deinit)
       .fixItReplace(SourceLoc(P.Tok.getLoc()), "deinit");
-    // fall through
-
+    // Fall through.
+    [[clang::fallthrough]];
   case tok::kw_deinit:
     Result = P.Context.Id_deinit;
     break;

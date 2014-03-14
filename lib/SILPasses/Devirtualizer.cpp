@@ -1040,8 +1040,10 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
       if (cast<CopyAddrInst>(UI.getUser())->getSrc() == ProtocolObject)
         continue;
 
-      // fallthrough: ...
+      // Fall through.
+      [[clang::fallthrough]];
     }
+
     case ValueKind::InitExistentialInst: {
       // Make sure there is a single initialization:
       if (Init) {

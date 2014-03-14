@@ -867,6 +867,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
       if (!isa<ApplyInst>(U.Inst))
         break;
       // FALL THROUGH.
+     [[clang::fallthrough]];
     case DIUseKind::Load:
     case DIUseKind::IndirectIn:
     case DIUseKind::InOutUse:
