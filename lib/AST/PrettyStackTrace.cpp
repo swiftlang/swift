@@ -34,9 +34,9 @@ void PrettyStackTraceDecl::print(llvm::raw_ostream &out) const {
   printDeclDescription(out, TheDecl, TheDecl->getASTContext());
 }
 
-void swift::printDeclDescription(llvm::raw_ostream &out, Decl *D,
+void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
                                  ASTContext &Context) {
-  if (ValueDecl *named = dyn_cast<ValueDecl>(D)) {
+  if (auto *named = dyn_cast<ValueDecl>(D)) {
     if (named->getName().get())
       out << '\'' << named->getName() << '\'';
     else

@@ -45,16 +45,16 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
-void printDeclDescription(llvm::raw_ostream &out, Decl *D,
+void printDeclDescription(llvm::raw_ostream &out, const Decl *D,
                           ASTContext &Context);
 
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.
 class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {
-  Decl *TheDecl;
+  const Decl *TheDecl;
   const char *Action;
 public:
-  PrettyStackTraceDecl(const char *action, Decl *D)
+  PrettyStackTraceDecl(const char *action, const Decl *D)
     : TheDecl(D), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
