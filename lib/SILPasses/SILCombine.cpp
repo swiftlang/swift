@@ -457,6 +457,11 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   if (StoreInst *SI = dyn_cast<StoreInst>(--it)) {
     SILValue EnumVal = SI->getSrc();
 
+    // Make sure that the store destination and the switch address is the same
+    // address.
+    if (SI->getDest() != SEAI->getOperand())
+      return nullptr;
+
     SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
     for (int i = 0, e = SEAI->getNumCases(); i < e; ++i)
       Cases.push_back(SEAI->getCase(i));
