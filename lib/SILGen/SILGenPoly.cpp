@@ -655,11 +655,11 @@ namespace {
 }
 
 /// Forward arguments according to a function type's ownership conventions.
-void forwardFunctionArguments(SILGenFunction &gen,
-                              SILLocation loc,
-                              CanSILFunctionType fTy,
-                              ArrayRef<ManagedValue> managedArgs,
-                              SmallVectorImpl<SILValue> &forwardedArgs) {
+static void forwardFunctionArguments(SILGenFunction &gen,
+                                     SILLocation loc,
+                                     CanSILFunctionType fTy,
+                                     ArrayRef<ManagedValue> managedArgs,
+                                     SmallVectorImpl<SILValue> &forwardedArgs) {
   auto argTypes = fTy->getInterfaceParametersWithoutIndirectResult();
   for (auto index : indices(managedArgs)) {
     auto &arg = managedArgs[index];
@@ -671,10 +671,10 @@ void forwardFunctionArguments(SILGenFunction &gen,
 
 /// Create a temporary result buffer, reuse an existing result address, or
 /// return null, based on the calling convention of a function type.
-SILValue getThunkInnerResultAddr(SILGenFunction &gen,
-                                 SILLocation loc,
-                                 CanSILFunctionType fTy,
-                                 SILValue outerResultAddr) {
+static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        CanSILFunctionType fTy,
+                                        SILValue outerResultAddr) {
   if (fTy->hasIndirectResult()) {
     auto resultType = fTy->getIndirectInterfaceResult().getSILType();
     resultType = gen.F.mapTypeIntoContext(resultType);
@@ -689,15 +689,15 @@ SILValue getThunkInnerResultAddr(SILGenFunction &gen,
 }
 
 /// Return the result of a function application as the result from a thunk.
-SILValue getThunkResult(SILGenFunction &gen,
-                        SILLocation loc,
-                        TranslationKind kind,
-                        CanSILFunctionType fTy,
-                        AbstractionPattern origResultType,
-                        CanType substResultType,
-                        SILValue innerResultValue,
-                        SILValue innerResultAddr,
-                        SILValue outerResultAddr) {
+static SILValue getThunkResult(SILGenFunction &gen,
+                               SILLocation loc,
+                               TranslationKind kind,
+                               CanSILFunctionType fTy,
+                               AbstractionPattern origResultType,
+                               CanType substResultType,
+                               SILValue innerResultValue,
+                               SILValue innerResultAddr,
+                               SILValue outerResultAddr) {
   // Convert the direct result to +1 if necessary.
   auto resultTy = gen.F.mapTypeIntoContext(fTy->getSemanticInterfaceResultSILType());
   auto &innerResultTL = gen.getTypeLowering(resultTy);
