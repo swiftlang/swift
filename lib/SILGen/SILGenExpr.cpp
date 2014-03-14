@@ -1896,9 +1896,28 @@ static DeclName getMagicFunctionName(DeclContext *dc) {
   }
   if (auto absFunc = dyn_cast<AbstractFunctionDecl>(dc)) {
     // If this is an accessor, use the name of the storage.
-    if (auto func = dyn_cast<FuncDecl>(absFunc))
+    if (auto func = dyn_cast<FuncDecl>(absFunc)) {
       if (auto storage = func->getAccessorStorageDecl())
         return storage->getFullName();
+    }
+
+    // If this is an initializer, form a compound name.
+    // FIXME: should fall out of giving compound names to initializers.
+    if (auto ctor = dyn_cast<ConstructorDecl>(absFunc)) {
+      if (ctor->hasSelectorStyleSignature()) {
+        auto &ctx = dc->getASTContext();
+        SmallVector<Identifier, 4> components;
+        components.push_back(ctx.Id_init);
+        auto tuple = cast<TuplePattern>(ctor->getArgParamPatterns()[1]);
+        for (const auto &elt : tuple->getFields()) {
+          auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
+          if (auto named = dyn_cast<NamedPattern>(eltPattern))
+            components.push_back(named->getBoundName());
+        }
+        return DeclName(ctx, components);
+      }
+    }
+
     return absFunc->getFullName();
   }
   if (auto init = dyn_cast<Initializer>(dc)) {
@@ -3233,9 +3252,19 @@ getMagicFunctionString(SILGenFunction &gen) {
     return gen.MagicFunctionName.getSimpleName().str();
   
   if (gen.MagicFunctionString.empty()) {
+    auto &ctx = gen.SGM.M.getASTContext();
     for (Identifier component : gen.MagicFunctionName.getComponents()) {
-      if (component.get())
+      if (component.get()) {
         gen.MagicFunctionString += component.str();
+
+        // After 'init', introduce a space rather than a ':', to mimic
+        // the declaration.
+        if (component == ctx.Id_init) {
+          gen.MagicFunctionString += ' ';
+          continue;
+        }
+      }
+
       gen.MagicFunctionString += ':';
     }
   }
