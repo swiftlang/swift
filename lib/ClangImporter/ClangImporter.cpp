@@ -835,6 +835,32 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
                                    unsigned previousGeneration) {
   auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                      nominal->getClangDecl());
+  if (!objcClass) {
+    if (nominal->isObjC()) {
+      // Map the name. If we can't represent the Swift name in Clang, bail out
+      // now.
+      auto clangName = Impl.importName(nominal->getName());
+      if (!clangName)
+        return;
+
+      auto &sema = Impl.Instance->getSema();
+
+      // Perform name lookup into the global scope.
+      // FIXME: Map source locations over.
+      clang::LookupResult lookupResult(sema, clangName,
+                                       clang::SourceLocation(),
+                                       clang::Sema::LookupOrdinaryName);
+      if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+        // FIXME: Filter based on access path? C++ access control?
+        for (auto clangDecl : lookupResult) {
+          objcClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl);
+          if (objcClass)
+            break;
+        }
+      }
+    }
+  }
+
   if (!objcClass)
     return;
 

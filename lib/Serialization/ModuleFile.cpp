@@ -803,6 +803,9 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
     return false;
   }
 
+  if (Bits.IsFramework)
+    (void)getModule(FileContext->getParentModule()->Name);
+
   return getStatus() == ModuleStatus::Valid;
 }
 
@@ -870,6 +873,8 @@ void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
     Module::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
+  bool includeShadowedModule =
+    (filter != Module::ImportFilter::Private && Bits.IsFramework);
 
   for (auto &dep : Dependencies) {
     if (filter != Module::ImportFilter::All &&
@@ -877,7 +882,18 @@ void ModuleFile::getImportedModules(
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
+
+    // FIXME: Do we want a way to limit re-exports?
+    if (includeShadowedModule && dep.Import.first.empty() &&
+        dep.Import.second == ShadowedModule)
+      includeShadowedModule = false;
   }
+
+  // Make sure to go through getModule() instead of accessing ShadowedModule
+  // directly, to force loading it.
+  if (includeShadowedModule)
+    if (ShadowedModule)
+      results.push_back({ {}, ShadowedModule });
 }
 
 void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
