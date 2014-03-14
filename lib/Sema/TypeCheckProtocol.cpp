@@ -1752,7 +1752,12 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
             knownConformance->getInt() &&
             (knownConformance->getPointer()->getState() ==
                 ProtocolConformanceState::Incomplete)) {
-          TC.diagnose(InheritedProto, diag::recursive_requirement_reference);
+              if (!conformance->hasInheritedConformance(InheritedProto)) {
+                conformance->setInheritedConformance(InheritedProto,
+                                                     knownConformance->
+                                                        getPointer());
+              }
+              continue;
         }
       }
       // Recursive call already diagnosed this problem, but tack on a note
