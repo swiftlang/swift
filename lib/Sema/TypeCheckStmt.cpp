@@ -845,23 +845,6 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       break;
     }
 
-    // A non-delegating constructor can only be declared within the
-    // same module as the class itself, so that it is guaranteed to
-    // see all of the stored properties.
-    // FIXME: Should actually query to see whether we are guaranteed to
-    // see all ivars, regardless of whether this is a class/struct/enum.
-    // That requires at least an access control model.
-    if (!isDelegating && ClassD) {
-      auto myModule = ctor->getParentModule();
-      auto classModule = ClassD->getParentModule();
-      if (myModule != classModule) {
-        diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(), 
-                 diag::non_delegating_init_outside_module,
-                 ctor->getDeclContext()->getDeclaredTypeOfContext(),
-                 classModule->Name);
-      }
-    }
-
     /// A complete object initializer must always be delegating.
     if (ctor->isCompleteObjectInit() && !isDelegating) {
       diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(),

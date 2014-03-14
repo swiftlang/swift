@@ -3329,6 +3329,17 @@ public:
           CD->setCompleteObjectInit(false);
         }
       }
+    } else if (auto extType = CD->getExtensionType()) {
+      // A designated initializer for a class must be written within the class
+      // itself.
+      if (extType->getClassOrBoundGenericClass() &&
+          isa<ExtensionDecl>(CD->getDeclContext())) {
+        SourceLoc fixItLoc = CD->getBodyParamPatterns().back()->getEndLoc();
+        fixItLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, fixItLoc);
+        TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
+          .fixItInsert(fixItLoc, " -> Self"); 
+        CD->setCompleteObjectInit(true);
+      }
     }
 
     GenericParamList *outerGenericParams;
