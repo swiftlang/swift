@@ -4472,9 +4472,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       else if (VD->isStatic())
         error = diag::objc_invalid_on_static_var;
       /* Otherwise it is an instance variable -- ok */
-    } else if (auto *protocol = dyn_cast<ProtocolDecl>(D)) {
-      if (!protocol->requiresClass())
-        error = diag::objc_protocol_not_class_protocol;
+    } else if (isa<ProtocolDecl>(D)) {
+      /* ok */
     } else {
       error = diag::invalid_objc_decl;
     }

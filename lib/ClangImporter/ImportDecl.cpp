@@ -2887,8 +2887,7 @@ namespace {
       importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
 
-      // Note that this is an Objective-C and class protocol.
-      result->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
+      // Note that this is an Objective-C protocol.
       result->setIsObjC(true);
       result->setMemberLoader(&Impl, 0);
 

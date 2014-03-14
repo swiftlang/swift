@@ -1515,15 +1515,6 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 void ConformanceChecker::checkConformance() {
   assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->getAttrs().isClassProtocol()
-      && !Adoptee->getClassOrBoundGenericClass()) {
-    TC.diagnose(Loc, diag::non_class_cannot_conform_to_class_protocol,
-                Adoptee, Proto->getDeclaredType());
-    Conformance->setState(ProtocolConformanceState::Invalid);
-    return;
-  }
-
   // FIXME: Caller checks that this the type conforms to all of the
   // inherited protocols.
   
@@ -1733,6 +1724,14 @@ checkConformsToProtocol(TypeChecker &TC, Type T, ProtocolDecl *Proto,
                     ProtocolConformanceState::Incomplete);
 
     TC.Context.setConformsTo(canT, Proto, ConformanceEntry(conformance, true));
+  }
+
+  // If the protocol requires a class, non-classes are a non-starter.
+  if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
+    TC.diagnose(ComplainLoc, diag::non_class_cannot_conform_to_class_protocol,
+                T, Proto->getDeclaredType());
+    conformance->setState(ProtocolConformanceState::Invalid);
+    return conformance;
   }
 
   // Check that T conforms to all inherited protocols.
