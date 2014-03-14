@@ -3085,8 +3085,6 @@ public:
       }
     }
     
-   
-    
     // Non-Objective-C declarations in extensions cannot override or
     // be overridden.
     if ((overridden->getDeclContext()->isExtensionContext() ||
@@ -3109,12 +3107,20 @@ public:
     
     if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
       overridingFunc->setOverriddenDecl(cast<FuncDecl>(overridden));
-    } else if (auto overridingVar = dyn_cast<VarDecl>(overriding)) {
-      overridingVar->setOverriddenDecl(cast<VarDecl>(overridden));
-    } else if (auto overridingSubscript = dyn_cast<SubscriptDecl>(overriding)) {
-      overridingSubscript->setOverriddenDecl(cast<SubscriptDecl>(overridden));
     } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(overriding)) {
       overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(overridden));
+    } else if (auto overridingASD = dyn_cast<AbstractStorageDecl>(overriding)) {
+      auto *overriddenASD = cast<AbstractStorageDecl>(overridden);
+      overridingASD->setOverriddenDecl(overriddenASD);
+      
+      // If there is a getter and/or setter, set their overrides as well.  This
+      // is not done for observing accessors, since they are never dynamicly
+      // dispatched (they are a local implementation detail of a property).
+      if (overriddenASD->getGetter() && overridingASD->getGetter())
+        overridingASD->getGetter()->setOverriddenDecl(overriddenASD->getGetter());
+      if (overriddenASD->getSetter() && overridingASD->getSetter())
+        overridingASD->getSetter()->setOverriddenDecl(overriddenASD->getSetter());
+      
     } else {
       llvm_unreachable("Unexpected decl");
     }
