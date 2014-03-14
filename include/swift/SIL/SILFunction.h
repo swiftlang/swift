@@ -138,6 +138,11 @@ public:
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Helper method which returns true if this function has "external" linkage.
+  bool isAvailableExternally() const {
+    return swift::isAvailableExternally(getLinkage());
+  }
+
   /// Get the DeclContext of this function. (Debug info only).
   DeclContext *getDeclContext() const { return DeclCtx; }
   void setDeclContext(Decl *D);

@@ -199,7 +199,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
                                 FnID);
-  if (DeclOnly)
+
+  if (DeclOnly || F.isAvailableExternally() || F.isExternalDeclaration())
     return;
 
   // Write the body's context archetypes, unless we don't actually have a body.

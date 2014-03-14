@@ -19,7 +19,9 @@ import Builtin
 
 // CHECK: sil_global @public_global : $Builtin.Word
 // CHECK: sil_global hidden @hidden_global : $Builtin.Word
-// CHECK: sil public_external @public_external_function_test : $@thin () -> () {
+// CHECK-NOT: sil @public_external_function_test : $@thin () -> () {
+// CHECK: sil @public_external_function_test : $@thin () -> ()
+// CHECK: sil hidden @hidden_function_test : $@thin () -> () {
 // CHECK: sil @references_public_function : $@thin () -> () {
 // CHECK-NOT: sil public @references_shared_function : $@thin () -> () {
 // CHECK: sil public @references_shared_function : $@thin () -> ()
@@ -32,8 +34,8 @@ import Builtin
 // CHECK: sil @references_hidden_global : $@thin () -> () {
 // CHECK-NOT: // CHECK: sil public @references_private_global : $@thin () -> () {
 // CHECK: sil public @references_private_global : $@thin () -> ()
-// CHECK: sil hidden @hidden_function_test : $@thin () -> () {
-// CHECK: sil hidden_external @hidden_external_function_test : $@thin () -> () {
+// CHECK-NOT: sil hidden_external @hidden_external_function_test : $@thin () -> () {
+// CHECK: sil hidden_external @hidden_external_function_test : $@thin () -> ()
 // CHECK: sil @public_function_test : $@thin () -> () {
 // CHECK: sil @public_function : $@thin () -> () {
 // CHECK: sil hidden @hidden_function : $@thin () -> () {

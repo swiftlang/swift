@@ -1770,7 +1770,7 @@ public:
 void SILFunction::verify() const {
 #ifndef NDEBUG
   if (isExternalDeclaration()) {
-    assert(isAvailableExternally(getLinkage()) &&
+    assert(isAvailableExternally() &&
            "external declaration of internal SILFunction not allowed");
     return;
   }
