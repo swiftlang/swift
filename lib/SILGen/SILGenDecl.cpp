@@ -1260,9 +1260,9 @@ public:
           return;
         
         ValueDecl *vd = witness.getDecl();
-        if (auto *method = cast<FuncDecl>(vd))
+        if (auto *method = dyn_cast<FuncDecl>(vd))
           SGM.emitObjCMethodThunk(method);
-        else if (auto *prop = cast<VarDecl>(vd))
+        else if (auto *prop = dyn_cast<VarDecl>(vd))
           SGM.emitObjCPropertyMethodThunks(prop);
         else
           llvm_unreachable("unexpected conformance mapping");
