@@ -257,7 +257,7 @@ bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   bool LinkAll = Mode == LinkingMode::LinkAll;
   // First attempt to link in Fun. If we fail, bail.
   auto NewFn = SILLoader->lookupSILFunction(Fun);
-  if (!NewFn)
+  if (!NewFn || NewFn->empty())
     return false;
   ++NumFuncLinked;
 
