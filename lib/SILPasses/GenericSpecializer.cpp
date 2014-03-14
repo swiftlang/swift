@@ -90,10 +90,11 @@ private:
    SILValue CalleeVal = Inst->getCallee();
    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
-     FRI = Builder.createFunctionRef(Inst->getLoc(),
+     FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                      &Builder.getFunction());
      ApplyInst *NAI =
-     Builder.createApply(Inst->getLoc(), FRI, Args, Inst->isTransparent());
+       Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args,
+                           Inst->isTransparent());
      doPostProcess(Inst, NAI);
      return;
    }
