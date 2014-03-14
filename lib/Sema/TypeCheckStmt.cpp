@@ -653,11 +653,6 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
       
       unsigned curArgIndex = nextArgIndex++;
       if (field.getInit()) {
-        // FIXME: cloned default arguments should have a different
-        // representation.
-        if (field.getInit()->alreadyChecked())
-          continue;
-        
         Expr *e = field.getInit()->getExpr();
 
         // Re-use an existing initializer context if possible.

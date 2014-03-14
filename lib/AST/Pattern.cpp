@@ -222,10 +222,21 @@ Pattern *Pattern::clone(ASTContext &context,
     auto tuple = cast<TuplePattern>(this);
     SmallVector<TuplePatternElt, 2> elts;
     elts.reserve(tuple->getNumFields());
-    for (const auto &elt : tuple->getFields())
-      elts.push_back(TuplePatternElt(elt.getPattern()->clone(context, options),
-                                     elt.getInit(),
-                                     elt.getDefaultArgKind()));
+    for (const auto &elt : tuple->getFields()) {
+      auto eltPattern = elt.getPattern()->clone(context, options);
+
+      // If we're inheriting a default argument, mark it as such.
+      if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
+          (options & Inherited)) {
+        elts.push_back(TuplePatternElt(eltPattern, nullptr,
+                                       DefaultArgumentKind::Inherited));
+      } else {
+        elts.push_back(TuplePatternElt(eltPattern,
+                                       elt.getInit(),
+                                       elt.getDefaultArgKind()));
+      }
+    }
+
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
                                   tuple->getRParenLoc(),
                                   tuple->hasVararg(),

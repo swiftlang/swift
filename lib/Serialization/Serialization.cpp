@@ -471,6 +471,8 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
     return serialization::DefaultArgumentKind::None;
   case swift::DefaultArgumentKind::Normal:
     return serialization::DefaultArgumentKind::Normal;
+  case swift::DefaultArgumentKind::Inherited:
+    return serialization::DefaultArgumentKind::Inherited;
   case swift::DefaultArgumentKind::Column:
     return serialization::DefaultArgumentKind::Column;
   case swift::DefaultArgumentKind::File:

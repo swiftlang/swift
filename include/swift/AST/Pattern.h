@@ -139,7 +139,11 @@ public:
 
   /// Flags used to indicate how pattern cloning should operate.
   enum CloneFlags {
+    /// The cloned pattern should be implicit.
     Implicit = 0x01,
+    /// The cloned pattern is for an inherited constructor; mark default
+    /// arguments as inherited.
+    Inherited = 0x02
   };
 
   Pattern *clone(ASTContext &context,

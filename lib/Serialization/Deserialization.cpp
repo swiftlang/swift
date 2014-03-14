@@ -192,6 +192,8 @@ getActualDefaultArgKind(uint8_t raw) {
     return swift::DefaultArgumentKind::None;
   case serialization::DefaultArgumentKind::Normal:
     return swift::DefaultArgumentKind::Normal;
+  case serialization::DefaultArgumentKind::Inherited:
+    return swift::DefaultArgumentKind::Inherited;
   case serialization::DefaultArgumentKind::Column:
     return swift::DefaultArgumentKind::Column;
   case serialization::DefaultArgumentKind::File:

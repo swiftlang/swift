@@ -25,6 +25,9 @@ enum class DefaultArgumentKind {
   None,
   /// A normal default argument.
   Normal,
+  /// The default argument is inherited from the corresponding argument of the
+  /// overridden declaration.
+  Inherited,
   /// The __FILE__ default argument, which is expanded at the call site.
   File,
   /// The __LINE__ default argument, which is expanded at the call site.

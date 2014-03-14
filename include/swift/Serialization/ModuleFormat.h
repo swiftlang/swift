@@ -177,6 +177,7 @@ enum DefaultArgumentKind : uint8_t {
   Line,
   Column,
   Function,
+  Inherited,
 };
 using DefaultArgumentField = BCFixed<3>;
 

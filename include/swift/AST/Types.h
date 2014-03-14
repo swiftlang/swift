@@ -910,6 +910,8 @@ class TupleTypeElt {
     VarArg,
     /// It has a normal default argument.
     DefaultArgument,
+    /// It has an inherited default argument.
+    InheritedDefaultArgument,
     /// It has a caller-provided __FILE__ default argument.
     FileArgument,
     /// It has a caller-provided __LINE__ default argument.
@@ -955,6 +957,8 @@ public:
       return DefaultArgumentKind::None;
     case DefaultArgOrVarArg::DefaultArgument:
       return DefaultArgumentKind::Normal;
+    case DefaultArgOrVarArg::InheritedDefaultArgument:
+      return DefaultArgumentKind::Inherited;
     case DefaultArgOrVarArg::FileArgument:
       return DefaultArgumentKind::File;
     case DefaultArgOrVarArg::LineArgument:
@@ -3285,6 +3289,10 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
 
     case DefaultArgumentKind::Normal:
       TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::DefaultArgument);
+      break;
+
+    case DefaultArgumentKind::Inherited:
+      TyAndDefaultOrVarArg.setInt(DefaultArgOrVarArg::InheritedDefaultArgument);
       break;
 
     case DefaultArgumentKind::File:

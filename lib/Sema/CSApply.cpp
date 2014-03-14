@@ -2372,7 +2372,7 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
 /// Produce the caller-side default argument for this default argument, or
 /// null if the default argument will be provided by the callee.
 static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
-                                 SourceLoc loc, AbstractFunctionDecl *owner,
+                                 SourceLoc loc, AbstractFunctionDecl *&owner,
                                  unsigned index) {
   auto defArg = owner->getDefaultArg(index);
   MagicIdentifierLiteralExpr::Kind magicKind;
@@ -2382,6 +2382,11 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
 
   case DefaultArgumentKind::Normal:
     return nullptr;
+
+  case DefaultArgumentKind::Inherited:
+    // Update the owner to reflect inheritance here.
+    owner = owner->getOverriddenDecl();
+    return getCallerDefaultArg(tc, dc, loc, owner, index);
 
   case DefaultArgumentKind::Column:
     magicKind = MagicIdentifierLiteralExpr::Column;

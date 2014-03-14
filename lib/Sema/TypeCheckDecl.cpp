@@ -3942,10 +3942,73 @@ createSubobjectInitOverride(TypeChecker &tc,
   selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
 
   // Create the initializer parameter patterns.
+  OptionSet<Pattern::CloneFlags> options;
+  options |= Pattern::Implicit;
+  options |= Pattern::Inherited;
   Pattern *argParamPatterns
-    = superclassCtor->getArgParamPatterns()[1]->clone(ctx, Pattern::Implicit);
+    = superclassCtor->getArgParamPatterns()[1]->clone(ctx, options);
   Pattern *bodyParamPatterns
-    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, Pattern::Implicit);
+    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, options);
+
+  // Fix up the default arguments in the type to refer to inherited default
+  // arguments.
+  // FIXME: If we weren't cloning the type along with the pattern, this would be
+  // a lot more direct.
+  Type argType = argParamPatterns->getType();
+
+  // Local function that maps default arguments to inherited default arguments.
+  std::function<Type(Type)> inheritDefaultArgs = [&](Type type) -> Type {
+    auto tuple = type->getAs<TupleType>();
+    if (!tuple)
+      return type;
+
+    bool anyChanged = false;
+    SmallVector<TupleTypeElt, 4> elements;
+    unsigned index = 0;
+    for (const auto &elt : tuple->getFields()) {
+      Type eltTy = elt.getType().transform(inheritDefaultArgs);
+      if (!eltTy)
+        return Type();
+
+      // If nothing has changd, just keep going.
+      if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer() &&
+          (elt.getDefaultArgKind() == DefaultArgumentKind::None ||
+           elt.getDefaultArgKind() == DefaultArgumentKind::Inherited)) {
+        ++index;
+        continue;
+      }
+
+      // If this is the first change we've seen, copy all of the previous
+      // elements.
+      if (!anyChanged) {
+        // Copy all of the previous elements.
+        for (unsigned i = 0; i != index; ++i) {
+          const TupleTypeElt &FromElt =tuple->getFields()[i];
+          elements.push_back(TupleTypeElt(FromElt.getType(), FromElt.getName(),
+                                          FromElt.getDefaultArgKind(),
+                                          FromElt.isVararg()));
+        }
+
+        anyChanged = true;
+      }
+
+      // Add the new tuple element, with the new type, no initializer,
+      auto defaultArgKind = elt.getDefaultArgKind();
+      if (defaultArgKind != DefaultArgumentKind::None)
+        defaultArgKind = DefaultArgumentKind::Inherited;
+      elements.push_back(TupleTypeElt(eltTy, elt.getName(), defaultArgKind,
+                                      elt.isVararg()));
+      ++index;
+    }
+
+    if (!anyChanged)
+      return type;
+
+    return TupleType::get(elements, ctx);
+  };
+
+  argType = argType.transform(inheritDefaultArgs);
+  argParamPatterns->setType(argType);
 
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
