@@ -8,7 +8,7 @@ class SomeClass {
   func hash() -> Int
 }
 
-//CHECK-LABLE: eliminate_sw_enum_addr
+//CHECK-LABEL: eliminate_sw_enum_addr
 //CHECK-NOT: switch_enum_addr
 //CHECK: switch_enum
 //CHECK: return
