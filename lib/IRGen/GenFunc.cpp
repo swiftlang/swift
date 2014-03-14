@@ -2173,6 +2173,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       auto ty = params[i - paramOffset].getSILType();
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(ty));
       ti.reexplode(IGF, in, out);
+      break;
     }
     case clang::CodeGen::ABIArgInfo::Ignore:
       break;

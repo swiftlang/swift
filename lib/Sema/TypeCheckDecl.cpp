@@ -3039,10 +3039,10 @@ public:
       auto matchDecl = std::get<0>(matches[0]);
       auto matchType = std::get<2>(matches[0]);
       
-      // Make sure that the parent property is actually overridable.
-      // FIXME: This should be a check for @final, not something specific to
-      // properties.
       if (abstractStorage) {
+        // Make sure that the parent property is actually overridable.
+        // FIXME: This should be a check for @final, not something specific to
+        // properties.
         auto *parentStorage = cast<AbstractStorageDecl>(matchDecl);
         if (!parentStorage->isOverridable()) {
           TC.diagnose(abstractStorage, diag::override_stored_property,
