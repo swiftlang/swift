@@ -2245,7 +2245,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
-      if (!isDelayedParsingEnabled()) {
+      if (Flags.contains(PD_InProtocol)) {
+        diagnose(Tok, diag::protocol_method_with_body);
+        skipUntilDeclRBrace();
+      } else if (!isDelayedParsingEnabled()) {
         ParserResult<BraceStmt> Body =
             parseBraceItemList(diag::func_decl_without_brace);
         if (Body.isNull()) {

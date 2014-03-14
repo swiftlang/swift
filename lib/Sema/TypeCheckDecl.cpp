@@ -1890,6 +1890,12 @@ public:
   }
   
   void visitEnumDecl(EnumDecl *ED) {
+    // This enum declaration is technically a parse error, so do not type
+    // check.
+    if (dyn_cast<ProtocolDecl>(ED->getParent())) {
+      return;
+    }
+        
     if (!IsSecondPass) {
       TC.validateDecl(ED);
 
@@ -2037,6 +2043,13 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
+    
+    // This struct declaration is technically a parse error, so do not type
+    // check.
+    if (dyn_cast<ProtocolDecl>(SD->getParent())) {
+      return;
+    }
+        
     if (!IsSecondPass) {
       TC.validateDecl(SD);
       if (!TC.ValidatedTypes.empty() && SD == TC.ValidatedTypes.back())
@@ -2156,6 +2169,13 @@ public:
   }
 
   void visitClassDecl(ClassDecl *CD) {
+    
+    // This class declaration is technically a parse error, so do not type
+    // check.
+    if (dyn_cast<ProtocolDecl>(CD->getParent())) {
+      return;
+    }
+    
     if (!IsSecondPass) {
       TC.validateDecl(CD);
 
@@ -2277,6 +2297,12 @@ public:
   }
   
   void visitProtocolDecl(ProtocolDecl *PD) {
+    // This protocol declaration is technically a parse error, so do not type
+    // check.
+    if (dyn_cast<ProtocolDecl>(PD->getParent())) {
+      return;
+    }
+        
     if (IsSecondPass) {
       return;
     }
