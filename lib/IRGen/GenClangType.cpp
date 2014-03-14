@@ -161,13 +161,13 @@ clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect UnsafePointer<T>, UncheckedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
-  if (auto underlyingTy = type->getAnyOptionalObjectType()) {
-    assert((underlyingTy->is<FunctionType>() ||
-            underlyingTy->is<DynamicSelfType>() ||
-            underlyingTy->getClassOrBoundGenericClass() ||
+  if (auto underlyingTy = type.getAnyOptionalObjectType()) {
+    assert((isa<FunctionType>(underlyingTy) ||
+            isa<DynamicSelfType>(underlyingTy) ||
+            underlyingTy.getClassOrBoundGenericClass() ||
             underlyingTy->isClassExistentialType()) &&
            "Unexpected optional type in Clang type generation!");
-    return visit(underlyingTy->getCanonicalType());
+    return visit(underlyingTy);
   }
 
   auto swiftStructDecl = type->getDecl();

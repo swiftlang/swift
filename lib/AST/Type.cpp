@@ -374,6 +374,12 @@ Type TypeBase::getAnyOptionalObjectType() {
   return Type();
 }
 
+CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
+  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+    if (boundTy->getDecl()->classifyAsOptionalType())
+      return boundTy.getGenericArgs()[0];
+  return CanType();
+}
 
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
@@ -1186,8 +1192,8 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
 
 static bool hasRetainablePointerRepresentation(CanType type) {
   // Look through one level of Optional<> or UncheckedOptional<>.
-  if (auto objType = type->getAnyOptionalObjectType()) {
-    type = CanType(objType);
+  if (auto objType = type.getAnyOptionalObjectType()) {
+    type = objType;
   }
 
   // Classes.

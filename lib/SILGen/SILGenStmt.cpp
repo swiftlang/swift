@@ -511,7 +511,7 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   // by the loop body. On loop exit, the terminating value will be in the
   // buffer.
   auto optTy = S->getGeneratorNext()->getType()->getCanonicalType();
-  auto valTy = CanType(optTy->getAnyOptionalObjectType());
+  auto valTy = optTy.getAnyOptionalObjectType();
   auto &optTL = getTypeLowering(optTy);
   SILValue nextBuf = emitTemporaryAllocation(S, optTL.getLoweredType());
   

@@ -140,6 +140,7 @@ class CanType : public Type {
 
   static bool hasReferenceSemanticsImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
+  static CanType getAnyOptionalObjectTypeImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -168,6 +169,10 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const; // in Types.h
+
+  CanType getAnyOptionalObjectType() const {
+    return getAnyOptionalObjectTypeImpl(*this);
+  }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }
