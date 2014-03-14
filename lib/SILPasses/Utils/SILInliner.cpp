@@ -280,6 +280,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
            Op->getKind() == ValueKind::StructElementAddrInst) &&
           Op->hasOneUse())
         return InlineCost::Free;
+      
+      return InlineCost::Free;
     }
     // Aggregates are exploded at the IR level; these are effectively no-ops.
     case ValueKind::TupleInst:
