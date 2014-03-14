@@ -2197,9 +2197,11 @@ public:
         // subclass that have not been overridden or otherwise provided.
         // Collect the set of initializers we override in superclass.
         llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
-        for (auto member : TC.lookupConstructors(CD->getDeclaredTypeInContext(),
-                                                 CD)) {
-          auto ctor = cast<ConstructorDecl>(member);
+        for (auto member : CD->getMembers()) {
+          auto ctor = dyn_cast<ConstructorDecl>(member);
+          if (!ctor)
+            continue;
+
           if (auto overridden = ctor->getOverriddenDecl())
             overriddenCtors.insert(overridden);
         }
@@ -3774,7 +3776,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 /// Create an expression that references the variables in the given
 /// pattern for, e.g., forwarding of these variables to another
 /// function with the same signature.
-static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern, 
+static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
+                              ConstructorDecl *toDecl,
+                              Pattern *argPattern,
                               Pattern *bodyPattern) {
   switch (argPattern->getKind()) {
 #define PATTERN(Id, Parent)
@@ -3784,7 +3788,7 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
     
   case PatternKind::Paren:
     if (auto subExpr = forwardArguments(
-                         tc,
+                         tc, classDecl, toDecl,
                          cast<ParenPattern>(argPattern)->getSubPattern(),
                          cast<ParenPattern>(bodyPattern)->getSubPattern())) {
       return new (tc.Context) ParenExpr(SourceLoc(), subExpr, SourceLoc(),
@@ -3801,12 +3805,17 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
     bool hasName = false;
 
     // FIXME: Can't forward varargs yet.
-    if (argTuple->hasVararg())
+    if (argTuple->hasVararg()) {
+      tc.diagnose(classDecl->getLoc(),
+                  diag::unsupported_synthesize_init_variadic,
+                  classDecl->getDeclaredType());
+      tc.diagnose(toDecl, diag::variadic_superclass_init_here);
       return nullptr;
+    }
 
     for (unsigned i = 0, n = argTuple->getNumFields(); i != n; ++i) {
       // Forward the value.
-      auto subExpr = forwardArguments(tc,
+      auto subExpr = forwardArguments(tc, classDecl, toDecl,
                                       argTuple->getFields()[i].getPattern(),
                                       bodyTuple->getFields()[i].getPattern());
       if (!subExpr)
@@ -3868,12 +3877,12 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
   }
 
   case PatternKind::Typed:
-    return forwardArguments(tc,
+    return forwardArguments(tc, classDecl, toDecl,
                             cast<TypedPattern>(argPattern)->getSubPattern(),
                             cast<TypedPattern>(bodyPattern)->getSubPattern());
 
   case PatternKind::Var:
-    return forwardArguments(tc,
+    return forwardArguments(tc, classDecl, toDecl,
                             cast<VarPattern>(argPattern)->getSubPattern(),
                             cast<VarPattern>(bodyPattern)->getSubPattern());
 
@@ -4050,7 +4059,7 @@ createSubobjectInitOverride(TypeChecker &tc,
                                                        SourceLoc(),
                                                        /*Implicit=*/true);
 
-  Expr *ctorArgs = forwardArguments(tc,
+  Expr *ctorArgs = forwardArguments(tc, classDecl, superclassCtor,
                                     ctor->getArgParamPatterns()[1],
                                     ctor->getBodyParamPatterns()[1]);
   if (!ctorArgs) {
