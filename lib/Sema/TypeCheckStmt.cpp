@@ -761,8 +761,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                                     SourceLoc(),
                                                          SourceLoc(),
                                                          /*Implicit=*/true);
-  Expr *args = new (Context) TupleExpr(SourceLoc(), { }, nullptr, SourceLoc(),
-                                       /*hasTrailingClosure=*/false,
+  Expr *args = new (Context) TupleExpr(SourceLoc(), SourceLoc(),
                                        /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
   r = new (Context) RebindSelfInConstructorExpr(r, ctor->getImplicitSelfDecl());

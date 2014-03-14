@@ -2798,9 +2798,8 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                     /*Implicit=*/true, /*direct ivar*/false);
 
     // Form an empty tuple.
-    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(), { },
-                                            nullptr, expr->getEndLoc(),
-                                            /*hasTrailingClosure=*/false,
+    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(),
+                                            expr->getEndLoc(),
                                             /*Implicit=*/true,
                                             TupleType::getEmpty(tc.Context));
 
@@ -3731,10 +3730,7 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     }
 
     // Call the witness.
-    Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(),
-                                    { }, nullptr,
-                                    expr->getEndLoc(),
-                                    /*hasTrailingClosure=*/false,
+    Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(), expr->getEndLoc(),
                                     /*Implicit=*/true,
                                     TupleType::getEmpty(ctx));
     expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
@@ -3772,12 +3768,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   (void)failed;
 
   // Call the builtin method.
-  Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(),
-                                  { }, nullptr,
-                                  expr->getEndLoc(),
-                                  /*hasTrailingClosure=*/false,
-                                  /*Implicit=*/true,
-                                  TupleType::getEmpty(ctx));
+  Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(), expr->getEndLoc(),
+                                  /*Implicit=*/true, TupleType::getEmpty(ctx));
   expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
   assert(!failed && "Could not call witness?");

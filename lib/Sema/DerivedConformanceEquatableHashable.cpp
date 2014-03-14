@@ -358,9 +358,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                       /*implicit*/ true);
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(), id_hashValue,
                                              SourceLoc(), /*implicit*/ true);
-  auto args = new (C) TupleExpr(SourceLoc(), {}, nullptr, SourceLoc(),
-                                /*trailing closure*/false,
-                                /*implicit*/ true);
+  auto args = new (C) TupleExpr(SourceLoc(), SourceLoc(), /*implicit*/ true);
   auto call = new (C) CallExpr(memberRef, args, /*implicit*/true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
   

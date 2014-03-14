@@ -303,8 +303,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   
   auto optionalRef = new (C) DeclRefExpr(C.getOptionalDecl(),
                                          SourceLoc(), /*implicit*/true);
-  auto emptyArgs = new (C) TupleExpr(SourceLoc(), {}, nullptr, SourceLoc(),
-                                     /*trailingClosure*/false,
+  auto emptyArgs = new (C) TupleExpr(SourceLoc(), SourceLoc(),
                                      /*implicit*/ true);
   auto dfltReturnExpr = new (C) CallExpr(optionalRef, emptyArgs,
                                          /*implicit*/ true);

@@ -196,9 +196,7 @@ void StmtBuilder::printClass(VarDecl *Arg, Type SugarT, ClassDecl *CD,
     Expr *Res = new (Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc,
                                                 /*Implicit=*/true);
     TupleExpr *CallArgs
-      = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
-                                /*hasTrailingClosure=*/false,
-                                /*Implicit=*/true,
+      = new (Context) TupleExpr(Loc, EndLoc, /*Implicit=*/true,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, /*Implicit=*/true, Type());
     Res = CE;
@@ -393,9 +391,7 @@ void StmtBuilder::printReplExpr(VarDecl *Arg, Type SugarT, CanType T,
     Expr *Res = new (Context) UnresolvedDotExpr(ArgRef, Loc, MemberName, 
                                                 EndLoc, /*Implicit=*/true);
     TupleExpr *CallArgs
-      = new (Context) TupleExpr(Loc, MutableArrayRef<Expr *>(), 0, EndLoc,
-                                /*hasTrailingClosure=*/false,
-                                /*Implicit=*/true,
+      = new (Context) TupleExpr(Loc, EndLoc, /*Implicit=*/true,
                                 TupleType::getEmpty(Context));
     Expr *CE = new (Context) CallExpr(Res, CallArgs, /*Implicit=*/true, Type());
     if (TC.typeCheckExpression(CE, Arg->getDeclContext(), Type(),
