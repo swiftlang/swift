@@ -1659,9 +1659,14 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
-  B.createApply(cleanupLoc, superclassDtorValue, superclassDtorType,
-                superclassDtorType.getFunctionInterfaceResultType(),
-                { }, superSelf);
+  ArrayRef<Substitution> subs
+    = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
+  auto substDtorType = superclassDtorType.castTo<SILFunctionType>()
+    ->substInterfaceGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
+  B.createApply(cleanupLoc, superclassDtorValue,
+                SILType::getPrimitiveObjectType(substDtorType),
+                substDtorType->getInterfaceResult().getSILType(),
+                subs, superSelf);
 
   // Return.
   B.createReturn(returnLoc, emitEmptyTuple(cleanupLoc));
