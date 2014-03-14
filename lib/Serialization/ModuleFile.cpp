@@ -873,8 +873,8 @@ void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
     Module::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
-  bool includeShadowedModule =
-    (filter != Module::ImportFilter::Private && Bits.IsFramework);
+  bool includeShadowedModule = (filter != Module::ImportFilter::Private &&
+                                ShadowedModule && Bits.IsFramework);
 
   for (auto &dep : Dependencies) {
     if (filter != Module::ImportFilter::All &&
@@ -892,8 +892,7 @@ void ModuleFile::getImportedModules(
   // Make sure to go through getModule() instead of accessing ShadowedModule
   // directly, to force loading it.
   if (includeShadowedModule)
-    if (ShadowedModule)
-      results.push_back({ {}, ShadowedModule });
+    results.push_back({ {}, ShadowedModule });
 }
 
 void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
