@@ -1152,6 +1152,17 @@ public:
            "Mismatched parenthesis location information validity");
   }
 
+  TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
+            bool Implicit, Type Ty = Type())
+    : Expr(ExprKind::Tuple, Implicit, Ty),
+      LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      SubExprs({}), SubExprNames(nullptr), HasTrailingClosure(false)
+  {
+    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
+           "Mismatched parenthesis location information validity");
+
+  }
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
 
