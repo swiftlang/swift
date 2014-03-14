@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 33;
+const uint16_t VERSION_MINOR = 34;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -97,6 +97,16 @@ enum OperatorKind : uint8_t {
   Postfix
 };
 using OperatorKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum AccessorKind : uint8_t {
+  Getter = 0,
+  Setter,
+  WillSet,
+  DidSet
+};
+using AccessorKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -926,11 +936,13 @@ namespace decls_block {
     ModuleIDField     // module ID
   >;
 
-  using XRefOperatorPathPieceLayout = BCRecordLayout<
-    XREF_OPERATOR_PATH_PIECE,
+  using XRefOperatorOrAccessorPathPieceLayout = BCRecordLayout<
+    XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE,
     IdentifierIDField, // name
-    OperatorKindField
+    AccessorKindField  // accessor kind OR operator fixity
   >;
+  static_assert(std::is_same<AccessorKindField, OperatorKindField>::value,
+                "accessor kinds and operator kinds are not compatible");
 
   using XRefGenericParamPathPieceLayout = BCRecordLayout<
     XREF_GENERIC_PARAM_PATH_PIECE,

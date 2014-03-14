@@ -947,6 +947,20 @@ void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
   DeclContextLayout::emitRecord(Out, ScratchRecord, abbrCode, memberIDs);
 }
 
+static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
+  switch (K) {
+  case swift::AccessorKind::NotAccessor:
+    llvm_unreachable("should only be called for actual accessors");
+#define CASE(NAME) \
+  case swift::AccessorKind::Is##NAME: return serialization::NAME;
+  CASE(Getter)
+  CASE(Setter)
+  CASE(WillSet)
+  CASE(DidSet)
+#undef CASE
+  }
+}
+
 void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   using namespace decls_block;
 
@@ -989,6 +1003,29 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   }
 
   case DeclContextKind::AbstractFunctionDecl: {
+    if (auto fn = dyn_cast<FuncDecl>(DC)) {
+      if (auto storage = fn->getAccessorStorageDecl()) {
+        writeCrossReference(storage->getDeclContext(), pathLen + 2);
+
+        Type ty = storage->getInterfaceType()->getCanonicalType();
+        auto nameID = addIdentifierRef(storage->getName());
+        abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+        XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                             addTypeRef(ty), nameID);
+
+        abbrCode =
+          DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
+        auto emptyID = addIdentifierRef(Identifier());
+        auto accessorKind = getStableAccessorKind(fn->getAccessorKind());
+        assert(!fn->isObservingAccessor() &&
+               "cannot form cross-reference to observing accessors");
+        XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
+                                                          abbrCode, emptyID,
+                                                          accessorKind);
+        break;
+      }
+    }
+
     auto fn = cast<AbstractFunctionDecl>(DC);
     writeCrossReference(DC->getParent(), pathLen + 1 + fn->isOperator());
 
@@ -1003,10 +1040,12 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       // and postfix operators.
       auto op = cast<FuncDecl>(fn)->getOperatorDecl();
       assert(op);
-      abbrCode = DeclTypeAbbrCodes[XRefOperatorPathPieceLayout::Code];
-      XRefOperatorPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                              addIdentifierRef(Identifier()),
-                                              getStableFixity(op->getKind()));
+      abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
+      auto emptyID = addIdentifierRef(Identifier());
+      auto fixity = getStableFixity(op->getKind());
+      XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
+                                                        abbrCode, emptyID,
+                                                        fixity);
     }
     break;
   }
@@ -1021,10 +1060,12 @@ void Serializer::writeCrossReference(const Decl *D) {
   if (auto op = dyn_cast<OperatorDecl>(D)) {
     writeCrossReference(op->getModuleContext());
 
-    abbrCode = DeclTypeAbbrCodes[XRefOperatorPathPieceLayout::Code];
-    XRefOperatorPathPieceLayout::emitRecord(Out, ScratchRecord,abbrCode,
-                                            addIdentifierRef(op->getName()),
-                                            getStableFixity(op->getKind()));
+    abbrCode = DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
+    auto nameID = addIdentifierRef(op->getName());
+    auto fixity = getStableFixity(op->getKind());
+    XRefOperatorOrAccessorPathPieceLayout::emitRecord(Out, ScratchRecord,
+                                                      abbrCode, nameID,
+                                                      fixity);
     return;
   }
 
@@ -2179,7 +2220,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<XRefTypePathPieceLayout>();
     registerDeclTypeAbbr<XRefValuePathPieceLayout>();
     registerDeclTypeAbbr<XRefExtensionPathPieceLayout>();
-    registerDeclTypeAbbr<XRefOperatorPathPieceLayout>();
+    registerDeclTypeAbbr<XRefOperatorOrAccessorPathPieceLayout>();
     registerDeclTypeAbbr<XRefGenericParamPathPieceLayout>();
 
     registerDeclTypeAbbr<NoConformanceLayout>();

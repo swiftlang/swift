@@ -78,6 +78,7 @@ namespace {
         Value,
         Operator,
         OperatorFilter,
+        Accessor,
         Extension,
         GenericParam,
         Unknown
@@ -129,6 +130,25 @@ namespace {
             break;
           }
           break;
+        case Kind::Accessor:
+          switch (getDataAs<uintptr_t>()) {
+          case Getter:
+            os << "(getter)";
+            break;
+          case Setter:
+            os << "(setter)";
+            break;
+          case WillSet:
+            os << "(willSet)";
+            break;
+          case DidSet:
+            os << "(didSet)";
+            break;
+          default:
+            os << "(unknown accessor kind)";
+            break;
+          }
+          break;
         case Kind::GenericParam:
           os << "generic param #" << getDataAs<uintptr_t>();
           break;
@@ -157,6 +177,11 @@ namespace {
     void addOperatorFilter(uint8_t fixity) {
       path.push_back({ PathPiece::Kind::OperatorFilter,
                        static_cast<uintptr_t>(fixity) });
+    }
+
+    void addAccessor(uint8_t kind) {
+      path.push_back({ PathPiece::Kind::Accessor,
+                       static_cast<uintptr_t>(kind) });
     }
 
     void addExtension(Module *M) {
@@ -988,10 +1013,10 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
   case XREF_EXTENSION_PATH_PIECE:
     llvm_unreachable("can only extend a nominal");
 
-  case XREF_OPERATOR_PATH_PIECE: {
+  case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
     IdentifierID IID;
     uint8_t rawOpKind;
-    XRefOperatorPathPieceLayout::readRecord(scratch, IID, rawOpKind);
+    XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, IID, rawOpKind);
 
     Identifier opName = getIdentifier(IID);
     pathTrace.addOperator(opName);
@@ -1079,11 +1104,35 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       continue;
     }
 
-    case XREF_OPERATOR_PATH_PIECE: {
-      uint8_t rawOpKind;
-      XRefOperatorPathPieceLayout::readRecord(scratch, Nothing, rawOpKind);
+    case XREF_OPERATOR_OR_ACCESSOR_PATH_PIECE: {
+      uint8_t rawKind;
+      XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, Nothing,
+                                                        rawKind);
 
-      pathTrace.addOperatorFilter(rawOpKind);
+      if (values.size() == 1) {
+        if (auto storage = dyn_cast<AbstractStorageDecl>(values.front())) {
+          pathTrace.addAccessor(rawKind);
+          switch (rawKind) {
+          case Getter:
+            values.front() = storage->getGetter();
+            break;
+          case Setter:
+            values.front() = storage->getSetter();
+            break;
+          case WillSet:
+          case DidSet:
+            llvm_unreachable("invalid XREF accessor kind");
+          default:
+            // Unknown accessor kind.
+            error();
+            return nullptr;
+          }
+
+          break;
+        }
+      }
+
+      pathTrace.addOperatorFilter(rawKind);
 
       auto newEnd = std::remove_if(values.begin(), values.end(),
                                    [=](ValueDecl *value) {
@@ -1092,7 +1141,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
           return true;
         if (!fn->getOperatorDecl())
           return true;
-        if (getStableFixity(fn->getOperatorDecl()->getKind()) != rawOpKind)
+        if (getStableFixity(fn->getOperatorDecl()->getKind()) != rawKind)
           return true;
         return false;
       });
