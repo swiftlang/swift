@@ -15,6 +15,6 @@ entry(%0: $*T, %1: $@thick T.Type):
   // CHECK: [[METHOD:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.type*, %swift.type*)*
   // CHECK: call void [[METHOD]]
   %m = witness_method $T, #DefCon.init!allocator.1 : $@thin @cc(witness_method) <U: DefCon> (@out U, @thick U.Type) -> ()
-  %z = apply %m<V = T>(%0, %1) : $@thin @cc(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
+  %z = apply %m<T>(%0, %1) : $@thin @cc(witness_method) <V: DefCon> (@out V, @thick V.Type) -> ()
   return %z : $()
 }

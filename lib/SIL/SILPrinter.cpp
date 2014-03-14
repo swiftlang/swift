@@ -578,8 +578,6 @@ public:
     OS << '<';
     interleave(Subs,
                [&](const Substitution &s) {
-                 s.Archetype->print(OS);
-                 OS << " = ";
                  s.Replacement->print(OS);
                },
                [&] { OS << ", "; });

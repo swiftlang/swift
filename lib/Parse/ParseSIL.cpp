@@ -1115,9 +1115,7 @@ bool parseApplySubstitutions(SILParser &SP,
     SILType Replace;
     Identifier ArcheId;
     TypeAttributes emptyAttrs;
-    if (SP.parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
-        SP.P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "=") ||
-        SP.parseSILTypeWithoutQualifiers(Replace, SILValueCategory::Object,
+    if (SP.parseSILTypeWithoutQualifiers(Replace, SILValueCategory::Object,
                                          emptyAttrs))
       return true;
     
@@ -1143,7 +1141,8 @@ bool getApplySubstitutionsFromParsed(
                              SmallVectorImpl<Substitution> &subs) {
   // Find the corresponding ArchetypeType for ArcheId in PTy.
   ArrayRef<ArchetypeType *> allArchetypes = params->getAllArchetypes();
-  assert(parses.size() <= params->getNumPrimaryArchetypes());
+  assert(parses.size() <= allArchetypes.size() &&
+         "Number of substitution exceeds number of archetypes");
   unsigned Id = 0;
   for (auto &parsed : parses) {
     Substitution sub{nullptr, nullptr, nullptr};
