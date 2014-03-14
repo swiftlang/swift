@@ -296,7 +296,10 @@ parseSelectorArgument(Parser &P,
     rp = PP->getRParenLoc();
   } else {
     auto *TP = cast<TuplePattern>(PatternRes.get());
-    
+
+    // Return the ')' location.
+    rp = TP->getRParenLoc();
+
     // Reject tuple patterns that aren't a single argument.
     if (TP->getNumFields() != 1 || TP->hasVararg()) {
       P.diagnose(TP->getLParenLoc(), diag::func_selector_with_not_one_argument);
@@ -304,9 +307,6 @@ parseSelectorArgument(Parser &P,
     }
 
     bodyElts.push_back(TP->getFields()[0]);
-
-    // Return the ')' location.
-    rp = TP->getRParenLoc();
   }
   
 

@@ -4293,7 +4293,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     for (auto member : lookupConstructors(superclassTy, classDecl)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || superclassCtor->isCompleteObjectInit() 
-          || superclassCtor->isRequired())
+          || superclassCtor->isRequired() || superclassCtor->isInvalid())
         continue;
 
       // We have a subobject initializer. Create an override of it.
