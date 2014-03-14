@@ -2999,28 +2999,7 @@ public:
     if (matches.size() == 1) {
       auto matchDecl = std::get<0>(matches[0]);
       auto matchType = std::get<2>(matches[0]);
-      
-      if (abstractStorage) {
-        // Make sure that the parent property is actually overridable.
-        // FIXME: This should be a check for @final, not something specific to
-        // properties.
-        auto *parentStorage = cast<AbstractStorageDecl>(matchDecl);
-        if (!parentStorage->isOverridable()) {
-          TC.diagnose(abstractStorage, diag::override_stored_property,
-                      abstractStorage->getName());
-          TC.diagnose(matchDecl, diag::property_override_here);
-          return true;
-        }
-        
-        // Make sure that the overriding property doesn't have storage.
-        if (abstractStorage->hasStorage()) {
-          TC.diagnose(abstractStorage, diag::override_with_stored_property,
-                      abstractStorage->getName());
-          TC.diagnose(parentStorage, diag::property_override_here);
-          return true;
-        }
-      }
-
+ 
       // If this is an exact type match, we're successful!
       if (uncurriedDeclTy->isEqual(matchType)) {
         // Nothing to do.
@@ -3081,6 +3060,32 @@ public:
   ///
   /// \returns true if an error occurred.
   bool recordOverride(ValueDecl *overriding, ValueDecl *overridden) {
+    
+    // Check property and subscript overriding.
+    if (auto *overriddenASD = dyn_cast<AbstractStorageDecl>(overridden)) {
+      auto *overridingASD = cast<AbstractStorageDecl>(overriding);
+      
+      // Make sure that the parent property is actually overridable.
+      // FIXME: This should be a check for @final, not something specific to
+      // properties.
+      if (!overriddenASD->isOverridable()) {
+        TC.diagnose(overridingASD, diag::override_stored_property,
+                    overridingASD->getName());
+        TC.diagnose(overriddenASD, diag::property_override_here);
+        return true;
+      }
+      
+      // Make sure that the overriding property doesn't have storage.
+      if (overridingASD->hasStorage()) {
+        TC.diagnose(overridingASD, diag::override_with_stored_property,
+                    overridingASD->getName());
+        TC.diagnose(overriddenASD, diag::property_override_here);
+        return true;
+      }
+    }
+    
+   
+    
     // Non-Objective-C declarations in extensions cannot override or
     // be overridden.
     if ((overridden->getDeclContext()->isExtensionContext() ||
