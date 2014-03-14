@@ -2301,7 +2301,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
   case ValueWitness::TypeOf:
     /// Class types require dynamic type lookup.
-    if (ClassDecl *cd = concreteType->getClassOrBoundGenericClass()) {
+    if (ClassDecl *cd = concreteType.getClassOrBoundGenericClass()) {
       if (hasKnownSwiftMetadata(IGM, cd))
         return asOpaquePtr(IGM, IGM.getObjectTypeofFn());
       return asOpaquePtr(IGM, IGM.getObjCTypeofFn());

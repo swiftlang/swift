@@ -194,22 +194,22 @@ public:
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
-    return getSwiftRValueType()->getClassOrBoundGenericClass();
+    return getSwiftRValueType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
   StructDecl *getStructOrBoundGenericStruct() const {
-    return getSwiftRValueType()->getStructOrBoundGenericStruct();
+    return getSwiftRValueType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
   EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getSwiftRValueType()->getEnumOrBoundGenericEnum();
+    return getSwiftRValueType().getEnumOrBoundGenericEnum();
   }
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getSwiftRValueType()->getNominalOrBoundGenericNominal();
+    return getSwiftRValueType().getNominalOrBoundGenericNominal();
   }
   
   /// True if the type is an address type.

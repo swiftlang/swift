@@ -3145,6 +3145,79 @@ inline bool TypeBase::isClassExistentialType() {
   return false;
 }
 
+inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
+  return getCanonicalType().getClassOrBoundGenericClass();
+}
+
+inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
+  if (auto classTy = dyn_cast<ClassType>(*this))
+    return classTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericClassType>(*this))
+    return boundTy->getDecl();
+
+  return nullptr;
+}
+
+inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
+  return getCanonicalType().getStructOrBoundGenericStruct();
+}
+
+inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
+  if (auto structTy = dyn_cast<StructType>(*this))
+    return structTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericStructType>(*this))
+    return boundTy->getDecl();
+  
+  return nullptr;
+}
+
+inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
+  return getCanonicalType().getEnumOrBoundGenericEnum();
+}
+
+inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
+  if (auto enumTy = dyn_cast<EnumType>(*this))
+    return enumTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(*this))
+    return boundTy->getDecl();
+  
+  return nullptr;
+}
+
+inline NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
+  return getCanonicalType().getNominalOrBoundGenericNominal();
+}
+
+inline NominalTypeDecl *CanType::getNominalOrBoundGenericNominal() const {
+  if (auto nomTy = dyn_cast<NominalType>(*this))
+    return nomTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
+    return boundTy->getDecl();
+  
+  return nullptr;
+}
+
+inline NominalTypeDecl *TypeBase::getAnyNominal() {
+  return getCanonicalType().getAnyNominal();
+}
+
+inline NominalTypeDecl *CanType::getAnyNominal() const {
+  if (auto nominalTy = dyn_cast<NominalType>(*this))
+    return nominalTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericType>(*this))
+    return boundTy->getDecl();
+
+  if (auto unboundTy = dyn_cast<UnboundGenericType>(*this))
+    return unboundTy->getDecl();
+
+  return nullptr;
+}
+
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
     return intTy->getWidth().isFixedWidth()

@@ -1883,14 +1883,14 @@ namespace {
 
     /// Differences in class types must be subtyping related.
     bool visitClassType(CanClassType overridden, CanType override) {
-      assert(override->getClassOrBoundGenericClass());
+      assert(override.getClassOrBoundGenericClass());
       return false;
     }
 
     /// Differences in bound generic class types must be subtyping related.
     bool visitBoundGenericType(CanBoundGenericType overridden, CanType override) {
       if (isa<ClassDecl>(overridden->getDecl())) {
-        assert(override->getClassOrBoundGenericClass());
+        assert(override.getClassOrBoundGenericClass());
         return false;
       }
       return visitType(overridden, override);
@@ -2525,7 +2525,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if (isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
 
@@ -2590,7 +2590,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
                                                         llvm::Value *metatype,
                                                         CanType type) {
   // If the type is known to have Swift metadata, this is trivial.
-  if (hasKnownSwiftMetadata(IGF.IGM, type->getClassOrBoundGenericClass()))
+  if (hasKnownSwiftMetadata(IGF.IGM, type.getClassOrBoundGenericClass()))
     return metatype;
 
   // Otherwise, we inline a little operation here.

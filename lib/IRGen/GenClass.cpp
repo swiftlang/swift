@@ -613,7 +613,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                                   llvm::Value *selfValue) {
-  auto *theClass = selfType.getSwiftType()->getClassOrBoundGenericClass();
+  auto *theClass = selfType.getClassOrBoundGenericClass();
 
   // Determine the size of the object we're deallocating.
   // FIXME: We should get this value dynamically!

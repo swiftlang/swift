@@ -28,14 +28,18 @@ namespace swift {
 
 class ASTPrinter;
 class ArchetypeType;
+class ClassDecl;
 class CanType;
+class EnumDecl;
 class GenericSignature;
 class LazyResolver;
 class Module;
+class NominalTypeDecl;
+class StructDecl;
+class SubstitutableType;
 class TypeBase;
 class Type;
 class TypeWalker;
-class SubstitutableType;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -158,6 +162,12 @@ public:
   bool isExistentialType() const {
     return isExistentialTypeImpl(*this);
   }
+
+  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
+  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
+  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
+  NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  NominalTypeDecl *getAnyNominal() const; // in Types.h
   
   // Direct comparison is allowed for CanTypes - they are known canonical.
   bool operator==(CanType T) const { return getPointer() == T.getPointer(); }

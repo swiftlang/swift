@@ -115,7 +115,7 @@ public:
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
                                                    IGF.IGM.ObjCClassPtrTy);
     metaclassMetadata = IGF.IGM.getAddrOfMetaclassObject(
-                                       origTy->getClassOrBoundGenericClass(),
+                                       origTy.getClassOrBoundGenericClass(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGF.IGM.ObjCClassPtrTy);

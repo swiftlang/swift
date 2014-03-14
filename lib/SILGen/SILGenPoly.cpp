@@ -1450,7 +1450,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
         .getInstanceType();
     }
     
-    if (selfInstanceType->getClassOrBoundGenericClass()) {
+    if (selfInstanceType.getClassOrBoundGenericClass()) {
       if (selfInstanceType != witnessInstanceType) {
         SILValue upcast = B.createUpcast(loc, selfOrigParam.getValue(),
                                  SILType::getPrimitiveObjectType(witnessType));

@@ -1969,7 +1969,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     if (auto origArchetype = dyn_cast<ArchetypeType>(origResultType)) {
       if (origArchetype->requiresClass()) {
         // Remap a class archetype to an instance.
-        assert((substResultType->getClassOrBoundGenericClass() ||
+        assert((substResultType.getClassOrBoundGenericClass() ||
                 isClassArchetype(substResultType)) &&
                "remapping class archetype to non-class?!");
         Explosion temp(getCallee().getExplosionLevel());

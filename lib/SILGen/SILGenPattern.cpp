@@ -489,8 +489,8 @@ static void destructurePattern(SILGenFunction &gen,
       }
     } else {
       // We have a class-to-class downcast.
-      assert(newFromType->getClassOrBoundGenericClass() &&
-             newToType->getClassOrBoundGenericClass() &&
+      assert(newFromType.getClassOrBoundGenericClass() &&
+             newToType.getClassOrBoundGenericClass() &&
              "non-class, non-archetype cast patterns should be orthogonal!");
       newKind = CheckedCastKind::Downcast;
     }

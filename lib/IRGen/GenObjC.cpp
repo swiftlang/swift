@@ -411,8 +411,8 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
     searchValue = emitClassHeapMetadataRef(IGF, searchClass);
   } else {
     ClassDecl *searchClassDecl =
-      searchClass.castTo<MetatypeType>()->getInstanceType()
-        ->getClassOrBoundGenericClass();
+      searchClass.castTo<MetatypeType>().getInstanceType()
+        .getClassOrBoundGenericClass();
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
                                                    NotForDefinition);
   }

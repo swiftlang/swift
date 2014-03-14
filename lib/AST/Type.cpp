@@ -353,59 +353,6 @@ bool TypeBase::isVoid() {
   return isEqual(getASTContext().TheEmptyTupleType);
 }
 
-ClassDecl *TypeBase::getClassOrBoundGenericClass() {
-  if (auto classTy = getAs<ClassType>())
-    return classTy->getDecl();
-
-  if (auto boundTy = getAs<BoundGenericType>())
-    return dyn_cast<ClassDecl>(boundTy->getDecl());
-
-  return nullptr;
-}
-
-StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  if (auto structTy = getAs<StructType>())
-    return structTy->getDecl();
-  
-  if (auto boundTy = getAs<BoundGenericType>())
-    return dyn_cast<StructDecl>(boundTy->getDecl());
-  
-  return nullptr;
-}
-
-EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  if (auto oofTy = getAs<EnumType>())
-    return oofTy->getDecl();
-  
-  if (auto boundTy = getAs<BoundGenericType>())
-    return dyn_cast<EnumDecl>(boundTy->getDecl());
-  
-  return nullptr;
-}
-
-NominalTypeDecl *TypeBase::getNominalOrBoundGenericNominal() {
-  if (auto nominalTy = getAs<NominalType>())
-    return nominalTy->getDecl();
-
-  if (auto boundTy = getAs<BoundGenericType>())
-    return boundTy->getDecl();
-
-  return nullptr;
-}
-
-NominalTypeDecl *TypeBase::getAnyNominal() {
-  if (auto nominalTy = getAs<NominalType>())
-    return nominalTy->getDecl();
-
-  if (auto boundTy = getAs<BoundGenericType>())
-    return boundTy->getDecl();
-
-  if (auto unboundTy = getAs<UnboundGenericType>())
-    return unboundTy->getDecl();
-
-  return nullptr;
-}
-
 Type TypeBase::getOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericType>())
     if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
