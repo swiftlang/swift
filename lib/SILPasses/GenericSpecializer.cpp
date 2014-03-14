@@ -319,7 +319,8 @@ void GenericSpecializer::collectApplyInst(SILFunction &F) {
 
       SILFunction *Callee = FRI->getReferencedFunction();
       if (Callee->isExternalDeclaration())
-        continue;
+        if (!M->linkFunction(Callee, SILModule::LinkingMode::LinkAll))
+          continue;
 
       // Save the ApplyInst into the function/bucket that it calls.
       ApplyInstMap[Callee].push_back(AI);
