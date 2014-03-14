@@ -314,6 +314,7 @@ private:
   unsigned AssociatedDeclKind : 8;
   unsigned SemanticContext : 3;
   CodeCompletionString *const CompletionString;
+  StringRef BriefDocComment;
 
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
@@ -326,10 +327,12 @@ private:
 
   CodeCompletionResult(SemanticContextKind SemanticContext,
                        CodeCompletionString *CompletionString,
-                       const Decl *AssociatedDecl)
+                       const Decl *AssociatedDecl,
+                       StringRef BriefDocComment)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
-        CompletionString(CompletionString) {
+        CompletionString(CompletionString),
+        BriefDocComment(BriefDocComment) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
@@ -349,6 +352,10 @@ public:
 
   const CodeCompletionString *getCompletionString() const {
     return CompletionString;
+  }
+
+  StringRef getBriefDocComment() const {
+    return BriefDocComment;
   }
 
   /// Print a debug representation of the code completion result to \p OS.

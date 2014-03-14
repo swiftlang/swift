@@ -27,6 +27,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "CodeCompletionResultBuilder.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -359,9 +361,23 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   auto *CCS = new (CCSMem) CodeCompletionString(Chunks);
 
   switch (Kind) {
-  case CodeCompletionResult::ResultKind::Declaration:
-    return new (Sink.Allocator) CodeCompletionResult(SemanticContext, CCS,
-                                                     AssociatedDecl);
+  case CodeCompletionResult::ResultKind::Declaration: {
+    StringRef BriefComment;
+    auto MaybeClangNode = AssociatedDecl->getClangNode();
+    if (MaybeClangNode) {
+      if (auto *D = MaybeClangNode.getAsDecl()) {
+        const auto &ClangContext = D->getASTContext();
+        if (const clang::RawComment *RC =
+                ClangContext.getRawCommentForAnyRedecl(D))
+          BriefComment = RC->getBriefText(ClangContext);
+      }
+    } else {
+      BriefComment = AssociatedDecl->getBriefComment();
+    }
+    return new (Sink.Allocator) CodeCompletionResult(
+        SemanticContext, CCS, AssociatedDecl,
+        copyString(Sink.Allocator, BriefComment));
+  }
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
