@@ -1119,7 +1119,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       ParserResult<Expr> Idx = parseExprList(tok::l_square, tok::r_square);
       if (Idx.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
-      if (Idx.isNull())
+      if (Idx.isNull() || Result.isNull())
         return nullptr;
       Result = makeParserResult(
           new (Context) SubscriptExpr(Result.get(), Idx.get()));
