@@ -3855,6 +3855,7 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
                                       /*Implicit=*/true);
   }
 
+  case PatternKind::Any:
   case PatternKind::Named: {
     auto decl = cast<NamedPattern>(bodyPattern)->getDecl();
     Expr *declRef = new (tc.Context) DeclRefExpr(decl, SourceLoc(),
@@ -3865,10 +3866,6 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
     }
     return declRef;
   }
-
-  case PatternKind::Any:
-    // FIXME: We still need to create a decl for these.
-    return nullptr;
 
   case PatternKind::Typed:
     return forwardArguments(tc,
@@ -3942,13 +3939,13 @@ createSubobjectInitOverride(TypeChecker &tc,
   selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
 
   // Create the initializer parameter patterns.
-  OptionSet<Pattern::CloneFlags> options;
-  options |= Pattern::Implicit;
+  OptionSet<Pattern::CloneFlags> options = Pattern::Implicit;
   options |= Pattern::Inherited;
   Pattern *argParamPatterns
     = superclassCtor->getArgParamPatterns()[1]->clone(ctx, options);
   Pattern *bodyParamPatterns
-    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, options);
+    = superclassCtor->getBodyParamPatterns()[1]->clone(
+        ctx, options | Pattern::AlwaysNamed);
 
   // Fix up the default arguments in the type to refer to inherited default
   // arguments.

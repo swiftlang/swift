@@ -143,7 +143,12 @@ public:
     Implicit = 0x01,
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited.
-    Inherited = 0x02
+    Inherited = 0x02,
+    /// Replace 'any' patterns in the cloned pattern with named patterns.
+    AlwaysNamed = 0x04,
+    /// Whether the named patterns produced from a cloned 'any' pattern is
+    /// are 'var'.
+    IsVar = 0x08
   };
 
   Pattern *clone(ASTContext &context,

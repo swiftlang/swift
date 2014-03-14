@@ -183,15 +183,29 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   }
 }
 
-
-
 Pattern *Pattern::clone(ASTContext &context,
                         OptionSet<CloneFlags> options) const {
   Pattern *result;
   switch (getKind()) {
-  case PatternKind::Any:
-    result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
+  case PatternKind::Any: {
+    auto any = cast<AnyPattern>(this);
+    if (options & AlwaysNamed) {
+      VarDecl *var = new (context) VarDecl(/*isStatic=*/false,
+                                           !(options & Pattern::IsVar),
+                                           any->getLoc(),
+                                           context.getIdentifier("_"),
+                                           any->hasType()? any->getType()
+                                                         : Type(),
+                                           nullptr);
+      if (options & Implicit)
+        var->setImplicit();
+
+      result = new (context) NamedPattern(var);
+    } else {
+      result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
+    }
     break;
+  }
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(this);
@@ -306,8 +320,9 @@ Pattern *Pattern::clone(ASTContext &context,
   case PatternKind::Var: {
     auto var = cast<VarPattern>(this);
     result = new(context) VarPattern(var->getLoc(),
-                                     var->getSubPattern()->clone(context,
-                                                                 options));
+                                     var->getSubPattern()->clone(
+                                       context,
+                                       options|IsVar));
   }
   }
 
