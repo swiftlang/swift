@@ -2731,8 +2731,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // FIXME: Hack until all delegation is dispatched.
   IsCompleteObjectInit = ctor->isCompleteObjectInit();
 
-  assert((ctor->getBody() || ctor->hasStubImplementation()) && 
-         "Class constructor without a body?");
+  assert(ctor->getBody() && "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
   bool isDelegating = false;
@@ -2834,14 +2833,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   }
 
   // Emit the constructor body.
-  if (ctor->hasStubImplementation()) {
-    auto int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    auto *trueInst = B.createIntegerLiteral(endOfInitLoc, int1Ty, 1);
-    auto *failInst = B.createCondFail(endOfInitLoc, trueInst);
-    (void)failInst;
-  } else {
-    visit(ctor->getBody());
-  }
+  visit(ctor->getBody());
 
   // Return 'self' in the epilog.
   Optional<SILValue> maybeReturnValue;

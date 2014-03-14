@@ -391,6 +391,9 @@ public:
   /// Retrieve the declaration of Swift._getBool.
   FuncDecl *getGetBoolDecl(LazyResolver *resolver) const;
 
+  /// Retrieve the declaration of Swift._unimplemented_initializer.
+  FuncDecl *getUnimplementedInitializerDecl(LazyResolver *resolver) const;
+
   /// \brief Look for the declaration with the given name within the
   /// swift module.
   void lookupInSwiftModule(StringRef name,

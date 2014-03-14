@@ -2572,7 +2572,7 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::DynamicMethodBranchInst;
-  }
+  }	
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.

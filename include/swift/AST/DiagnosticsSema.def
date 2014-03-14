@@ -311,7 +311,8 @@ NOTE(note_no_in_class_init_3plus,sema_tcd,none,
      "stored properties %0, %1, %select{and %2|%2, and others}3 "
      "without initial values prevent synthesized initializers",
      (Identifier, Identifier, Identifier, bool))
-
+ERROR(missing_unimplemented_init_runtime,sema_tcd,none,
+      "standard library error: missing _unimplemented_initializer", ())
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,

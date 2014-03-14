@@ -650,10 +650,14 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
       if (field.getPattern()->hasType() &&
           field.getPattern()->getType()->is<ErrorType>())
         continue;
+      
       unsigned curArgIndex = nextArgIndex++;
       if (field.getInit()) {
-        assert(!field.getInit()->alreadyChecked() &&
-               "Expression already checked");
+        // FIXME: cloned default arguments should have a different
+        // representation.
+        if (field.getInit()->alreadyChecked())
+          continue;
+        
         Expr *e = field.getInit()->getExpr();
 
         // Re-use an existing initializer context if possible.

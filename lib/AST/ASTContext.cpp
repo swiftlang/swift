@@ -90,6 +90,9 @@ struct ASTContext::Implementation {
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
 
+  /// func _unimplemented_initializer(className: StaticString).
+  FuncDecl *UnimplementedInitializerDecl = nullptr;
+
   /// \brief The set of known protocols, lazily populated as needed.
   ProtocolDecl *KnownProtocols[NumKnownProtocols] = { };
 
@@ -544,6 +547,24 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
     return nullptr;
 
   Impl.GetBoolDecl = decl;
+  return decl;
+}
+
+FuncDecl *
+ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
+  if (Impl.UnimplementedInitializerDecl)
+    return Impl.UnimplementedInitializerDecl;
+
+  // Look for the function.
+  CanType input, output;
+  auto decl = findLibraryIntrinsic(*this, "_unimplemented_initializer", 
+                                   resolver);
+  if (!decl || !isNonGenericIntrinsic(decl, input, output))
+    return nullptr;
+
+  // FIXME: Check inputs and outputs.
+
+  Impl.UnimplementedInitializerDecl = decl;
   return decl;
 }
 

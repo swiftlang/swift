@@ -2260,6 +2260,7 @@ public:
             assert(ctor->getOverriddenDecl() == superclassCtor && 
                    "Not an override?");
             synthesizedCtors.push_back(ctor);
+            visit(ctor);
           }
         }
 
@@ -3870,6 +3871,37 @@ static Expr *forwardArguments(TypeChecker &tc, Pattern *argPattern,
   }
 }
 
+/// Create a stub body that emits a fatal error message.
+static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
+  auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
+  auto classDecl = ctor->getExtensionType()->getClassOrBoundGenericClass();
+  if (!unimplementedInitDecl) {
+    tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
+    return;
+  }
+
+  // Create a call to Swift._unimplemented_initializer
+  auto loc = classDecl->getLoc();
+  Expr *fn = new (tc.Context) DeclRefExpr(unimplementedInitDecl, loc,
+                                          /*Implicit=*/true);
+
+  llvm::SmallString<64> buffer;
+  StringRef fullClassName = tc.Context.AllocateCopy(
+                              (classDecl->getModuleContext()->Name.str() + "." +
+                               classDecl->getName().str()).toStringRef(buffer));
+
+  Expr *className = new (tc.Context) StringLiteralExpr(fullClassName, loc);
+  className = new (tc.Context) ParenExpr(loc, className, loc, false);
+  Expr *call = new (tc.Context) CallExpr(fn, className, /*Implicit=*/true);
+  ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
+                                  ASTNode(call),
+                                  SourceLoc(),
+                                  /*Implicit=*/true));
+
+  // Note that this is a stub implementation/
+  ctor->setStubImplementation(true);
+}
+
 static ConstructorDecl *
 createSubobjectInitOverride(TypeChecker &tc,
                             ClassDecl *classDecl,
@@ -3930,8 +3962,8 @@ createSubobjectInitOverride(TypeChecker &tc,
   DeclChecker(tc, false, false).checkOverrides(ctor);
 
   if (kind == SubobjectInitKind::Stub) {
-    // Mark this as a stub implementation. We're done here.
-    ctor->setStubImplementation(true);
+    // Make this a stub implementation.
+    createStubBody(tc, ctor);
     return ctor;
   }
 
@@ -3954,7 +3986,7 @@ createSubobjectInitOverride(TypeChecker &tc,
     // but there are currently holes when dealing with vararg
     // initializers and _ parameters. Fail somewhat gracefully by
     // generating a stub here.
-    ctor->setStubImplementation(true);
+    createStubBody(tc, ctor);
     return ctor;
   }
 
