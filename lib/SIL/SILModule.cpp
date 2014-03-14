@@ -70,6 +70,7 @@ class SILModule::SerializationCallback : public SerializedSILLoader::Callback {
       return;
     case SILLinkage::Shared:
       decl->setLinkage(SILLinkage::Shared);
+      return;
     case SILLinkage::Private: // ?
     case SILLinkage::PublicExternal:
     case SILLinkage::HiddenExternal:
