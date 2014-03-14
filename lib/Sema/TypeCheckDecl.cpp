@@ -3060,72 +3060,72 @@ public:
   /// overridden declaration.
   ///
   /// \returns true if an error occurred.
-  bool recordOverride(ValueDecl *overriding, ValueDecl *overridden) {
+  bool recordOverride(ValueDecl *override, ValueDecl *base) {
     
     // Check property and subscript overriding.
-    if (auto *overriddenASD = dyn_cast<AbstractStorageDecl>(overridden)) {
-      auto *overridingASD = cast<AbstractStorageDecl>(overriding);
+    if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
+      auto *overrideASD = cast<AbstractStorageDecl>(override);
       
       // Make sure that the parent property is actually overridable.
       // FIXME: This should be a check for @final, not something specific to
       // properties.
-      if (!overriddenASD->isOverridable()) {
-        TC.diagnose(overridingASD, diag::override_stored_property,
-                    overridingASD->getName());
-        TC.diagnose(overriddenASD, diag::property_override_here);
+      if (!baseASD->isOverridable()) {
+        TC.diagnose(overrideASD, diag::override_stored_property,
+                    overrideASD->getName());
+        TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
       
       // Make sure that the overriding property doesn't have storage.
-      if (overridingASD->hasStorage()) {
-        TC.diagnose(overridingASD, diag::override_with_stored_property,
-                    overridingASD->getName());
-        TC.diagnose(overriddenASD, diag::property_override_here);
+      if (overrideASD->hasStorage()) {
+        TC.diagnose(overrideASD, diag::override_with_stored_property,
+                    overrideASD->getName());
+        TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
     }
     
     // Non-Objective-C declarations in extensions cannot override or
     // be overridden.
-    if ((overridden->getDeclContext()->isExtensionContext() ||
-         overriding->getDeclContext()->isExtensionContext()) &&
-        !overridden->isObjC()) {
-      TC.diagnose(overriding, diag::override_decl_extension,
-                  !overriding->getDeclContext()->isExtensionContext());
-      TC.diagnose(overridden, diag::overridden_here);
+    if ((base->getDeclContext()->isExtensionContext() ||
+         override->getDeclContext()->isExtensionContext()) &&
+        !base->isObjC()) {
+      TC.diagnose(override, diag::override_decl_extension,
+                  !override->getDeclContext()->isExtensionContext());
+      TC.diagnose(base, diag::overridden_here);
       return true;
     }
     
     // If the overriding declaration does not have the @override
     // attribute on it, complain.
-    if (!overriding->getAttrs().isOverride() &&
-        !isa<ConstructorDecl>(overriding)) {
+    if (!override->getAttrs().isOverride() &&
+        !isa<ConstructorDecl>(override)) {
       // FIXME: rdar://16320042 - For properties, we don't have a useful
       // location for the 'var' token.  Instead of emitting a bogus fixit, only
       // emit the fixit for 'func's.
-      if (!isa<VarDecl>(overriding))
-        TC.diagnose(overriding, diag::missing_override)
-          .fixItInsert(overriding->getStartLoc(), "@override ");
+      if (!isa<VarDecl>(override))
+        TC.diagnose(override, diag::missing_override)
+          .fixItInsert(override->getStartLoc(), "@override ");
       else
-        TC.diagnose(overriding, diag::missing_override);
-      TC.diagnose(overridden, diag::overridden_here);
+        TC.diagnose(override, diag::missing_override);
+      TC.diagnose(base, diag::overridden_here);
     }
     
-    if (auto overridingFunc = dyn_cast<FuncDecl>(overriding)) {
-      overridingFunc->setOverriddenDecl(cast<FuncDecl>(overridden));
-    } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(overriding)) {
-      overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(overridden));
-    } else if (auto overridingASD = dyn_cast<AbstractStorageDecl>(overriding)) {
-      auto *overriddenASD = cast<AbstractStorageDecl>(overridden);
-      overridingASD->setOverriddenDecl(overriddenASD);
+    if (auto overridingFunc = dyn_cast<FuncDecl>(override)) {
+      overridingFunc->setOverriddenDecl(cast<FuncDecl>(base));
+    } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(override)) {
+      overridingCtor->setOverriddenDecl(cast<ConstructorDecl>(base));
+    } else if (auto overridingASD = dyn_cast<AbstractStorageDecl>(override)) {
+      auto *baseASD = cast<AbstractStorageDecl>(base);
+      overridingASD->setOverriddenDecl(baseASD);
       
       // If there is a getter and/or setter, set their overrides as well.  This
       // is not done for observing accessors, since they are never dynamicly
       // dispatched (they are a local implementation detail of a property).
-      if (overriddenASD->getGetter() && overridingASD->getGetter())
-        overridingASD->getGetter()->setOverriddenDecl(overriddenASD->getGetter());
-      if (overriddenASD->getSetter() && overridingASD->getSetter())
-        overridingASD->getSetter()->setOverriddenDecl(overriddenASD->getSetter());
+      if (baseASD->getGetter() && overridingASD->getGetter())
+        overridingASD->getGetter()->setOverriddenDecl(baseASD->getGetter());
+      if (baseASD->getSetter() && overridingASD->getSetter())
+        overridingASD->getSetter()->setOverriddenDecl(baseASD->getSetter());
       
     } else {
       llvm_unreachable("Unexpected decl");
