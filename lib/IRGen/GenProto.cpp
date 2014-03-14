@@ -2890,7 +2890,7 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
   case AbstractCC::C:
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
-    abort();
+    return false;
   case AbstractCC::ObjCMethod:
     // An ObjC witness_method reference will notionally have polymorphic type
     // <Self: P> (...) -> (...), but there are no polymorphic parameters that
