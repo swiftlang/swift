@@ -461,10 +461,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     return fn;
   }
 
-  // Set the cache entry now in order to properly handle both forward
-  // declarations and deserialization errors.
-  cacheEntry.set(fn, /*fully deserialized*/ true);
-
   scratch.clear();
 
   assert(!fn->getContextGenericParams()
@@ -504,6 +500,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
+        cacheEntry.set(fn, /*fully deserialized*/ true);
         return fn;
       }
     }
@@ -517,6 +514,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
+
+  // If fn is empty, we failed to deserialize its body. Return nullptr to signal
+  // error.
+  if (fn->empty())
+    return nullptr;
 
   if (Callback) Callback->didDeserializeBody(MF->getAssociatedModule(), fn);
 
