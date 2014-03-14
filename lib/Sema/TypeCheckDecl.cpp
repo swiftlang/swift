@@ -1648,7 +1648,7 @@ public:
       TC.typeCheckDecl(VD->getSetter(), true);
     }
 
-    if (IsFirstPass && !checkPropertyOverrides(VD)) {
+    if (IsFirstPass && !checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
       if (VD->getAttrs().isOverride() && !VD->getOverriddenDecl()) {
@@ -2893,15 +2893,15 @@ public:
       return false;
 
     auto method = dyn_cast<AbstractFunctionDecl>(decl);
-    auto subscript = dyn_cast<SubscriptDecl>(decl);
-    assert((method || subscript) && "Not a method or subscript?");
+    auto abstractStorage = dyn_cast<AbstractStorageDecl>(decl);
+    assert((method || abstractStorage) && "Not a method or abstractStorage?");
 
     // Only named methods are permitted.
     // FIXME: Should this be a check for an accessor.
     if (method && !method->hasName())
       return false;
 
-    // Figure out the type of the declaration that we're use for comparisons.
+    // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType();
     auto uncurriedDeclTy = declTy;
     if (method)
@@ -2917,7 +2917,7 @@ public:
     if (decl->isObjC()) {
       if (method)
         methodSelector = method->getObjCSelector(methodSelectorBuffer);
-      else
+      else if (auto *subscript = dyn_cast<SubscriptDecl>(abstractStorage))
         subscriptKind = subscript->getObjCSubscriptKind();
     }
 
@@ -2946,8 +2946,8 @@ public:
         continue;
 
       auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
-      auto parentSubscript = dyn_cast<SubscriptDecl>(parentDecl);
-      assert(parentMethod || parentSubscript);
+      auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
+      assert(parentMethod || parentStorage);
 
       // If both are Objective-C, then match based on selectors or subscript
       /// kind and check the types separately.
@@ -2960,18 +2960,22 @@ public:
             continue;
 
           objCMatch = true;
-        } else {
+        } else if (auto *parentSubscript =
+                     dyn_cast<SubscriptDecl>(parentStorage)) {
           // If the subscript kinds don't match, it's not an override.
           if (subscriptKind != parentSubscript->getObjCSubscriptKind())
             continue;
 
           objCMatch = true;
         }
+        
+        // Properties don't need anything here since they are always checked by
+        // name.
       }
 
       // Check whether the types are identical.
       // FIXME: It's wrong to use the uncurried types here for methods.
-      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl,owningTy);
+      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy);
       auto uncurriedParentDeclTy = parentDeclTy;
       if (method) {
         uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
@@ -2985,6 +2989,14 @@ public:
       if (uncurriedDeclTy->isEqual(uncurriedParentDeclTy)) {
         matches.push_back({parentDecl, true, uncurriedParentDeclTy});
         hadExactMatch = true;
+        continue;
+      }
+      
+      // If this is a property, we accept the match and then reject it below if
+      // the types don't line up, since you can't overload properties based on
+      // types.
+      if (isa<VarDecl>(parentDecl)) {
+        matches.push_back({parentDecl, false, uncurriedParentDeclTy});
         continue;
       }
 
@@ -3027,17 +3039,68 @@ public:
       auto matchDecl = std::get<0>(matches[0]);
       auto matchType = std::get<2>(matches[0]);
       
-      // If this is a subscript, validate that covariance is ok.
-      if (subscript &&
-          // An exact match is always okay.
-          !uncurriedDeclTy->isEqual(matchType)) {
+      // Make sure that the parent property is actually overridable.
+      // FIXME: This should be a check for @final, not something specific to
+      // properties.
+      if (abstractStorage) {
+        auto *parentStorage = cast<AbstractStorageDecl>(matchDecl);
+        if (!parentStorage->isOverridable()) {
+          TC.diagnose(abstractStorage, diag::override_stored_property,
+                      abstractStorage->getName());
+          TC.diagnose(matchDecl, diag::property_override_here);
+          return true;
+        }
         
+        // Make sure that the overriding property doesn't have storage.
+        if (abstractStorage->hasStorage()) {
+          TC.diagnose(abstractStorage, diag::override_with_stored_property,
+                      abstractStorage->getName());
+          TC.diagnose(parentStorage, diag::property_override_here);
+          return true;
+        }
+      }
+
+      // If this is an exact type match, we're successful!
+      if (uncurriedDeclTy->isEqual(matchType)) {
+        // Nothing to do.
+        
+      } else if (auto subscript =
+                   dyn_cast_or_null<SubscriptDecl>(abstractStorage)) {
+        // Otherwise, if this is a subscript, validate that covariance is ok.
         // If the parent is non-mutable, it's okay to be covariant.
         auto parentSubscript = cast<SubscriptDecl>(matchDecl);
         if (parentSubscript->getSetter()) {
           TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
                       uncurriedDeclTy, matchType);
           TC.diagnose(matchDecl, diag::subscript_override_here);
+          return true;
+        }
+      } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
+        auto propertyTy = property->getInterfaceType();
+        auto parentPropertyTy = adjustSuperclassMemberDeclType(matchDecl,
+                                                               superclass);
+        
+        if (!propertyTy->canOverride(parentPropertyTy, &TC)) {
+          TC.diagnose(property, diag::override_property_type_mismatch,
+                      property->getName(), propertyTy, parentPropertyTy);
+          TC.diagnose(matchDecl, diag::property_override_here);
+          return true;
+        }
+        
+        // Differing only in Optional vs. UncheckedOptional is fine.
+        bool IsSilentDifference = false;
+        if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
+          if (auto parentPropertyTyNoOptional =
+              parentPropertyTy->getAnyOptionalObjectType())
+            if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
+              IsSilentDifference = true;
+        
+        // The overridden property must not be mutable.
+        if (cast<AbstractStorageDecl>(matchDecl)->getSetter() &&
+            !IsSilentDifference) {
+          TC.diagnose(property, diag::override_mutable_covariant_property,
+                      property->getName(), parentPropertyTy, propertyTy);
+          TC.diagnose(matchDecl, diag::property_override_here);
           return true;
         }
       }
@@ -3049,122 +3112,6 @@ public:
     TC.diagnose(decl, diag::override_multiple_decls_base);
     for (auto match : matches)
       TC.diagnose(std::get<0>(match), diag::overridden_here);
-    return true;
-  }
-
-  /// Determine which property this property overrides (if any).
-  ///
-  /// \returns true if an error occurred.
-  bool checkPropertyOverrides(VarDecl *property) {
-    if (property->isInvalid())
-      return false;
-
-    auto owningTy = property->getDeclContext()->getDeclaredInterfaceType();
-    if (!owningTy)
-      return false;
-
-    auto classDecl = owningTy->getClassOrBoundGenericClass();
-    if (!classDecl)
-      return false;
-
-    Type superclass = classDecl->getSuperclass();
-    if (!superclass)
-      return false;
-
-    if (!property->hasName())
-      return false;
-
-    // Look for members with the same name as this one.
-    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
-    LookupResult members = TC.lookupMember(superclassMetaTy, property->getName(),
-                                           property->getDeclContext(),
-                                           /*allowDynamicLookup=*/false);
-    SmallVector<VarDecl *, 2> matches;
-    for (auto member : members) {
-      if (member->isInvalid())
-        continue;
-
-      auto parentProperty = dyn_cast<VarDecl>(member);
-      if (!parentProperty)
-        continue;
-
-      // Check whether there are any obvious reasons why the two given
-      // properties do not have an overriding relationship.
-      if (!areOverrideCompatibleSimple(property, parentProperty))
-        continue;
-
-      // Otherwise, it's an override.
-      matches.push_back(parentProperty);
-    }
-
-    // If we have no matches, there's nothing to do.
-    if (matches.empty()) {
-      return false;
-    }
-
-    // If we have a single match, make sure it has a compatible type.
-    // FIXME: readonly properties could allow covariance.
-    if (matches.size() == 1) {
-      auto parentProperty = matches.front();
-
-      // Make sure that the parent property is actually overridable.
-      if (!parentProperty->isOverridable()) {
-        TC.diagnose(property, diag::override_stored_property,
-                    property->getName());
-        TC.diagnose(parentProperty, diag::property_override_here);
-        return true;
-      }
-
-      // Make sure that the overriding property doesn't have storage.
-      if (property->hasStorage()) {
-        TC.diagnose(property, diag::override_with_stored_property,
-                    property->getName());
-        TC.diagnose(parentProperty, diag::property_override_here);
-        return true;
-      }
-
-      // Check the types.
-      auto propertyTy = property->getInterfaceType();
-      auto parentPropertyTy = adjustSuperclassMemberDeclType(parentProperty,
-                                                             superclass);
-
-      // An exact match is always fine.
-      if (propertyTy->isEqual(parentPropertyTy)) {
-        return recordOverride(property, parentProperty);
-      }
-
-      // Differing only in Optional vs. UncheckedOptional is fine.
-      if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
-        if (auto parentPropertyTyNoOptional =
-              parentPropertyTy->getAnyOptionalObjectType())
-          if (propertyTyNoOptional->isEqual(parentPropertyTyNoOptional))
-            return recordOverride(property, parentProperty);
-
-      // Check for subtyping.
-      if (propertyTy->canOverride(parentPropertyTy, &TC)) {
-        // The overridden property must not be mutable.
-        if (parentProperty->getSetter()) {
-          TC.diagnose(property, diag::override_mutable_covariant_property,
-                      property->getName(), parentPropertyTy, propertyTy);
-          TC.diagnose(parentProperty, diag::property_override_here);
-          return true;
-        }
-
-        return recordOverride(property, parentProperty);
-      }
-
-
-      TC.diagnose(property, diag::override_property_type_mismatch,
-                  property->getName(), propertyTy, parentPropertyTy);
-      TC.diagnose(parentProperty, diag::property_override_here);
-      return true;
-    }
-
-    // We override more than one property. Complain.
-    TC.diagnose(property, diag::override_multiple_decls_base);
-    for (auto match : matches) {
-      TC.diagnose(match, diag::overridden_here);
-    }
     return true;
   }
 
