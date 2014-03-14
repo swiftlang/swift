@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "serialized-sil-loader"
 #include "DeserializeSIL.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -39,8 +41,11 @@ SerializedSILLoader::~SerializedSILLoader() {}
 
 SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Callee))
+    if (auto Func = Des->lookupSILFunction(Callee)) {
+      DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
+            << Des->getModuleIdentifier().str() << "\n");
       return Func;
+    }
   }
   return nullptr;
 }

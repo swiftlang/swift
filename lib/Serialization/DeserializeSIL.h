@@ -92,6 +92,9 @@ namespace swift {
     SILWitnessTable *readWitnessTable(serialization::DeclID);
 
 public:
+    Identifier getModuleIdentifier() const {
+      return MF->getAssociatedModule()->getName();
+    }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILVTable *lookupVTable(Identifier Name);
 

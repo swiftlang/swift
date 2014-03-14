@@ -187,6 +187,8 @@ private:
 
   Module(Identifier name, ASTContext &ctx);
 public:
+  Identifier getName() const { return Name; }
+
   static Module *create(Identifier name, ASTContext &ctx) {
     return new (ctx) Module(name, ctx);
   }
