@@ -259,6 +259,9 @@ endif()
 check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
 append_if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG "-Wimplicit-fallthrough" CMAKE_CXX_FLAGS)
 
+check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
+append_if(CXX_SUPPORTS_OVERLOADED_VIRTUAL "-Woverloaded-virtual" CMAKE_CXX_FLAGS)
+
 # Set sizeof(void*) if cross-compiling.
 if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "64$")
