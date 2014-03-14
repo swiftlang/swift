@@ -13,6 +13,7 @@
 // This file implements the protocol conformance data structures.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Decl.h"
@@ -509,7 +510,7 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
         continue;
 
       // Fall through.
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
     }
 
     case SelfReferenceKind::Yes: {

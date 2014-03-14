@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Driver/Job.h"
-
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -83,7 +83,7 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
       os << '\\';
       // Fall-through to the default case, since we still need to print the
       // character.
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
     default:
       os << c;
     }

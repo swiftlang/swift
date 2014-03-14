@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "predictable-memopt"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SILPasses/Passes.h"
 #include "DIMemoryUseCollector.h"
 #include "swift/SIL/SILBuilder.h"
@@ -867,7 +868,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
       if (!isa<ApplyInst>(U.Inst))
         break;
       // FALL THROUGH.
-     [[clang::fallthrough]];
+     SWIFT_FALLTHROUGH;
     case DIUseKind::Load:
     case DIUseKind::IndirectIn:
     case DIUseKind::InOutUse:

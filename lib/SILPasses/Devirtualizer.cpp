@@ -1041,7 +1041,7 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
         continue;
 
       // Fall through.
-      [[clang::fallthrough]];
+      SWIFT_FALLTHROUGH;
     }
 
     case ValueKind::InitExistentialInst: {
