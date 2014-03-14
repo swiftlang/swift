@@ -43,6 +43,11 @@ struct SingleRawComment {
     return Kind == CommentKind::OrdinaryLine ||
            Kind == CommentKind::OrdinaryBlock;
   }
+
+  bool isLine() const LLVM_READONLY {
+    return Kind == CommentKind::OrdinaryLine ||
+           Kind == CommentKind::LineDoc;
+  }
 };
 
 struct RawComment {

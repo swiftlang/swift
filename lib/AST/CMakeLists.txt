@@ -30,7 +30,7 @@ add_swift_library(swiftAST
   TypeWalker.cpp
   USRGeneration.cpp
   Verifier.cpp
-  DEPENDS swiftBasic LLVMCore clangIndex)
+  DEPENDS swiftBasic swiftReST LLVMCore clangIndex)
 
 if( NOT SWIFT_BUILT_STANDALONE )
   add_dependencies(swiftAST intrinsics_gen)

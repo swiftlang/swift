@@ -19,7 +19,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ReST/Parser.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -148,23 +150,103 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
-static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
-                                     const Decl *D) {
-  llvm::SmallString<256> Result;
-  {
-    llvm::raw_svector_ostream OS(Result);
-    // FIXME: extract brief comment.
-    OS << "Brief comment for ";
-    bool HasName = false;
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->hasName()) {
-        HasName = true;
-        OS << VD->getName();
+static unsigned measureNewline(const char *BufferPtr, const char *BufferEnd) {
+  if (BufferPtr == BufferEnd)
+    return 0;
+
+  if (*BufferPtr == '\n')
+    return 1;
+
+  assert(*BufferPtr == '\r');
+  unsigned Bytes = 1;
+  if (BufferPtr != BufferEnd && *BufferPtr == '\n')
+    Bytes++;
+  return Bytes;
+}
+
+static unsigned measureNewline(StringRef S) {
+  return measureNewline(S.data(), S.data() + S.size());
+}
+
+static bool startsWithNewline(StringRef S) {
+  return S.startswith("\n") || S.startswith("\r\n");
+}
+
+static unsigned measureASCIIArt(StringRef S) {
+  if (S.startswith(" * "))
+   return 3;
+  if (S.startswith(" *\n") || S.startswith(" *\n\r"))
+    return 2;
+  return 0;
+}
+
+static llvm::rest::LineList
+toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
+  llvm::rest::LineList Result;
+  for (const auto &C : RC.Comments) {
+    if (C.isLine()) {
+      // Skip comment marker.
+      unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
+      StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes);
+
+      // Drop trailing newline.
+      Cleaned = Cleaned.rtrim("\n\r");
+      SourceLoc CleanedStartLoc =
+          C.Range.getStart().getAdvancedLoc(CommentMarkerBytes);
+      Result.addLine(Cleaned, RSM.registerLine(Cleaned, CleanedStartLoc));
+    } else {
+      // Skip comment markers at the beginning and at the end.
+      unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
+      StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes).drop_back(2);
+      SourceLoc CleanedStartLoc =
+          C.Range.getStart().getAdvancedLoc(CommentMarkerBytes);
+
+      // Determine if we have leading decorations in this block comment.
+      bool HasASCIIArt = false;
+      if (startsWithNewline(Cleaned)) {
+        Result.addLine(Cleaned.substr(0, 0),
+                       RSM.registerLine(Cleaned.substr(0, 0), CleanedStartLoc));
+        unsigned NewlineBytes = measureNewline(Cleaned);
+        Cleaned = Cleaned.drop_front(NewlineBytes);
+        CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(NewlineBytes);
+        HasASCIIArt = measureASCIIArt(Cleaned) != 0;
+      }
+
+      while (!Cleaned.empty()) {
+        size_t Pos = Cleaned.find_first_of("\n\r");
+        if (Pos == StringRef::npos)
+          Pos = Cleaned.size();
+
+        // Skip over ASCII art, if present.
+        if (HasASCIIArt)
+          if (unsigned ASCIIArtBytes = measureASCIIArt(Cleaned)) {
+            Cleaned = Cleaned.drop_front(ASCIIArtBytes);
+            CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(ASCIIArtBytes);
+            Pos -= ASCIIArtBytes;
+          }
+
+        StringRef Line = Cleaned.substr(0, Pos);
+        Result.addLine(Line, RSM.registerLine(Line, CleanedStartLoc));
+
+        Cleaned = Cleaned.drop_front(Pos);
+        unsigned NewlineBytes = measureNewline(Cleaned);
+        Cleaned = Cleaned.drop_front(NewlineBytes);
+        Pos += NewlineBytes;
+        CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(Pos);
       }
     }
-    if (!HasName)
-      OS << "<anonymous>";
   }
+  return std::move(Result);
+}
+
+static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
+                                     const Decl *D) {
+  PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
+
+  llvm::rest::SourceManager<SourceLoc> RSM;
+  llvm::rest::LineList LL = toLineList(RSM, RC);
+  llvm::SmallString<256> Result;
+  llvm::rest::extractBrief(LL, Result);
 
   if (Result.empty())
     return StringRef();
