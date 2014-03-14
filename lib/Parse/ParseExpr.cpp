@@ -1882,14 +1882,23 @@ ParserResult<Expr> Parser::parseExprCollection() {
   Parser::StructureMarkerRAII ParsingCollection(*this, Tok);
   SourceLoc LSquareLoc = consumeToken(tok::l_square);
 
-  // Parse an empty collection literal.
+  // [] is always an array.
   if (Tok.is(tok::r_square)) {
-    // FIXME: We want a special 'empty collection' literal kind.
     SourceLoc RSquareLoc = consumeToken();
+    auto EmptyTuple =
+      new (Context) TupleExpr(LSquareLoc, RSquareLoc, /*Implicit=*/false);
     return makeParserResult(
-        new (Context) TupleExpr(LSquareLoc, { }, nullptr, RSquareLoc,
-                                /*hasTrailingClosure=*/false,
-                                /*Implicit=*/false));
+                new (Context) ArrayExpr(LSquareLoc, EmptyTuple, RSquareLoc));
+  }
+
+  // [:] is always an empty dictionary.
+  if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
+    consumeToken(tok::colon);
+    SourceLoc RSquareLoc = consumeToken();
+    auto EmptyTuple =
+      new (Context) TupleExpr(LSquareLoc, RSquareLoc, /*Implicit=*/false);
+    return makeParserResult(
+              new (Context) DictionaryExpr(LSquareLoc, EmptyTuple, RSquareLoc));
   }
 
   // Parse the first expression.
@@ -1920,6 +1929,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
 ///
 ///   expr-array:
 ///     '[' expr (',' expr)* ','? ']'
+///     '[' ']'
 ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                           Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
@@ -1975,6 +1985,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 ///
 ///   expr-dictionary:
 ///     '[' expr ':' expr (',' expr ':' expr)* ','? ']'
+///     '[' ':' ']'
 ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                                Expr *FirstKey) {
   // Each subexpression is a (key, value) tuple. 

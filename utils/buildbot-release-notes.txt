@@ -4,6 +4,11 @@
 * 'nil' may now be used as a Selector value. This also allows calls to 
   Cocoa methods that accept `nil` selectors.
 
+* [] and [:] can now be used as the empty array and dictionary literal,
+  respectively.  Because these carry no information about their element types,
+  they may only be used in a context that provides this information through type
+  inference (e.g. when passing a function argument).
+
 
 2014-03-12
 ----------
