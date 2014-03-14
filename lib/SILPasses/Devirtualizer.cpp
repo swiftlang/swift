@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "devirtualization"
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/CallGraph.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILArgument.h"
