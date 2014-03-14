@@ -981,6 +981,12 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
     extInfo = extInfo.withCallingConv(AbstractCC::C);
   }
   
+  // Pull out the generic signature.
+  CanGenericSignature genericSig;
+  if (auto gft = dyn_cast<GenericFunctionType>(t)) {
+    genericSig = gft.getGenericSignature();
+  }
+  
   // Pull the innermost generic parameter list in the type out.
   Optional<GenericParamList *> genericParams;
   {
@@ -999,9 +1005,12 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
   
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
     if (genericParams) {
+      assert(!genericSig && "got mix of poly/generic function type?!");
       return CanPolymorphicFunctionType::get(input, result,
                                              innerGenericParams,
                                              extInfo);
+    } else if (genericSig) {
+      return CanGenericFunctionType::get(genericSig, input, result, extInfo);
     } else {
       return CanFunctionType::get(input, result, extInfo);
     }
@@ -1430,6 +1439,11 @@ CanSILFunctionType
 SILFunctionType::substInterfaceGenericArgs(SILModule &silModule,
                                            Module *astModule,
                                            ArrayRef<Substitution> subs) {
+  if (subs.empty()) {
+    assert(!isPolymorphic() && "no args for polymorphic substitution");
+    return CanSILFunctionType(this);
+  }
+  
   assert(isPolymorphic());
   TypeSubstitutionMap map = GenericSig->getSubstitutionMap(subs);
   SILTypeSubstituter substituter(silModule, astModule, map);
