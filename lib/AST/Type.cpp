@@ -1184,6 +1184,52 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   return false;
 }
 
+static bool hasRetainablePointerRepresentation(CanType type) {
+  // Look through one level of Optional<> or UncheckedOptional<>.
+  if (auto objType = type->getAnyOptionalObjectType()) {
+    type = CanType(objType);
+  }
+
+  // Classes.
+  if (type.getClassOrBoundGenericClass())
+    return true;
+
+  // Pure-ObjC existential types.
+  if (type.isExistentialType()) {
+    SmallVector<ProtocolDecl*, 4> protos;
+    (void) type->isExistentialType(protos);
+
+    // The type must be class-bounded, and all the protocols must be
+    // ObjC (and thus not require protocol witnesses).
+    if (protos.empty())
+      return false;
+    for (auto proto : protos) {
+      if (!proto->isObjC())
+        return false;
+    }
+    return true;
+  }
+
+  // Blocks.
+  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
+    return fnType->isBlock();
+  } else if (auto fnType = dyn_cast<SILFunctionType>(type)) {
+    return fnType->isBlock();
+  }
+
+  // Class metatypes.
+  if (auto metatype = dyn_cast<MetatypeType>(type)) {
+    CanType instanceType = metatype.getInstanceType();
+    return (instanceType.getClassOrBoundGenericClass() != nullptr);
+  }
+
+  return false;
+}
+
+bool TypeBase::hasRetainablePointerRepresentation() {
+  return ::hasRetainablePointerRepresentation(getCanonicalType());
+}
+
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
 static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {

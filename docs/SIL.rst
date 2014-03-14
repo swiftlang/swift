@@ -467,9 +467,10 @@ throughout the execution of the call. This means that any
 ``strong_retain``, ``strong_release`` pairs in the callee on the
 argument can be eliminated.
 
-An autoreleased direct result must have object pointer type.  It may
-have been autoreleased, and the caller should take action to reclaim
-that autorelease with ``strong_retain_autoreleased``.
+An autoreleased direct result must have a type with a retainable
+pointer representation.  It may have been autoreleased, and the caller
+should take action to reclaim that autorelease with
+``strong_retain_autoreleased``.
 
 Properties of Types
 ```````````````````
@@ -526,6 +527,14 @@ Some additional meaningful categories of type:
   one or more class protocols. All reference types can be ``retain``-ed and
   ``release``-d. Reference types also have *ownership semantics* for their
   referenced heap object; see `Reference Counting`_ below.
+- A type with *retainable pointer representation* is guaranteed to
+  be compatible (in the C sense) with the Objective-C ``id`` type.
+  The value at runtime may be ``nil``.  This includes classes,
+  class metatypes, block functions, and class-bounded existentials with
+  only Objective-C-compatible protocol constraints, as well as one
+  level of ``Optional`` or ``UncheckedOptional`` applied to any of the
+  above.  Types with retainable pointer representation can be returned
+  via the ``@autoreleased`` return convention.
 
 SILGen does not always map Swift function types one-to-one to SIL function
 types. Function types are transformed in order to encode additional attributes:
@@ -1848,7 +1857,7 @@ strong_retain_autoreleased
   sil-instruction ::= 'strong_retain_autoreleased' sil-operand
 
   strong_retain_autoreleased %0 : $T
-  // $T must be a reference type
+  // $T must have a retainable pointer representation
 
 Retains the heap object referenced by ``%0`` using the Objective-C ARC
 "autoreleased return value" optimization. The operand must be the result of an

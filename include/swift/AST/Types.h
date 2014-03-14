@@ -444,6 +444,12 @@ public:
   /// override.
   bool canOverride(Type other, LazyResolver *resolver);
 
+  /// \brief Determines whether this type has a retainable pointer
+  /// representation, i.e. whether it is representable as a single,
+  /// possibly nil pointer that can be unknown-retained and
+  /// unknown-released.
+  bool hasRetainablePointerRepresentation();
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();

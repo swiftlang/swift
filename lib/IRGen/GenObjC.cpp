@@ -75,7 +75,8 @@ static llvm::Constant *getCastOfRetainFn(IRGenModule &IGM,
   assert(origFnTy->getReturnType() == IGM.ObjCPtrTy);
   assert(origFnTy->getNumParams() == 1);
   assert(origFnTy->getParamType(0) == IGM.ObjCPtrTy);
-  assert(isa<llvm::PointerType>(valueTy));
+  assert(isa<llvm::PointerType>(valueTy) ||
+         valueTy == IGM.IntPtrTy); // happens with optional types
 #endif
   if (valueTy == IGM.ObjCPtrTy)
     return fn;

@@ -263,6 +263,11 @@ public:
   bool hasReferenceSemantics() const {
     return getSwiftRValueType().hasReferenceSemantics();
   }
+  /// Returns true if the referenced type is guaranteed to have a
+  /// single-retainable-pointer representation.
+  bool hasRetainablePointerRepresentation() const {
+    return getSwiftRValueType()->hasRetainablePointerRepresentation();
+  }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {
     return getSwiftRValueType()->isExistentialType();

@@ -674,8 +674,10 @@ public:
     requireReferenceValue(RI->getOperand(), "Operand of strong_retain");
   }
   void checkStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *RI) {
-    requireReferenceValue(RI->getOperand(), "Operand of "
-                          "strong_retain_autoreleased");
+    require(RI->getOperand().getType().isObject(),
+            "Operand of strong_retain_autoreleased must be an object");
+    require(RI->getOperand().getType().hasRetainablePointerRepresentation(),
+            "Operand of strong_retain_autoreleased must be a retainable pointer");
     require(isa<ApplyInst>(RI->getOperand()),
             "Operand of strong_retain_autoreleased must be the return value of "
             "an apply instruction");
@@ -1468,7 +1470,7 @@ public:
             "return value type does not match return type of function");
     require(instResultType.isObject(),
             "autoreleased return value cannot be an address");
-    require(instResultType.hasReferenceSemantics(),
+    require(instResultType.hasRetainablePointerRepresentation(),
             "autoreleased return value must be a reference type");
   }
 
