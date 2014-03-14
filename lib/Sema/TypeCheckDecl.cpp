@@ -2928,10 +2928,9 @@ public:
                                            decl->getDeclContext(),
                                            /*allowDynamicLookup=*/false);
 
-    unsigned numExactMatches = 0;
-    SmallVector<std::tuple<ValueDecl *, bool, Type>, 2> matches;
-    ValueDecl *exactMatch = nullptr;
-    Type exactMatchType;
+    typedef std::tuple<ValueDecl *, bool, Type> MatchType;
+    SmallVector<MatchType, 2> matches;
+    bool hadExactMatch = false;
     for (auto member : members) {
       if (member->isInvalid())
         continue;
@@ -2984,28 +2983,16 @@ public:
       }
 
       if (uncurriedDeclTy->isEqual(uncurriedParentDeclTy)) {
-        ++numExactMatches;
         matches.push_back({parentDecl, true, uncurriedParentDeclTy});
-        if (!exactMatch) {
-          exactMatch = parentDecl;
-          exactMatchType = uncurriedParentDeclTy;
-        }
+        hadExactMatch = true;
         continue;
       }
 
       // Failing that, check for subtyping.
       if (uncurriedDeclTy->canOverride(uncurriedParentDeclTy, &TC)) {
         // If the Objective-C selectors match, always call it exact.
-        // For subscripts, we perform extra checking below.
-        if (objCMatch) {
-          ++numExactMatches;
-          if (!exactMatch) {
-            exactMatch = parentDecl;
-            exactMatchType = uncurriedParentDeclTy;
-          }
-        }
-
         matches.push_back({parentDecl, objCMatch, uncurriedParentDeclTy});
+        hadExactMatch |= objCMatch;
         continue;
       }
 
@@ -3025,56 +3012,43 @@ public:
     }
 
     // If we have no matches, there's nothing to do.
-    if (matches.empty()) {
+    if (matches.empty())
       return false;
-    }
 
-    // Check for a proper subscript override.
-    auto checkSubscript = [&](ValueDecl *parentDecl, Type type) -> bool {
-      assert(subscript && "Not a subscript");
+    // If we had an exact match, throw away any non-exact matches.
+    if (hadExactMatch)
+      matches.erase(std::remove_if(matches.begin(), matches.end(),
+                                   [&](MatchType &match) {
+                                     return !std::get<1>(match);
+                                   }), matches.end());
 
-      // An exact match is always okay.
-      if (uncurriedDeclTy->isEqual(type))
-        return false;
-
-      // If the parent is non-mutable, it's okay to be covariant.
-      auto parentSubscript = cast<SubscriptDecl>(parentDecl);
-      if (!parentSubscript->getSetter())
-        return false;
-
-      TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
-                  uncurriedDeclTy, type);
-      TC.diagnose(parentDecl, diag::subscript_override_here);
-      return true;
-    };
-
-    // If we have a single exact match, take it.
-    if (numExactMatches == 1) {
-      if (subscript && checkSubscript(exactMatch, exactMatchType))
-        return true;
-
-      return recordOverride(decl, exactMatch);
-    }
-
-    // If we have a single subtype match, take it.
-    using std::get;
-    if (numExactMatches == 0 && matches.size() == 1) {
+    // If we have a single match (exact or not), take it.
+    if (matches.size() == 1) {
+      auto matchDecl = std::get<0>(matches[0]);
+      auto matchType = std::get<2>(matches[0]);
+      
+      // If this is a subscript, validate that covariance is ok.
       if (subscript &&
-          checkSubscript(get<0>(matches.front()), get<2>(matches.front())))
-        return true;
+          // An exact match is always okay.
+          !uncurriedDeclTy->isEqual(matchType)) {
+        
+        // If the parent is non-mutable, it's okay to be covariant.
+        auto parentSubscript = cast<SubscriptDecl>(matchDecl);
+        if (parentSubscript->getSetter()) {
+          TC.diagnose(subscript, diag::override_mutable_covariant_subscript,
+                      uncurriedDeclTy, matchType);
+          TC.diagnose(matchDecl, diag::subscript_override_here);
+          return true;
+        }
+      }
 
-      return recordOverride(decl, get<0>(matches.front()));
+      return recordOverride(decl, matchDecl);
     }
 
     // We override more than one declaration. Complain.
     TC.diagnose(decl, diag::override_multiple_decls_base);
-    for (auto match : matches) {
-      // If we had exact matches, skip non-exact ones.
-      if (exactMatch && !get<1>(match))
-        continue;
-
-      TC.diagnose(get<0>(match), diag::overridden_here);
-    }
+    for (auto match : matches)
+      TC.diagnose(std::get<0>(match), diag::overridden_here);
     return true;
   }
 
