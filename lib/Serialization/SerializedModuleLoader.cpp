@@ -91,24 +91,23 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
     // FIXME: Which name should we be using here? Do we care about CPU subtypes?
     // FIXME: At the very least, don't hardcode "arch".
-    llvm::SmallString<16> archFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
-    llvm::SmallString<16> archDocFilename(ctx.LangOpts.TargetConfigOptions["arch"]);
-    if (!archFilename.empty()) {
-      archFilename += '.';
-      archFilename += SERIALIZED_MODULE_EXTENSION;
+    llvm::SmallString<16> archFile(ctx.LangOpts.TargetConfigOptions["arch"]);
+    llvm::SmallString<16> archDocFile(ctx.LangOpts.TargetConfigOptions["arch"]);
+    if (!archFile.empty()) {
+      archFile += '.';
+      archFile += SERIALIZED_MODULE_EXTENSION;
 
-      moduleDocFilename = ctx.LangOpts.TargetConfigOptions["arch"];
-      moduleDocFilename += '.';
-      moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
+      archDocFile += '.';
+      archDocFile += SERIALIZED_MODULE_DOC_EXTENSION;
     }
 
     llvm::SmallString<128> currPath;
     for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
       currPath.clear();
       llvm::sys::path::append(currPath, path, moduleFramework.str(),
-                              moduleFilename.str());
-      auto err = openModuleFiles(currPath, archFilename.str(),
-                                 archDocFilename.str(), moduleBuffer,
+                              "Modules", moduleFilename.str());
+      auto err = openModuleFiles(currPath, archFile.str(),
+                                 archDocFile.str(), moduleBuffer,
                                  moduleDocBuffer, scratch);
       if (!err || err.value() != llvm::errc::no_such_file_or_directory)
         return err;
