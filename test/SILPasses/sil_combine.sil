@@ -5,6 +5,8 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class RawBuffer {}
+class HeapBufferStorage<T,U> : RawBuffer {}
 
 //////////////////////
 // Simple DCE Tests //
