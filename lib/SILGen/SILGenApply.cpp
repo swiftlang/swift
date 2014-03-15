@@ -783,6 +783,7 @@ public:
     if (auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
       SILDeclRef::Kind kind;
       bool isDynamicallyDispatched = false;
+      bool requiresAllocRefDynamic = false;
 
       // Non-extension class methods and Objective-C methods are dynamically
       // dispatched.
@@ -804,14 +805,51 @@ public:
             thisCallSite->getArg()->getType()->is<MetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
           isDynamicallyDispatched = true;
-          kind = SILDeclRef::Kind::Allocator;
+
+          if (gen.SGM.requiresObjCDispatch(afd)) {
+            // When we're performing Objective-C dispatch, we don't have an
+            // allocating constructor to call. So, perform an alloc_ref_dynamic
+            // and pass that along to the initializer.
+            requiresAllocRefDynamic = true;
+            kind = SILDeclRef::Kind::Initializer;
+          } else {
+            kind = SILDeclRef::Kind::Allocator;
+          }
         }
       }
 
       if (isDynamicallyDispatched) {
         ApplyExpr *thisCallSite = callSites.back();
         callSites.pop_back();
-        setSelfParam(gen.emitRValue(thisCallSite->getArg()), thisCallSite);
+        RValue self = gen.emitRValue(thisCallSite->getArg());
+
+        // If we require a dynamic allocation of the object here, do so now.
+        if (requiresAllocRefDynamic) {
+          SILLocation loc = thisCallSite->getArg();
+          CanType type = cast<MetatypeType>(self.getType()).getInstanceType();
+
+          // Convert to an Objective-C metatype representation.
+          CanType objcMetaType
+            = CanMetatypeType::get(type, MetatypeRepresentation::ObjC,
+                                   type->getASTContext());
+          ManagedValue selfValue = std::move(self).getAsSingleValue(gen,loc);
+          selfValue = ManagedValue(
+                        gen.B.emitThickToObjCMetatype(
+                          loc, selfValue.getValue(),
+                          gen.SGM.getLoweredType(objcMetaType)),
+                        selfValue.getCleanup());
+
+          // Allocate the object.
+          selfValue = ManagedValue(gen.B.createAllocRefDynamic(
+                                     loc,
+                                     selfValue.getValue(),
+                                     gen.SGM.getLoweredType(type),
+                                     /*objc=*/true),
+                                   selfValue.getCleanup());
+          self = RValue(gen, loc, type, selfValue);
+        }
+
+        setSelfParam(std::move(self), thisCallSite);
         SILDeclRef constant(afd, kind,
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
