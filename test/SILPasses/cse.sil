@@ -547,6 +547,7 @@ sil @sil_extract_of_string : $@thin () -> Builtin.Word {
 }
 
 sil @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
+sil @helper2 : $@thin (UInt8, UInt8) -> Builtin.Word
 
 sil @sil_string_different_encodings : $@thin () -> Builtin.Word {
   %0 = string_literal utf8 "help"
@@ -557,4 +558,29 @@ sil @sil_string_different_encodings : $@thin () -> Builtin.Word {
 }
 // CHECK:      [[T0:%.*]] = function_ref @helper
 // CHECK-NEXT: apply [[T0]](%0, %1)
+
+
+// CHECK-LABEL: raw_idx_cse
+// CHECK: integer_literal
+// CHECK-NEXT: index_raw_pointer
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: apply
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @raw_idx_cse: $@thin (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %X = function_ref @helper2 : $@thin (UInt8, UInt8) -> Builtin.Word
+  %1 = integer_literal $Builtin.Word, 5
+  %2 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %3 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %4 = pointer_to_address %2 : $Builtin.RawPointer to $*UInt8
+  %5 = pointer_to_address %3 : $Builtin.RawPointer to $*UInt8
+  %6 = load %4 : $*UInt8
+  %7 = load %5 : $*UInt8
+  %8 = apply %X(%6, %7) : $@thin (UInt8, UInt8) -> Builtin.Word
+  %Y = tuple()
+  return %Y : $()
+}
 

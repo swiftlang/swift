@@ -72,6 +72,8 @@ struct SimpleValue {
       case ValueKind::TupleElementAddrInst:
       case ValueKind::MetatypeInst:
       case ValueKind::RefElementAddrInst:
+      case ValueKind::IndexRawPointerInst:
+      case ValueKind::PointerToAddressInst:
         return true;
       default:
         return false;
@@ -179,6 +181,15 @@ public:
 
   hash_code visitMetatypeInst(MetatypeInst *X) {
     return llvm::hash_combine(unsigned(ValueKind::MetatypeInst), X->getType());
+  }
+
+  hash_code visitIndexRawPointerInst(IndexRawPointerInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::IndexRawPointerInst),
+                              X->getType(), X->getBase(), X->getIndex());
+  }
+  hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::PointerToAddressInst),
+                              X->getType(), X->getOperand());
   }
 };
 } // end anonymous namespace
