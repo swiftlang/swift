@@ -28,6 +28,13 @@ enum Bar {
   case B
 }
 
+// CHECK-LABEL: %O11enum_32_bit3Bas = type <{ [4 x i8] }>
+enum Bas {
+  case A(ClassExistential)
+  case B(C)
+  case Z
+}
+
 // CHECK-LABEL: define void @foo(i32)
 sil @foo : $@thin (@owned Foo) -> () {
 entry(%0 : $Foo):
@@ -40,6 +47,13 @@ entry(%0 : $Bar):
   return undef : $()
 }
 
+// CHECK-LABEL: define void @bas(i32)
+sil @bas : $@thin (@owned Bas) -> () {
+entry(%0 : $Bas):
+  return undef : $()
+}
+
 // Force instantiation of the IR types
 sil @indirect_foo : $@thin (@in Foo) -> ()
 sil @indirect_bar : $@thin (@in Bar) -> ()
+sil @indirect_bas : $@thin (@in Bas) -> ()
