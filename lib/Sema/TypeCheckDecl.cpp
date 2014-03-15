@@ -4557,6 +4557,13 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       return false;
     return bool(ContextTy->getClassOrBoundGenericClass());
   };
+  auto isInClassOrProtocolContext = [](Decl *vd) {
+   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
+    if (!ContextTy)
+      return false;
+    return bool(ContextTy->getClassOrBoundGenericClass()) ||
+           ContextTy->is<ProtocolType>();
+  };
 
   if (Attrs.isObjC()) {
     // Only classes, class protocols, instance properties, methods,
@@ -4565,15 +4572,15 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (isa<ClassDecl>(D)) {
       if (!D->getDeclContext()->isModuleScopeContext())
         error = diag::objc_class_not_top_level;
-    } else if (isa<FuncDecl>(D) && isInClassContext(D)) {
+    } else if (isa<FuncDecl>(D) && isInClassOrProtocolContext(D)) {
       if (isOperator || cast<FuncDecl>(D)->isGetterOrSetter())
         error = diag::invalid_objc_decl;
-    } else if (isa<ConstructorDecl>(D) && isInClassContext(D)) {
+    } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
-    } else if (isa<SubscriptDecl>(D) && isInClassContext(D)) {
+    } else if (isa<SubscriptDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (!isInClassContext(VD))
+      if (!isInClassOrProtocolContext(VD))
         error = diag::invalid_objc_decl;
       else if (VD->isStatic())
         error = diag::objc_invalid_on_static_var;
