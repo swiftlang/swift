@@ -2192,8 +2192,8 @@ public:
 
     if (!IsFirstPass) {
       TC.addImplicitConstructors(CD);
-      TC.addImplicitDestructor(CD);
     }
+    TC.addImplicitDestructor(CD);
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
