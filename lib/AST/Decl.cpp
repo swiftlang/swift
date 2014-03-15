@@ -1189,7 +1189,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
     // We only care about subobject initializers.
     auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor || ctor->isCompleteObjectInit())
+    if (!ctor || ctor->isCompleteObjectInit() || ctor->hasStubImplementation())
       continue;
 
     // If this subobject initializer wasn't overridden, we can't inherit.
