@@ -192,14 +192,14 @@ toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
       // Drop trailing newline.
       Cleaned = Cleaned.rtrim("\n\r");
       SourceLoc CleanedStartLoc =
-          C.Range.getStart().getAdvancedLoc(CommentMarkerBytes);
+          C.Range.getStart().getAdvancedLocOrInvalid(CommentMarkerBytes);
       Result.addLine(Cleaned, RSM.registerLine(Cleaned, CleanedStartLoc));
     } else {
       // Skip comment markers at the beginning and at the end.
       unsigned CommentMarkerBytes = 2 + (C.isOrdinary() ? 0 : 1);
       StringRef Cleaned = C.RawText.drop_front(CommentMarkerBytes).drop_back(2);
       SourceLoc CleanedStartLoc =
-          C.Range.getStart().getAdvancedLoc(CommentMarkerBytes);
+          C.Range.getStart().getAdvancedLocOrInvalid(CommentMarkerBytes);
 
       // Determine if we have leading decorations in this block comment.
       bool HasASCIIArt = false;
@@ -208,7 +208,7 @@ toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
                        RSM.registerLine(Cleaned.substr(0, 0), CleanedStartLoc));
         unsigned NewlineBytes = measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
-        CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(NewlineBytes);
+        CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(NewlineBytes);
         HasASCIIArt = measureASCIIArt(Cleaned) != 0;
       }
 
@@ -221,7 +221,8 @@ toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
         if (HasASCIIArt)
           if (unsigned ASCIIArtBytes = measureASCIIArt(Cleaned)) {
             Cleaned = Cleaned.drop_front(ASCIIArtBytes);
-            CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(ASCIIArtBytes);
+            CleanedStartLoc =
+                CleanedStartLoc.getAdvancedLocOrInvalid(ASCIIArtBytes);
             Pos -= ASCIIArtBytes;
           }
 
@@ -232,7 +233,7 @@ toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
         unsigned NewlineBytes = measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
         Pos += NewlineBytes;
-        CleanedStartLoc = CleanedStartLoc.getAdvancedLoc(Pos);
+        CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(Pos);
       }
     }
   }

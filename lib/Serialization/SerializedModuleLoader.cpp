@@ -47,17 +47,15 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
           StringRef(Scratch.data(), Scratch.size()), ModuleBuffer))
     return Err;
 
-  if (!ModuleDocFilename.empty()) {
-    // Try to open the module documentation file.  If it does not exist, ignore
-    // the error.  However, pass though all other errors.
-    Scratch.clear();
-    llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
-    auto Err = llvm::MemoryBuffer::getFile(
-        StringRef(Scratch.data(), Scratch.size()), ModuleDocBuffer);
-    if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
-      ModuleBuffer.reset(nullptr);
-      return Err;
-    }
+  // Try to open the module documentation file.  If it does not exist, ignore
+  // the error.  However, pass though all other errors.
+  Scratch.clear();
+  llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
+  auto Err = llvm::MemoryBuffer::getFile(
+      StringRef(Scratch.data(), Scratch.size()), ModuleDocBuffer);
+  if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
+    ModuleBuffer.reset(nullptr);
+    return Err;
   }
   return llvm::error_code();
 }
@@ -117,10 +115,9 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   }
 
   // Search the runtime import path.
-  // FIXME: Disable doc imports for now...they cause crashes.
   isFramework = false;
   return openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,
-                         moduleFilename.str(), {},
+                         moduleFilename.str(), moduleDocFilename.str(),
                          moduleBuffer, moduleDocBuffer, scratch);
 }
 
