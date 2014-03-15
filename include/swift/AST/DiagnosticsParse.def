@@ -516,7 +516,7 @@ ERROR(generic_non_function,type_parsing,PointsToFirstBadToken,
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
       "expected expression after '=' in 'case'", ())
 ERROR(nonliteral_enum_case_raw_value,type_parsing,PointsToFirstBadToken,
-      "raw value for enum case must be an integer, float, character, or string literal", ())
+      "raw value for enum case must be a literal", ())
 
 // Array Types
 ERROR(expected_expr_array_type,expr_parsing,PointsToFirstBadToken,

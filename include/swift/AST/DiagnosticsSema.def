@@ -528,7 +528,7 @@ ERROR(circular_enum_inheritance,sema_tcd,none,
 ERROR(raw_type_not_first,sema_tcd,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,sema_tcd,none,
-      "raw type %0 is not integer-, float-, char-, or string-literal-convertible",
+      "raw type %0 is not convertible from any literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,sema_tcd,none,
       "'fromRaw' method cannot be synthesized because raw type %0 is not "
