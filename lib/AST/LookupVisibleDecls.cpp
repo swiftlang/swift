@@ -45,7 +45,11 @@ private:
   /// Did we recurse into a superclass?
   unsigned IsOnSuperclass : 1;
 
-  LookupState() : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0) {}
+  unsigned InheritsSuperclassInitializers : 1;
+
+  LookupState()
+      : IsQualified(0), IsOnMetatype(0), IsOnSuperclass(0),
+        InheritsSuperclassInitializers(0) {}
 
 public:
   LookupState(const LookupState &) = default;
@@ -65,6 +69,9 @@ public:
   bool isQualified() const { return IsQualified; }
   bool isOnMetatype() const { return IsOnMetatype; }
   bool isOnSuperclass() const { return IsOnSuperclass; }
+  bool isInheritsSuperclassInitializers() const {
+    return InheritsSuperclassInitializers;
+  }
 
   LookupState withOnMetatype() const {
     auto Result = *this;
@@ -75,6 +82,18 @@ public:
   LookupState withOnSuperclass() const {
     auto Result = *this;
     Result.IsOnSuperclass = 1;
+    return Result;
+  }
+
+  LookupState withInheritsSuperclassInitializers() const {
+    auto Result = *this;
+    Result.InheritsSuperclassInitializers = 1;
+    return Result;
+  }
+
+  LookupState withoutInheritsSuperclassInitializers() const {
+    auto Result = *this;
+    Result.InheritsSuperclassInitializers = 0;
     return Result;
   }
 };
@@ -105,9 +124,16 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
     if (!(LS.isQualified() && LS.isOnMetatype()))
       return false;
   }
-  if (LS.isQualified() && LS.isOnSuperclass() && isa<ConstructorDecl>(Member)) {
-    // Can not call constructors from a superclass.
-    return false;
+  if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
+    // Constructors with stub implementations can not be called in Swift.
+    if (CD->hasStubImplementation())
+      return false;
+    if (LS.isQualified() && LS.isOnSuperclass()) {
+      // Can not call initializers from a superclass, except for inherited
+      // complete object initializers.
+      return LS.isInheritsSuperclassInitializers() &&
+             CD->isCompleteObjectInit();
+    }
   }
   if (LS.isQualified() && !LS.isOnMetatype() && isa<TypeDecl>(Member)) {
     // Nested type declarations can be accessed only with unqualified lookup or
@@ -377,7 +403,16 @@ static void lookupVisibleMemberDeclsImpl(
     if (CurClass && CurClass->hasSuperclass()) {
       BaseTy = CurClass->getSuperclass();
       Reason = getReasonForSuper(Reason);
-      LS = LS.withOnSuperclass();
+
+      bool InheritsSuperclassInitializers =
+          CurClass->inheritsSuperclassInitializers(TypeResolver);
+      if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
+        LS = LS.withoutInheritsSuperclassInitializers();
+      else if (!LS.isOnSuperclass()) {
+        LS = LS.withOnSuperclass();
+        if (InheritsSuperclassInitializers)
+          LS = LS.withInheritsSuperclassInitializers();
+      }
     } else {
       break;
     }
