@@ -1,0 +1,48 @@
+// RUN: %sil-opt %s -cse -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// "return (x + y) + (x + y)"
+// make sure we are only calculating x+y once.
+
+//CHECK-LABLE: simply_arith
+//CHECK: apply
+//CHECK: apply
+//CHECK-NOT: apply
+//CHECK: return
+sil @simply_arith : $@thin (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  debug_value %0 : $Int  // let x                 // id: %2
+  debug_value %1 : $Int  // let y                 // id: %3
+  %4 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %8
+  %5 = struct_extract %0 : $Int, #Int.value       // user: %8
+  %6 = struct_extract %1 : $Int, #Int.value       // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  %8 = apply %4(%5, %6, %7) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Word, Builtin.Int1), 1 // user: %11
+  cond_fail %10 : $Builtin.Int1                   // id: %11
+  %12 = struct $Int (%9 : $Builtin.Word)          // user: %23
+  %13 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %17
+  %14 = struct_extract %0 : $Int, #Int.value      // user: %17
+  %15 = struct_extract %1 : $Int, #Int.value      // user: %17
+  %16 = integer_literal $Builtin.Int1, -1         // user: %17
+  %17 = apply %13(%14, %15, %16) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %18, %19
+  %18 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 0 // user: %21
+  %19 = tuple_extract %17 : $(Builtin.Word, Builtin.Int1), 1 // user: %20
+  cond_fail %19 : $Builtin.Int1                   // id: %20
+  %21 = struct $Int (%18 : $Builtin.Word)         // user: %24
+  %22 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %26
+  %23 = struct_extract %12 : $Int, #Int.value     // user: %26
+  %24 = struct_extract %21 : $Int, #Int.value     // user: %26
+  %25 = integer_literal $Builtin.Int1, -1         // user: %26
+  %26 = apply %22(%23, %24, %25) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %27, %28
+  %27 = tuple_extract %26 : $(Builtin.Word, Builtin.Int1), 0 // user: %30
+  %28 = tuple_extract %26 : $(Builtin.Word, Builtin.Int1), 1 // user: %29
+  cond_fail %28 : $Builtin.Int1                   // id: %29
+  %30 = struct $Int (%27 : $Builtin.Word)         // user: %31
+  return %30 : $Int                               // id: %31
+}
+

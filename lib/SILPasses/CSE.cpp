@@ -57,6 +57,10 @@ struct SimpleValue {
   }
 
   static bool canHandle(SILInstruction *Inst) {
+    if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
+      auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+      return (BFRI && isSideEffectFree(BFRI));
+     }
     switch (Inst->getKind()) {
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
@@ -190,6 +194,13 @@ public:
   hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
     return llvm::hash_combine(unsigned(ValueKind::PointerToAddressInst),
                               X->getType(), X->getOperand());
+  }
+  hash_code visitApplyInst(ApplyInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(unsigned(ValueKind::ApplyInst), X->getCallee(),
+                              llvm::hash_combine_range(Operands.begin(),
+                                                       Operands.end()),
+                              X->hasSubstitutions(), X->isTransparent());
   }
 };
 } // end anonymous namespace
