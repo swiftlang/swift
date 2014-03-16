@@ -528,12 +528,15 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   // followed by a '}', ';', statement or decl start keyword sequence.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
       !isStartOfStmt(Tok) && !isStartOfDecl(Tok, peekToken())) {
+    SourceLoc ExprLoc;
+    if (Tok.isNot(tok::eof))
+      ExprLoc = Tok.getLoc();
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
-    if (Result.isNull()) {
+    if (Result.isNull() && ExprLoc.isValid()) {
       // Create an ErrorExpr to tell the type checker that this return
       // statement had an expression argument in the source.  This supresses
       // the error about missing return value in a non-void function.
-      Result = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+      Result = makeParserErrorResult(new (Context) ErrorExpr(ExprLoc));
     }
     return makeParserResult(
         Result, new (Context) ReturnStmt(ReturnLoc, Result.getPtrOrNull()));
