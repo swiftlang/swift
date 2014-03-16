@@ -78,6 +78,7 @@ struct SimpleValue {
       case ValueKind::RefElementAddrInst:
       case ValueKind::IndexRawPointerInst:
       case ValueKind::PointerToAddressInst:
+      case ValueKind::CondFailInst:
         return true;
       default:
         return false;
@@ -161,6 +162,11 @@ public:
   hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
     return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
                               X->getStructDecl(), X->getField(),
+                              X->getOperand());
+  }
+
+  hash_code visitCondFailInst(CondFailInst *X) {
+    return llvm::hash_combine(unsigned(ValueKind::CondFailInst),
                               X->getOperand());
   }
 

@@ -9,8 +9,11 @@ import Swift
 
 //CHECK-LABLE: simply_arith
 //CHECK: apply
+//CHECK: cond_fail
 //CHECK: apply
+//CHECK: cond_fail
 //CHECK-NOT: apply
+//CHECK-NOT: cond_fail
 //CHECK: return
 sil @simply_arith : $@thin (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):

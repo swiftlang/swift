@@ -319,11 +319,19 @@ namespace {
       // at this point.
       return true;
     }
+
     bool visitIndexRawPointerInst(IndexRawPointerInst *RHS) {
       // We have already compared the operands/types, so we should have equality
       // at this point.
       return true;
     }
+
+    bool visitCondFailInst(CondFailInst *RHS) {
+      // We have already compared the operands/types, so we should have equality
+      // at this point.
+      return true;
+    }
+
     bool visitPointerToAddressInst(PointerToAddressInst *RHS) {
       // We have already compared the operands/types, so we should have equality
       // at this point.
