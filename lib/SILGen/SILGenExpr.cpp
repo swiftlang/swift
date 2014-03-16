@@ -3835,17 +3835,16 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     = SGF.emitRValueAsSingleValue(E->getExistentialValue());
   
   // Open the existential value into the opened archetype value.
-  auto archetypeTy = E->getOpenedArchetype();
   SILValue archetypeValue;
   if (existentialValue.getValue().getType().isAddress()) {
     archetypeValue = SGF.B.createOpenExistential(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(archetypeTy));
+                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
   } else {
     assert(existentialValue.getValue().getType().isObject());
     archetypeValue = SGF.B.createOpenExistentialRef(
                        E, existentialValue.forward(SGF),
-                       SGF.getLoweredType(archetypeTy));
+                       SGF.getLoweredType(E->getOpaqueValue()->getType()));
   }
   
   // Register the opaque value for the projected existential.

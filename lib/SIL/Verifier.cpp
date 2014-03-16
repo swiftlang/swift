@@ -1080,15 +1080,43 @@ public:
     SILType operandType = OEI->getOperand().getType();
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
-    SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftType()->isExistentialType(protocols),
-            "open_existential must be applied to existential");
-    require(operandType.isClassExistentialType(),
-            "open_existential_ref operand must be class existential");
 
-    require(isOpenedArchetype(OEI->getType().getSwiftRValueType()),
+    CanType instanceTy = operandType.getSwiftType();
+    bool isOperandMetatype = false;
+    if (auto metaTy = dyn_cast<MetatypeType>(instanceTy)) {
+      instanceTy = metaTy.getInstanceType();
+      isOperandMetatype = true;
+    }
+
+    require(instanceTy->isExistentialType(),
+            "open_existential_ref must be applied to existential or metatype "
+            "thereof");
+    require(isOperandMetatype || instanceTy->isClassExistentialType(),
+            "open_existential_ref operand must be class existential or "
+            "metatype");
+
+    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+    if (auto resultMetaTy = dyn_cast<MetatypeType>(resultInstanceTy)) {
+      require(isOperandMetatype, 
+              "open_existential_ref result is a metatype but operand is not");
+      require(resultMetaTy->hasRepresentation(),
+              "open_existential_ref result metatype must have a "
+              "representation");
+      require(resultMetaTy->getRepresentation() == 
+                cast<MetatypeType>(operandType.getSwiftType())
+                  ->getRepresentation(),
+              "open_existential_ref result and operand metatypes must have the "
+              "same representation");
+              
+      resultInstanceTy = resultMetaTy.getInstanceType();
+    } else {
+      require(!isOperandMetatype, 
+              "open_existential_ref operand is a metatype but result is not");
+    }
+
+    require(isOpenedArchetype(resultInstanceTy),
             "open_existential_ref result must be an opened existential "
-            "archetype");
+            "archetype or metatype thereof");
   }
 
   void checkInitExistentialInst(InitExistentialInst *AEI) {

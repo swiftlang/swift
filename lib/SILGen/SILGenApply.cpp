@@ -773,7 +773,39 @@ public:
     }
     ++callDepth;
   }
-  
+
+  /// Given a metatype value for the type, allocate an Objective-C
+  /// object (with alloc_ref_dynamic) of that type.
+  ///
+  /// \returns the self object.
+  ManagedValue allocateObjCObject(ManagedValue selfMeta, SILLocation loc) {
+    auto metaType = cast<MetatypeType>(selfMeta.getType().getSwiftRValueType());
+    CanType type = metaType.getInstanceType();
+
+    // Convert to an Objective-C metatype representation, if needed.
+    CanType objcMetaType
+      = CanMetatypeType::get(type, MetatypeRepresentation::ObjC,
+                             type->getASTContext());
+    ManagedValue selfMetaObjC;
+    if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
+      selfMetaObjC = selfMeta;
+    } else {
+      selfMetaObjC = ManagedValue(
+                       gen.B.emitThickToObjCMetatype(
+                         loc, selfMeta.getValue(),
+                         gen.SGM.getLoweredType(objcMetaType)),
+                       selfMeta.getCleanup());
+    }
+
+    // Allocate the object.
+    return ManagedValue(gen.B.createAllocRefDynamic(
+                          loc,
+                          selfMetaObjC.getValue(),
+                          gen.SGM.getLoweredType(type),
+                          /*objc=*/true),
+                          selfMetaObjC.getCleanup());
+  }
+
   //
   // Known callees.
   //
@@ -826,27 +858,11 @@ public:
         // If we require a dynamic allocation of the object here, do so now.
         if (requiresAllocRefDynamic) {
           SILLocation loc = thisCallSite->getArg();
-          CanType type = cast<MetatypeType>(self.getType()).getInstanceType();
-
-          // Convert to an Objective-C metatype representation.
-          CanType objcMetaType
-            = CanMetatypeType::get(type, MetatypeRepresentation::ObjC,
-                                   type->getASTContext());
-          ManagedValue selfValue = std::move(self).getAsSingleValue(gen,loc);
-          selfValue = ManagedValue(
-                        gen.B.emitThickToObjCMetatype(
-                          loc, selfValue.getValue(),
-                          gen.SGM.getLoweredType(objcMetaType)),
-                        selfValue.getCleanup());
-
-          // Allocate the object.
-          selfValue = ManagedValue(gen.B.createAllocRefDynamic(
-                                     loc,
-                                     selfValue.getValue(),
-                                     gen.SGM.getLoweredType(type),
-                                     /*objc=*/true),
-                                   selfValue.getCleanup());
-          self = RValue(gen, loc, type, selfValue);
+          auto selfValue = allocateObjCObject(
+                             std::move(self).getAsSingleValue(gen, loc),
+                             loc);
+          self = RValue(gen, loc, selfValue.getType().getSwiftRValueType(),
+                        selfValue);
         }
 
         setSelfParam(std::move(self), thisCallSite);
@@ -948,11 +964,6 @@ public:
     if (!fd)
       return visitExpr(e);
 
-    // Figure out the kind of declaration reference we're working with.
-    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
-    if (isa<ConstructorDecl>(fd))
-      kind = SILDeclRef::Kind::Allocator;
-
     // We have four cases to deal with here:
     //
     //  1) for a "static" / "type" method, the base is a metatype.
@@ -972,7 +983,23 @@ public:
 
     auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
     auto baseTy = e->getBase()->getType()->getLValueOrInOutObjectType();
-    
+
+    // Figure out the kind of declaration reference we're working with.
+    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+    if (isa<ConstructorDecl>(fd)) {
+      if (proto->isObjC()) {
+        // For Objective-C initializers, we only have an initializing
+        // initializer. We need to allocate the object ourselves.
+        kind = SILDeclRef::Kind::Initializer;
+
+        baseVal = allocateObjCObject(baseVal, e->getBase());
+      } else {
+        // For non-Objective-C initializers, we have an allocating
+        // initializer to call.
+        kind = SILDeclRef::Kind::Allocator;
+      }
+    }
+
     if (!baseTy->isExistentialType()) {
       setSelfParam(RValue(gen, e->getBase(), baseVal.getType().getSwiftType(),
                           baseVal), e);

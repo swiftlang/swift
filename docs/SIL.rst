@@ -2988,9 +2988,8 @@ open_existential_ref
 
   sil-instruction ::= 'open_existential_ref' sil-operand 'to' sil-type
 
-  %1 = open_existential %0 : $P to $@opened P
-  // %0 must be of a $*P type for aclass protocol or protocol composition
-  //   type P
+  %1 = open_existential_ref %0 : $P to $@opened P
+  // %0 must be of a $P type for a class protocol, class protocol composition, or a metatype of a protocol or protocol composition
   // $@opened P must be a unique archetype that refers to an opened 
   // existential type P. 
   // %1 will be of type $P
@@ -2999,7 +2998,8 @@ Extracts the class instance refernece from a class existential
 container. The protocol conformances associated with this existential
 container are associated directly with the archetype ``@opened P``. This 
 pointer can be used with any operation on archetypes, such as 
-``witness_method``.
+``witness_method``. When the operand is of metatype type, the result
+will be the metatype of the opened archetype.
 
 Unchecked Conversions
 ~~~~~~~~~~~~~~~~~~~~~
