@@ -467,6 +467,9 @@ SourceRange UnresolvedMemberExpr::getSourceRange() const {
 }
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
-  return getOpaqueValue()->getType()->castTo<ArchetypeType>();
+  auto type = getOpaqueValue()->getType();
+  if (auto metaTy = type->getAs<MetatypeType>())
+    type = metaTy->getInstanceType();
+  return type->castTo<ArchetypeType>();
 }
 

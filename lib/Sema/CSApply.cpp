@@ -448,22 +448,18 @@ namespace {
       (void)baseTy->isExistentialType(protocols);
       auto archetype = ArchetypeType::getOpened(baseTy);
 
-      // Create the opaque opened value.
-      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(),
-                                                    archetype);
+      // Create the opaque opened value. If we started with a
+      // metatype, it's a metatype.
+      Type opaqueType = archetype;
+      if (isMetatype)
+        opaqueType = MetatypeType::get(archetype, ctx);
+      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
       archetypeVal->setUniquelyReferenced(true);
 
       // Record this opened existential.
       OpenedExistentials[archetype] = { base, archetypeVal };
 
-      // If we started with a metatype, produce a metatype.
-      Expr *newBase = archetypeVal;
-      if (isMetatype) {
-        auto metaTy = MetatypeType::get(archetype, ctx);
-        newBase = new (ctx) MetatypeExpr(archetypeVal, SourceLoc(), metaTy);
-      }
-
-      return std::make_tuple(newBase, archetype);
+      return std::make_tuple(archetypeVal, archetype);
     }
 
     /// \brief Build a new member reference with the given base and member.
