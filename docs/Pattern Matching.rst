@@ -28,9 +28,7 @@ Swift has a pretty small set of types right now:
 * Struct types.  Nominal heterogenous fixed-length products.
 * Class types.  Nominal, subtypeable heterogenous fixed-length products
   with identity.
-* Protocol and protocol-composition types. Existential types restricted
-  to a single variable which must also be the head type, i.e. more
-  formally :math:`\exists y : P1, P2 . y`.
+* Protocol and protocol-composition types.
 
 In addition, each of the nominal types can be made generic; this
 doesn't affect the overall introduction/elimination design because an
