@@ -69,8 +69,9 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx, bool useOptional)
-  : Impl(*new Implementation(ctx, useOptional))
+ClangImporter::ClangImporter(ASTContext &ctx, bool useOptional, 
+                             bool splitPrepositions)
+  : Impl(*new Implementation(ctx, useOptional, splitPrepositions))
 {
 }
 
@@ -109,7 +110,8 @@ MAKE_HAS_ATTR(ObjCCompleteDefinition)
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, ctx.LangOpts.EnableObjCOptional)
+    new ClangImporter(ctx, ctx.LangOpts.EnableObjCOptional,
+                      ctx.LangOpts.SplitPrepositions)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -495,7 +497,11 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 }
 
 DeclName
-ClangImporter::Implementation::importName(clang::Selector selector) {
+ClangImporter::Implementation::importName(clang::Selector selector,
+                                          bool *firstParamIncludedInName) {
+  if (firstParamIncludedInName)
+    *firstParamIncludedInName = false;
+
   if (selector.isNull())
     return DeclName();
   
@@ -504,8 +510,36 @@ ClangImporter::Implementation::importName(clang::Selector selector) {
   
   SmallVector<Identifier, 2> components;
   
-  for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i)
-    components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
+  for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i) {
+    if (i > 0 || !SplitPrepositions) {
+      components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
+      continue;
+    }
+
+    // Split the first selector into a function name and a first
+    // parameter name.
+    // FIXME: Eventually handle init method selectors, too.
+    StringRef funcName, paramName;
+    llvm::SmallString<16> buffer;
+    auto piece = selector.getIdentifierInfoForSlot(i);
+    std::tie(funcName, paramName) = splitFirstSelectorPiece(piece->getName(),
+                                                            buffer);
+
+    // FIXME: Don't allow splitting out 'init'. That's currently
+    // handled elsewhere.
+    if (funcName.equals("init")) {
+      components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
+      continue;
+    }
+
+    components.push_back(SwiftContext.getIdentifier(funcName));
+    if (!paramName.empty()) {
+      if (firstParamIncludedInName)
+        *firstParamIncludedInName = true;
+
+      components.push_back(SwiftContext.getIdentifier(paramName));
+    }
+  }
   
   return DeclName(SwiftContext, components);
 }

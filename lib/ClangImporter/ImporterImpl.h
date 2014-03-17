@@ -166,8 +166,9 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, bool enableOptional)
-    : SwiftContext(ctx), EnableOptional(enableOptional) { }
+  Implementation(ASTContext &ctx, bool enableOptional, bool splitPrepositions)
+    : SwiftContext(ctx), EnableOptional(enableOptional),
+      SplitPrepositions(splitPrepositions) { }
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -177,6 +178,7 @@ public:
   ASTContext &SwiftContext;
 
   const bool EnableOptional;
+  const bool SplitPrepositions;
 
 private:
   /// \brief A count of the number of load module operations.
@@ -392,8 +394,21 @@ public:
                         StringRef removePrefix = "");
   
   /// Import the given selector name into Swift.
-  DeclName importName(clang::Selector selector);
+  DeclName importName(clang::Selector selector, 
+                      bool *firstParamIncludedInName = nullptr);
   
+  /// Split the first selector piece into a function name and first
+  /// parameter name, if possible.
+  ///
+  /// \param selector The selector piece to split.
+  ///
+  /// \returns a (function name, first parameter name) pair describing
+  /// the split. If no split is possible, the function name will be \c
+  /// selector and the parameter name will be empty.
+  std::pair<StringRef, StringRef> splitFirstSelectorPiece(
+                                    StringRef selector,
+                                    SmallVectorImpl<char> &buffer);
+
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
 

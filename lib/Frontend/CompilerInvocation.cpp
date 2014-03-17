@@ -533,6 +533,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableObjCOptional = Args.hasArg(OPT_enable_objc_optional);
+  Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
 
   return false;
 }

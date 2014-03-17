@@ -1567,7 +1567,9 @@ namespace {
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc, bool forceClassMethod = false) {
-      DeclName name = Impl.importName(decl->getSelector());
+      bool firstParamIncludedInName;
+      DeclName name = Impl.importName(decl->getSelector(),
+                                      &firstParamIncludedInName);
       if (!name)
         return nullptr;
 
@@ -1614,6 +1616,7 @@ namespace {
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
           SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
           argPatterns, bodyPatterns, TypeLoc(), dc);
+      result->setFirstParamIncludedInName(firstParamIncludedInName);
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;

@@ -540,33 +540,89 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   return converter.Visit(type.getTypePtr());
 }
 
-/// Given the first selector piece for an init method, e.g., \c initWithFoo,
-/// produce the
+/// Split the given selector piece at the given index, updating
+/// capitalization as required.
 ///
-/// \param piece The first selector piece, e.g., \c initWithFoo.
-/// \param buffer A scratch buffer.
-/// \returns the name of the parameter that corresponds to this selector piece.
-static StringRef getFirstInitParameterName(StringRef piece,
-                                           SmallVectorImpl<char> &buffer) {
-  assert(piece.startswith("init") && "Must be in the init family");
-  piece = piece.substr(4);
-
-  // If the second character is uppercase, we have an acronym, so don't
-  // make any changes. Similarly, if there's nothing to change, or lowercasing
-  // the first letter would have no effect, there's nothing more to do.
-  // just re
-  if (piece.empty() ||
-      (piece.size() > 1 && isupper(piece[1])) ||
-      tolower(piece[0]) == piece[0]) {
-    return piece;
+/// \param selector The selector piece.
+/// \param index The index at which to split.
+/// \param buffer Buffer used for scratch space.
+///
+/// \returns a pair of strings \c (before,after), where \c after has
+/// has its capitalization adjusted if necessary.
+std::pair<StringRef, StringRef> 
+splitSelectorPieceAt(StringRef selector, unsigned index,
+                     SmallVectorImpl<char> &buffer) {
+  // If the split point is at the end of the selector, the solution is
+  // trivial.
+  if (selector.str().size() == index) {
+    return { selector, "" };
   }
 
-  // Lowercase the first letter.
+  // If there are at least two characters in the parameter name, and
+  // lowercasing the second of them changes it, we have an
+  // acronym. Don't lowercase anything.
+  if (selector.size() > index + 1 && 
+      tolower(selector[index + 1]) != selector[index + 1]) {
+    return { selector.substr(0, index), selector.substr(index) };
+  }
+    
+  // Lowercase the first character of the parameter name.
   buffer.clear();
-  buffer.reserve(piece.size());
-  buffer.push_back(tolower(piece[0]));
-  buffer.append(piece.begin() + 1, piece.end());
-  return StringRef(buffer.data(), buffer.size());
+  buffer.reserve(selector.size() - index);
+  buffer.push_back(tolower(selector[index]));
+  buffer.append(selector.begin() + index + 1, selector.end());
+  return { selector.substr(0, index), StringRef(buffer.data(), buffer.size()) };
+}
+
+/// Determine whether the given word (which should have its first
+/// letter already capitalized) is a preposition.
+static bool isPreposition(StringRef word) {
+  return llvm::StringSwitch<bool>(word)
+#define PREPOSITION(Word) .Case(#Word, true)
+#include "Prepositions.def"
+    .Default(false);
+}
+
+std::pair<StringRef, StringRef> 
+ClangImporter::Implementation::splitFirstSelectorPiece(
+                                 StringRef selector,
+                                 SmallVectorImpl<char> &buffer) {
+  // If "init" is the first word, we have an initializer.
+  if (selector.startswith("init") &&
+      (selector.size() == 4 || tolower(selector[4]) != selector[4])) {
+    return splitSelectorPieceAt(selector, 4, buffer);
+  }
+
+  // Scan words from the back of the selector looking for a
+  // preposition.
+  unsigned wordStart = selector.size();
+  unsigned wordEnd = wordStart;
+  for (;;) {
+    // Skip over any lowercase letters.
+    while (wordStart > 0 && 
+           tolower(selector[wordStart-1]) == selector[wordStart-1])
+      --wordStart;
+
+    // Skip over any non-lowercase letters.
+    while (wordStart > 0 && 
+           tolower(selector[wordStart-1]) != selector[wordStart-1])
+      --wordStart;
+
+    // [wordStart, wordEnd) is the current word.
+    if (wordStart == 0)
+      break;
+
+    // If this word is a preposition, split here.
+    if (isPreposition(selector.substr(wordStart, wordEnd - wordStart))) {
+      return splitSelectorPieceAt(selector, wordStart, buffer);
+    }
+
+    // Look for the next word.
+    wordEnd = wordStart;
+  }
+
+  // Nothing to split.
+  return { selector, "" };
 }
 
 Type ClangImporter::Implementation::importFunctionType(
@@ -618,24 +674,33 @@ Type ClangImporter::Implementation::importFunctionType(
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
     Identifier name = bodyName;
-    if ((index > 0 || kind == SpecialMethodKind::Constructor) &&
-        index < selector.getNumArgs()) {
+    if (index < selector.getNumArgs() &&
+        (index > 0 || 
+         kind == SpecialMethodKind::Constructor || 
+         SplitPrepositions)) {
       // For parameters after the first, or all parameters in a constructor,
       // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
 
+      // For the first selector piece either in a constructor or when 
       // For the first selector piece in a constructor, strip off the 'init'
       // prefer and lowercase the first letter of the remainder (unless the
       // second letter is also uppercase, in which case we probably have an
       // acronym anyway).
-      if (index == 0 && kind == SpecialMethodKind::Constructor &&
-          !name.empty()) {
-        llvm::SmallString<32> buffer;
-        auto newName = getFirstInitParameterName(name.str(), buffer);
-        if (newName.empty())
-          name = Identifier();
-        else
-          name = SwiftContext.getIdentifier(newName);
+      if (index == 0 && !name.empty() &&
+          (kind == SpecialMethodKind::Constructor || SplitPrepositions)) {
+        StringRef newFuncName, newName;
+        llvm::SmallString<16> buffer;
+        std::tie(newFuncName, newName)
+          = splitFirstSelectorPiece(name.str(), buffer);
+
+        if (kind == SpecialMethodKind::Constructor ||
+            !newFuncName.equals("init")) {
+          if (newName.empty())
+            name = Identifier();
+          else
+            name = SwiftContext.getIdentifier(newName);
+        }
       }
     }
 
@@ -699,12 +764,11 @@ Type ClangImporter::Implementation::importFunctionType(
   // suitably modified for a parameter name.
   if (kind == SpecialMethodKind::Constructor && selector.isUnarySelector() &&
       params.empty()) {
-    llvm::SmallString<32> buffer;
-    auto paramName = getFirstInitParameterName(
-                       selector.getIdentifierInfoForSlot(0)->getName(),
-                       buffer);
-    if (!paramName.empty()) {
-      auto name = SwiftContext.getIdentifier(paramName);
+    llvm::SmallString<16> buffer;
+    auto name = selector.getIdentifierInfoForSlot(0)->getName();
+    StringRef newName = splitFirstSelectorPiece(name, buffer).second;
+    if (!newName.empty()) {
+      auto name = SwiftContext.getIdentifier(newName);
       auto type = TupleType::getEmpty(SwiftContext);
       auto var = new (SwiftContext) VarDecl(/*static*/ false,
                                             /*IsLet*/ true,

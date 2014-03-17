@@ -12,7 +12,7 @@
 // This file lists the Objective-C protocols that have been renamed
 // due to conflicts with other class names, e.g.,
 // NSObject-the-protocol vs. NSObject-the-class.
-// ===----------------------------------------------------------------------===//
+// ===---------------------------------------------------------------------===//
 
 #ifndef RENAMED_PROTOCOL
 #  error Must define RENAMED_PROTOCOL(ObjCName, SwiftName)

@@ -55,6 +55,10 @@ namespace swift {
     /// references and optional closures, respectively.
     bool EnableObjCOptional = false;
 
+    /// Whether to split imported Objective-C selectors just before
+    /// the last preopsition.
+    bool SplitPrepositions = false;
+
     /// \brief Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
