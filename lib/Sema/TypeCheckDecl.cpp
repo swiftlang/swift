@@ -1117,15 +1117,10 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 }
 
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
-static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC,
-                                           VarDecl **SelfDeclRet = nullptr) {
+static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   ASTContext &Ctx = DC->getASTContext();
   auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
                                      Loc, Ctx.Id_self, Type(), DC);
-  // FIXME: Remove SelfDeclRet when we don't need it anymore.
-  if (SelfDeclRet)
-    *SelfDeclRet = SelfDecl;
-
   SelfDecl->setImplicit();
   Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
   return new (Ctx) TypedPattern(P, TypeLoc());
@@ -1152,14 +1147,14 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
   return ValueParamsPattern;
 }
 
-static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
+static FuncDecl *createGetterPrototype(VarDecl *VD) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
-  
+
   // Create the parameter list for the getter.
   Pattern *GetterParams[] = {
     // The implicit 'self' argument.
-    buildImplicitSelfParameter(Loc, VD->getDeclContext(), &SelfDecl),
+    buildImplicitSelfParameter(Loc, VD->getDeclContext()),
     
     // Add a no-parameters clause.
     TuplePattern::create(VD->getASTContext(), Loc, ArrayRef<TuplePatternElt>(),
@@ -1177,15 +1172,14 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, VarDecl *&SelfDecl) {
   return Get;
 }
 
-static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
-                                       VarDecl *&ValueDecl) {
+static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
   // Create the parameter list for the setter.
   Pattern *SetterParams[] = {
     // The implicit 'self' argument.
-    buildImplicitSelfParameter(Loc, VD->getDeclContext(), &SelfDecl),
+    buildImplicitSelfParameter(Loc, VD->getDeclContext()),
     
     // Add a "(value : T)" pattern.
     buildSetterValueArgumentPattern(VD, &ValueDecl)
@@ -1205,8 +1199,7 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&SelfDecl,
 
 
 static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
-  VarDecl *SelfDecl = nullptr;
-  auto *Get = createGetterPrototype(VD, SelfDecl);
+  auto *Get = createGetterPrototype(VD);
   
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, nullptr, VD->getLoc());
@@ -1217,6 +1210,36 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
   appendMembers(PD, Get);
 }
 
+
+/// Synthesize the body of a trivial getter.
+///
+static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
+  auto &Ctx = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
+
+  Expr *GetResult;
+  if (VarDecl *SelfDecl = Get->getImplicitSelfDecl()) {
+    // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
+    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+    GetResult = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                        /*implicit*/true,/*direct ivar*/true);
+  } else {
+    // Non-member observing accessors just directly load the variable.
+    // Create (return (decl_ref_expr(VD)))
+    GetResult = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                      /*direct ivar*/true);
+  }
+  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), GetResult,
+                                        /*implicit*/true);
+  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
+
+  // Mark it transparent, there is no user benefit to this actually existing, we
+  // just want it for abstraction purposes (i.e., to make access to the variable
+  // uniform and to be able to put the getter in a vtable).
+  Get->getMutableAttrs().setAttr(AK_transparent, Loc);
+}
+
+
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
@@ -1225,30 +1248,25 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
-  VarDecl *SelfDecl = nullptr;
-
-  auto *Get = createGetterPrototype(VD, SelfDecl);
-  
-  // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
-  auto *DRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-  auto *MRE = new (Context) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                          /*implicit*/true,/*direct ivar*/true);
-  ASTNode Return = new (Context) ReturnStmt(SourceLoc(), MRE, /*implicit*/true);
-  Get->setBody(BraceStmt::create(Context, Loc, Return, Loc));
+  auto *Get = createGetterPrototype(VD);
+  synthesizeTrivialGetter(Get, VD);
 
   FuncDecl *Set = nullptr;
   if (!VD->isLet()) {
     // Okay, the getter is set up, create the setter next.
     VarDecl *ValueDecl = nullptr;
 
-    Set = createSetterPrototype(VD, SelfDecl, ValueDecl);
+    Set = createSetterPrototype(VD, ValueDecl);
+
+    VarDecl *SelfDecl = Set->getImplicitSelfDecl();
 
     // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
     //                decl_ref_expr(value))
     auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
     auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
-    MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                      /*implicit*/true, /*direct ivar*/true);
+    auto *MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD,
+                                            SourceLoc(), /*implicit*/true,
+                                            /*direct ivar*/true);
     ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
     Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
   }
@@ -1313,24 +1331,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   
   /// The getter is always trivial: just perform a (direct!) load of storage.
   auto *Get = VD->getGetter();
-  Expr *GetResult;
-  if (VarDecl *SelfDecl = Get->getImplicitSelfDecl()) {
-    // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
-    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-    GetResult = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                        /*implicit*/true,/*direct ivar*/true);
-  } else {
-    // Non-member observing accessors just directly load the variable.
-    // Create (return (decl_ref_expr(VD)))
-    GetResult = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                      /*direct ivar*/true);
-  }
-  ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), GetResult,
-                                        /*implicit*/true);
-  Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
-
-  // Mark it transparent, there is no user benefit to this actually existing.
-  Get->getMutableAttrs().setAttr(AK_transparent, Loc);
+  synthesizeTrivialGetter(Get, VD);
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
@@ -1613,6 +1614,16 @@ public:
       VD->setIsObjC(isObjC);
     }
 
+    if (IsFirstPass && !checkOverrides(VD)) {
+      // If a property has an override attribute but does not override
+      // anything, complain.
+      if (VD->getAttrs().isOverride() && !VD->getOverriddenDecl()) {
+        TC.diagnose(VD, diag::property_does_not_override)
+        .highlight(VD->getAttrs().getLoc(AK_override));
+        VD->getMutableAttrs().clearAttribute(AK_override);
+      }
+    }
+
     // In a protocol context, variables written as "var x : Int" are really
     // computed properties with just a getter.  Create the getter decl now.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
@@ -1647,17 +1658,6 @@ public:
       TC.typeCheckDecl(VD->getGetter(), true);
       TC.typeCheckDecl(VD->getSetter(), true);
     }
-
-    if (IsFirstPass && !checkOverrides(VD)) {
-      // If a property has an override attribute but does not override
-      // anything, complain.
-      if (VD->getAttrs().isOverride() && !VD->getOverriddenDecl()) {
-        TC.diagnose(VD, diag::property_does_not_override)
-          .highlight(VD->getAttrs().getLoc(AK_override));
-        VD->getMutableAttrs().clearAttribute(AK_override);
-      }
-    }
-
   }
 
 
@@ -3103,7 +3103,7 @@ public:
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
-      
+
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage()) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
@@ -3789,8 +3789,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
   // Create the constructor.
   auto constructorID = context.Id_init;
-  VarDecl *selfDecl;
-  Pattern *selfPat = buildImplicitSelfParameter(Loc, decl, &selfDecl);
+  Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
   auto *ctor = new (context) ConstructorDecl(constructorID, Loc,
                                              selfPat, pattern, selfPat, pattern,
                                              nullptr, decl);
@@ -4378,8 +4377,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   if (FoundDestructor)
     return;
 
-  VarDecl *selfDecl;
-  Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD, &selfDecl);
+  Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD);
 
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, CD->getLoc(),
                                           selfPat, CD);
@@ -4838,10 +4836,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         D->getMutableAttrs().clearAttribute(AK_transparent);
       }
     } else if (isa<FuncDecl>(D) && cast<FuncDecl>(D)->isAccessor() &&
-               cast<FuncDecl>(D)->getAccessorStorageDecl()->getStorageKind()
-                  == VarDecl::Observing) {
-      // @transparent is always ok on observing accessors, since they are
-      // directly dispatched (even in classes).
+               D->isImplicit()) {
+      // @transparent is always ok on implicitly generated accessors: they can
+      // be dispatched (even in classes) when the references are within the
+      // class themself.
     } else {
       assert(AFD || VD);
       DeclContext *Ctx = AFD ? AFD->getParent() : VD->getDeclContext();
