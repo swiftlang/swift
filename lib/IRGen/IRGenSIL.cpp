@@ -2025,7 +2025,6 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   LoweredBB &noMethodBB = getLoweredBB(i->getNoMethodBB());
 
   // Emit the swift_objcRespondsToSelector() call.
-  // FIXME: Make this work for subscripts as well.
   StringRef selector;
   llvm::SmallString<64> selectorBuffer;
   if (auto fnDecl = dyn_cast<FuncDecl>(i->getMember().getDecl()))

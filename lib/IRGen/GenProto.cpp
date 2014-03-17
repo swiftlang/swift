@@ -253,8 +253,8 @@ namespace {
     }
 
     void visitFunc(FuncDecl *func) {
+      // Accessors are emitted by their var/subscript declaration.
       if (func->isAccessor())
-        // FIXME: To be implemented.
         return;
       emitFunc(func);
     }

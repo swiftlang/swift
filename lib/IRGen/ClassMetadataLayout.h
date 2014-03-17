@@ -123,11 +123,23 @@ private:
     // Add entries for the methods.
     for (auto member : theClass->getMembers()) {
       // Add entries for methods.
-      if (auto fn = dyn_cast<FuncDecl>(member))
+      if (auto fn = dyn_cast<FuncDecl>(member)) {
+        // Ignore accessors.  These get added when their AbstractStorageDecl is
+        // visited.
+        if (fn->isAccessor())
+          continue;
         addMethodEntries(fn);
-      // Add entries for constructors.
-      else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      } else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+        // Add entries for constructors.
         addMethodEntries(ctor);
+      } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
+        // FIXME: Stored properties shouldn't be represented this way.
+        // FIXME: Handle @final.
+        if (!asd->hasAccessorFunctions()) continue;
+
+        addMethodEntries(asd->getGetter());
+        if (auto *setter = asd->getSetter())
+          addMethodEntries(setter);
       }
     }
     
@@ -224,12 +236,6 @@ private:
                       SILDeclRef::Kind kind,
                       ResilienceExpansion explosionLevel,
                       unsigned uncurryLevel) {
-    // FIXME: Ignore getters and setters.  This is probably wrong!
-    if (auto func = dyn_cast<FuncDecl>(fn)) {
-      if (func->isAccessor())
-        return;
-    }
-
     // If the method overrides something, we don't need a new entry.
     if (fn->getOverriddenDecl()) {
       // Except we do if it differs by abstraction from all the
