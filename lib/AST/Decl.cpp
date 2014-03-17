@@ -2086,6 +2086,20 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
     return out.str();
 
   // Otherwise, it's at least a unary selector.
+
+  // If the first parameter name is significant, uppercase and add it.
+  if (tuple && isFirstParamIncludedInName()) {
+    auto eltPattern = tuple->getFields()[0].getPattern()
+                        ->getSemanticsProvidingPattern();
+
+    // Add a label to the selector component if there's a tag.
+    if (auto named = dyn_cast<NamedPattern>(eltPattern)) {
+      StringRef name = named->getBoundName().str();
+      out << (char)toupper(name[0]) << name.substr(1);
+    }
+  }
+
+  // Add the ':'.
   out << ':';
 
   // If it's a unary selector, we're done.

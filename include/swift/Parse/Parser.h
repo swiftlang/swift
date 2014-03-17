@@ -776,7 +776,8 @@ public:
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       TypeRepr *&retType,
-                                      bool &HasSelectorStyleSignature);
+                                      bool &HasSelectorStyleSignature,
+                                      bool &FirstParamIncludedInName);
   ParserStatus parseConstructorArguments(Pattern *&ArgPattern,
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs,
