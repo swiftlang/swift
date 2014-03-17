@@ -20,13 +20,18 @@ namespace swift {
 
 struct HeapMetadata;
 
+// The members of the HeapObject header that are not shared by a
+// standard Objective-C instance
+#define SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS       \
+  uint32_t refCount;                            \
+  uint32_t weakRefCount
+
 /// The Swift heap-object header.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
   struct HeapMetadata const *metadata;
 
-  uint32_t refCount;
-  uint32_t weakRefCount;
+  SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
   // FIXME: allocate two words of metadata on 32-bit platforms
 };
 
