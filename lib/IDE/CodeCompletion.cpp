@@ -1090,20 +1090,20 @@ public:
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
-    bool IsImlicitlyCurriedInstanceMethod;
+    bool IsImplicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
-      IsImlicitlyCurriedInstanceMethod = ExprType->is<MetatypeType>() &&
-                                         !FD->isStatic();
+      IsImplicitlyCurriedInstanceMethod = ExprType->is<MetatypeType>() &&
+                                          !FD->isStatic();
       break;
     case LookupKind::ValueInDeclContext:
-      IsImlicitlyCurriedInstanceMethod =
+      IsImplicitlyCurriedInstanceMethod =
           InsideStaticMethod &&
           FD->getDeclContext() == CurrentMethod->getDeclContext() &&
           !FD->isStatic();
-      if (!IsImlicitlyCurriedInstanceMethod) {
+      if (!IsImplicitlyCurriedInstanceMethod) {
         if (auto Init = dyn_cast<Initializer>(CurrDeclContext)) {
-          IsImlicitlyCurriedInstanceMethod =
+          IsImplicitlyCurriedInstanceMethod =
               FD->getDeclContext() == Init->getParent() &&
               !FD->isStatic();
         }
@@ -1115,7 +1115,7 @@ public:
       llvm_unreachable("can not have a method call while doing a "
                        "type completion");
     case LookupKind::ImportFromModule:
-      IsImlicitlyCurriedInstanceMethod = false;
+      IsImplicitlyCurriedInstanceMethod = false;
       break;
     }
 
@@ -1136,7 +1136,7 @@ public:
     llvm::SmallString<32> TypeStr;
 
     unsigned FirstIndex = 0;
-    if (!IsImlicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
+    if (!IsImplicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
 
@@ -1152,7 +1152,7 @@ public:
 
     Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
 
-    if (IsImlicitlyCurriedInstanceMethod) {
+    if (IsImplicitlyCurriedInstanceMethod) {
       if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer()))
         FirstInputType = PT->getUnderlyingType();
 
