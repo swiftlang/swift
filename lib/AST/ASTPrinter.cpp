@@ -735,7 +735,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   // Print in selector style.
   for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
-    if (isa<ConstructorDecl>(AFD) || (isa<FuncDecl>(AFD) && i != 0)) {
+    if (isa<ConstructorDecl>(AFD) || 
+        (isa<FuncDecl>(AFD) && 
+         (i != 0 || cast<FuncDecl>(AFD)->isFirstParamIncludedInName()))) {
       Printer << " ";
       auto ArgName = ArgTuple->getFields()[i].getPattern()->getBoundName();
       if (ArgName.empty())
