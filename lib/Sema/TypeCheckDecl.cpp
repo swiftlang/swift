@@ -1211,7 +1211,10 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
 }
 
 
-/// Synthesize the body of a trivial getter.
+/// Synthesize the body of a trivial getter.  For a non-member vardecl or one
+/// which is not an override of a base class property, it performs a a direct
+/// storage load.  For an override of a base member property, it chains up to
+/// super.
 ///
 static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
   auto &Ctx = VD->getASTContext();
@@ -1269,6 +1272,9 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
                                             /*direct ivar*/true);
     ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
     Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
+
+    // Mark it transparent, there is no user benefit to this actually existing.
+    Set->getMutableAttrs().setAttr(AK_transparent, Loc);
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
