@@ -371,6 +371,12 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
                                             IdT->getIdentifier().getLength())
                           }))
       return false;
+
+  } else if (auto InOutT = dyn_cast<InOutTypeRepr>(T)) {
+    if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+                            CharSourceRange(InOutT->getInOutLoc(), /*'inout'*/5)
+                          }))
+      return false;
   }
   return true;
 }
