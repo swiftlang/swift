@@ -318,7 +318,10 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
   return Simplified;
 }
 
-bool isTrampolineBlock(SILBasicBlock *SBB) {
+/// \return True if this basic blocks has a single instruction that is the
+/// terminator that jumps to another basic block passing all of the arguments
+/// in the original order.
+static bool isTrampolineBlock(SILBasicBlock *SBB) {
   // Ignore blocks with more than one instruction.
   if (SBB->getTerminator() != SBB->begin())
     return false;
