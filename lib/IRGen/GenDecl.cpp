@@ -1139,7 +1139,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   if (isPattern) {
     defaultVarTy = TypeMetadataPatternStructTy;
     defaultVarPtrTy = TypeMetadataPatternPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
 
   // Objective-C classes use the generic metadata type and need no adjustment.
   } else if (isa<ClassType>(concreteType) &&
@@ -1147,7 +1147,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                     cast<ClassType>(concreteType)->getDecl())) {
     defaultVarTy = TypeMetadataStructTy;
     defaultVarPtrTy = TypeMetadataPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
     ObjCClass = cast<ClassType>(concreteType)->getDecl();
   // Class direct metadata use the heap type and require a two-word
   // adjustment (due to the heap-metadata header).
@@ -1155,14 +1155,14 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
              isa<BoundGenericClassType>(concreteType)) {
     defaultVarTy = FullHeapMetadataStructTy;
     defaultVarPtrTy = FullHeapMetadataPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::Class;
+    adjustmentIndex = 2;
 
   // All other non-pattern direct metadata use the full type and
   // require an adjustment.
   } else {
     defaultVarTy = FullTypeMetadataStructTy;
     defaultVarPtrTy = FullTypeMetadataPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+    adjustmentIndex = 1;
   }
 
   // When indirect, this is always a pointer variable and has no
@@ -1170,7 +1170,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   if (isIndirect) {
     defaultVarTy = defaultVarPtrTy;
     defaultVarPtrTy = defaultVarTy->getPointerTo();
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
   }
 
   LinkEntity entity
