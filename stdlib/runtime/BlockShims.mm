@@ -61,11 +61,13 @@ namespace {
 
 #define FUNC(ARGS, RESULTS) CAT3(CAT3(_TTbXFdCb_, ARGS, _), RESULTS, _)
 
-#define OWNED(T) o##T
-#define DIRECT(T) d##T
-#define INDIRECT(T) i##T
+#define OWNED(_type_) CAT2(o,_type_)
+#define DIRECT(_type_) CAT2(d,_type_)
+#define INDIRECT(_type_) CAT2(i,_type_)
 #define VOID dT_
 #define NONE
+
+#define OBJCPTR(_type_) _type_
 
 /// () -> Void
 MAKE_BLOCK_SHIM(FUNC(NONE,
@@ -79,23 +81,23 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(Si),
 
 /// NSDictionary enumerator
 /// (id, id, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
-                          DIRECT(PS__),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(OBJCPTR(PS__)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, id, BOOL *));
 
 /// NSDictionary predicate
 /// (id, id, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
-                          DIRECT(PS__),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(OBJCPTR(PS__)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
                 BOOL(id, id, BOOL *));
 
 /// NSArray enumerator
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -103,7 +105,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
 
 /// NSArray predicate
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
@@ -117,7 +119,7 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo18NSAnimationContext),
                 
 /// NSAttributedString enumerator
 /// (id, NSRange, UnsafePointer<BOOL>) -> Void  aka attribute string enumerator
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(VSC8_NSRange),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -125,7 +127,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(PSo9AnyObject_),
 
 /// NSAttributedString enumerator
 /// (NSDictionary, NSRange, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo12NSDictionary),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo12NSDictionary)),
                           DIRECT(VSC8_NSRange),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -133,7 +135,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo12NSDictionary),
 
 /// NSCalendar enumerator
 /// (NSDate, Bool, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo6NSDate),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo6NSDate)),
                           DIRECT(V10ObjectiveC8ObjCBool),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -156,8 +158,8 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(VSs14COpaquePointer),
 
 /// NSComparator
 /// (NSObject, NSObject) -> NSComparisonResult
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo8NSObject),
-                          DIRECT(S_)),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(CSo8NSObject)),
+                          DIRECT(OBJCPTR(S_))),
                      DIRECT(V10Foundation18NSComparisonResult)),
                 long(id, id));
 
@@ -169,14 +171,14 @@ MAKE_BLOCK_SHIM(_TTbbTPSo9AnyObject_CSo7NSArrayCSo19NSMutableDictionary_PS__,
 
 /// NSFileCoordinator accessor
 /// (NSURL) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo5NSURL),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo5NSURL)),
                      VOID),
                 void(id));
 
 /// NSFileCoordinator accessor
 /// (NSURL, NSURL) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo5NSURL),
-                          DIRECT(S_)),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(CSo5NSURL)),
+                          DIRECT(OBJCPTR(S_))),
                      VOID),
                 void(id, id))
 
@@ -187,21 +189,21 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo5NSURL),
 
 /// NSFileHandle handler
 /// (NSFileHandle) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo12NSFileHandle),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo12NSFileHandle)),
                      VOID),
                 void(id));
 
 /// NSFileManager error handler
 /// (NSURL, NSError) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo5NSURL),
-                          DIRECT(CSo7NSError)),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(CSo5NSURL)),
+                          DIRECT(OBJCPTR(CSo7NSError))),
                      DIRECT(V10ObjectiveC8ObjCBool)),
                 BOOL(id, id));
 
 /// NSFilePresenter completion handler
 /// NSXPCConnection error handler
 /// (NSError) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo7NSError),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo7NSError)),
                      VOID),
                 void(id));
 
@@ -221,28 +223,28 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(Si),
 
 /// NSNotificationCenter observer
 /// (NSNotification) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo14NSNotification),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo14NSNotification)),
                      VOID),
                 void(id));
 
 /// NSRegularExpression enumerator
 /// (NSTextCheckingResult, NSMatchingFlags, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo20NSTextCheckingResult),
-                          DIRECT(CSo15NSMatchingFlags),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo20NSTextCheckingResult)),
+                          DIRECT(OBJCPTR(CSo15NSMatchingFlags)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, NSMatchingFlags, BOOL *));
 
 /// NSSet enumerator
 /// (id, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo9AnyObject_),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
                 void(id, BOOL *));
 
 /// NSSet predicate
 /// (id, UnsafePointer<BOOL>) -> Bool
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo9AnyObject_),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(V10ObjectiveC8ObjCBool)),
                 BOOL(id, BOOL *));
@@ -256,28 +258,28 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(PSo9AnyObject_),
 /// FIXME String to NSString conversion?
 MAKE_BLOCK_SHIM(
   FUNC(
-    CAT2(DIRECT(CSo8NSString),
+    CAT2(DIRECT(OBJCPTR(CSo8NSString)),
          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
       VOID
   ), void(NSString*, BOOL*))
 
 /// NSTask termination handler
 /// (NSTask) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo6NSTask),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo6NSTask)),
                      VOID),
                 void(id));
 
 /// NSURLConnection completion handler
 /// (NSURLResponse, NSData, NSError) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(CSo13NSURLResponse),
-                          DIRECT(CSo6NSData),
-                          DIRECT(CSo7NSError)),
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo13NSURLResponse)),
+                          DIRECT(OBJCPTR(CSo6NSData)),
+                          DIRECT(OBJCPTR(CSo7NSError))),
                      VOID),
                 void(id, id, id));
 
 /// enumerateLinguisticTagsInRange callback
 /// (NSString, NSRange, NSRange, UnsafePointer<BOOL>) -> Void
-MAKE_BLOCK_SHIM(FUNC(CAT4(DIRECT(CSo8NSString),
+MAKE_BLOCK_SHIM(FUNC(CAT4(DIRECT(OBJCPTR(CSo8NSString)),
                           DIRECT(VSC8_NSRange),
                           DIRECT(S0_),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
@@ -297,12 +299,12 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(V10ObjectiveC8ObjCBool),
                 void(BOOL));
 
 /// XPC handler (currently using NSObject)
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo8NSObject),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo8NSObject)),
                      VOID),
                 void(id));
 
 // Another custom XPC handler.
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(CSo7NSError),
-                          DIRECT(CSo8NSString)),
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(CSo7NSError)),
+                          DIRECT(OBJCPTR(CSo8NSString))),
                      VOID),
                 void(id, id));
