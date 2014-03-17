@@ -742,7 +742,7 @@ namespace {
         break;
       }
 
-      if (type.hasReferenceSemantics())
+      if (type->hasRetainablePointerRepresentation())
         return ResultConvention::Autoreleased;
 
       return ResultConvention::Unowned;
