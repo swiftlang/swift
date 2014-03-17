@@ -332,7 +332,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            llvm::makeArrayRef(SF.Decls).slice(StartElem));
   }
 
-#define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE) \
+#define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
   if (Module *module = SF.getASTContext().LoadedModules.lookup(#BRIDGED_MOD)) {\
     checkBridgingFunctions(TC, module, #BRIDGED_TYPE, \
                            "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \

@@ -484,7 +484,7 @@ class TypeConverter {
   getConstantContextGenericParams(SILDeclRef constant, bool addCaptures);
   
   // Types converted during foreign bridging.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
   Optional<CanType> BridgedType##Ty; \
   Optional<CanType> NativeType##Ty;
 #include "swift/SIL/BridgedTypes.def"
@@ -697,10 +697,13 @@ public:
                                     GenericParamList *contextParams) const;
 
   /// Known types for bridging.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
   CanType get##BridgedType##Type(); \
   CanType get##NativeType##Type();
 #include "swift/SIL/BridgedTypes.def"
+
+private:
+  Type getLoweredCBridgedType(Type t);
 };
 
 inline const TypeLowering &

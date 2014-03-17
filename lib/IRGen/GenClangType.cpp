@@ -162,11 +162,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect UnsafePointer<T>, UncheckedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
   if (auto underlyingTy = type.getAnyOptionalObjectType()) {
-    assert((isa<FunctionType>(underlyingTy) ||
-            isa<DynamicSelfType>(underlyingTy) ||
-            underlyingTy.getClassOrBoundGenericClass() ||
-            underlyingTy->isClassExistentialType()) &&
-           "Unexpected optional type in Clang type generation!");
+    // The underlying type could be a bridged type, which makes any
+    // sort of casual assertion here difficult.
     return visit(underlyingTy);
   }
 

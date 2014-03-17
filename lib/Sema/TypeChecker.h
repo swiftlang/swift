@@ -260,7 +260,10 @@ private:
 
   /// A set of types that are representable in Objective-C, but require
   /// non-trivial bridging.
-  llvm::DenseSet<CanType> ObjCRepresentableTypes;
+  ///
+  /// The value of the map is a flag indicating whether the bridged
+  /// type can be optional.
+  llvm::DenseMap<CanType, bool> ObjCRepresentableTypes;
 
   Module *StdlibModule = nullptr;
 

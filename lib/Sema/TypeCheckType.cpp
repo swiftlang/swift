@@ -1366,6 +1366,31 @@ Type TypeChecker::resolveMemberType(DeclContext *dc, Type type,
   return memberTypes.back().second;
 }
 
+/// Look up and validate a type declared in the standard library.
+static CanType lookupUniqueTypeInLibrary(TypeChecker &TC,
+                                         Module *stdlib,
+                                         Identifier name) {
+  SmallVector<ValueDecl *, 4> results;
+  stdlib->lookupValue({}, name, NLKind::UnqualifiedLookup, results);
+
+  TypeDecl *type = nullptr;
+  for (auto result: results) {
+    if (auto foundType = dyn_cast<TypeDecl>(result)) {
+      // Fail if we find two types with this name.
+      if (type) return CanType();
+      type = foundType;
+    }
+  }
+
+  // Fail if we didn't find a type.
+  if (!type) return CanType();
+
+  TC.validateDecl(type);
+  if (type->isInvalid()) return CanType();
+
+  return type->getDeclaredType()->getCanonicalType();
+}
+
 static void lookupLibraryTypes(TypeChecker &TC,
                                Module *Stdlib,
                                ArrayRef<Identifier> TypeNames,
@@ -1684,40 +1709,50 @@ static bool isObjCPointerType(Type T) {
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
                                                  Type T) {
+  // Look through one level of optional type, but remember that we did.
+  bool wasOptional = false;
+  if (auto valueType = T->getAnyOptionalObjectType()) {
+    T = valueType;
+    wasOptional = true;
+  }
+
   if (isObjCPointerType(T))
     return true;
+
+  // TODO: maybe Optional<UnsafePointer<T>> should be okay?
+  if (wasOptional) return false;
 
   if (auto NTD = T->getAnyNominal()) {
     // If the type was imported from Clang, it is representable in Objective-C.
     if (NTD->hasClangNode())
       return true;
+
+    // An UnsafePointer<T> is representable in Objective-C if T is a
+    // trivially representable type.
+    if (NTD == getUnsafePointerDecl(DC)) {
+      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+      return isTriviallyRepresentableInObjC(DC, T);
+    }
   }
 
+  // If it's a mapped type, it's representable.
   fillObjCRepresentableTypeCache(DC);
   if (ObjCMappedTypes.count(T->getCanonicalType()))
     return true;
 
-  // An UnsafePointer<T> is representable in Objective-C if T is a trivially
-  // mapped type, or T is a representable UnsafePointer<U> type.
-  // An Optional<T> or UncheckedOptional<T> is representable in Objective-C if
-  // the object type is a class or block pointer (after bridging).
-  while (auto BGT = T->getAs<BoundGenericType>()) {
-    if (Context.LangOpts.EnableObjCOptional)
-      if (auto underlying = T->getAnyOptionalObjectType())
-        return isObjCPointerType(underlying);
-
-    if (BGT->getDecl() != getUnsafePointerDecl(DC))
-      break;
-
-    T = BGT->getGenericArgs()[0];
-  }
-
-  return ObjCMappedTypes.count(T->getCanonicalType());
+  return false;
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (isTriviallyRepresentableInObjC(DC, T))
     return true;
+
+  // Look through one level of optional type, but remember that we did.
+  bool wasOptional = false;
+  if (auto valueType = T->getAnyOptionalObjectType()) {
+    T = valueType;
+    wasOptional = true;
+  }
 
   if (auto FT = T->getAs<FunctionType>()) {
     if (!FT->isBlock())
@@ -1739,9 +1774,15 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
   }
 
+  // Check to see if this is a bridged type.  Note that some bridged
+  // types are representable, but their optional type is not.
   fillObjCRepresentableTypeCache(DC);
-  if (ObjCRepresentableTypes.count(T->getCanonicalType()))
+  auto iter = ObjCRepresentableTypes.find(T->getCanonicalType());
+  if (iter != ObjCRepresentableTypes.end()) {
+    if (wasOptional && !iter->second)
+      return false;
     return true;
+  }
 
   return false;
 }
@@ -1806,6 +1847,17 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 }
 
+static void lookupRepresentableType(TypeChecker &TC,
+                                    Module *stdlib,
+                                    Identifier nativeName,
+                                    bool isOptionalRepresentable,
+                                    llvm::DenseMap<CanType, bool> &types) {
+  auto nativeType = lookupUniqueTypeInLibrary(TC, stdlib, nativeName);
+  if (!nativeType) return;
+
+  types.insert({nativeType, isOptionalRepresentable});
+}
+
 void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   if (!ObjCMappedTypes.empty())
     return;
@@ -1820,14 +1872,15 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   Module *Stdlib = getStdlibModule(DC);
   lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
 
-  StdlibTypeNames.clear();
 #define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
-                    NATIVE_MODULE, NATIVE_TYPE)                            \
-  if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) \
-    StdlibTypeNames.push_back(Context.getIdentifier(#NATIVE_TYPE));
+                    NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)       \
+  if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) { \
+    lookupRepresentableType(*this, Stdlib,                                 \
+                            Context.getIdentifier(#NATIVE_TYPE),           \
+                            OPTIONAL_IS_BRIDGED,                           \
+                            ObjCRepresentableTypes);                       \
+  }
 #include "swift/SIL/BridgedTypes.def"
-
-  lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCRepresentableTypes);
 
   Identifier ID_ObjectiveC = Context.getIdentifier(OBJC_MODULE_NAME);
   if (auto ObjCModule = Context.getLoadedModule(ID_ObjectiveC)) {

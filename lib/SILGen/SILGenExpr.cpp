@@ -3574,12 +3574,122 @@ static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
+typedef ManagedValue ValueTransform(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue v,
+                                    CanType loweredResultTy);
+
+/// Emit an optional-to-optional transformation.
+static ManagedValue emitOptionalToOptional(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ManagedValue input,
+                                           CanType loweredResultTy,
+                                           ValueTransform &transformValue) {
+  auto isNotPresentBB = gen.createBasicBlock();
+  auto isPresentBB = gen.createBasicBlock();
+  auto contBB = gen.createBasicBlock();
+
+  // Create a temporary for the output optional.
+  SILType resultTy = SILType::getPrimitiveObjectType(loweredResultTy);
+  auto &resultTL = gen.getTypeLowering(resultTy);
+  auto resultTemp = gen.emitTemporaryAllocation(loc, resultTy);
+
+  // Materialize the input.
+  SILValue inputTemp;
+  if (input.getType().isAddress()) {
+    inputTemp = input.forward(gen);
+  } else {
+    inputTemp = gen.emitTemporaryAllocation(loc, input.getType());
+    input.forwardInto(gen, loc, inputTemp);
+  }
+
+  // Branch on whether the input is optional.
+  auto isPresent = gen.emitDoesOptionalHaveValue(loc, inputTemp);
+  gen.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
+
+  // If it's present, apply the recursive transformation to the value.
+  gen.B.emitBlock(isPresentBB);
+  {
+    // Don't allow cleanups to escape the conditional block.
+    FullExpr presentScope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+
+    CanType loweredResultValueTy = loweredResultTy.getAnyOptionalObjectType();
+    assert(loweredResultValueTy);
+
+    // Pull the value out.  This will load if the value is not address-only.
+    auto &inputTL = gen.getTypeLowering(input.getType());
+    auto inputValue = gen.emitGetOptionalValueFrom(loc,
+                                        ManagedValue::forUnmanaged(inputTemp),
+                                                   inputTL,
+                                                   SGFContext());
+
+    // Transform it.
+    auto resultValue = transformValue(gen, loc, inputValue,
+                                      loweredResultValueTy);
+
+    // Inject that into the result type.
+    RValueSource resultValueRV(loc, RValue(resultValue, loweredResultValueTy));
+    gen.emitInjectOptionalValueInto(loc, std::move(resultValueRV),
+                                    resultTemp, resultTL);
+
+  }
+  gen.B.createBranch(loc, contBB);
+
+  // If it's not present, inject 'nothing' into the result.
+  gen.B.emitBlock(isNotPresentBB);
+  {
+    gen.emitInjectOptionalNothingInto(loc, resultTemp, resultTL);
+  }
+  gen.B.createBranch(loc, contBB);
+
+  // Continue.
+  gen.B.emitBlock(contBB);
+  if (resultTL.isAddressOnly()) {
+    return gen.emitManagedBufferWithCleanup(resultTemp, resultTL);
+  } else {
+    return gen.emitLoad(loc, resultTemp, resultTL, SGFContext(), IsTake);
+  }
+}
+
+static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue v,
+                                              CanType loweredBridgedTy) {
+  auto loweredNativeTy = v.getType().getSwiftRValueType();
+  if (loweredNativeTy == loweredBridgedTy)
+    return v;
+
+  if (loweredNativeTy.getAnyOptionalObjectType()) {
+    return emitOptionalToOptional(gen, loc, v, loweredBridgedTy,
+                                  emitNativeToCBridgedValue);
+  }
+
+  // If the input is a native type with a bridged mapping, convert it.
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
+  if (loweredNativeTy == gen.SGM.Types.get##NativeType##Type()              \
+      && loweredBridgedTy == gen.SGM.Types.get##BridgedType##Type()) {      \
+    return emitBridge##NativeType##To##BridgedType(gen, loc, v);            \
+  }
+#include "swift/SIL/BridgedTypes.def"
+
+  // Bridge thick to Objective-C metatypes.
+  if (auto bridgedMetaTy = dyn_cast<MetatypeType>(loweredBridgedTy)) {
+    if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
+      SILValue native = gen.B.emitThickToObjCMetatype(loc, v.getValue(),
+                           SILType::getPrimitiveObjectType(loweredBridgedTy));
+      return ManagedValue(native, v.getCleanup());
+    }
+  }
+
+  return v;
+}
+
 ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                       ManagedValue v,
                                                       AbstractCC destCC,
                                                       CanType origNativeTy,
                                                       CanType substNativeTy,
-                                                      CanType bridgedTy) {
+                                                      CanType loweredBridgedTy) {
   switch (destCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -3588,31 +3698,48 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
     return v;
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    // If the input is a native type with a bridged mapping, convert it.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
-    if (substNativeTy == SGM.Types.get##NativeType##Type() \
-        && bridgedTy == SGM.Types.get##BridgedType##Type()) {           \
-      return emitBridge##NativeType##To##BridgedType(*this, loc, v);    \
-    }
+    return emitNativeToCBridgedValue(*this, loc, v, loweredBridgedTy);
+  }
+  llvm_unreachable("bad CC");
+}
+
+static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue v,
+                                              CanType loweredNativeTy) {
+  auto loweredBridgedTy = v.getType().getSwiftRValueType();
+  if (loweredNativeTy == loweredBridgedTy)
+    return v;
+
+  if (loweredNativeTy.getAnyOptionalObjectType()) {
+    return emitOptionalToOptional(gen, loc, v, loweredNativeTy,
+                                  emitCBridgedToNativeValue);
+  }
+
+  // If the output is a bridged type, convert it back to a native type.
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
+  if (loweredNativeTy == gen.SGM.Types.get##NativeType##Type() &&           \
+      loweredBridgedTy == gen.SGM.Types.get##BridgedType##Type()) {         \
+    return emitBridge##BridgedType##To##NativeType(gen, loc, v);            \
+  }
 #include "swift/SIL/BridgedTypes.def"
 
-    // Bridge thick to Objective-C metatypes.
-    if (auto bridgedMetaTy = bridgedTy->getAs<MetatypeType>()) {
-      if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
-        SILValue native = B.emitThickToObjCMetatype(loc, v.getValue(),
-                                                    getLoweredType(bridgedTy));
-        return ManagedValue(native, v.getCleanup());
-      }
+  // Bridge Objective-C to thick metatypes.
+  if (auto bridgedMetaTy = dyn_cast<MetatypeType>(loweredBridgedTy)){
+    if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
+      SILValue native = gen.B.emitObjCToThickMetatype(loc, v.getValue(),
+                                        gen.getLoweredType(loweredNativeTy));
+      return ManagedValue(native, v.getCleanup());
     }
-
-    return v;
   }
+
+  return v;
 }
 
 ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
                                                       ManagedValue v,
                                                       AbstractCC srcCC,
-                                                      CanType nativeTy) {
+                                                      CanType loweredNativeTy) {
   switch (srcCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -3622,25 +3749,9 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    // If the output is a bridged type, convert it back to a native type.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType)     \
-    if (nativeTy == SGM.Types.get##NativeType##Type() &&                    \
-        v.getType().getSwiftType() == SGM.Types.get##BridgedType##Type()) { \
-      return emitBridge##BridgedType##To##NativeType(*this, loc, v);        \
-    }
-#include "swift/SIL/BridgedTypes.def"
-
-    // Bridge Objective-C to thick metatypes.
-    if (auto bridgedMetaTy = v.getType().getSwiftType()->getAs<MetatypeType>()){
-      if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
-        SILValue native = B.emitObjCToThickMetatype(loc, v.getValue(),
-                                                    getLoweredType(nativeTy));
-        return ManagedValue(native, v.getCleanup());
-      }
-    }
-
-    return v;
+    return emitCBridgedToNativeValue(*this, loc, v, loweredNativeTy);
   }
+  llvm_unreachable("bad CC");
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc) {

@@ -14,17 +14,20 @@
 // implicit conversions to bridge to native Swift types.
 //
 // BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,
-//             NATIVE_MODULE, NATIVE_TYPE)
+//             NATIVE_MODULE, NATIVE_TYPE,
+//             OPTIONAL_IS_BRIDGED)
 //  - BRIDGED_MODULE is the name of the module into which the foreign type
 //    is imported.
 //  - BRIDGED_TYPE is the name of the foreign type.
 //  - NATIVE_MODULE is the name of the module containing the native Swift type.
 //  - NATIVE_TYPE is the name of the native Swift type.
+//  - OPTIONAL_IS_BRIDGED is true or false depending on whether Native?
+//    is also bridged to Bridged?.
 //
 //===----------------------------------------------------------------------===//
 
-BRIDGE_TYPE(Foundation,NSString, Swift,String)
-BRIDGE_TYPE(ObjectiveC,ObjCBool, Swift,Bool)
+BRIDGE_TYPE(Foundation,NSString, Swift,String,  true)
+BRIDGE_TYPE(ObjectiveC,ObjCBool, Swift,Bool,    false)
 
 #undef BRIDGE_TYPE
 

@@ -107,7 +107,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   return t;
 }
 
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
   CanType TypeConverter::get##BridgedType##Type() {         \
     return getKnownType(BridgedType##Ty, M.getASTContext(), \
                         #BridgedModule, #BridgedType);      \
@@ -1949,25 +1949,39 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
     // Map native types back to bridged types.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType) \
-    { auto nativeType = get##NativeType##Type();                        \
-      if (nativeType && t->isEqual(nativeType))                         \
-        return get##BridgedType##Type();                                \
+
+    // Look through optional types.
+    if (auto valueTy = t->getOptionalObjectType()) {
+      return OptionalType::get(getLoweredCBridgedType(valueTy));
+    } else if (auto valueTy = t->getUncheckedOptionalObjectType()) {
+      return UncheckedOptionalType::get(getLoweredCBridgedType(valueTy));
+    } else {
+      return getLoweredCBridgedType(t);
     }
+  }
+};
+
+Type TypeConverter::getLoweredCBridgedType(Type t) {
+#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType, Opt) \
+  { auto nativeType = get##NativeType##Type();                               \
+    if (nativeType && t->isEqual(nativeType))                                \
+      return get##BridgedType##Type();                                       \
+  }
 #include "swift/SIL/BridgedTypes.def"
 
-    // Class metatypes bridge to ObjC metatypes.
-    // FIXME: @objc protocol metatypes.
-    if (auto metaTy = t->getAs<MetatypeType>()) {
-      if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
-        return MetatypeType::get(metaTy->getInstanceType(),
-                                 MetatypeRepresentation::ObjC,
-                                 metaTy->getASTContext());
-      }
+  // Class metatypes bridge to ObjC metatypes.
+  // FIXME: @objc protocol metatypes.
+  if (auto metaTy = t->getAs<MetatypeType>()) {
+    if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
+      return MetatypeType::get(metaTy->getInstanceType(),
+                               MetatypeRepresentation::ObjC,
+                               metaTy->getASTContext());
     }
-
-    return t;
   }
+
+  // Blocks?
+
+  return t;
 }
 
 SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
