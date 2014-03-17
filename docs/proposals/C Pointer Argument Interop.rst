@@ -112,12 +112,11 @@ Library Features
 ================
 
 The necessary conversions can be represented entirely in the standard library
-with the help of some new language features--inout address conversion, inout
-writeback conversion, and interior pointer conversion--which are described
-below. There are five categories of argument behavior needed, and thus five
-new standard library types.  These types should have no user-accessible
-operations of their own other than their implicit conversions. The necessary
-types are as follows:
+with the help of some new language features, inout address conversion, inout
+writeback conversion, and interior pointer conversion, described below. There
+are three categories of argument behavior needed, and thus three new types.
+These types should have no user-accessible operations of their own other than
+their implicit conversions. The necessary types are as follows:
 
 - ``CConstPointer<T>`` is the imported representation of a ``const T *``
   argument. It is implicitly convertible from ``inout T`` by inout address
@@ -129,11 +128,6 @@ types are as follows:
   ``inout T`` by inout address conversion and from ``inout Array<T>`` by mutating
   interior pointer conversion. It is also implicitly convertible to and from
   ``UnsafePointer<T>`` by normal conversion.
-- ``CConstVoidPointer`` and ``CMutableVoidPointer`` are the imported
-  representations of ``const void *`` and ``void *`` respectively.
-  They are implicitly convertible by normal conversion from, respectively,
-  any ``CConstPointer<T>`` or any ``CMutablePointer<T>``, and thus are
-  transitively convertible from the corresponding ``inout`` and array types.
 - ``ObjCInOut<T>`` is the imported representation of a ``T **``
   argument for an ObjC class type ``T``. It is implicitly convertible from
   ``inout T`` by inout writeback conversion and is implicitly convertible
