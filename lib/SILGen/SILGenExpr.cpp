@@ -1888,8 +1888,9 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                           SGF.getForwardingSubstitutions(), e));
 }
 
-// Get the __FUNCTION__ name for a declaration.
-static DeclName getMagicFunctionName(DeclContext *dc) {
+// Get the __FUNCTION__ name for a declaration and a bit indicating whether
+// the first argument should be separated via a space rather than a colon.
+static std::pair<DeclName, bool> getMagicFunctionName(DeclContext *dc) {
   // For closures, use the parent name.
   if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
     return getMagicFunctionName(closure->getParent());
@@ -1898,7 +1899,9 @@ static DeclName getMagicFunctionName(DeclContext *dc) {
     // If this is an accessor, use the name of the storage.
     if (auto func = dyn_cast<FuncDecl>(absFunc)) {
       if (auto storage = func->getAccessorStorageDecl())
-        return storage->getFullName();
+        return { storage->getFullName(), false };
+
+      return { func->getFullName(), func->isFirstParamIncludedInName() };
     }
 
     // If this is an initializer, form a compound name.
@@ -1913,32 +1916,34 @@ static DeclName getMagicFunctionName(DeclContext *dc) {
           auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
           if (auto named = dyn_cast<NamedPattern>(eltPattern))
             components.push_back(named->getBoundName());
+          else
+            components.push_back(Identifier());
         }
-        return DeclName(ctx, components);
+        return { DeclName(ctx, components), true };
       }
     }
 
-    return absFunc->getFullName();
+    return { absFunc->getFullName(), false };
   }
   if (auto init = dyn_cast<Initializer>(dc)) {
     return getMagicFunctionName(init->getParent());
   }
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    return nominal->getName();
+    return { nominal->getName(), false };
   }
   if (auto tl = dyn_cast<TopLevelCodeDecl>(dc)) {
-    return tl->getModuleContext()->Name;
+    return { tl->getModuleContext()->Name, false };
   }
   if (auto fu = dyn_cast<FileUnit>(dc)) {
-    return fu->getParentModule()->Name;
+    return { fu->getParentModule()->Name, false };
   }
   if (auto m = dyn_cast<Module>(dc)) {
-    return m->Name;
+    return { m->Name, false };
   }
   llvm_unreachable("unexpected __FUNCTION__ context");
 }
 
-static DeclName getMagicFunctionName(SILDeclRef ref) {
+static std::pair<DeclName, bool> getMagicFunctionName(SILDeclRef ref) {
   switch (ref.kind) {
   case SILDeclRef::Kind::Func:
     if (auto closure = ref.getAbstractClosureExpr())
@@ -1965,7 +1970,8 @@ static DeclName getMagicFunctionName(SILDeclRef ref) {
 }
 
 void SILGenFunction::emitFunction(FuncDecl *fd) {
-  MagicFunctionName = getMagicFunctionName(fd);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(fd);
   
   Type resultTy = fd->getResultType();
   emitProlog(fd, fd->getBodyParamPatterns(), resultTy);
@@ -1975,7 +1981,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
-  MagicFunctionName = getMagicFunctionName(ace);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(ace);
   
   emitProlog(ace, ace->getParams(), ace->getResultType());
   prepareEpilog(ace->getResultType(), CleanupLocation(ace));
@@ -2111,7 +2118,8 @@ void SILGenFunction::emitEpilog(SILLocation TopLevel, bool AutoGen) {
 }
 
 void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
-  MagicFunctionName = getMagicFunctionName(dd);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(dd);
   
   RegularLocation Loc(dd);
   if (dd->isImplicit())
@@ -2325,7 +2333,8 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 }
 
 void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
-  MagicFunctionName = getMagicFunctionName(ctor);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(ctor);
   
   // If there's no body, this is the implicit elementwise constructor.
   if (!ctor->getBody())
@@ -2726,7 +2735,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 }
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
-  MagicFunctionName = getMagicFunctionName(ctor);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(ctor);
   
   // FIXME: Hack until all delegation is dispatched.
   IsCompleteObjectInit = ctor->isCompleteObjectInit();
@@ -3162,7 +3172,8 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
-  MagicFunctionName = getMagicFunctionName(function);
+  std::tie(MagicFunctionName, MagicFunctionSeparatedFirstParam)
+    = getMagicFunctionName(function);
   
   RegularLocation Loc(value);
   Loc.markAutoGenerated();
@@ -3244,20 +3255,21 @@ getMagicFunctionString(SILGenFunction &gen) {
     return gen.MagicFunctionName.getSimpleName().str();
   
   if (gen.MagicFunctionString.empty()) {
-    auto &ctx = gen.SGM.M.getASTContext();
+    bool isFirst = true;
     for (Identifier component : gen.MagicFunctionName.getComponents()) {
       if (component.get()) {
         gen.MagicFunctionString += component.str();
 
-        // After 'init', introduce a space rather than a ':', to mimic
-        // the declaration.
-        if (component == ctx.Id_init) {
+        // If we're supposed to have a space rather than a colon here, do so.
+        if (isFirst && gen.MagicFunctionSeparatedFirstParam) {
           gen.MagicFunctionString += ' ';
+          isFirst = false;
           continue;
         }
       }
 
       gen.MagicFunctionString += ':';
+        isFirst = false;
     }
   }
   return gen.MagicFunctionString;
