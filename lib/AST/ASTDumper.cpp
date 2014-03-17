@@ -605,7 +605,6 @@ namespace {
 
     void visitDestructorDecl(DestructorDecl *DD) {
       printCommonAFD(DD, "destructor_decl");
-      OS << '\n';
       printAbstractFunctionDecl(DD);
       OS << ')';
     }
