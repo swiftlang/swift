@@ -946,7 +946,8 @@ static CanType getBridgedInputType(TypeConverter &tc,
     SmallVector<TupleTypeElt, 4> bridgedFields;
     bool changed = false;
     for (auto &elt : tuple->getFields()) {
-      CanType bridged = CanType(tc.getLoweredBridgedType(elt.getType(), cc));
+      CanType bridged =
+        tc.getLoweredBridgedType(elt.getType(), cc)->getCanonicalType();
       if (bridged != CanType(elt.getType())) {
         changed = true;
         bridgedFields.push_back(elt.getWithType(bridged));
