@@ -16,7 +16,7 @@ add_swift_library(swift_runtime INSTALL
   Metadata.cpp
   Stubs.cpp
   SwiftObject.mm
-  NSSwiftArrayBase.mm
+  NSSwiftXXXBase.mm.gyb
   Enum.cpp
   Once.cpp
   Init.cpp

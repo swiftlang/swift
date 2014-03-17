@@ -1,4 +1,4 @@
-//===--- NSSwiftArrayBase.mm - Native Swift Array base class --------------===//
+//===--- NSSwiftXXXBase.mm.gyb - Cocoa bases for Swift container buffers --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This implements runtime support for bridging between Swift and Objective-C
-// arrays.
+// This file defines:
+//
+//    NSSwiftArrayBase, NSSwiftDictionaryBase, and eventually,
+//    NSSwiftStringBase
+//
+// To optimize bridging between Swift containers and their Cocoa
+// counterparts, we derive Swift containers' buffers from the
+// corresponding Cocoa classes; that way we can just hand a buffer off
+// to Cocoa when it holds bridged types.  
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,18 +43,20 @@ extern "C" id _objc_rootAutorelease(id);
 
 using namespace swift;
 
-@interface NSSwiftArrayBase : NSArray
+% for Class in ('Array','Dictionary'):
+@interface NSSwift${Class}Base : NS${Class}
 {
-  uint32_t magic1;
-  uint32_t magic2;
+  SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 }
 @end
 
-@implementation NSSwiftArrayBase
+@implementation NSSwift${Class}Base
 + (void)load {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  class_setSuperclass(objc_getClass("NSSwiftArray"), [NSSwiftArrayBase class]);
+  class_setSuperclass(
+    objc_getClass("NSSwift${Class}"),
+    [NSSwift${Class}Base class]);
 #pragma clang diagnostic pop
 }
 
@@ -76,3 +85,4 @@ using namespace swift;
   return true;
 }
 @end
+% end
