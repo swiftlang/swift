@@ -822,6 +822,7 @@ public:
       // FIXME: Eventually, extension methods on classes will become
       // dynamically dispatched as well.
       if (auto fd = dyn_cast<FuncDecl>(afd)) {
+        // FIXME: @final some day.
         if ((fd->isObjC() || isa<ClassDecl>(fd->getDeclContext())) &&
             // didSet and willSet methods should always be directly dispatched.
             !fd->isObservingAccessor()) {
@@ -2604,11 +2605,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   }
 
   // FIXME: Have a nicely-abstracted way to figure out which kind of
-  // dispatch we're doing.
-  // FIXME: We should do this for any declaration within a class. However,
-  // IRGen doesn't yet have the machinery for handling class_method on
-  // getters and setters.
-  if (gen.SGM.requiresObjCDispatch(decl)) {
+  // dispatch we're doing.  This should handle @final, etc.
+  bool isClassDispatch = false;
+  if (auto ctx = decl->getDeclContext()->getDeclaredTypeOfContext())
+    isClassDispatch = ctx->getClassOrBoundGenericClass();
+    if (isClassDispatch) {
     auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
 
     if (!isSuper)
