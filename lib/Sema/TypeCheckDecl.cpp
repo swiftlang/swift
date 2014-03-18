@@ -2872,7 +2872,7 @@ public:
   ///
   /// \returns true if an error occurred.
   bool checkOverrides(ValueDecl *decl) {
-    if (decl->isInvalid())
+    if (decl->isInvalid() || decl->getOverriddenDecl())
       return false;
 
     auto owningTy = decl->getDeclContext()->getDeclaredInterfaceType();
