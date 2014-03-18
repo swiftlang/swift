@@ -414,10 +414,24 @@ namespace {
       auto baseTypeVar = base->castTo<TypeVariableType>();
       return CG.getMemberType(baseTypeVar, member->getName(),
                               [&]() -> TypeVariableType* {
-        auto nestedType = baseTypeVar->getImpl().getArchetype()
-                           ->getNestedType(member->getName());
+        auto implArchetype = baseTypeVar->getImpl().getArchetype();
+        if (!implArchetype) {
+          return baseTypeVar;
+        }
+        auto nestedType = implArchetype->getNestedType(member->getName());
         auto archetype = nestedType.dyn_cast<ArchetypeType*>();
-
+                                
+        // The nested type could be a type parameter type. If that's the case,
+        // obtain the archetype from its decl.
+        if (!archetype) {
+          auto type = nestedType.get<Type>();
+          
+          if (auto GTPT = type->getAs<GenericTypeParamType>()) {
+            auto gpDecl = GTPT->getDecl();
+            archetype = gpDecl->getArchetype();
+          }
+        }
+                                
         auto locator = archetype
            ? CS.getConstraintLocator((Expr *)nullptr, LocatorPathElt(archetype))
            : nullptr;

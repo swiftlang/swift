@@ -856,7 +856,17 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
   // For an archetype, retrieve the nested type with the appropriate name.
   // There are no conformance tables.
   if (auto archetype = type->getAs<ArchetypeType>()) {
-    return archetype->getNestedTypeValue(name);
+    auto nestedType = archetype->getNestedTypeValue(name);
+    
+    if (auto GTPT = nestedType->getAs<GenericTypeParamType>()) {
+      auto gpDecl = GTPT->getDecl();
+      
+      if (auto archetype = gpDecl->getArchetype()) {
+        return archetype;
+      }
+    }
+    
+    return nestedType;
   }
 
   // Find the named requirement.
