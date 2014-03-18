@@ -179,6 +179,7 @@ public:
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
+    EscapedIdentifier = false;
   }
 };
   
