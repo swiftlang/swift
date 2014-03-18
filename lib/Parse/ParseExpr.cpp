@@ -1159,7 +1159,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a ? suffix.
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(
-          new (Context) BindOptionalExpr(Result.get(), TokLoc));
+          new (Context) BindOptionalExpr(Result.get(), TokLoc, /*depth*/ 0));
       hasBindOptional = true;
       continue;
     }

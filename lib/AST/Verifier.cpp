@@ -76,6 +76,9 @@ struct ASTNodeBase {};
     using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
     SmallVector<ScopeLike, 4> Scopes;
 
+    /// \brief The stack of optional evaluations active at this point.
+    SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
+
     /// \brief The set of opaque value expressions active at this point.
     llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
 
@@ -444,6 +447,19 @@ struct ASTNodeBase {};
       OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
+    }
+
+    // Keep a stack of the currently-live optional evaluations.
+    bool shouldVerify(OptionalEvaluationExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      OptionalEvaluations.push_back(expr);
+      return true;
+    }
+    void cleanup(OptionalEvaluationExpr *expr) {
+      assert(OptionalEvaluations.back() == expr);
+      OptionalEvaluations.pop_back();
     }
 
     /// Canonicalize the given DeclContext pointer, in terms of
@@ -857,6 +873,14 @@ struct ASTNodeBase {};
 
       // FIXME: Check base/member types through substitutions.
 
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(BindOptionalExpr *E) {
+      if (E->getDepth() >= OptionalEvaluations.size()) {
+        Out << "BindOptional expression is out of its depth";
+        abort();
+      }
       verifyCheckedBase(E);
     }
 

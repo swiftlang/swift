@@ -156,6 +156,14 @@ class alignas(8) Expr {
   enum { NumClosureExprBits = NumAbstractClosureExprBits + 1 };
   static_assert(NumClosureExprBits <= 32, "fits in an unsigned");
 
+  class BindOptionalExprBitfields {
+    friend class BindOptionalExpr;
+    unsigned : NumExprBits;
+    unsigned Depth : 16;
+  };
+  enum { NumBindOptionalExprBits = NumExprBits + 16 };
+  static_assert(NumBindOptionalExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
@@ -168,6 +176,7 @@ protected:
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
+    BindOptionalExprBitfields BindOptionalExprBits;
   };
 
 private:
@@ -1476,20 +1485,30 @@ public:
 /// evaluates to a missing value, the OptionalEvaluationExpr
 /// immediately completes and produces a missing value in the result
 /// type.
+///
+/// The depth of the BindOptionalExpr indicates which
+/// OptionalEvaluationExpr is completed, in case the BindOptionalExpr
+/// is contained within more than one such expression.
 class BindOptionalExpr : public Expr {
   Expr *SubExpr;
   SourceLoc QuestionLoc;
 
 public:
-  BindOptionalExpr(Expr *subExpr, SourceLoc questionLoc, Type ty = Type())
+  BindOptionalExpr(Expr *subExpr, SourceLoc questionLoc,
+                   unsigned depth, Type ty = Type())
     : Expr(ExprKind::BindOptional, /*Implicit=*/ false, ty),
-      SubExpr(subExpr), QuestionLoc(questionLoc) {}
+      SubExpr(subExpr), QuestionLoc(questionLoc) {
+    BindOptionalExprBits.Depth = depth;
+    assert(BindOptionalExprBits.Depth == depth && "bitfield truncation");
+  }
 
   SourceRange getSourceRange() const {
     return SourceRange(SubExpr->getStartLoc(), QuestionLoc);
   }
   SourceLoc getLoc() const { return getQuestionLoc(); }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  unsigned getDepth() const { return BindOptionalExprBits.Depth; }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *expr) { SubExpr = expr; }

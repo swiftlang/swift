@@ -3816,7 +3816,10 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
-  assert(SGF.BindOptionalFailureDest.isValid());
+  assert(E->getDepth() < SGF.BindOptionalFailureDests.size());
+  auto failureDest =
+    SGF.BindOptionalFailureDests[SGF.BindOptionalFailureDests.size()
+                                   - E->getDepth() - 1];
 
   // Create a temporary of type Optional<T>.
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
@@ -3835,7 +3838,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
 
   // If not, thread out through a bunch of cleanups.
   SGF.B.emitBlock(hasNoValueBB);
-  SGF.Cleanups.emitBranchAndCleanups(SGF.BindOptionalFailureDest, E);
+  SGF.Cleanups.emitBranchAndCleanups(failureDest, E);
 
   // If so, get that value as the result of our expression.
   SGF.B.emitBlock(hasValueBB);
@@ -3848,13 +3851,20 @@ namespace {
   /// A RAII object to save and restore BindOptionalFailureDest.
   class RestoreOptionalFailureDest {
     SILGenFunction &SGF;
-    JumpDest Prev;
+#ifndef DEBUG
+    unsigned Depth;
+#endif
   public:
-    RestoreOptionalFailureDest(SILGenFunction &SGF)
-      : SGF(SGF), Prev(SGF.BindOptionalFailureDest) {
+    RestoreOptionalFailureDest(SILGenFunction &SGF, JumpDest &&dest)
+      : SGF(SGF)
+#ifndef NDEBUG
+      , Depth(SGF.BindOptionalFailureDests.size()) {
+#endif
+      SGF.BindOptionalFailureDests.push_back(std::move(dest));
     }
     ~RestoreOptionalFailureDest() {
-      SGF.BindOptionalFailureDest = Prev;
+      assert(SGF.BindOptionalFailureDests.size() == Depth + 1);
+      SGF.BindOptionalFailureDests.pop_back();
     }
   };
 }
@@ -3878,10 +3888,9 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   // Install a new optional-failure destination just outside of the
   // cleanups scope.
-  RestoreOptionalFailureDest restoreFailureDest(SGF);
   SILBasicBlock *failureBB = SGF.createBasicBlock();
-  SGF.BindOptionalFailureDest =
-    JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E);
+  RestoreOptionalFailureDest restoreFailureDest(SGF,
+                    JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
   // Emit the operand into the temporary.
   SGF.emitExprInto(E->getSubExpr(), optInit);

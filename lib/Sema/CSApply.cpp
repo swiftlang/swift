@@ -2871,7 +2871,7 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   Type toValueType = toGenericType->getGenericArgs()[0];
 
   expr = new (tc.Context) BindOptionalExpr(expr, expr->getSourceRange().End,
-                                           fromValueType);
+                                           /*depth*/ 0, fromValueType);
   expr->setImplicit(true);
   expr = coerceToType(expr, toValueType, locator);
   if (!expr) return nullptr;

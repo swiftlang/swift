@@ -111,7 +111,7 @@ public:
 
   /// The cleanup depth and BB for when the operand of a
   /// BindOptionalExpr is a missing value.
-  JumpDest BindOptionalFailureDest = JumpDest::invalid();
+  SmallVector<JumpDest, 2> BindOptionalFailureDests;
 
   /// The cleanup depth and epilog BB for "return" instructions.
   JumpDest ReturnDest;

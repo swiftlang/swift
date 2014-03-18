@@ -1477,7 +1477,8 @@ public:
     OS << ')';
   }
   void visitBindOptionalExpr(BindOptionalExpr *E) {
-    printCommon(E, "bind_optional_expr") << '\n';
+    printCommon(E, "bind_optional_expr")
+      << " depth=" << E->getDepth() << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
