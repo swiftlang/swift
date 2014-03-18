@@ -751,8 +751,18 @@ public:
       // As of writing, local variable auto closures are currently allowed by
       // the parser, but the plan is that they will be disallowed, so this will
       // actually only apply to auto closure parameters, which is what we want
-      auto *t = d->getDecl()->getType()->castTo<AnyFunctionType>();
-      isTransparent = t->getExtInfo().isAutoClosure();
+      Type Ty = d->getDecl()->getType();
+
+      // Strip the InOut qualifier. 
+      if (auto *IO = Ty->getAs<InOutType>()) {
+        Ty = IO->getObjectType();
+      }
+
+      // If the decl type is a function type, figure out if it is an auto
+      // closure.
+      if (auto *AnyF = Ty->getAs<AnyFunctionType>()) {
+        isTransparent = AnyF->getExtInfo().isAutoClosure();
+      }
     }
     // TODO: preserve the function pointer at its original abstraction level
     ManagedValue fn = gen.emitRValueAsSingleValue(e);
