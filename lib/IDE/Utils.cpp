@@ -17,9 +17,11 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace ide;
@@ -52,5 +54,93 @@ bool ide::isSourceInputComplete(StringRef Text) {
   std::unique_ptr<llvm::MemoryBuffer> InputBuf;
   InputBuf.reset(llvm::MemoryBuffer::getMemBufferCopy(Text));
   return ide::isSourceInputComplete(std::move(InputBuf));
+}
+
+// FIXME: copied from Clang's
+// CommentASTToXMLConverter::appendToResultWithXMLEscaping
+static void appendWithXMLEscaping(raw_ostream &OS, StringRef S) {
+  for (const char C : S) {
+    switch (C) {
+    case '&':
+      OS << "&amp;";
+      break;
+    case '<':
+      OS << "&lt;";
+      break;
+    case '>':
+      OS << "&gt;";
+      break;
+    case '"':
+      OS << "&quot;";
+      break;
+    case '\'':
+      OS << "&apos;";
+      break;
+    default:
+      OS << C;
+      break;
+    }
+  }
+}
+
+bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
+  StringRef BriefComment = D->getBriefComment();
+  if (BriefComment.empty())
+    return false;
+
+  StringRef RootEndTag;
+  if (isa<AbstractFunctionDecl>(D)) {
+    OS << "<Function";
+    RootEndTag = "</Function>";
+  } else {
+    OS << "<Other";
+    RootEndTag = "</Other>";
+  }
+
+  {
+    // Print line and column number.
+    auto Loc = D->getLoc();
+    const auto &SM = D->getASTContext().SourceMgr;
+    unsigned BufferID = SM.findBufferContainingLoc(Loc);
+    StringRef FileName = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+    auto LineAndColumn = SM.getLineAndColumn(Loc);
+    OS << " file=\"";
+    appendWithXMLEscaping(OS, FileName);
+    OS << "\"";
+    OS << " line=\"" << LineAndColumn.first
+       << "\" column=\"" << LineAndColumn.second << "\"";
+  }
+
+  // Finish the root tag.
+  OS << ">";
+
+  auto *VD = dyn_cast<ValueDecl>(D);
+
+  OS << "<Name>";
+  if (VD && VD->hasName())
+    OS << VD->getFullName();
+  OS << "</Name>";
+
+  if (VD) {
+    llvm::SmallString<64> SS;
+    bool Failed;
+    {
+      llvm::raw_svector_ostream OS(SS);
+      Failed = ide::printDeclUSR(VD, OS);
+    }
+    if (!Failed && !SS.empty()) {
+      OS << "<USR>" << SS << "</USR>";
+    }
+  }
+
+  // FIXME: <Declaration>
+  OS << "<Abstract><Para>";
+  appendWithXMLEscaping(OS, BriefComment);
+  OS << "</Para></Abstract>";
+
+  OS << RootEndTag;
+
+  OS.flush();
+  return true;
 }
 
