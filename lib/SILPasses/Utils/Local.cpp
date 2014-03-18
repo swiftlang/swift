@@ -261,8 +261,11 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
         continue;
     }
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
-      if (partialApply->getSubstCalleeType()
-          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+      auto args = partialApply->getArguments();
+      auto params = partialApply->getSubstCalleeType()
+        ->getInterfaceParameters();
+      params = params.slice(params.size() - args.size(), args.size());
+      if (params[UI->getOperandNumber()-1].isIndirect())
         continue;
     }
 
