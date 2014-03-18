@@ -186,7 +186,7 @@ void graph::prims(std::vector<Node *> &Graph,
   assert(Graph.size() < UnknownIndex && "We do not support more than "
          "(unsigned)-1 sized graphs since we use -1 as a sentinel value.");
   PriorityQueue Queue;
-  Queue.dump_debug();
+  Queue.dump();
 
   // Initialize our data structures. They will contain at most Graph.size()
   // elements, so just reserve that space now.
@@ -202,7 +202,7 @@ void graph::prims(std::vector<Node *> &Graph,
   // Make the minimum spanning tree root its own parent for simplicity.
   TreeEdges.push_back(0);
 
-  printf("Creating graph...\n");
+  //printf("Creating graph...\n");
   for (unsigned i = 1; i < GraphSize; ++i) {
     Queue.Heap.push_back({i, INFINITY});
     Queue.GraphIndexToHeapIndexMap.push_back(i);
@@ -210,10 +210,8 @@ void graph::prims(std::vector<Node *> &Graph,
     TreeEdges.push_back(UnknownIndex);
   }
 
-  printf("\nPerforming Algorithm...\n");
+  //printf("\nPerforming Algorithm...\n");
   // Until our queue is empty...
-  unsigned Count = 0;
-
   while (!Queue.Heap.empty()) {
     // Extract the minimum element of the queue (i.e. the last one).
     CostQueueElt E = Queue.popHeap();
@@ -222,8 +220,6 @@ void graph::prims(std::vector<Node *> &Graph,
 
     // For each AdjIndex in the adjacentcy list of the node...
     for (unsigned AdjNodeIndex : Graph[NodeId]->adjList) {
-      //printf("%d\n", Count);
-      Count++;
       // Compute the distance from NodeIndex to AdjNodeIndex. If the distance in
       // between the two nodes is closer than the current set distance to the
       // spanning tree of the adjacent node, set NodeIndex to be the parent of
