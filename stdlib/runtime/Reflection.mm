@@ -19,6 +19,7 @@
 #include <new>
 #include <string>
 #include <Foundation/Foundation.h>
+#include <dlfcn.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
 
@@ -47,11 +48,6 @@ struct ReflectableWitnessTable {
 };
   
 struct MagicMirrorData;
-  
-struct OptionalObjectIdentifier {
-  const void *id;
-  bool isNone;
-};
   
 struct String;
   
@@ -132,11 +128,6 @@ struct OptionalQuickLookObject {
   };
 };
   
-/// We can't return String accurately from C on some platforms, so use a Swift
-/// thunk we can tail-call to do it for us.
-using StringReturn = void;
-extern "C" StringReturn swift_returnString(String *s);
-  
 /// The enumeration of mirror dispositions.
 enum class MirrorDisposition : bool {
   Aggregate,
@@ -144,32 +135,7 @@ enum class MirrorDisposition : bool {
 };
   
 /// A Mirror witness table for use by MagicMirror.
-struct MirrorWitnessTable {
-  /// var value: Any { get }
-  Any (*getValue)(MagicMirrorData *self, const Metadata *Self);
-  /// var valueType: Any.Type { get }
-  const Metadata * (*getType)(MagicMirrorData *self, const Metadata *Self);
-  
-  /// var objectIdentifier: ObjectIdentifier? { get }
-  OptionalObjectIdentifier (*getObjectIdentifier)(MagicMirrorData *self,
-                                                  const Metadata *Self);
-  /// var count: Int { get }
-  intptr_t (*getCount)(MagicMirrorData *self, const Metadata *Self);
-  
-  /// subscript(Int) -> (String, Mirror) { get }
-  StringMirrorTuple (*getChild)(intptr_t i, MagicMirrorData *self,
-                                const Metadata *Self);
-  /// var summary: String { get }
-  StringReturn (*getString)(MagicMirrorData *self, const Metadata *Self);
-  
-  /// var IDERepresentation: IDERepresentable? { get }
-  OptionalQuickLookObject (*getIDERepresentation)
-    (MagicMirrorData *self, const Metadata *Self);
-  
-  /// var disposition: MirrorDisposition { get }
-  MirrorDisposition (*getDisposition)(MagicMirrorData *self,
-                                      const Metadata *Self);
-};
+struct MirrorWitnessTable;
   
 /// The protocol descriptor for Reflectable from the stdlib.
 extern "C" const ProtocolDescriptor _TMpSs11Reflectable;
@@ -187,9 +153,6 @@ struct MagicMirrorData {
   const Metadata *Type;
 };
   
-/// Type metadata for MagicMirrorData from the stdlib.
-extern "C" const FullMetadata<StructMetadata> _TMdVSs16_MagicMirrorData;
-  
 /// A magic implementation of Mirror that can^Wwill be able to look at runtime
 /// metadata to walk an arbitrary object.
 ///
@@ -198,7 +161,7 @@ extern "C" const FullMetadata<StructMetadata> _TMdVSs16_MagicMirrorData;
 class MagicMirror {
 public:
   // The existential header.
-  const Metadata *Self = &_TMdVSs16_MagicMirrorData;
+  const Metadata *Self;
   const MirrorWitnessTable *MirrorWitness;
   
   // The data for the mirror.
@@ -220,73 +183,74 @@ static_assert(alignof(MagicMirror) == alignof(Mirror),
 static_assert(sizeof(MagicMirror) == sizeof(Mirror),
               "MagicMirror layout does not match existential container");
   
-// -- Mirror witnesses for a type we don't know how to reflect.
+// -- Build an Any from an arbitrary value unowned-referenced by a mirror.
   
-Any Opaque_getValue(MagicMirrorData *self, const Metadata *Self) {
+extern "C"
+Any swift_MagicMirrorData_value(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
   Any result;
   
-  auto T = self->Type;
-  result.Self = T;
-  T->vw_initializeBufferWithCopy(&result.Value,
-                                 const_cast<OpaqueValue*>(self->Value));
+  result.Self = type;
+  type->vw_initializeBufferWithCopy(&result.Value,
+                                    const_cast<OpaqueValue*>(value));
+  
+  swift_release(owner);
   
   return result;
 }
-const Metadata *Opaque_getType(MagicMirrorData *self, const Metadata *Self) {
-  return self->Type->vw_typeOf(const_cast<OpaqueValue*>(self->Value));
+extern "C"
+const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
+                                                const OpaqueValue *value,
+                                                const Metadata *type) {
+  auto r = type->vw_typeOf(const_cast<OpaqueValue*>(value));
+  swift_release(owner);
+  return r;
 }
-OptionalObjectIdentifier Opaque_getObjectIdentifier(MagicMirrorData *self,
-                                                    const Metadata *Self) {
-  return {nullptr, 1};
-}
-intptr_t Opaque_getCount(MagicMirrorData *self, const Metadata *Self) {
-  return 0;
-}
-StringMirrorTuple Opaque_getChild(intptr_t i, MagicMirrorData *self,
-                                  const Metadata *Self) {
-  // unreachable
-  abort();
-}
-StringReturn Opaque_getString(MagicMirrorData *self, const Metadata *Self) {
-  String s("<something>");
   
-  return swift_returnString(&s);
-}
-OptionalQuickLookObject Opaque_getIDERepresentation(MagicMirrorData *self,
-                                                    const Metadata *Self) {
-  OptionalQuickLookObject result;
-  memset(&result, 0, sizeof(result));
-  result.optional.isNone = true;
+extern "C"
+Any swift_MagicMirrorData_objcValue(HeapObject *owner,
+                                    const OpaqueValue *value,
+                                    const Metadata *type) {
+  Any result;
+    
+  id object = *reinterpret_cast<const id *>(value);
+  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
+  result.Self = swift_getObjCClassMetadata(isa);
+  *reinterpret_cast<id *>(&result.Value) = [object retain];
+  swift_release(owner);
   return result;
 }
-MirrorDisposition Aggregate_getDisposition(MagicMirrorData *self,
-                                           const Metadata *Self) {
-  return MirrorDisposition::Aggregate;
+  
+extern "C"
+const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
+                                                    const OpaqueValue *value,
+                                                    const Metadata *type) {
+  id object = *reinterpret_cast<const id *>(value);
+  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
+  swift_release(owner);
+  return swift_getObjCClassMetadata(isa);
 }
   
-static const MirrorWitnessTable OpaqueMirrorWitness{
-  Opaque_getValue,
-  Opaque_getType,
-  Opaque_getObjectIdentifier,
-  Opaque_getCount,
-  Opaque_getChild,
-  Opaque_getString,
-  Opaque_getIDERepresentation,
-  Aggregate_getDisposition,
-};
+// -- Tuple destructuring.
   
-// -- Mirror witnesses for a tuple type.
-  
-intptr_t Tuple_getCount(MagicMirrorData *self, const Metadata *Self) {
-  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
+extern "C"
+intptr_t swift_TupleMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
+  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
+  swift_release(owner);
   return Tuple->NumElements;
 }
-
-StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
-                                 const Metadata *Self) {
+  
+extern "C"
+StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
+                                              HeapObject *owner,
+                                              const OpaqueValue *value,
+                                              const Metadata *type) {
   StringMirrorTuple result;
   
-  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
+  auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   
   if (i < 0 || (size_t)i > Tuple->NumElements)
     abort();
@@ -299,55 +263,12 @@ StringMirrorTuple Tuple_getChild(intptr_t i, MagicMirrorData *self,
   
   // Get a Mirror for the nth element.
   auto &elt = Tuple->getElements()[i];
-  auto bytes = reinterpret_cast<const char*>(self->Value);
+  auto bytes = reinterpret_cast<const char*>(value);
   auto eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
   
-  result.second = swift_unsafeReflectAny(self->Owner, eltData, elt.Type);
+  result.second = swift_unsafeReflectAny(owner, eltData, elt.Type);
   return result;
 }
-  
-StringReturn Tuple_getString(MagicMirrorData *self, const Metadata *Self) {
-  auto Tuple = static_cast<const TupleTypeMetadata *>(self->Type);
-  
-  auto buf = reinterpret_cast<char*>(malloc(128));
-  snprintf(buf, 127, "(%zu elements)", Tuple->NumElements);
-  buf[127] = 0;
-  
-  String s(buf, intptr_t(strlen(buf)));
-  free(buf);
-  return swift_returnString(&s);
-}
-  
-static const MirrorWitnessTable TupleMirrorWitness{
-  Opaque_getValue,
-  Opaque_getType,
-  Opaque_getObjectIdentifier,
-  Tuple_getCount,
-  Tuple_getChild,
-  Tuple_getString,
-  Opaque_getIDERepresentation,
-  Aggregate_getDisposition,
-};
-  
-// -- Mirror witnesses for classes.
-  
-OptionalObjectIdentifier Class_getObjectIdentifier(MagicMirrorData *self,
-                                                   const Metadata *Self) {
-  const void *object = *reinterpret_cast<const void * const*>(self->Value);
-  return {object, false};
-}
-  
-// TODO: Structural reflection of native classes.
-static const MirrorWitnessTable ClassMirrorWitness{
-  Opaque_getValue,
-  Opaque_getType,
-  Class_getObjectIdentifier,
-  Opaque_getCount,
-  Opaque_getChild,
-  Opaque_getString,
-  Opaque_getIDERepresentation,
-  Aggregate_getDisposition,
-};
   
 // -- Mirror witnesses for ObjC classes.
   
@@ -366,7 +287,7 @@ extern "C" const FullMetadata<Metadata> _TMdVSs6UInt32;
 extern "C" const FullMetadata<Metadata> _TMdVSs6UInt64;
   
 /// Map an ObjC type encoding string to a Swift type metadata object.
-const Metadata *getMetadataForEncoding(const char *encoding) {
+static const Metadata *getMetadataForEncoding(const char *encoding) {
   switch (*encoding) {
   case 'c': // char
     return &_TMdVSs4Int8;
@@ -405,26 +326,13 @@ const Metadata *getMetadataForEncoding(const char *encoding) {
   }
 }
   
-Any ObjC_getValue(MagicMirrorData *self, const Metadata *Self) {
-  Any result;
-  
-  id object = *reinterpret_cast<const id *>(self->Value);
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
-  result.Self = swift_getObjCClassMetadata(isa);
-  *reinterpret_cast<id *>(&result.Value) = [object retain];
-  return result;
-}
-  
-const Metadata *ObjC_getType(MagicMirrorData *self, const Metadata *Self) {
-  id object = *reinterpret_cast<const id *>(self->Value);
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
-  return swift_getObjCClassMetadata(isa);
-}
-  
-intptr_t ObjC_getCount(MagicMirrorData *self, const Metadata *Self) {
+extern "C"
+intptr_t swift_ObjCMirror_count(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
   // Copying the ivar list just to free it is lame, but we have
-  // no room to save it.
-  auto isa = (Class)self->Type;
+  // nowhere to save it.
+  auto isa = (Class)type;
   
   unsigned count;
   Ivar *ivars = class_copyIvarList(isa, &count);
@@ -434,13 +342,22 @@ intptr_t ObjC_getCount(MagicMirrorData *self, const Metadata *Self) {
   if (class_getSuperclass(isa))
     count += 1;
   
+  swift_release(owner);
   return count;
 }
-Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig);
-StringMirrorTuple ObjC_getChild(intptr_t i, MagicMirrorData *self,
-                                const Metadata *Self) {
-  id object = *reinterpret_cast<const id *>(self->Value);
-  auto isa = (Class)self->Type;
+  
+static Mirror ObjC_getMirrorForSuperclass(Class sup,
+                                          HeapObject *owner,
+                                          const OpaqueValue *value,
+                                          const Metadata *type);
+  
+extern "C"
+StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
+                                             HeapObject *owner,
+                                             const OpaqueValue *value,
+                                             const Metadata *type) {
+  id object = *reinterpret_cast<const id *>(value);
+  auto isa = (Class)type;
   
   // If there's a superclass, it becomes the first child.
   if (auto sup = class_getSuperclass(isa)) {
@@ -448,7 +365,7 @@ StringMirrorTuple ObjC_getChild(intptr_t i, MagicMirrorData *self,
       StringMirrorTuple result;
       const char *supName = class_getName(sup);
       result.first = String(supName, strlen(supName));
-      result.second = ObjC_getMirrorForSuperclass(sup, self);
+      result.second = ObjC_getMirrorForSuperclass(sup, owner, value, type);
       return result;
     }
     --i;
@@ -467,32 +384,27 @@ StringMirrorTuple ObjC_getChild(intptr_t i, MagicMirrorData *self,
   const char *typeEncoding = ivar_getTypeEncoding(ivars[i]);
   free(ivars);
   
-  const OpaqueValue *value =
+  const OpaqueValue *ivar =
     reinterpret_cast<const OpaqueValue *>(
     reinterpret_cast<const char*>(object) + offset);
   
-  const Metadata *type = getMetadataForEncoding(typeEncoding);
+  const Metadata *ivarType = getMetadataForEncoding(typeEncoding);
   
   StringMirrorTuple result;
   result.first = String(name, strlen(name));
-  result.second = swift_unsafeReflectAny(self->Owner, value, type);
+  result.second = swift_unsafeReflectAny(owner, ivar, ivarType);
   return result;
 }
-StringReturn ObjC_getString(MagicMirrorData *self, const Metadata *Self) {
-  id object = *reinterpret_cast<const id *>(self->Value);
   
-  NSString *result = [object debugDescription];
-  const char *cResult = [result UTF8String];
-  String s(cResult, strlen(cResult));
-  return swift_returnString(&s);
-}
-  
-OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
-                                                  const Metadata *Self) {
+extern "C"
+OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
+                                                       const OpaqueValue *value,
+                                                       const Metadata *type) {
   OptionalQuickLookObject result;
   memset(&result, 0, sizeof(result));
   
-  id object = *reinterpret_cast<const id *>(self->Value);
+  id object = [*reinterpret_cast<const id *>(value) retain];
+  swift_release(owner);
   if ([object respondsToSelector:@selector(debugQuickLookObject)])
     object = [object debugQuickLookObject];
     
@@ -539,73 +451,103 @@ OptionalQuickLookObject ObjC_getIDERepresentation(MagicMirrorData *self,
   return result;
 }
   
-static const MirrorWitnessTable ObjCMirrorWitness{
-  ObjC_getValue,
-  ObjC_getType,
-  Class_getObjectIdentifier,
-  ObjC_getCount,
-  ObjC_getChild,
-  ObjC_getString,
-  ObjC_getIDERepresentation,
-  Aggregate_getDisposition,
-};
+// -- MagicMirror implementation.
   
-static const MirrorWitnessTable ObjCSuperMirrorWitness{
-  ObjC_getValue,
-  ObjC_getType,
-  // For super mirrors, we suppress the object identifier.
-  Opaque_getObjectIdentifier,
-  ObjC_getCount,
-  ObjC_getChild,
-  ObjC_getString,
-  ObjC_getIDERepresentation,
-  Aggregate_getDisposition,
-};
+// Addresses of the type metadata and Mirror witness tables for the primitive
+// mirrors.
+extern "C" const FullMetadata<Metadata> _TMdVSs13_OpaqueMirror;
+extern "C" const MirrorWitnessTable _TWPVSs13_OpaqueMirrorSs6MirrorSs;
+extern "C" const FullMetadata<Metadata> _TMdVSs12_TupleMirror;
+extern "C" const MirrorWitnessTable _TWPVSs12_TupleMirrorSs6MirrorSs;
+extern "C" const FullMetadata<Metadata> _TMdVSs12_ClassMirror;
+extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs6MirrorSs;
   
-Mirror ObjC_getMirrorForSuperclass(Class sup, MagicMirrorData *orig) {
+// These type metadata objects are kept in swiftFoundation because they rely
+// on string bridging being installed.
+static const Metadata *getObjCMirrorMetadata() {
+  static const Metadata *metadata = nullptr;
+  if (!metadata)
+    metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
+      dlsym(RTLD_DEFAULT, "_TMdV10Foundation11_ObjCMirror"));
+  assert(metadata);
+  return metadata;
+}
+static const MirrorWitnessTable *getObjCMirrorWitness() {
+  static const MirrorWitnessTable *witness = nullptr;
+  if (!witness)
+    witness = reinterpret_cast<const MirrorWitnessTable*>(
+      dlsym(RTLD_DEFAULT, "_TWPV10Foundation11_ObjCMirrorSs6MirrorS_"));
+  assert(witness);
+  return witness;
+}
+static const Metadata *getObjCSuperMirrorMetadata() {
+  static const Metadata *metadata = nullptr;
+  if (!metadata)
+    metadata = reinterpret_cast<const FullMetadata<Metadata>*>(
+      dlsym(RTLD_DEFAULT, "_TMdV10Foundation16_ObjCSuperMirror"));
+  assert(metadata);
+  return metadata;
+}
+static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
+  static const MirrorWitnessTable *witness = nullptr;
+  if (!witness)
+    witness = reinterpret_cast<const MirrorWitnessTable*>(
+      dlsym(RTLD_DEFAULT, "_TWPV10Foundation16_ObjCSuperMirrorSs6MirrorS_"));
+  assert(witness);
+  
+  return witness;
+}
+  
+static Mirror ObjC_getMirrorForSuperclass(Class sup,
+                                          HeapObject *owner,
+                                          const OpaqueValue *value,
+                                          const Metadata *type) {
   Mirror resultBuf;
   MagicMirror *result = ::new (&resultBuf) MagicMirror;
   
-  result->MirrorWitness = &ObjCSuperMirrorWitness;
-  result->Data.Owner = swift_retain(orig->Owner);
+  result->Self = getObjCSuperMirrorMetadata();
+  result->MirrorWitness = getObjCSuperMirrorWitness();
+  result->Data.Owner = owner;
   result->Data.Type = reinterpret_cast<ClassMetadata*>(sup);
-  result->Data.Value = orig->Value;
+  result->Data.Value = value;
   return resultBuf;
 }
   
-// -- MagicMirror implementation.
+// (type being mirrored, mirror type, mirror witness)
+using MirrorTriple
+  = std::tuple<const Metadata *, const Metadata *, const MirrorWitnessTable *>;
   
-static std::pair<const Metadata *, const MirrorWitnessTable *>
-getWitnessForClass(const OpaqueValue *Value) {
+static MirrorTriple
+getImplementationForClass(const OpaqueValue *Value) {
   // Get the runtime type of the object.
   id obj = *reinterpret_cast<const id *>(Value);
   auto isa = reinterpret_cast<const ClassMetadata*>(object_getClass(obj));
   
   // If this is a pure ObjC class, reflect it using ObjC's runtime facilities.
   if (!isa->isTypeMetadata())
-    return {isa, &ObjCMirrorWitness};
+    return {isa, getObjCMirrorMetadata(), getObjCMirrorWitness()};
   
   // Otherwise, use the (currently nonexistent) native Swift facilities.
-  return {isa, &ClassMirrorWitness};
+  return {isa, &_TMdVSs12_ClassMirror, &_TWPVSs12_ClassMirrorSs6MirrorSs};
 }
   
 /// Get the magic mirror witnesses appropriate to a particular type.
-static std::pair<const Metadata *, const MirrorWitnessTable *>
-getWitnessForType(const Metadata *T, const OpaqueValue *Value) {
+static MirrorTriple
+getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   switch (T->getKind()) {
   case MetadataKind::Tuple:
-    return {T, &TupleMirrorWitness};
+    return {T, &_TMdVSs12_TupleMirror, &_TWPVSs12_TupleMirrorSs6MirrorSs};
       
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::Class: {
-    return getWitnessForClass(Value);
+    return getImplementationForClass(Value);
   }
       
   case MetadataKind::Opaque: {
     // If this is the Builtin.ObjCPointer type, use the dynamic type of the
     // object reference.
     if (T == &_TMdBO.base) {
-      return getWitnessForClass(Value);
+      return getImplementationForClass(Value);
     }
     
     // If this is the Builtin.ObjectPointer type, and the heap object is a
@@ -614,7 +556,7 @@ getWitnessForType(const Metadata *T, const OpaqueValue *Value) {
       const HeapObject *obj
         = *reinterpret_cast<const HeapObject * const*>(Value);
       if (obj->metadata->getKind() == MetadataKind::Class)
-        return getWitnessForClass(Value);
+        return getImplementationForClass(Value);
     }
     SWIFT_FALLTHROUGH;
   }
@@ -625,7 +567,7 @@ getWitnessForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Function:
   case MetadataKind::Existential:
   case MetadataKind::Metatype:
-    return {T, &OpaqueMirrorWitness};
+    return {T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs6MirrorSs};
       
   // Types can't have these kinds.
   case MetadataKind::PolyFunction:
@@ -643,7 +585,7 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
   BoxPair box = swift_allocBox(T);
   
   T->vw_initializeWithTake(box.value, value);
-  std::tie(T, MirrorWitness) = getWitnessForType(T, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, value);
   
   Data = {box.heapObject, box.value, T};
 }
@@ -651,13 +593,12 @@ MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
 /// MagicMirror ownership-sharing subvalue constructor.
 MagicMirror::MagicMirror(HeapObject *owner,
                          const OpaqueValue *value, const Metadata *T) {
-  swift_retain(owner);
-  
-  std::tie(T, MirrorWitness) = getWitnessForType(T, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, value);
   Data = {owner, value, T};
 }
   
-const ReflectableWitnessTable *getReflectableConformance(const Metadata *T) {
+static const ReflectableWitnessTable *
+getReflectableConformance(const Metadata *T) {
   return reinterpret_cast<const ReflectableWitnessTable*>(
     swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr));
 }
