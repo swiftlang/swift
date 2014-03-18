@@ -1119,17 +1119,26 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // used to differentiate them from C++ and ObjC classes.
     Name = getMangledName(DbgTy);
     auto ClassTy = BaseTy->castTo<ClassType>();
-    if (auto Decl = ClassTy->getDecl()) {
+    if (auto *Decl = ClassTy->getDecl()) {
       Location L = getLoc(SM, Decl);
       auto Attrs = Decl->getAttrs();
       auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
-      if (auto ClangDecl = Decl->getClangDecl()) {
+      if (auto *ClangDecl = Decl->getClangDecl()) {
         auto ClangSrcLoc = ClangDecl->getLocStart();
         clang::SourceManager &ClangSM =
           CI.getClangASTContext().getSourceManager();
         L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
         L.Filename = ClangSM.getBufferName(ClangSrcLoc);
-        auto ModuleName = ClangDecl->getOwningModule()->getTopLevelModuleName();
+
+        // Use "ObjectiveC" as default for implicit decls.  FIXME: Do
+        // something more clever based on the decl's mangled name.
+        StringRef ModuleName = "ObjectiveC";
+        if (auto *OwningModule = ClangDecl->getOwningModule())
+          ModuleName = OwningModule->getTopLevelModuleName();
+        else
+          assert(ClangDecl->isImplicit() &&
+                 "explicit clang decl without an owning module");
+
         auto ModuleFile = getOrCreateFile(L.Filename);
         // This placeholder gets RAUW'd by finalize().
         Scope =getOrCreateNamespace(ModuleFile, ModuleName, ModuleFile, L.Line);
