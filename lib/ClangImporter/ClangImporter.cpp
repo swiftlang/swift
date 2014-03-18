@@ -562,11 +562,6 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
     return { selector, "" };
   }
 
-  // If the first part would be a Swift reserved word, we can't split.
-  if (isSwiftReservedName(selector.substr(0, index))) {
-    return { selector, "" };
-  }
-
   // If there are at least two characters in the parameter name, and
   // lowercasing the second of them changes it, we have an
   // acronym. Don't lowercase anything.
