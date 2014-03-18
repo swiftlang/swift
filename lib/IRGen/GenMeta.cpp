@@ -869,6 +869,8 @@ namespace {
       addConstantSize(numFields);
       addConstantSize(FieldVectorOffset);
       Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
+      // TODO: Build field type accessor function.
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
   };
   
@@ -952,6 +954,9 @@ namespace {
       addConstantSize(numFields);
       addConstantSize(FieldVectorOffset);
       Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
+      
+      // TODO: Build field type accessor function.
+      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
   };
   
@@ -1009,6 +1014,7 @@ namespace {
     
     void addKindDependentFields() {
       // FIXME: Populate.
+      addConstantSize(0);
       addConstantSize(0);
       addConstantSize(0);
       addConstantSize(0);

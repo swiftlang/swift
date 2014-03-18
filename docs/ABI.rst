@@ -537,7 +537,7 @@ layout is as follows:
 
 - The mangled **name** is referenced as a null-terminated C string at
   **offset 1**. This name includes no bound generic parameters.
-- The following three fields depend on the kind of nominal type.
+- The following four fields depend on the kind of nominal type.
 
   * For a struct or class:
 
@@ -550,10 +550,15 @@ layout is as follows:
     + The **field names** are referenced as a doubly-null-terminated list of
       C strings at **offset 4**. The order of names corresponds to the order
       of fields in the field offset vector.
+    + The **field type accessor** is a function pointer at **offset 5**. If
+      non-null, the function takes a pointer to an instance of type metadata
+      for the nominal type, and returns a pointer to an array of type metadata
+      references for the types of the fields of that instance. The order matches
+      that of the field offset vector and field name list.
 
   * For an enum:
 
-    + TODO: Offsets 2-4 are always zero.
+    + TODO: Offsets 2-5 are always zero.
 
 - The **generic parameter descriptor** begins at **offset 5**. This describes
   the layout of the generic parameter vector in the metadata record:

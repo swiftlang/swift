@@ -795,6 +795,11 @@ struct NominalTypeDescriptor {
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       const char *FieldNames;
+      
+      /// The field type vector accessor. Returns a pointer to an array of
+      /// type metadata references whose order is consistent with that of the
+      /// field offset vector.
+      const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
     } Class;
     
     /// Information about struct types.
@@ -814,6 +819,11 @@ struct NominalTypeDescriptor {
       /// The field names. A doubly-null-terminated list of strings, whose
       /// length and order is consistent with that of the field offset vector.
       const char *FieldNames;
+      
+      /// The field type vector accessor. Returns a pointer to an array of
+      /// type metadata references whose order is consistent with that of the
+      /// field offset vector.
+      const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
     } Struct;
     
     /// Information about enum types.
@@ -826,6 +836,10 @@ struct NominalTypeDescriptor {
       /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
       /// tag order, non-empty cases first, followed by empty cases.
       const char *CaseNames;
+      /// The field type vector accessor. Returns a pointer to an array of
+      /// type metadata references whose order is consistent with that of the
+      /// CaseNames.
+      const Metadata * const *(*GetCaseTypes)(const Metadata *Self);
     } Enum;
   };
   
