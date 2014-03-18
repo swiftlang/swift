@@ -1136,7 +1136,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   SILValue origVal = original.forward(SGF);
   SILBasicBlock *success, *failure;
   auto &origTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  auto castTy = E->getCastTypeLoc().getType()->getCanonicalType();
+  auto castTy = E->getType()->getCanonicalType().getAnyOptionalObjectType();
   auto &castTL = SGF.getTypeLowering(castTy);
   SILValue origAbs = SGF.emitCheckedCastAbstractionChange(E, origVal,
                                                           origTL,

@@ -2131,7 +2131,105 @@ namespace {
         break;
       }
 
-      return simplifyExprType(expr);
+      Type finalResultType = simplifyType(expr->getType());
+
+      // We can't really do the optional logic correctly at compile
+      // time when the cast involves an archetype/existential.
+      if (castKind != CheckedCastKind::Downcast) {
+        expr->setType(finalResultType);
+        return expr;
+      }
+
+      // Handle optional operands or optional results.
+
+      /// A helper function to plumb a stack of optional types.
+      auto plumbOptionals = [](Type type, SmallVectorImpl<Type> &optionals) {
+        while (auto valueType = type->getAnyOptionalObjectType()) {
+          optionals.push_back(type);
+          type = valueType;
+        }
+        return type;
+      };
+
+      Expr *subExpr = expr->getSubExpr();
+      Type srcType = subExpr->getType();
+
+      // There's nothing special to do if the operand isn't optional.
+      SmallVector<Type, 4> srcOptionals;
+      srcType = plumbOptionals(srcType, srcOptionals);
+      if (srcOptionals.empty()) {
+        expr->setType(finalResultType);
+        return expr;
+      }
+
+      SmallVector<Type, 4> destOptionals;
+      auto destValueType = plumbOptionals(finalResultType, destOptionals);
+
+      // This is a checked cast, so the result type will always have
+      // at least one level of optional, which should become the type
+      // of the checked-cast expression.
+      assert(!destOptionals.empty() &&
+             "result of checked cast is not an optional type");
+      expr->setType(destOptionals.back());
+
+      // The result type (without the final optional) is a subtype of
+      // the operand type, so it will never have a higher depth.
+      assert(destOptionals.size() - 1 <= srcOptionals.size());
+
+      // The outermost N levels of optionals on the operand must all
+      // be present or the cast fails.  The innermost M levels of
+      // optionals on the operand are reflected in the requested
+      // destination type, so we should map these nils into the result.
+      unsigned numRequiredOptionals =
+        srcOptionals.size() - (destOptionals.size() - 1);
+
+      // The number of OptionalEvaluationExprs between the point of the
+      // inner cast and the enclosing OptionalEvaluationExpr (exclusive)
+      // which represents failure for the entire operation.
+      unsigned failureDepth = destOptionals.size() - 1;
+
+      // Drill down on the operand until it's non-optional.
+      SourceLoc fakeQuestionLoc = subExpr->getEndLoc();
+      for (unsigned i : indices(srcOptionals)) {
+        // As we move into the range of mapped optionals, start
+        // lowering the depth.
+        unsigned depth = failureDepth;
+        if (i >= numRequiredOptionals) {
+          depth -= (i - numRequiredOptionals) + 1;
+        }
+
+        Type valueType =
+          (i + 1 == srcOptionals.size() ? srcType : srcOptionals[i+1]);
+        subExpr = new (tc.Context) BindOptionalExpr(subExpr, fakeQuestionLoc,
+                                                    depth, valueType);
+        subExpr->setImplicit(true);
+      }
+      expr->setSubExpr(subExpr);
+
+      // If we're casting to an optional type, we need to capture the
+      // final M bindings.
+      Expr *result = expr;
+      if (destOptionals.size() > 1) {
+        // If the innermost cast fails, the entire expression fails.  To
+        // get this behavior, we have to bind and then re-inject the result.
+        // (SILGen should know how to peephole this.)
+        result = new (tc.Context) BindOptionalExpr(result, expr->getEndLoc(),
+                                                   failureDepth, destValueType);
+        result->setImplicit(true);
+
+        for (unsigned i = destOptionals.size(); i != 0; --i) {
+          Type destType = destOptionals[i-1];
+          result = new (tc.Context) InjectIntoOptionalExpr(result, destType);
+          result = new (tc.Context) OptionalEvaluationExpr(result, destType);
+        }
+
+      // Otherwise, we just need to capture the failure-depth binding.
+      } else {
+        result = new (tc.Context) OptionalEvaluationExpr(result,
+                                                         finalResultType);
+      }
+
+      return result;
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
