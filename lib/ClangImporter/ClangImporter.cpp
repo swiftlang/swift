@@ -439,7 +439,7 @@ ClangImporter::Implementation::importSourceRange(clang::SourceRange loc) {
 static bool isSwiftReservedName(StringRef name) {
   /// FIXME: Check Swift keywords.
   return llvm::StringSwitch<bool>(name)
-           .Cases("true", "false", "new", true)
+           .Cases("true", "false", true)
            .Default(false);
 }
 
@@ -553,7 +553,7 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 ///
 /// \returns a pair of strings \c (before,after), where \c after has
 /// has its capitalization adjusted if necessary.
-std::pair<StringRef, StringRef> 
+static std::pair<StringRef, StringRef>
 splitSelectorPieceAt(StringRef selector, unsigned index,
                      SmallVectorImpl<char> &buffer) {
   // If the split point is at the end of the selector, the solution is
