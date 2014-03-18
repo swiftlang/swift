@@ -3597,6 +3597,9 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
                                     IGF.getTypeInfoForLowered(archetype));
 
     for (auto proto : archetypeProtos) {
+      if (!requiresProtocolWitnessTable(proto))
+        continue;
+
       ProtocolPath path(IGF.IGM, archTI.getProtocols(), proto);
       auto wtable = archTI.getWitnessTable(IGF, archetype,
                                            path.getOriginIndex());
@@ -3613,6 +3616,9 @@ void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
   assert(archetypeProtos.size() == sub.Conformance.size());
   for (unsigned j = 0, je = archetypeProtos.size(); j != je; ++j) {
     auto proto = archetypeProtos[j];
+    if (!requiresProtocolWitnessTable(proto))
+      continue;
+    
     auto &protoI = IGF.IGM.getProtocolInfo(proto);
     auto &confI = protoI.getConformance(IGF.IGM, replType, replTI, proto,
                                         *sub.Conformance[j]);
