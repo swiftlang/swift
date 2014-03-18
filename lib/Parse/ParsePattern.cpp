@@ -543,7 +543,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
     // Recover by creating a '() -> ?' signature.
     auto *EmptyTuplePattern =
-        TuplePattern::create(Context, Tok.getLoc(), {}, Tok.getLoc());
+        TuplePattern::create(Context, PreviousLoc, {}, PreviousLoc);
     argPatterns.push_back(EmptyTuplePattern);
     bodyPatterns.push_back(EmptyTuplePattern);
   }
