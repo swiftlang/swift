@@ -25,14 +25,15 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
-#include "clang/Frontend/CompilerInvocation.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/Lex/Preprocessor.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
+#include "clang/Frontend/CompilerInvocation.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/Lookup.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -562,11 +563,10 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
     return { selector, "" };
   }
 
-  // If there are at least two characters in the parameter name, and
-  // lowercasing the second of them changes it, we have an
-  // acronym. Don't lowercase anything.
-  if (selector.size() > index + 1 && 
-      tolower(selector[index + 1]) != selector[index + 1]) {
+  // If there are at least two characters in the parameter name, and the second
+  // one is not a lowercase character (uppercase or digit), we have an acronym.
+  // Don't lowercase anything.
+  if (selector.size() > index + 1 && !clang::isLowercase(selector[index + 1])) {
     return { selector.substr(0, index), selector.substr(index) };
   }
     
@@ -593,7 +593,7 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
                                  SmallVectorImpl<char> &buffer) {
   // If "init" is the first word, we have an initializer.
   if (selector.startswith("init") &&
-      (selector.size() == 4 || tolower(selector[4]) != selector[4])) {
+      (selector.size() == 4 || !clang::isLowercase(selector[4]))) {
     return splitSelectorPieceAt(selector, 4, buffer);
   }
 
@@ -603,13 +603,11 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
   unsigned wordEnd = wordStart;
   for (;;) {
     // Skip over any lowercase letters.
-    while (wordStart > 0 && 
-           tolower(selector[wordStart-1]) == selector[wordStart-1])
+    while (wordStart > 0 && clang::isLowercase(selector[wordStart-1]))
       --wordStart;
 
     // Skip over any non-lowercase letters.
-    while (wordStart > 0 && 
-           tolower(selector[wordStart-1]) != selector[wordStart-1])
+    while (wordStart > 0 && !clang::isLowercase(selector[wordStart-1]))
       --wordStart;
 
     // [wordStart, wordEnd) is the current word.
