@@ -56,7 +56,9 @@ example from Core Foundation is ``CGColorCreate``, which takes a
 
 We are willing to assume that the API is well-behaved and does not mutate the
 pointed-to array, so we can safely pass an interior pointer to the array storage
-without worrying about mutation.
+without worrying about mutation. We only guarantee the lifetime of the
+array for the duration of the call, so it could potentially be promoted to a
+stack allocation.
 
 "In" Arguments
 ~~~~~~~~~~~~~~
@@ -68,16 +70,51 @@ particularly prevalent on platforms like Win32 where there has historically
 been no standard ABI for passing structs by value, but pure "in" pointer
 parameters are rare on our platforms.  The potential consequences of
 disregarding value identity with C APIs are too high to allow scalar arguments
-to implicitly be used as pointer arguments, so although const pointers should
-never be used for actual mutation, we propose that only ``inout`` scalar
-arguments be accepted for const pointer parameters.  Although our semantics
-normally do not guarantee value identity, ``inout`` parameters that refer to
-stored variables or stored properties of C-derived types are in practice never
-subjected to implicit writebacks except in limited circumstances such as
-capture of ``inout`` references in closures that could be diagnosed. Requiring
-``inout`` also prevents the use of rvalues or ``let`` bindings that never have
-well-defined addresses as pointer arguments. If using an rvalue as a pointer
-argument is desired, it can easily be wrapped in an array.
+to implicitly be used as pointer arguments::
+
+  // From C: void foo(const pthread_mutex_t *);
+  import Foo
+
+  let mutex = pthread_mutex_create()
+  // This would pass a different temporary buffer on each call--not what you
+  // want for a mutex!
+  foo(mutex)
+  foo(mutex)
+  foo(mutex)
+
+Although const pointers should never be used for actual mutation, we propose
+that only ``inout`` scalar arguments be accepted for const pointer parameters.
+Although our semantics normally do not guarantee value identity, ``inout``
+parameters that refer to stored variables or stored properties of C-derived
+types are in practice never subjected to implicit writebacks except in limited
+circumstances such as capture of ``inout`` references in closures that could be
+diagnosed. Requiring ``inout`` also prevents the use of rvalues or ``let``
+bindings that never have well-defined addresses as pointer arguments. This
+more clearly communicates the intent for the callee to receive the same
+variable on every call::
+
+  // From C: void foo(const pthread_mutex_t *);
+  import Foo
+
+  var mutex = pthread_mutex_create()
+  foo(&mutex)
+  foo(&mutex)
+  foo(&mutex)
+
+If using an rvalue as a pointer argument is desired, it can easily be wrapped
+in an array. This communicates that the value *is* being copied into the
+temporary array, so it's more obvious that identity would not be maintained::
+
+  // an immutable scalar we might want to pass into a "const double*".
+  let grayLevel = 0.5
+  let monochrome = CGColorSpaceCreateGrayscale()
+
+  // error, can't pass Double into second argument.
+  let c1 = CGColorCreate(monochrome, grayval)
+  // error, can't take the address of a 'let' (would be ok for a 'var')
+  let c2 = CGColorCreate(monochrome, &grayval)
+  // OK, we're explicitly forming an array
+  let c3 = CGColorCreate(monochrome, [grayval])
 
 Non-Const Pointer Arguments
 ---------------------------
@@ -89,17 +126,37 @@ Non-const arguments of C type can be used as "out" or "inout" parameters,
 either of scalars or of arrays, and so should accept ``inout`` parameters of
 array or scalar type. Although a C API may expect a pure "out" parameter and
 not require initialization of its arguments, it is safer to assume the argument
-is ``inout`` and always require initialization. For array parameters, the
-exact point of mutation inside the callee cannot be known, so a copy-on-write
-array buffer must be eagerly uniqued prior to the address of the array being
-taken.
+is ``inout`` and always require initialization::
+
+  var s, c: Double
+  // error, 's' and 'c' aren't initialized
+  sincos(0.5, &s, &c)
+
+  var s1 = 0.0, c1 = 0.0
+  // OK
+  sincos(0.5, &s1, &c1)
+
+For array parameters, the exact point of mutation inside the callee cannot be
+known, so a copy-on-write array buffer must be eagerly uniqued prior to the
+address of the array being taken::
+
+  func loadFloatsFromData(data: NSData) {
+    var a: Float[] = [0.0, 0.0, 0.0, 0.0]
+    var b = a
+
+    // Should only mutate 'b' without affecting 'a', so its backing store
+    // must be uniqued
+    data.getBytes(&b, sizeof(Float.self) * b.count)
+  }
 
 ObjC Types
 ~~~~~~~~~~
 
 ARC semantics treat an ``NSFoo**`` type as a pointer to an ``__autoreleasing``
-``NSFoo*``, so the use of such an argument is limited to it being a scalar
-``inout`` object reference or ``nil``.
+``NSFoo*``. Although in theory these interfaces could receive arrays of object
+pointers in Objective-C, that use case doesn't come up in Cocoa, and we can't
+reliably bridge such APIs into Swift. We only need to bridge ObjC mutable pointer
+types to accept a scalar ``inout`` object reference or ``nil``.
 
 Pointer Return Values
 ---------------------
