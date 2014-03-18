@@ -560,17 +560,17 @@ layout is as follows:
 
     + TODO: Offsets 2-5 are always zero.
 
-- The **generic parameter descriptor** begins at **offset 5**. This describes
+- The **generic parameter descriptor** begins at **offset 6**. This describes
   the layout of the generic parameter vector in the metadata record:
 
-  * The **offset of the generic parameter vector** is stored at **offset 5**.
+  * The **offset of the generic parameter vector** is stored at **offset 6**.
     This is the offset in pointer-sized words of the generic parameter vector
     inside the metadata record. If the type is not generic, this is zero.
-  * The **number of type parameters** is stored at **offset 6**.
+  * The **number of type parameters** is stored at **offset 7**.
   * For each type parameter **n**, the following fields are stored:
 
     + The **number of witnesses** for the type parameter is stored at
-      **offset 7+n**. This is the number of witness table pointers that are
+      **offset 8+n**. This is the number of witness table pointers that are
       stored for the type parameter in the generic parameter vector.
 
 Note that there is no nominal type descriptor for protocols or protocol types.
