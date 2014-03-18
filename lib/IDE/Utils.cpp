@@ -22,6 +22,9 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/Index/CommentToXML.h"
 
 using namespace swift;
 using namespace ide;
@@ -83,7 +86,32 @@ static void appendWithXMLEscaping(raw_ostream &OS, StringRef S) {
   }
 }
 
+static bool getClangDocumentationCommentAsXML(const clang::Decl *D,
+                                              raw_ostream &OS) {
+  const auto &ClangContext = D->getASTContext();
+  const clang::comments::FullComment *FC =
+      ClangContext.getCommentForDecl(D, /*PP=*/nullptr);
+  if (!FC)
+    return false;
+
+  // FIXME: hang the converter object somewhere so that it is persistent
+  // between requests to this AST.
+  clang::index::CommentToXMLConverter Converter;
+
+  llvm::SmallString<1024> XML;
+  Converter.convertCommentToXML(FC, XML, ClangContext);
+  OS << XML;
+  return true;
+}
+
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
+  auto MaybeClangNode = D->getClangNode();
+  if (MaybeClangNode) {
+    if (auto *CD = MaybeClangNode.getAsDecl())
+      return getClangDocumentationCommentAsXML(CD, OS);
+    return false;
+  }
+
   StringRef BriefComment = D->getBriefComment();
   if (BriefComment.empty())
     return false;
