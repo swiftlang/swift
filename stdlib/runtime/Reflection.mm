@@ -96,11 +96,15 @@ struct QuickLookObject {
   
   union {
     String Text;
+    intptr_t Int;
+    double Float;
     Any Any;
     RawData Raw;
   };
   enum class Tag : uint8_t {
     Text,
+    Int,
+    Float,
     Image,
     Sound,
     Color,
@@ -407,13 +411,38 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
   swift_release(owner);
   if ([object respondsToSelector:@selector(debugQuickLookObject)])
     object = [object debugQuickLookObject];
-    
+  
+  // NSStrings quick-look as text.
   if ([object isKindOfClass:[NSString class]]) {
     result.payload.Text = String((NSString*)object);
     result.payload.Kind = QuickLookObject::Tag::Text;
     result.optional.isNone = false;
     return result;
   }
+  
+  // NSNumbers quick-look as integers or doubles, depending on type.
+  if ([object isKindOfClass:[NSNumber class]]) {
+    NSNumber *n = object;
+    
+    switch ([n objCType][0]) {
+    case 'd':
+    case 'f':
+      result.payload.Float = [n doubleValue];
+      result.payload.Kind = QuickLookObject::Tag::Float;
+      break;
+        
+    // FIXME: decimals?
+    default:
+      result.payload.Int = [n integerValue];
+      result.payload.Kind = QuickLookObject::Tag::Int;
+      break;
+    }
+    
+    result.optional.isNone = false;
+    return result;
+  }
+  
+  // Various other framework types are used for rich representations.
   
   /// Store an ObjC reference into an Any.
   auto setAnyToObject = [](Any &any, id obj) {
