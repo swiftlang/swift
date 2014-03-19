@@ -221,11 +221,6 @@ static bool useCaptured(Operand *UI) {
     return false;
   }
 
-  if ((isa<AddressToPointerInst>(User) || isa<PointerToAddressInst>(User)) &&
-      User->hasOneUse()) {
-    return useCaptured(*User->use_begin());
-  }
-
   return true;
 }
 
