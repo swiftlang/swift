@@ -215,10 +215,15 @@ static bool useCaptured(Operand *UI) {
   // These instructions do not cause the address to escape.
   if (isa<CopyAddrInst>(User) ||
       isa<LoadInst>(User) ||
-      isa<ProtocolMethodInst>(User) ||
-      (isa<StoreInst>(User) && UI->getOperandNumber() == 1) ||
-      (isa<AssignInst>(User) && UI->getOperandNumber() == 1)) {
+      isa<ProtocolMethodInst>(User))
     return false;
+
+  if (auto *Store = dyn_cast<StoreInst>(User)) {
+    if (Store->getDest() == UI->get())
+      return false;
+  } else if (auto *Assign = dyn_cast<AssignInst>(User)) {
+    if (Assign->getDest() == UI->get())
+      return false;
   }
 
   return true;
