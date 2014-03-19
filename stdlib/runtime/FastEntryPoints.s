@@ -22,6 +22,7 @@
   .globl $0
   .align 4
 $0:
+  .cfi_startproc
 .endmacro
 
 .macro STATIC_FUNC
@@ -32,6 +33,7 @@ $0:
 .endmacro
 
 .macro END_FUNC
+  .cfi_endproc
 .endmacro
 
 #if SWIFT_HAVE_FAST_ENTRY_POINTS
@@ -105,7 +107,8 @@ $0:
   pop   %rax
   // the stack may have been aligned, therefore LEAVE instead of POP %rbp
   leave
-  .cfi_endproc
+  .cfi_def_cfa rsp, 8
+  .cfi_same_value rbp
 .endmacro
 
 // XXX FIXME -- We need to change this to return "void"
