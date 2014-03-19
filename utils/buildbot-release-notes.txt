@@ -1,7 +1,7 @@
 2014-03-19
 ----------
 
-* 'nil' may now be used as a Selector value. This also allows calls to 
+* 'nil' may now be used as a Selector value. This allows calls to
   Cocoa methods that accept `nil` selectors.
 
 * [] and [:] can now be used as the empty array and dictionary literal,
@@ -9,6 +9,10 @@
   they may only be used in a context that provides this information through type
   inference (e.g. when passing a function argument).
 
+* Properties defined in classes are now dynamically dispatched and can be 
+  overriden with @override.  Currently @override only works with computed properties
+  overriding other computed properties, but this will be enhanced in coming weeks.
+  
 
 2014-03-12
 ----------
