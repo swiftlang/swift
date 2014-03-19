@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <utility>
 #include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/System.h"
 
 namespace swift {
 
@@ -578,46 +579,51 @@ namespace heap_object_abi {
 #if defined(__x86_64__)
 
 # ifdef __APPLE__
-// Darwin reserves the low 4GB of address space.
-static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
 # else
-// Assume only the null 4K page is reserved.
-static const uintptr_t LeastValidPointerValue = 4096U;
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
 # endif
-
-// Only the bottom 47 bits are used, and heap objects are eight-byte-aligned.
-static const uintptr_t SwiftSpareBitsMask   = 0xFFFF800000000007ULL;
-// Objective-C reserves the high and low bits for tagged pointers.
-static const uintptr_t ObjCSpareBitsMask    = 0x8FFF800000000006ULL;
-static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
-
-// Number of low bits reserved by Objective-C.
-static const unsigned ObjCReservedLowBits = 1U;
+static const uintptr_t SwiftSpareBitsMask =
+  SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
+static const uintptr_t ObjCSpareBitsMask =
+  SWIFT_ABI_X86_64_OBJC_SPARE_BITS_MASK;
+static const uintptr_t ObjCReservedBitsMask =
+  SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
+static const unsigned ObjCReservedLowBits =
+  SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS;
 
 #elif defined(__arm64__)
 
-// Darwin reserves the low 4GB of address space.
-static const uintptr_t LeastValidPointerValue = 4ULL*1024ULL*1024ULL*1024ULL;
-
-// TBI guarantees the top byte of pointers is unused.
-// Heap objects are eight-byte aligned.
-static const uintptr_t SwiftSpareBitsMask   = 0xFF00000000000007ULL;
-// Objective-C reserves the high and low bits for tagged pointers.
-static const uintptr_t ObjCSpareBitsMask    = 0x8F00000000000006ULL;
-static const uintptr_t ObjCReservedBitsMask = 0x8000000000000001ULL;
-
-// Number of low bits reserved by Objective-C.
-static const unsigned ObjCReservedLowBits = 1U;
+# ifdef __APPLE__
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
+# else
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
+# endif
+static const uintptr_t SwiftSpareBitsMask =
+  SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
+static const uintptr_t ObjCSpareBitsMask =
+  SWIFT_ABI_ARM64_OBJC_SPARE_BITS_MASK;
+static const uintptr_t ObjCReservedBitsMask =
+  SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
+static const unsigned ObjCReservedLowBits =
+  SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS;
 
 #else
 
-// Assume the entire first page of memory is unusable.
-static const uintptr_t LeastValidPointerValue = 4096;
-// Make no assumptions about spare bits.
-static const uintptr_t SwiftSpareBitsMask = 0U;
-static const uintptr_t ObjCSpareBitsMask = 0U;
-static const uintptr_t ObjCReservedBitsMask = 0U;
-static const unsigned ObjCReservedLowBits = 0U;
+static const uintptr_t LeastValidPointerValue =
+  SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
+static const uintptr_t SwiftSpareBitsMask =
+  SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK;
+static const uintptr_t ObjCSpareBitsMask =
+  SWIFT_ABI_DEFAULT_OBJC_SPARE_BITS_MASK;
+static const uintptr_t ObjCReservedBitsMask =
+  SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
+static const unsigned ObjCReservedLowBits =
+  SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS;
 
 #endif
 
