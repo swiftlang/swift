@@ -1434,7 +1434,7 @@ static bool isClassOrObjCProtocol(Type T) {
     }
     // Check that all protocols are @objc.
     for (auto PD : Protocols) {
-      if (!PD->getAttrs().isObjC())
+      if (!PD->isObjC())
         return false;
     }
     return true;
@@ -1839,7 +1839,7 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     }
     // Find a protocol that is not @objc.
     for (auto PD : Protocols) {
-      if (!PD->getAttrs().isObjC()) {
+      if (!PD->isObjC()) {
         diagnose(TypeRange.Start, diag::not_objc_protocol,
                  PD->getDeclaredType());
         return;
@@ -1902,16 +1902,6 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
     StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
     lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
-  }
-
-  if (auto *AnyObject =
-         Context.getProtocol(KnownProtocolKind::AnyObject)) {
-    validateDecl(AnyObject);
-    CanType AnyObjectType =
-        AnyObject->getDeclaredType()->getCanonicalType();
-    ObjCMappedTypes.insert(AnyObjectType);
-    ObjCMappedTypes.insert(
-        MetatypeType::get(AnyObjectType, Context)->getCanonicalType());
   }
 }
 
