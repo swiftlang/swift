@@ -67,6 +67,12 @@ SILParserTUState::~SILParserTUState() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+  struct ParsedSubstitution {
+    SourceLoc loc;
+    Identifier name;
+    Type replacement;
+  };
+
   class SILParser {
   public:
     Parser &P;
@@ -88,6 +94,8 @@ namespace {
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
+    bool parseApplySubstitutions(
+                   SmallVectorImpl<ParsedSubstitution> &parsed);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -1091,43 +1099,39 @@ bool SILParser::parseSILBBArgsAtBranch(SmallVector<SILValue, 6> &Args) {
   return false;
 }
 
-namespace {
-struct ParsedSubstitution {
-  SourceLoc loc;
-  Identifier name;
-  SILType replacement;
-};
-}
-
 /// Parse the substitution list for an apply instruction.
-bool parseApplySubstitutions(SILParser &SP,
+bool SILParser::parseApplySubstitutions(
                              SmallVectorImpl<ParsedSubstitution> &parsed) {
   // Check for an opening '<' bracket.
-  if (!SP.P.Tok.isContextualPunctuator("<"))
+  if (!P.Tok.isContextualPunctuator("<"))
     return false;
   
-  SP.P.consumeToken();
+  P.consumeToken();
   
   // Parse a list of Substitutions: Archetype = Replacement.
   do {
-    SourceLoc Loc = SP.P.Tok.getLoc();
+    SourceLoc Loc = P.Tok.getLoc();
     Substitution Sub;
     SILType Replace;
     Identifier ArcheId;
     TypeAttributes emptyAttrs;
-    if (SP.parseSILTypeWithoutQualifiers(Replace, SILValueCategory::Object,
-                                         emptyAttrs))
+
+    // Parse substitution as AST type.
+    ParserResult<TypeRepr> TyR = P.parseType();
+    if (TyR.isNull())
       return true;
-    
-    parsed.push_back({Loc, ArcheId, Replace});
-  } while (SP.P.consumeIf(tok::comma));
+    TypeLoc Ty = TyR.get();
+    if (performTypeLocChecking(Ty, false))
+      return true;
+    parsed.push_back({Loc, ArcheId, Ty.getType()});
+  } while (P.consumeIf(tok::comma));
   
   // Consume the closing '>'.
-  if (!SP.P.Tok.isContextualPunctuator(">")) {
-    SP.P.diagnose(SP.P.Tok, diag::expected_tok_in_sil_instr, ">");
+  if (!P.Tok.isContextualPunctuator(">")) {
+    P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
     return true;
   }
-  SP.P.consumeToken();
+  P.consumeToken();
   
   return false;
 }
@@ -1152,7 +1156,7 @@ bool getApplySubstitutionsFromParsed(
       SP.P.diagnose(parsed.loc, diag::sil_apply_archetype_not_found);
       return true;
     }
-    sub.Replacement = parsed.replacement.getSwiftType();
+    sub.Replacement = parsed.replacement;
     subs.push_back(sub);
   }
   return false;
@@ -2382,7 +2386,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       parseValueName(FnName))
     return true;
   SmallVector<ParsedSubstitution, 4> parsedSubs;
-  if (parseApplySubstitutions(*this, parsedSubs))
+  if (parseApplySubstitutions(parsedSubs))
     return true;
     
   if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))

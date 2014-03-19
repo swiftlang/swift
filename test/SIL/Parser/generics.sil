@@ -71,7 +71,7 @@ bb0:
   %4 = load %1 : $*Builtin.Int64
   %5 = alloc_stack $Builtin.Int64
   store %4 to %5#1 : $*Builtin.Int64
-  // CHECK: apply %{{[0-9]+}}<{{.*}}Builtin.Int64, {{.*}}Builtin.Int32>(%{{.*}}) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
+  // CHECK: apply %{{[0-9]+}}<{{.*}}Int64, {{.*}}Int32>(%{{.*}}) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %7 = apply %3<Builtin.Int64, Builtin.Int32>(%5#1) : $@thin <τ_0_0, τ_0_1> (@in τ_0_0) -> @owned @callee_owned (@in τ_0_1) -> ()
   %8 = function_ref @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
   // CHECK: partial_apply %{{[0-9]+}}(%{{[0-9]+}}) : $@thin (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
