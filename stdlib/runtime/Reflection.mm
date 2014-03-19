@@ -96,7 +96,8 @@ struct QuickLookObject {
   
   union {
     String Text;
-    intptr_t Int;
+    int64_t Int;
+    uint64_t UInt;
     double Float;
     Any Any;
     RawData Raw;
@@ -104,6 +105,7 @@ struct QuickLookObject {
   enum class Tag : uint8_t {
     Text,
     Int,
+    UInt,
     Float,
     Image,
     Sound,
@@ -122,6 +124,9 @@ struct OptionalQuickLookObject {
     struct {
       union {
         String Text;
+        int64_t Int;
+        uint64_t UInt;
+        double Float;
         Any Any;
         QuickLookObject::RawData Raw;
       };
@@ -425,15 +430,20 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
     NSNumber *n = object;
     
     switch ([n objCType][0]) {
-    case 'd':
-    case 'f':
+    case 'd': // double
+    case 'f': // float
       result.payload.Float = [n doubleValue];
       result.payload.Kind = QuickLookObject::Tag::Float;
       break;
         
+    case 'Q': // unsigned long long
+      result.payload.UInt = [n unsignedLongLongValue];
+      result.payload.Kind = QuickLookObject::Tag::UInt;
+      break;
+
     // FIXME: decimals?
     default:
-      result.payload.Int = [n integerValue];
+      result.payload.Int = [n longLongValue];
       result.payload.Kind = QuickLookObject::Tag::Int;
       break;
     }
