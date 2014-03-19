@@ -386,7 +386,6 @@ public:
   /// \param dc           The context where the arguments are applied.
   /// \param genericArgs  The list of generic arguments to apply to the type.
   /// \param resolver     The generic type resolver.
-  /// \param options      Options that alter type resolution.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
   /// error.
@@ -394,8 +393,7 @@ public:
                              SourceLoc loc,
                              DeclContext *dc,
                              MutableArrayRef<TypeLoc> genericArgs,
-                             GenericTypeResolver *resolver,
-                             TypeResolutionOptions options);
+                             GenericTypeResolver *resolver);
 
   /// \brief Replace the type \c T of a protocol member \c Member given the
   /// type of the base of a member access, \c BaseTy.

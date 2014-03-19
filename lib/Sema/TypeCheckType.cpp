@@ -177,8 +177,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
                                         DeclContext *dc,
                                         MutableArrayRef<TypeLoc> genericArgs,
-                                        GenericTypeResolver *resolver,
-                                        TypeResolutionOptions options) {
+                                        GenericTypeResolver *resolver) {
   // Make sure we always have a resolver to use.
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
@@ -213,7 +212,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   SmallVector<Type, 4> genericArgTypes;
   for (auto &genericArg : genericArgs) {
     // Validate the generic argument.
-    if (validateType(genericArg, dc, options, resolver))
+    if (validateType(genericArg, dc, None, resolver))
       return nullptr;
 
     genericArgTypes.push_back(genericArg.getType());
@@ -246,12 +245,11 @@ Type TypeChecker::applyGenericArguments(Type type,
 static Type applyGenericTypeReprArgs(TypeChecker &TC, Type type, SourceLoc loc,
                                      DeclContext *dc,
                                      ArrayRef<TypeRepr *> genericArgs,
-                                     GenericTypeResolver *resolver,
-                                     TypeResolutionOptions options) {
+                                     GenericTypeResolver *resolver) {
   SmallVector<TypeLoc, 8> args;
   for (auto tyR : genericArgs)
     args.push_back(tyR);
-  Type ty = TC.applyGenericArguments(type, loc, dc, args, resolver, options);
+  Type ty = TC.applyGenericArguments(type, loc, dc, args, resolver);
   if (!ty)
     return ErrorType::get(TC.Context);
   return ty;
@@ -271,8 +269,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             ArrayRef<TypeRepr *> genericArgs,
                             bool allowUnboundGenerics,
-                            GenericTypeResolver *resolver,
-                            TypeResolutionOptions options) {
+                            GenericTypeResolver *resolver) {
   TC.validateDecl(typeDecl);
 
   Type type;
@@ -298,8 +295,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
-    type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs, resolver,
-                                    options);
+    type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs, resolver);
   }
 
   assert(type);
@@ -332,8 +328,7 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 /// reference.
 static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 ArrayRef<ComponentIdentTypeRepr *> components,
-                                GenericTypeResolver *resolver,
-                                TypeResolutionOptions options) {
+                                GenericTypeResolver *resolver) {
   auto comp = components.back();
 
   // Unqualified lookup case.
@@ -347,8 +342,7 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // Retrieve the nominal type and resolve it within this context.
       assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
-                                  /*allowUnboundGenerics=*/false, resolver,
-                                  options);
+                                  /*allowUnboundGenerics=*/false, resolver);
       if (type->is<ErrorType>())
         return true;
 
@@ -435,7 +429,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                     DC, genericArgs,
                                     options.contains(TR_AllowUnboundGenerics),
-                                    resolver, options);
+                                    resolver);
         if (type->is<ErrorType>()) {
           comp->setValue(type);
           return type;
@@ -483,7 +477,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         // If we're not allowed to complain or we couldn't fix the
         // source, bail out.
         if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, resolver, options)) {
+            diagnoseUnknownType(TC, DC, components, resolver)) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -556,7 +550,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           // If we're not allowed to complain or we couldn't fix the
           // source, bail out.
           if (!diagnoseErrors || 
-              diagnoseUnknownType(TC, DC, components, resolver, options)) {
+              diagnoseUnknownType(TC, DC, components, resolver)) {
             Type ty = ErrorType::get(TC.Context);
             comp->setValue(ty);
             return ty;
@@ -581,7 +575,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           memberType = applyGenericTypeReprArgs(TC, memberType,
                                                 genComp->getIdLoc(),
                                                 DC, genComp->getGenericArgs(),
-                                                resolver, options);
+                                                resolver);
 
         comp->setValue(memberType);
         return memberType;
@@ -616,7 +610,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       bool recovered = false;
       if (!foundModuleTypes) {
         if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, resolver, options)) {
+            diagnoseUnknownType(TC, DC, components, resolver)) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -632,7 +626,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
         foundType = applyGenericTypeReprArgs(TC, foundType, genComp->getIdLoc(),
                                              DC, genComp->getGenericArgs(),
-                                             resolver, options);
+                                             resolver);
       }
 
       comp->setValue(foundType);
@@ -664,7 +658,7 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                               genericArgs, 
                               options.contains(TR_AllowUnboundGenerics),
-                              resolver, options);
+                              resolver);
   comp->setValue(type);
   return type;
 }
