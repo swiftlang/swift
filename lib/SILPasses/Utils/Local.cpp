@@ -253,20 +253,30 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
       continue;
     }
 
-    // apply and partial_apply instructions do not capture the pointer when
-    // it is passed through inout arguments or for indirect returns.
+    // apply instructions do not capture the pointer when it is passed
+    // indirectly
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getSubstCalleeType()
-          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect()) {
+        Users.push_back(User);
         continue;
+      }
     }
+
+    // partial_apply instructions do not allow the pointer to escape
+    // when it is passed indirectly, unless the partial_apply itself
+    // escapes
     if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
       auto args = partialApply->getArguments();
       auto params = partialApply->getSubstCalleeType()
         ->getInterfaceParameters();
       params = params.slice(params.size() - args.size(), args.size());
-      if (params[UI->getOperandNumber()-1].isIndirect())
+      if (params[UI->getOperandNumber()-1].isIndirect()) {
+        Users.push_back(User);
+        if (canValueEscape(User, Users))
+          return true;
         continue;
+      }
     }
 
     return true;
