@@ -611,8 +611,8 @@ static const unsigned ObjCReservedLowBits = 1U;
 
 #else
 
-// Assume only 0 is an invalid pointer.
-static const uintptr_t LeastValidPointerValue = 1U;
+// Assume the entire first page of memory is unusable.
+static const uintptr_t LeastValidPointerValue = 4096;
 // Make no assumptions about spare bits.
 static const uintptr_t SwiftSpareBitsMask = 0U;
 static const uintptr_t ObjCSpareBitsMask = 0U;
