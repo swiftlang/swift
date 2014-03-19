@@ -991,6 +991,9 @@ NOTE(not_objc_empty_tuple,sema_objc,none,
       "empty tuple type cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,sema_objc,none,
       "tuples cannot be represented in Objective-C", ())
+NOTE(not_objc_swift_class,sema_objc,none,
+     "classes not annotated with @objc cannot be represented "
+     "in Objective-C", ())
 NOTE(not_objc_swift_struct,sema_objc,none,
       "Swift structs cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_enum,sema_objc,none,

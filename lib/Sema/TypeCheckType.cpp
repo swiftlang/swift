@@ -1807,6 +1807,14 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
+  // Special diagnostic for classes.
+  if (auto *CT = T->getAs<ClassType>()) {
+    if (!CT->getDecl()->isObjC())
+      diagnose(TypeRange.Start, diag::not_objc_swift_class)
+          .highlight(TypeRange);
+    return;
+  }
+
   // Special diagnostic for structs.
   if (T->is<StructType>()) {
     diagnose(TypeRange.Start, diag::not_objc_swift_struct)
