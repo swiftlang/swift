@@ -3271,11 +3271,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
   (void)Canon;
-  // Note that the decl was imported from Clang.  Don't mark stdlib decls as
+  // Note that the decl was imported from Clang.  Don't mark Swift decls as
   // imported.
   if (!Result->getDeclContext()->isModuleScopeContext() ||
-      (Result->getModuleContext() != getStdlibModule() &&
-       Result->getModuleContext() != getNamedModule(OBJC_MODULE_NAME))) {
+      isa<ClangModuleUnit>(Result->getDeclContext())) {
 #ifndef NDEBUG
     // Either the Swift declaration was from stdlib,
     // or we imported the underlying decl of the typedef,
