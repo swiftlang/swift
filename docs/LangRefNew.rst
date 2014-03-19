@@ -783,7 +783,20 @@ protocols.
   In ambiguous cases users can always opt-out of the trailing closure syntax by
   using explicit parentheses in the function call.
 
+.. _langref.decl.func:
+
+``func`` Declarations
+---------------------
+
 ...
+
+.. _langref.decl.func.signature:
+
+Function signatures
+^^^^^^^^^^^^^^^^^^^
+
+...
+
 
 .. _langref.decl.subscript:
 
@@ -880,6 +893,308 @@ Materializable Types
 
 ...
 
+.. _langref.pattern:
+
+Patterns
+========
+
+.. admonition:: Commentary
+
+  The pattern grammar mirrors the expression grammar, or to be more specific,
+  the grammar of literals.  This is because the conceptual algorithm for
+  matching a value against a pattern is to try to find an assignment of values
+  to variables which makes the pattern equal the value.  So every expression
+  form which can be used to build a value directly should generally have a
+  corresponding pattern form.
+
+.. code-block:: none
+
+  pattern-atom ::= pattern-var
+  pattern-atom ::= pattern-any
+  pattern-atom ::= pattern-tuple
+  pattern-atom ::= pattern-is
+  pattern-atom ::= pattern-enum-element
+  pattern-atom ::= expr
+
+  pattern      ::= pattern-atom
+  pattern      ::= pattern-typed
+
+A pattern represents the structure of a composite value.  Parts of a value can
+be extracted and bound to variables or compared against other values by
+*pattern matching*. Among other places, pattern matching occurs on the
+left-hand side of :ref:`var bindings <langref.decl.var>`, in the arguments of
+:ref:`func declarations <langref.decl.func>`, and in the <tt>case</tt> labels
+of :ref:`switch statements <langref.stmt.switch>`.  Some examples::
+
+    var point = (1, 0, 0)
+
+    // Extract the elements of the "point" tuple and bind them to
+    // variables x, y, and z.
+    var (x, y, z) = point
+    println("x=\(x) y=\(y) z=\(z)")
+
+    // Dispatch on the elements of a tuple in a "switch" statement.
+    switch point {
+    case (0, 0, 0):
+      println("origin")
+    // The pattern "_" matches any value.
+    case (_, 0, 0):
+      println("on the x axis")
+    case (0, _, 0):
+      println("on the y axis")
+    case (0, 0, _):
+      println("on the z axis")
+    case (var x, var y, var z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+
+
+A pattern may be "irrefutable", meaning informally that it matches all values
+of its type.  Patterns in declarations, such as :ref:`var <langref.decl.var>`
+and :ref:`func <langref.decl.func>`, are required to be irrefutable.  Patterns
+in the ``case`` labels of :ref:`switch statements <langref.stmt.switch>`,
+however, are not.
+
+The basic pattern grammar is a literal "atom" followed by an optional type
+annotation.  Type annotations are useful for documentation, as well as for
+coercing a matched expression to a particular kind.  They are also required
+when patterns are used in a :ref:`function signature
+<langref.decl.func.signature>`.  Type annotations are currently not allowed in
+switch statements.
+
+A pattern has a type.  A pattern may be "fully-typed", meaning informally that
+its type is fully determined by the type annotations it contains.  Some
+patterns may also derive a type from their context, be it an enclosing pattern
+or the way it is used;  this set of situations is not yet fully determined.
+
+.. _langref.pattern.typed:
+
+Typed Patterns
+--------------
+
+.. code-block:: none
+
+  pattern-typed ::= pattern-atom ':' type
+
+A type annotation constrains a pattern to have a specific type.  An annotated
+pattern is fully-typed if its annotation type is fully-typed.  It is
+irrefutable if and only if its subpattern is irrefutable.
+
+Type annotations are currently not allowed in the ``case`` labels of ``switch``
+statements; case patterns always get their type from the subject of the switch.
+
+.. _langref.pattern.any:
+
+Any Patterns
+------------
+
+.. code-block:: none
+
+  pattern-any ::= '_'
+
+The symbol ``_`` in a pattern matches and ignores any value. It is irrefutable.
+
+.. _langref.pattern.var:
+
+'var' and 'let' Patterns
+------------------------
+
+.. code-block:: none
+
+  pattern-var ::= 'let' pattern
+  pattern-var ::= 'var' pattern
+
+The ``var`` and ``let`` keywords within a pattern introduces variable bindings.
+Any identifiers within the subpattern bind new named variables to their
+matching values.  'var' bindings are mutable within the bound scope, and 'let'
+bindings are immutable.
+
+::
+
+    var point = (0, 0, 0)
+    switch point {
+    // Bind x, y, z to the elements of point.
+    case (var x, var y, var z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+
+    switch point {
+    // Same. 'var' distributes to the identifiers in its subpattern.
+    case var (x, y, z):
+      println("x=\(x) y=\(y) z=\(z)")
+    }
+
+Outside of a <tt>var</tt> pattern, an identifier behaves as an :ref:`expression
+pattern <langref.pattern.expr>` referencing an existing definition.
+
+::
+
+    var zero = 0
+    switch point {
+    // x and z are bound as new variables.
+    // zero is a reference to the existing 'zero' variable.
+    case (var x, zero, var z):
+      println("point off the y axis: x=\(x) z=\(z)")
+    default:
+      println("on the y axis")
+    }
+
+The left-hand pattern of a :ref:`var declaration <langref.decl.var>` and the
+argument pattern of a :ref:`func declaration <langref.decl.func>` are
+implicitly inside a ``var`` pattern; identifiers in their patterns always bind
+variables.  Variable bindings are irrefutable.
+
+The type of a bound variable must be :ref:`materializable
+<langref.types.materializable>` unless it appears in a :ref:`func-signature
+<langref.decl.func.signature>` and is directly of a ``inout``\ -annotated type.
+
+.. _langref.pattern.tuple:
+
+Tuple Patterns
+--------------
+
+.. code-block:: none
+
+  pattern-tuple ::= '(' pattern-tuple-body? ')'
+  pattern-tuple-body ::= pattern-tuple-element (',' pattern-tuple-body)* '...'?
+  pattern-tuple-element ::= pattern
+  pattern-tuple-element ::= pattern '=' expr
+
+A tuple pattern is a list of zero or more patterns.  Within a :ref:`function
+signature <langref.decl.func.signature>`, patterns may also be given a
+default-value expression.
+
+A tuple pattern is irrefutable if all its sub-patterns are irrefutable.
+
+A tuple pattern is fully-typed if all its sub-patterns are fully-typed, in
+which case its type is the corresponding tuple type, where each
+``type-tuple-element`` has the type, label, and default value of the
+corresponding ``pattern-tuple-element``.  A ``pattern-tuple-element`` has a
+label if it is a named pattern or a type annotation of a named pattern.
+
+A tuple pattern whose body ends in ``'...'`` is a varargs tuple.  The last
+element of such a tuple must be a typed pattern, and the type of that pattern
+is changed from ``T`` to ``T[]``.  The corresponding tuple type for a varargs
+tuple is a varargs tuple type.
+
+As a special case, a tuple pattern with one element that has no label, has no
+default value, and is not varargs is treated as a grouping parenthesis: it has
+the type of its constituent pattern, not a tuple type.
+
+.. _langref.pattern.is:
+
+``is`` Patterns
+---------------
+
+.. code-block:: none
+
+  pattern-is ::= 'is' type
+
+``is`` patterns perform a type check equivalent to the ``x is T`` <a
+href="#expr-cast">cast operator</a>. The pattern matches if the runtime type of
+a value is of the given type. ``is`` patterns are refutable and thus cannot
+appear in declarations.
+
+::
+
+  class B {}
+  class D1 : B {}
+  class D2 : B {}
+
+  var bs : B[] = [B(), D1(), D2()]
+
+  for b in bs {
+    switch b {
+    case is B:
+      println("B")
+    case is D1:
+      println("D1")
+    case is D2:
+      println("D2")
+    }
+  }
+
+
+.. _langref.pattern.enum_element:
+
+Enum Element Patterns
+---------------------
+
+.. code-block:: none
+
+  pattern-enum-element ::= type-identifier? '.' identifier pattern-tuple?
+
+Enum element patterns match a value of <a href="#type-enum">enum type</a> if
+the value matches the referenced ``case`` of the enum.  If the ``case`` has a
+type, the value of that type can be matched against an optional subpattern.
+
+::
+
+  enum HTMLTag {
+    case A(href: String)
+    case IMG(src: String, alt: String)
+    case BR
+  }
+
+  switch tag {
+  case .BR:
+    println("<br>")
+  case .IMG(var src, var alt):
+    println("<img src=\"\(escape(src))\" alt=\"\(escape(alt))\">")
+  case .A(var href):
+    println("<a href=\"\(escape(href))\">")
+  }
+
+Enum element patterns are refutable and thus cannot appear in declarations.
+(They are currently considered refutable even if the enum contains only a
+single ``case``.)
+
+.. _langref.pattern.expr:
+
+Expressions in Patterns
+-----------------------
+
+Patterns may include arbitrary expressions as subpatterns.  Expression patterns
+are refutable and thus cannot appear in declarations.  An expression pattern is
+compared to its corresponding value using the ``~=`` operator.  The match
+succeeds if ``expr ~= value`` evaluates to true.  The standard library provides
+a default implementation of ``~=`` using ``==`` equality; additionally, range
+objects may be matched against integer and floating-point values.  The ``~=``
+operator may be overloaded like any function.
+
+::
+
+  var point = (0, 0, 0)
+  switch point {
+  // Equality comparison.
+  case (0, 0, 0):
+    println("origin")
+  // Range comparison.
+  case (-10...10, -10...10, -10...10):
+    println("close to the origin")
+  default:
+    println("too far away")
+  }
+
+  // Define pattern matching of an integer value to a string expression.
+  func ~=(pattern:String, value:Int) -&gt; Bool {
+    return pattern == "\(value)"
+  }
+
+  // Now we can pattern-match strings to integers:
+  switch point {
+  case ("0", "0", "0"):
+    println("origin")
+  default:
+    println("not the origin")
+  }
+
+The order of evaluation of expressions in patterns, including whether an
+expression is evaluated at all, is unspecified.  The compiler is free to
+reorder or elide expression evaluation in patterns to improve dispatch
+efficiency.  Expressions in patterns therefore cannot be relied on for side
+effects.
+
 .. _langref.expr:
 
 Expressions
@@ -891,6 +1206,130 @@ Expressions
 
 Function Application
 --------------------
+
+...
+
+.. _langref.stmt:
+
+Statements
+==========
+
+...
+
+.. _langref.stmt.break:
+
+``break`` Statement
+-------------------
+
+.. code-block:: none
+
+  stmt-return ::= 'break'
+
+The 'break' statement transfers control out of the enclosing 'for' loop or
+'while' loop.
+
+.. _langref.stmt.continue:
+
+``continue`` Statement
+----------------------
+
+.. code-block:: none
+
+    stmt-return ::= 'continue'
+
+The 'continue' statement transfers control back to the start of the enclosing
+'for' loop or 'while' loop.
+
+...
+
+.. _langref.stmt.switch:
+
+``switch`` Statement
+--------------------
+
+.. code-block:: none
+
+  stmt-switch ::= 'switch' expr-basic '{' stmt-switch-case* '}'
+  stmt-switch-case ::= (case-label+ | default-label) brace-item*
+
+  case-label ::= 'case' pattern (',' pattern)* ('where' expr)? ':'
+  default-label ::= 'default' ':'
+
+'switch' statements branch on the value of an expression by :ref:`pattern
+matching <langref.pattern>`.  The subject expression of the switch is evaluated
+and tested against the patterns in its ``case`` labels in source order.  When a
+pattern is found that matches the value, control is transferred into the
+matching ``case`` block.  ``case`` labels may declare multiple patterns
+separated by commas, and multiple ``case`` labels may cover a case block.  Case
+labels may optionally specify a *guard* expression, introduced by the ``where``
+keyword; if present, control is transferred to the case only if the subject
+value both matches one of its patterns and the guard expression evaluates to
+true.  Patterns are tested "as if" in source order; if multiple cases can match
+a value, control is transferred only to the first matching case.  The actual
+execution order of pattern matching operations, and in particular the
+evaluation order of :ref:`expression patterns <langref.pattern.expr>`, is
+unspecified.
+
+A switch may also contain a ``default`` block.  If present, it receives control
+if no cases match the subject value.  The ``default`` block must appear at the
+end of the switch and must be the only label for its block.  ``default`` is
+equivalent to a final ``case _`` pattern.  Switches are required to be
+exhaustive; either the contained case patterns must cover every possible value
+of the subject's type, or else an explicit ``default`` block must be specified
+to handle uncovered cases.
+
+Every case and default block has its own scope.  Declarations within a case or
+default block are only visible within that block.  Case patterns may bind
+variables using the :ref:`var keyword <langref.pattern.var>`; those variables
+are also scoped into the corresponding case block, and may be referenced in the
+``where`` guard for the case label.  However, if a case block matches multiple
+patterns, none of those patterns may contain variable bindings.
+
+Control does not implicitly 'fall through' from one case block to the next.
+:ref:`fallthrough statements <langref.stmt.fallthrough>` may explicitly
+transfer control among case blocks.  :ref:`break <langref.stmt.break>` and
+:ref:`continue <langref.stmt.continue>` within a switch will break or continue
+out of an enclosing 'while' or 'for' loop, not out of the 'switch' itself.
+
+::
+
+  func classifyPoint(point:(Int, Int)) {
+    switch point {
+    case (0, 0):
+      println("origin")
+
+    case (_, 0):
+      println("on the x axis")
+
+    case (0, _):
+      println("on the y axis")
+
+    case (var x, var y) where x == y:
+      println("on the y = x diagonal")
+
+    case (var x, var y) where -x == y:
+      println("on the y = -x diagonal")
+
+    case (var x, var y):
+      println("length \(sqrt(x*x + y*y))")
+    }
+  }
+
+.. _langref.stmt.fallthrough:
+
+``fallthrough`` Statement
+-------------------------
+
+.. code-block:: none
+
+    stmt-fallthrough ::= 'fallthrough'
+
+``fallthrough`` transfers control from a ``case`` block of a :ref:`switch
+statement <langref.stmt.switch>` to the next ``case`` or ``default`` block
+within the switch.  It may only appear inside a ``switch``.  ``fallthrough``
+cannot be used in the final block of a ``switch``.  It also cannot transfer
+control into a ``case`` block whose pattern contains :ref:`var bindings
+<langref.pattern.var>`.
 
 .. _langref.stdlib:
 
