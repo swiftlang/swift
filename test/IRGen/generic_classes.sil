@@ -55,7 +55,7 @@ import gizmo
 // CHECK:   i8* getelementptr inbounds ([35 x i8]* [[ROOTNONGENERIC_NAME]], i64 0, i64 0),
 // --       num fields
 // CHECK:   i64 3,
-// --       -- no field offset vector
+// --       -- field offset vector offset
 // CHECK:   i64 9,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
