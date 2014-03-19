@@ -11,6 +11,7 @@ Contents
 
    DesignDecisions
    LangRefNew
+   ObjectInitialization
    Generics
    Pattern Matching
    Resilience
