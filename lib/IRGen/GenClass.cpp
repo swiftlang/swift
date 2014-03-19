@@ -779,6 +779,9 @@ namespace {
     SmallVector<llvm::Constant*, 16> OptClassMethods;
     SmallVector<llvm::Constant*, 4> Protocols;
     SmallVector<llvm::Constant*, 8> Properties;
+    SmallVector<llvm::Constant*, 16> MethodTypesExt;
+    SmallVector<llvm::Constant*, 16> OptMethodTypesExt;
+    
     llvm::Constant *Name = nullptr;
     /// Index of the first non-inherited field in the layout.
     unsigned FirstFieldIndex;
@@ -973,13 +976,18 @@ namespace {
       //   const property_list_t *properties;
       fields.push_back(buildPropertyList());
       //   uint32_t size;
-      unsigned size = IGM.getPointerSize().getValue() * fields.size();
+      unsigned size = IGM.getPointerSize().getValue() * fields.size() +
+                      IGM.getPointerSize().getValue(); // This is for extendedMethodTypes
       size += 8; // 'size' and 'flags' fields that haven't been added yet.
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, size));
       //   uint32_t flags;
       //   1 = Swift
       unsigned swiftFlag = getProtocol()->hasClangNode() ? 0 : 1;
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, swiftFlag));
+      
+      // const char ** extendedMethodTypes;
+      fields.push_back(buildOptExtendedMethodTypes());
+      
       // };
       
       return buildGlobalVariable(fields, "_PROTOCOL_");
@@ -1116,15 +1124,27 @@ namespace {
       
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       if (!method->isStatic()) {
-        if (method->getAttrs().isOptional())
+        if (method->getAttrs().isOptional()) {
           OptInstanceMethods.push_back(entry);
-        else
+          if (isBuildingProtocol())
+            OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+        }
+        else {
           InstanceMethods.push_back(entry);
+          if (isBuildingProtocol())
+            MethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+        }
       } else {
-        if (method->getAttrs().isOptional())
+        if (method->getAttrs().isOptional()) {
           OptClassMethods.push_back(entry);
-        else
+          if (isBuildingProtocol())
+            OptMethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+        }
+        else {
           ClassMethods.push_back(entry);
+          if (isBuildingProtocol())
+            MethodTypesExt.push_back(getMethodTypeExtendedEncoding(IGM, method));
+        }
       }
     }
 
@@ -1229,6 +1249,12 @@ namespace {
                              "_PROTOCOL_INSTANCE_METHODS_OPT_");
     }
 
+    llvm::Constant *buildOptExtendedMethodTypes() {
+      MethodTypesExt.insert(MethodTypesExt.end(),
+                            OptMethodTypesExt.begin(), OptMethodTypesExt.end());
+      return buildMethodList(MethodTypesExt,
+                             "_PROTOCOL_METHOD_TYPES_");
+    }
 
     /// struct method_list_t {
     ///   uint32_t entsize; // runtime uses low bits for its own purposes
@@ -1477,15 +1503,19 @@ namespace {
 
       SmallVector<llvm::Constant*, 3> fields;
 
-      // In all of the foo_list_t structs, either:
-      //   - there's a 32-bit entry size and a 32-bit count or
-      //   - there's no entry size and a uintptr_t count.
-      if (!optionalEltSize.isZero()) {
-        fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
-                                                optionalEltSize.getValue()));
-        fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, objects.size()));
-      } else {
-        fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, objects.size()));
+      // FIXME. _PROTOCOL_METHOD_TYPES_ does not have the first two entries.
+      // May want to pull this into its own routine for performance; if needed.
+      if (!nameBase.equals("_PROTOCOL_METHOD_TYPES_")) {
+        // In all of the foo_list_t structs, either:
+        //   - there's a 32-bit entry size and a 32-bit count or
+        //   - there's no entry size and a uintptr_t count.
+        if (!optionalEltSize.isZero()) {
+          fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
+                                                  optionalEltSize.getValue()));
+          fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, objects.size()));
+        } else {
+          fields.push_back(llvm::ConstantInt::get(IGM.IntPtrTy, objects.size()));
+        }
       }
 
       auto arrayTy =

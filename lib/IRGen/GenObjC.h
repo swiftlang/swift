@@ -132,6 +132,11 @@ namespace irgen {
                                                               ClassDecl *cd,
                                                               bool isDestroyer);
   
+  /// Produces extended encoding of method type.
+  /// \returns the encoded type.
+  llvm::Constant *getMethodTypeExtendedEncoding(IRGenModule &IGM,
+                                                AbstractFunctionDecl *method);
+  
   /// Build an Objective-C method descriptor for the given property's
   /// getter and setter methods.
   std::pair<llvm::Constant *, llvm::Constant *>

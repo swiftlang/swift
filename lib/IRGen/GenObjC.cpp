@@ -1136,6 +1136,17 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
   return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
 }
 
+llvm::Constant *
+irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
+                                     AbstractFunctionDecl *method) {
+  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
+  if (!isa<DestructorDecl>(method)) {
+    // Account for the 'self' pointer being curried.
+    methodType = methodType->getResult()->castTo<AnyFunctionType>();
+  }
+  return GetObjCEncodingForMethodType(IGM, methodType);
+}
+
 /// Emit Objective-C method descriptors for the property accessors of the given
 /// property. Returns a pair of Constants consisting of the getter and setter
 /// function pointers, in that order. The setter llvm::Constant* will be null if
