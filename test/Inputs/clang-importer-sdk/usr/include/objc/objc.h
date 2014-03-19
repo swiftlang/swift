@@ -46,6 +46,7 @@ typedef long NSInteger;
 - (id<BProto, Cat1Proto>)getAsProtoWithCat;
 - performAdd:(int)x withValue:(int)y withValue:(int)z withValue2:(int)w;
 - performMultiplyWithValue:(int)x value:(int)y;
+- moveFor:(int)x;
 @property (readonly) int readCounter;
 
 @property int informalMadeFormal;
