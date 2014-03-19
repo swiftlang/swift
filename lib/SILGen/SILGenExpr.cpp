@@ -3851,15 +3851,16 @@ namespace {
   /// A RAII object to save and restore BindOptionalFailureDest.
   class RestoreOptionalFailureDest {
     SILGenFunction &SGF;
-#ifndef DEBUG
+#ifndef NDEBUG
     unsigned Depth;
 #endif
   public:
     RestoreOptionalFailureDest(SILGenFunction &SGF, JumpDest &&dest)
       : SGF(SGF)
 #ifndef NDEBUG
-      , Depth(SGF.BindOptionalFailureDests.size()) {
+      , Depth(SGF.BindOptionalFailureDests.size())
 #endif
+    {
       SGF.BindOptionalFailureDests.push_back(std::move(dest));
     }
     ~RestoreOptionalFailureDest() {
