@@ -751,12 +751,7 @@ public:
       // As of writing, local variable auto closures are currently allowed by
       // the parser, but the plan is that they will be disallowed, so this will
       // actually only apply to auto closure parameters, which is what we want
-      Type Ty = d->getDecl()->getType();
-
-      // Strip the InOut qualifier. 
-      if (auto *IO = Ty->getAs<InOutType>()) {
-        Ty = IO->getObjectType();
-      }
+      Type Ty = d->getDecl()->getType()->getInOutObjectType();
 
       // If the decl type is a function type, figure out if it is an auto
       // closure.
