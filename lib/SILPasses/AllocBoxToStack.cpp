@@ -204,8 +204,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
   if (!LastRelease)
     return false;
 
-  auto &lowering =
-    ABI->getModule().Types.getTypeLowering(ABI->getElementType());
+  auto &lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
   if (LastRelease == nullptr && !lowering.isTrivial()) {
     // If we can't tell where the last release is, we don't know where to insert
     // the destroy_addr for this box.
