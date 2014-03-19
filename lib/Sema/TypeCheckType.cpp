@@ -1423,8 +1423,8 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
 }
 
 static bool isClassOrObjCProtocol(Type T) {
-  if (T->is<ClassType>())
-    return true;
+  if (auto *CT = T->getAs<ClassType>())
+    return CT->getDecl()->isObjC();
 
   SmallVector<ProtocolDecl *, 4> Protocols;
   if (T->isExistentialType(Protocols)) {
@@ -1903,7 +1903,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
         AnyObject->getDeclaredType()->getCanonicalType();
     ObjCMappedTypes.insert(AnyObjectType);
     ObjCMappedTypes.insert(
-      MetatypeType::get(AnyObjectType, Context)->getCanonicalType());
+        MetatypeType::get(AnyObjectType, Context)->getCanonicalType());
   }
 }
 

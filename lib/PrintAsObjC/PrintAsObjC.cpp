@@ -463,16 +463,15 @@ private:
 
   void visitClassType(ClassType *CT) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
-    if (CD->isObjC())
-      os << CD->getName() << " *";
-    else
-      os << "id";
+    assert(CD->isObjC());
+    os << CD->getName() << " *";
   }
 
   void visitProtocolType(ProtocolType *PT, bool isMetatype = false) {
     os << (isMetatype ? "Class" : "id");
 
     auto proto = PT->getDecl();
+    assert(proto->isObjC());
     if (auto knownKind = proto->getKnownProtocolKind())
       if (*knownKind == KnownProtocolKind::AnyObject)
         return;
