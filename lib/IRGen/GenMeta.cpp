@@ -918,7 +918,8 @@ namespace {
       ScanForDescriptorOffsets scanner(IGM, Target);
       scanner.layout();
       assert(scanner.AddressPoint != ~0U
-             && "did not find fields in Class metadata?!");
+             && scanner.FieldVectorOffset != ~0U
+             && "did not find required fields in struct metadata?!");
       assert(scanner.FieldVectorOffset >= scanner.AddressPoint
              && "found field offset vector after address point?!");
       assert(scanner.GenericParamsOffset >= scanner.AddressPoint

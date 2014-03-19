@@ -52,10 +52,6 @@ protected:
   /// Is the object layout globally resilient at this point?
   bool IsObjectResilient = false;
 
-  /// Is the object layout generically dependent at this point?
-  /// Implies IsObjectResilient.
-  bool IsObjectGenericallyArranged = false;
-
   /// Is the metadata layout globally resilient at this point?
   bool IsMetadataResilient = false;
 
@@ -116,8 +112,6 @@ private:
     if (IGM.isResilient(theClass, ResilienceScope::Universal)) {
       IsObjectResilient = true;
       IsMetadataResilient = true;
-      if (theClass->getGenericParamsOfContext())
-        IsObjectGenericallyArranged = true;
     }
     
     // Add entries for the methods.
@@ -143,27 +137,20 @@ private:
       }
     }
     
-    // Add offset fields if *any* of the fields are generically
-    // arranged.  Essentially, we don't want the metadata layout to
-    // depend on order of allocation.  In theory, if we only have one
-    // generically-sized field, that field itself doesn't need an
-    // offset --- but that's really tricky to guarantee.
+    // Add field offsets.
     for (auto member : theClass->getMembers()) {
       if (auto field = dyn_cast<VarDecl>(member))
         if (field->hasStorage())
           updateForFieldSize(field);
     }
 
-    // Add fields.
-    if (IsObjectGenericallyArranged) {
-      asImpl().noteStartOfFieldOffsets(theClass);
-      for (auto member : theClass->getMembers()) {
-        if (auto field = dyn_cast<VarDecl>(member))
-          if (field->hasStorage())
-            addFieldEntries(field);
-      }
-      asImpl().noteEndOfFieldOffsets(theClass);
+    asImpl().noteStartOfFieldOffsets(theClass);
+    for (auto member : theClass->getMembers()) {
+      if (auto field = dyn_cast<VarDecl>(member))
+        if (field->hasStorage())
+          addFieldEntries(field);
     }
+    asImpl().noteEndOfFieldOffsets(theClass);
   }
   
   /// Notes the beginning of the field offset vector for a particular ancestor
@@ -185,8 +172,7 @@ private:
   }
 
   void addFieldEntries(VarDecl *field) {
-    if (IsObjectGenericallyArranged)
-      asImpl().addFieldOffset(field);
+    asImpl().addFieldOffset(field);
   }
 
   void updateForFieldSize(VarDecl *field) {
@@ -204,7 +190,6 @@ private:
       return;
     case ObjectSize::Dependent:
       IsObjectResilient = true;
-      IsObjectGenericallyArranged = true;
       return;
     }
     llvm_unreachable("invalid type size classification");
