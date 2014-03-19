@@ -1,8 +1,52 @@
 2014-03-19
 ----------
 
-* 'nil' may now be used as a Selector value. This allows calls to
-  Cocoa methods that accept `nil` selectors.
+* When a class provides no initializers of its own but has default
+  values for all of its stored properties, it will automatically
+  inherit all of the initializers of its superclass. For example:
+
+    class Document {
+      var title: String
+
+      init() -> Self {
+        self.init(withTitle: "Default title")
+      }
+
+      init withTitle(title: String) { 
+        self.title = title
+      }
+    }
+
+    class VersionedDocument : Document {
+      var version = 0
+
+      // inherits 'init' and 'init withTitle:' from Document
+    }
+
+  When one does provide a designated initializer in a subclass, as in
+  the following example:
+
+    class SecureDocument : Document {
+      var key: CryptoKey
+
+      init withKey(key: CryptoKey) -> Self {
+        self.init(withKey: key, title: "Default title")        
+      }
+
+      init withKey(key: CryptoKey) title(String) {
+        self.key = key
+        super.init(withTitle: title)        
+      }
+    }
+
+  the compiler emits Objective-C method stubs for all of the
+  designated initializers of the parent class that will abort at
+  runtime if called, and which indicate which initializer needs to be
+  implemented. This provides memory safety for cases where an
+  Objective-C initializer (such as -[Document init] in this example)
+  appears to be inherited, but isn't actually implemented. 
+
+* 'nil' may now be used as a Selector value. This allows calls to  Cocoa methods that accept `nil` selectors.
 
 * [] and [:] can now be used as the empty array and dictionary literal,
   respectively.  Because these carry no information about their element types,
