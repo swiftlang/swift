@@ -728,38 +728,16 @@ public:
     OS << name << " " << getIDAndType(operand) << " to " << CI->getType();
   }
 
-  StringRef getCastKindName(CheckedCastKind kind) const {
-    switch (kind) {
-    case CheckedCastKind::Unresolved:
-    case CheckedCastKind::Coercion:
-      llvm_unreachable("invalid cast kind for SIL");
-    case CheckedCastKind::Downcast:
-      return "downcast";
-    case CheckedCastKind::SuperToArchetype:
-      return "super_to_archetype";
-    case CheckedCastKind::ArchetypeToArchetype:
-      return "archetype_to_archetype";
-    case CheckedCastKind::ArchetypeToConcrete:
-      return "archetype_to_concrete";
-    case CheckedCastKind::ExistentialToArchetype:
-      return "existential_to_archetype";
-    case CheckedCastKind::ExistentialToConcrete:
-      return "existential_to_concrete";
-    case CheckedCastKind::ConcreteToArchetype:
-      return "concrete_to_archetype";
-    case CheckedCastKind::ConcreteToUnrelatedExistential:
-      return "concrete_to_unrelated_existential";
-    }
-  }
-  
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    OS << "unconditional_checked_cast " << getCastKindName(CI->getCastKind())
+    OS << "unconditional_checked_cast "
+       << getCheckedCastKindName(CI->getCastKind())
        << ' ' << getIDAndType(CI->getOperand())
        << " to " << CI->getType();
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
-    OS << "checked_cast_br " << getCastKindName(CI->getCastKind()) << ' '
+    OS << "checked_cast_br "
+       << getCheckedCastKindName(CI->getCastKind()) << ' '
        << getIDAndType(CI->getOperand())
        << " to " << CI->getCastType() << ", "
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());

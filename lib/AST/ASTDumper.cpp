@@ -1431,6 +1431,9 @@ public:
 
   void printExplicitCastExpr(ExplicitCastExpr *E, const char *name) {
     printCommon(E, name) << ' ';
+    if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
+      OS << getCheckedCastKindName(checkedCast->getCastKind()) << ' ';
+    OS << "writtenType=";
     E->getCastTypeLoc().getType().print(OS);
     OS << '\n';
     printRec(E->getSubExpr());

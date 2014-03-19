@@ -1785,6 +1785,32 @@ static StringRef getStringForParameterConvention(ParameterConvention conv) {
   llvm_unreachable("bad parameter convention");
 }
 
+StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
+  switch (kind) {
+  case CheckedCastKind::Unresolved:
+    return "unresolved";
+  case CheckedCastKind::Coercion:
+    return "coercion";
+  case CheckedCastKind::Downcast:
+    return "downcast";
+  case CheckedCastKind::SuperToArchetype:
+    return "super_to_archetype";
+  case CheckedCastKind::ArchetypeToArchetype:
+    return "archetype_to_archetype";
+  case CheckedCastKind::ArchetypeToConcrete:
+    return "archetype_to_concrete";
+  case CheckedCastKind::ExistentialToArchetype:
+    return "existential_to_archetype";
+  case CheckedCastKind::ExistentialToConcrete:
+    return "existential_to_concrete";
+  case CheckedCastKind::ConcreteToArchetype:
+    return "concrete_to_archetype";
+  case CheckedCastKind::ConcreteToUnrelatedExistential:
+    return "concrete_to_unrelated_existential";
+  }
+  llvm_unreachable("bad checked cast name");
+}
+
 void SILParameterInfo::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';

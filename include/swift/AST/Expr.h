@@ -2716,6 +2716,9 @@ enum class CheckedCastKind {
   /// known to conform to.
   ConcreteToUnrelatedExistential,
 };
+
+/// Return a string representation of a CheckedCastKind.
+StringRef getCheckedCastKindName(CheckedCastKind kind);
   
 /// \brief Abstract base class for checked casts 'as' and 'is'. These represent
 /// casts that can dynamically fail.
