@@ -2307,9 +2307,6 @@ namespace {
 
     /// Whether this type is AnyObject or an implicit lvalue thereof.
     bool isDynamicLookupType(Type type) {
-      // Look through lvalues.
-      type = type->getRValueType();
-
       // Check whether we have a protocol type.
       auto protoTy = type->getAs<ProtocolType>();
       if (!protoTy)
@@ -2324,14 +2321,31 @@ namespace {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
 
+      // Choice #0 is forcing a T? to T.
+      // Choice #1 is forcing an AnyObject or AnyObject? to a class type.
+      unsigned disjChoice =
+        solution.getDisjunctionChoice(cs.getConstraintLocator(expr));
+      bool isAnyObjectDowncast = (disjChoice != 0);
+
       // If the subexpression is of AnyObject type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
       Expr *subExpr = expr->getSubExpr();
-      if (isDynamicLookupType(expr->getSubExpr()->getType()) &&
-          !isDynamicLookupType(valueType)) {
+      if (isAnyObjectDowncast) {
         // Coerce the subexpression to an rvalue.
         subExpr = tc.coerceToRValue(subExpr);
         if (!subExpr) return nullptr;
+
+        // If the operand is AnyObject?, force it.
+        if (auto operandValueType =
+              subExpr->getType()->getAnyOptionalObjectType()) {
+          subExpr = new (tc.Context) ForceValueExpr(subExpr,
+                                                    expr->getExclaimLoc());
+          subExpr->setType(operandValueType);
+          subExpr->setImplicit(true);
+        }
+
+        // At this point, we should have an AnyObject.
+        assert(isDynamicLookupType(subExpr->getType()));
 
         // Create a conditional checked cast to the value type, e.g., x as T.
         bool isArchetype = valueType->is<ArchetypeType>();

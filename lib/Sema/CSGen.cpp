@@ -1127,7 +1127,8 @@ namespace {
         // is of class type.
         Constraint::createConjunction(CS, downcastConstraints, locator)
       };
-      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator));
+      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator,
+                                                     RememberChoice));
 
       // The result is of type T.
       return valueTy;

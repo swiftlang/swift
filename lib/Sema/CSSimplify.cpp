@@ -1648,6 +1648,16 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
   // Look through implicit lvalue types.
   baseTy = baseTy->getRValueType();
 
+  // Look through one level of optional type.
+  // FIXME: this is kindof specific to the use of this
+  // constraint for ForceValueExpr.
+  if (auto valueTy = baseTy->getAnyOptionalObjectType()) {
+    valueTy = simplifyForTypePropertyConstraint(*this, valueTy);
+    if (!valueTy)
+      return SolutionKind::Unsolved;
+    baseTy = valueTy;
+  }
+
   if (auto protoTy = baseTy->getAs<ProtocolType>()) {
     if (protoTy->getDecl()->isSpecificProtocol(
                               KnownProtocolKind::AnyObject))

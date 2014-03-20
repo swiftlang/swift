@@ -780,6 +780,12 @@ public:
                             Type openedType,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
+  /// Return the disjunction choice for the given constraint location.
+  unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
+    assert(DisjunctionChoices.count(locator));
+    return DisjunctionChoices.find(locator)->second;
+  }
+
   /// \brief Retrieve the fixed score of this solution
   const Score &getFixedScore() const { return FixedScore; }
 
