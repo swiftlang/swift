@@ -2623,7 +2623,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
 
     while (auto *upcast = dyn_cast<UpcastInst>(self))
       self = upcast->getOperand();
-    return Callee::forSuperMethod(gen, self, constant, substAccessorType, loc);
+
+    if (constant.isForeign)
+      return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
   }
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);
