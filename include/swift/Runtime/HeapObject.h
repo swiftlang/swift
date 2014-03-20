@@ -199,7 +199,7 @@ extern "C" void swift_retain_noresult(HeapObject *object);
 
 static inline HeapObject *_swift_retain(HeapObject *object) {
   if (object) {
-    object->refCount += RC_INTERVAL;
+    __sync_fetch_and_add(&object->refCount, RC_INTERVAL);
   }
   return object;
 }

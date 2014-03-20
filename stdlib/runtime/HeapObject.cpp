@@ -227,7 +227,7 @@ HeapObject *swift::swift_retain(HeapObject *object) {
 }
 
 void swift::swift_release(HeapObject *object) {
-  if (object && ((object->refCount -= RC_INTERVAL) == 0)) {
+  if (object && (__sync_sub_and_fetch(&object->refCount, RC_INTERVAL) == 0)) {
     _swift_release_slow(object);
   }
 }
@@ -235,9 +235,8 @@ void swift::swift_release(HeapObject *object) {
 void swift::swift_weakRetain(HeapObject *object) {
   if (!object) return;
 
-  // FIXME: not thread-safe
   // FIXME: should check carry bit
-  if ((object->weakRefCount += WRC_INTERVAL) < WRC_INTERVAL) {
+  if (__sync_add_and_fetch(&object->weakRefCount, WRC_INTERVAL) < WRC_INTERVAL){
     assert(0 && "weak retain count overflow");
   }
 }
@@ -245,8 +244,7 @@ void swift::swift_weakRetain(HeapObject *object) {
 void swift::swift_weakRelease(HeapObject *object) {
   if (!object) return;
 
-  // FIXME: not thread-safe
-  uint32_t newCount = (object->weakRefCount -= WRC_INTERVAL);
+  uint32_t newCount = __sync_sub_and_fetch(&object->weakRefCount, WRC_INTERVAL);
   if (newCount >= (uint32_t)~WRC_INTERVAL) {
     assert(0 && "weak retain count underflow");
   }
@@ -258,11 +256,10 @@ void swift::swift_weakRelease(HeapObject *object) {
 HeapObject *swift::swift_tryRetain(HeapObject *object) {
   if (!object) return nullptr;
 
-  // FIXME: not thread-safe
-  uint32_t newCount = (object->refCount += RC_INTERVAL);
+  uint32_t newCount = __sync_add_and_fetch(&object->refCount, RC_INTERVAL);
   assert(newCount >= RC_INTERVAL  &&  "retain count overflow");
   if (newCount & RC_DEALLOCATING_BIT) {
-    object->refCount -= RC_INTERVAL;
+    __sync_fetch_and_sub(&object->refCount, RC_INTERVAL);
     return nullptr;
   }
   return object;
