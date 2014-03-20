@@ -503,7 +503,8 @@ extern "C" const ValueWitnessTable _TWVBi8_;      // Builtin.Int8
 extern "C" const ValueWitnessTable _TWVBi16_;     // Builtin.Int16
 extern "C" const ValueWitnessTable _TWVBi32_;     // Builtin.Int32
 extern "C" const ValueWitnessTable _TWVBi64_;     // Builtin.Int64
-
+extern "C" const ValueWitnessTable _TWVBi128_;    // Builtin.Int128
+  
 // The object-pointer table can be used for arbitrary Swift refcounted
 // pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.ObjectPointer
@@ -711,6 +712,7 @@ extern "C" const FullOpaqueMetadata _TMdBi8_;      // Builtin.Int8
 extern "C" const FullOpaqueMetadata _TMdBi16_;     // Builtin.Int16
 extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
 extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
+extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
 extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
 extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
 

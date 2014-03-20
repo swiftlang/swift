@@ -80,10 +80,20 @@ INSTANTIATE(uintptr_t);
   (value_witness_types::stride) (SIZE)                                  \
 }
 
+namespace {
+  // A type sized and aligned the way Swift wants Int128 (and Float80/Float128)
+  // to be sized and aligned.
+  struct alignas(16) int128_like {
+    char data[16];
+  };
+}
+
 const ValueWitnessTable swift::_TWVBi8_ = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
 const ValueWitnessTable swift::_TWVBi16_ = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
 const ValueWitnessTable swift::_TWVBi32_ = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
 const ValueWitnessTable swift::_TWVBi64_ = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
+const ValueWitnessTable swift::_TWVBi128_
+  = POD_VALUE_WITNESS_TABLE(int128_like, 16);
 
 /// A function to initialize a buffer/variable by retaining the given
 /// pointer and then assigning it.
@@ -404,6 +414,7 @@ OPAQUE_METADATA(Bi8_)
 OPAQUE_METADATA(Bi16_)
 OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
+OPAQUE_METADATA(Bi128_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(BO)
 
