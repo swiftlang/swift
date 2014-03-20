@@ -54,6 +54,10 @@ extern "C" pthread_key_t _swiftAllocOffset = -1;
 
 namespace {
 
+void *mmapWrapper(size_t size) {
+  return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+}
+
 pthread_rwlock_t globalLock = PTHREAD_RWLOCK_INITIALIZER;
 
 typedef struct AllocCacheEntry_s {
@@ -63,7 +67,8 @@ typedef struct AllocCacheEntry_s {
 AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
 class Arena;
-static llvm::DenseMap<const void*, Arena> arenas;
+static llvm::DenseMap<void *, Arena> arenas;
+static llvm::DenseMap<void *, size_t> hugeAllocations;
 
 class Arena {
 public:
@@ -72,8 +77,7 @@ public:
   Arena(size_t idx, size_t size) : byteSize(size) {
     assert(size > 0);
     const size_t arenaSize = 64*1024;
-    base = mmap(NULL, arenaSize * 2, PROT_READ|PROT_WRITE,
-                MAP_ANON|MAP_PRIVATE, -1, 0);
+    base = mmapWrapper(arenaSize * 2);
     assert(base != MAP_FAILED);
     void *newBase = (void *)(((size_t)base & ~0xFFFFul) + arenaSize);
     size_t frontSlop = (size_t)newBase - (size_t)base;
@@ -98,7 +102,7 @@ public:
   }
   static void newArena(size_t idx, size_t size) {
     auto arena = Arena(idx, size);
-    arenas.insert(std::pair<const void *, Arena>(arena.base, arena));
+    arenas.insert(std::pair<void *, Arena>(arena.base, arena));
   }
 };
 
@@ -128,7 +132,14 @@ static void registerZone() {
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   void *ptr = (void *)((unsigned long)pointer & ~0xFFFFul);
   auto it = arenas.find(ptr);
-  return it != arenas.end() ? it->second.byteSize : 0;
+  if (it != arenas.end()) {
+    return it->second.byteSize;
+  }
+  auto it2 = hugeAllocations.find(ptr);
+  if (it2 != hugeAllocations.end()) {
+    return it2->second;
+  }
+  return 0;
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
@@ -216,7 +227,6 @@ again:
   } else if (idx <= 64) { sz = (idx - 48) << 8;
 #endif
   } else {
-    // FIXME -- handle big items
     __builtin_trap();
   }
 
@@ -259,12 +269,23 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   else if (size <  0x800) idx = (size >> 7) + 0x28;
   else if (size < 0x1000) idx = (size >> 8) + 0x30;
 #endif
-
-  void *r;
-  if (idx != SIZE_MAX) {
-    r = swift_tryRawAlloc(idx);
-    if (r) return r;
+  else {
+    ++size;
+    // large allocations
+    void *r = mmapWrapper(size);
+    if (r == MAP_FAILED) {
+      if (flags & SWIFT_TRYALLOC) {
+        return NULL;
+      }
+      abort();
+    }
+    hugeAllocations.insert(std::pair<void *, size_t>(r, size));
+    return r;
   }
+
+  assert(idx != SIZE_MAX);
+  void *r = swift_tryRawAlloc(idx);
+  if (r) return r;
 
   do {
     r = _swift_zone.malloc(NULL, size);
@@ -359,17 +380,14 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes) {
 }
 
 void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
-  AllocIndex idx;
-
   if (bytes == 0) {
-    // the caller either doesn't know the size
-    // or the caller really does think the size is zero
-    // in any case, punt!
-    return free(ptr);
+    bytes = _swift_zone.size(NULL, ptr);
   }
+  assert(bytes != 0);
 
   bytes--;
 
+  AllocIndex idx;
 #ifdef __LP64__
   if        (bytes < 0x80)   { idx = (bytes >> 3);
   } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
@@ -386,7 +404,13 @@ void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28;
   } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30;
 #endif
-  } else { return free(ptr);
+  } else {
+    auto it2 = hugeAllocations.find(ptr);
+    assert(it2 != hugeAllocations.end());
+    int r = munmap(it2->first, it2->second);
+    assert(r != -1);
+    hugeAllocations.erase(it2);
+    return;
   }
 
   swift_rawDealloc(ptr, idx);
