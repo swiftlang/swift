@@ -25,6 +25,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/AST/Type.h"
 
 using namespace swift;
@@ -216,10 +217,25 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
 
 clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
-  // Any protocol composition type in Swift that shows up in an @objc
-  // method maps 1-1 to "id <SomeProto>"; with clang's encoding
-  // ignoring the protocol list.
-  return getClangIdType(getClangASTContext());
+  // FIXME. Eventually, this will have its own helper routine.
+  SmallVector<const clang::ObjCProtocolDecl *, 4> Protocols;
+  for (Type t : type->getProtocols()) {
+    ProtocolDecl *protocol = t->castTo<ProtocolType>()->getDecl();
+    if (auto *clangDecl = protocol->getClangDecl())
+      if (auto *PDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl))
+        Protocols.push_back(PDecl);
+  }
+  auto &clangCtx = getClangASTContext();
+  if (Protocols.empty())
+    return getClangIdType(clangCtx);
+  // id<protocol-list>
+  clang::ObjCProtocolDecl **ProtoQuals = new clang::ObjCProtocolDecl*[Protocols.size()];
+  memcpy(ProtoQuals, Protocols.data(), sizeof(clang::ObjCProtocolDecl*)*Protocols.size());
+  auto clangType = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                     ProtoQuals,
+                     Protocols.size());
+  auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitBuiltinRawPointerType(

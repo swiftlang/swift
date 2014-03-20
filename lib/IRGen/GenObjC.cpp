@@ -874,8 +874,17 @@ static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
   return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 }
 
+static void
+HelperGetObjCEncodingForType(clang::ASTContext &Context, clang::CanQualType T,
+                             std::string &S, bool Extended) {
+  
+  Context.getObjCEncodingForMethodParameter(clang::Decl::OBJC_TQ_None,
+                                            T, S, Extended);
+}
+
 static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
-                                                     AnyFunctionType *T) {
+                                                     AnyFunctionType *T,
+                                                     bool Extended) {
   ASTContext &Context = IGM.Context;
   auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
   assert(CI && "no clang module loader");
@@ -891,8 +900,8 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
   if (clangType.isNull())
     return cnull;
   
-  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   
+  HelperGetObjCEncodingForType(clangASTContext, clangType, TypeStr, Extended);
   
   Size PtrSize = IGM.getPointerSize();
   Size::int_type ParmOffset = 2 * PtrSize.getValue();
@@ -922,7 +931,7 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
       
       // TODO. Some stuff related to Array and Function type is missing.
       // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
-      clangASTContext.getObjCEncodingForType(PType, TypeStr);
+      HelperGetObjCEncodingForType(clangASTContext, PType, TypeStr, Extended);
       TypeStr += llvm::itostr(ParmOffset);
       clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(PType);
       ParmOffset += sz.getQuantity();
@@ -946,7 +955,7 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
   TypeStr += "@0:";
   TypeStr += llvm::itostr(PtrSize.getValue());
   ParmOffset = 2 * PtrSize.getValue();
-  clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+  HelperGetObjCEncodingForType(clangASTContext, clangType, TypeStr, Extended);
   TypeStr += llvm::itostr(ParmOffset);
   return IGM.getAddrOfGlobalString(TypeStr.c_str());
 }
@@ -971,7 +980,7 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
     // Account for the 'self' pointer being curried.
     methodType = methodType->getResult()->castTo<AnyFunctionType>();
   }
-  atEncoding = GetObjCEncodingForMethodType(IGM, methodType);
+  atEncoding = GetObjCEncodingForMethodType(IGM, methodType, false);
   
   /// The third element is the method implementation pointer.
   if (auto func = dyn_cast<FuncDecl>(method))
@@ -1144,7 +1153,7 @@ irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
     // Account for the 'self' pointer being curried.
     methodType = methodType->getResult()->castTo<AnyFunctionType>();
   }
-  return GetObjCEncodingForMethodType(IGM, methodType);
+  return GetObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
 }
 
 /// Emit Objective-C method descriptors for the property accessors of the given
