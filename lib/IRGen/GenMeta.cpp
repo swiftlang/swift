@@ -794,6 +794,203 @@ namespace {
     //   void addKindDependentFields();
   };
   
+  static unsigned
+  getSizeOfMetadataRecord(IRGenModule &IGM, NominalTypeDecl *type) {
+    if (auto s = dyn_cast<StructDecl>(type)) {
+      class StructMetadataSize
+        : public StructMetadataScanner<StructMetadataSize>
+      {
+        unsigned AddressPoint = ~0U;
+      public:
+        StructMetadataSize(IRGenModule &IGM, StructDecl *target)
+          : StructMetadataScanner(IGM, target) {}
+        
+        void noteAddressPoint() {
+          AddressPoint = NextIndex;
+          StructMetadataScanner::noteAddressPoint();
+        }
+        
+        unsigned getSize() {
+          assert(AddressPoint != ~0U
+                 && "did not find address point?!");
+          assert(AddressPoint < NextIndex
+                 && "address point is after next index?!");
+          return NextIndex - AddressPoint;
+        }
+      };
+      
+      StructMetadataSize sizer(IGM, s);
+      sizer.layout();
+      return sizer.getSize();
+    }
+    
+    if (auto c = dyn_cast<ClassDecl>(type)) {
+      class ClassMetadataSize
+        : public ClassMetadataScanner<ClassMetadataSize>
+      {
+        unsigned AddressPoint = ~0U;
+      public:
+        ClassMetadataSize(IRGenModule &IGM, ClassDecl *target)
+          : ClassMetadataScanner(IGM, target) {}
+        
+        void noteAddressPoint() {
+          AddressPoint = NextIndex;
+          ClassMetadataScanner::noteAddressPoint();
+        }
+        
+        unsigned getSize() {
+          assert(AddressPoint != ~0U
+                 && "did not find address point?!");
+          assert(AddressPoint < NextIndex
+                 && "address point is after next index?!");
+          return NextIndex - AddressPoint;
+        }
+      };
+      
+      ClassMetadataSize sizer(IGM, c);
+      sizer.layout();
+      return sizer.getSize();
+    }
+    
+    llvm_unreachable("not implemented for other nominal types");
+  }
+  
+  /// Build the field type vector accessor for a nominal type. This is a
+  /// function that lazily instantiates the type metadata for all of the
+  /// types of the stored properties of an instance of a nominal type.
+  static llvm::Function *
+  buildFieldTypeAccessorFn(IRGenModule &IGM,
+                         NominalTypeDecl *type,
+                         NominalTypeDecl::StoredPropertyRange storedProperties){
+    // The accessor function has the following signature:
+    // const Metadata * const *getFieldTypes(const Metadata *T);
+    auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
+    auto fnTy = llvm::FunctionType::get(metadataArrayPtrTy,
+                                        IGM.TypeMetadataPtrTy,
+                                        /*vararg*/ false);
+    auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::InternalLinkage,
+                                     llvm::Twine("get_field_types_")
+                                       + type->getName().str(),
+                                     IGM.getModule());
+    IRGenFunction IGF(IGM, fn);
+    
+    llvm::Value *metadata = IGF.collectParameters(ResilienceExpansion::Minimal)
+      .claimNext();
+    
+    // Get the address at which the field type vector reference should be
+    // cached.
+    llvm::Value *vectorPtr;
+    auto nullVector = llvm::ConstantPointerNull::get(metadataArrayPtrTy);
+    
+    // If the type is not generic, we can use a global variable to cache the
+    // address of the field type vector for the single instance.
+    if (!type->getGenericParamsOfContext()) {
+      vectorPtr = new llvm::GlobalVariable(*IGM.getModule(),
+                                           metadataArrayPtrTy,
+                                           /*constant*/ false,
+                                           llvm::GlobalValue::InternalLinkage,
+                                           nullVector,
+                                           llvm::Twine("field_type_vector_")
+                                             + type->getName().str());
+    // For a generic type, use a slot we saved in the generic metadata pattern
+    // immediately after the metadata object itself, which should be
+    // instantiated with every generic metadata instance.
+    } else {
+      unsigned offset = getSizeOfMetadataRecord(IGM, type);
+      vectorPtr = IGF.Builder.CreateBitCast(metadata,
+                                            metadataArrayPtrTy->getPointerTo());
+      vectorPtr = IGF.Builder.CreateInBoundsGEP(vectorPtr,
+                                  llvm::ConstantInt::get(IGM.Int32Ty, offset));
+    }
+    
+    // First, see if the field type vector has already been populated. This
+    // load can be nonatomic; if we race to build the field offset vector, we
+    // will detect so when we try to commit our pointer and simply discard the
+    // redundant work.
+    llvm::Value *initialVector
+      = IGF.Builder.CreateLoad(vectorPtr, IGM.getPointerAlignment());
+    
+    auto entryBB = IGF.Builder.GetInsertBlock();
+    auto buildBB = IGF.createBasicBlock("build_field_types");
+    auto raceLostBB = IGF.createBasicBlock("race_lost");
+    auto doneBB = IGF.createBasicBlock("done");
+    
+    llvm::Value *isNull
+      = IGF.Builder.CreateICmpEQ(initialVector, nullVector);
+    IGF.Builder.CreateCondBr(isNull, buildBB, doneBB);
+    
+    // Build the field type vector if we didn't already.
+    IGF.Builder.emitBlock(buildBB);
+    
+    // Bind the metadata instance to our local type data so we
+    // use it to provide metadata for generic parameters in field types.
+    emitPolymorphicParametersForGenericValueWitness(IGF, type, metadata);
+    
+    // Allocate storage for the field vector.
+    SmallVector<VarDecl*, 4> fields(storedProperties.begin(),
+                                    storedProperties.end());
+    unsigned allocSize = fields.size() * IGM.getPointerSize().getValue();
+    auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
+    auto allocAlignVal = llvm::ConstantInt::get(IGM.IntPtrTy,
+                                        IGM.getPointerAlignment().getValue());
+    llvm::Value *builtVectorAlloc
+      = IGF.emitAllocRawCall(allocSizeVal, allocAlignVal);
+    
+    llvm::Value *builtVector
+      = IGF.Builder.CreateBitCast(builtVectorAlloc, metadataArrayPtrTy);
+    
+    // Emit type metadata for the fields into the vector.
+    for (unsigned i : indices(fields)) {
+      auto field = fields[i];
+      auto slot = IGF.Builder.CreateInBoundsGEP(builtVector,
+                        llvm::ConstantInt::get(IGM.Int32Ty, i));
+      auto fieldTy = field->getType()->getCanonicalType();
+      
+      // Strip reference storage qualifiers like @unowned and @weak.
+      // FIXME: Some clients probably care about them.
+      if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldTy))
+        fieldTy = refStorTy.getReferentType();
+      
+      auto metadata = IGF.emitTypeMetadataRef(fieldTy);
+      IGF.Builder.CreateStore(metadata, slot, IGM.getPointerAlignment());
+    }
+    
+    // Atomically compare-exchange a pointer to our vector into the slot.
+    auto vectorIntPtr = IGF.Builder.CreateBitCast(vectorPtr,
+                                                  IGM.IntPtrTy->getPointerTo());
+    auto builtVectorInt = IGF.Builder.CreatePtrToInt(builtVector,
+                                                     IGM.IntPtrTy);
+    auto zero = llvm::ConstantInt::get(IGM.IntPtrTy, 0);
+    
+    auto raceVectorInt = IGF.Builder.CreateAtomicCmpXchg(vectorIntPtr,
+                                 zero, builtVectorInt,
+                                 llvm::AtomicOrdering::SequentiallyConsistent,
+                                 llvm::AtomicOrdering::SequentiallyConsistent);
+    
+    // The pointer in the slot should still have been null.
+    auto didStore = IGF.Builder.CreateICmpEQ(raceVectorInt, zero);
+    IGF.Builder.CreateCondBr(didStore, doneBB, raceLostBB);
+    
+    // If the cmpxchg failed, someone beat us to landing their field type
+    // vector. Deallocate ours and return the winner.
+    IGF.Builder.emitBlock(raceLostBB);
+    IGF.emitDeallocRawCall(builtVectorAlloc, allocSizeVal);
+    auto raceVector = IGF.Builder.CreateIntToPtr(raceVectorInt,
+                                                 metadataArrayPtrTy);
+    IGF.Builder.CreateBr(doneBB);
+    
+    // Return the result.
+    IGF.Builder.emitBlock(doneBB);
+    auto phi = IGF.Builder.CreatePHI(metadataArrayPtrTy, 3);
+    phi->addIncoming(initialVector, entryBB);
+    phi->addIncoming(builtVector, buildBB);
+    phi->addIncoming(raceVector, raceLostBB);
+    
+    IGF.Builder.CreateRet(phi);
+    
+    return fn;
+  }
+  
   class StructNominalTypeDescriptorBuilder
     : public NominalTypeDescriptorBuilderBase<StructNominalTypeDescriptorBuilder>
   {
@@ -840,8 +1037,7 @@ namespace {
              && "found generic param vector after address point?!");
       FieldVectorOffset = scanner.FieldVectorOffset - scanner.AddressPoint;
       GenericParamsOffset = scanner.GenericParamsOffset == ~0U
-        ? 0
-        : scanner.GenericParamsOffset - scanner.AddressPoint;
+        ? 0 : scanner.GenericParamsOffset - scanner.AddressPoint;
     }
     
     StructDecl *getTarget() { return Target; }
@@ -869,8 +1065,13 @@ namespace {
       addConstantSize(numFields);
       addConstantSize(FieldVectorOffset);
       Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
-      // TODO: Build field type accessor function.
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      
+      // Build the field type accessor function.
+      llvm::Function *fieldTypeVectorAccessor
+        = buildFieldTypeAccessorFn(IGM, Target,
+                                   Target->getStoredProperties());
+      
+      Fields.push_back(fieldTypeVectorAccessor);
     }
   };
   
@@ -924,10 +1125,8 @@ namespace {
              && "found field offset vector after address point?!");
       assert(scanner.GenericParamsOffset >= scanner.AddressPoint
              && "found generic param vector after address point?!");
-      FieldVectorOffset = scanner.FieldVectorOffset == ~0U
-        ? 0 : scanner.FieldVectorOffset - scanner.AddressPoint;
-      GenericParamsOffset = scanner.GenericParamsOffset == ~0U
-        ? 0 : scanner.GenericParamsOffset - scanner.AddressPoint;
+      FieldVectorOffset = scanner.FieldVectorOffset - scanner.AddressPoint;
+      GenericParamsOffset = scanner.GenericParamsOffset - scanner.AddressPoint;
     }
     
     ClassDecl *getTarget() { return Target; }
@@ -956,8 +1155,12 @@ namespace {
       addConstantSize(FieldVectorOffset);
       Fields.push_back(IGM.getAddrOfGlobalString(fieldNames));
       
-      // TODO: Build field type accessor function.
-      Fields.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+      // Build the field type accessor function.
+      llvm::Function *fieldTypeVectorAccessor
+        = buildFieldTypeAccessorFn(IGM, Target,
+                                   Target->getStoredProperties());
+      
+      Fields.push_back(fieldTypeVectorAccessor);
     }
   };
   
@@ -1169,6 +1372,9 @@ namespace {
       // Lay out the template data.
       super::layout();
       
+      // Save a slot for the field type vector address to be instantiated into.
+      asImpl().addFieldTypeVectorReferenceSlot();
+      
       // If we have a dependent value witness table, emit its template.
       if (HasDependentVWT) {
         // Note the dependent VWT offset.
@@ -1229,7 +1435,12 @@ namespace {
       FillOps.push_back(FillOp(NumGenericWitnesses++, getNextIndex()));
       super::addGenericWitnessTable(type, protocol, std::forward<T>(args)...);
     }
-
+    
+    void addFieldTypeVectorReferenceSlot() {
+      Fields.push_back(
+         llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy->getPointerTo()));
+    }
+    
   private:
     static llvm::Constant *makeArray(llvm::Type *eltTy,
                                      ArrayRef<llvm::Constant*> elts) {
@@ -1470,7 +1681,7 @@ namespace {
                                 ProtocolDecl *protocol, ClassDecl *forClass) {
       Fields.push_back(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
     }
-
+    
     llvm::Constant *getInit() {
       return llvm::ConstantStruct::getAnon(Fields);
     }
@@ -2720,7 +2931,6 @@ namespace {
     }
 
     void addNominalTypeDescriptor() {
-      // FIXME!
       Fields.push_back(StructNominalTypeDescriptorBuilder(IGM, Target).emit());
     }
 
