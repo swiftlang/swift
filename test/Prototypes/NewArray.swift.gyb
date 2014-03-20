@@ -1,0 +1,1077 @@
+%# -*- mode: swift -*-
+//===--- NewArray.swift.gyb -----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
+// RUN: %target-build-swift -module-cache-path %t/clang-module-cache %t/NewArray.swift -o %t/a.out -parse-stdlib
+// RUN: %target-run %t/a.out
+
+import Swift
+import SwiftShims
+
+// Copy from the given subRange of source into target, returning one
+// past the end of the resulting target range.
+func _copyFrom<T>(
+  source: CocoaArray, subRange: Range<Int>, target: UnsafePointer<T>
+) -> UnsafePointer<T> {
+
+  // FIXME: Need this temporary tee pending <rdar://problem/16208065>
+  let tee = T.self
+  assert(Bool(Builtin.canBeObjCClass(tee)),
+     "Can't copy from NSArray into Array of non-ObjC types")
+  
+  let nsSubRange = SwiftShims._SwiftNSRange(
+      location:subRange.startIndex,
+      length: subRange.endIndex - subRange.startIndex)
+
+  let buffer = reinterpretCast(target) as UnsafePointer<AnyObject>
+  
+  // copy the references out of the NSArray without retaining them
+  source.getObjects(buffer)range(nsSubRange)
+  // retain the copied objects
+  var result = target
+  for i in subRange {
+    result.initialize(result.get())
+    ++result
+  }
+  return result
+}
+
+// A protocol that covers all Array-like types
+protocol ArrayType
+  : MutableCollection, ArrayLiteralConvertible, ConditionallyBridgedToObjectiveC
+{
+  //===--- public interface -----------------------------------------------===//
+  init()
+  
+  var count: Int {get}
+  var capacity: Int {get}
+  
+  mutating func reserve(n: Int)
+  mutating func append(element: Self.GeneratorType.Element)
+
+  //===--- implementation detail  -----------------------------------------===//
+  mutating func _adopt(newBuffer: SharedArray<Self.GeneratorType.Element>)
+  
+  var _nativeBuffer: SharedArray<Self.GeneratorType.Element>? {get}
+
+  // Returns true iff Self can allow its buffer to be directly
+  // mutated.  *Must* remain a mutating function and not a get-only
+  // property if we are to have a hope of accurate uniqueness checks
+  mutating func _hasMutableBuffer() -> Bool
+
+  // Copy elements from the given subRange into the range starting at
+  // target, returning a pointer past-the-end of the target range
+  func _copy(
+    subRange: Range<Self.IndexType>,
+    target: UnsafePointer<Self.GeneratorType.Element>
+  ) -> UnsafePointer<Self.GeneratorType.Element>
+
+  // Update this Array's idea of its count.  Does NOT construct or
+  // destroy elements to ensure that count is accurate.
+  mutating func _updateCount(newCount: Int)
+
+  class func _hasValueSemantics() -> Bool
+}
+
+func sharedArray<U: Collection>(
+  rhs: U
+) -> SharedArray<U.GeneratorType.Element> {
+  let newCount = numericCast(countElements(rhs)) as Int
+  var g = rhs.generate()
+  
+  return SharedArray<U.GeneratorType.Element>(
+    newCount, newCount,
+    { g.next()! }, managedByCopyOnWrite: false)
+}
+
+// create a ContiguousArray<T> from any collection of Ts
+
+// FIXME: would be a constructor but for <rdar://problem/11700999>
+// We keep this overload to avoid an expensive copy
+func sharedArray<T>(rhs: SharedArray<T>) -> SharedArray<T> {
+  return rhs
+}
+
+// Return a SharedArray, capable of storing at least max(newCount,
+// capacityRequest) elements, that target is willing to let you modify
+// as part of modifying target itself.  The result's count field will
+// be set to newCount.
+// 
+// NOTE: If the resulting Buffer is owned by target, it contains the
+// same initialized elements that it did before the call; otherwise it
+// has no initialized elements.  Regardless, no *new* elements will
+// have been initialized, so in general, the result's count will not
+// match its number of initialized elements, and that needs to be
+// corrected before it can go into circulation.
+func _demandMutableBuffer<T: ArrayType>(
+  inout target: T, newCount: Int, capacityRequest: Int = 0
+) -> SharedArray<T.GeneratorType.Element>
+{
+  let oldCount = target.count
+  let oldCapacity = target.capacity
+  assert(newCount >= oldCount, "don't use this to shrink the buffer'")
+
+  let minCapacity = max(newCount, capacityRequest)
+  
+  // WARNING: do not swap the arguments to && here.  The auto-closure
+  // used by the RHS will mess with the COW optimization.
+  if _fastPath(target._hasMutableBuffer() && minCapacity <= oldCapacity) {
+    target._updateCount(newCount)
+    return target._nativeBuffer!
+  }
+
+  let newCapacity = capacityRequest != 0 ? minCapacity
+    : newCount > oldCapacity ? max(newCount, oldCapacity * 2) : oldCapacity;
+  
+  return SharedArray(newCount, newCapacity, T._hasValueSemantics())
+}
+
+// Wraps the buffer for a ContiguousArray and presents it as a
+// Collection with reference semantics.  This should probably not be
+// exposed to users.
+struct SharedArray<T> : ArrayType, Equatable {
+  typealias Storage = ContiguousArrayStorage<T>
+  typealias Base = HeapBuffer<CountAndCapacity,T>
+  typealias IndexType = Int
+
+  init() {
+    base = Base()
+  }
+  
+  init(x: Storage) {
+    base = Base(reinterpretCast(x) as Storage.Masquerade)
+  }
+
+  // Construct from a cocoa array.  This will typically happen when
+  // mutating an element
+  init(other: CocoaArray, managedByCopyOnWrite: Bool) {
+    let count = other.count
+    self = SharedArray(other, count, count, managedByCopyOnWrite)
+  }
+
+  // Construct, with the given capacity, from a cocoa array, copying its
+  // first count elements.  
+  init(
+    other: CocoaArray,
+    count: Int,
+    capacity: Int,
+    managedByCopyOnWrite: Bool
+  ) {
+    assert(count <= other.count,
+      "Insufficient NSArray elements")
+    
+    assert(Bool(Builtin.canBeObjCClass(T.self)),
+      "constructing an Array of non-ObjC type from an NSArray")
+    
+    self = SharedArray(count, capacity, managedByCopyOnWrite)
+    _copyFrom(other, 0...count, base.elementStorage)
+  }
+
+  // Create a buffer with the given count and capacity, initializing
+  // elements starting from 0 with the result of repeatedly calling
+  // nextElement
+  init(
+    count: Int, capacity: Int, nextElement: ()->T, managedByCopyOnWrite: Bool
+  ) {
+    self = SharedArray(count, capacity, managedByCopyOnWrite)
+    for i in 0...count {
+      (base.elementStorage + i).initialize(nextElement())
+    }
+  }
+  
+  // Create a buffer with the given count and capacity, *leaving the
+  // elements uninitialized*.  Initialize count elements or reset
+  // self.count immediately after using this constructor.
+  init(count: Int, capacity: Int, managedByCopyOnWrite: Bool) {
+    base = Base(Storage.self, CountAndCapacity(), capacity)
+    base.value = CountAndCapacity(count, base._capacity(), managedByCopyOnWrite)
+  }
+
+  var storage: ContiguousArrayStorage<T>? {
+    return base.storage.map {
+      ($0 as ContiguousArrayStorage<T>)!
+    }
+  }
+  var startIndex: IndexType {
+    return 0
+  }
+
+  var endIndex: IndexType {
+    return count
+  }
+  
+
+  func generate() -> IndexingGenerator<SharedArray> {
+    return IndexingGenerator(self)
+  }
+  
+  var count: Int {
+    return base ? base.value.count : 0
+  }
+
+  var capacity: Int {
+    return base ? base.value.capacity : 0
+  }
+
+  mutating func reserve(n: Int) {
+    _reserve(&self, n)
+  }
+  //===--- Collection conformance -----------------------------------------===//
+  subscript(i: IndexType) -> T {
+    get {
+      assert(i >= 0 && i < count, "Array index out of range")
+      return base.elementStorage[i]
+    }
+    set(newValue) {
+      assert(i >= 0 && i < count, "Array index out of range")
+      base.elementStorage[i] = newValue
+    }
+  }
+
+  //===--- Unsafe memory access -------------------------------------------===//
+  
+  // Execute body, passing a pointer to the beginning of our element
+  // storage, and return the result. The pointer is guaranteed to be
+  // valid throughout the execution of body.
+  func withUnsafePointerToElements<R>( body: (UnsafePointer<T>) -> R ) -> R {
+    return withExtendedLifetime(base) {
+      body(self.base.elementStorage)
+    }
+  }
+  
+
+  //===--- ArrayLiteralConvertible conformance ----------------------------===//
+  static func convertFromArrayLiteral((literal): T...) -> SharedArray<T> {
+    return sharedArray(literal)
+  }
+  //===--- bridging -------------------------------------------------------===//
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+  @conversion
+  func __conversion() -> Storage {
+    assert(
+      SharedArray.isBridgedToObjectiveC(),
+      "Array element type is not bridged to ObjectiveC")
+    return reinterpretCast(base.storage)
+  }
+  func bridgeToObjectiveC() -> CocoaArray {
+    return self
+  }
+  //===--- structural change ----------------------------------------------===//
+  mutating func append(x: T) {
+    self += x
+  }
+  
+  //===--- private --------------------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+  mutating func isUniquelyReferenced() -> Bool {
+    return base.isUniquelyReferenced()
+  }
+
+  mutating func _hasMutableBuffer() -> Bool {
+    return true
+  }
+
+  mutating func _adopt(newBuffer: SharedArray<T>) {
+    assert(!newBuffer.base.value.managedByCopyOnWrite)
+    self = newBuffer
+  }
+  
+  var _nativeBuffer: SharedArray? {
+    return self
+  }
+
+  func _updateCount(newCount: Int) {
+    assert(newCount <= capacity)
+    base.value.count = newCount
+  }
+  
+  func _copy(
+    subRange: Range<Int>, target: UnsafePointer<T>
+  ) -> UnsafePointer<T>
+  {
+    var dst = target
+    var src = base.elementStorage + subRange.startIndex
+    for i in subRange {
+      dst++.initialize(src++.get())
+    }
+    return dst
+  }
+
+  static func _hasValueSemantics() -> Bool {
+    return false
+  }
+  
+  var base: HeapBuffer<CountAndCapacity, T>
+}
+
+func == <Element> (
+  lhs: SharedArray<Element>,
+  rhs: SharedArray<Element>) -> Bool {
+  return lhs.base == rhs.base
+}
+
+// create a ContiguousArray<T> from any collection of Ts
+// FIXME: would be a constructor but for <rdar://problem/11700999> 
+func contiguousArray<
+  U: Collection
+>(rhs: U) -> ContiguousArray<U.GeneratorType.Element> {
+  let newCount = numericCast(countElements(rhs)) as Int
+  var g = rhs.generate()
+  typealias Element = U.GeneratorType.Element
+  
+  return ContiguousArray(
+    SharedArray(newCount, newCount, { g.next()! }, managedByCopyOnWrite: true)
+  )
+}
+
+// create a ContiguousArray<T> from any collection of Ts
+
+// FIXME: would be a constructor but for <rdar://problem/11700999>
+// We keep this overload to avoid an expensive copy
+func contiguousArray<T>(rhs: ContiguousArray<T>) -> ContiguousArray<T> {
+  return rhs
+}
+
+/// Shared subscript "set" implementation for ArrayTypes
+func _setItem<
+  T: ArrayType 
+    where T.IndexType : SignedInteger, 
+          T.IndexType.DistanceType == T.IndexType
+>(
+  inout self_: T, i: T.IndexType, x: T.GeneratorType.Element
+) {
+  var newBuffer = _demandMutableBuffer(&self_, self_.count)
+  let oldBuffer = self_._nativeBuffer
+  if _fastPath(newBuffer == oldBuffer) {
+    newBuffer[Int(i.toIntMax())] = x
+  }
+  else {
+    var p = newBuffer.base.elementStorage
+    p = self_._copy(0...i, p)
+    p++.initialize(x)
+    self_._copy(i.succ()...count(indices(self_)), p)
+    self_._adopt(newBuffer)
+  }
+}
+
+/// Reserve n elements of mutable storage capacity in self_
+func _reserve<
+  T: ArrayType 
+    where T.IndexType : SignedInteger, 
+          T.IndexType.DistanceType == T.IndexType
+>(
+  inout self_: T, n: T.IndexType
+) -> SharedArray<T.GeneratorType.Element> {
+  var newBuffer = _demandMutableBuffer(&self_, self_.count, numericCast(n))
+  let oldBuffer = self_._nativeBuffer
+  if _slowPath(newBuffer != oldBuffer) {
+    let p = newBuffer.base.elementStorage
+    self_._copy(0...count(indices(self_)), p)
+    self_._adopt(newBuffer)
+  }
+  return newBuffer
+}
+
+// An Array of Ts stored contiguously in memory
+struct ContiguousArray<T> : ArrayType {
+  //===--- associated types -----------------------------------------------===//
+  typealias IndexType = Int
+  
+  //===--- constructors --------------------------------------------------===//
+  init() {
+    buffer = Buffer()
+  }
+
+  // Construct from any collection of Ts
+  // FIXME: using free function "array" instead due to <rdar://problem/11700999>
+  // init<U: Collection where U.GeneratorType.Element == T>(rhs: U)
+  // init(x: ContiguousArray) // don't eagerly copy ContiguousArrays
+  
+  //===--- public properties ----------------------------------------------===//
+  var count: Int {
+    return buffer.count
+  }
+  
+  var capacity: Int {
+    return buffer.capacity
+  }
+
+  mutating func reserve(n: Int) {
+    _reserve(&self, n)
+  }
+  //===--- Collection conformance -----------------------------------------===//
+  subscript(i: IndexType) -> T {
+    get {
+      return buffer[i]
+    }
+    set(newValue) {
+      _setItem(&self, i, newValue)
+    }
+  }
+
+  func generate() -> IndexingGenerator<ContiguousArray> {
+    return IndexingGenerator(self)
+  }
+
+  var startIndex: IndexType {
+    return 0
+  }
+  
+  var endIndex: IndexType {
+    return count
+  }
+
+  //===--- ArrayLiteralConvertible conformance ----------------------------===//
+  static func convertFromArrayLiteral((literal): T...) -> ContiguousArray<T> {
+    return contiguousArray(literal)
+  }
+  //===--- bridging -------------------------------------------------------===//
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+  @conversion
+  func __conversion() -> Storage {
+    assert(
+      isBridgedToObjectiveC(T.self),
+      "Array element type is not bridged to ObjectiveC")
+    return buffer
+  }
+  func bridgeToObjectiveC() -> CocoaArray {
+    return self
+  }
+  //===--- structural change ----------------------------------------------===//
+  mutating func append(x: T) {
+    self += x
+  }
+
+  //===--- private --------------------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+  typealias Storage = ContiguousArrayStorage<T>
+  typealias Buffer = SharedArray<T>
+
+  init(s: Buffer) {
+    buffer = s
+  }
+
+  init(s: Storage) {
+    buffer = Buffer(s)
+  }
+
+  var _nativeBuffer: SharedArray<T>? {
+    return self.buffer
+  }
+
+  mutating func _adopt(newBuffer: SharedArray<T>) {
+    assert(newBuffer.base.value.managedByCopyOnWrite)
+    self.buffer = newBuffer
+  }
+
+  func _copy(
+    subRange: Range<Int>, target: UnsafePointer<T>
+  ) -> UnsafePointer<T> {
+    return buffer._copy(subRange, target)
+  }
+  
+  mutating func _updateCount(newCount: Int) {
+    buffer._updateCount(newCount)
+  }
+  
+  mutating func _hasMutableBuffer() -> Bool {
+    return buffer.isUniquelyReferenced()
+  }
+  
+  static func _hasValueSemantics() -> Bool {
+    return true
+  }
+  
+  var buffer: Buffer
+}
+
+// Extend lhs with the elements of rhs.  This overload is optimized
+// for when the rhs is non-destructively countable.
+@assignment
+func += <
+  Target: ArrayType,
+  Other: Collection
+where 
+  Other.GeneratorType.Element == Target.GeneratorType.Element,
+  Target.IndexType : SignedInteger,
+  Target.IndexType.DistanceType == Target.IndexType
+>(
+  inout lhs: Target, rhs: Other
+) {
+  let oldCount = lhs.count
+  let newCount = oldCount + numericCast(countElements(rhs))
+  var newBuffer = _demandMutableBuffer(&lhs, newCount)
+
+  
+  if _slowPath(newBuffer != lhs._nativeBuffer) {
+    
+    var dst = newBuffer.base.elementStorage
+
+    // Move elements if we can; otherwise copy them
+    if _fastPath(lhs._hasMutableBuffer() && newCount >= oldCount) {
+      var oldBuffer = lhs._nativeBuffer!
+      var src = oldBuffer.base.elementStorage
+      for i in 0...oldCount {
+        dst++.initialize(src++.move())
+      }
+      // Don't destroy the elements; they've been moved
+      oldBuffer._updateCount(0)
+    }
+    else {
+      lhs._copy(indices(lhs), dst)
+    }
+    lhs._adopt(newBuffer)
+  }
+
+  // At this point we still have only oldCount initialized elements;
+  // fill the buffer up to newCount
+  let lhsCount = lhs.count // Prevents assert auto_closure from capturing lhs
+  assert(lhsCount == newCount)
+  var p = newBuffer.base.elementStorage + oldCount
+  for x in rhs {
+    p++.initialize(x)
+  }
+}
+
+// Append newElement to lhs
+@assignment
+func += <
+  Target: ArrayType
+  where Target.IndexType : SignedInteger,
+    Target.IndexType.DistanceType == Target.IndexType
+>(
+  inout lhs: Target, newElement: Target.GeneratorType.Element
+) {
+  lhs += CollectionOfOne(newElement)
+}
+
+// Extend lhs with the elements of rhs.
+@assignment
+func += <
+  Target: ArrayType,
+  Other: Sequence
+where
+  Other.GeneratorType.Element == Target.GeneratorType.Element,
+  Target.IndexType : SignedInteger,
+  Target.IndexType.DistanceType == Target.IndexType
+>(
+  inout lhs: Target, rhs: Other
+) {
+  for x in rhs {
+    lhs += x
+  }
+}
+
+//===--- ArrayStorage<T>: either a ContiguousArray<T> or a Cococa Array ---===//
+
+enum ArrayStorage<T> {
+case Native(ContiguousArrayStorage<T>)
+case Cocoa(CocoaArray)
+case Empty
+
+  func _invariantCheck() -> Bool {
+    switch self {
+    case .Native(let x):
+      // Check that the compiler is using discriminator bits the way
+      // we expect; the direct representation should be the native
+      // one.  If this assert fires, it means our reinterpretCast in
+      // the native property below is wrong.  Try reordering the case
+      // declarations above, but don't change this assert.  We need
+      // the Native case to be represented literally in this enum.
+      assert(
+        (reinterpretCast(x) as Int) == (reinterpretCast(self) as Int),
+        "ArrayStorage<T> does not reinterpretCast to ContiguousArrayStorage<T>"
+      )
+      
+    case .Cocoa(let x):
+      // See comment on assertion above
+      assert(
+        (reinterpretCast(x) as Int) != (reinterpretCast(self) as Int),
+        "ArrayStorage<T> does not reinterpretCast to ContiguousArrayStorage<T>"
+      )
+      // We should never store T this way if it's known not to be an
+      // objective-C class.
+      assert(Bool(Builtin.canBeObjCClass(T.self)))
+    case .Empty:
+      ()
+    }
+    return true
+  }
+
+  mutating func isUniquelyReferenced() -> Bool {
+    if !native {
+      return false
+    }
+    return Swift.isUniquelyReferenced(&self)
+  }
+  
+  var native: ContiguousArray<T>? {
+    assert(_invariantCheck())
+    if !Bool(Builtin.canBeObjCClass(T.self)) {
+      return ContiguousArray(reinterpretCast(self) as ContiguousArrayStorage<T>)
+    }
+    switch self {
+    case Native(let x):
+      return ContiguousArray(x)
+    case Cocoa:
+      return .None
+    case Empty:
+      return ContiguousArray()
+    }
+  }
+  
+  var cocoa: CocoaArray? {
+    assert(_invariantCheck())
+    if !Bool(Builtin.canBeObjCClass(T.self)) {
+      return .None
+    }
+    switch self {
+    case Cocoa(let x):
+      return .Some(x)
+    default:
+      return .None
+    }
+  }
+}
+
+// create an Array<T> from any collection of Ts
+// FIXME: would be a constructor but for <rdar://problem/11700999> 
+func array<U: Collection>(rhs: U) -> Array<U.GeneratorType.Element> {
+  return Array(contiguousArray(rhs))
+}
+
+// create an Array<T> from any collection of Ts
+
+// FIXME: would be a constructor but for <rdar://problem/11700999>
+// We keep this overload to avoid an expensive copy
+func array<T>(rhs: Array<T>) -> Array<T> {
+  return rhs
+}
+
+
+struct Array<T> : ArrayType, ArrayLiteralConvertible {
+  
+  //===--- ArrayType conformance ------------------------------------------===//
+  init() {
+    storage = .Empty
+  }
+  
+  var count: Int {
+    return native ? native!.count : cocoa!.count
+  }
+  
+  var capacity: Int {
+    return native ? native!.capacity : cocoa!.count
+  }
+
+
+  mutating func reserve(n: Int) {
+    _reserve(&self, n)
+  }
+
+  //===--- constructors ---------------------------------------------------===//
+  init(x: ContiguousArray<T>) {
+    storage = x.buffer.storage ? .Native(x.buffer.storage!) : .Empty
+  }
+  
+  //===--- Collection conformance -----------------------------------------===//
+  subscript(i: Int) -> T {
+    get {
+      return native
+        ? native!.buffer[i]
+        : reinterpretCast(cocoa!.objectAtIndex(i))
+    }
+    set(newValue) {
+      _setItem(&self, i, newValue)
+    }
+  }
+
+  func generate() -> IndexingGenerator<Array> {
+    return IndexingGenerator(self)
+  }
+
+  var startIndex: Int {
+    return 0
+  }
+  
+  var endIndex: Int {
+    return count
+  }
+
+  //===--- ArrayLiteralConvertible conformance ----------------------------===//
+  static func convertFromArrayLiteral((literal): T...) -> Array {
+    return Array(contiguousArray(literal))
+  }
+  //===--- bridging -------------------------------------------------------===//
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+  @conversion
+  func __conversion() -> CocoaArray {
+    assert(
+      isBridgedToObjectiveC(T.self),
+      "Array element type is not bridged to ObjectiveC")
+    return native ? native! : cocoa!
+  }
+  func bridgeToObjectiveC() -> CocoaArray {
+
+    return self
+  }
+  //===--- structural change ----------------------------------------------===//
+  mutating func append(x: T) {
+    self += x
+  }
+  
+  //===--- private --------------------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+  var native: ContiguousArray<T>? {
+    return storage.native
+  }
+
+  var cocoa: CocoaArray? {
+    return storage.cocoa
+  }
+
+  var _nativeBuffer: SharedArray<T>? {
+    return storage.native.map { $0.buffer }
+  }
+
+  mutating func _adopt(newBuffer: SharedArray<T>) {
+    assert(newBuffer.base.value.managedByCopyOnWrite)
+    storage = newBuffer.count != 0 ? .Native(newBuffer.storage!) : .Empty
+  }
+  
+  func _copy(
+    subRange: Range<Int>, target: UnsafePointer<T>
+  ) -> UnsafePointer<T> {
+    if _fastPath(native) {
+      return native!._copy(subRange, target)
+    }
+    return _copyFrom(cocoa!, subRange, target)
+  }
+  
+  mutating func _updateCount(newCount: Int) {
+    switch storage {
+    case .Native(let s):
+      SharedArray(s)._updateCount(newCount)
+    case .Empty:
+      assert(newCount == 0, "Can't represent nonzero count in empty array.")
+    case .Cocoa:
+      fatal("attempting to update count of Cocoa array")
+    }
+  }
+  
+  mutating func _hasMutableBuffer() -> Bool {
+    return storage.isUniquelyReferenced()
+  }
+
+  static func _hasValueSemantics() -> Bool {
+    return true
+  }
+  
+  init(x: CocoaArray) {
+    storage = .Cocoa(x)
+  }
+  
+  var storage: ArrayStorage<T>
+}
+
+struct ArraySlice<
+  A: ArrayType 
+  where A.IndexType : SignedInteger, 
+        A.IndexType.DistanceType == A.IndexType,
+        A.ObjectiveCType: CocoaArray
+> : ArrayType {
+  typealias Element = A.GeneratorType.Element
+  typealias IndexType = A.IndexType
+  
+  init(base: A, baseRange: Range<IndexType>) {
+    self.base = base
+    self.baseRange = baseRange
+  }
+  
+  //===--- ArrayType conformance ------------------------------------------===//
+  init() {
+    self = ArraySlice.convertFromArrayLiteral()
+  }
+  
+  var count: Int {
+    return numericCast(countElements(baseRange))
+  }
+
+  var capacity: Int {
+    return count == base.count ? base.capacity : count
+  }
+
+  mutating func reserve(n: Int) {
+    _reserve(&self, numericCast(n))
+  }
+  
+  mutating func append(element: Element) {
+    self += element
+  }
+  
+  mutating func _adopt(newBuffer: SharedArray<Element>) {
+    base._adopt(newBuffer)
+    baseRange = indices(base)
+  }
+  
+  var _nativeBuffer: SharedArray<Element>? {
+    return base._nativeBuffer
+  }
+
+  mutating func _updateCount(newCount: Int) {
+    let oldCount = count
+    base._updateCount(newCount)
+    let d = numericCast(newCount - oldCount) as IndexType.DistanceType
+    baseRange = baseRange.startIndex...advance(baseRange.endIndex, d)
+  }
+  
+  mutating func _hasMutableBuffer() -> Bool {
+    // Only allow in-place modification if we have the whole base array.
+    // Otherwise, just reallocate; this will help release any
+    // otherwise-unused elements.
+    return count == base.count && base._hasMutableBuffer()
+  }
+
+  func _copy(
+    subRange: Range<IndexType>, target: UnsafePointer<Element>
+  ) -> UnsafePointer<Element> {
+    let d = baseRange.startIndex
+    return base._copy(subRange.startIndex+d...subRange.endIndex+d, target)
+  }
+  
+  static func _hasValueSemantics() -> Bool {
+    return A._hasValueSemantics()
+  }
+  
+  //===--- Collection conformance -----------------------------------------===//
+  typealias IndexType = A.IndexType
+
+  var startIndex: IndexType {
+    return .from(0)
+  }
+  
+  var endIndex: IndexType {
+    return Swift.count(baseRange)
+  }
+
+  subscript(i: IndexType) -> Element {
+    get {
+      return base[baseRange.startIndex + i]
+    }
+    set(newValue) {
+      base[baseRange.startIndex + i] = newValue
+    }
+  }
+  
+  //===--- Sequence conformance -------------------------------------------===//
+  func generate() -> IndexingGenerator<ArraySlice> {
+    return IndexingGenerator(self)
+  }
+
+  //===--- ArrayLiteralConvertible ----------------------------------------===//
+  static func convertFromArrayLiteral((literal): Element...) -> ArraySlice {
+    var s = A.convertFromArrayLiteral()
+    s += literal
+    return ArraySlice(s, indices(s))
+  }
+  //===--- bridging -------------------------------------------------------===//
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(Element.self)
+  }
+  @conversion
+  func __conversion() -> ObjCClassType {
+    assert(
+      isBridgedToObjectiveC(Element.self),
+      "Array element type is not bridged to ObjectiveC")
+    return count == base.count
+      ? base.bridgeToObjectiveC()
+      : contiguousArray(self)
+  }
+  func bridgeToObjectiveC() -> ObjCClassType {
+    return self
+  }
+  //===--- private --------------------------------------------------------===//
+  var base: A
+  var baseRange: Range<A.IndexType>
+}
+
+//===--- testing code begins here -----------------------------------------===//
+
+func printSequence<
+  T: Sequence
+  where T.GeneratorType.Element : ReplPrintable
+>(x: T) {
+  print("[")
+  var prefix = ""
+  for a in x {
+    print(prefix)
+    a.replPrint()
+    prefix = ", "
+  }
+  println("]")
+}
+
+func bufferID<T : ArrayType>(x: T) -> Int {
+  return x._nativeBuffer ? reinterpretCast(x._nativeBuffer!) as Int : 0
+}
+
+func checkReallocation<T : ArrayType>(
+  x: T, lastBuffer: Int
+) -> Int {
+  let currentBuffer = bufferID(x)
+  if currentBuffer != lastBuffer {
+    println("reallocated with capacity \(x.capacity)")
+  }
+  return currentBuffer
+}
+
+func test<
+  T: ArrayType
+    where T.GeneratorType.Element == T.Element,
+          T.Element : Integer,
+          T.IndexType : SignedInteger,
+          T.IndexType.DistanceType == T.IndexType
+>(_: T.Type, header: String) {
+  
+  println("== \(header) ==")
+  
+  var x: T = [1, 2, 3, 4, 5]
+  print("x = "); printSequence(x)
+  x.reserve(x.count + 2)
+  print("after reserve, x = "); printSequence(x)
+  let bufferId0 = bufferID(x)
+
+  // Append a range of integers
+  let start: T.Element = 0
+  let end: T.Element = 2
+  let other = start...end
+
+  println("x += 0...2");
+  x += other
+  print("x = "); printSequence(x)
+  let bufferId1 = checkReallocation(x, bufferId0)
+
+  println("x += 13 (\(x.capacity + 1 - x.count) times)");   
+  for i in x.count...(x.capacity + 1) {
+    let bufferId1a = checkReallocation(x, bufferId1)
+    assert(bufferId1a == bufferId1)
+    x += 13
+  }
+  print("x = "); printSequence(x)
+  let bufferId2 = checkReallocation(x, bufferId1)
+
+  let y = x
+  x[x.endIndex.pred()] = 17
+  println("let y = x; x[x.count - 1] = 17");   
+  print("x = "); printSequence(x)
+  let bufferId3 = checkReallocation(x, bufferId2)
+  
+  print("y = "); printSequence(y)
+}
+
+test(SharedArray<Int>.self, "SharedArray")
+// CHECK: == SharedArray ==
+// CHECK-NEXT: x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: after reserve, x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: x += 0...2
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1]
+// CHECK-NEXT: x += 13 ({{[0-9]+}} times)
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)+}}]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: let y = x; x[x.count - 1] = 17
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 17]
+// CHECK-NEXT: y = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 17]
+
+test(ContiguousArray<Int>.self, "ContiguousArray")
+// CHECK: == ContiguousArray ==
+// CHECK-NEXT: x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: after reserve, x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: x += 0...2
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1]
+// CHECK-NEXT: x += 13 ({{[0-9]+}} times)
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)+}}]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: let y = x; x[x.count - 1] = 17
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 17]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: y = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 13]
+
+test(Array<Int>.self, "Array")
+// CHECK: == Array ==
+// CHECK-NEXT: x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: after reserve, x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: x += 0...2
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1]
+// CHECK-NEXT: x += 13 ({{[0-9]+}} times)
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)+}}]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: let y = x; x[x.count - 1] = 17
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 17]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: y = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 13]
+
+test(ArraySlice<Array<Int>>.self, "ArraySlice")
+// CHECK: == ArraySlice ==
+// CHECK-NEXT: x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: after reserve, x = [1, 2, 3, 4, 5]
+// CHECK-NEXT: x += 0...2
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1]
+// CHECK-NEXT: x += 13 ({{[0-9]+}} times)
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)+}}]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: let y = x; x[x.count - 1] = 17
+// CHECK-NEXT: x = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 17]
+// CHECK-NEXT: reallocated with capacity {{[0-9]+}}
+// CHECK-NEXT: y = [1, 2, 3, 4, 5, 0, 1{{(, 13)*}}, 13]
+
+import Foundation
+
+func nsArrayOfStrings() -> CocoaArray {
+  var src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
+
+  return src._nativeBuffer!.withUnsafePointerToElements {
+    p in
+    reinterpretCast(
+      NSArray(withObjects: reinterpretCast(p), count: src.count))
+    as CocoaArray
+  }
+}
+
+func cocoa() {
+  println("== Cocoa ==")
+
+  var a = Array<NSString>(nsArrayOfStrings())
+  printSequence(a)
+  a += "qux"
+  printSequence(a)
+
+  a = Array<NSString>(nsArrayOfStrings())
+  printSequence(a)
+  a[1] = "garply"
+  printSequence(a)
+}
+cocoa()
+// CHECK: == Cocoa ==
+// CHECK-NEXT: [foo, bar, baz]
+// CHECK-NEXT: [foo, bar, baz, qux]
+// CHECK-NEXT: [foo, bar, baz]
+// CHECK-NEXT: [foo, garply, baz]
+
+// CHECK-NEXT: all done.
+println("all done.")
