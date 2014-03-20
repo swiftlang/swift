@@ -133,11 +133,11 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                                              llvm::Value *alignMask,
                                              const llvm::Twine &name) {
 
-  // Try to use swift_rawAlloc.
+  // Try to use swift_alloc.
   if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
     AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
     if (allocToken != InvalidAllocToken) {
-      return emitAllocatingCall(*this, IGM.getRawAllocFn(),
+      return emitAllocatingCall(*this, IGM.getAllocFn(),
                           { llvm::ConstantInt::get(IGM.SizeTy, allocToken) },
                                 name);
     }
@@ -193,17 +193,17 @@ static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
 /// guaranteed to be zero-initialized.
 void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                                        llvm::Value *size) {
-  // Try to use swift_rawDealloc.
+  // Try to use swift_dealloc.
   if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
     AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
     if (allocToken != InvalidAllocToken) {
-      return emitDeallocatingCall(*this, IGM.getRawDeallocFn(), pointer,
+      return emitDeallocatingCall(*this, IGM.getDeallocFn(), pointer,
                              llvm::ConstantInt::get(IGM.SizeTy, allocToken));
     }
   }
 
-  // Okay, fall back to swift_slowRawDealloc.
-  return emitDeallocatingCall(*this, IGM.getSlowRawDeallocFn(), pointer, size);
+  // Okay, fall back to swift_slowDealloc.
+  return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(), pointer, size);
 }
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,

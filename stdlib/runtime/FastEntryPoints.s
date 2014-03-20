@@ -60,7 +60,7 @@ $0:
 // convertStringToNSSwiftString:
 //   mov   %rdi, %rcx     // backup %rdi without spilling
 //   mov   $5, %rdi
-//   call  swift_rawAlloc
+//   call  swift_alloc
 //   lea   NSSwiftStringClass(%rip), %r8
 //   mov   %r8,    (%rax) // vtable/isa
 //   mov   $1,    8(%rax) // ref count
@@ -176,7 +176,7 @@ BEGIN_FUNC _swift_release
   ret
 END_FUNC
 
-BEGIN_FUNC _swift_rawDealloc
+BEGIN_FUNC _swift_dealloc
   add   __swiftAllocOffset(%rip), %rsi
   mov   %gs:(,%rsi,8), %r11
   mov   %r11, (%rdi)
@@ -212,20 +212,14 @@ BEGIN_FUNC $0
   cmpq  $$0, %gs:(%r11,%rdi,8)
   jnz   1b
   ret
-.elseif $2 == SWIFT_TRYRAWALLOC
-  mov   __swiftAllocOffset(%rip), %r11
-  shl   $$3, %r11
-  cmpq  $$0, %gs:(%r11,%rdi,8)
-  jnz   1b
-  ret
 .else
   jmp   1b
 .endif
 END_FUNC
 .endmacro
 
-ALLOC_FUNC _swift_rawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_RAWALLOC
-ALLOC_FUNC _swift_tryRawAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYRAWALLOC
+ALLOC_FUNC _swift_alloc, SWIFT_TSD_RAW_ALLOC_BASE, 0
+ALLOC_FUNC _swift_tryAlloc, SWIFT_TSD_RAW_ALLOC_BASE, SWIFT_TRYALLOC
 
 BEGIN_FUNC _swift_tryRetain
   test  %rdi, %rdi
@@ -270,7 +264,7 @@ BEGIN_FUNC _swift_weakRelease
 3:
   SaveRegisters
   xor   %esi, %esi
-  call  _swift_slowRawDealloc
+  call  _swift_slowDealloc
   RestoreRegisters
   ret
 END_FUNC

@@ -130,13 +130,11 @@ extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 // The default API will wait for available memory and return zero filled.
 //
 // The "try" flag tells the runtime to not wait for memory
-// The "raw" flag allocates uninitialized memory.
-// When neither flag is needed, pass zero.
+// When no flag is needed, pass zero.
 //
 // If alignment is needed, then please round up to the desired alignment.
 // For example, a 12 byte allocation with 8 byte alignment becomes 16.
 #define SWIFT_TRYALLOC 0x0001
-#define SWIFT_RAWALLOC 0x0002
 extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
 
 // These exist as fast entry points for the above slow API.
@@ -175,13 +173,13 @@ extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
 // return swift_alloc(tinyIndex);
 typedef unsigned long AllocIndex;
 
-extern "C" void *swift_rawAlloc(AllocIndex idx);
-extern "C" void *swift_tryRawAlloc(AllocIndex idx);
+extern "C" void *swift_alloc(AllocIndex idx);
+extern "C" void *swift_tryAlloc(AllocIndex idx);
 
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
-extern "C" void swift_rawDealloc(void *ptr, AllocIndex idx);
-extern "C" void swift_slowRawDealloc(void *ptr, size_t bytes);
+extern "C" void swift_dealloc(void *ptr, AllocIndex idx);
+extern "C" void swift_slowDealloc(void *ptr, size_t bytes);
 
 /// Atomically increments the retain count of an object.
 ///

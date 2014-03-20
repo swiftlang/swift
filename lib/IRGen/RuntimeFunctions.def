@@ -56,14 +56,14 @@ FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
          ARGS(RefCountedPtrTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void *swift_rawAlloc(SwiftAllocIndex index);
-FUNCTION(RawAlloc,       swift_rawAlloc,      RuntimeCC,
+// void *swift_alloc(SwiftAllocIndex index);
+FUNCTION(Alloc,       swift_alloc,      RuntimeCC,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_rawDealloc(void *ptr, SwiftAllocIndex index);
-FUNCTION(RawDealloc,     swift_rawDealloc,    RuntimeCC,
+// void swift_dealloc(void *ptr, SwiftAllocIndex index);
+FUNCTION(Dealloc,     swift_dealloc,    RuntimeCC,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
@@ -74,8 +74,8 @@ FUNCTION(SlowAlloc,      swift_slowAlloc,     RuntimeCC,
          ARGS(SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_slowRawDealloc(void *ptr, size_t size);
-FUNCTION(SlowRawDealloc, swift_slowRawDealloc,RuntimeCC,
+// void swift_slowDealloc(void *ptr, size_t size);
+FUNCTION(SlowDealloc, swift_slowDealloc,RuntimeCC,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))

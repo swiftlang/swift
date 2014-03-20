@@ -36,8 +36,6 @@
 #define WRC_INTERVAL 1
 #define WRC_MASK 0xffffffff
 #define SWIFT_TRYALLOC 0x0001
-#define SWIFT_RAWALLOC 0x0002
-#define SWIFT_TRYRAWALLOC 0x0003
 
 #ifdef SWIFT_HAVE_FAST_ENTRY_POINTS
 #error "Do not try to override SWIFT_HAVE_FAST_ENTRY_POINTS"

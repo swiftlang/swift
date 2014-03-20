@@ -39,8 +39,7 @@ swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredAlignmentMask) {
   // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
   auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
-  auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size,
-                                                               SWIFT_RAWALLOC));
+  auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size, 0));
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
   object->weakRefCount = WRC_INTERVAL;
@@ -252,7 +251,7 @@ void swift::swift_weakRelease(HeapObject *object) {
     assert(0 && "weak retain count underflow");
   }
   if (newCount == 0) {
-    swift_slowRawDealloc(object, 0);
+    swift_slowDealloc(object, 0);
   }
 }
 
