@@ -878,7 +878,7 @@ struct ClassMetadata : public HeapMetadata {
       Description(description),
       InstanceSize(size), InstanceAlignMask(alignMask) {}
 
-  /// The metadata for the super class.  This is null for the root class.
+  /// The metadata for the superclass.  This is null for the root class.
   const ClassMetadata *SuperClass;
 
   /// The cache data is used for certain dynamic lookups; it is owned
@@ -909,6 +909,24 @@ struct ClassMetadata : public HeapMetadata {
   //   - generic parameters for this class
   //   - class variables (if we choose to support these)
   //   - "tabulated" virtual methods
+  
+  /// Get a pointer to the field offset vector, if present, or null.
+  const uintptr_t *getFieldOffsets() const {
+    auto offset = Description->Class.FieldOffsetVectorOffset;
+    if (offset == 0)
+      return nullptr;
+    auto asWords = reinterpret_cast<const void * const*>(this);
+    return reinterpret_cast<const uintptr_t *>(asWords + offset);
+  }
+  
+  /// Get a pointer to the field type vector, if present, or null.
+  const Metadata * const *getFieldTypes() const {
+    auto *getter = Description->Class.GetFieldTypes;
+    if (!getter)
+      return nullptr;
+    
+    return getter(this);
+  }
 };
 
 /// The structure of metadata for heap-allocated local variables.

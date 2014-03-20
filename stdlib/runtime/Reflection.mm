@@ -13,6 +13,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Metadata.h"
 #include <cassert>
 #include <cstring>
@@ -32,6 +33,7 @@ using namespace swift;
 
 @end
 
+@class SwiftObject;
 
 namespace {
   
@@ -320,6 +322,79 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   return result;
 }
   
+// -- Class destructuring.
+  
+static bool classHasSuperclass(const ClassMetadata *c) {
+  // A class does not have a superclass if its ObjC superclass is the
+  // "SwiftObject" root class.
+  return c->SuperClass
+    && (Class)c->SuperClass != NSClassFromString(@"SwiftObject");
+}
+  
+static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
+                                     HeapObject *owner,
+                                     const OpaqueValue *value,
+                                     const Metadata *type);
+  
+extern "C"
+intptr_t swift_ClassMirror_count(HeapObject *owner,
+                                 const OpaqueValue *value,
+                                 const Metadata *type) {
+  auto Clas = static_cast<const ClassMetadata*>(type);
+  swift_release(owner);
+  auto count = Clas->Description->Class.NumFields;
+  
+  // If the class has a superclass, the superclass instance is treated as the
+  // first child.
+  if (classHasSuperclass(Clas))
+    count += 1;
+    
+  return count;
+}
+  
+extern "C"
+StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
+                                              HeapObject *owner,
+                                              const OpaqueValue *value,
+                                              const Metadata *type) {
+  StringMirrorTuple result;
+  
+  auto Clas = static_cast<const ClassMetadata*>(type);
+  
+  if (classHasSuperclass(Clas)) {
+    // If the class has a superclass, the superclass instance is treated as the
+    // first child.
+    if (i == 0) {
+      // FIXME: Put superclass name here
+      result.first = String("super");
+      result.second
+        = getMirrorForSuperclass(Clas->SuperClass, owner, value, type);
+      return result;
+    }
+    --i;
+  }
+  
+  if (i < 0 || (size_t)i > Clas->Description->Class.NumFields)
+    abort();
+  
+  // Load the type and offset from their respective vectors.
+  auto fieldType = Clas->getFieldTypes()[i];
+  auto fieldOffset = Clas->getFieldOffsets()[i];
+  
+  auto bytes = *reinterpret_cast<const char * const*>(value);
+  auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
+  
+  // Get the field name from the doubly-null-terminated list.
+  const char *fieldName = Clas->Description->Class.FieldNames;
+  for (unsigned j = 0; j < i; ++j) {
+    while (*fieldName++);
+  }
+  
+  result.first = String(fieldName);
+  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
+  return result;
+}
+  
 // -- Mirror witnesses for ObjC classes.
   
 extern "C" const FullMetadata<Metadata> _TMdSb; // Bool
@@ -388,7 +463,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   Ivar *ivars = class_copyIvarList(isa, &count);
   free(ivars);
   
-  // The superobject counts as a subobject.
+  // The superobject counts as a child.
   if (class_getSuperclass(isa))
     count += 1;
   
@@ -543,6 +618,8 @@ extern "C" const FullMetadata<Metadata> _TMdVSs13_StructMirror;
 extern "C" const MirrorWitnessTable _TWPVSs13_StructMirrorSs6MirrorSs;
 extern "C" const FullMetadata<Metadata> _TMdVSs12_ClassMirror;
 extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs6MirrorSs;
+extern "C" const FullMetadata<Metadata> _TMdVSs17_ClassSuperMirror;
+extern "C" const MirrorWitnessTable _TWPVSs17_ClassSuperMirrorSs6MirrorSs;
   
 // These type metadata objects are kept in swiftFoundation because they rely
 // on string bridging being installed.
@@ -580,6 +657,27 @@ static const MirrorWitnessTable *getObjCSuperMirrorWitness() {
   return witness;
 }
   
+static Mirror getMirrorForSuperclass(const ClassMetadata *sup,
+                                     HeapObject *owner,
+                                     const OpaqueValue *value,
+                                     const Metadata *type) {
+  // If the superclass is natively ObjC, cut over to the ObjC mirror
+  // implementation.
+  if (!sup->isTypeMetadata())
+    return ObjC_getMirrorForSuperclass((Class)sup, owner, value, type);
+  
+  Mirror resultBuf;
+  MagicMirror *result = ::new (&resultBuf) MagicMirror;
+  
+  result->Self = &_TMdVSs17_ClassSuperMirror;
+  result->MirrorWitness = &_TWPVSs17_ClassSuperMirrorSs6MirrorSs;
+  result->Data.Owner = owner;
+  result->Data.Type = sup;
+  result->Data.Value = value;
+  
+  return resultBuf;
+}
+  
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
                                           HeapObject *owner,
                                           const OpaqueValue *value,
@@ -609,7 +707,7 @@ getImplementationForClass(const OpaqueValue *Value) {
   if (!isa->isTypeMetadata())
     return {isa, getObjCMirrorMetadata(), getObjCMirrorWitness()};
   
-  // Otherwise, use the (currently nonexistent) native Swift facilities.
+  // Otherwise, use the native Swift facilities.
   return {isa, &_TMdVSs12_ClassMirror, &_TWPVSs12_ClassMirrorSs6MirrorSs};
 }
   
