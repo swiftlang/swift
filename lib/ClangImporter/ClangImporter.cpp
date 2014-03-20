@@ -603,7 +603,6 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
 
   // Scan words from the back of the selector looking for a
   // preposition.
-  unsigned selectorEnd = selector.size();
   unsigned wordStart = selector.size();
   unsigned wordEnd = wordStart;
   for (;;) {
@@ -619,30 +618,28 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
     if (wordStart == 0)
       break;
 
-    // If this word is a preposition, and it isn't the last word, split here.
-    if (wordEnd != selectorEnd) {
-      if (auto isPrep = isPreposition(
-                          selector.substr(wordStart, wordEnd - wordStart))) {
-        unsigned splitLocation;
-        switch (SplitPrepositions) {
-        case SelectorSplitKind::None:
-          llvm_unreachable("not splitting selectors");
+    // If this word is a preposition, split here.
+    if (auto isPrep = isPreposition(
+                        selector.substr(wordStart, wordEnd - wordStart))) {
+      unsigned splitLocation;
+      switch (SplitPrepositions) {
+      case SelectorSplitKind::None:
+        llvm_unreachable("not splitting selectors");
 
-        case SelectorSplitKind::BeforePreposition:
-          splitLocation = wordStart;
-          break;
+      case SelectorSplitKind::BeforePreposition:
+        splitLocation = wordStart;
+        break;
 
-        case SelectorSplitKind::AfterPreposition:
-          splitLocation = wordEnd;
-          break;
+      case SelectorSplitKind::AfterPreposition:
+        splitLocation = wordEnd;
+        break;
 
-        case SelectorSplitKind::DirectionalPreposition:
-          splitLocation = *isPrep ? wordStart : wordEnd;
-          break;
-        }
-
-        return splitSelectorPieceAt(selector, splitLocation, buffer);
+      case SelectorSplitKind::DirectionalPreposition:
+        splitLocation = *isPrep ? wordStart : wordEnd;
+        break;
       }
+
+      return splitSelectorPieceAt(selector, splitLocation, buffer);
     }
 
     // Look for the next word.
