@@ -147,9 +147,8 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                           SourceLoc(), SourceLoc(), Identifier(), elt, nullptr);
     pat->setImplicit();
     
-    auto label = CaseLabel::create(C, /*isDefault*/false,
-                                   SourceLoc(),
-                                   pat, SourceLoc(), nullptr, SourceLoc());
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
     
     auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
@@ -157,7 +156,9 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
     
-    cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false, body));
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
   }
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
@@ -280,9 +281,8 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                                       nullptr, nullptr);
     litPat->setImplicit();
     
-    auto label = CaseLabel::create(C, /*isDefault*/false,
-                                   SourceLoc(), litPat, SourceLoc(),
-                                   nullptr, SourceLoc());
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
     
     auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
     auto metaTyRef = new (C) MetatypeExpr(nullptr, SourceLoc(), metaTy);
@@ -292,14 +292,15 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
     auto body = BraceStmt::create(C, SourceLoc(),
                                   ASTNode(returnStmt), SourceLoc());
     
-    cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false, body));
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
   }
   
   auto anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabel = CaseLabel::create(C, /*isDefault*/true, SourceLoc(),
-                                     anyPat, SourceLoc(), nullptr,
-                                     SourceLoc());
+  auto dfltLabelItem =
+      CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
   
   auto optionalRef = new (C) DeclRefExpr(C.getOptionalDecl(),
                                          SourceLoc(), /*implicit*/true);
@@ -310,8 +311,9 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   auto dfltReturnStmt = new (C) ReturnStmt(SourceLoc(), dfltReturnExpr);
   auto dfltBody = BraceStmt::create(C, SourceLoc(),
                                     ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(CaseStmt::create(C, dfltLabel, /*hasBoundDecls*/false,
-                                   dfltBody));
+  cases.push_back(
+      CaseStmt::create(C, SourceLoc(), dfltLabelItem, /*HasBoundDecls=*/false,
+                       SourceLoc(), dfltBody));
   
   auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(SourceLoc(), rawRef, SourceLoc(),

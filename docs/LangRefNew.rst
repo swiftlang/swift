@@ -1250,9 +1250,9 @@ The 'continue' statement transfers control back to the start of the enclosing
 .. code-block:: none
 
   stmt-switch ::= 'switch' expr-basic '{' stmt-switch-case* '}'
-  stmt-switch-case ::= (case-label+ | default-label) brace-item*
+  stmt-switch-case ::= (case-label | default-label) brace-item+
 
-  case-label ::= 'case' pattern (',' pattern)* ('where' expr)? ':'
+  case-label ::= 'case' pattern ('where' expr)? (',' pattern ('where' expr)?)* ':'
   default-label ::= 'default' ':'
 
 'switch' statements branch on the value of an expression by :ref:`pattern
@@ -1260,15 +1260,15 @@ matching <langref.pattern>`.  The subject expression of the switch is evaluated
 and tested against the patterns in its ``case`` labels in source order.  When a
 pattern is found that matches the value, control is transferred into the
 matching ``case`` block.  ``case`` labels may declare multiple patterns
-separated by commas, and multiple ``case`` labels may cover a case block.  Case
-labels may optionally specify a *guard* expression, introduced by the ``where``
-keyword; if present, control is transferred to the case only if the subject
-value both matches one of its patterns and the guard expression evaluates to
-true.  Patterns are tested "as if" in source order; if multiple cases can match
-a value, control is transferred only to the first matching case.  The actual
-execution order of pattern matching operations, and in particular the
-evaluation order of :ref:`expression patterns <langref.pattern.expr>`, is
-unspecified.
+separated by commas.  Only a single ``case`` labels may precede a block of
+code.  Case labels may optionally specify a *guard* expression, introduced by
+the ``where`` keyword; if present, control is transferred to the case only if
+the subject value both matches the corresponding pattern and the guard
+expression evaluates to true.  Patterns are tested "as if" in source order; if
+multiple cases can match a value, control is transferred only to the first
+matching case.  The actual execution order of pattern matching operations, and
+in particular the evaluation order of :ref:`expression patterns
+<langref.pattern.expr>`, is unspecified.
 
 A switch may also contain a ``default`` block.  If present, it receives control
 if no cases match the subject value.  The ``default`` block must appear at the
@@ -1291,9 +1291,12 @@ transfer control among case blocks.  :ref:`break <langref.stmt.break>` and
 :ref:`continue <langref.stmt.continue>` within a switch will break or continue
 out of an enclosing 'while' or 'for' loop, not out of the 'switch' itself.
 
+At least one ``brace-item`` is required in every case or default block.  It is
+allowed to be a no-op.
+
 ::
 
-  func classifyPoint(point:(Int, Int)) {
+  func classifyPoint(point: (Int, Int)) {
     switch point {
     case (0, 0):
       println("origin")

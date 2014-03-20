@@ -1333,172 +1333,171 @@ ParserResult<Stmt> Parser::parseStmtSwitch() {
 }
 
 namespace {
-  class CollectVarsAndAddToScope : public ASTWalker {
-  public:
-    Parser &TheParser;
-    SmallVectorImpl<Decl*> &Decls;
-    
-    CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<Decl*> &Decls)
-    : TheParser(P), Decls(Decls) {}
-    
-    Pattern *walkToPatternPost(Pattern *P) override {
-      // Handle vars.
-      if (auto *Named = dyn_cast<NamedPattern>(P)) {
-        VarDecl *VD = Named->getDecl();
-        Decls.push_back(VD);
-        TheParser.addToScope(VD);
-      }
-      return P;
+class CollectVarsAndAddToScope : public ASTWalker {
+public:
+  Parser &TheParser;
+  SmallVectorImpl<Decl *> &Decls;
+
+  CollectVarsAndAddToScope(Parser &P, SmallVectorImpl<Decl *> &Decls)
+      : TheParser(P), Decls(Decls) {}
+
+  Pattern *walkToPatternPost(Pattern *P) override {
+    // Handle vars.
+    if (auto *Named = dyn_cast<NamedPattern>(P)) {
+      VarDecl *VD = Named->getDecl();
+      Decls.push_back(VD);
+      TheParser.addToScope(VD);
     }
-  };
-}
+    return P;
+  }
+};
+} // unnamed namespace
 
-ParserStatus Parser::parseStmtCaseLabels(SmallVectorImpl<CaseLabel *> &labels,
-                                         SmallVectorImpl<Decl *> &boundDecls) {
-  // We must have at least one case label.
-  assert(Tok.is(tok::kw_case) || Tok.is(tok::kw_default));
-
+static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
+                                  SmallVectorImpl<CaseLabelItem> &LabelItems,
+                                  SmallVectorImpl<Decl *> &BoundDecls,
+                                  SourceLoc &ColonLoc) {
   ParserStatus Status;
 
-  bool parsedDefault = false;
-  bool parsedOtherLabelWithDefault = false;
+  CaseLoc = P.consumeToken(tok::kw_case);
+
   do {
-    // 'default' should label a block by itself.
-    if (parsedDefault && !parsedOtherLabelWithDefault) {
-      diagnose(Tok, diag::default_with_other_labels);
-      parsedOtherLabelWithDefault = true;
-    }
-
-    // case-label ::= 'case' matching-pattern (',' matching-pattern)*
-    //                ('where' expr)? ':'
-    if (Tok.is(tok::kw_case)) {
-      SourceLoc caseLoc = consumeToken();
-      
-      // Parse comma-separated patterns.
-      SmallVector<Pattern *, 2> patterns;
-      do {
-        if (CodeCompletion) {
-          if (Tok.is(tok::code_complete)) {
-            CodeCompletion->completeCaseStmtBeginning();
-            consumeToken();
-            continue;
-          }
-          if (Tok.is(tok::period) && peekToken().is(tok::code_complete)) {
-            consumeToken();
-            CodeCompletion->completeCaseStmtDotPrefix();
-            consumeToken();
-            continue;
-          }
-        }
-
-        ParserResult<Pattern> pattern = parseMatchingPattern();
-        Status |= pattern;
-        if (pattern.isNonNull()) {
-          // Add variable bindings from the pattern to the case scope.  We have
-          // to do this with a full AST walk, because the freshly parsed pattern
-          // represents tuples and var patterns as tupleexprs and
-          // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
-          pattern.get()->walk(CollectVarsAndAddToScope(*this, boundDecls));
-          patterns.push_back(pattern.get());
-        }
-      } while (consumeIf(tok::comma));
-      
-      // Parse an optional 'where' guard.
-      SourceLoc whereLoc;
-      Expr *guardExpr = nullptr;
-      
-      if (Tok.is(tok::kw_where)) {
-        whereLoc = consumeToken();
-        ParserResult<Expr> guard = parseExpr(diag::expected_case_where_expr);
-        Status |= guard;
-        if (guard.isNonNull())
-          guardExpr = guard.get();
+    ParserResult<Pattern> CasePattern;
+    if (P.CodeCompletion) {
+      if (P.Tok.is(tok::code_complete)) {
+        CasePattern =
+            makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+        P.CodeCompletion->completeCaseStmtBeginning();
+        P.consumeToken();
       }
-      
-      SourceLoc colonLoc = Tok.getLoc();
-      if (!Tok.is(tok::colon))
-        diagnose(Tok, diag::expected_case_colon, "case");
-      else
-        colonLoc = consumeToken();
-      
-      auto label = CaseLabel::create(Context, /*isDefault*/false,
-                                     caseLoc, patterns, whereLoc, guardExpr,
-                                     colonLoc);
-      labels.push_back(label);
-      continue;
+      if (P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+        CasePattern =
+            makeParserErrorResult(new (P.Context) AnyPattern(SourceLoc()));
+        P.consumeToken();
+        P.CodeCompletion->completeCaseStmtDotPrefix();
+        P.consumeToken();
+      }
     }
-    
-    // case-label ::= 'default' ':'
-    
-    // 'default' should label a block by itself.
-    if (!labels.empty() && !parsedOtherLabelWithDefault) {
-      diagnose(Tok, diag::default_with_other_labels);
-      parsedOtherLabelWithDefault = true;
+
+    if (CasePattern.isNull())
+      CasePattern = P.parseMatchingPattern();
+
+    if (CasePattern.isNull())
+      CasePattern =
+          makeParserErrorResult(new (P.Context) AnyPattern(P.PreviousLoc));
+
+    Status |= CasePattern;
+    if (CasePattern.isNonNull()) {
+      // Add variable bindings from the pattern to the case scope.  We have
+      // to do this with a full AST walk, because the freshly parsed pattern
+      // represents tuples and var patterns as tupleexprs and
+      // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
+      CasePattern.get()->walk(CollectVarsAndAddToScope(P, BoundDecls));
     }
-    
-    parsedDefault = true;
-    SourceLoc defaultLoc = consumeToken(tok::kw_default);
-    
-    // We don't allow 'where' guards on a 'default' block. For recovery
-    // parse one if present.
-    SourceLoc whereLoc;
-    Expr *guardExpr = nullptr;
-    if (Tok.is(tok::kw_where)) {
-      diagnose(Tok, diag::default_with_where);
-      whereLoc = consumeToken();
-      ParserResult<Expr> guard = parseExpr(diag::expected_case_where_expr);
-      Status |= guard;
-      if (guard.isNonNull())
-        guardExpr = guard.get();
+
+    // Parse an optional 'where' guard.
+    SourceLoc WhereLoc;
+    ParserResult<Expr> Guard;
+    if (P.Tok.is(tok::kw_where)) {
+      WhereLoc = P.consumeToken(tok::kw_where);
+      Guard = P.parseExpr(diag::expected_case_where_expr);
+      Status |= Guard;
     }
-    
-    SourceLoc colonLoc = Tok.getLoc();
-    if (!Tok.is(tok::colon))
-      diagnose(Tok, diag::expected_case_colon, "default");
-    else
-      consumeToken(tok::colon);
-    
-    // Create an implicit AnyPattern to represent the default match.
-    auto any = new (Context) AnyPattern(defaultLoc);
-    auto label = CaseLabel::create(Context, /*isDefault*/true,
-                                   defaultLoc, any, whereLoc, guardExpr,
-                                   colonLoc);
-    labels.push_back(label);
-  } while (Tok.is(tok::kw_case) || Tok.is(tok::kw_default));
+
+    LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
+                                       CasePattern.get(), WhereLoc,
+                                       Guard.getPtrOrNull()));
+  } while (P.consumeIf(tok::comma));
+
+  ColonLoc = P.Tok.getLoc();
+  if (!P.Tok.is(tok::colon)) {
+    P.diagnose(P.Tok, diag::expected_case_colon, "case");
+    Status.setIsParseError();
+  } else
+    P.consumeToken(tok::colon);
+
   return Status;
 }
 
-// stmt-case ::= case-label+ brace-item*
+static ParserStatus
+parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
+                     SmallVectorImpl<CaseLabelItem> &LabelItems,
+                     SourceLoc &ColonLoc) {
+  ParserStatus Status;
+
+  CaseLoc = P.consumeToken(tok::kw_default);
+
+  // We don't allow 'where' guards on a 'default' block. For recovery
+  // parse one if present.
+  SourceLoc WhereLoc;
+  ParserResult<Expr> Guard;
+  if (P.Tok.is(tok::kw_where)) {
+    P.diagnose(P.Tok, diag::default_with_where);
+    WhereLoc = P.consumeToken(tok::kw_where);
+    Guard = P.parseExpr(diag::expected_case_where_expr);
+    Status |= Guard;
+  }
+
+  ColonLoc = P.Tok.getLoc();
+  if (!P.Tok.is(tok::colon)) {
+    P.diagnose(P.Tok, diag::expected_case_colon, "default");
+    Status.setIsParseError();
+  } else
+    P.consumeToken(tok::colon);
+
+  // Create an implicit AnyPattern to represent the default match.
+  auto Any = new (P.Context) AnyPattern(CaseLoc);
+  LabelItems.push_back(
+      CaseLabelItem(/*IsDefault=*/true, Any, WhereLoc, Guard.getPtrOrNull()));
+
+  return Status;
+}
+
 ParserResult<CaseStmt> Parser::parseStmtCase() {
   // A case block has its own scope for variables bound out of the pattern.
-  Scope scope(this, ScopeKind::CaseVars);
+  Scope S(this, ScopeKind::CaseVars);
 
   ParserStatus Status;
 
-  SmallVector<CaseLabel*, 2> labels;
-  SmallVector<Decl*, 4> boundDecls;
-  Status |= parseStmtCaseLabels(labels, boundDecls);
+  SmallVector<CaseLabelItem, 2> CaseLabelItems;
+  SmallVector<Decl *, 4> BoundDecls;
 
-  assert(!labels.empty() && "did not parse any labels?!");
+  SourceLoc CaseLoc;
+  SourceLoc ColonLoc;
+  if (Tok.is(tok::kw_case)) {
+    Status |=
+        ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls, ColonLoc);
+  } else {
+    Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
+  }
+
+  assert(!CaseLabelItems.empty() && "did not parse any labels?!");
 
   // Case blocks with multiple patterns cannot bind variables.
-  if (!boundDecls.empty()
-      && (labels.size() > 1 || labels[0]->getPatterns().size() > 1))
-    diagnose(boundDecls[0]->getLoc(),
+  if (!BoundDecls.empty() && CaseLabelItems.size() > 1)
+    diagnose(BoundDecls[0]->getLoc(),
              diag::var_binding_with_multiple_case_patterns);
 
-  SmallVector<ASTNode, 8> bodyItems;
+  SmallVector<ASTNode, 8> BodyItems;
 
-  SourceLoc startOfBody = Tok.getLoc();
-  Status |= parseBraceItems(bodyItems, BraceItemListKind::Case);
-  BraceStmt *body;
-  if (bodyItems.empty()) {
-    body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
+  SourceLoc StartOfBody = Tok.getLoc();
+  if (Tok.isNot(tok::kw_case) && Tok.isNot(tok::kw_default) &&
+      Tok.isNot(tok::r_brace)) {
+    Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
+  } else if (Status.isSuccess()) {
+    diagnose(CaseLoc, diag::case_stmt_without_body)
+        .highlight(SourceRange(CaseLoc, ColonLoc));
+  }
+  BraceStmt *Body;
+  if (BodyItems.empty()) {
+    Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
                              PreviousLoc, /*implicit=*/true);
   } else {
-    body = BraceStmt::create(Context, startOfBody, bodyItems, PreviousLoc);
+    Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc);
   }
 
   return makeParserResult(
-      Status, CaseStmt::create(Context, labels, !boundDecls.empty(), body));
+      Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
+                               !BoundDecls.empty(), ColonLoc, Body));
 }
+

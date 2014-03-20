@@ -523,34 +523,34 @@ public:
       // final case block, it is invalid.
       FallthroughDest = i+1 == e ? nullptr : S->getCases()[i+1];
 
-      for (auto *caseLabel : caseBlock->getCaseLabels()) {
-        // Resolve the patterns in the label.
-        for (auto *&pattern : caseLabel->getPatterns()) {
-          if (auto *newPattern = TC.resolvePattern(pattern, DC)) {
-            pattern = newPattern;
-          } else {
-            hadTypeError = true;
-            continue;
-          }
-
-          // Coerce the pattern to the subject's type.
-          if (TC.coercePatternToType(pattern, DC, subjectType, None)) {
-            // If that failed, mark any variables binding pieces of the pattern
-            // as invalid to silence follow-on errors.
-            pattern->forEachVariable([&](VarDecl *VD) {
-              VD->overwriteType(ErrorType::get(TC.Context));
-              VD->setInvalid();
-            });
-            hadTypeError = true;
-          }
+      for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
+        // Resolve the pattern in the label.
+        Pattern *pattern = labelItem.getPattern();
+        if (auto *newPattern = TC.resolvePattern(pattern, DC)) {
+          pattern = newPattern;
+        } else {
+          hadTypeError = true;
+          continue;
         }
-        
+
+        // Coerce the pattern to the subject's type.
+        if (TC.coercePatternToType(pattern, DC, subjectType, None)) {
+          // If that failed, mark any variables binding pieces of the pattern
+          // as invalid to silence follow-on errors.
+          pattern->forEachVariable([&](VarDecl *VD) {
+            VD->overwriteType(ErrorType::get(TC.Context));
+            VD->setInvalid();
+          });
+          hadTypeError = true;
+        }
+        labelItem.setPattern(pattern);
+
         // Check the guard expression, if present.
-        if (auto *guard = caseLabel->getGuardExpr()) {
+        if (auto *guard = labelItem.getGuardExpr()) {
           if (TC.typeCheckCondition(guard, DC))
             hadTypeError = true;
           else
-            caseLabel->setGuardExpr(guard);
+            labelItem.setGuardExpr(guard);
         }
       }
       

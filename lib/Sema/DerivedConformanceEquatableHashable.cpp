@@ -138,7 +138,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   eqDecl->setDerivedForTypeDecl(enumDecl);
   
   SmallVector<CaseStmt*, 4> cases;
-  SmallVector<CaseLabel*, 4> caseLabels;
+  SmallVector<CaseLabelItem, 4> caseLabelItems;
   
   for (auto elt : enumDecl->getAllElements()) {
     assert(!elt->hasArgumentType()
@@ -156,32 +156,33 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
     };
     auto tuplePat = TuplePattern::create(C, SourceLoc(), tupleElts, SourceLoc());
     tuplePat->setImplicit();
-    
-    caseLabels.push_back(CaseLabel::create(C, /*isDefault*/false,
-                                           SourceLoc(), tuplePat, SourceLoc(),
-                                           nullptr, SourceLoc()));
-    
+
+    caseLabelItems.push_back(
+        CaseLabelItem(/*IsDefault=*/false, tuplePat, SourceLoc(), nullptr));
   }
   {
     Expr *trueExpr = getTrueExpr(C);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
     BraceStmt* body = BraceStmt::create(C, SourceLoc(),
                                         ASTNode(returnStmt), SourceLoc());
-    cases.push_back(CaseStmt::create(C, caseLabels, /*hasBoundDecls*/false, body));
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), caseLabelItems,
+                         /*HasBoundDecls=*/false, SourceLoc(), body));
   }
   {
     auto any = new (C) AnyPattern(SourceLoc());
     any->setImplicit();
-    
-    auto label = CaseLabel::create(C, /*isDefault*/ true,
-                                   SourceLoc(), any, SourceLoc(),
-                                   nullptr, SourceLoc());
-    
+
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/true, any, SourceLoc(), nullptr);
+
     Expr *falseExpr = getFalseExpr(C);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
     BraceStmt* body = BraceStmt::create(C, SourceLoc(),
                                         ASTNode(returnStmt), SourceLoc());
-    cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false, body));
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
   }
   
   auto aRef = new (C) DeclRefExpr(aParam.first, SourceLoc(), /*implicit*/ true);
@@ -330,9 +331,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                           SourceLoc(), SourceLoc(), Identifier(), elt, nullptr);
     pat->setImplicit();
     
-    auto label = CaseLabel::create(C, /*isDefault*/false,
-                                   SourceLoc(),
-                                   pat, SourceLoc(), nullptr, SourceLoc());
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
     
     llvm::SmallString<8> indexVal;
     APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
@@ -347,8 +347,9 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                          indexExpr, /*implicit*/ true);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, label, /*hasBoundDecls*/false,
-                                     body));
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
   }
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,

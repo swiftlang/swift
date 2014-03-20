@@ -91,7 +91,9 @@ namespace {
     void printRec(Expr *E) { E->print(OS, Indent + 2); }
     void printRec(Stmt *S) { S->print(OS, Indent + 2); }
     void printRec(TypeRepr *T);
-    void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
+    void printRec(const Pattern *P) {
+      PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
+    }
 
     raw_ostream &printCommon(Pattern *P, const char *Name) {
       OS.indent(Indent) << '(';
@@ -792,7 +794,9 @@ public:
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Expr *E) { E->print(OS, Indent + 2); }
-  void printRec(Pattern *P) {  PrintPattern(OS, Indent+2).visit(P); }
+  void printRec(const Pattern *P) {
+    PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
+  }
   
   void printRec(StmtCondition C) {
     if (auto E = C.dyn_cast<Expr*>())
@@ -924,16 +928,16 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     OS.indent(Indent) << "(case_stmt";
-    for (CaseLabel *label : S->getCaseLabels()) {
+    for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
-      OS.indent(Indent+2) << "(case_label";
-      for (Pattern *p : label->getPatterns()) {
+      OS.indent(Indent + 2) << "(case_label_item";
+      if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
-        printRec(p);
+        printRec(CasePattern);
       }
-      if (Expr *guard = label->getGuardExpr()) {
+      if (auto *Guard = LabelItem.getGuardExpr()) {
         OS << '\n';
-        guard->print(OS, Indent+4);
+        Guard->print(OS, Indent+4);
       }
       OS << ')';
     }
@@ -981,7 +985,9 @@ public:
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
   void printRec(Stmt *S) { S->print(OS, Indent + 2); }
-  void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
+  void printRec(const Pattern *P) {
+    PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
+  }
   void printRec(TypeRepr *T);
 
   raw_ostream &printCommon(Expr *E, const char *C) {

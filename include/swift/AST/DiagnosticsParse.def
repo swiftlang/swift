@@ -554,7 +554,7 @@ ERROR(init_expected_self,type_parsing,PointsToFirstBadToken,
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(expected_pattern,pattern_parsing,none,
+ERROR(expected_pattern,pattern_parsing,PointsToFirstBadToken,
       "expected pattern", ())
 ERROR(expected_pattern_is_keyword,pattern_parsing,none,
       "keyword '%0' cannot be used as an identifier", (StringRef))
@@ -690,15 +690,15 @@ ERROR(expected_case_where_expr,stmt_parsing,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'case'", ())
 ERROR(expected_case_colon,stmt_parsing,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
-ERROR(default_with_other_labels,stmt_parsing,none,
-      "'default' cannot appear with other 'case' or 'default' labels over the same block",
-      ())
 ERROR(default_with_where,stmt_parsing,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
 ERROR(var_binding_with_multiple_case_patterns,stmt_parsing,none,
       "'case' labels with multiple patterns cannot declare variables",
       ())
+ERROR(case_stmt_without_body,stmt_parsing,none,
+      "'case' label in a 'switch' should have at least one executable "
+      "statement", ())
 
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics

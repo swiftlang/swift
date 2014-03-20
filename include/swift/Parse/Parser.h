@@ -943,9 +943,7 @@ public:
   ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc);
   ParserResult<Stmt> parseStmtSwitch();
   ParserResult<CaseStmt> parseStmtCase();
-  ParserStatus parseStmtCaseLabels(SmallVectorImpl<CaseLabel*> &labels,
-                                   SmallVectorImpl<Decl *> &boundDecls);
-  
+
   /// Evaluate the conditional configuration expression of an #if statement
   bool evaluateConfigConditionExpr(Expr *configExpr);
   

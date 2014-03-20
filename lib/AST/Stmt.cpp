@@ -18,7 +18,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "llvm/ADT/PointerUnion.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -117,55 +119,37 @@ SourceRange DoWhileStmt::getSourceRange() const {
   return SourceRange(DoLoc, Cond->getEndLoc());
 }
 
-CaseLabel::CaseLabel(bool isDefault,
-                     SourceLoc caseLoc, ArrayRef<Pattern*> patterns,
-                     SourceLoc whereLoc, Expr *guardExpr,
-                     SourceLoc colonLoc)
-  : CaseLoc(caseLoc), ColonLoc(colonLoc), WhereLoc(whereLoc),
-    GuardExprAndIsDefault(guardExpr, isDefault),
-    NumPatterns(patterns.size())
-{
-  MutableArrayRef<Pattern*> patternBuf{getPatternsBuffer(), NumPatterns};
-  
+SourceRange CaseLabelItem::getSourceRange() const {
+  if (auto *E = getGuardExpr())
+    return { CasePattern->getStartLoc(), E->getEndLoc() };
+  return CasePattern->getSourceRange();
+}
+
+CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
+                   bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
+                   Optional<bool> Implicit)
+    : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
+      CaseLoc(CaseLoc), ColonLoc(ColonLoc),
+      BodyAndHasBoundDecls(Body, HasBoundDecls),
+      NumPatterns(CaseLabelItems.size()) {
+  assert(NumPatterns > 0 && "case block must have at least one pattern");
+  MutableArrayRef<CaseLabelItem> Items{ getCaseLabelItemsBuffer(),
+                                        NumPatterns };
+
   for (unsigned i = 0; i < NumPatterns; ++i) {
-    patternBuf[i] = patterns[i];
+    new (&Items[i]) CaseLabelItem(CaseLabelItems[i]);
   }
 }
 
-CaseLabel *CaseLabel::create(ASTContext &C, bool isDefault,
-                             SourceLoc caseLoc, ArrayRef<Pattern *> patterns,
-                             SourceLoc whereLoc, Expr *guardExpr,
-                             SourceLoc colonLoc) {
-  void *buf = C.Allocate(sizeof(CaseLabel) + sizeof(Pattern*) * patterns.size(),
-                         alignof(CaseLabel));
-  return ::new (buf) CaseLabel(isDefault,
-                               caseLoc, patterns,
-                               whereLoc, guardExpr, colonLoc);
-}
-
-CaseStmt::CaseStmt(ArrayRef<CaseLabel*> Labels, bool HasBoundDecls, Stmt *Body,
-                   Optional<bool> implicit)
-  : Stmt(StmtKind::Case,
-         getDefaultImplicitFlag(implicit, Labels[0]->getCaseLoc())),
-    BodyAndHasBoundDecls(Body, HasBoundDecls),
-    NumCaseLabels(Labels.size())
-{
-  assert(NumCaseLabels > 0 && "case block must have at least one label");
-  MutableArrayRef<CaseLabel*> buf{getCaseLabelsBuffer(), NumCaseLabels};
-  
-  for (unsigned i = 0; i < NumCaseLabels; ++i) {
-    buf[i] = Labels[i];
-  }
-}
-
-CaseStmt *CaseStmt::create(ASTContext &C,
-                           ArrayRef<CaseLabel*> Labels,
-                           bool HasBoundDecls,
-                           Stmt *Body,
-                           Optional<bool> implicit) {
-  void *p = C.Allocate(sizeof(CaseStmt) + Labels.size() * sizeof(CaseLabel*),
-                       alignof(CaseStmt));
-  return ::new (p) CaseStmt(Labels, HasBoundDecls, Body, implicit);
+CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
+                           ArrayRef<CaseLabelItem> CaseLabelItems,
+                           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
+                           Optional<bool> Implicit) {
+  void *Mem = C.Allocate(sizeof(CaseStmt) +
+                             CaseLabelItems.size() * sizeof(CaseLabelItem),
+                         alignof(CaseStmt));
+  return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls, ColonLoc,
+                              Body, Implicit);
 }
 
 SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,

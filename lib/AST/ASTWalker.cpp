@@ -937,16 +937,14 @@ Stmt *Traversal::visitSwitchStmt(SwitchStmt *S) {
 }
 
 Stmt *Traversal::visitCaseStmt(CaseStmt *S) {
-  for (CaseLabel *label : S->getCaseLabels()) {
-    for (Pattern *&pattern : label->getPatterns()) {
-      if (Pattern *newPattern = doIt(pattern))
-        pattern = newPattern;
-      else
-        return nullptr;
-    }
-    if (label->getGuardExpr()) {
-      if (Expr *newGuard = doIt(label->getGuardExpr()))
-        label->setGuardExpr(newGuard);
+  for (auto &CLI : S->getMutableCaseLabelItems()) {
+    if (auto *newPattern = doIt(CLI.getPattern()))
+      CLI.setPattern(newPattern);
+    else
+      return nullptr;
+    if (CLI.getGuardExpr()) {
+      if (auto *newGuard = doIt(CLI.getGuardExpr()))
+        CLI.setGuardExpr(newGuard);
       else
         return nullptr;
     }

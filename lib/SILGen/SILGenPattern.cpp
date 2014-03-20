@@ -1818,10 +1818,10 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     
     for (auto *caseBlock : S->getCases()) {
       caseMap[caseBlock] = {};
-      for (auto *label : caseBlock->getCaseLabels())
-        for (auto *pattern : label->getPatterns())
-          clauses.addRow(caseBlock, label->getGuardExpr(), pattern,
-                         CleanupsDepth::invalid(), contBB);
+      for (const auto &labelItem : caseBlock->getCaseLabelItems())
+        clauses.addRow(caseBlock, const_cast<Expr *>(labelItem.getGuardExpr()),
+                       labelItem.getPattern(),
+                       CleanupsDepth::invalid(), contBB);
     }
   
     // Bind variable bindings from the topmost pattern nodes.

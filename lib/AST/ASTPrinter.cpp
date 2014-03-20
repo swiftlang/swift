@@ -1061,28 +1061,25 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   Printer << "}";
 }
 
-void PrintAST::visitCaseStmt(CaseStmt *stmt) {
-  auto printCaseLabel = [&](CaseLabel *label) {
-    if (label->isDefault()) {
-      Printer << "default";
-      // '_' pattern is implicit and doesn't need to be printed.
-    } else {
-      Printer << "case ";
-      interleave(label->getPatterns(),
-                 [&](Pattern *p) { printPattern(p); },
-                 [&] { Printer << ", "; });
-    }
-    if (label->getGuardExpr()) {
-      Printer << " where ";
-      // FIXME: print guard expr
-    }
-    Printer << ":\n";
-  };
+void PrintAST::visitCaseStmt(CaseStmt *CS) {
+  if (CS->isDefault()) {
+    Printer << "default";
+  } else {
+    auto PrintCaseLabelItem = [&](const CaseLabelItem &CLI) {
+      if (auto *P = CLI.getPattern())
+        printPattern(P);
+      if (CLI.getGuardExpr()) {
+        Printer << " where ";
+        // FIXME: print guard expr
+      }
+    };
+    Printer << "case ";
+    interleave(CS->getCaseLabelItems(), PrintCaseLabelItem,
+               [&] { Printer << ", "; });
+  }
+  Printer << ":\n";
 
-  for (auto *label : stmt->getCaseLabels())
-    printCaseLabel(label);
-
-  printBraceStmtElements(cast<BraceStmt>(stmt->getBody()));
+  printBraceStmtElements(cast<BraceStmt>(CS->getBody()));
 }
 
 void Decl::print(raw_ostream &os) const {

@@ -1,3 +1,36 @@
+2014-03-26
+----------
+
+* 'switch' now always requires a statement after a 'case' or 'default'.
+
+  Old syntax:
+
+    switch x {
+    case .A:
+    case .B(1):
+      println(".A or .B(1)")
+    default:
+      // Ignore it.
+    }
+
+  New syntax:
+
+    switch x {
+    case .A, .B(1):
+      println(".A or .B(1)")
+    default:
+      () // Ignore it.
+    }
+
+  The following syntax can be used to introduce guard expressions for patterns
+  inside the 'case':
+
+  switch x {
+  case .A where isFoo(),
+       .B(1) where isBar():
+    ...
+  }
+
 2014-03-19
 ----------
 

@@ -187,7 +187,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
   }
 
-  void checkPattern(Pattern *Pat) {
+  void checkPattern(const Pattern *Pat) {
     switch (Pat->getKind()) {
     case PatternKind::Tuple:
       for (auto &field : cast<TuplePattern>(Pat)->getFields())
@@ -201,7 +201,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     case PatternKind::Named:
       return checkValueDecl(cast<NamedPattern>(Pat)->getDecl());
     case PatternKind::NominalType: {
-      for (auto &elt : cast<NominalTypePattern>(Pat)->getMutableElements())
+      for (const auto &elt : cast<NominalTypePattern>(Pat)->getElements())
         checkPattern(elt.getSubPattern());
       return;
     }
@@ -305,11 +305,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitCaseStmt(CaseStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
-    for (auto Label : S->getCaseLabels()) {
-      for (auto P : Label->getPatterns()) {
-        if (!IntersectsRange(P->getSourceRange()))
-          checkPattern(P);
-      }
+    for (const auto &CLI : S->getCaseLabelItems()) {
+      auto *P = CLI.getPattern();
+      if (!IntersectsRange(P->getSourceRange()))
+        checkPattern(P);
     }
     visit(S->getBody());
   }

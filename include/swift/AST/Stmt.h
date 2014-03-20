@@ -418,125 +418,101 @@ public:
     return S->getKind() == StmtKind::ForEach;
   }
 };
-  
-/// A label used at the head of a 'case' block. Each 'case' label may have one
-/// or more comma-separated patterns. The 'case' may also optionally have a
-/// 'where' guard expression. 'default' is allowed as an alternate spelling of
-/// 'case _'.
-///
-/// Some examples:
-///
-/// case 1:
-/// case 2, 3:
-/// case Foo(var x, var y) where x < y:
-/// default:
-class CaseLabel {
-  SourceLoc CaseLoc;
-  SourceLoc ColonLoc;
+
+/// A pattern and an optional guard expression used in a 'case' statement.
+class CaseLabelItem {
+  Pattern *CasePattern;
   SourceLoc WhereLoc;
   llvm::PointerIntPair<Expr *, 1, bool> GuardExprAndIsDefault;
-  unsigned NumPatterns;
-  
-  CaseLabel(bool isDefault,
-            SourceLoc caseLoc, ArrayRef<Pattern*> patterns,
-            SourceLoc whereLoc, Expr *guardExpr,
-            SourceLoc colonLoc);
-  
-  Pattern **getPatternsBuffer() {
-    return reinterpret_cast<Pattern**>(this + 1);
-  }
-  const Pattern * const *getPatternsBuffer() const {
-    return reinterpret_cast<const Pattern * const *>(this + 1);
-  }
-  
-  /// CaseLabels should be allocated with an ASTContext using create.
-  void *operator new(size_t) = delete;
-  void operator delete(void*) = delete;
-  
+
 public:
-  static CaseLabel *create(ASTContext &C,
-                           bool isDefault,
-                           SourceLoc caseLoc,
-                           ArrayRef<Pattern*> patterns,
-                           SourceLoc whereLoc,
-                           Expr * /*nullable*/ guardExpr,
-                           SourceLoc colonLoc);
-  
-  SourceLoc getLoc() const { return CaseLoc; }
-  SourceLoc getCaseLoc() const { return CaseLoc; }
-  SourceLoc getColonLoc() const { return ColonLoc; }
+  CaseLabelItem(const CaseLabelItem &) = default;
+
+  CaseLabelItem(bool IsDefault, Pattern *CasePattern, SourceLoc WhereLoc,
+                Expr *GuardExpr)
+      : CasePattern(CasePattern), WhereLoc(WhereLoc),
+        GuardExprAndIsDefault(GuardExpr, IsDefault) {}
+
   SourceLoc getWhereLoc() const { return WhereLoc; }
-  
-  SourceRange getSourceRange() const {
-    return {CaseLoc, ColonLoc};
-  }
-  
-  MutableArrayRef<Pattern*> getPatterns() {
-    return {getPatternsBuffer(), NumPatterns};
-  }
-  ArrayRef<const Pattern *> getPatterns() const {
-    return {getPatternsBuffer(), NumPatterns};
-  }
-  
+
+  SourceRange getSourceRange() const;
+
+  Pattern *getPattern() { return CasePattern; }
+  const Pattern *getPattern() const { return CasePattern; }
+  void setPattern(Pattern *CasePattern) { this->CasePattern = CasePattern; }
+
   /// Return the guard expression if present, or null if the case label has
   /// no guard.
-  Expr *getGuardExpr() const { return GuardExprAndIsDefault.getPointer(); }
+  Expr *getGuardExpr() { return GuardExprAndIsDefault.getPointer(); }
+  const Expr *getGuardExpr() const {
+    return GuardExprAndIsDefault.getPointer();
+  }
   void setGuardExpr(Expr *e) { GuardExprAndIsDefault.setPointer(e); }
-  
+
   /// Returns true if this is syntactically a 'default' label.
   bool isDefault() const { return GuardExprAndIsDefault.getInt(); }
 };
-  
-/// A 'case' or 'default' block of a switch statement. Only valid as the
-/// substatement of a SwitchStmt. A case block begins either with one or more
-/// CaseLabels or a single 'default' label.
-class CaseStmt : public Stmt {
-  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
-  unsigned NumCaseLabels;
 
-  CaseLabel * const *getCaseLabelsBuffer() const {
-    return reinterpret_cast<CaseLabel * const *>(this + 1);
+/// A 'case' or 'default' block of a switch statement.  Only valid as the
+/// substatement of a SwitchStmt.  A case block begins either with one or more
+/// CaseLabelItems or a single 'default' label.
+///
+/// Some examples:
+/// \code
+///   case 1:
+///   case 2, 3:
+///   case Foo(var x, var y) where x < y:
+///   case 2 where foo(), 3 where bar():
+///   default:
+/// \endcode
+
+class CaseStmt : public Stmt {
+  SourceLoc CaseLoc;
+  SourceLoc ColonLoc;
+
+  llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
+  unsigned NumPatterns;
+
+  const CaseLabelItem *getCaseLabelItemsBuffer() const {
+    return reinterpret_cast<const CaseLabelItem *>(this + 1);
   }
-  CaseLabel **getCaseLabelsBuffer() {
-    return reinterpret_cast<CaseLabel **>(this + 1);
+  CaseLabelItem *getCaseLabelItemsBuffer() {
+    return reinterpret_cast<CaseLabelItem *>(this + 1);
   }
-  
-  CaseStmt(ArrayRef<CaseLabel*> Labels, bool hasBoundDecls, Stmt *Body,
+
+  CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
+           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
            Optional<bool> Implicit);
-  
+
 public:
-  static CaseStmt *create(ASTContext &C,
-                          ArrayRef<CaseLabel*> Labels,
-                          bool hasBoundDecls,
-                          Stmt *Body,
+  static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
+                          ArrayRef<CaseLabelItem> CaseLabelItems,
+                          bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
                           Optional<bool> Implicit = {});
-  
-  ArrayRef<CaseLabel *> getCaseLabels() const {
-    return {getCaseLabelsBuffer(), NumCaseLabels};
+
+  ArrayRef<CaseLabelItem> getCaseLabelItems() const {
+    return { getCaseLabelItemsBuffer(), NumPatterns };
   }
-  
+  MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
+    return { getCaseLabelItemsBuffer(), NumPatterns };
+  }
+
   Stmt *getBody() const { return BodyAndHasBoundDecls.getPointer(); }
   void setBody(Stmt *body) { BodyAndHasBoundDecls.setPointer(body); }
-  
+
   /// True if the case block declares any patterns with local variable bindings.
   bool hasBoundDecls() const { return BodyAndHasBoundDecls.getInt(); }
-  
+
   /// Get the source location of the 'case' or 'default' of the first label.
-  SourceLoc getLoc() const {
-    return getCaseLabels()[0]->getLoc();
-  }
-  
+  SourceLoc getLoc() const { return CaseLoc; }
+
   SourceRange getSourceRange() const {
-    return {getLoc(), getBody()->getEndLoc()};
+    return { getLoc(), getBody()->getEndLoc() };
   }
-  
-  bool isDefault() {
-    return getCaseLabels()[0]->isDefault();
-  }
-  
-  static bool classof(const Stmt *S) {
-    return S->getKind() == StmtKind::Case;
-  }
+
+  bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
+
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 };
 
 /// Switch statement.

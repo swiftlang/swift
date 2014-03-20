@@ -623,9 +623,8 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitCaseStmt(CaseStmt *S) {
     if (!isReferencePointInRange(S->getSourceRange()))
       return;
-    for (auto Label : S->getCaseLabels()) {
-      for (auto P : Label->getPatterns())
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+    for (const auto &CLI : S->getCaseLabelItems()) {
+      checkPattern(CLI.getPattern(), DeclVisibilityKind::LocalVariable);
     }
     visit(S->getBody());
   }
