@@ -31,7 +31,9 @@ namespace swift {
     /// Split before the last preposition.
     BeforePreposition,
     /// Split after the last preposition.
-    AfterPreposition
+    AfterPreposition,
+    /// Split before directional prepositions, after other prepositions.
+    DirectionalPreposition,
   };
 
   /// \brief A collection of options that affect the language dialect and

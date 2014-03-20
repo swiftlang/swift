@@ -13,6 +13,8 @@
 @interface NSDocument : NSObject
 - (instancetype)init NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithURL:(NSString*)url;
+
+- (void)copyDocumentFromURL:(NSURL*)fromURL toURL:(NSURL*)toURL;
 @end
 
 @interface NSAwesomeDocument : NSDocument

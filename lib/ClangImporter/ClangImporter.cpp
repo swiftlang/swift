@@ -580,11 +580,15 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
 
 /// Determine whether the given word (which should have its first
 /// letter already capitalized) is a preposition.
-static bool isPreposition(StringRef word) {
-  return llvm::StringSwitch<bool>(word)
-#define PREPOSITION(Word) .Case(#Word, true)
+///
+/// The stored boolean indicates whether the preposition has
+/// direction.
+static Optional<bool> isPreposition(StringRef word) {
+  return llvm::StringSwitch<Optional<bool>>(word)
+#define DIRECTIONAL_PREPOSITION(Word) .Case(#Word, true)
+#define PREPOSITION(Word) .Case(#Word, false)
 #include "Prepositions.def"
-    .Default(false);
+    .Default(Nothing);
 }
 
 std::pair<StringRef, StringRef> 
@@ -602,7 +606,6 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
   unsigned selectorEnd = selector.size();
   unsigned wordStart = selector.size();
   unsigned wordEnd = wordStart;
-  bool splitBefore = SplitPrepositions == SelectorSplitKind::BeforePreposition;
   for (;;) {
     // Skip over any lowercase letters.
     while (wordStart > 0 && clang::isLowercase(selector[wordStart-1]))
@@ -617,11 +620,29 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
       break;
 
     // If this word is a preposition, and it isn't the last word, split here.
-    if (wordEnd != selectorEnd &&
-        isPreposition(selector.substr(wordStart, wordEnd - wordStart))) {
-      return splitSelectorPieceAt(selector, 
-                                  splitBefore ? wordStart : wordEnd, 
-                                  buffer);
+    if (wordEnd != selectorEnd) {
+      if (auto isPrep = isPreposition(
+                          selector.substr(wordStart, wordEnd - wordStart))) {
+        unsigned splitLocation;
+        switch (SplitPrepositions) {
+        case SelectorSplitKind::None:
+          llvm_unreachable("not splitting selectors");
+
+        case SelectorSplitKind::BeforePreposition:
+          splitLocation = wordStart;
+          break;
+
+        case SelectorSplitKind::AfterPreposition:
+          splitLocation = wordEnd;
+          break;
+
+        case SelectorSplitKind::DirectionalPreposition:
+          splitLocation = *isPrep ? wordStart : wordEnd;
+          break;
+        }
+
+        return splitSelectorPieceAt(selector, splitLocation, buffer);
+      }
     }
 
     // Look for the next word.

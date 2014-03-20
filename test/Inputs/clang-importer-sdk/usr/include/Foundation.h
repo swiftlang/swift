@@ -140,3 +140,6 @@ typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
 @end
 
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
+
+@interface NSURL : NSObject
+@end
