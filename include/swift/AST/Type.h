@@ -97,6 +97,14 @@ public:
   /// \returns the result of transforming the type.
   Type transform(const std::function<Type(Type)> &fn) const;
 
+  /// Look through the given type and its children and apply fn to them.
+  void visit(const std::function<void (Type)> &fn) const {
+    findIf([&fn](Type t) -> bool {
+        fn(t);
+        return false;
+      });
+  }
+
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
