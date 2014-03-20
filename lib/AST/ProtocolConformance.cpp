@@ -32,23 +32,23 @@ void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
 
 }
 
-#define CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                        \
-switch (getKind()) {                                                       \
-  case ProtocolConformanceKind::Normal:                                    \
-    static_assert(&ProtocolConformance::Method !=                          \
-                    &NormalProtocolConformance::Method,                    \
-                  "Must override NormalProtocolConformance::" #Method);    \
-    return cast<NormalProtocolConformance>(this)->Method Args;             \
-  case ProtocolConformanceKind::Specialized:                               \
-    static_assert(&ProtocolConformance::Method !=                          \
-                    &InheritedProtocolConformance::Method,                 \
-                  "Must override InheritedProtocolConformance::" #Method); \
-    return cast<SpecializedProtocolConformance>(this)->Method Args;        \
-  case ProtocolConformanceKind::Inherited:                                 \
-    static_assert(&ProtocolConformance::Method !=                          \
-                    &InheritedProtocolConformance::Method,                 \
-                  "Must override InheritedProtocolConformance::" #Method); \
-    return cast<InheritedProtocolConformance>(this)->Method Args;          \
+#define CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                          \
+switch (getKind()) {                                                         \
+  case ProtocolConformanceKind::Normal:                                      \
+    static_assert(&ProtocolConformance::Method !=                            \
+                    &NormalProtocolConformance::Method,                      \
+                  "Must override NormalProtocolConformance::" #Method);      \
+    return cast<NormalProtocolConformance>(this)->Method Args;               \
+  case ProtocolConformanceKind::Specialized:                                 \
+    static_assert(&ProtocolConformance::Method !=                            \
+                    &SpecializedProtocolConformance::Method,                 \
+                  "Must override SpecializedProtocolConformance::" #Method); \
+    return cast<SpecializedProtocolConformance>(this)->Method Args;          \
+  case ProtocolConformanceKind::Inherited:                                   \
+    static_assert(&ProtocolConformance::Method !=                            \
+                    &InheritedProtocolConformance::Method,                   \
+                  "Must override InheritedProtocolConformance::" #Method);   \
+    return cast<InheritedProtocolConformance>(this)->Method Args;            \
 }
 
 /// Get the protocol being conformed to.
