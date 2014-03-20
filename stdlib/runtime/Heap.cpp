@@ -18,6 +18,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
+#include <mach/vm_statistics.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cassert>
@@ -63,8 +64,9 @@ size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
 }
 
-void *mmapWrapper(size_t size) {
-  return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+void *mmapWrapper(size_t size, bool huge) {
+  int tag = VM_MAKE_TAG(huge ? VM_MEMORY_MALLOC_HUGE : VM_MEMORY_MALLOC_SMALL);
+  return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, tag, 0);
 }
 
 pthread_rwlock_t globalLock = PTHREAD_RWLOCK_INITIALIZER;
@@ -85,7 +87,7 @@ public:
   size_t byteSize;
   Arena(size_t idx, size_t size) : byteSize(size) {
     assert(size > 0);
-    base = mmapWrapper(arenaSize * 2);
+    base = mmapWrapper(arenaSize * 2, /*huge*/ false);
     assert(base != MAP_FAILED);
     void *newBase = (void *)(((size_t)base & ~arenaMask) + arenaSize);
     size_t frontSlop = (size_t)newBase - (size_t)base;
@@ -275,7 +277,7 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   else {
     ++size;
     // large allocations
-    void *r = mmapWrapper(size);
+    void *r = mmapWrapper(size, /*huge*/ true);
     if (r == MAP_FAILED) {
       if (flags & SWIFT_TRYALLOC) {
         return NULL;
