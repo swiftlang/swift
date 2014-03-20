@@ -262,17 +262,21 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.
       SourceLoc SL = FD->getFuncLoc();
-      unsigned TokLen;
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
-      case AccessorKind::IsGetter: TokLen = 3; break;
-      case AccessorKind::IsSetter: TokLen = 3; break;
-      case AccessorKind::IsWillSet: TokLen = 7; break;
-      case AccessorKind::IsDidSet: TokLen = 6; break;
+      // Make sure the func loc is not the start of the function body, in which
+      // case the context sensitive keyword was implied.
+      if (FD->getBodySourceRange().Start != SL) {
+        unsigned TokLen;
+        switch (FD->getAccessorKind()) {
+          case AccessorKind::NotAccessor: llvm_unreachable("expected accessor");
+          case AccessorKind::IsGetter: TokLen = 3; break;
+          case AccessorKind::IsSetter: TokLen = 3; break;
+          case AccessorKind::IsWillSet: TokLen = 7; break;
+          case AccessorKind::IsDidSet: TokLen = 6; break;
+        }
+        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+          CharSourceRange(SL, TokLen)}))
+          return false;
       }
-      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                              CharSourceRange(SL, TokLen)}))
-        return false;
     }
     else {
       // Pass Function / Method structure node.
