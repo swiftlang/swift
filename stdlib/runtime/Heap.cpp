@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/ADT/DenseMap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
@@ -21,6 +22,10 @@
 #include <stdlib.h>
 #include <cassert>
 #include <pthread.h>
+#include <vector>
+#include <sys/mman.h>
+#include <errno.h>
+#include <unistd.h>
 
 using namespace swift;
 
@@ -45,20 +50,74 @@ malloc_zone_t _swift_zone = {
   NULL, // XXX -- add support for pressure_relief?
 };
 
-extern "C" pthread_key_t _swift_alloc_offset = -1;
+extern "C" pthread_key_t _swiftAllocOffset = -1;
+
+namespace {
+
+pthread_rwlock_t globalLock = PTHREAD_RWLOCK_INITIALIZER;
+
+typedef struct AllocCacheEntry_s {
+  struct AllocCacheEntry_s *next;
+} *AllocCacheEntry;
+
+AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
+
+class Arena;
+static llvm::DenseMap<const void*, Arena> arenas;
+
+class Arena {
+public:
+  void *base;
+  size_t byteSize;
+  Arena(size_t idx, size_t size) : byteSize(size) {
+    assert(size > 0);
+    const size_t arenaSize = 64*1024;
+    base = mmap(NULL, arenaSize * 2, PROT_READ|PROT_WRITE,
+                MAP_ANON|MAP_PRIVATE, -1, 0);
+    assert(base != MAP_FAILED);
+    void *newBase = (void *)(((size_t)base & ~0xFFFFul) + arenaSize);
+    size_t frontSlop = (size_t)newBase - (size_t)base;
+    size_t backSlop = arenaSize - frontSlop;
+    int r = munmap(base, frontSlop);
+    assert(r != -1);
+    if (backSlop) {
+      r = munmap((uint8_t *)newBase + arenaSize, backSlop);
+      assert(r != -1);
+    }
+    base = newBase;
+    auto headNode = (AllocCacheEntry)base;
+    auto node = headNode;
+    size_t allocations = arenaSize / size;
+    for (unsigned i = 1; i < allocations; i++) {
+      auto nextNode = (AllocCacheEntry)((uint8_t *)base + i * size);
+      node->next = nextNode;
+      node = nextNode;
+    }
+    assert(globalCache[idx] == NULL);
+    globalCache[idx] = headNode;
+  }
+  static void newArena(size_t idx, size_t size) {
+    auto arena = Arena(idx, size);
+    arenas.insert(std::pair<const void *, Arena>(arena.base, arena));
+  }
+};
+
+} // end anonymous namespace
+
+static void _swift_key_destructor(void *);
 
 __attribute__((constructor))
 static void registerZone() {
   assert(sizeof(pthread_key_t) == sizeof(long));
   malloc_zone_register(&_swift_zone);
   pthread_key_t key, prev_key;
-  int r = pthread_key_create(&key, NULL);
+  int r = pthread_key_create(&key, _swift_key_destructor);
   assert(r == 0);
   (void)r;
   prev_key = key;
-  _swift_alloc_offset = key;
+  _swiftAllocOffset = key;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
-    int r = pthread_key_create(&key, NULL);
+    int r = pthread_key_create(&key, _swift_key_destructor);
     assert(r == 0);
     (void)r;
     assert(key == prev_key + 1);
@@ -67,29 +126,44 @@ static void registerZone() {
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
-  return 0;
+  void *ptr = (void *)((unsigned long)pointer & ~0xFFFFul);
+  auto it = arenas.find(ptr);
+  return it != arenas.end() ? it->second.byteSize : 0;
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
-  return malloc(size);
+  return swift::swift_slowAlloc(size, SWIFT_TRYALLOC|SWIFT_RAWALLOC);
 }
 
 void *swift::_swift_zone_calloc(malloc_zone_t *zone,
                                 size_t count, size_t size) {
-  return calloc(count, size);
+  void *ptr = swift::_swift_zone_malloc(zone, count * size);
+  if (ptr) {
+    memset(ptr, 0, count * size);
+  }
+  return ptr;
 }
 
 void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
-  return valloc(size);
+  size_t pageMask = getpagesize() - 1;
+  assert((pageMask & 0xFFF) == 0xFFF); // at least 4k
+  size = (size + pageMask) & ~pageMask;
+  return swift::_swift_zone_malloc(zone, size);
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
-  return free(pointer);
+  swift::swift_slowDealloc(pointer, 0);
 }
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
                                  void *pointer, size_t size) {
-  return realloc(pointer, size);
+  abort(); // nobody should call this
+  // but making it work is easy if we want:
+  auto newPointer = swift::_swift_zone_malloc(zone, size);
+  auto oldSize = swift::_swift_zone_size(zone, pointer);
+  memcpy(newPointer, pointer, size < oldSize ? size : oldSize);
+  swift::_swift_zone_free(zone, pointer);
+  return newPointer;
 }
 
 void swift::_swift_zone_destroy(malloc_zone_t *zone) {
@@ -103,7 +177,24 @@ __attribute__((noinline,used))
 static void *
 _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
 {
+  assert(flags & SWIFT_RAWALLOC);
+  void *ptr = NULL;
   size_t sz;
+  int r;
+
+again:
+  r = pthread_rwlock_wrlock(&globalLock);
+  assert(r == 0);
+  if ((ptr = globalCache[idx])) {
+    globalCache[idx] = globalCache[idx]->next;
+  }
+  // we should probably refill the cache in bulk
+  r = pthread_rwlock_unlock(&globalLock);
+  assert(r == 0);
+
+  if (ptr) {
+    return ptr;
+  }
 
   idx++;
 
@@ -125,19 +216,15 @@ _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
   } else if (idx <= 64) { sz = (idx - 48) << 8;
 #endif
   } else {
+    // FIXME -- handle big items
     __builtin_trap();
   }
 
-  void *r;
-  do {
-    if (flags & SWIFT_RAWALLOC) {
-      r = _swift_zone.malloc(NULL, sz);
-    } else {
-      r = _swift_zone.calloc(NULL, 1, sz);
-    }
-  } while (!r && !(flags & SWIFT_TRYALLOC));
+  idx--;
 
-  return r;
+  Arena::newArena(idx, sz);
+  // FIXME -- SWIFT_TRYALLOC
+  goto again;
 }
 
 extern "C" LLVM_LIBRARY_VISIBILITY
@@ -151,6 +238,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
 }
 
 void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
+  assert(flags & SWIFT_RAWALLOC);
   size_t idx = SIZE_MAX;
   if (size == 0) idx = 0;
   --size;
@@ -174,17 +262,12 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
 
   void *r;
   if (idx != SIZE_MAX) {
-    assert(flags & SWIFT_RAWALLOC);
     r = swift_tryRawAlloc(idx);
     if (r) return r;
   }
 
   do {
-    if (flags & SWIFT_RAWALLOC) {
-      r = _swift_zone.malloc(NULL, size);
-    } else {
-      r = _swift_zone.calloc(NULL, 1, size);
-    }
+    r = _swift_zone.malloc(NULL, size);
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
   return r;
@@ -201,25 +284,21 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
 // These are implemented in FastEntryPoints.s on some platforms.
 #ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
 
-struct AllocCacheEntry {
-  struct AllocCacheEntry *next;
-};
-
-static AllocCacheEntry *
+static AllocCacheEntry
 getRawAllocCacheEntry(unsigned long idx) {
   assert(idx < ALLOC_CACHE_COUNT);
-  return (AllocCacheEntry *)_os_tsd_get_direct(idx + _swift_alloc_offset);
+  return (AllocCacheEntry)_os_tsd_get_direct(idx + _swiftAllocOffset);
 }
 
 static void
-setRawAllocCacheEntry(unsigned long idx, AllocCacheEntry *entry) {
+setRawAllocCacheEntry(unsigned long idx, AllocCacheEntry entry) {
   assert(idx < ALLOC_CACHE_COUNT);
-  _os_tsd_set_direct(idx + _swift_alloc_offset, entry);
+  _os_tsd_set_direct(idx + _swiftAllocOffset, entry);
 }
 
 void *swift::swift_rawAlloc(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
-  AllocCacheEntry *r = getRawAllocCacheEntry(idx);
+  AllocCacheEntry r = getRawAllocCacheEntry(idx);
   if (r) {
     setRawAllocCacheEntry(idx, r->next);
     return r;
@@ -229,7 +308,7 @@ void *swift::swift_rawAlloc(AllocIndex idx) {
 
 void *swift::swift_tryRawAlloc(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
-  AllocCacheEntry *r = getRawAllocCacheEntry(idx);
+  AllocCacheEntry r = getRawAllocCacheEntry(idx);
   if (r) {
     setRawAllocCacheEntry(idx, r->next);
     return r;
@@ -239,8 +318,8 @@ void *swift::swift_tryRawAlloc(AllocIndex idx) {
 
 void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
-  auto cur = static_cast<AllocCacheEntry *>(ptr);
-  AllocCacheEntry *prev = getRawAllocCacheEntry(idx);
+  auto cur = static_cast<AllocCacheEntry>(ptr);
+  AllocCacheEntry prev = getRawAllocCacheEntry(idx);
   cur->next = prev;
   setRawAllocCacheEntry(idx, cur);
 }
@@ -250,8 +329,9 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   if (bytes == 0) {
-    bytes = malloc_size(ptr);
+    bytes = _swift_zone.size(NULL, ptr);
   }
+  assert(bytes != 0);
 
   bytes--;
 
@@ -310,4 +390,37 @@ void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   }
 
   swift_rawDealloc(ptr, idx);
+}
+
+static void
+_swift_key_destructor(void *arg) {
+  (void)arg;
+  AllocCacheEntry threadCache[ALLOC_CACHE_COUNT];
+  AllocCacheEntry threadCacheTail[ALLOC_CACHE_COUNT];
+  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+    threadCache[i] = (AllocCacheEntry)_os_tsd_get_direct(
+                                                      _swiftAllocOffset + i);
+    if (threadCache[i] == NULL) {
+      continue;
+    }
+    _os_tsd_set_direct(_swiftAllocOffset + i, NULL);
+    AllocCacheEntry temp = threadCache[i];
+    while (temp->next) {
+      temp = temp->next;
+    }
+    threadCacheTail[i] = temp;
+  }
+  int r;
+  r = pthread_rwlock_wrlock(&globalLock);
+  assert(r == 0);
+  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+    if (threadCache[i] == NULL) {
+      continue;
+    }
+    threadCacheTail[i] = globalCache[i];
+    globalCache[i] = threadCache[i];
+  }
+  r = pthread_rwlock_unlock(&globalLock);
+  assert(r == 0);
+  abort();
 }
