@@ -92,7 +92,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(OBJCPTR(PS__)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
-                     DIRECT(V10ObjectiveC8ObjCBool)),
+                     DIRECT(S2_)),
                 BOOL(id, id, BOOL *));
 
 /// NSArray enumerator
@@ -108,7 +108,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
-                     DIRECT(V10ObjectiveC8ObjCBool)),
+                     DIRECT(S2_)),
                 BOOL(id, NSUInteger, BOOL *));
 
 /// NSAnimationContext animation group
@@ -134,10 +134,10 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo12NSDictionary)),
                 void(id, NSRange, BOOL *));
 
 /// NSCalendar enumerator
-/// (NSDate, Bool, UnsafePointer<BOOL>) -> Void
+/// (NSDate, BOOL, UnsafePointer<BOOL>) -> Void
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(CSo6NSDate)),
                           DIRECT(V10ObjectiveC8ObjCBool),
-                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                          DIRECT(GVSs13UnsafePointerS1__)),
                      VOID),
                 void(id, BOOL, BOOL *));
 
@@ -215,10 +215,10 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(Si),
                 void(NSUInteger, BOOL *));
 
 /// NSIndexSet predicate
-/// (NSUInteger, UnsafePointer<BOOL>) -> Bool
+/// (NSUInteger, UnsafePointer<BOOL>) -> BOOL
 MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
-                     DIRECT(V10ObjectiveC8ObjCBool)),
+                     DIRECT(S1_)),
                 BOOL(NSUInteger, BOOL *));
 
 /// NSNotificationCenter observer
@@ -243,10 +243,10 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
                 void(id, BOOL *));
 
 /// NSSet predicate
-/// (id, UnsafePointer<BOOL>) -> Bool
+/// (id, UnsafePointer<BOOL>) -> BOOL
 MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
-                     DIRECT(V10ObjectiveC8ObjCBool)),
+                     DIRECT(S2_)),
                 BOOL(id, BOOL *));
 
 /// NSSubstring substring enumerator
