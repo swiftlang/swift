@@ -177,7 +177,7 @@ public:
   }
 
   void visitSILArgument(SILArgument *arg) {
-    checkLegalTypes(arg);
+    checkLegalTypes(arg->getFunction(), arg);
   }
 
   void visitSILInstruction(SILInstruction *I) {
@@ -187,7 +187,7 @@ public:
     // Check the SILLLocation attached to the instruction.
     checkInstructionsSILLocation(I);
 
-    checkLegalTypes(I);
+    checkLegalTypes(I->getFunction(), I);
   }
 
   void checkSILInstruction(SILInstruction *I) {
@@ -238,14 +238,7 @@ public:
 
       // Make sure that if operand is generic that its primary archetypes match
       // the function context.
-      operand.get().getType().getSwiftRValueType().visit([&](Type t) {
-        auto *A = dyn_cast<ArchetypeType>(t.getPointer());
-        if (!A)
-          return;
-        require(isArchetypeValidInFunction(A, I->getFunction()),
-                "Operand is of an ArchetypeType that does not exist in the "
-                "Caller's generic param list.");
-      });
+      checkLegalTypes(I->getFunction(), operand.get().getDef());
     }
   }
 
@@ -278,20 +271,30 @@ public:
         "artificial locations are only allowed on Unreachable instructions");
   }
 
-  /// Check that the types of this value producer are all legal.
-  void checkLegalTypes(ValueBase *value) {
+  /// Check that the types of this value producer are all legal in the function
+  /// context in which it exists.
+  void checkLegalTypes(SILFunction *F, ValueBase *value) {
     for (auto type : value->getTypes()) {
-      checkLegalType(type);
+      checkLegalType(F, type);
     }
   }
 
   /// Check that the given type is a legal SIL value.
-  void checkLegalType(SILType type) {
+  void checkLegalType(SILFunction *F, SILType type) {
     auto rvalueType = type.getSwiftRValueType();
     require(!isa<LValueType>(rvalueType),
             "l-value types are not legal in SIL");
     require(!isa<AnyFunctionType>(rvalueType),
             "AST function types are not legal in SIL");
+
+    rvalueType.visit([&](Type t) {
+      auto *A = dyn_cast<ArchetypeType>(t.getPointer());
+      if (!A)
+        return;
+      require(isArchetypeValidInFunction(A, F),
+              "Operand is of an ArchetypeType that does not exist in the "
+              "Caller's generic param list.");
+    });
   }
 
   /// Check that this operand appears in the use-chain of the value it uses.
