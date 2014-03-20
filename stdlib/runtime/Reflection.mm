@@ -279,6 +279,47 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   return result;
 }
   
+// -- Struct destructuring.
+  
+extern "C"
+intptr_t swift_StructMirror_count(HeapObject *owner,
+                                  const OpaqueValue *value,
+                                  const Metadata *type) {
+  auto Struct = static_cast<const StructMetadata *>(type);
+  swift_release(owner);
+  return Struct->Description->Struct.NumFields;
+}
+  
+extern "C"
+StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
+                                               HeapObject *owner,
+                                               const OpaqueValue *value,
+                                               const Metadata *type) {
+  StringMirrorTuple result;
+  
+  auto Struct = static_cast<const StructMetadata *>(type);
+  
+  if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
+    abort();
+  
+  // Load the type and offset from their respective vectors.
+  auto fieldType = Struct->getFieldTypes()[i];
+  auto fieldOffset = Struct->getFieldOffsets()[i];
+  
+  auto bytes = reinterpret_cast<const char*>(value);
+  auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
+  
+  // Get the field name from the doubly-null-terminated list.
+  const char *fieldName = Struct->Description->Struct.FieldNames;
+  for (unsigned j = 0; j < i; ++j) {
+    while (*fieldName++);
+  }
+  
+  result.first = String(fieldName);
+  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
+  return result;
+}
+  
 // -- Mirror witnesses for ObjC classes.
   
 extern "C" const FullMetadata<Metadata> _TMdSb; // Bool
@@ -498,6 +539,8 @@ extern "C" const FullMetadata<Metadata> _TMdVSs13_OpaqueMirror;
 extern "C" const MirrorWitnessTable _TWPVSs13_OpaqueMirrorSs6MirrorSs;
 extern "C" const FullMetadata<Metadata> _TMdVSs12_TupleMirror;
 extern "C" const MirrorWitnessTable _TWPVSs12_TupleMirrorSs6MirrorSs;
+extern "C" const FullMetadata<Metadata> _TMdVSs13_StructMirror;
+extern "C" const MirrorWitnessTable _TWPVSs13_StructMirrorSs6MirrorSs;
 extern "C" const FullMetadata<Metadata> _TMdVSs12_ClassMirror;
 extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs6MirrorSs;
   
@@ -577,6 +620,9 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Tuple:
     return {T, &_TMdVSs12_TupleMirror, &_TWPVSs12_TupleMirrorSs6MirrorSs};
       
+  case MetadataKind::Struct:
+    return {T, &_TMdVSs13_StructMirror, &_TWPVSs13_StructMirrorSs6MirrorSs};
+      
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::Class: {
     return getImplementationForClass(Value);
@@ -601,7 +647,6 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   }
       
   /// TODO: Implement specialized mirror witnesses for all kinds.
-  case MetadataKind::Struct:
   case MetadataKind::Enum:
   case MetadataKind::Function:
   case MetadataKind::Existential:

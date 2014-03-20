@@ -958,6 +958,24 @@ struct StructMetadata : public Metadata {
   /// The parent type of this member type, or null if this is not a
   /// member type.
   const Metadata *Parent;
+  
+  /// Get a pointer to the field offset vector, if present, or null.
+  const uintptr_t *getFieldOffsets() const {
+    auto offset = Description->Struct.FieldOffsetVectorOffset;
+    if (offset == 0)
+      return nullptr;
+    auto asWords = reinterpret_cast<const void * const*>(this);
+    return reinterpret_cast<const uintptr_t *>(asWords + offset);
+  }
+  
+  /// Get a pointer to the field type vector, if present, or null.
+  const Metadata * const *getFieldTypes() const {
+    auto *getter = Description->Struct.GetFieldTypes;
+    if (!getter)
+      return nullptr;
+    
+    return getter(this);
+  }
 
   // This is followed by the generics information, if this type is generic.
 };
