@@ -178,10 +178,6 @@ typedef unsigned long AllocIndex;
 extern "C" void *swift_rawAlloc(AllocIndex idx);
 extern "C" void *swift_tryRawAlloc(AllocIndex idx);
 
-// If bytes is knowable but is large OR if bytes is not knowable,
-// then use the slow entry point and pass zero:
-extern "C" void swift_slowDealloc(void *ptr, size_t bytes);
-
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
 extern "C" void swift_rawDealloc(void *ptr, AllocIndex idx);

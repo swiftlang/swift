@@ -169,7 +169,7 @@ void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
-  swift::swift_slowDealloc(pointer, 0);
+  swift::swift_slowRawDealloc(pointer, 0);
 }
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
@@ -353,37 +353,6 @@ void swift::swift_rawDealloc(void *ptr, AllocIndex idx) {
 
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
-
-void swift::swift_slowDealloc(void *ptr, size_t bytes) {
-  if (bytes == 0) {
-    bytes = _swift_zone.size(NULL, ptr);
-  }
-  assert(bytes != 0);
-
-  bytes--;
-
-  AllocIndex idx;
-#ifdef __LP64__
-  if        (bytes < 0x80)   { idx = (bytes >> 3);
-  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
-  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10;
-  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18;
-  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20;
-  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28;
-#else
-  if        (bytes < 0x40)   { idx = (bytes >> 2);
-  } else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;
-  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10;
-  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18;
-  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20;
-  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28;
-  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30;
-#endif
-  } else { return free(ptr);
-  }
-
-  swift_rawDealloc(ptr, idx);
-}
 
 void swift::swift_slowRawDealloc(void *ptr, size_t bytes) {
   if (bytes == 0) {
