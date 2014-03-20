@@ -33,6 +33,29 @@ using Lowering::AbstractionPattern;
 // prevent release builds from triggering spurious unused variable warnings.
 #ifndef NDEBUG
 
+/// Returns true if A is an opened existential type, Self, or is equal to an
+/// archetype in F's nested archetype list.
+///
+/// FIXME: Once Self has been removed in favor of opened existential types
+/// everywhere, remove support for self.
+static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
+  // The only two cases where an archetype is always legal in a function is if
+  // it is self or if it is from an opened existential type. Currently, Self is
+  // being migrated away from in favor of opened existential types, so we should
+  // remove the special case here for Self when that process is completed.
+  //
+  // *NOTE* Associated types of self are not valid here.
+  if (!A->getOpenedExistentialType().isNull() || A->getSelfProtocol())
+    return true;
+
+  // Ok, we have an archetype, make sure it is in the nested archetypes of our
+  // caller.
+  for (auto Iter : F->getContextGenericParams()->getAllNestedArchetypes())
+    if (A->isEqual(&*Iter))
+      return true;
+  return false;
+}
+
 namespace {
 /// Metaprogramming-friendly base class.
 template <class Impl>
@@ -212,6 +235,17 @@ public:
       require(operand.getUser() == I,
               "instruction's operand's owner isn't the instruction");
       require(isInValueUses(&operand), "operand value isn't used by operand");
+
+      // Make sure that if operand is generic that its primary archetypes match
+      // the function context.
+      operand.get().getType().getSwiftRValueType().visit([&](Type t) {
+        auto *A = dyn_cast<ArchetypeType>(t.getPointer());
+        if (!A)
+          return;
+        require(isArchetypeValidInFunction(A, I->getFunction()),
+                "Operand is of an ArchetypeType that does not exist in the "
+                "Caller's generic param list.");
+      });
     }
   }
 
@@ -320,23 +354,15 @@ public:
     // If we have a substitution whose replacement type is an archetype, make
     // sure that the replacement archetype is in the context generic params of
     // the caller function.
-    GenericParamList *gp = AI->getFunction()->getContextGenericParams();
     // For each substitution Sub in AI...
     for (auto &Sub : AI->getSubstitutions()) {
       // If Sub's replacement is not an archetype type or is from an opened
       // existential type, skip it...
-      auto Arch = Sub.Replacement->getAs<ArchetypeType>();
-      if (!Arch || !Arch->getOpenedExistentialType().isNull())
+      auto A = Sub.Replacement->getAs<ArchetypeType>();
+      if (!A)
         continue;
-
-      // Ok, we have an archetype, make sure it is in the nested archetypes of
-      // our caller.
-      bool foundMatch = false;
-      for (auto Iter : gp->getAllNestedArchetypes())
-        if ((foundMatch = Arch->isEqual(&*Iter)))
-          break;
-      require(foundMatch, "Archetype to be substituted in AI does not exist in"
-              " Caller's generic param list");
+      require(isArchetypeValidInFunction(A, AI->getFunction()),
+              "Archetype to be substituted must be valid in function.");
     }
 
     // Then make sure that we have a type that can be substituted for the
