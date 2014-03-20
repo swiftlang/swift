@@ -54,6 +54,15 @@ extern "C" pthread_key_t _swiftAllocOffset = -1;
 
 namespace {
 
+const size_t  pageSize = getpagesize();
+const size_t  pageMask = getpagesize() - 1;
+const size_t arenaSize = 0x10000;
+const size_t arenaMask =  0xFFFF;
+
+size_t roundToPage(size_t size) {
+  return (size + pageMask) & ~pageMask;
+}
+
 void *mmapWrapper(size_t size) {
   return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
 }
@@ -76,10 +85,9 @@ public:
   size_t byteSize;
   Arena(size_t idx, size_t size) : byteSize(size) {
     assert(size > 0);
-    const size_t arenaSize = 64*1024;
     base = mmapWrapper(arenaSize * 2);
     assert(base != MAP_FAILED);
-    void *newBase = (void *)(((size_t)base & ~0xFFFFul) + arenaSize);
+    void *newBase = (void *)(((size_t)base & ~arenaMask) + arenaSize);
     size_t frontSlop = (size_t)newBase - (size_t)base;
     size_t backSlop = arenaSize - frontSlop;
     int r = munmap(base, frontSlop);
@@ -130,7 +138,7 @@ static void registerZone() {
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
-  void *ptr = (void *)((unsigned long)pointer & ~0xFFFFul);
+  void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
   auto it = arenas.find(ptr);
   if (it != arenas.end()) {
     return it->second.byteSize;
@@ -156,10 +164,8 @@ void *swift::_swift_zone_calloc(malloc_zone_t *zone,
 }
 
 void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
-  size_t pageMask = getpagesize() - 1;
   assert((pageMask & 0xFFF) == 0xFFF); // at least 4k
-  size = (size + pageMask) & ~pageMask;
-  return swift::_swift_zone_malloc(zone, size);
+  return swift::_swift_zone_malloc(zone, roundToPage(size));
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
