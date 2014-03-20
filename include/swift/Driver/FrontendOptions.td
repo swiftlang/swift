@@ -108,8 +108,11 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def enable_objc_optional : Flag<["-"], "enable-objc-optional">,
   HelpText<"Import Objective-C references using UncheckedOptional">;
 
-def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
+def split_objc_selectors_before : Flag<["-"], "split-objc-selectors-before">,
   HelpText<"Split imported Objective-C selectors before the last preposition">;
+
+def split_objc_selectors_after : Flag<["-"], "split-objc-selectors-after">,
+  HelpText<"Split imported Objective-C selectors after the last preposition">;
 
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;

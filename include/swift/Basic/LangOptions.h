@@ -23,6 +23,17 @@
 
 namespace swift {
   
+  /// Describes how selectors will be split when imported from
+  /// Objective-C.
+  enum class SelectorSplitKind {
+    /// No splitting.
+    None,
+    /// Split before the last preposition.
+    BeforePreposition,
+    /// Split after the last preposition.
+    AfterPreposition
+  };
+
   /// \brief A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
@@ -55,9 +66,8 @@ namespace swift {
     /// references and optional closures, respectively.
     bool EnableObjCOptional = false;
 
-    /// Whether to split imported Objective-C selectors just before
-    /// the last preopsition.
-    bool SplitPrepositions = false;
+    /// How to split imported Objective-C selectors, if at all.
+    SelectorSplitKind SplitPrepositions = SelectorSplitKind::None;
 
     /// \brief Implicit target configuration options.  There are currently two
     ///   supported target configuration values:

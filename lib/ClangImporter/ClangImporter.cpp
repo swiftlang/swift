@@ -71,7 +71,7 @@ namespace {
 
 
 ClangImporter::ClangImporter(ASTContext &ctx, bool useOptional, 
-                             bool splitPrepositions)
+                             SelectorSplitKind splitPrepositions)
   : Impl(*new Implementation(ctx, useOptional, splitPrepositions))
 {
 }
@@ -512,7 +512,7 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   SmallVector<Identifier, 2> components;
   
   for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i) {
-    if (i > 0 || !SplitPrepositions) {
+    if (i > 0 || SplitPrepositions == SelectorSplitKind::None) {
       components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
       continue;
     }
@@ -602,6 +602,7 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
   unsigned selectorEnd = selector.size();
   unsigned wordStart = selector.size();
   unsigned wordEnd = wordStart;
+  bool splitBefore = SplitPrepositions == SelectorSplitKind::BeforePreposition;
   for (;;) {
     // Skip over any lowercase letters.
     while (wordStart > 0 && clang::isLowercase(selector[wordStart-1]))
@@ -618,7 +619,9 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
     // If this word is a preposition, and it isn't the last word, split here.
     if (wordEnd != selectorEnd &&
         isPreposition(selector.substr(wordStart, wordEnd - wordStart))) {
-      return splitSelectorPieceAt(selector, wordStart, buffer);
+      return splitSelectorPieceAt(selector, 
+                                  splitBefore ? wordStart : wordEnd, 
+                                  buffer);
     }
 
     // Look for the next word.

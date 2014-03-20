@@ -533,7 +533,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableObjCOptional = Args.hasArg(OPT_enable_objc_optional);
-  Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
+
+  if (const Arg *A = Args.getLastArg(OPT_split_objc_selectors_before,
+                                     OPT_split_objc_selectors_after)) {
+    if (A->getOption().matches(OPT_split_objc_selectors_before))
+      Opts.SplitPrepositions = SelectorSplitKind::BeforePreposition;
+    else
+      Opts.SplitPrepositions = SelectorSplitKind::AfterPreposition;
+  }
 
   return false;
 }

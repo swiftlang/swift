@@ -166,7 +166,8 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, bool enableOptional, bool splitPrepositions)
+  Implementation(ASTContext &ctx, bool enableOptional, 
+                 SelectorSplitKind splitPrepositions)
     : SwiftContext(ctx), EnableOptional(enableOptional),
       SplitPrepositions(splitPrepositions) { }
 
@@ -178,7 +179,7 @@ public:
   ASTContext &SwiftContext;
 
   const bool EnableOptional;
-  const bool SplitPrepositions;
+  const SelectorSplitKind SplitPrepositions;
 
 private:
   /// \brief A count of the number of load module operations.

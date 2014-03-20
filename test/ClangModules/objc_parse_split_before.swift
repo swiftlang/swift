@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-darwin13 -split-objc-selectors %s -verify
+// RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-darwin13 -split-objc-selectors-before %s -verify
 // RUN: ls -lR %t/clang-module-cache | grep ObjectiveC.pcm
 
 import AppKit
@@ -37,6 +37,9 @@ func instanceMethods(b: B) {
   // Renaming of redundant parameters.
   b.performMultiply(withValue:1, value:2)
   
+  // Splitting does not split a preposition at the end
+  b.moveFor(5)
+
   // Both class and instance methods exist.
   b.description()
   b.instanceTakesObjectClassTakesFloat(b)
@@ -126,14 +129,12 @@ func newConstruction(a: A, aproxy: AProxy) {
   b = B(forWorldDomination:())
   b = B(17, andDouble : 3.14159)
 
-  // FIXME: 'new' being a keyword causes problems here.
-  b = B.new(withA:a) // expected-error{{expected member name following '.'}}
+  b = B.`new`(withA:a)
   B.alloc()._initFoo()
   b.notAnInit()
 
   // init methods are not imported by themselves.
-  // FIXME: They're currently getting imported.
-  b.initWithInt(17)
+  b.initWithInt(17) // expected-error{{'B' does not have a member named 'initWithInt'}}
 
   // init methods on non-NSObject-rooted classes
   AProxy(5)
