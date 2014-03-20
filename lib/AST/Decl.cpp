@@ -518,6 +518,18 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
+bool PatternBindingDecl::hasStorage() const {
+  // Walk the pattern, to check to see if any of the VarDecls included in it
+  // have storage.
+  bool HasStorage = false;
+  getPattern()->forEachVariable([&](VarDecl *VD) {
+    if (VD->hasStorage())
+      HasStorage = true;
+  });
+
+  return HasStorage;
+}
+
 SourceLoc TopLevelCodeDecl::getStartLoc() const {
   return Body->getStartLoc();
 }

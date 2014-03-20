@@ -1363,9 +1363,9 @@ public:
 /// this contains the pattern "(a, b)" and the intializer "foo()".  The same
 /// applies to simpler declarations like "var a = foo()".
 class PatternBindingDecl : public Decl {
-  SourceLoc StaticLoc; ///< Location of the 'static' keyword, if present.
-  SourceLoc VarLoc; ///< Location of the 'var' keyword.
-  Pattern *Pat; ///< The pattern this decl binds.
+  SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
+  SourceLoc VarLoc;    ///< Location of the 'var' keyword.
+  Pattern *Pat;        ///< The pattern this decl binds.
 
   /// The initializer, and whether it's been type-checked already.
   llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
@@ -1407,7 +1407,7 @@ public:
   }
 
   /// Does this binding declare something that requires storage?
-  bool hasStorage() const { return PatternBindingDeclBits.HasStorage; }
+  bool hasStorage() const;
   void setHasStorage(bool S = true) { PatternBindingDeclBits.HasStorage = S; }
   
   /// Does this binding appear in an 'if' or 'while' condition?

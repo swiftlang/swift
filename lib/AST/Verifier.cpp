@@ -1043,23 +1043,6 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
-      // Verify that a binding without storage declares a simple
-      // variable without storage.
-      if (!binding->hasStorage()) {
-        auto pattern = binding->getPattern();
-        if (auto typed = dyn_cast<TypedPattern>(pattern))
-          pattern = typed->getSubPattern();
-        auto named = dyn_cast<NamedPattern>(pattern);
-        if (!named) {
-          Out << "Unstored PatternBindingDecl with a non-simple pattern";
-          abort();
-        } else if (named->getDecl()->hasStorage()) {
-          Out << "Unstored PatternBindingDecl declares variable with storage";
-          abort();
-        }
-      } else {
-        // TODO: verify that none of the bound variables has storage.
-      }
     }
 
     void verifyChecked(VarDecl *var) {
