@@ -407,10 +407,13 @@ static TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
     for (auto A : CBI->getFalseArgs())
       FalseArgs.push_back(A);
 
-    if (Dest == CBI->getTrueBB())
+    if (Dest == CBI->getTrueBB()) {
       TrueArgs.push_back(Val);
-    else
+      assert(TrueArgs.size() == Dest->getNumBBArg());
+    } else {
       FalseArgs.push_back(Val);
+      assert(FalseArgs.size() == Dest->getNumBBArg());
+    }
 
     return Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
                                     CBI->getTrueBB(), TrueArgs,
@@ -426,6 +429,7 @@ static TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
       Args.push_back(A);
 
     Args.push_back(Val);
+    assert(Args.size() == Dest->getNumBBArg());
     return Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
   }
 
@@ -488,24 +492,14 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     NumInstRemoved++;
   } // End of LoadInst loop.
 
-  // Now that all of the loads are fixed we can fix the Branches that point
-  // to the blocks with the added arguments. We keep a list of the fixed
-  // predecessors.
-  BlockSet FixedPreds;
+  // Now that all of the loads are fixed we can fix the branches that point
+  // to the blocks with the added arguments.
 
   // For each Block with a new Phi argument:
   for (auto Block : PhiBlocks) {
-
-    // For each predecessor block.
-    SmallVector<SILBasicBlock *, 2> Preds(Block->pred_begin(),
-                                          Block->pred_end());
-
-    for (auto PBB : Preds) {
+    // Fix all predecessors.
+    for (auto PBB : Block->getPreds()) {
       assert(PBB && "Invalid block!");
-      // Handle every branch only once.
-      if (!FixedPreds.insert(PBB).second)
-        continue;
-
       fixPhiPredBlock(PhiBlocks, Block, PBB);
     }
   }
