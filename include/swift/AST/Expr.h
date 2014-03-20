@@ -57,6 +57,38 @@ enum class ExprKind : uint8_t {
 #include "swift/AST/ExprNodes.def"
 };
   
+/// Discriminates the different kinds of checked cast supported.
+enum class CheckedCastKind : unsigned {
+  /// The kind has not been determined yet.
+  Unresolved,
+
+  /// Valid resolved kinds start here.
+  First_Resolved,
+
+  /// The requested cast is an implicit conversion, so this is a coercion.
+  Coercion = First_Resolved,
+  /// A cast from a class to one of its subclasses.
+  Downcast,
+  /// A cast from a class to a type parameter constrained by that class as a
+  /// superclass.
+  SuperToArchetype,
+  /// A cast from a type parameter to another type parameter.
+  ArchetypeToArchetype,
+  /// A cast from a type parameter to a concrete type.
+  ArchetypeToConcrete,
+  /// A cast from an existential type to a type parameter.
+  ExistentialToArchetype,
+  /// A cast from an existential type to a concrete type.
+  ExistentialToConcrete,
+  /// A cast from a concrete type to a type parameter.
+  ConcreteToArchetype,
+  /// A cast from a concrete type to an existential type it is not statically
+  /// known to conform to.
+  ConcreteToUnrelatedExistential,
+  
+  Last_CheckedCastKind = ConcreteToUnrelatedExistential,
+};
+  
 /// Expr - Base class for all expressions in swift.
 class alignas(8) Expr {
   Expr(const Expr&) = delete;
@@ -163,7 +195,19 @@ class alignas(8) Expr {
   };
   enum { NumBindOptionalExprBits = NumExprBits + 16 };
   static_assert(NumBindOptionalExprBits <= 32, "fits in an unsigned");
-
+  
+  enum { NumCheckedCastKindBits = 4 };
+  class CheckedCastExprBitfields {
+    friend class CheckedCastExpr;
+    unsigned : NumExprBits;
+    unsigned CastKind : NumCheckedCastKindBits;
+  };
+  enum { NumCheckedCastExprBits = NumExprBits + 4 };
+  static_assert(NumCheckedCastExprBits <= 32, "fits in an unsigned");
+  static_assert(unsigned(CheckedCastKind::Last_CheckedCastKind)
+                  < (1 << NumCheckedCastKindBits),
+                "unable to fit a CheckedCastKind in the given number of bits");
+  
 protected:
   union {
     ExprBitfields ExprBits;
@@ -177,6 +221,7 @@ protected:
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
+    CheckedCastExprBitfields CheckedCastExprBits;
   };
 
 private:
@@ -2687,57 +2732,31 @@ public:
   }
 };
 
-/// Discriminates the different kinds of checked cast supported.
-enum class CheckedCastKind {
-  /// The kind has not been determined yet.
-  Unresolved,
-
-  /// Valid resolved kinds start here.
-  First_Resolved,
-
-  /// The requested cast is an implicit conversion, so this is a coercion.
-  Coercion = First_Resolved,
-  /// A cast from a class to one of its subclasses.
-  Downcast,
-  /// A cast from a class to a type parameter constrained by that class as a
-  /// superclass.
-  SuperToArchetype,
-  /// A cast from a type parameter to another type parameter.
-  ArchetypeToArchetype,
-  /// A cast from a type parameter to a concrete type.
-  ArchetypeToConcrete,
-  /// A cast from an existential type to a type parameter.
-  ExistentialToArchetype,
-  /// A cast from an existential type to a concrete type.
-  ExistentialToConcrete,
-  /// A cast from a concrete type to a type parameter.
-  ConcreteToArchetype,
-  /// A cast from a concrete type to an existential type it is not statically
-  /// known to conform to.
-  ConcreteToUnrelatedExistential,
-};
-
 /// Return a string representation of a CheckedCastKind.
 StringRef getCheckedCastKindName(CheckedCastKind kind);
   
 /// \brief Abstract base class for checked casts 'as' and 'is'. These represent
 /// casts that can dynamically fail.
 class CheckedCastExpr : public ExplicitCastExpr {
-  CheckedCastKind CastKind;
 public:
   CheckedCastExpr(ExprKind kind,
                   Expr *sub, SourceLoc asLoc, TypeLoc castTy, Type resultTy)
-    : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy),
-      CastKind(CheckedCastKind::Unresolved)
-  {}
+    : ExplicitCastExpr(kind, sub, asLoc, castTy, resultTy)
+  {
+    CheckedCastExprBits.CastKind = unsigned(CheckedCastKind::Unresolved);
+  }
   
   /// Return the semantic kind of cast performed.
-  CheckedCastKind getCastKind() const { return CastKind; }
-  void setCastKind(CheckedCastKind kind) { CastKind = kind; }
+  CheckedCastKind getCastKind() const {
+    return CheckedCastKind(CheckedCastExprBits.CastKind);
+  }
+  void setCastKind(CheckedCastKind kind) {
+    CheckedCastExprBits.CastKind = unsigned(kind);
+  }
   
   /// True if the cast has been type-checked and its kind has been set.
   bool isResolved() const {
-    return CastKind >= CheckedCastKind::First_Resolved;
+    return getCastKind() >= CheckedCastKind::First_Resolved;
   }
   
   static bool classof(const Expr *E) {
