@@ -27,7 +27,7 @@ import gizmo
 // --       generic parameter count, witness table counts
 // CHECK:   i64 1, i64 0
 // CHECK: }
-// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}}* } {
+// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}} i64 } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_ROOTGENERIC:@fill_generic_metadata[0-9]*]],
 // --       nominal type descriptor
@@ -78,7 +78,7 @@ import gizmo
 // CHECK:   i64 7
 // CHECK: }
 
-// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } {
+// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}} i64 } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_GENERICINHERITSGENERIC:@fill_generic_metadata[0-9]*]],
 // --       RootGeneric vtable

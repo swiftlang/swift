@@ -1,8 +1,8 @@
 // RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
 
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[C:%C7unowned1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[UNKNOWN:%objc_object]] = type opaque
 // CHECK: [[A:%V7unowned1A]] = type <{ [[C]]* }>
 
