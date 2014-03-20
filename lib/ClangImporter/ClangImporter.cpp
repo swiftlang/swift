@@ -607,12 +607,21 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
   unsigned wordEnd = wordStart;
   for (;;) {
     // Skip over any lowercase letters.
-    while (wordStart > 0 && clang::isLowercase(selector[wordStart-1]))
+    bool anyLower = false;
+    while (wordStart > 0 && clang::isLowercase(selector[wordStart-1])) {
       --wordStart;
+      anyLower = true;
+    }
 
     // Skip over any non-lowercase letters.
-    while (wordStart > 0 && !clang::isLowercase(selector[wordStart-1]))
+    while (wordStart > 0 && !clang::isLowercase(selector[wordStart-1])) {
       --wordStart;
+
+      // If there were any lowercase letters, stop after the first
+      // uppercase letter we see.
+      if (anyLower)
+        break;
+    }
 
     // [wordStart, wordEnd) is the current word.
     if (wordStart == 0)

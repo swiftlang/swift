@@ -15,6 +15,7 @@
 - (instancetype)initWithURL:(NSString*)url;
 
 - (void)copyDocumentFromURL:(NSURL*)fromURL toURL:(NSURL*)toURL;
+- (void)scaleXBy:(NSInteger)value;
 @end
 
 @interface NSAwesomeDocument : NSDocument
