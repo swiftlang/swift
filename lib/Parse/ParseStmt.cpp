@@ -587,7 +587,6 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
                                                  StaticSpellingKind::None,
                                                  VarLoc, Pattern.get(),
                                                  Init,
-                                                 /*hasStorage*/ true,
                                                  /*isConditional*/ true,
                                                  /*parent*/ CurDeclContext);
     

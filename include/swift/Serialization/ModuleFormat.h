@@ -703,8 +703,7 @@ namespace decls_block {
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
     BCFixed<1>,  // static?
-    StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCFixed<1>   // storage?
+    StaticSpellingKindField // spelling of 'static' or 'class'
     // The pattern trails the record.
   >;
 

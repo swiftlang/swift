@@ -1415,7 +1415,6 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
                                                StaticSpellingKind::None,
                                                SourceLoc(),
                                                tmpPattern, OldValueExpr,
-                                               /*storage*/ true,
                                                /*conditional*/ false, Set);
     tmpPBD->setImplicit();
     SetterBody.push_back(tmpPBD);

@@ -1226,8 +1226,7 @@ void Serializer::writeDecl(const Decl *D) {
     PatternBindingLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addDeclRef(DC), binding->isImplicit(),
         binding->isStatic(),
-        uint8_t(getStableStaticSpelling(binding->getStaticSpelling())),
-        binding->hasStorage());
+        uint8_t(getStableStaticSpelling(binding->getStaticSpelling())));
 
     writePattern(binding->getPattern());
     // Ignore initializer; external clients don't need to know about it.

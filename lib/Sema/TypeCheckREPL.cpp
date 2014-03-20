@@ -256,7 +256,6 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
     addToBody(new (Context) PatternBindingDecl(SourceLoc(),
                                                StaticSpellingKind::None,
                                                Loc, pattern, init,
-                                               /*storage*/ true,
                                                /*conditional*/ false,
                                                DC));
   }
@@ -659,7 +658,6 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        StaticSpellingKind::None,
                                        E->getStartLoc(), metavarPat, E,
-                                       /*storage*/ true,
                                        /*conditional*/ false,
                                        &SF);
   SF.Decls.push_back(metavarBinding);
@@ -722,8 +720,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     = new (Context) PatternBindingDecl(SourceLoc(),
                                        StaticSpellingKind::None,
                                        PBD->getStartLoc(), metavarPat,
-                                       PBD->getInit(), /*storage*/ true,
-                                       /*conditional*/ false,
+                                       PBD->getInit(), /*conditional*/ false,
                                        &SF);
 
   auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),

@@ -1844,13 +1844,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit;
     bool isStatic;
     uint8_t RawStaticSpelling;
-    bool hasStorage;
 
     decls_block::PatternBindingLayout::readRecord(scratch, contextID,
                                                   isImplicit,
                                                   isStatic,
-                                                  RawStaticSpelling,
-                                                  hasStorage);
+                                                  RawStaticSpelling);
     Pattern *pattern = maybeReadPattern();
     assert(pattern);
 
@@ -1863,7 +1861,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto binding = new (ctx) PatternBindingDecl(
         SourceLoc(), StaticSpelling.getValue(), SourceLoc(), pattern,
         /*init=*/nullptr,
-        /*storage=*/hasStorage,
         /*conditional=*/false, getDeclContext(contextID));
     declOrOffset = binding;
 

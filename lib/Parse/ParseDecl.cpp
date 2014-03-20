@@ -1896,7 +1896,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   } Bindings(*this);
 
   bool HasGetSet = false;
-  bool hasStorage = true;
   ParserStatus Status;
 
   do {
@@ -1932,7 +1931,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // In the normal case, just add PatternBindingDecls to our DeclContext.
     auto PBD = new (Context) PatternBindingDecl(
-        StaticLoc, StaticSpelling, VarLoc, pattern.get(), nullptr, hasStorage,
+        StaticLoc, StaticSpelling, VarLoc, pattern.get(), nullptr,
         /*conditional*/ false, CurDeclContext);
 
     Bindings.All.push_back({PBD, topLevelDecl});
@@ -1995,7 +1994,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (Tok.is(tok::l_brace)) {
       if (auto *boundVar =
             parseDeclVarGetSet(pattern.get(), Flags, StaticLoc, Decls)) {
-        hasStorage = boundVar->hasStorage();
 
         if (PBD->getInit() && !boundVar->hasStorage()) {
           diagnose(pattern.get()->getLoc(), diag::getset_init)
@@ -2009,8 +2007,6 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
 
       HasGetSet = true;
     }
-
-    PBD->setHasStorage(hasStorage);
 
     // Add all parsed vardecls to this scope.
     addPatternVariablesToScope(pattern.get());

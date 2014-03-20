@@ -977,7 +977,6 @@ namespace {
         auto patternBinding = new (Impl.SwiftContext)
             PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), varPattern, nullptr,
-                               /*storage*/ true,
                                /*conditional*/ false, structDecl);
 
         // Create a constructor to initialize that value from a value of the
@@ -1056,7 +1055,6 @@ namespace {
         auto patternBinding = new (Impl.SwiftContext)
             PatternBindingDecl(SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), varPattern, nullptr,
-                               /*storage*/ true,
                                /*conditional*/ false, structDecl);
 
         // Create a default initializer to get the value with no options set.

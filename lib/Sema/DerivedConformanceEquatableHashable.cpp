@@ -320,7 +320,6 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                                               StaticSpellingKind::None,
                                               SourceLoc(),
                                               indexPat, nullptr,
-                                              /*storage*/ true,
                                               /*conditional*/ false,
                                               enumDecl);
   
@@ -369,9 +368,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
     returnStmt,
   };
   
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                bodyStmts,
-                                SourceLoc());
+  auto body = BraceStmt::create(C, SourceLoc(), bodyStmts, SourceLoc());
   hashValueDecl->setBody(body);
   
   // Compute the type of hashValue().
