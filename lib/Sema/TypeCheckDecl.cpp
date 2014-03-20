@@ -3146,6 +3146,17 @@ public:
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
+
+      // Make sure that an observing property isn't observing something
+      // read-only.  Observing properties look at change, read-only properties
+      // have nothing to observe!
+      if (overrideASD->getStorageKind() == VarDecl::Observing &&
+          !baseASD->isSettable(baseASD->getDeclContext())) {
+        TC.diagnose(overrideASD, diag::observing_readonly_property,
+                    overrideASD->getName());
+        TC.diagnose(baseASD, diag::property_override_here);
+        return true;
+      }
     }
     
     // Non-Objective-C declarations in extensions cannot override or
