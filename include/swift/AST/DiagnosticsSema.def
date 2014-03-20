@@ -188,6 +188,9 @@ ERROR(downcast_from_concrete_to_unrelated_archetype,sema_tcc,none,
       "cannot cast from concrete type %0 to type variable %1 for which it "
       "does not match constraints",
       (Type, Type))
+ERROR(downcast_to_more_optional,sema_tcc,none,
+      "cannot downcast from %0 to a more optional type %1",
+      (Type, Type))
 ERROR(pattern_in_expr,sema_tcc,none,
       "%0 cannot appear in an expression", (PatternKind))
 NOTE(note_call_to_operator,sema_tcc,none,

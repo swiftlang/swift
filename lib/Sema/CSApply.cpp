@@ -2133,14 +2133,12 @@ namespace {
 
       Type finalResultType = simplifyType(expr->getType());
 
-      // We can't really do the optional logic correctly at compile
-      // time when the cast involves an archetype/existential.
-      if (castKind != CheckedCastKind::Downcast) {
-        expr->setType(finalResultType);
-        return expr;
-      }
-
       // Handle optional operands or optional results.
+
+      // FIXME: some of this work needs to be delayed until runtime to
+      // properly account for archetypes dynamically being optional
+      // types.  For example, if we're casting T to NSView?, that
+      // should succeed if T=NSObject? and its value is actually nil.
 
       /// A helper function to plumb a stack of optional types.
       auto plumbOptionals = [](Type type, SmallVectorImpl<Type> &optionals) {

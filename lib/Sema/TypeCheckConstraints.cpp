@@ -1535,19 +1535,45 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceRange diagFromRange,
                                  SourceRange diagToRange,
                                  std::function<bool (Type)> convertToType) {
+  // If the from/to types are equivalent or implicitly convertible,
+  // this is a coercion.
+  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
+    return CheckedCastKind::Coercion;
+  }
+
   Type origFromType = fromType;
+  Type origToType = toType;
+
+  // Strip optional wrappers off of the destination type in sync with
+  // stripping them off the origin type.
+  while (auto toValueType = toType->getAnyOptionalObjectType()) {
+    // Complain if we're trying to increase optionality, e.g.
+    // casting an NSObject? to an NSString??.  That's not a subtype
+    // relationship.
+    auto fromValueType = fromType->getAnyOptionalObjectType();
+    if (!fromValueType) {
+      diagnose(diagLoc, diag::downcast_to_more_optional,
+               origFromType, origToType)
+        .highlight(diagFromRange)
+        .highlight(diagToRange);
+      return CheckedCastKind::Unresolved;
+    }
+
+    toType = toValueType;
+    fromType = fromValueType;
+  }
+
+  // Strip any remaining optional wrappers off the source type.
+  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
+    fromType = fromValueType;
+  }
+
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
   SmallVector<ProtocolDecl*, 2> toProtocols;
   bool toExistential = toType->isExistentialType(toProtocols);
   SmallVector<ProtocolDecl*, 2> fromProtocols;
   bool fromExistential = fromType->isExistentialType(fromProtocols);
-  
-  // If the from/to types are equivalent or implicitly convertible,
-  // this is a coercion.
-  if (fromType->isEqual(toType) || isConvertibleTo(fromType, toType, dc)) {
-    return CheckedCastKind::Coercion;
-  }
   
   // We can only downcast to an existential if the destination protocols are
   // objc and the source type is a class or an existential bounded by objc
@@ -1573,7 +1599,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     
   unsupported_existential_cast:
     diagnose(diagLoc, diag::downcast_to_non_objc_existential,
-             origFromType, toType)
+             origFromType, origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
     return CheckedCastKind::Unresolved;
@@ -1595,7 +1621,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     } else {
       diagnose(diagLoc,
                diag::downcast_from_existential_to_unrelated,
-               origFromType, toType)
+               origFromType, origToType)
         .highlight(diagFromRange)
         .highlight(diagToRange);
       return CheckedCastKind::Unresolved;
@@ -1607,7 +1633,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (!isSubstitutableFor(toType, fromType->castTo<ArchetypeType>(), dc)) {
       diagnose(diagLoc,
                diag::downcast_from_archetype_to_unrelated,
-               origFromType, toType)
+               origFromType, origToType)
         .highlight(diagFromRange)
         .highlight(diagToRange);
       return CheckedCastKind::Unresolved;
@@ -1633,7 +1659,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     
     diagnose(diagLoc,
              diag::downcast_from_concrete_to_unrelated_archetype,
-             origFromType, toType)
+             origFromType, origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
     return CheckedCastKind::Unresolved;
@@ -1648,7 +1674,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // The destination type must be a subtype of the source type.
   if (!isSubtypeOf(toType, fromType, dc)) {
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, toType)
+    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
     return CheckedCastKind::Unresolved;
