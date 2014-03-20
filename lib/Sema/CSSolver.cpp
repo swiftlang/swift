@@ -125,6 +125,18 @@ Solution ConstraintSystem::finalize(
     }
   }
 
+  // Remember all the disjunction choices we made.
+  for (auto &choice : DisjunctionChoices) {
+    // We shouldn't ever register disjunction choices multiple times,
+    // but saving and re-applying solutions can cause us to get
+    // multiple entries.  We should use an optimized PartialSolution
+    // structure for that use case, which would optimize a lot of
+    // stuff here.
+    assert(!solution.DisjunctionChoices.count(choice.first) ||
+           solution.DisjunctionChoices[choice.first] == choice.second);
+    solution.DisjunctionChoices.insert(choice);
+  }
+
   return std::move(solution);
 }
 
@@ -164,6 +176,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     ConstraintRestrictions.push_back(
         std::make_tuple(restriction.first.first, restriction.first.second,
                         restriction.second));
+  }
+
+  // Register the solution's disjunction choices.
+  for (auto &choice : solution.DisjunctionChoices) {
+    DisjunctionChoices.push_back(choice);
   }
 }
 
@@ -349,6 +366,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
+  numDisjunctionChoices = cs.DisjunctionChoices.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
 
@@ -392,6 +410,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any constraint restrictions.
   truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
+
+  // Remove any disjunction choices.
+  truncate(cs.DisjunctionChoices, numDisjunctionChoices);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1251,7 +1272,10 @@ bool ConstraintSystem::solveSimplified(
   // Try each of the constraints within the disjunction.
   bool anySolved = false;
   ++solverState->NumDisjunctions;
-  for (auto constraint : disjunction->getNestedConstraints()) {
+  auto constraints = disjunction->getNestedConstraints();
+  for (auto index : indices(constraints)) {
+    auto constraint = constraints[index];
+
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
     if (anySolved && shortCircuitDisjunctionAt(constraint))
@@ -1266,6 +1290,14 @@ bool ConstraintSystem::solveSimplified(
         << "(assuming ";
       constraint->print(log, &TC.Context.SourceMgr);
       log << '\n';
+    }
+
+    // If the disjunction requested us to, remember which choice we
+    // took for it.
+    if (disjunction->shouldRememberChoice()) {
+      auto locator = disjunction->getLocator();
+      assert(locator && "remembered disjunction doesn't have a locator?");
+      DisjunctionChoices.push_back({locator, index});
     }
 
     // Simplify this term in the disjunction.

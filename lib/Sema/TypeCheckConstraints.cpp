@@ -1421,6 +1421,13 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
                   << " to " << restriction.first.second
                   << " is " << getName(restriction.second) << "\n";
   }
+
+  out << "\nDisjunction choices:\n";
+  for (auto &choice : DisjunctionChoices) {
+    out.indent(2);
+    choice.first->dump(sm, out);
+    out << " is #" << choice.second << "\n";
+  }
 }
 
 void ConstraintSystem::dump() {
@@ -1501,6 +1508,15 @@ void ConstraintSystem::dump(raw_ostream &out) {
       }
     }
     out << "\n";
+  }
+
+  if (!DisjunctionChoices.empty()) {
+    out << "\nDisjunction choices:\n";
+    for (auto &choice : DisjunctionChoices) {
+      out.indent(2);
+      choice.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      out << " is #" << choice.second << "\n";
+    }
   }
 
   if (failedConstraint) {

@@ -162,6 +162,13 @@ enum class ConversionRestrictionKind {
 /// Return a string representation of a conversion restriction.
 llvm::StringRef getName(ConversionRestrictionKind kind);
 
+/// Should we record which choice was taken in this disjunction for
+/// the purposes of applying it later?
+enum RememberChoice_t : bool {
+  ForgetChoice = false,
+  RememberChoice = true
+};
+
 /// \brief A constraint between two type variables.
 class Constraint : public llvm::ilist_node<Constraint> {
   /// \brief The kind of constraint.
@@ -176,10 +183,14 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
 
+  /// Whether the choice of this disjunction should be recorded in the
+  /// solver state.
+  unsigned RememberChoice : 1;
+
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 30;
+  unsigned NumTypeVariables : 29;
 
   union {
     struct {
@@ -260,7 +271,9 @@ public:
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
                                        ArrayRef<Constraint *> constraints,
-                                       ConstraintLocator *locator);
+                                       ConstraintLocator *locator,
+                                       RememberChoice_t shouldRememberChoice
+                                         = ForgetChoice);
 
   /// \brief Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -278,6 +291,10 @@ public:
 
   /// Set whether this constraint is active or not.
   void setActive(bool active) { IsActive = active; }
+
+  /// Whether the solver should remember which choice was taken for
+  /// this constraint.
+  bool shouldRememberChoice() const { return RememberChoice; }
 
   /// Retrieve the set of type variables referenced by this constraint.
   ArrayRef<TypeVariableType *> getTypeVariables() const {

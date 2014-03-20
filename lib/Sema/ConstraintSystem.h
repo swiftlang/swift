@@ -712,6 +712,10 @@ public:
   llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
     ConstraintRestrictions;
 
+  /// The set of disjunction choices used to arrive at this solution,
+  /// which informs constraint application.
+  llvm::SmallDenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
+
   /// \brief Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(TypeChecker &tc, Type type) const;
@@ -982,6 +986,11 @@ private:
   SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
       ConstraintRestrictions;
 
+  /// \brief The set of remembered disjunction choices used to reach
+  /// the current constraint system.
+  SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
+      DisjunctionChoices;
+
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList ActiveConstraints;
@@ -1073,6 +1082,9 @@ public:
 
     /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
+
+    /// \brief The length of \c DisjunctionChoices.
+    unsigned numDisjunctionChoices;
 
     /// The previous score.
     Score PreviousScore;

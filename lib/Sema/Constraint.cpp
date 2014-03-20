@@ -28,8 +28,8 @@ using namespace constraints;
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        ConstraintLocator *locator, 
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), HasRestriction(false), IsActive(false), 
-    NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator) 
+  : Kind(kind), HasRestriction(false), IsActive(false), RememberChoice(false),
+    NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator)
 {
   assert(kind == ConstraintKind::Conjunction ||
          kind == ConstraintKind::Disjunction);
@@ -39,9 +39,9 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
                        DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(Kind), HasRestriction(false), IsActive(false), 
-    NumTypeVariables(typeVars.size()), Types { First, Second, Member }, 
-    Locator(locator)
+  : Kind(Kind), HasRestriction(false), IsActive(false), RememberChoice(false),
+    NumTypeVariables(typeVars.size()),
+    Types { First, Second, Member }, Locator(locator)
 {
   switch (Kind) {
   case ConstraintKind::Bind:
@@ -91,9 +91,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 Constraint::Constraint(Type type, OverloadChoice choice, 
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(ConstraintKind::BindOverload), HasRestriction(false),
-    IsActive(false), NumTypeVariables(typeVars.size()), 
-    Overload{type, choice}, Locator(locator) 
+  : Kind(ConstraintKind::BindOverload),
+    HasRestriction(false), IsActive(false), RememberChoice(false),
+    NumTypeVariables(typeVars.size()), Overload{type, choice},
+    Locator(locator) 
 { 
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -102,8 +103,9 @@ Constraint::Constraint(ConstraintKind kind,
                        ConversionRestrictionKind restriction,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-    : Kind(kind), Restriction(restriction), HasRestriction(true),
-      IsActive(false), NumTypeVariables(typeVars.size()), 
+    : Kind(kind), Restriction(restriction),
+      HasRestriction(true), IsActive(false), RememberChoice(false),
+      NumTypeVariables(typeVars.size()), 
       Types{ first, second, Identifier() }, Locator(locator)
 {
   assert(!first.isNull());
@@ -122,10 +124,13 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   if (Kind == ConstraintKind::Conjunction ||
       Kind == ConstraintKind::Disjunction) {
     bool isConjunction = (Kind == ConstraintKind::Conjunction);
-    if (isConjunction)
+    if (isConjunction) {
       Out << "conjunction";
-    else
+    } else {
       Out << "disjunction";
+      if (shouldRememberChoice())
+        Out << " (remembered)";
+    }
     if (Locator) {
       Out << " [[";
       Locator->dump(sm, Out);
@@ -439,7 +444,8 @@ Constraint *Constraint::createConjunction(ConstraintSystem &cs,
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
                                           ArrayRef<Constraint *> constraints,
-                                          ConstraintLocator *locator) {
+                                          ConstraintLocator *locator,
+                                          RememberChoice_t rememberChoice) {
   // Unwrap any disjunctions inside the disjunction constraint; we only allow
   // disjunctions at the top level.
   SmallVector<TypeVariableType *, 4> typeVars;
@@ -476,16 +482,20 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
   assert(!constraints.empty() && "Empty disjunction constraint");
 
   // If there is a single constraint, this isn't a disjunction at all.
-  if (constraints.size() == 1)
+  if (constraints.size() == 1) {
+    assert(!rememberChoice && "simplified an important disjunction?");
     return constraints.front();
+  }
 
   // Create the disjunction constraint.
   uniqueTypeVariables(typeVars);
   unsigned size = sizeof(Constraint) 
                 + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(ConstraintKind::Disjunction,
+  auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
                               cs.allocateCopy(constraints), locator, typeVars);
+  disjunction->RememberChoice = (bool) rememberChoice;
+  return disjunction;
 }
 
 void *Constraint::operator new(size_t bytes, ConstraintSystem& cs,
