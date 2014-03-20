@@ -1969,6 +1969,12 @@ public:
     friend bool operator!=(iterator lhs, iterator rhs) {
       return !(lhs == rhs);
     }
+    
+    using difference_type = ptrdiff_t;
+    using value_type = FilterDeclType *;
+    using pointer = FilterDeclType * const *;
+    using reference = FilterDeclType * const &;
+    using iterator_category = std::forward_iterator_tag;
   };
 
 private:

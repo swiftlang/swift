@@ -26,7 +26,7 @@ import Builtin
 // CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
 // CHECK:   void (i8*, i8*)* [[SINGLE_DYNAMIC_FILL_METADATA:@fill_generic_metadata[0-9]*]],
-// CHECK:   i32 176, i16 1, i16 8, [8 x i8*] zeroinitializer,
+// CHECK:   i32 184, i16 1, i16 8, [8 x i8*] zeroinitializer,
 // -- placeholder for vwtable pointer
 // CHECK:   i8* null,
 // -- address point
@@ -173,7 +173,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK:   [[ARG:%.*]] = load i64* [[ARGS_SLOT_ADDR]], align 8
 // CHECK:   store i64 [[ARG]], i64* [[METADATA_SLOT_ADDR]], align 8
 // -- store vwtable reference
-// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 6
+// CHECK:   [[VWTABLE_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 7
 // CHECK:   [[VWTABLE_VAL:%.*]] = ptrtoint i64* [[VWTABLE_ADDR]] to i64
 // CHECK:   [[VWTABLE_SLOT_ADDR:%.*]] = getelementptr inbounds i64* [[METADATA_ADDR]], i32 0
 // CHECK:   store i64 [[VWTABLE_VAL]], i64* [[VWTABLE_SLOT_ADDR]], align 8
