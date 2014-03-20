@@ -30,6 +30,23 @@
        .B(1) where isBar():
     ...
   }
+  
+* Observing properties can now @override properties in a base class, so you can
+  observe changes that happen to them.
+
+     class MyAwesomeView : SomeBasicView {
+      @override
+      var enabled : Bool {
+        didSet {
+          println("Something changed")
+        }
+      }
+      ...
+    }
+    
+  Observing properties still invoke the base class getter/setter (or storage)
+  when accessed.
+
 
 2014-03-19
 ----------

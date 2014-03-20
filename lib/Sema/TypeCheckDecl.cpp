@@ -1211,6 +1211,63 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
 }
 
 
+/// Load the value of VD.  If VD is an @override of another value, we call the
+/// superclass getter.  Otherwise, we do a direct load of the value.
+static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
+                                                      VarDecl *SelfDecl) {
+  auto &Ctx = VD->getASTContext();
+  if (!SelfDecl) {
+    // Non-member observing accessors just directly load the variable.
+    // Create (return (decl_ref_expr(VD)))
+    return new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                 /*direct ivar*/true);
+  }
+  
+  if (!VD->getOverriddenDecl()) {
+    // For a non-overridden getter, just access the storage.  Create:
+    // (return (member_ref_expr(decl_ref_expr(self), VD)))
+    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
+    return new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
+                                   /*implicit*/true,/*direct ivar*/true);
+  }
+
+  // For an override, chain up to super.  Create:
+  // (unresolved_dot_expr field 'declname'
+  //   (super_ref_expr))
+  auto *SRE = new (Ctx) SuperRefExpr(SelfDecl, SourceLoc(), /*implicit*/true);
+  return new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
+                                     SourceLoc(), /*implicit*/true);
+}
+
+/// Store 'Val' to 'VD'.  If VD is an @override of another value, we call the
+/// superclass setter.  Otherwise, we do a direct store of the value.
+static Expr *createPropertyStoreOrCallSuperclassSetter(Expr *Val,
+                                                       VarDecl *VD,
+                                                       VarDecl *SelfDecl) {
+  auto &Ctx = VD->getASTContext();
+
+  // Create:
+  //   (assign (decl_ref_expr(VD)), decl_ref_expr(value))
+  // or:
+  //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
+  Expr *Dest;
+  if (!SelfDecl) {
+    Dest = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
+                                 /*direct ivar*/true);
+  } else if (VD->getOverriddenDecl() == nullptr) {
+    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
+    Dest = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
+                                   /*implicit*/true, /*direct ivar*/true);
+  } else {
+    auto *SRE = new (Ctx) SuperRefExpr(SelfDecl, SourceLoc(), /*implicit*/true);
+    Dest = new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
+                                       SourceLoc(), /*implicit*/true);
+  }
+  return new (Ctx) AssignExpr(Dest, SourceLoc(), Val, true);
+
+}
+
+
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
 /// which is not an override of a base class property, it performs a a direct
 /// storage load.  For an override of a base member property, it chains up to
@@ -1218,22 +1275,13 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
 ///
 static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
   auto &Ctx = VD->getASTContext();
-  SourceLoc Loc = VD->getLoc();
-
-  Expr *GetResult;
-  if (VarDecl *SelfDecl = Get->getImplicitSelfDecl()) {
-    // Create (return (member_ref_expr(decl_ref_expr(self), VD)))
-    auto *DRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(),/*implicit*/true);
-    GetResult = new (Ctx) MemberRefExpr(DRE, SourceLoc(), VD, SourceLoc(),
-                                        /*implicit*/true,/*direct ivar*/true);
-  } else {
-    // Non-member observing accessors just directly load the variable.
-    // Create (return (decl_ref_expr(VD)))
-    GetResult = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                      /*direct ivar*/true);
-  }
+  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
+  
+  Expr *GetResult = createPropertyLoadOrCallSuperclassGetter(VD, SelfDecl);
   ASTNode Return = new (Ctx) ReturnStmt(SourceLoc(), GetResult,
                                         /*implicit*/true);
+
+  SourceLoc Loc = VD->getLoc();
   Get->setBody(BraceStmt::create(Ctx, Loc, Return, Loc));
 
   // Mark it transparent, there is no user benefit to this actually existing, we
@@ -1263,14 +1311,9 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
 
     VarDecl *SelfDecl = Set->getImplicitSelfDecl();
 
-    // Create (assign (member_ref_expr(decl_ref_expr(self), VD)),
-    //                decl_ref_expr(value))
-    auto *SelfDRE = new (Context) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
     auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
-    auto *MRE = new (Context) MemberRefExpr(SelfDRE, SourceLoc(), VD,
-                                            SourceLoc(), /*implicit*/true,
-                                            /*direct ivar*/true);
-    ASTNode Assign = new (Context) AssignExpr(MRE, SourceLoc(), ValueDRE, true);
+    ASTNode Assign = createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD,
+                                                               SelfDecl);
     Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
 
     // Mark it transparent, there is no user benefit to this actually existing.
@@ -1335,7 +1378,8 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   auto &Ctx = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
-  /// The getter is always trivial: just perform a (direct!) load of storage.
+  // The getter is always trivial: just perform a (direct!) load of storage, or
+  // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
   synthesizeTrivialGetter(Get, VD);
 
@@ -1353,20 +1397,14 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   // does a direct store, then invokes didSet with the oldValue.
   SmallVector<ASTNode, 6> SetterBody;
 
-  // If there is a didSet, it will take the old value.  Load it so that we have
-  // it.
+  // If there is a didSet, it will take the old value.  Load it into a temporary
+  // 'let' so we have it for later.
+  // TODO: check the body of didSet to only do this load (which may call the
+  // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
   if (VD->getDidSetFunc()) {
-    Expr *OldValueExpr;
-    if (SelfDecl) {
-      auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-      OldValueExpr = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD,
-                                             SourceLoc(),
-                                     /*implicit*/true, /*direct ivar*/true);
-    } else {
-      OldValueExpr = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                   /*direct ivar*/true);
-    }
+    Expr *OldValueExpr
+      = createPropertyLoadOrCallSuperclassGetter(VD, SelfDecl);
     
     OldValue = new (Ctx) VarDecl(/*static*/ false, /*isLet*/ true,
                                  SourceLoc(), Ctx.getIdentifier("tmp"),
@@ -1401,21 +1439,11 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
   }
   
-  // Create:
-  //   (assign (member_ref_expr(decl_ref_expr(self), VD)), decl_ref_expr(value))
-  // or:
-  //   (assign (decl_ref_expr(VD)), decl_ref_expr(value))
+  // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  Expr *Dest;
-  if (SelfDecl) {
-    auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
-    Dest = new (Ctx) MemberRefExpr(SelfDRE, SourceLoc(), VD, SourceLoc(),
-                                   /*implicit*/true, /*direct ivar*/true);
-  } else {
-    Dest = new (Ctx) DeclRefExpr(VD, SourceLoc(),/*implicit*/true,
-                                 /*direct ivar*/true);
-  }
-  SetterBody.push_back(new (Ctx) AssignExpr(Dest, SourceLoc(), ValueDRE, true));
+  ASTNode Assign = createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD,
+                                                             SelfDecl);
+  SetterBody.push_back(Assign);
   
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
@@ -3111,7 +3139,8 @@ public:
       }
 
       // Make sure that the overriding property doesn't have storage.
-      if (overrideASD->hasStorage()) {
+      if (overrideASD->hasStorage() &&
+          overrideASD->getStorageKind() != VarDecl::Observing) {
         TC.diagnose(overrideASD, diag::override_with_stored_property,
                     overrideASD->getName());
         TC.diagnose(baseASD, diag::property_override_here);

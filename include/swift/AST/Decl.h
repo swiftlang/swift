@@ -2786,8 +2786,11 @@ public:
     switch (getStorageKind()) {
     case Stored:
     case StoredWithTrivialAccessors:
-    case Observing:
       return true;
+    case Observing:
+      // Observing properties and stored properties with synthesized accessors
+      // have storage, unless they're @override'ing a value in a base class.
+      return getOverriddenDecl() == nullptr;
     case Computed:
       return false;
     }
