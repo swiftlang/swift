@@ -118,8 +118,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
 
-  // Pass through any -Xllvm flags.
+  // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
+  inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
 
   const std::string &moduleDocOutputPath =
       output->getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
