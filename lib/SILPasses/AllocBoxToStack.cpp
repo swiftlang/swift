@@ -143,13 +143,11 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
   // not, we can turn it into an alloc_stack.
-  SmallVector<SILInstruction*, 32> Users;
-  if (canValueEscape(SILValue(ABI, 1), Users))
+  if (canValueEscape(SILValue(ABI, 1)))
     return false;
 
   // Scan all of the uses of the retain count value, collecting all the releases
   // and validating that we don't have an unexpected user.
-  SmallVector<SILInstruction*, 4> Releases;
   for (auto UI : SILValue(ABI, 0).getUses()) {
     auto *User = UI->getUser();
 
@@ -158,11 +156,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
 
     // Release doesn't either, but we want to keep track of where this value
     // gets released.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
-      Releases.push_back(User);
-      Users.push_back(User);
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User))
       continue;
-    }
 
     // Otherwise, this looks like it escapes.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"

@@ -230,15 +230,13 @@ static bool useCaptured(Operand *UI) {
 }
 
 bool
-swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
+swift::canValueEscape(SILValue V) {
   for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
 
     // These instructions do not cause the address to escape.
-    if (!useCaptured(UI)) {
-      Users.push_back(User);
+    if (!useCaptured(UI))
       continue;
-    }
 
     // These instructions only cause the value to escape if they are used in
     // a way that escapes.  Recursively check that the uses of the instruction
@@ -247,8 +245,7 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
         isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
         isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
         isa<PointerToAddressInst>(User)) {
-      Users.push_back(User);
-      if (canValueEscape(User, Users))
+      if (canValueEscape(User))
         return true;
       continue;
     }
@@ -258,7 +255,6 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       if (apply->getSubstCalleeType()
           ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect()) {
-        Users.push_back(User);
         continue;
       }
     }
@@ -272,8 +268,7 @@ swift::canValueEscape(SILValue V, SmallVectorImpl<SILInstruction*> &Users) {
         ->getInterfaceParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
-        Users.push_back(User);
-        if (canValueEscape(User, Users))
+        if (canValueEscape(User))
           return true;
         continue;
       }
