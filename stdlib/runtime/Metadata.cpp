@@ -1261,7 +1261,6 @@ struct OpaqueExistentialValueWitnesses {
   
   static void destroy(Container *value, const Metadata *self) {
     value->metadata->vw_destroyBuffer(value->getValueBuffer(self));
-    value->metadata->vw_deallocateBuffer(value->getValueBuffer(self));
   }
   
   static Container *initializeBufferWithCopy(ValueBuffer *dest,
