@@ -12,3 +12,5 @@
 Ansible *NSAnse(Ansible *x) {
   return x;
 }
+
+void hasNoPrototype();

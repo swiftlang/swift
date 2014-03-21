@@ -540,19 +540,24 @@ namespace {
 
   /// Conventions based on a C function type.
   class CFunctionTypeConventions : public Conventions {
-    const clang::FunctionProtoType *FnType;
+    const clang::FunctionType *FnType;
+    
+    clang::QualType getParamType(unsigned i) const {
+      return FnType->castAs<clang::FunctionProtoType>()->getParamType(i);
+    }
+    
   public:
-    CFunctionTypeConventions(const clang::FunctionProtoType *type)
+    CFunctionTypeConventions(const clang::FunctionType *type)
       : FnType(type) {}
 
     ParameterConvention getIndirectParameter(unsigned index,
                                              CanType type) const override {
-      return getIndirectCParameterConvention(FnType->getParamType(index));
+      return getIndirectCParameterConvention(getParamType(index));
     }
 
     ParameterConvention getDirectParameter(unsigned index,
                                            CanType type) const override {
-      return getDirectCParameterConvention(FnType->getParamType(index));
+      return getDirectCParameterConvention(getParamType(index));
     }
 
     ParameterConvention getCallee() const override {
@@ -583,7 +588,7 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-    auto fnType = func->getType()->castAs<clang::FunctionProtoType>();
+    auto fnType = func->getType()->castAs<clang::FunctionType>();
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo,
                               CFunctionTypeConventions(fnType));
