@@ -854,6 +854,10 @@ public:
   bool canParseTypeArray();
   bool canParseGenericArguments();
 
+  bool canParsePatternTuple();
+  bool canParsePatternAtom();
+  bool canParsePattern();
+
   //===--------------------------------------------------------------------===//
   // Expression Parsing
   ParserResult<Expr> parseExpr(Diag<> ID) {

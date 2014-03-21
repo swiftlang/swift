@@ -855,16 +855,10 @@ bool Parser::canParseTypeTupleBody() {
     } while (consumeIf(tok::comma));
   }
   
-  if (Tok.isEllipsis()) {
+  if (Tok.isEllipsis())
     consumeToken();
-  }
-  
-  if (Tok.is(tok::r_paren)) {
-    consumeToken();
-    return true;
-  } else {
-    return false;
-  }
+
+  return consumeIf(tok::r_paren);
 }
 
 

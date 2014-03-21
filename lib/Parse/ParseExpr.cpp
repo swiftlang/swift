@@ -1383,8 +1383,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     BacktrackingScope backtrack(*this);
 
     // Parse the pattern-tuple.
-    consumeToken();
-    if (!canParseTypeTupleBody())
+    if (!canParsePatternTuple())
       return false;
 
     // Parse the func-signature-result, if present.

@@ -974,3 +974,65 @@ ParserResult<Pattern> Parser::parseMatchingPatternIs() {
 bool Parser::isOnlyStartOfMatchingPattern() {
   return Tok.is(tok::kw_var) || Tok.is(tok::kw_let) || Tok.is(tok::kw_is);
 }
+
+bool Parser::canParsePattern() {
+  switch (Tok.getKind()) {
+  case tok::kw_let:      ///   pattern ::= 'let' pattern
+  case tok::kw_var:      ///   pattern ::= 'var' pattern
+    consumeToken();
+    return canParsePattern();
+  default:
+    ///   pattern ::= pattern-atom
+    ///   pattern ::= pattern-atom ':' type
+    if (!canParsePatternAtom())
+      return false;
+
+    if (!consumeIf(tok::colon))
+      return true;
+    return canParseType();
+  }
+}
+
+bool Parser::canParsePatternAtom() {
+  switch (Tok.getKind()) {
+  case tok::l_paren: return canParsePatternTuple();
+  case tok::identifier:
+  case tok::kw__:
+    consumeToken();
+    return true;
+  default:
+    return false;
+  }
+}
+
+
+bool Parser::canParsePatternTuple() {
+  if (!consumeIf(tok::l_paren)) return false;
+
+  if (Tok.isNot(tok::r_paren)) {
+    do {
+      // The contextual inout marker is part of argument lists.
+      if (Tok.isContextualKeyword("inout"))
+        consumeToken(tok::identifier);
+
+      if (!canParsePattern()) return false;
+
+      // Parse default values. This aren't actually allowed, but we recover
+      // better if we skip over them.
+      if (consumeIf(tok::equal)) {
+        while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
+               Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
+               Tok.isNot(tok::comma) &&
+               !isStartOfDecl(Tok, peekToken())) {
+          skipSingle();
+        }
+      }
+
+    } while (consumeIf(tok::comma));
+  }
+
+  if (Tok.isEllipsis())
+    consumeToken();
+
+  return consumeIf(tok::r_paren);
+}
