@@ -196,7 +196,7 @@ __attribute__((noinline,used))
 static void *
 _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
 {
-  void *ptr = NULL;
+  AllocCacheEntry ptr = NULL;
   size_t sz;
   int r;
 
@@ -346,6 +346,7 @@ void swift::swift_dealloc(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   auto cur = static_cast<AllocCacheEntry>(ptr);
   AllocCacheEntry prev = getAllocCacheEntry(idx);
+  assert(cur != prev && "trivial double free!");
   cur->next = prev;
   setAllocCacheEntry(idx, cur);
 }
