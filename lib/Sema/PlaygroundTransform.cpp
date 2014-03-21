@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -36,6 +37,7 @@ class Instrumenter {
 private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
+  unsigned TmpNameIndex = 0;
 public:
   Instrumenter (ASTContext &C, DeclContext *DC) :
     Context(C), TypeCheckDC(DC) { }
@@ -85,11 +87,38 @@ public:
       swift::ASTNode &Element = Elements[EI];
       if (Expr *E = Element.dyn_cast<Expr*>()) {
         if (AssignExpr *AE = llvm::dyn_cast<AssignExpr>(E)) {
-          Expr *Log = logAssignExpr(AE);
+          std::pair<PatternBindingDecl *, VarDecl *> PV =
+            buildPatternAndVariable(AE->getSrc());
+          DeclRefExpr *DRE =
+            new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                      SourceLoc(),
+                                      true, // implicit
+                                      false, // uses direct property access
+                                      AE->getSrc()->getType());
+          AssignExpr *NAE = new (Context) AssignExpr(AE->getDest(),
+                                                     SourceLoc(),
+                                                     DRE,
+                                                     true); // implicit
+          AE->setImplicit(true);
+          Expr *Log = buildLoggerCall(
+            new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                      SourceLoc(),
+                                      true, // implicit
+                                      false, // uses direct property access
+                                      AE->getSrc()->getType()),
+            AE->getSrc()->getSourceRange());
+          Modified = true;
+          Elements[EI] = PV.first;
+          Elements.insert(Elements.begin() + (EI + 1), PV.second);
+          Elements.insert(Elements.begin() + (EI + 2), Log);
+          Elements.insert(Elements.begin() + (EI + 3), NAE);
+          EI += 3;
+        }
+        else {
+          Expr *Log = logExpr(E);
           if (Log) {
             Modified = true;
-            Elements.insert(Elements.begin() + (EI + 1), Log);
-            ++EI;
+            Elements[EI] = Log;
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
@@ -99,7 +128,14 @@ public:
           Elements[EI] = NS;
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
-        (void)D;
+        if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
+          Expr *Log = logVarDecl(VD);
+          if (Log) {
+            Modified = true;
+            Elements.insert(Elements.begin() + (EI + 1), Log);
+            ++EI;
+          }
+        }
       }
     }
 
@@ -113,26 +149,61 @@ public:
   }
 
   // log*() functions return a newly-created log expression to be inserted
-  // after the expression they're looking at.
-  Expr *logAssignExpr(AssignExpr *AE) {
-    Expr *Dest = AE->getDest();
-    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(Dest)) {
-      return buildLoggerCall(DRE->getDecl());
-    }
-    return nullptr;
+  // after or instead of the expression they're looking at.
+  Expr *logExpr(Expr *E) {
+    return buildLoggerCall(E, E->getSourceRange());
   }
 
-  Expr *buildLoggerCall(ValueDecl *VD) {
+  Expr *logVarDecl(VarDecl *VD) {
+    return buildLoggerCall(
+      new (Context) DeclRefExpr(ConcreteDeclRef(VD),
+                                SourceLoc(),
+                                true, // implicit
+                                false, // uses direct property access
+                                Type()),
+      VD->getSourceRange());
+  }
+
+  std::pair<PatternBindingDecl*, VarDecl*>
+    buildPatternAndVariable(Expr *InitExpr) {
+    char NameBuf[11] = { 0 };
+    snprintf(NameBuf, 11, "tmp%u", TmpNameIndex);
+    TmpNameIndex++;
+
+    VarDecl *VD = new (Context) VarDecl(false, // static
+                                        true, // let
+                                        SourceLoc(),
+                                        Context.getIdentifier(NameBuf),
+                                        InitExpr->getType(),
+                                        TypeCheckDC);
+
+    VD->setImplicit();
+
+    NamedPattern *NP = new (Context) NamedPattern(VD,
+                                                  true); // implicit
+
+    PatternBindingDecl *PBD =
+      new (Context) PatternBindingDecl(SourceLoc(),
+                                       StaticSpellingKind::None,
+                                       SourceLoc(),
+                                       NP,
+                                       InitExpr,
+                                       false, // is conditional
+                                       TypeCheckDC);
+
+    PBD->setImplicit();
+
+    return std::make_pair(PBD, VD);
+  }
+
+  Expr *buildLoggerCall(Expr *E, SourceRange SR) {
     Expr *Name = new (Context) StringLiteralExpr("", SourceRange());
     Expr *Header = new (Context) StringLiteralExpr("", SourceRange());
+    Name->setImplicit(true);
     Header->setImplicit(true);
 
     Expr *LoggerArgExprs[] = {
-        new (Context) DeclRefExpr(ConcreteDeclRef(VD),
-                                  SourceLoc(),
-                                  true, // implicit
-                                  false, // uses direct property access
-                                  Type()),
+        E,
         Name,
         Header
       };
@@ -157,8 +228,39 @@ public:
     Expr *LoggerCall = new (Context) CallExpr(LoggerRef, LoggerArgs, true,
                                               Type());
 
+    std::pair<unsigned, unsigned> StartLC =
+      Context.SourceMgr.getLineAndColumn(SR.Start);
+
+    std::pair<unsigned, unsigned> EndLC =
+      Context.SourceMgr.getLineAndColumn(SR.End);
+
+    const size_t buf_size = 8;
+
+    char *start_line_buf = (char*)Context.Allocate(buf_size, 1);
+    char *end_line_buf = (char*)Context.Allocate(buf_size, 1);
+    char *start_column_buf = (char*)Context.Allocate(buf_size, 1);
+    char *end_column_buf = (char*)Context.Allocate(buf_size, 1);
+
+    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first - 5);
+    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second - 1);
+    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first - 5);
+    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second - 1);
+
+    Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
+                                                       SourceLoc(), true);
+    Expr *EndLine = new (Context) IntegerLiteralExpr(end_line_buf,
+                                                     SourceLoc(), true);
+    Expr *StartColumn = new (Context) IntegerLiteralExpr(start_column_buf, 
+                                                         SourceLoc(), true);
+    Expr *EndColumn = new (Context) IntegerLiteralExpr(end_column_buf, 
+                                                       SourceLoc(), true);
+
     Expr *SendDataArgExprs[] = {
-        LoggerCall
+        LoggerCall,
+        StartLine,
+        EndLine,
+        StartColumn,
+        EndColumn
       };
 
     TupleExpr *SendDataArgs = new (Context) TupleExpr(
@@ -224,7 +326,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
       ASTContext &Context(SF.getASTContext());
 
       Module *LoggerModule = Context.getModule(
-        std::make_pair(Context.getIdentifier("PlaygroundLoggerLibrary"),
+        std::make_pair(Context.getIdentifier("PlaygroundLogger"),
                        SourceLoc()));
 
       Module *CommModule = Context.getModule(
