@@ -415,7 +415,7 @@ _swift_key_destructor(void *arg) {
     if (threadCache[i] == NULL) {
       continue;
     }
-    threadCacheTail[i] = globalCache[i];
+    threadCacheTail[i]->next = globalCache[i];
     globalCache[i] = threadCache[i];
   }
   r = pthread_rwlock_unlock(&globalLock);
