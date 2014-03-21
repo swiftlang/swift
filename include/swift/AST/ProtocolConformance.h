@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -529,7 +530,7 @@ public:
     // some crazy cases that also require major diagnostic work, where the
     // substitutions involve conformances of the same type to the same
     // protocol drawn from different imported modules.
-    ID.AddPointer(type.getPointer());
+    ID.AddPointer(type->getCanonicalType().getPointer());
     ID.AddPointer(genericConformance);
   }
 
@@ -622,7 +623,7 @@ public:
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
                       ProtocolConformance *inheritedConformance) {
-    ID.AddPointer(type.getPointer());
+    ID.AddPointer(type->getCanonicalType().getPointer());
     ID.AddPointer(inheritedConformance);
   }
 
