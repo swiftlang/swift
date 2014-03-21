@@ -355,7 +355,7 @@ class ParseContext:
         def posToLine(pos):
             return bisect(self.lineStarts, pos) - 1
             
-        for self.tokenKind, self.tokenText, m in baseTokens:
+        for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
             self.codeText = None
             
@@ -365,7 +365,7 @@ class ParseContext:
             if kind.endswith('Open'): # %{...}% and ${...} constructs
 
                 # Tokenize text that follows as Python up to an unmatched '}'
-                codeStart = m.end(kind)
+                codeStart = self.tokenMatch.end(kind)
                 self.codeStartLine = posToLine(codeStart)
 
                 closePos = tokenizePythonToUnmatchedCloseCurly(
@@ -387,14 +387,14 @@ class ParseContext:
 
             elif kind == 'atLines':
                 
-                self.codeStartLine = posToLine(m.start('atLines'))
-                codeStartPos = m.end('_indent')
-                indentation = m.group('_indent')
+                self.codeStartLine = posToLine(self.tokenMatch.start('atLines'))
+                codeStartPos = self.tokenMatch.end('_indent')
+                indentation = self.tokenMatch.group('_indent')
 
                 # Strip off the leading indentation and %-sign
                 sourceLines = re.split(
                     '^' + re.escape(indentation), 
-                    m.group('atLines')+'\n', 
+                    self.tokenMatch.group('atLines')+'\n', 
                     flags=re.MULTILINE)[1:]
 
                 if codeStartsWithDedentKeyword(sourceLines):
@@ -787,6 +787,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true', default=False, help='Run a self-test')
     parser.add_argument('--verbose-test', action='store_true', default=False, help='Run a verbose self-test')
     parser.add_argument('--dump', action='store_true', default=False, help='Dump the parsed template to stdout')
+    parser.add_argument('--line-prefix', default='//#line', help='Line marker prefix; empty => no line markers')
     
 
     args = parser.parse_args(sys.argv[1:])
