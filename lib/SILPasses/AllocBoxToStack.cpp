@@ -16,149 +16,129 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
 STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
-STATISTIC(NumEntryCycleBB, "Number of alloc_box's promotion disrupted due to "
-          "entry cycle");
 
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
-/// \brief Checks if the single entry single exit region starting at \p Entry
-/// and ending at \p Exit has cycles. This function returns True if there is
-/// a path between \p  Entry to itself without going through \p Exit.
-static bool regionHasCycles(SILBasicBlock *Entry, SILBasicBlock *Exit) {
-  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
-  llvm::SmallPtrSet<SILBasicBlock *, 16> VisitedBBSet;
+// Propagate liveness backwards from an initial set of blocks in our
+// LiveIn set.
+void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
+                       SILBasicBlock *DefBB) {
 
-  // Start the scan at the entry block.
-  Worklist.push_back(Entry);
+  // First populate a worklist of predecessors.
+  llvm::SmallVector<SILBasicBlock*, 64> Worklist;
+  for (auto *BB : LiveIn)
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
 
-  // For each BB in the worklist...
+  // Now propagate liveness backwards until we hit the alloc_box.
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
-    // Add the successors of the BB to the worklist...
-    for (auto &Succ : BB->getSuccs()) {
-      auto *BB = Succ.getBB();
+    // If it's already in the set, then we've already queued and/or
+    // processed the predecessors.
+    if (BB == DefBB || !LiveIn.insert(BB))
+      continue;
 
-      // If one of those successors is the entry block, we have a cycle.
-      if (BB == Entry) {
-        ++NumEntryCycleBB;
-        return true;
-      }
-
-      // If the successor is the exit block, skip it.
-      if (BB == Exit)
-        continue;
-
-      // Otherwise, if we have not visited the BB yet, add it to the worklist
-      // for processing.
-      if (VisitedBBSet.insert(BB))
-        Worklist.push_back(BB);
-    }
+    for (auto Pred : BB->getPreds())
+      Worklist.push_back(Pred);
   }
+}
 
-  // The entry block is not reachable from itself, we are safe.
+// Is any successor of BB in the LiveIn set?
+bool successorHasLiveIn(SILBasicBlock *BB,
+                        llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn) {
+  for (auto &Succ : BB->getSuccs())
+    if (LiveIn.count(Succ))
+      return true;
+
   return false;
 }
 
-/// getLastRelease - Determine if there is a single ReleaseInst or
-/// DeallocBoxInst that post-dominates all of the uses of the specified
-/// AllocBox.  If so, return it.  If not, return null.
-static SILInstruction *getLastRelease(AllocBoxInst *ABI,
-                                      SmallVectorImpl<SILInstruction*> &Users,
-                                    SmallVectorImpl<SILInstruction*> &Releases,
-                                      PostDominanceInfo *PDI) {
-  // If there are no releases, then the box is leaked.  Don't transform it. This
-  // can only happen in hand-written SIL code, not compiler generated code.
-  if (Releases.empty())
-    return nullptr;
-
-
-  // If there is a single release, it must be the last release.  The calling
-  // conventions used in SIL (at least in the case where the ABI doesn't escape)
-  // are such that the value is live until it is explicitly released: there are
-  // no calls in this case that pass ownership and release for us.
-  if (Releases.size() == 1)
-    return Releases.back();
-
-  // If there are multiple releases of the value, we only support the case where
-  // there is a single ultimate release that post-dominates all of the rest of
-  // them.
-
-  // Determine the most-post-dominating release by doing a linear scan over all
-  // of the releases to find one that post-dominates them all.  Because we don't
-  // want to do multiple scans of the block (which could be large) just keep
-  // track of whether there are multiple releases in the ultimate block we find.
-  bool MultipleReleasesInBlock = false;
-  SILInstruction *LastRelease = Releases[0];
-
-  for (unsigned i = 1, e = Releases.size(); i != e; ++i) {
-    SILInstruction *RI = Releases[i];
-
-    // If this release is in the same block as our candidate, keep track of the
-    // multiple release nature of that block, but don't try to determine an
-    // ordering between them yet.
-    if (RI->getParent() == LastRelease->getParent()) {
-      MultipleReleasesInBlock = true;
-      continue;
-    }
-
-    if (PDI->properlyDominates(RI->getParent(), LastRelease->getParent())) {
-      // RI post-dom's LastRelease, so it is our new LastRelease.
-      LastRelease = RI;
-      MultipleReleasesInBlock = false;
-    }
-  }
-
-  // Okay, we found the most-post-dominating release. We are currently checking
-  // for domination/post-domination but not control equivalence, a necessary
-  // condition for a single entry/single-exit region. This check ensures
-  // that we do not run into the issue by making sure that the allocbox is not
-  // reachable from itself.
-  if (regionHasCycles(ABI->getParent(), LastRelease->getParent()))
-    return nullptr;
-
-  // Make sure that the most-post-dominating release we have found postdom all
-  // of our uses. If the release does not postdom a use, it would be unsafe to
-  // perform the use.
-  for (auto *User : Users) {
-    if (User->getParent() == LastRelease->getParent())
-      continue;
-
-    if (!PDI->properlyDominates(LastRelease->getParent(), User->getParent()))
-      return nullptr;
-  }
-
-  // Okay, the LastRelease block postdoms all users.  If there are multiple
-  // releases in the block, make sure we're looking at the last one.
-  if (MultipleReleasesInBlock) {
-    for (auto MBBI = --LastRelease->getParent()->end(); ; --MBBI) {
-      auto *RI = dyn_cast<StrongReleaseInst>(MBBI);
-      if (RI == nullptr ||
-          RI->getOperand() != SILValue(ABI, 0)) {
-        assert(MBBI != LastRelease->getParent()->begin() &&
-               "Didn't find any release in this block?");
+// Walk backwards in BB looking for strong_release or dealloc_box of
+// the given value, and add it to Releases.
+void addLastRelease(SILValue V, SILBasicBlock *BB,
+                    llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
+    if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I)) {
+      if (I->getOperand(0) != V)
         continue;
-      }
-      LastRelease = RI;
-      break;
+
+      Releases.push_back(&*I);
+      return;
+    }
+    assert((!isa<StrongRetainInst>(*I) || I->getOperand(0) != V) &&
+           "Did not expect retain after final release/dealloc!");
+
+  }
+
+  llvm_unreachable("Did not find release/dealloc!");
+}
+
+// Find the final releases of the alloc_box along any given path.
+// These can include paths from a release back to the alloc_box in a
+// loop.
+void getFinalReleases(AllocBoxInst *ABI,
+                      llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+  llvm::SmallPtrSet<SILBasicBlock*, 16> LiveIn;
+  llvm::SmallPtrSet<SILBasicBlock*, 16> UseBlocks;
+
+  auto *DefBB = ABI->getParent();
+
+  auto seenRelease = false;
+  SILInstruction *OneRelease = nullptr;
+
+  // We'll treat this like a liveness problem where the alloc_box is
+  // the def. Each block that has a use of the owning pointer has the
+  // value live-in unless it is the block with the alloc_box.
+  for (auto UI : SILValue(ABI, 0).getUses()) {
+    auto *User = UI->getUser();
+    auto *BB = User->getParent();
+
+    if (BB != DefBB)
+      LiveIn.insert(BB);
+
+    // Also keep track of the blocks with uses.
+    UseBlocks.insert(BB);
+
+    // Try to speed up the trivial case of single release/dealloc.
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
+      if (!seenRelease)
+        OneRelease = User;
+      else
+        OneRelease = nullptr;
+
+      seenRelease = true;
     }
   }
 
-  return LastRelease;
+  // Only a single release/dealloc? We're done!
+  if (OneRelease) {
+    Releases.push_back(OneRelease);
+    return;
+  }
+
+  propagateLiveness(LiveIn, DefBB);
+
+  // Now examine each block we saw a use in. If it has no successors
+  // that are in LiveIn, then the last use in the block is the final
+  // release/dealloc.
+  for (auto *BB : UseBlocks)
+    if (!successorHasLiveIn(BB, LiveIn))
+      addLastRelease(SILValue(ABI, 0), BB, Releases);
 }
 
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
 /// alloc_stack.  On success, this updates the IR and returns true, but does not
 /// remove the alloc_box itself.
-static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
+static bool optimizeAllocBox(AllocBoxInst *ABI) {
 
   // Scan all of the uses of the alloc_box to see if any of them cause the
   // allocated memory to escape.  If so, we can't promote it to the stack.  If
@@ -192,29 +172,10 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
     return false;
   }
 
-
-  // Okay, the value doesn't escape.  Determine where the last release is.  This
-  // code only handles the case where there is a single "last release".  This
-  // should work for us, because we don't expect code duplication that can
-  // introduce different releases for different codepaths.  If this ends up
-  // mattering in the future, this can be generalized.
-  SILInstruction *LastRelease = getLastRelease(ABI, Users, Releases, PDI);
-
-  // FIXME: If there's no last release, we can't balance the alloc_stack.
-  if (!LastRelease)
-    return false;
-
-  auto &lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
-  if (LastRelease == nullptr && !lowering.isTrivial()) {
-    // If we can't tell where the last release is, we don't know where to insert
-    // the destroy_addr for this box.
-    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box: " << *ABI
-          << "    Cannot determine location of the last release!\n"
-          << *ABI->getParent()->getParent() << "\n");
-    return false;
-  }
-
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
+
+  llvm::SmallVector<SILInstruction*, 4> FinalReleases;
+  getFinalReleases(ABI, FinalReleases);
 
   // Okay, it looks like this value doesn't escape.  Promote it to an
   // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
@@ -225,12 +186,12 @@ static bool optimizeAllocBox(AllocBoxInst *ABI, PostDominanceInfo *PDI) {
   // Replace all uses of the pointer operand with the spiffy new AllocStack.
   SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());
 
-  // If we found a 'last release', insert a dealloc_stack instruction and a
-  // destroy_addr if its type is non-trivial.
-  if (LastRelease) {
+  auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
+
+  for (auto LastRelease : FinalReleases) {
     SILBuilder B2(LastRelease);
 
-    if (!lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
+    if (!Lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
       B2.emitDestroyAddr(CleanupLocation::getCleanupLocation(ABI->getLoc()),
                          ASI->getAddressResult());
 
@@ -258,15 +219,13 @@ namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
-    PostDominanceInfo *PDI = DA->getPostDomInfo(getFunction());
     bool Changed = false;
 
     for (auto &BB : *getFunction()) {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
         if (auto *ABI = dyn_cast<AllocBoxInst>(I))
-          if (optimizeAllocBox(ABI, PDI)) {
+          if (optimizeAllocBox(ABI)) {
             ++NumStackPromoted;
             // Carefully move iterator to avoid invalidation problems.
             ++I;

@@ -231,19 +231,16 @@ bb0(%0 : $Bool):
   // CHECK-NEXT: return
 }
 
-// Make sure that we do not attempt to optimize this since allocbox is
-// not smart enough yet to insert dealloc_stacks in the appropriate
-// places.
-//
-// rdar://15832873
+// Make sure that we can promote this box and dealloc_stack
+// on each path.
 //
 // CHECK-LABEL: sil @box_reachable_from_release_test
 // CHECK: bb1
-// CHECK: alloc_box
+// CHECK: alloc_stack
 // CHECK: bb2:
-// CHECK: strong_release
+// CHECK: dealloc_stack
 // CHECK: bb3:
-// CHECK: strong_release
+// CHECK: dealloc_stack
 sil @box_reachable_from_release_test : $@thin () -> () {
 bb0:
   br bb1
