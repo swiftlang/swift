@@ -221,12 +221,12 @@ would not inherit ``A``'s convenience initializers::
 
   The requirement that a subclass override all of the designated
   initializers of its superclass to enable initializer inheritance is
-  crucial to Swift's memory safety model. See `Initializer Inheritance
-  Model` for more information.
+  crucial to Swift's memory safety model. See `Initializer
+  Inheritance Model`_ for more information.
 
 Note that a subclass may have different designated initializers from
 its superclass. This can occur in a number of ways. For example, the
-subclass might override one of it's superclass's designated
+subclass might override one of its superclass's designated
 initializers with a convenience initializer::
 
   class YetAnotherB : A {
