@@ -199,6 +199,14 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);
+    
+    // If the cast was forced, add the ForceValueExpr here.
+    auto forceLoc = as->getForceLoc();
+    if (forceLoc.isValid()) {
+      as->setForceLoc(SourceLoc());
+      return new (TC.Context) ForceValueExpr(as, forceLoc);
+    }
+    
     return as;
   }
   

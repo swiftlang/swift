@@ -2685,7 +2685,7 @@ public:
 /// type, and "a" is the expression that will be converted to the type.
 class ExplicitCastExpr : public Expr {
   Expr *SubExpr;
-  SourceLoc AsLoc;
+  SourceLoc AsLoc, ForceLoc;
   TypeLoc CastTy;
 
 protected:
@@ -2717,15 +2717,25 @@ public:
   SourceRange getSourceRange() const {
     if (CastTy.getSourceRange().isInvalid())
       return SubExpr->getSourceRange();
-
-    return SubExpr
-      ? SourceRange{SubExpr->getStartLoc(), CastTy.getSourceRange().End}
-      : SourceRange{AsLoc, CastTy.getSourceRange().End};
+    
+    auto startLoc = SubExpr ? SubExpr->getStartLoc() : AsLoc;
+    auto endLoc = ForceLoc.isValid() ? ForceLoc : CastTy.getSourceRange().End;
+    
+    return {startLoc, endLoc};
   }
   
   /// True if the node has been processed by SequenceExpr folding.
   bool isFolded() const { return SubExpr; }
-
+  
+  /// Location of a trailing unparenthesizeded postfix '!' that may have
+  /// followed this cast.
+  SourceLoc getForceLoc() const {
+    return ForceLoc;
+  }
+  void setForceLoc(SourceLoc loc) {
+    ForceLoc = loc;
+  }
+  
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ExplicitCastExpr &&
            E->getKind() <= ExprKind::Last_ExplicitCastExpr;

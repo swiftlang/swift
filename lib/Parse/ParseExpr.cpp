@@ -148,7 +148,7 @@ ParserResult<Expr> Parser::parseExprIs() {
 
 /// parseExprAs
 ///   expr-as:
-///     'as' type
+///     'as' type '!'?
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
 
@@ -158,7 +158,12 @@ ParserResult<Expr> Parser::parseExprAs() {
   if (type.isNull())
     return nullptr;
   
-  Expr *parsed = new (Context) ConditionalCheckedCastExpr(asLoc, type.get());
+  auto *parsed = new (Context) ConditionalCheckedCastExpr(asLoc, type.get());
+  
+  // As a special case, parse '!' after the type. We'll resolve it to a
+  // ForceValueExpr after sequence resolution.
+  if (Tok.is(tok::exclaim_postfix))
+    parsed->setForceLoc(consumeToken(tok::exclaim_postfix));
   
   return makeParserResult(parsed);
 }

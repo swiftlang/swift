@@ -48,6 +48,19 @@
   when accessed.
 
 
+* An 'as' cast can now be forced using the postfix '!' operator without using
+  parens:
+
+    class B {}
+    class D {}
+
+    let b: B = D()
+
+    // Before
+    let d1: D = (b as D)!
+    // After
+    let d2: D = b as D!
+
 2014-03-19
 ----------
 
