@@ -812,7 +812,7 @@ namespace {
     {
       buildCategoryName(CategoryName);
 
-      visitConformances(theClass->getProtocols());
+      visitConformances(theExtension->getProtocols());
 
       for (Decl *member : TheExtension->getMembers())
         visit(member);
