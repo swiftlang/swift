@@ -2241,6 +2241,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     .emitProtocolWitness(conformance, requirement, witness, witnessSubs,
                          isFree, inOutSelf);
   
+  f->verify();
+  
   return f;
 }
 
