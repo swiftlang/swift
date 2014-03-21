@@ -78,8 +78,8 @@ typedef struct AllocCacheEntry_s {
 AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
 class Arena;
-static llvm::DenseMap<void *, Arena> arenas;
-static llvm::DenseMap<void *, size_t> hugeAllocations;
+static llvm::DenseMap<const void *, Arena> arenas;
+static llvm::DenseMap<const void *, size_t> hugeAllocations;
 
 class Arena {
 public:
@@ -145,7 +145,7 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   if (it != arenas.end()) {
     return it->second.byteSize;
   }
-  auto it2 = hugeAllocations.find(ptr);
+  auto it2 = hugeAllocations.find(pointer);
   if (it2 != hugeAllocations.end()) {
     return it2->second;
   }
@@ -381,7 +381,7 @@ void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   } else {
     auto it2 = hugeAllocations.find(ptr);
     assert(it2 != hugeAllocations.end());
-    int r = munmap(it2->first, it2->second);
+    int r = munmap(const_cast<void *>(it2->first), it2->second);
     assert(r != -1);
     hugeAllocations.erase(it2);
     return;
