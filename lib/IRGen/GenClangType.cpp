@@ -204,6 +204,31 @@ clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
 //        at that point.
 clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
   auto &clangCtx = getClangASTContext();
+  GenClangType CTG(Context);
+  SmallVector<clang::QualType, 16> ParamTypes;
+  Type Result = type->getResult();
+  Type Input = type->getInput();
+  auto ResultType = CTG.visit(Result->getCanonicalType());
+  if (!ResultType.isNull())
+    if (auto tuple = dyn_cast<TupleType>(Input->getCanonicalType())) {
+      bool failed = false;
+      for (unsigned i = 0; i < tuple->getNumElements(); i++) {
+        Type ArgType = tuple->getElementType(i);
+        auto clangType = CTG.visit(ArgType->getCanonicalType());
+        if (clangType.isNull()) {
+          failed = true;
+          break;
+        }
+        ParamTypes.push_back(clangType);
+      }
+      if (!failed) {
+        clang::FunctionProtoType::ExtProtoInfo DefaultEPI;
+        auto fnTy = clangCtx.getFunctionType(ResultType, ParamTypes, DefaultEPI);
+        auto blockTy = clangCtx.getBlockPointerType(fnTy);
+        return clangCtx.getCanonicalType(blockTy);
+      }
+    }
+  
   // We'll select (void)(^)() for function types. As long as it's a
   // pointer type it doesn't matter exactly which for either ABI type
   // generation or Obj-C type encoding.
