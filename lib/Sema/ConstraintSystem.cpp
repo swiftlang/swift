@@ -426,9 +426,14 @@ namespace {
         if (!archetype) {
           auto type = nestedType.get<Type>();
           
+          if (auto ST = type->getAs<SubstitutedType>()) {
+            type = ST->getOriginal();
+          }
+          
           if (auto GTPT = type->getAs<GenericTypeParamType>()) {
-            auto gpDecl = GTPT->getDecl();
-            archetype = gpDecl->getArchetype();
+            if (auto gpDecl = GTPT->getDecl()) {
+              archetype = gpDecl->getArchetype();
+            }
           }
         }
                                 
@@ -451,7 +456,7 @@ namespace {
 
         // Bind the member's type variable as a type member of the base,
         // if needed.
-        if (shouldBindMember) {
+        if (archetype && shouldBindMember) {
           CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
                                               baseTypeVar, memberTypeVar, 
                                               member->getName(), locator));
@@ -461,14 +466,11 @@ namespace {
         // variable to it.
         if (replacementType)
           CS.addConstraint(ConstraintKind::Bind, memberTypeVar, replacementType);
-
-        // Add associated type constraints.
+                                
         if (!archetype) {
           // If the nested type is not an archetype (because it was constrained
-          // to a concrete type by a requirement), bind the type variable
-          // to that type.
-          CS.addConstraint(ConstraintKind::Bind, memberTypeVar,
-                           ArchetypeType::getNestedTypeValue(nestedType));
+          // to a concrete type by a requirement), return the fresh type
+          // variable now, and let binding occur during overload resolution.
           return memberTypeVar;
         }
                                 
@@ -526,11 +528,8 @@ namespace {
       if (auto genericParam = type->getAs<GenericTypeParamType>()) {
         auto known = replacements.find(genericParam->getCanonicalType());
         
-        // If no replacement was found for the type parameter, there had to have
-        // been an upstream semantic error.  In this case, pass the type
-        // parameter on to provide better error recovery.
         if (known == replacements.end())
-          return genericParam;
+          return cs.createTypeVariable(nullptr, TVO_PrefersSubtypeBinding);
         
         return known->second;
       }
@@ -1175,6 +1174,16 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       refType = tuple->getElementType(choice.getTupleIndex());
     }
     break;
+  }
+  
+  // If the overload reference type is a dependent member (which could occur
+  // in the case of a conformance check against an associated type rooted off of
+  // "Self"), we'll need to open the type up so as not to short-circuit the
+  // binding constraint against the already bound overload type.
+  if ((choice.getKind() == OverloadChoiceKind::TypeDecl) &&
+      refType->getAs<DependentMemberType>()) {
+    refType = openType(refType,
+                         choice.getDecl()->getPotentialGenericDeclContext());
   }
 
   // Add the type binding constraint.
