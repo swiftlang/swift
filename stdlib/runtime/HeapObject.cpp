@@ -58,7 +58,7 @@ extern "C" HeapObject* swift_bufferAllocate(
 extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }
 
 /// A do-nothing destructor for POD metadata.
-static void destroyPOD(HeapObject*) {}
+static void destroyPOD(HeapObject *o);
 
 /// Heap metadata for POD allocations.
 static const FullMetadata<HeapMetadata> PODHeapMetadata{
@@ -79,6 +79,12 @@ namespace {
       return (sizeof(PODBox) + alignMask) & ~alignMask;
     }
   };
+}
+
+static void destroyPOD(HeapObject *o) {
+  auto box = static_cast<PODBox*>(o);
+  // Deallocate the buffer.
+  return swift_deallocObject(box, box->allocatedSize);
 }
 
 BoxPair::Return
