@@ -146,9 +146,16 @@ clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
 }
 
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
-  // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
-  // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
-  return getClangIdType(getClangASTContext());
+  auto &clangCtx = getClangASTContext();
+  // produce the clang type INTF * if it is imported ObjC object.
+  if (auto *swiftDecl = type->getDecl())
+    if (auto *clangDecl = swiftDecl->getClangDecl())
+      if (auto *CDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+        auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
+        auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+        return clangCtx.getCanonicalType(ptrTy);
+    }
+  return getClangIdType(clangCtx);
 }
 
 clang::CanQualType GenClangType::visitBoundGenericClassType(
