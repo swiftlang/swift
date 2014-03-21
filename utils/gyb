@@ -188,6 +188,7 @@ def tokenizeTemplate(templateText):
     end = len(templateText)
 
     savedLiteral = []
+    literalFirstMatch = None
 
     while pos < end:
         m = tokenizeRE.match(templateText, pos, end)
@@ -198,12 +199,14 @@ def tokenizeTemplate(templateText):
             if text is not None and kind[0] != '_')
                 
         if kind in ('literal', 'symbol'):
+            if len(savedLiteral) == 0:
+                literalFirstMatch = m
             savedLiteral.append(text) # literals and symbols get batched together
             pos = None
         else:
             # found a non-literal.  First yield any literal we've accumulated
             if savedLiteral != []:
-                yield 'literal', ''.join(savedLiteral), m
+                yield 'literal', ''.join(savedLiteral), literalFirstMatch
                 savedLiteral = []
 
             # Then yield the thing we found.  If we get a reply, it's
@@ -218,7 +221,7 @@ def tokenizeTemplate(templateText):
             yield # Client is not yet ready to process next token
 
     if savedLiteral != []:
-        yield 'literal', ''.join(savedLiteral), None
+        yield 'literal', ''.join(savedLiteral), literalFirstMatch
 
 def splitAtLines(sourceLines):
     r"""Return a list of lines at which to split the incoming source
