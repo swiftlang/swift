@@ -1597,25 +1597,49 @@ const {
 
   // Get the slice of the generic parameters and requirements we haven't
   // applied.
+  auto appliedParams = params.slice(0, args.size());
   auto unappliedParams = params.slice(args.size());
   
-  // Requirements are in parameter order.
-  // FIXME: Except for same-type requirements. Those need to be substituted
-  // and propagated somehow.
-  auto unappliedReqts = getRequirements();
-  auto rootType = [](Type t) -> Type {
+  // Drop requirements rooted in the applied generic parameters.
+  SmallVector<Requirement, 4> unappliedReqts;
+  
+  auto rootType = [](Type t) -> TypeBase* {
     while (auto dmt = t->getAs<DependentMemberType>()) {
       t = dmt->getBase();
     }
-    return t;
+    return t.getPointer();
   };
   
-  for (auto appliedParam : params.slice(0, args.size())) {
-    while (!unappliedReqts.empty()
-           && rootType(unappliedReqts[0].getFirstType())
-               ->isEqual(appliedParam)) {
-      unappliedReqts = unappliedReqts.slice(1);
+  auto rootedInAppliedParam = [&](Type t) -> bool {
+    return std::find(appliedParams.begin(), appliedParams.end(), rootType(t))
+             != appliedParams.end();
+  };
+  
+  for (auto &reqt : getRequirements()) {
+    switch (reqt.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::WitnessMarker:
+      // Substituting the parameter eliminates conformance constraints rooted
+      // in the parameter.
+      if (rootedInAppliedParam(reqt.getFirstType()))
+        continue;
+      break;
+        
+    case RequirementKind::SameType: {
+      // Same-type constraints are eliminated if both sides of the constraint
+      // are rooted in substituted parameters.
+      if (rootedInAppliedParam(reqt.getFirstType())
+          && rootedInAppliedParam(reqt.getSecondType()))
+        continue;
+        
+      // Otherwise, substitute the constrained types.
+      unappliedReqts.push_back(Requirement(RequirementKind::SameType,
+                           reqt.getFirstType().subst(M, subs, true, nullptr),
+                           reqt.getSecondType().subst(M, subs, true, nullptr)));
+      continue;
     }
+    }
+    unappliedReqts.push_back(reqt);
   }
   
   GenericSignature *sig = GenericSignature::get(unappliedParams, unappliedReqts);
