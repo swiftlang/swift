@@ -2695,9 +2695,6 @@ RValueSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                     SGFContext(), IsNotTake);
   }
 
-  // Other bases get passed +1.  Consume the base's +1.
-  base = ManagedValue::forUnmanaged(base.forward(*this));
-  
   return RValueSource(loc, RValue(*this, loc,
                                   base.getType().getSwiftType(), base));
 }

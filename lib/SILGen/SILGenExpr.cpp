@@ -590,7 +590,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     return emitLoadOfLValue(loc, LV, C);
   }
 
-  // rvalue MemberRefExprs are produces in a two cases: when accessing a 'let'
+  // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
   assert(base.getType().getSwiftRValueType()->getAnyNominal() &&
          "The base of an rvalue MemberRefExpr should be an rvalue value");
@@ -4015,5 +4015,3 @@ RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
 ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
   return emitRValue(E, C).getAsSingleValue(*this, E);
 }
-
-
