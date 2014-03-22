@@ -1572,6 +1572,8 @@ namespace {
         return nullptr;
 
       assert(dc->getDeclaredTypeOfContext() && "Method in non-type context?");
+      assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
+             "Clang method in Swift context?");
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
@@ -2371,8 +2373,8 @@ namespace {
       // reasons. Fix it.
       auto containerTy = dc->getDeclaredTypeInContext();
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
-                          lookup);
+      dc->lookupQualified(containerTy, name, NL_QualifiedDefault,
+                          Impl.getTypeResolver(), lookup);
       Type unlabeledIndices;
       for (auto result : lookup) {
         auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -2433,20 +2435,8 @@ namespace {
     /// Finish the given protocol conformance (for an imported type)
     /// by filling in any missing witnesses.
     void finishProtocolConformance(NormalProtocolConformance *conformance) {
-      auto proto = conformance->getProtocol();
-
-      // Make sure this protocol was completely imported.
-      // FIXME: This wouldn't be needed if member imports were lazy
-      // like they should be.
-      SmallVector<Decl *, 4> members;
-      if (auto clangProto = dyn_cast_or_null<clang::ObjCProtocolDecl>(
-                              proto->getClangDecl())) {
-        if (auto def = clangProto->getDefinition())
-          importObjCMembers(def, proto, members);
-      }
-
       // Create witnesses for requirements not already met.
-      for (auto req : members) {
+      for (auto req : conformance->getProtocol()->getMembers()) {
         auto valueReq = dyn_cast<ValueDecl>(req);
         if (!valueReq)
           continue;
@@ -2801,6 +2791,8 @@ namespace {
                                                        results);
           if (results.size() == 1) {
             if (auto singleResult = dyn_cast<T>(results.front())) {
+              if (auto typeResolver = Impl.getTypeResolver())
+                typeResolver->resolveDeclSignature(singleResult);
               Impl.ImportedDecls[decl->getCanonicalDecl()] = singleResult;
               return singleResult;
             }
@@ -2915,33 +2907,54 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      // Special case for Protocol, which gets forward-declared everywhere but
-      // really lives in ObjectiveC.
-      // FIXME: This is a workaround for a Clang modules bug.
-      // See http://llvm.org/bugs/show_bug.cgi?id=19061
-      if (decl->getCanonicalDecl() ==
-          Impl.getClangASTContext().getObjCProtocolDecl()->getCanonicalDecl() &&
-          !decl->hasDefinition()) {
-        Type nsObject = Impl.getNSObjectType();
-        if (!nsObject)
-          return nullptr;
+      if (!decl->hasDefinition()) {
+        // Special case for Protocol, which gets forward-declared everywhere but
+        // really lives in ObjectiveC.
+        // FIXME: This is a workaround for a Clang modules bug.
+        // See http://llvm.org/bugs/show_bug.cgi?id=19061
+        clang::ASTContext &clangCtx = Impl.getClangASTContext();
+        if (decl->getCanonicalDecl() ==
+            clangCtx.getObjCProtocolDecl()->getCanonicalDecl()) {
+          Type nsObjectTy = Impl.getNSObjectType();
+          if (!nsObjectTy)
+            return nullptr;
 
-        const ClassDecl *nsObjectDecl = nsObject->getClassOrBoundGenericClass();
-        auto dc = nsObjectDecl->getDeclContext();
+          const ClassDecl *nsObjectDecl =
+            nsObjectTy->getClassOrBoundGenericClass();
+          auto dc = nsObjectDecl->getDeclContext();
 
-        auto result = new (Impl.SwiftContext) ClassDecl(SourceLoc(), name,
-                                                        SourceLoc(), {},
-                                                        nullptr, dc);
-        result->setAddedImplicitInitializers();
-        result->computeType();
-        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-        result->setClangNode(decl);
-        result->setCircularityCheck(CircularityCheck::Checked);
-        result->setSuperclass(nsObject);
-        result->setCheckedInheritanceClause();
-        result->setIsObjC(true);
-        Impl.registerExternalDecl(result);
-        return result;
+          auto result = new (Impl.SwiftContext) ClassDecl(SourceLoc(), name,
+                                                          SourceLoc(), {},
+                                                          nullptr, dc);
+          result->setAddedImplicitInitializers();
+          result->computeType();
+          Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+          result->setClangNode(decl);
+          result->setCircularityCheck(CircularityCheck::Checked);
+          result->setSuperclass(nsObjectTy);
+          result->setCheckedInheritanceClause();
+          result->setIsObjC(true);
+          Impl.registerExternalDecl(result);
+          return result;
+        }
+
+        // Otherwise, check if this class is implemented in its adapter.
+        // FIXME: This only matters for the module currently being built.
+        if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
+          if (auto adapter = clangModule->getAdapterModule()) {
+            SmallVector<ValueDecl *, 4> swiftClasses;
+            adapter->lookupValue({}, name, NLKind::UnqualifiedLookup,
+                                 swiftClasses);
+            if (swiftClasses.size() == 1) {
+              if (auto swiftClass = dyn_cast<ClassDecl>(swiftClasses.front())) {
+                if (auto typeResolver = Impl.getTypeResolver())
+                  typeResolver->resolveDeclSignature(swiftClass);
+                Impl.ImportedDecls[decl->getCanonicalDecl()] = swiftClass;
+                return swiftClass;
+              }
+            }
+          }
+        }
       }
 
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -3034,8 +3047,8 @@ namespace {
       auto containerTy = dc->getDeclaredTypeInContext();
       VarDecl *overridden = nullptr;
       SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
-                          lookup);
+      dc->lookupQualified(containerTy, name, NL_QualifiedDefault,
+                          Impl.getTypeResolver(), lookup);
       for (auto result : lookup) {
         if (isa<FuncDecl>(result))
           return nullptr;

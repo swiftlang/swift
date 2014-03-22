@@ -28,6 +28,7 @@ namespace swift {
 
 class ASTContext;
 class ClangModuleUnit;
+class LazyResolver;
 class Module;
 class NominalTypeDecl;
 class VisibleDeclConsumer;
@@ -110,6 +111,9 @@ public:
                               unsigned previousGeneration) override;
 
   void verifyAllModules() override;
+
+  void setTypeResolver(LazyResolver &resolver);
+  void clearTypeResolver();
 
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const;

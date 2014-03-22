@@ -834,6 +834,10 @@ public:
     }
   }
 
+  void discardTypeResolver() {
+    TypeResolver.reset();
+  }
+
   void setHaveDot() {
     HaveDot = true;
   }
@@ -1874,19 +1878,21 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   if (Lookup.RequestedCachedResults) {
+    // Create helpers for result caching.
+    auto &SwiftContext = P.Context;
+    auto FillCacheCallback =
+        [&SwiftContext](CodeCompletionCacheImpl &Cache,
+                        const CodeCompletionCacheImpl::Key &K) {
+      auto V = Cache.getResultSinkFor(K);
+      CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
+      Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
+                                        K.ResultsHaveLeadingDot);
+      Cache.storeResults(K, V);
+    };
+
     auto &Request = Lookup.RequestedCachedResults.getValue();
     if (Request.TheModule) {
-      // Create helpers for result caching.
-      auto &SwiftContext = P.Context;
-      auto FillCacheCallback =
-          [&SwiftContext](CodeCompletionCacheImpl &Cache,
-                          const CodeCompletionCacheImpl::Key &K) {
-        auto V = Cache.getResultSinkFor(K);
-        CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
-        Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
-                                          K.ResultsHaveLeadingDot);
-        Cache.storeResults(K, V);
-      };
+      Lookup.discardTypeResolver();
 
       // FIXME: actually check imports.
       StringRef ModuleFilename = Request.TheModule->getModuleFilename();
@@ -1903,18 +1909,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
-
-      // Create helpers for result caching.
-      auto &SwiftContext = P.Context;
-      auto FillCacheCallback =
-          [&SwiftContext](CodeCompletionCacheImpl &Cache,
-                          const CodeCompletionCacheImpl::Key &K) {
-        auto V = Cache.getResultSinkFor(K);
-        CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
-        Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
-                                          K.ResultsHaveLeadingDot);
-        Cache.storeResults(K, V);
-      };
+      Lookup.discardTypeResolver();
 
       // Add results for all imported modules.
       auto *SF = CurDeclContext->getParentSourceFile();

@@ -201,6 +201,9 @@ private:
   /// parser.
   std::unique_ptr<clang::SyntaxOnlyAction> Action;
 
+  /// The active type checker, or null if there is no active type checker.
+  LazyResolver *typeResolver = nullptr;
+
 public:
   /// \brief Mapping of already-imported declarations.
   llvm::DenseMap<const clang::Decl *, Decl *> ImportedDecls;
@@ -377,7 +380,8 @@ public:
 
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
-  ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D);
+  ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
+                                         bool allowForwardDeclaration = false);
 
   /// \brief Import the given Swift identifier into Clang.
   clang::DeclarationName importName(Identifier name);
@@ -623,6 +627,14 @@ public:
     if (iter == SpecialTypedefNames.end())
       return {};
     return iter->second;
+  }
+
+  LazyResolver *getTypeResolver() const {
+    return typeResolver;
+  }
+  void setTypeResolver(LazyResolver *newResolver) {
+    assert((!typeResolver || !newResolver) && "already have a type resolver");
+    typeResolver = newResolver;
   }
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,

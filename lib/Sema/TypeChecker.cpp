@@ -26,6 +26,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -40,10 +41,17 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
   : Context(Ctx), Diags(Diags)
 {
   Context.addMutationListener(*this);
+  auto clangImporter =
+    static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
+  clangImporter->setTypeResolver(*this);
+
 }
 
 TypeChecker::~TypeChecker() {
   Context.removeMutationListener(*this);
+  auto clangImporter =
+    static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
+  clangImporter->clearTypeResolver();
 }
 
 void TypeChecker::handleExternalDecl(Decl *decl) {

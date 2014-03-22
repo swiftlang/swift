@@ -80,6 +80,14 @@ ClangImporter::~ClangImporter() {
   delete &Impl;
 }
 
+void ClangImporter::setTypeResolver(LazyResolver &resolver) {
+  Impl.setTypeResolver(&resolver);
+}
+
+void ClangImporter::clearTypeResolver() {
+  Impl.setTypeResolver(nullptr);
+}
+
 namespace {
   namespace attr_fallback {}
 }
@@ -383,25 +391,32 @@ ClangImporter::Implementation::getWrapperForModule(ClangImporter &importer,
   return file;
 }
 
-static clang::Module *getBestOwningModule(const clang::Decl *D) {
-  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
+static clang::Module *getBestOwningModule(const clang::Decl *D,
+                                          bool allowForwardDeclaration) {
+  const clang::Decl *actual = nullptr;
+  if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
     // Put the Objective-C class into the module that contains the @interface
-    // definition, not just @class forward declaration.
-    D = OID->getDefinition();
-  else if (auto TD = dyn_cast<clang::TagDecl>(D))
-    D = TD->getDefinition();
-  else
-    D = D->getCanonicalDecl();
+    // definition, not just some @class forward declaration.
+    actual = OID->getDefinition();
+    if (!actual && !allowForwardDeclaration)
+      return nullptr;
 
-  if (!D)
-    return nullptr;
+  } else if (auto TD = dyn_cast<clang::TagDecl>(D)) {
+    actual = TD->getDefinition();
+    if (!actual && !allowForwardDeclaration)
+      return nullptr;
+  }
 
-  return D->getOwningModule();
+  if (!actual)
+    actual = D->getCanonicalDecl();
+
+  return actual->getOwningModule();
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
-    const clang::Decl *D) {
-  clang::Module *M = getBestOwningModule(D);
+    const clang::Decl *D,
+    bool allowForwardDeclaration) {
+  clang::Module *M = getBestOwningModule(D, allowForwardDeclaration);
   if (!M)
     return nullptr;
 
