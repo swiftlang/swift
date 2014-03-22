@@ -12,6 +12,7 @@
 
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILExternalSource.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -249,83 +250,143 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   return Info;
 }
 
-bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  // If we are not linking anything bail.
-  if (Mode == LinkingMode::LinkNone)
-    return false;
+namespace {
 
-  bool LinkAll = Mode == LinkingMode::LinkAll;
-  // First attempt to link in Fun. If we fail, bail.
-  auto NewFn = SILLoader->lookupSILFunction(Fun);
-  if (!NewFn || NewFn->empty())
-    return false;
-  ++NumFuncLinked;
+/// Visitor that knows how to link in dependencies of SILInstructions.
+class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
+  using LinkingMode = SILModule::LinkingMode;
 
-  // Ok, we succeeded in linking in Fun. Transitively link in the functions that
-  // Fun references.
-  SmallVector<SILFunction *, 128> Worklist;
-  Worklist.push_back(NewFn);
-  while (!Worklist.empty()) {
-    auto Fn = Worklist.pop_back_val();
+  /// The SILLoader that this visitor is using to link.
+  SerializedSILLoader *Loader;
 
-    for (auto &BB : *Fn)
-      for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
-        SILFunction *CalleeFunction = nullptr;
-        bool TryLinking = false;
-        if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-          SILValue Callee = AI->getCallee();
-          // Handles FunctionRefInst only.
-          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
-            CalleeFunction = FRI->getReferencedFunction();
-            // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = LinkAll || AI->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Shared;
-          }
-        } else if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(I)) {
-          SILValue Callee = PAI->getCallee();
-          // Handles FunctionRefInst only.
-          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
-            CalleeFunction = FRI->getReferencedFunction();
-            // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = LinkAll || CalleeFunction->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Shared;
-          } else {
-            continue;
-          }
-        } else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
-          // When EnableLinkAll is true, we link the function referenced by
-          // FunctionRefInst.
-          CalleeFunction = LinkAll ? FRI->getReferencedFunction() :
-                                           nullptr;
-          TryLinking = LinkAll;
-        }
+  /// The external SIL source to use when linking this module.
+  SILExternalSource *ExternalSource = nullptr;
 
-        if (!CalleeFunction)
-          continue;
+  /// Worklist of SILFunctions we are processing.
+  llvm::SmallVector<SILFunction *, 128> Worklist;
 
-        // The ExternalSource may wish to rewrite non-empty bodies.
-        if (ExternalSource)
-          if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
-            NewFn->verify();
-            Worklist.push_back(NewFn);
-            ++NumFuncLinked;
-            continue;
-          }
+  /// A list of callees of the current instruction being visited. cleared after
+  /// every instruction is visited.
+  llvm::SmallVector<SILFunction *, 4> CalleeFunctions;
 
-        CalleeFunction->setBare(IsBare);
+  /// The current linking mode.
+  LinkingMode Mode;
+public:
 
-        if (CalleeFunction->empty())
-          // Try to find the definition in a serialized module when callee is
-          // currently empty.
-          if (TryLinking)
-            if (auto NewFn = SILLoader->lookupSILFunction(CalleeFunction)) {
-              NewFn->verify();
-              Worklist.push_back(NewFn);
-              ++NumFuncLinked;
-              continue;
+  SILLinkerVisitor(SerializedSILLoader *L, SILModule::LinkingMode M,
+                   SILExternalSource *E = nullptr)
+    : Loader(L), ExternalSource(E), Worklist(), CalleeFunctions(), Mode(M) { }
+
+  /// Process F, recursively deserializing any thing F may reference.
+  bool process(SILFunction *F) {
+    if (Mode == LinkingMode::LinkNone)
+      return false;
+
+    auto NewFn = Loader->lookupSILFunction(F);
+    if (!NewFn || NewFn->empty())
+      return false;
+
+    ++NumFuncLinked;
+
+    Worklist.push_back(NewFn);
+    while (!Worklist.empty()) {
+      auto Fn = Worklist.pop_back_val();
+      for (auto &BB : *Fn) {
+        for (auto &I : BB) {
+          // Should we try linking?
+          if (visit(&I)) {
+            for (auto F : CalleeFunctions) {
+              // The ExternalSource may wish to rewrite non-empty bodies.
+              if (!F->empty() && ExternalSource)
+                if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
+                  NewFn->verify();
+                  Worklist.push_back(NewFn);
+                  ++NumFuncLinked;
+                  continue;
+                }
+
+              F->setBare(IsBare);
+
+              if (F->empty())
+                if (auto NewFn = Loader->lookupSILFunction(F)) {
+                  NewFn->verify();
+                  Worklist.push_back(NewFn);
+                  ++NumFuncLinked;
+                }
             }
+            CalleeFunctions.clear();
+          } else {
+            assert(CalleeFunctions.empty() && "CalleeFunctions should always "
+                   "be empty if visit does not return true.");
+          }
+        }
       }
+    }
+
+    // If we return true, we deserialized at least one function.
+    return true;
   }
 
-  return true;
+  /// We do not want to visit callee functions if we just have a value base.
+  bool visitValueBase(ValueBase *V) { return false; }
+
+  bool visitApplyInst(ApplyInst *AI) {
+    // If we don't have a function ref inst, just return false. We do not have
+    // interesting callees.
+    auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+    if (!FRI)
+      return false;
+
+    // Ok we have a function ref inst, grab the callee.
+    SILFunction *Callee = FRI->getReferencedFunction();
+
+    // If the linking mode is not link all, AI is not transparent, and the
+    // callee is not shared, we don't want to perform any linking.
+    if (!isLinkAll() && !AI->isTransparent() &&
+        Callee->getLinkage() != SILLinkage::Shared)
+      return false;
+
+    // Otherwise we want to try and link in the callee... Add it to the callee
+    // list and return true.
+    addCalleeFunction(Callee);
+    return true;
+  }
+
+  bool visitPartialApplyInst(PartialApplyInst *PAI) {
+    auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+    if (!FRI)
+      return false;
+
+    SILFunction *Callee = FRI->getReferencedFunction();
+    if (!isLinkAll() && !Callee->isTransparent() &&
+        Callee->getLinkage() != SILLinkage::Shared)
+      return false;
+
+    addCalleeFunction(Callee);
+    return true;
+  }
+
+  bool visitFunctionRefInst(FunctionRefInst *FRI) {
+    if (!isLinkAll())
+      return false;
+
+    addCalleeFunction(FRI->getReferencedFunction());
+    return true;
+  }
+
+private:
+  /// Add a function to our callee list for processing.
+  void addCalleeFunction(SILFunction *F) {
+    CalleeFunctions.push_back(F);
+  }
+
+  /// Is the current mode link all? Link all implies we should try and link
+  /// everything, not just transparent/shared functions.
+  bool isLinkAll() const { return Mode == LinkingMode::LinkAll; }
+};
+
+} // end anonymous namespace.
+
+bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(SILLoader, Mode, ExternalSource).process(Fun);
 }
