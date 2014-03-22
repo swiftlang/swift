@@ -18,7 +18,6 @@
 #define TYPECHECKING_H
 
 #include "swift/AST/AST.h"
-#include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/KnownProtocols.h"
@@ -228,7 +227,7 @@ enum class ObjCReason {
 
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
-class TypeChecker : public ASTMutationListener, public LazyResolver {
+class TypeChecker : public LazyResolver {
 public:
   ASTContext &Context;
   DiagnosticEngine &Diags;
@@ -467,8 +466,13 @@ public:
     validateDecl(VD, true);
   }
 
-  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) {
+  virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
+  }
+
+  virtual void
+  resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) override {
+    handleExternalDecl(nominal);
   }
 
   /// Validate the signature of a generic function.
@@ -927,8 +931,6 @@ public:
   /// @{
   void handleExternalDecl(Decl *decl);
 
-  /// \brief A new declaration was added to the AST.
-  virtual void addedExternalDecl(Decl *decl);
   /// @}
 
   /// \name Lazy resolution.

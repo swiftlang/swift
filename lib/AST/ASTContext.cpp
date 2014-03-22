@@ -18,7 +18,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
-#include "swift/AST/ASTMutationListener.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExprHandle.h"
@@ -36,7 +35,6 @@
 
 using namespace swift;
 
-ASTMutationListener::~ASTMutationListener() = default;
 LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
 
@@ -103,9 +101,6 @@ struct ASTContext::Implementation {
   /// \brief The module loader used to load Clang modules.
   // FIXME: We shouldn't be special-casing Clang.
   llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ClangModuleLoader;
-
-  /// \brief The set of AST mutation listeners.
-  SmallVector<ASTMutationListener *, 4> MutationListeners;
 
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
@@ -730,21 +725,7 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
          ::hasOptionalIntrinsics(*this, resolver, OTK_UncheckedOptional);
 }
 
-void ASTContext::addMutationListener(ASTMutationListener &listener) {
-  Impl.MutationListeners.push_back(&listener);
-}
-
-void ASTContext::removeMutationListener(ASTMutationListener &listener) {
-  auto known = std::find(Impl.MutationListeners.rbegin(),
-                         Impl.MutationListeners.rend(),
-                         &listener);
-  assert(known != Impl.MutationListeners.rend() && "listener not registered");
-  Impl.MutationListeners.erase(known.base()-1);
-}
-
 void ASTContext::addedExternalDecl(Decl *decl) {
-  for (auto listener : Impl.MutationListeners)
-    listener->addedExternalDecl(decl);
   ExternalDefinitions.insert(decl);
 }
 

@@ -40,7 +40,6 @@ using namespace swift;
 TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
   : Context(Ctx), Diags(Diags)
 {
-  Context.addMutationListener(*this);
   auto clangImporter =
     static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
   clangImporter->setTypeResolver(*this);
@@ -48,7 +47,6 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
 }
 
 TypeChecker::~TypeChecker() {
-  Context.removeMutationListener(*this);
   auto clangImporter =
     static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
   clangImporter->clearTypeResolver();
@@ -64,10 +62,6 @@ void TypeChecker::handleExternalDecl(Decl *decl) {
   if (auto ED = dyn_cast<EnumDecl>(decl)) {
     addImplicitEnumConformances(ED);
   }
-}
-
-void TypeChecker::addedExternalDecl(Decl *decl) {
-  handleExternalDecl(decl);
 }
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {

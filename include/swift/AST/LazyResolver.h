@@ -88,6 +88,10 @@ public:
 
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
+
+  /// Resolve any implicitly-generated members and conformances for generated
+  /// external decls.
+  virtual void resolveExternalDeclImplicitMembers(NominalTypeDecl *nominal) = 0;
 };
 
 

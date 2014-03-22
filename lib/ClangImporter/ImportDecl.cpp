@@ -3341,6 +3341,9 @@ void ClangImporter::Implementation::finishPendingActions() {
   while (!RegisteredExternalDecls.empty()) {
     Decl *D = RegisteredExternalDecls.pop_back_val();
     SwiftContext.addedExternalDecl(D);
+    if (auto typeResolver = getTypeResolver())
+      if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+        typeResolver->resolveExternalDeclImplicitMembers(nominal);
   }
 }
 

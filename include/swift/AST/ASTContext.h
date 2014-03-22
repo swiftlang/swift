@@ -48,7 +48,6 @@ namespace clang {
 
 namespace swift {
   class ASTContext;
-  class ASTMutationListener;
   class BoundGenericType;
   class ClangNode;
   class Decl;
@@ -401,15 +400,6 @@ public:
 
   /// Retrieve a specific, known protocol.
   ProtocolDecl *getProtocol(KnownProtocolKind kind) const;
-
-  /// \brief Add a new mutation listener to this AST context.
-  ///
-  /// Mutation listeners will receive events when the AST is updated, e.g.,
-  /// due to the module importer.
-  void addMutationListener(ASTMutationListener &listener);
-
-  /// \brief Remove the given mutation listener from this AST context.
-  void removeMutationListener(ASTMutationListener &listener);
 
   /// \brief Notify all of the mutation listeners that the given declaration
   /// was just added.
