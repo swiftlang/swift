@@ -258,7 +258,8 @@ private:
 /// Here, there is a normal protocol conformance for both \c A and \c B<T>,
 /// providing the witnesses \c A.foo and \c B<T>.foo, respectively, for the
 /// requirement \c foo.
-class NormalProtocolConformance : public ProtocolConformance {
+class NormalProtocolConformance : public ProtocolConformance,
+                                  public llvm::FoldingSetNode {
   /// Describes whether this conformance is inheritable to subclasses or not.
   enum class IsInheritableKind {
     /// We haven't checked yet whether this conformance is inheritable.
@@ -419,6 +420,16 @@ public:
     DefaultedDefinitions.insert(requirement);
   }
 
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getType(), getProtocol(), getDeclContext()->getParentModule());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type type,
+                      ProtocolDecl *protocol, Module *module) {
+    ID.AddPointer(type->getCanonicalType().getPointer());
+    ID.AddPointer(protocol);
+    ID.AddPointer(module);
+  }
 
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Normal;

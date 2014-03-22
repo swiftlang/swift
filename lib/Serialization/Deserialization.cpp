@@ -571,6 +571,10 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
                                         FileContext,
                                         ProtocolConformanceState::Incomplete);
+  // If we have a complete protocol conformance do not attempt to initialize
+  // it. Just return the proto, conformance pair.
+  if (conformance->getState() == ProtocolConformanceState::Complete)
+    return { proto, conformance };
 
   // Set inherited conformances.
   for (auto inherited : inheritedConformances) {

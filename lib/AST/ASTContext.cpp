@@ -150,6 +150,9 @@ struct ASTContext::Implementation {
     llvm::DenseMap<BoundGenericType *, ArrayRef<Substitution>>
       BoundGenericSubstitutions;
 
+    /// The set of normal protocol conformances.
+    llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
+
     /// The set of specialized protocol conformances.
     llvm::FoldingSet<SpecializedProtocolConformance> SpecializedConformances;
 
@@ -165,6 +168,11 @@ struct ASTContext::Implementation {
         conformance.~SpecializedProtocolConformance();
       for (auto &conformance : InheritedConformances)
         conformance.~InheritedProtocolConformance();
+
+      // Call the normal conformance destructors last since they could be
+      // referenced by the conformance types.
+      for (auto &conformance : NormalConformances)
+        conformance.~NormalProtocolConformance();
     }
   };
   
@@ -188,12 +196,6 @@ struct ASTContext::Implementation {
   /// \brief The set of nominal types and extensions thereof known to conform
   /// to compiler-known protocols.
   ConformanceListPair KnownProtocolConformances[NumKnownProtocols];
-
-  /// The list of normal protocol conformances.
-  ///
-  /// Since these conformances are tied explicitly to the source code, semantic
-  /// analysis is responsible for handling the uniquing.
-  SmallVector<NormalProtocolConformance *, 2> NormalConformances;
 
   /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
@@ -296,10 +298,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
 }
 
 ASTContext::~ASTContext() {
-  // Tear down protocol conformances.
-  for (auto conformance : Impl.NormalConformances)
-    conformance->~NormalProtocolConformance();
-
   delete &Impl;
 }
 
@@ -1019,10 +1017,23 @@ ASTContext::getConformance(Type conformingType,
                            SourceLoc loc,
                            DeclContext *dc,
                            ProtocolConformanceState state) {
+  llvm::FoldingSetNodeID id;
+  NormalProtocolConformance::Profile(id, conformingType, protocol,
+                                     dc->getParentModule());
+
+  // Did we already record the specialized conformance?
+  void *insertPos;
+  auto &normalConformances =
+    Impl.getArena(AllocationArena::Permanent).NormalConformances;
+  if (auto result = normalConformances.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new normal protocol conformance.
   auto result
     = new (*this, AllocationArena::Permanent)
-         NormalProtocolConformance(conformingType, protocol, loc, dc, state);
-  Impl.NormalConformances.push_back(result);
+      NormalProtocolConformance(conformingType, protocol, loc, dc, state);
+  normalConformances.InsertNode(result, insertPos);
+
   return result;
 }
 

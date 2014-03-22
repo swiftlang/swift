@@ -917,6 +917,8 @@ public:
       require(AMI->getConformance()->getType()
                 ->isEqual(AMI->getLookupType().getSwiftRValueType()),
               "concrete type lookup requires conformance that matches type");
+      require(AMI->getModule().lookUpWitnessTable(AMI->getConformance()).first,
+              "Could not find witness table for conformance.");
     }
   }
 
