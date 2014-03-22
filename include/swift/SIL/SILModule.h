@@ -308,6 +308,11 @@ public:
   std::pair<SILWitnessTable *, ArrayRef<Substitution>>
   lookUpWitnessTable(const ProtocolConformance *C);
 
+  // Given a protocol conformance, attempt to create a witness table declaration
+  // for it.
+  SILWitnessTable *
+  createWitnessTableDeclaration(ProtocolConformance *C);
+
   /// \brief Return the stage of processing this module is at.
   SILStage getStage() const { return Stage; }
 

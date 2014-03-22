@@ -93,6 +93,38 @@ SILModule::~SILModule() {
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 
+SILWitnessTable *
+SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
+  // Walk down to the base NormalProtocolConformance.
+  ProtocolConformance *ParentC = C;
+  ArrayRef<Substitution> Subs;
+  while (!isa<NormalProtocolConformance>(ParentC)) {
+    switch (ParentC->getKind()) {
+    case ProtocolConformanceKind::Normal:
+      llvm_unreachable("should have exited the loop?!");
+    case ProtocolConformanceKind::Inherited:
+      ParentC = cast<InheritedProtocolConformance>(ParentC)
+        ->getInheritedConformance();
+      break;
+    case ProtocolConformanceKind::Specialized: {
+      auto SC = cast<SpecializedProtocolConformance>(ParentC);
+      ParentC = SC->getGenericConformance();
+      assert(Subs.empty() && "multiple conformance specializations?!");
+      Subs = SC->getGenericSubstitutions();
+      break;
+    }
+    }
+  }
+  NormalProtocolConformance *NormalC
+    = cast<NormalProtocolConformance>(ParentC);
+
+  SILWitnessTable *WT = SILWitnessTable::create(*this,
+                                                SILLinkage::PublicExternal,
+                                                NormalC);
+  WitnessTableLookupCache[NormalC] = WT;
+  return WT;
+}
+
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   // Walk down to the base NormalProtocolConformance.
@@ -142,6 +174,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   }
   return {nullptr, Subs};
 }
+
 
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   StringRef name,

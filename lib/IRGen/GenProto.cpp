@@ -2694,6 +2694,10 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
+  // Don't emit a witness table if it is a declaration.
+  if (wt->isDeclaration())
+    return;
+
   // Build the witnesses.
   SmallVector<llvm::Constant*, 32> witnesses;
   WitnessTableBuilder(*this, witnesses, wt)

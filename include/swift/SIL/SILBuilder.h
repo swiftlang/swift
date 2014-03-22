@@ -537,6 +537,10 @@ public:
                                              SILType MethodTy,
                                              bool Volatile = false)
   {
+    assert((!Conformance ||
+            F.getModule().lookUpWitnessTable(Conformance).first) &&
+           "Can not create a witness method inst for a conformance that does "
+           "not have a witness table mapped to it.");
     return insert(new (F.getModule())
                     WitnessMethodInst(Loc, LookupTy, Conformance,
                                         Member, MethodTy,

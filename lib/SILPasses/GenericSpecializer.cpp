@@ -124,6 +124,12 @@ private:
     assert(sub.Conformance.size() == 1 &&
            "didn't get conformance from substitution?!");
 
+    // If we don't have a witness table for this conformance, create a witness
+    // table declaration for it.
+    SILModule &OtherMod = getCloned()->getModule();
+    if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first)
+      OtherMod.createWitnessTableDeclaration(sub.Conformance[0]);
+
     doPostProcess(Inst,Builder.
                   createWitnessMethod(getOpLocation(Inst->getLoc()),
                                         getOpType(Inst->getLookupType()),
