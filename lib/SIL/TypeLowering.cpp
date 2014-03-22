@@ -149,9 +149,12 @@ CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
     }
   }
   
-  // "Captured" local typealiases require no context.
-  // FIXME: Is this true for dependent typealiases?
+  // "Captured" local types require no context.
   if (isa<TypeAliasDecl>(capture.getPointer()))
+    return CaptureKind::None;
+  if (isa<GenericTypeParamDecl>(capture.getPointer()))
+    return CaptureKind::None;
+  if (isa<AssociatedTypeDecl>(capture.getPointer()))
     return CaptureKind::None;
   
   return CaptureKind::LocalFunction;
