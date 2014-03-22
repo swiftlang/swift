@@ -171,12 +171,11 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprSequence
 ///
 ///   expr-sequence(Mode):
-///     expr-unary(Mode) expr-binary(Mode)* expr-cast?
+///     expr-unary(Mode) expr-binary(Mode)*
 ///   expr-binary(Mode):
 ///     operator-binary expr-unary(Mode)
 ///     '?' expr-sequence(Mode) ':' expr-unary(Mode)
 ///     '=' expr-unary
-///   expr-cast:
 ///     expr-is
 ///     expr-as
 ///
@@ -189,8 +188,6 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
   
-  Expr *suffix = nullptr;
-
   while (true) {
     if (isConfigCondition && Tok.isAtStartOfLine())
       break;
@@ -202,7 +199,8 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     if (Primary.isNull())
       return nullptr;
     SequencedExprs.push_back(Primary.get());
-
+    
+parse_operator:
     switch (Tok.getKind()) {
     case tok::oper_binary: {
       // If '>' is not an operator and this token starts with a '>', we're done.
@@ -258,33 +256,43 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       break;
     }
         
+    case tok::kw_is: {
+      // Parse a type after the 'is' token instead of an expression.
+      ParserResult<Expr> is = parseExprIs();
+      if (is.isNull() || is.hasCodeCompletion())
+        return nullptr;
+      
+      // Store the expr itself as a placeholder RHS. The real RHS is the
+      // type parameter stored in the node itself.
+      SequencedExprs.push_back(is.get());
+      SequencedExprs.push_back(is.get());
+      
+      // We already parsed the right operand as part of the 'is' production.
+      // Jump directly to parsing another operator.
+      goto parse_operator;
+    }
+        
+    case tok::kw_as: {
+      ParserResult<Expr> as = parseExprAs();
+      if (as.isNull() || as.hasCodeCompletion())
+        return nullptr;
+        
+      // Store the expr itself as a placeholder RHS. The real RHS is the
+      // type parameter stored in the node itself.
+      SequencedExprs.push_back(as.get());
+      SequencedExprs.push_back(as.get());
+      
+      // We already parsed the right operand as part of the 'is' production.
+      // Jump directly to parsing another operator.
+      goto parse_operator;
+    }
+        
     default:
       // If the next token is not a binary operator, we're done.
       goto done;
     }
   }
 done:
-  
-  // Check for a cast suffix.
-  if (Tok.is(tok::kw_is)) {
-    ParserResult<Expr> is = parseExprIs();
-    if (is.isNull() || is.hasCodeCompletion())
-      return nullptr;
-    suffix = is.get();
-  }
-  else if (Tok.is(tok::kw_as)) {
-    ParserResult<Expr> as = parseExprAs();
-    if (as.isNull() || as.hasCodeCompletion())
-      return nullptr;
-    suffix = as.get();
-  }
-  
-  // If present, push the cast suffix onto the sequence with a placeholder
-  // RHS. (The real RHS is the type parameter encoded in the node itself.)
-  if (suffix) {
-    SequencedExprs.push_back(suffix);
-    SequencedExprs.push_back(suffix);
-  }
   
   if (SequencedExprs.empty()) {
     if (isConfigCondition) {

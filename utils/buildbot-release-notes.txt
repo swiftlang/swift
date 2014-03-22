@@ -61,6 +61,13 @@
     // After
     let d2: D = b as D!
 
+  Casts can also be chained without parens:
+
+    // Before
+    let b2: B = (((D() as B) as D)!) as B
+    // After
+    let b3: B = D() as B as D! as B
+
 2014-03-19
 ----------
 
