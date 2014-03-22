@@ -1143,7 +1143,7 @@ static void checkAllowedAttributes(const Decl *D) {
       KINDS... })
     attrs.clearAttribute(AK);
 
-  if (!attrs.isEmpty()) {
+  if (attrs.containsTraditionalAttributes()) {
     llvm::errs() << "Serialization: unhandled attributes ";
     attrs.print(llvm::errs());
     llvm::errs() << "\n";
@@ -1151,6 +1151,35 @@ static void checkAllowedAttributes(const Decl *D) {
   }
 #endif
 }
+
+/// Asserts if the declaration has any declaration attributes other than the
+/// ones specified in the template parameters.
+///
+/// This is a no-op in release builds.
+///
+/// This is blatant duplication from checkAllowedAttributes.  The idea is
+/// to provide a migratory path for attributes to move to the new
+/// attribute representation.
+template <DeclAttrKind ...KINDS>
+static void checkAllowedDeclAttributes(const Decl *D) {
+#ifndef NDEBUG
+  auto attrs = D->getAttrs();
+
+  llvm::DenseSet<int> Kinds;
+  for (DeclAttrKind AK : { KINDS... })
+    Kinds.insert((int)AK);
+
+  for (auto Attr : attrs) {
+    if (!Kinds.count((int)Attr->getKind())) {
+      llvm::errs() << "Serialization: unhandled attributes ";
+      Attr->print(llvm::errs());
+      llvm::errs() << "\n";
+      llvm_unreachable("TODO: handle the above attributes");
+    }
+  }
+#endif
+}
+
 
 static bool isForced(const Decl *D,
                      const llvm::DenseMap<Serializer::DeclTypeUnion,
@@ -1497,10 +1526,11 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_asmname, AK_assignment, AK_conversion, AK_IBAction, AK_infix,
+      AK_assignment, AK_conversion, AK_IBAction, AK_infix,
       AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
+    checkAllowedDeclAttributes<DAK_asmname>(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 
@@ -1532,11 +1562,12 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getAccessorStorageDecl()),
                            nameComponents);
     
-    if (!fn->getAttrs().AsmName.empty())
+    if (auto AsmA = fn->getAttrs().getAttribute<AsmnameAttr>()) {
       FuncAsmNameLayout::emitRecord(Out, ScratchRecord,
                                     DeclTypeAbbrCodes[FuncAsmNameLayout::Code],
-                                    fn->getAttrs().AsmName);
-      
+                                    AsmA->Name);
+    }
+
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
     // Write both argument and body parameters. This is important for proper

@@ -821,6 +821,9 @@ ERROR(unknown_attribute,attribute_parsing,none,
       "unknown attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,attribute_parsing,none,
       "duplicate attribute", ())
+NOTE(previous_attribute,parsing,none,
+     "attribute already specified here", ())
+
 ERROR(invalid_attribute_inversion,attribute_parsing,none,
       "attribute may not be inverted", ())
 ERROR(cannot_combine_attribute,attribute_parsing,none,

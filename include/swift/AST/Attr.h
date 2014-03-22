@@ -25,6 +25,7 @@
 
 namespace swift {
 class ASTPrinter;
+class ASTContext;
 
 /// The associativity of a binary operator.
 enum class Associativity {
@@ -127,16 +128,22 @@ enum AttrKind {
   AK_Count
 };
 
+// FIXME: DeclAttrKind and AttrKind should eventually be merged, but
+// there is currently a representational difference as one set of
+// attributes is migrated from one implementation to another.
+enum DeclAttrKind {
+#define DECL_ATTR(X) DAK_##X,
+#include "swift/AST/Attr.def"
+  DAK_Count
+};
+
 // Define enumerators for each type attribute, e.g. TAK_weak.
 enum TypeAttrKind {
-#define ATTR(X)
 #define TYPE_ATTR(X) TAK_##X,
 #include "swift/AST/Attr.def"
   TAK_Count
 };
 
-  
-  
 /// TypeAttributes - These are attributes that may be applied to types.
 class TypeAttributes {
   // Get a SourceLoc for every possible attribute that can be parsed in source.
@@ -209,7 +216,72 @@ public:
   unsigned getOpenedID() const { return *OpenedID; }
 };
 
-  
+class AttributeBase {
+public:
+  /// The source range of the attribute.
+  const SourceRange Range;
+
+  /// The location of the attribute.
+  SourceLoc getLocation() const { return Range.Start; }
+
+  /// Return the source range of the attribute.
+  SourceRange getRange() const { return Range; }
+
+  // Only allow allocation of attributes using the allocator in ASTContext
+  // or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = alignof(AttributeBase));
+
+  // Make placement new and vanilla new/delete illegal for attributes.
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+  void *operator new(size_t Bytes, void *Mem) throw() = delete;
+
+  AttributeBase(const AttributeBase &) = delete;
+
+protected:
+  AttributeBase(SourceRange Range) : Range(Range) {}
+};
+
+class DeclAttributes;
+
+  /// Represents one declaration attribute.
+class DeclAttribute : public AttributeBase {
+  friend class DeclAttributes;
+protected:
+  const DeclAttrKind DK;
+  DeclAttribute *Next;
+
+  DeclAttribute(DeclAttrKind DK, SourceRange Range) :
+    AttributeBase(Range),
+    DK(DK),
+    Next(nullptr) {}
+
+public:
+  DeclAttrKind getKind() const { return DK; }
+
+  /// Print the attribute to the provided ASTPrinter.
+  void print(ASTPrinter &Printer) const;
+
+  /// Print the attribute to the provided stream.
+  void print(llvm::raw_ostream &OS) const;
+};
+
+/// Defines the @asmname attribute.
+class AsmnameAttr : public DeclAttribute {
+public:
+  AsmnameAttr(StringRef Name, SourceRange Range)
+    : DeclAttribute(DAK_asmname, Range),
+      Name(Name) {}
+
+  /// The symbol name.
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_asmname;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Source locations for every possible attribute that can be parsed in
@@ -219,6 +291,9 @@ class DeclAttributes {
 
   unsigned NumAttrsSet : 8;
   unsigned NumVirtualAttrsSet : 8;
+
+  /// Linked list of declaration attributes.
+  DeclAttribute *DeclAttrs;
 
 public:
   /// The location of the first '@' in the attribute specifier.
@@ -231,8 +306,6 @@ public:
   /// they are not allowed in that context.
   SourceLoc AtLoc;
 
-  StringRef AsmName;
-
   /// When the mutating attribute is present (i.e., we have a location for it),
   /// this indicates whether it was inverted (@!mutating) or not (@mutating).
   /// Clients should generally use the getMutating() accessor.
@@ -242,14 +315,15 @@ public:
   /// the declaration.
   CharSourceRange CommentRange;
 
-  DeclAttributes() : NumAttrsSet(0), NumVirtualAttrsSet(0) {}
+  DeclAttributes() : NumAttrsSet(0), NumVirtualAttrsSet(0),
+                     DeclAttrs(nullptr) {}
 
   bool shouldSaveInAST() const {
-    return AtLoc.isValid() || NumAttrsSet != 0;
+    return AtLoc.isValid() || NumAttrsSet != 0 || DeclAttrs;
   }
 
-  bool isEmpty() const {
-    return NumAttrsSet == 0;
+  bool containsTraditionalAttributes() const {
+    return NumAttrsSet != 0;
   }
 
   bool hasNonVirtualAttributes() const {
@@ -280,7 +354,7 @@ public:
   bool has(AttrKind A) const {
     return HasAttr[A];
   }
-  
+
   SourceLoc getLoc(AttrKind A) const {
     return AttrLocs[A];
   }
@@ -310,6 +384,11 @@ public:
 
   void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
     for (auto Loc : AttrLocs) {
+      if (Loc.isValid())
+        Locs.push_back(Loc);
+    }
+    for (auto Attr : *this) {
+      auto Loc = Attr->getLocation();
       if (Loc.isValid())
         Locs.push_back(Loc);
     }
@@ -374,6 +453,58 @@ public:
 
   void print(llvm::raw_ostream &OS) const;
   void print(ASTPrinter &Printer) const;
+
+  template <typename T, typename DERIVED> class iterator_base {
+    T* Impl;
+  public:
+    iterator_base(T* Impl) : Impl(Impl) {}
+    DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
+    bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
+    bool operator!=(const iterator_base &X) const { return X.Impl != Impl; }
+    T* operator*() const { return Impl; }
+    T& operator->() const { return *Impl; }
+  };
+
+  /// Add a constructed DeclAttribute to this list.
+  void add(DeclAttribute *Attr) {
+    Attr->Next = DeclAttrs;
+    DeclAttrs = Attr;
+  }
+
+  // Iterator interface over DeclAttribute objects.
+  class iterator : public iterator_base<DeclAttribute, iterator> {
+  public:
+    iterator(DeclAttribute *Impl) : iterator_base(Impl) {}
+  };
+
+  class const_iterator : public iterator_base<const DeclAttribute,
+                                              const_iterator> {
+  public:
+    const_iterator(const DeclAttribute *Impl) : iterator_base(Impl) {}
+  };
+
+  iterator begin() { return DeclAttrs; }
+  iterator end() { return nullptr; }
+  const_iterator begin() const { return DeclAttrs; }
+  const_iterator end() const { return nullptr; }
+
+  template <typename ATTR>
+  const ATTR* getAttribute() const {
+    for (auto Attr : *this)
+      if (const ATTR* SpecificAttr = dyn_cast<ATTR>(Attr))
+        return SpecificAttr;
+    return nullptr;
+  }
+
+  template <typename ATTR>
+  bool hasAttribute() const { return getAttribute<ATTR>() != nullptr; }
+
+  const DeclAttribute *getAttribute(DeclAttrKind DK) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK)
+        return Attr;
+    return nullptr;
+  }
 };
   
 } // end namespace swift

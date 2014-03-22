@@ -144,6 +144,75 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
   .Default(TAK_Count);
 }
 
+/// If the specified string is a valid declaration attribute,
+/// return the kind.  Otherwise, return DAK_Count as a sentinel.
+static DeclAttrKind getDeclAttrFromString(StringRef Str) {
+  return llvm::StringSwitch<DeclAttrKind>(Str)
+#define DECL_ATTR(X) .Case(#X, DAK_##X)
+#include "swift/AST/Attr.def"
+  .Default(DAK_Count);
+}
+
+bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, DeclAttrKind DK){
+  // Ok, it is a valid attribute, eat it, and then process it.
+  SourceLoc Loc = consumeToken();
+  bool DiscardAttribute = false;
+  const
+
+  // Diagnose duplicated attributes.
+  auto DuplicateAttribute = Attributes.getAttribute(DK);
+  if (DuplicateAttribute) {
+    // Delay issuing the diagnostic until we parse the attribute.
+    DiscardAttribute = true;
+  }
+
+  // Filled in during parsing.  If there is a duplicate
+  // diagnostic this can be used for better error presentation.
+  SourceRange AttrRange;
+
+  switch (DK) {
+    case DAK_Count:
+      llvm_unreachable("DAK_Count should not appear in parsing switch");
+    case DAK_asmname: {
+      if (!consumeIf(tok::equal)) {
+        diagnose(Loc, diag::asmname_expected_equals);
+        return false;
+      }
+
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Loc, diag::asmname_expected_string_literal);
+        return false;
+      }
+
+      SmallVector<Lexer::StringSegment, 1> Segments;
+      L->getStringLiteralSegments(Tok, Segments);
+      if (Segments.size() != 1 ||
+          Segments.front().Kind == Lexer::StringSegment::Expr) {
+        diagnose(Loc, diag::asmname_interpolated_string);
+      } else {
+        StringRef Name(
+                SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
+                SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, BufferID),
+                Segments.front().Length);
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+        if (!DiscardAttribute)
+          Attributes.add(new (Context) AsmnameAttr(Name, AttrRange));
+      }
+      consumeToken(tok::string_literal);
+      break;
+    }
+  };
+
+  if (DuplicateAttribute) {
+    diagnose(Loc, diag::duplicate_attribute)
+      .highlight(AttrRange);
+    diagnose(DuplicateAttribute->getLocation(), diag::previous_attribute)
+      .highlight(DuplicateAttribute->getRange());
+  }
+
+  return false;
+}
+
 /// \verbatim
 ///   attribute:
 ///     'asmname' '=' identifier
@@ -179,6 +248,12 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
                .Default(AK_Count);
   
   if (attr == AK_Count) {
+    // If the attribute follows the new representation, switch
+    // over to the alternate parsing path.
+    DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
+    if (DK != DAK_Count)
+      return parseNewDeclAttribute(Attributes, DK);
+
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
     else
@@ -190,7 +265,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     if (consumeIf(tok::equal)) {
       if (Tok.is(tok::identifier) ||
           Tok.is(tok::integer_literal) ||
-          Tok.is(tok::floating_literal))
+          Tok.is(tok::floating_literal) ||
+          Tok.is(tok::string_literal))
         consumeToken();
     }
     return true;
@@ -260,35 +336,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
       Attributes.clearAttribute(attr);
     }
     break;
-
-  case AK_asmname: {
-    if (!consumeIf(tok::equal)) {
-      diagnose(Loc, diag::asmname_expected_equals);
-      Attributes.clearAttribute(attr);
-      return false;
-    }
-
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Loc, diag::asmname_expected_string_literal);
-      Attributes.clearAttribute(attr);
-     return false;
-    }
-
-    SmallVector<Lexer::StringSegment, 1> Segments;
-    L->getStringLiteralSegments(Tok, Segments);
-    if (Segments.size() != 1 ||
-        Segments.front().Kind == Lexer::StringSegment::Expr) {
-      diagnose(Loc, diag::asmname_interpolated_string);
-      Attributes.clearAttribute(attr);
-    } else {
-      Attributes.AsmName = StringRef(
-          SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
-              SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, BufferID),
-          Segments.front().Length);
-    }
-    consumeToken(tok::string_literal);
-    break;
-  }
   }
 
   return false;
@@ -1615,7 +1662,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     bool ExternalAsmName = false;
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
       // asmname'd accessors don't need bodies.
-      if (Attributes.AsmName.empty()) {
+      if (!Attributes.hasAttribute<AsmnameAttr>()) {
         diagnose(Tok, diag::expected_lbrace_accessor, (unsigned)Kind);
         return true;
       }

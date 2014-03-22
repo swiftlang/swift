@@ -23,6 +23,13 @@
 
 using namespace swift;
 
+
+// Only allow allocation of attributes using the allocator in ASTContext.
+void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
+                                  unsigned Alignment) {
+  return C.Allocate(Bytes, Alignment);
+}
+
 /// A statically-allocated empty set of attributes.
 const DeclAttributes Decl::EmptyAttrs;
 
@@ -59,8 +66,6 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
   }
   if (isNoReturn())
     Printer << "@noreturn ";
-  if (!AsmName.empty())
-    Printer << "@asmname=\"" << AsmName << "\" ";
   if (isPostfix())
     Printer << "@postfix ";
   if (isObjC())
@@ -86,4 +91,22 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@required ";
   if (isOverride())
     Printer << "@override ";
+
+  for (auto DA : *this)
+    DA->print(Printer);
+}
+
+void DeclAttribute::print(ASTPrinter &Printer) const {
+  switch (getKind()) {
+    case DAK_asmname:
+      Printer << "@asmname=\"" << cast<AsmnameAttr>(this)->Name << "\" ";
+      break;
+    case DAK_Count:
+      llvm_unreachable("exceed declaration attribute kinds");
+  }
+}
+
+void DeclAttribute::print(llvm::raw_ostream &OS) const {
+  StreamPrinter P(OS);
+  print(P);
 }

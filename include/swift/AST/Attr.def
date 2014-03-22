@@ -18,6 +18,10 @@
 #define ATTR(X)
 #endif
 
+#ifndef DECL_ATTR
+#define DECL_ATTR(X)
+#endif
+
 #ifndef TYPE_ATTR
 #define TYPE_ATTR(X)
 #endif
@@ -55,6 +59,8 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 
+DECL_ATTR(asmname)
+
 ATTR(assignment)
 ATTR(class_protocol)
 ATTR(conversion)
@@ -64,7 +70,6 @@ ATTR(mutating)
 ATTR(resilient)
 ATTR(fragile)
 ATTR(born_fragile)
-ATTR(asmname)
 ATTR(noreturn)
 ATTR(prefix)
 ATTR(postfix)
@@ -87,5 +92,6 @@ VIRTUAL_ATTR(raw_doc_comment)
 
 #undef VIRTUAL_ATTR
 #undef IB_ATTR
+#undef DECL_ATTR
 #undef TYPE_ATTR
 #undef ATTR

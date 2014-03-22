@@ -1819,7 +1819,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (hasSelectorStyleSignature)
       fn->setHasSelectorStyleSignature();
     if (!asmname.empty())
-      fn->getMutableAttrs().AsmName = ctx.AllocateCopy(asmname);
+      // FIXME: deserialize range.
+      fn->getMutableAttrs().add(new (ctx) AsmnameAttr(asmname, SourceRange()));
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
         fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());

@@ -2611,7 +2611,7 @@ public:
 
     // Functions can have an asmname attribute.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (!func->getAttrs().AsmName.empty())
+      if (func->getAttrs().hasAttribute<AsmnameAttr>())
         return false;
     }
 
