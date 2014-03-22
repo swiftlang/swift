@@ -496,6 +496,24 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
   return AliasAnalysis::AliasResult::MayAlias;
 }
 
+
+//===----------------------------------------------------------------------===//
+//                                TBAA
+//===----------------------------------------------------------------------===//
+
+/// \brief return True if the TBAA rules for \p T1 and \p T2 dictate that typed
+/// access to these types is undefined.
+static bool typesForbidAliasing(SILType T1, SILType T2, SILModule *M) {
+  if (T1 == T2)
+    return false;
+  
+  // Classes can't alias non-class types.
+  if (T1.getClassOrBoundGenericClass() && T2.isTrivial(*M)) return true;
+  if (T2.getClassOrBoundGenericClass() && T1.isTrivial(*M)) return true;
+  
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//
@@ -515,6 +533,10 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
+
+  if (typesForbidAliasing(V1.getType(), V2.getType(), Mod))
+   return AliasResult::NoAlias;
+
   // Strip off any casts on V1, V2.
   V1 = V1.stripCasts();
   V2 = V2.stripCasts();

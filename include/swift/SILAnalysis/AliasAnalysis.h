@@ -41,11 +41,12 @@ public:
 private:
   using AliasCacheKey = std::pair<SILValue, SILValue>;
   llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
+  SILModule *Mod;
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
 
 public:
-  AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias) {}
+  AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias), Mod(M) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;

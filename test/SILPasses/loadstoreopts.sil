@@ -187,3 +187,21 @@ bb0(%0 : $Int):
   return %4 : $Int
 }
 
+// CHECK-LABEL: sil @tbaa_class_alias_nonclass
+// CHECK: strong_retain [[RET:%[0-9]+]]
+// CHECK: strong_retain [[RET]]
+// CHECK: return
+sil @tbaa_class_alias_nonclass : $@thin (@owned B, @inout Agg1) -> () {
+bb0(%0 : $B, %1 : $*Agg1):
+  %2 = alloc_box $B
+  %3 = load %1 : $*Agg1
+  %4 = store %3 to %1 : $*Agg1
+  %5 = load %2#1 : $*B
+  %6 = store %3 to %1 : $*Agg1
+  %7 = load %2#1 : $*B
+  %8 = strong_retain %5 : $B   //%7 and %5 should really be one load.
+  %9 = strong_retain %7 : $B
+  %10 = tuple()
+  %11 = return %10 : $()
+}
+
