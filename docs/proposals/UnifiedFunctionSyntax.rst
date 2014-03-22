@@ -1,0 +1,331 @@
+:orphan: 
+
+Unified Function Syntax via Selector Splitting
+==============================================
+
+Cocoa Selectors
+---------------
+A Cocoa selector is intended to convey what a method does or produces as well as what its various parameters are. For example, ``NSTableView`` has the following method::
+
+  - (void)moveRowAtIndex:(NSInteger)oldIndex toIndex:(NSInteger)newIndex;
+
+Note that there are three pieces of information in the selector ``moveRowAtIndex:toIndex:``:
+
+1. What the method is doing ("moving a row").
+2. What the first parameter is ("the index of the row we're moving").
+3. What the second parameter is ("the index we're moving to").
+
+However, there are only two selector pieces: "moveRowAtIndex" and "toIndex". The first selector piece is conveying both #1 and #2, and it reads well in English because the preposition "at" separates the action (``moveRow``) from the first parameter (``AtIndex``), while the second selector piece conveys #3. Cocoa conventions in this area are fairly stronger, where the first selector piece describes both the operation and the first parameter, and subsequent selector pieces describe the remaining parameters.
+
+Splitting Selectors at Prepositions
+-----------------------------------
+When importing an Objective-C selector, split the first selector piece into a base method name and a first parameter name. The actual split will occur just before the last preposition in the selector piece, using camelCase word boundaries to identify words. The resulting method signature is::
+
+  moveRow(atIndex:toIndex:)
+
+where ``moveRow`` is the base name, ``atIndex`` is the name of the first parameter (note that the 'a' has been automatically lowercased), and ``toIndex`` is the name of the second parameter.
+
+In the (fairly rare) case where there are two prepositions in the initial selector, splitting at the last preposition improves the likelihood of a better split, because the last prepositional phrase is more likely to pertain to the first parameter. For example,  ``appendBezierPathWithArcFromPoint:toPoint:radius:`` becomes::
+
+  appendBezierPathWithArc(fromPoint:toPoint:radius:)
+
+If there are no prepositions within the first selector piece, the entire first selector piece becomes the base name, and the first parameter is unnamed. For example ``UIView``'s ``insertSubview:atIndex:`` becomes::
+
+  insertSubview(_:atIndex:)
+
+where '_' is a placeholder for a parameter with no name.
+
+Calling Syntax
+--------------
+By splitting selectors into a base name and parameter names, Swift's keyword-argument calling syntax works naturally::
+
+  tableView.moveRow(atIndex: i, toIndex: j)
+  view.insertSubview(otherView, atIndex: i)
+
+The syntax generalizes naturally to global and local functions that have no object parameter, i.e.,::
+
+  NSMakeRange(location: loc, length: len)
+
+assuming that we had parameter names for C functions or a Swift overlap that provided them. It also nicely handles cases where parameter names aren't available, e.g.,::
+
+  NSMakeRange(loc, len)
+
+as well as variadic methods::
+
+  NSString.string(withFormat: "%@ : %@", key, value)
+
+Declaration Syntax
+------------------
+The existing "selector-style" declaration syntax can be extended to better support declaring functions with separate base names and first parameter names, i.e.::
+
+  func moveRow atIndex(Int) toIndex(Int)
+
+However, this declaration looks very little like the call site, which uses a parenthesized argument list, commas, and colons. Instead, we can mirror the call syntax directly::
+
+  func moveRow(atIndex: Int, toIndex: Int)
+
+Now, sometimes the API name that works well at the call site doesn't work well for the body of the function. For example, splitting the selector for ``UIView``'s ``contentHuggingPriorityForAxis::`` results in:
+
+  func contentHuggingPriority(forAxis: UILayoutConstraintAxis) -> UILayoutPriority
+
+The name ``forAxis`` works well at the call site, but not within the function body. So, we allow one to specify the name of the parameter for the body of the function::
+
+  func contentHuggingPriority(forAxis(axis): UILayoutConstraintAxis) -> UILayoutPriority {
+    // use 'axis' in the body
+  }
+
+One can use '_' in either parameter name position to specify that the parameter has no name.
+
+Method Names
+------------
+The name of a method in this scheme is determined by the base name and the names of each of the parameters, and is written as::
+
+  basename(param1:param2:param3:)
+
+to mirror the form of declarations and calls, with types, arguments, and commas omitted. In code, one can refer to the name of a function either via its basename (if the parameters can be inferred or are provided via a call), i.e.,
+
+ let f: (UILayoutConstraintAxis) -> UILayoutPriority = view.contentHuggingPriority
+
+or by spelling its complete name in backticks, as one would do when referring to an optional method in a delegate::
+
+  if let method = delegate.`tableView(_:viewForTableColumn:row:)` {
+    // ... 
+  }
+
+Initializers
+------------
+Objective-C ``init`` methods correspond to initializers in Swift. Swift splits the selector name after the ``init``. For example, ``NSView``'s ``initWitFrame:`` method becomes the initializer::
+
+  init(withFrame: NSRect)
+
+There is a degenerate case here where the ``init`` method has additional words following ``init``, but there is no parameter with which to associate the information, such as with ``initForIncrementalLoad``. This is currently handled by adding an empty tuple parameter to store the name, i.e.::
+
+  init(forIncrementalLoad:())
+
+which requires the somewhat unfortunate initialization syntax::
+
+  NSBitmapImageRep(forIncrementalLoad:())
+
+Fortunately, this is a relatively isolated problem: Cocoa and Cocoa Touch contain only four selectors of this form::
+
+  initForIncrementalLoad
+  initListDescriptor
+  initRecordDescriptor
+  initToMemory
+
+With a number that small, it's easy enough to provide overlays.
+
+Handling Poor Mappings
+----------------------
+The split-at-last-preposition heuristic works well for a significant number of selectors, but it is not perfect. Therefore, we will introduce an attribute into Objective-C that allows one to specify the Swift method name for that Objective-C API. For example, the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will come into Swift as::
+
+  class func bookmarkDataWithContents(ofURL(bookmarkFileURL): NSURL, inout error: NSError) -> NSData
+
+However, one can provide a different mapping with the ``method_name`` attribute::
+
+  + (NSData *)bookmarkDataWithContentsOfURL:(NSURL *)bookmarkFileURL error:(NSError **)error __attribute__((method_name(bookmarkData(withContentsOfURL:error:))))
+
+This attribute specifies the Swift method signature corresponding to that selector. Presumably, the ``method_name`` attribute will be wrapped in a macro supplied by Foundation, i.e.,::
+
+  #define NS_METHOD_NAME(Name) __attribute__((method_name(Name)))
+
+A mapping in the other direction is also important, allowing one to associate a specific Objective-C selector with a method. For example, a Boolean property::
+
+  var enabled: Bool {
+    @selector(isEnabled) get {
+      // ...
+    }
+
+    set {
+      // ...
+    }
+  }
+
+Which Prepositions?
+-------------------
+
+English has a large number of prepositions, and many of those words also have other rules as adjectives, adverbs, and so on. The following list, taken from `The English Club`_, with poetic, archaic, and non-US forms removed, provided the starting point for the list of prepositions used in splitting. The **bolded** prepositions are used to split; notes indicate whether Cocoa uses this preposition as a preposition in any of its selectors, as well as any special circumstances that affect inclusion or exclusion from the list.
+
++----------------+---------+----------------------------+
+|Preposition     |In Cocoa?|   Notes                    |
++----------------+---------+----------------------------+
+| Aboard         | No      |                            |
++----------------+---------+----------------------------+
+| About          | No*     | Used as an adjective       |
++----------------+---------+----------------------------+
+| **Above**      | Yes     |                            |
++----------------+---------+----------------------------+
+| Across         | No      |                            |
++----------------+---------+----------------------------+
+| **After**      | Yes     |                            |
++----------------+---------+----------------------------+
+| Against        | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| **Along**      | Yes     |                            |
++----------------+---------+----------------------------+
+| **Alongside**  | Yes     |                            |
++----------------+---------+----------------------------+
+| Amid           | No      |                            |
++----------------+---------+----------------------------+
+| Among          | No      |                            |
++----------------+---------+----------------------------+
+| Anti           | No*     | Used as an adjective       |
++----------------+---------+----------------------------+
+| Around         | No      |                            |
++----------------+---------+----------------------------+
+| **As**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Astride        | No      |                            |
++----------------+---------+----------------------------+
+| **At**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Bar            | No*     | Used as a noun             |
++----------------+---------+----------------------------+
+| Barring        | No      |                            |
++----------------+---------+----------------------------+
+| **Before**     | Yes     |                            |
++----------------+---------+----------------------------+
+| Behind         | No      |                            |
++----------------+---------+----------------------------+
+| **Below**      | Yes     |                            |
++----------------+---------+----------------------------+
+| Beneath        | No      |                            |
++----------------+---------+----------------------------+
+| Beside         | No      |                            |
++----------------+---------+----------------------------+
+| Besides        | No      |                            |
++----------------+---------+----------------------------+
+| Between        | Yes     | Not amenable to parameters |
++----------------+---------+----------------------------+
+| Beyond         | No      |                            |
++----------------+---------+----------------------------+
+| But            | No      |                            |
++----------------+---------+----------------------------+
+| **By**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Circa          | No      |                            |
++----------------+---------+----------------------------+
+| Concerning     | No      |                            |
++----------------+---------+----------------------------+
+| Considering    | No      |                            |
++----------------+---------+----------------------------+
+| Counting       | No*     | Used as an adjective       |
++----------------+---------+----------------------------+
+| Cum            | No      |                            |
++----------------+---------+----------------------------+
+| Despite        | No      |                            |
++----------------+---------+----------------------------+
+| Down           | No*     | Used as a noun             |
++----------------+---------+----------------------------+
+| During         | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| Except         | No      |                            |
++----------------+---------+----------------------------+
+| Excepting      | No      |                            |
++----------------+---------+----------------------------+
+| Excluding      | No      |                            |
++----------------+---------+----------------------------+
+| **Following**  | Yes     |                            |
++----------------+---------+----------------------------+
+| **For**        | Yes     |                            |
++----------------+---------+----------------------------+
+| **From**       | Yes     |                            |
++----------------+---------+----------------------------+
+| **Given**      | Yes     |                            |
++----------------+---------+----------------------------+
+| **In**         | Yes     |                            |
++----------------+---------+----------------------------+
+| **Including**  | Yes     |                            |
++----------------+---------+----------------------------+
+| **Inside**     | Yes     |                            |
++----------------+---------+----------------------------+
+| **Into**       | Yes     |                            |
++----------------+---------+----------------------------+
+| Less           | No*     | Always "less than"         |
++----------------+---------+----------------------------+
+| Like           | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| Minus          | No      |                            |
++----------------+---------+----------------------------+
+| Near           | No      |                            |
++----------------+---------+----------------------------+
+| Notwithstanding| No      |                            |
++----------------+---------+----------------------------+
+| **Of**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Off            | No*     | Used as a noun             |
++----------------+---------+----------------------------+
+| **On**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Onto           | No      |                            |
++----------------+---------+----------------------------+
+| Opposite       | No      |                            |
++----------------+---------+----------------------------+
+| Out            | No*     | Used as an adverb          |
++----------------+---------+----------------------------+
+| Outside        | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| **Over**       | Yes     |                            |
++----------------+---------+----------------------------+
+| Past           | No      |                            |
++----------------+---------+----------------------------+
+| Pending        | No*     | Used as an adjective       |
++----------------+---------+----------------------------+
+| **Per**        | Yes     |                            |
++----------------+---------+----------------------------+
+| Plus           | No      | Used as an adjective       |
++----------------+---------+----------------------------+
+| Pro            | No      |                            |
++----------------+---------+----------------------------+
+| Regarding      | No      |                            |
++----------------+---------+----------------------------+
+| Respecting     | No      |                            |
++----------------+---------+----------------------------+
+| Round          | No      |                            |
++----------------+---------+----------------------------+
+| Save           | No*     | Used as adjective, verb    |
++----------------+---------+----------------------------+
+| Saving         | No*     | Used as adjective          |
++----------------+---------+----------------------------+
+| **Since**      | Yes     |                            |
++----------------+---------+----------------------------+
+| Than           | No*     | Always "greater than"      |
++----------------+---------+----------------------------+
+| Through        | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| Throughout     | No      |                            |
++----------------+---------+----------------------------+
+| **To**         | Yes     |                            |
++----------------+---------+----------------------------+
+| Toward         | No      |                            |
++----------------+---------+----------------------------+
+| Towards        | No      |                            |
++----------------+---------+----------------------------+
+| Under          | No      |                            |
++----------------+---------+----------------------------+
+| Underneath     | No      |                            |
++----------------+---------+----------------------------+
+| Unlike         | No      |                            |
++----------------+---------+----------------------------+
+| **Until**      | Yes     |                            |
++----------------+---------+----------------------------+
+| Unto           | No      |                            |
++----------------+---------+----------------------------+
+| Up             | No*     | Used as adjective          |
++----------------+---------+----------------------------+
+| Upon           | Yes*    | Misleading when split      |
++----------------+---------+----------------------------+
+| Versus         | No      |                            |
++----------------+---------+----------------------------+
+| **Via**        | Yes     |                            |
++----------------+---------+----------------------------+
+| **With**       | Yes     |                            |
++----------------+---------+----------------------------+
+| **Within**     | Yes     |                            |
++----------------+---------+----------------------------+
+| **Without**    | Yes     |                            |
++----------------+---------+----------------------------+
+| Worth          | No      |                            |
++----------------+---------+----------------------------+
+
+.. _the english club: http://www.englishclub.com/grammar/prepositions-list.htm
