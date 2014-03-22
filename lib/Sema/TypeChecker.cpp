@@ -40,13 +40,6 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
   : Context(Ctx), Diags(Diags)
 {
   Context.addMutationListener(*this);
-
-  // Add any external definitions already part of the module.
-  // Note: the underlying vector can get reallocated during this traversal.
-  // We don't want to pick up the new external definitions.
-  unsigned n = Context.ExternalDefinitions.size();
-  for (unsigned i = Context.LastCheckedExternalDefinition; i != n; ++i)
-    handleExternalDecl(Context.ExternalDefinitions[i]);
 }
 
 TypeChecker::~TypeChecker() {
@@ -266,7 +259,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   TypeChecker TC(SF.getASTContext());
   auto &DefinedFunctions = TC.definedFunctions;
-  size_t existingExternalDecls = TC.Context.ExternalDefinitions.size();
   
   // Lookup the swift module.  This ensures that we record all known protocols
   // in the AST.
@@ -412,11 +404,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         TC.typeCheckAbstractFunctionBody(AFD);
         continue;
       }
-       if (isa<StructDecl>(decl) || isa<ClassDecl>(decl) ||
-           isa<EnumDecl>(decl) || isa<ProtocolDecl>(decl)) {
-         if (currentExternalDef < existingExternalDecls)
-           TC.handleExternalDecl(decl);
-         continue;
+      if (isa<NominalTypeDecl>(decl)) {
+        TC.handleExternalDecl(decl);
+        continue;
       }
       llvm_unreachable("Unhandled external definition kind");
     }
