@@ -506,11 +506,49 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 static bool typesForbidAliasing(SILType T1, SILType T2, SILModule *M) {
   if (T1 == T2)
     return false;
-  
-  // Classes can't alias non-class types.
-  if (T1.getClassOrBoundGenericClass() && T2.isTrivial(*M)) return true;
-  if (T2.getClassOrBoundGenericClass() && T1.isTrivial(*M)) return true;
-  
+
+  // Address types do not alias value types.
+  if (T1.getCategory() != T2.getCategory())
+    return false;
+
+  // Strip the SIL address type.
+  T1 = T1.getObjectType();
+  T2 = T2.getObjectType();
+
+  bool IsObjPtr1 = isa<BuiltinObjectPointerType>(T1.getSwiftRValueType());
+  bool IsClass1 = T1.getClassOrBoundGenericClass();
+  bool IsStruct1 = T1.getStructOrBoundGenericStruct();
+  bool IsEnum1 = T1.getEnumOrBoundGenericEnum();
+
+  bool IsObjPtr2 = isa<BuiltinObjectPointerType>(T2.getSwiftRValueType());
+  bool IsClass2 = T2.getClassOrBoundGenericClass();
+  bool IsStruct2 = T2.getStructOrBoundGenericStruct();
+  bool IsEnum2 = T2.getEnumOrBoundGenericEnum();
+
+  // Builtin.ObjectPointer aliases with classes.
+  if (IsObjPtr1 && IsClass2) return false;
+  if (IsObjPtr2 && IsClass1) return false;
+
+  // Classes don't alias non-classes.
+  if (IsClass1 && !IsClass2) return true;
+  if (IsClass2 && !IsClass1) return true;
+
+  // If the types have unbound generic arguments then we don't know the possible
+  // range of the type. A type such as $Array<Int> may alias $Array<T>.
+  // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
+  // don't alias.
+  // TODO: implement the full comparison of generic types.
+  bool hasUnboundTypes = hasUnboundGenericTypes(T1.getSwiftRValueType()) ||
+                         hasUnboundGenericTypes(T2.getSwiftRValueType());
+
+  // Structs don't alias non-structs.
+  if (IsStruct1 && !hasUnboundTypes) return true;
+  if (IsStruct2 && !hasUnboundTypes) return true;
+
+  // Enums don't alias non-enums.
+  if (IsEnum1 && !hasUnboundTypes) return true;
+  if (IsEnum2 && !hasUnboundTypes) return true;
+
   return false;
 }
 
