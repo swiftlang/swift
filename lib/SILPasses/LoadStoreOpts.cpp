@@ -103,7 +103,7 @@ invalidateAliasingLoads(SILInstruction *Inst,
 /// duplicated loads.
 bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
   bool Changed = false;
-  StoreInst *PrevStore = 0;
+  StoreInst *PrevStore = nullptr;
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
   auto II = BB->begin(), E = BB->end();
@@ -175,7 +175,7 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
         SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
         recursivelyDeleteTriviallyDeadInstructions(LI, true);
         Changed = true;
-        LI = 0;
+        LI = nullptr;
         NumDupLoads++;
         break;
       }
@@ -218,7 +218,7 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
     if (Inst->mayReadFromMemory()) {
       DEBUG(llvm::dbgs() << "    Found an instruction that reads from memory."
             " Invalidating store.\n");
-      PrevStore = 0;
+      PrevStore = nullptr;
     }
 
     // If we have an instruction that may write to memory and we can not prove
@@ -228,7 +228,7 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
       invalidateAliasingLoads(Inst, Loads, AA);
-      PrevStore = 0;
+      PrevStore = nullptr;
     }
   }
 
