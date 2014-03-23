@@ -17,6 +17,7 @@ main(void) {
     }
   }
   uint64_t delta = mach_absolute_time() - start;
+  printf("%f nanoseconds\n", (double)delta);
   printf("%f ns/lap\n", (double)delta / (double)LAPS);
 
   return 0;
