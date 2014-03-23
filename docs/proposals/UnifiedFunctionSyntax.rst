@@ -7,50 +7,48 @@ Unified Function Syntax via Selector Splitting
 
 Cocoa Selectors
 ---------------
-A Cocoa selector is intended to convey what a method does or produces as well as what its various parameters are. For example, ``NSTableView`` has the following method::
+A Cocoa selector is intended to convey what a method does or produces as well as what its various arguments are. For example, ``NSTableView`` has the following method::
 
   - (void)moveRowAtIndex:(NSInteger)oldIndex toIndex:(NSInteger)newIndex;
 
 Note that there are three pieces of information in the selector ``moveRowAtIndex:toIndex:``:
 
 1. What the method is doing ("moving a row").
-2. What the first parameter is ("the index of the row we're moving").
-3. What the second parameter is ("the index we're moving to").
+2. What the first argument is ("the index of the row we're moving").
+3. What the second argument is ("the index we're moving to").
 
-However, there are only two selector pieces: "moveRowAtIndex" and "toIndex". The first selector piece is conveying both #1 and #2, and it reads well in English because the preposition "at" separates the action (``moveRow``) from the first parameter (``AtIndex``), while the second selector piece conveys #3. Cocoa conventions in this area are fairly strong, where the first selector piece describes both the operation and the first parameter, and subsequent selector pieces describe the remaining parameters.
-
-FIXME: parameter -> argument
+However, there are only two selector pieces: "moveRowAtIndex" and "toIndex". The first selector piece is conveying both #1 and #2, and it reads well in English because the preposition "at" separates the action (``moveRow``) from the first argument (``AtIndex``), while the second selector piece conveys #3. Cocoa conventions in this area are fairly strong, where the first selector piece describes both the operation and the first argument, and subsequent selector pieces describe the remaining arguments.
 
 Splitting Selectors at Prepositions
 -----------------------------------
-When importing an Objective-C selector, split the first selector piece into a base method name and a first parameter name. The actual split will occur just before the last preposition in the selector piece, using camelCase word boundaries to identify words. The resulting method name is::
+When importing an Objective-C selector, split the first selector piece into a base method name and a first argument name. The actual split will occur just before the last preposition in the selector piece, using camelCase word boundaries to identify words. The resulting method name is::
 
   moveRow(atIndex:toIndex:)
 
-where ``moveRow`` is the base name, ``atIndex`` is the name of the first parameter (note that the 'a' has been automatically lowercased), and ``toIndex`` is the name of the second parameter.
+where ``moveRow`` is the base name, ``atIndex`` is the name of the first argument (note that the 'a' has been automatically lowercased), and ``toIndex`` is the name of the second argument.
 
-In the (fairly rare) case where there are two prepositions in the initial selector, splitting at the last preposition improves the likelihood of a better split, because the last prepositional phrase is more likely to pertain to the first parameter. For example,  ``appendBezierPathWithArcFromPoint:toPoint:radius:`` becomes::
+In the (fairly rare) case where there are two prepositions in the initial selector, splitting at the last preposition improves the likelihood of a better split, because the last prepositional phrase is more likely to pertain to the first argument. For example,  ``appendBezierPathWithArcFromPoint:toPoint:radius:`` becomes::
 
   appendBezierPathWithArc(fromPoint:toPoint:radius:)
 
-If there are no prepositions within the first selector piece, the entire first selector piece becomes the base name, and the first parameter is unnamed. For example ``UIView``'s ``insertSubview:atIndex:`` becomes::
+If there are no prepositions within the first selector piece, the entire first selector piece becomes the base name, and the first argument is unnamed. For example ``UIView``'s ``insertSubview:atIndex:`` becomes::
 
   insertSubview(_:atIndex:)
 
-where '_' is a placeholder for a parameter with no name.
+where '_' is a placeholder for an argument with no name.
 
 Calling Syntax
 --------------
-By splitting selectors into a base name and parameter names, Swift's keyword-argument calling syntax works naturally::
+By splitting selectors into a base name and argument names, Swift's keyword-argument calling syntax works naturally::
 
   tableView.moveRow(atIndex: i, toIndex: j)
   view.insertSubview(someView, atIndex: i)
 
-The syntax generalizes naturally to global and local functions that have no object parameter, i.e.,::
+The syntax generalizes naturally to global and local functions that have no object argument, i.e.,::
 
   NSMakeRange(location: loc, length: len)
 
-assuming that we had parameter names for C functions or a Swift overlay that provided them. It also nicely handles cases where parameter names aren't available, e.g.,::
+assuming that we had argument names for C functions or a Swift overlay that provided them. It also nicely handles cases where argument names aren't available, e.g.,::
 
   NSMakeRange(loc, len)
 
@@ -60,7 +58,7 @@ as well as variadic methods::
 
 Declaration Syntax
 ------------------
-The existing "selector-style" declaration syntax can be extended to better support declaring functions with separate base names and first parameter names, i.e.::
+The existing "selector-style" declaration syntax can be extended to better support declaring functions with separate base names and first argument names, i.e.::
 
   func moveRow atIndex(Int) toIndex(Int)
 
@@ -68,7 +66,7 @@ However, this declaration looks very little like the call site, which uses a par
 
   func moveRow(atIndex: Int, toIndex: Int)
 
-Now, sometimes the API name that works well at the call site doesn't work well for the body of the function. For example, splitting the selector for ``UIView``'s ``contentHuggingPriorityForAxis::`` results in:
+Now, sometimes the argument name that works well at the call site doesn't work well for the body of the function. For example, splitting the selector for ``UIView``'s ``contentHuggingPriorityForAxis::`` results in:
 
   func contentHuggingPriority(forAxis: UILayoutConstraintAxis) -> UILayoutPriority
 
@@ -78,16 +76,16 @@ The name ``forAxis`` works well at the call site, but not within the function bo
     // use 'axis' in the body
   }
 
-One can use '_' in either parameter name position to specify that the parameter has no name. For example::
+One can use '_' in either the argument or parameter name position to specify that there is no name. For example::
 
-  func f(_(a): Int,  // no API name; parameter name is 'a'
-         b(_): Int)  // API name is 'b'; no parameter name
+  func f(_(a): Int)  // no argument name; parameter name is 'a'
+  func g(b(_): Int)  // argument name is 'b'; no parameter name
 
-The first parameter doesn't support keyword arguments; it is what an imported C or C++ function would use. The second parameter is less interesting: there is an API name for it, but the parameter itself is no longer used within the function, and is presumably only kept around for backward compatibility.
+The first function doesn't support keyword arguments; it is what an imported C or C++ function would use. The second function is likely to be fairly common, and is therefore less interesting: an argument name for its only parameter, but the parameter itself is no longer used within the function, and is presumably only kept around for backward compatibility.
 
 Method Names
 ------------
-The name of a method in this scheme is determined by the base name and the names of each of the parameters, and is written as::
+The name of a method in this scheme is determined by the base name and the names of each of the arguments, and is written as::
 
   basename(param1:param2:param3:)
 
@@ -107,7 +105,7 @@ Objective-C ``init`` methods correspond to initializers in Swift. Swift splits t
 
   init(withFrame: NSRect)
 
-There is a degenerate case here where the ``init`` method has additional words following ``init``, but there is no parameter with which to associate the information, such as with ``initForIncrementalLoad``. This is currently handled by adding an empty tuple parameter to store the name, i.e.::
+There is a degenerate case here where the ``init`` method has additional words following ``init``, but there is no argument with which to associate the information, such as with ``initForIncrementalLoad``. This is currently handled by adding an empty tuple parameter to store the name, i.e.::
 
   init(forIncrementalLoad:())
 
