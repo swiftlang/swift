@@ -1293,6 +1293,7 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     Options.TypeDefinitions = true;
     Options.VarInitializers = true;
     Options.SkipImplicit = true;
+    Options.ExplodePatternBindingDecls = true;
 
     SmallVector<Decl *, 32> topLevelDecls;
     M->getTopLevelDecls(topLevelDecls);

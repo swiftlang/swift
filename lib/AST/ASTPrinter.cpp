@@ -390,8 +390,14 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
 }
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
-  if (!ASD->hasAccessorFunctions())
+  if (!ASD->hasAccessorFunctions()) {
+    // If this is a 'let' vardecl, we print { get } since it is part of the
+    // contract that it isn't mutable.
+    if (!ASD->isSettable(ASD->getDeclContext()))
+      Printer << " { get }";
+    
     return;
+  }
 
   bool InProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if (!InProtocol && !Options.FunctionDefinitions &&
@@ -606,7 +612,18 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   recordDeclLoc(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  Printer << "var ";
+  
+  // FIXME: We're not printing proper "{ get set }" annotations in pattern
+  // binding decls.  As a hack, scan the decl to find out if any of the
+  // variables are immutable, and if so, we print as 'let'.  This allows us to
+  // handle the 'let x = 4' case properly at least.
+  bool isMutable = true;
+  decl->getPattern()->forEachVariable([&](VarDecl *V) {
+    if (!V->isSettable(V->getDeclContext()))
+      isMutable = false;
+  });
+       
+  Printer << (isMutable ? "var " : "let ");
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
     // FIXME: Implement once we can pretty-print expressions.
@@ -702,6 +719,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printImplicitObjCNote(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
+  // Always print "var" here for a variable, even if it was defined as a
   Printer << "var ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
