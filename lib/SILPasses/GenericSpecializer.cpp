@@ -226,13 +226,6 @@ void TypeSubCloner::populateCloned() {
   }
 }
 
-/// \brief Return true if we can specialize this type.
-static bool isGenericType(Type F) {
-  return F.findIf([](Type type) ->bool {
-                    return isa<ArchetypeType>(type.getPointer());
-                  });
-}
-
 /// Check if we can clone and remap types this function.
 static bool canSpecializeFunction(SILFunction *F) {
   if (F->isExternalDeclaration())
@@ -258,7 +251,7 @@ static bool canSpecializeFunctionWithSubList(SILFunction *F,
       SILType::substFuncType(F->getModule(), F->getModule().getSwiftModule(),
                              SubsMap, F->getLoweredFunctionType(),
                                                 /*dropGenerics = */ true);
-  return !isGenericType(N);
+  return !hasUnboundGenericTypes(N);
 }
 
 namespace {

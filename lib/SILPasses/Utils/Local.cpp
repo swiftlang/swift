@@ -279,3 +279,9 @@ swift::canValueEscape(SILValue V) {
   
   return false;
 }
+
+bool swift::hasUnboundGenericTypes(Type T) {
+    return T.findIf([](Type type) ->bool {
+      return isa<ArchetypeType>(type.getPointer());
+    });
+ }
