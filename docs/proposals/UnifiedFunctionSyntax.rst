@@ -17,11 +17,13 @@ Note that there are three pieces of information in the selector ``moveRowAtIndex
 2. What the first parameter is ("the index of the row we're moving").
 3. What the second parameter is ("the index we're moving to").
 
-However, there are only two selector pieces: "moveRowAtIndex" and "toIndex". The first selector piece is conveying both #1 and #2, and it reads well in English because the preposition "at" separates the action (``moveRow``) from the first parameter (``AtIndex``), while the second selector piece conveys #3. Cocoa conventions in this area are fairly stronger, where the first selector piece describes both the operation and the first parameter, and subsequent selector pieces describe the remaining parameters.
+However, there are only two selector pieces: "moveRowAtIndex" and "toIndex". The first selector piece is conveying both #1 and #2, and it reads well in English because the preposition "at" separates the action (``moveRow``) from the first parameter (``AtIndex``), while the second selector piece conveys #3. Cocoa conventions in this area are fairly strong, where the first selector piece describes both the operation and the first parameter, and subsequent selector pieces describe the remaining parameters.
+
+FIXME: parameter -> argument
 
 Splitting Selectors at Prepositions
 -----------------------------------
-When importing an Objective-C selector, split the first selector piece into a base method name and a first parameter name. The actual split will occur just before the last preposition in the selector piece, using camelCase word boundaries to identify words. The resulting method signature is::
+When importing an Objective-C selector, split the first selector piece into a base method name and a first parameter name. The actual split will occur just before the last preposition in the selector piece, using camelCase word boundaries to identify words. The resulting method name is::
 
   moveRow(atIndex:toIndex:)
 
@@ -42,13 +44,13 @@ Calling Syntax
 By splitting selectors into a base name and parameter names, Swift's keyword-argument calling syntax works naturally::
 
   tableView.moveRow(atIndex: i, toIndex: j)
-  view.insertSubview(otherView, atIndex: i)
+  view.insertSubview(someView, atIndex: i)
 
 The syntax generalizes naturally to global and local functions that have no object parameter, i.e.,::
 
   NSMakeRange(location: loc, length: len)
 
-assuming that we had parameter names for C functions or a Swift overlap that provided them. It also nicely handles cases where parameter names aren't available, e.g.,::
+assuming that we had parameter names for C functions or a Swift overlay that provided them. It also nicely handles cases where parameter names aren't available, e.g.,::
 
   NSMakeRange(loc, len)
 
@@ -62,7 +64,7 @@ The existing "selector-style" declaration syntax can be extended to better suppo
 
   func moveRow atIndex(Int) toIndex(Int)
 
-However, this declaration looks very little like the call site, which uses a parenthesized argument list, commas, and colons. Instead, we can mirror the call syntax directly::
+However, this declaration looks very little like the call site, which uses a parenthesized argument list, commas, and colons. Let's eliminate the "selector-style" declaration syntax entirely. We can use the existing ("tuple-style") declaration syntax to mirror the call syntax directly::
 
   func moveRow(atIndex: Int, toIndex: Int)
 
@@ -76,7 +78,12 @@ The name ``forAxis`` works well at the call site, but not within the function bo
     // use 'axis' in the body
   }
 
-One can use '_' in either parameter name position to specify that the parameter has no name.
+One can use '_' in either parameter name position to specify that the parameter has no name. For example::
+
+  func f(_(a): Int,  // no API name; parameter name is 'a'
+         b(_): Int)  // API name is 'b'; no parameter name
+
+The first parameter doesn't support keyword arguments; it is what an imported C or C++ function would use. The second parameter is less interesting: there is an API name for it, but the parameter itself is no longer used within the function, and is presumably only kept around for backward compatibility.
 
 Method Names
 ------------
@@ -84,11 +91,11 @@ The name of a method in this scheme is determined by the base name and the names
 
   basename(param1:param2:param3:)
 
-to mirror the form of declarations and calls, with types, arguments, and commas omitted. In code, one can refer to the name of a function either via its basename (if the parameters can be inferred or are provided via a call), i.e.,
+to mirror the form of declarations and calls, with types, arguments, and commas omitted. In code, one can refer to the name of a function just by its basename, if the context provides enough information to uniquely determine the method. For example, when uncurrying a method reference to a variable of specified type::
 
  let f: (UILayoutConstraintAxis) -> UILayoutPriority = view.contentHuggingPriority
 
-or by spelling its complete name in backticks, as one would do when referring to an optional method in a delegate::
+To refer to the complete method name, place the method name in backticks, as in this reference to an optional method in a delegate::
 
   if let method = delegate.`tableView(_:viewForTableColumn:row:)` {
     // ... 
@@ -119,7 +126,7 @@ With a number that small, it's easy enough to provide overlays.
 
 Handling Poor Mappings
 ----------------------
-The split-at-last-preposition heuristic works well for a significant number of selectors, but it is not perfect. Therefore, we will introduce an attribute into Objective-C that allows one to specify the Swift method name for that Objective-C API. For example, the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will come into Swift as::
+The split-at-last-preposition heuristic works well for a significant number of selectors, but it is not perfect. Therefore, we will introduce an attribute into Objective-C that allows one to specify the Swift method name for that Objective-C API. For example, by default, the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will come into Swift as::
 
   class func bookmarkDataWithContents(ofURL(bookmarkFileURL): NSURL, inout error: NSError) -> NSData
 
@@ -127,7 +134,7 @@ However, one can provide a different mapping with the ``method_name`` attribute:
 
   + (NSData *)bookmarkDataWithContentsOfURL:(NSURL *)bookmarkFileURL error:(NSError **)error __attribute__((method_name(bookmarkData(withContentsOfURL:error:))))
 
-This attribute specifies the Swift method signature corresponding to that selector. Presumably, the ``method_name`` attribute will be wrapped in a macro supplied by Foundation, i.e.,::
+This attribute specifies the Swift method name corresponding to that selector. Presumably, the ``method_name`` attribute will be wrapped in a macro supplied by Foundation, i.e.,::
 
   #define NS_METHOD_NAME(Name) __attribute__((method_name(Name)))
 
@@ -148,7 +155,7 @@ Optionality and Ordering of Keyword Arguments
 A number of programming languages have keyword arguments in one form or another, including Ada, C#, Fortran 95, Lua, Objective-C, OCaml, Perl 6, Python, Ruby, and Smalltalk. All but Objective-C and Smalltalk allow re-ordering of arguments at the call site, and many allow one to provide arguments positionally without their associated name at the call site. However, Cocoa APIs were designed based on the understanding that they would not be re-ordered, and the sentence structure of some selectors depends on that. To that end, a new attribute ``call_arguments(strict)`` can be placed on any function and indicates that keyword arguments are required and cannot be reordered in calls to that function, i.e.::
 
   @call_arguments(strict)
-  func moveRow atIndex(Int) toIndex(Int)
+  func moveRow(atIndex:Int, toIndex:Int)
 
 Swift's Objective-C importer will automatically add this to all imported Objective-C methods, so that Cocoa APIs will retain their sentence structure.
 
