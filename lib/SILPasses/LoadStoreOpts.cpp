@@ -104,6 +104,12 @@ invalidateAliasingLoads(SILInstruction *Inst,
 bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
   bool Changed = false;
   StoreInst *PrevStore = nullptr;
+
+  // This is a list of LoadInst instructions that reference memory locations
+  // were not clobbered by instructions that write to memory. In other words
+  // the SSA value of the load is known to be the same value as the referenced
+  // pointer. The values in the list are potentially updated on each iteration
+  // of the loop below.
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
 
   auto II = BB->begin(), E = BB->end();
