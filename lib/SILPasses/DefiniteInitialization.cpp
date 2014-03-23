@@ -731,10 +731,55 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         if (auto *REI =
               dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
           diagnose(Module, Inst->getLoc(),
-                   diag::ivar_in_base_object_use_before_initialized,
-                   REI->getField()->getName().str());
+                   diag::property_in_base_object_use_before_initialized,
+                   REI->getField()->getName());
           return;
         }
+      
+      // If the upcast is used by a class_method + apply, then this is a call of
+      // a superclass method or property accessor.
+      ClassMethodInst *CMI = nullptr;
+      ApplyInst *AI = nullptr;
+      bool isUnrecognized = false;
+      
+      for (auto UI : SILValue(UCI, 0).getUses()) {
+        auto *User = UI->getUser();
+        if (auto *TAI = dyn_cast<ApplyInst>(User)) {
+          if (!AI) {
+            AI = TAI;
+            continue;
+          }
+        }
+        if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
+          if (!CMI) {
+            CMI = TCMI;
+            continue;
+          }
+        }
+        
+        isUnrecognized = true;
+        break;
+      }
+      
+      if (!isUnrecognized && CMI && AI) {
+        // TODO: Could handle many other members more specifically.
+        auto *Decl = CMI->getMember().getDecl();
+        if (auto *FD = dyn_cast<FuncDecl>(Decl)) {
+          // Calls to getters and setters are calls are accesses to a property.
+          if (FD->isAccessor()) {
+            diagnose(Module, Inst->getLoc(),
+                     diag::property_in_base_object_use_before_initialized,
+                     FD->getAccessorStorageDecl()->getName());
+            return;
+          }
+          
+          // Otherwise, this is a method access.
+          diagnose(Module, Inst->getLoc(),
+                   diag::method_in_base_object_use_before_initialized,
+                   FD->getName());
+          return;
+        }
+      }
     }
 
     // Otherwise, this is a general use of self.

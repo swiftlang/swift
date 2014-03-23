@@ -75,10 +75,13 @@ ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
 ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
       "address of variable '%0' taken before it is initialized",
       (StringRef))
-ERROR(ivar_in_base_object_use_before_initialized,sil_analysis,none,
-      "use of property '%0' in base object before super.init"
+ERROR(property_in_base_object_use_before_initialized,sil_analysis,none,
+      "use of property %0 in base object before super.init"
       " initializes it",
-      (StringRef))
+      (Identifier))
+ERROR(method_in_base_object_use_before_initialized,sil_analysis,none,
+      "use of method %0 in base object before super.init initializes it",
+      (Identifier))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
       "property '%0' not initialized at super.init call",
       (StringRef))
