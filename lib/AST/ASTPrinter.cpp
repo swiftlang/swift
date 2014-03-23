@@ -702,7 +702,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printImplicitObjCNote(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  Printer << "var ";
+  Printer << (decl->isLet() ? "let " : "var ");
   recordDeclLoc(decl);
   Printer << decl->getName().str();
   if (decl->hasType()) {
