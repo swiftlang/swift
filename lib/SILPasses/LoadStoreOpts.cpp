@@ -224,10 +224,12 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
     // If we have an instruction that may write to memory and we can not prove
     // that it and its operands can not alias a load we have visited, invalidate
     // that load.
-    if (Inst->mayWriteToMemory())
+    if (Inst->mayWriteToMemory()) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
       invalidateAliasingLoads(Inst, Loads, AA);
+      PrevStore = 0;
+    }
   }
 
   return Changed;
