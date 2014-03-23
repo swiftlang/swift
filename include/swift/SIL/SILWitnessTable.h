@@ -29,16 +29,16 @@
 #include <string>
 
 namespace swift {
-  class ClassDecl;
-  class SILFunction;
-  class SILModule;
-  class NormalProtocolConformance;
-  
+
+class ClassDecl;
+class SILFunction;
+class SILModule;
+class NormalProtocolConformance;
+
 /// A mapping from each requirement of a protocol to the SIL-level entity
 /// satisfying the requirement for a concrete type.
 class SILWitnessTable : public llvm::ilist_node<SILWitnessTable>,
-                        public SILAllocated<SILWitnessTable>
-{
+                        public SILAllocated<SILWitnessTable> {
 public:
   /// A witness table entry describing the witness for a method.
   struct MethodWitness {
@@ -140,29 +140,38 @@ public:
   };
   
 private:
+  /// The linkage of the witness table.
   SILLinkage Linkage;
+
+  /// The conformance mapped to this witness table.
   NormalProtocolConformance *Conformance;
+
+  /// The various witnesses containing in this witness table. Is empty if the
+  /// table has no witness entires or if it is a declaration.
   ArrayRef<Entry> Entries;
+
+  /// Whether or not this witness table is a declaration. This is separate from
+  /// whether or not entries is empty since you can have an empty witness table
+  /// that is not a declaration.
   bool IsDeclaration;
 
-  SILWitnessTable(SILModule &M,
-                  SILLinkage Linkage,
+  /// Private constructor for making SILWitnessTable definitions.
+  SILWitnessTable(SILModule &M, SILLinkage Linkage,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
-  SILWitnessTable(SILModule &M,
-                  SILLinkage Linkage,
+  /// Private constructor for making SILWitnessTable declarations.
+  SILWitnessTable(SILModule &M, SILLinkage Linkage,
                   NormalProtocolConformance *Conformance);
 
 public:
-  /// Create a new SILWitnessTable with the given entries.
-  static SILWitnessTable *create(SILModule &M,
-                                 SILLinkage Linkage,
+  /// Create a new SILWitnessTable definition with the given entries.
+  static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries);
 
-  static SILWitnessTable *create(SILModule &M,
-                                 SILLinkage Linkage,
+  /// Create a new SILWitnessTable declaration.
+  static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
                                  NormalProtocolConformance *Conformance);
 
   ~SILWitnessTable();
@@ -170,7 +179,10 @@ public:
   /// Return the AST ProtocolConformance this witness table represents.
   NormalProtocolConformance *getConformance() const { return Conformance; }
 
+  /// Returns true if this witness table is a declaration.
   bool isDeclaration() const { return IsDeclaration; }
+
+  /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
 
   /// Return all of the witness table entries.
@@ -181,6 +193,8 @@ public:
   
   /// Get the linkage of the witness table.
   SILLinkage getLinkage() const { return Linkage; }
+
+  /// Set the linkage of the witness table.
   void setLinkage(SILLinkage l) { Linkage = l; }
   
   /// Print the witness table.
@@ -188,7 +202,7 @@ public:
   void dump() const;
 };
   
-}
+} // end swift namespace
 
 //===----------------------------------------------------------------------===//
 // ilist_traits for SILWitnessTable
