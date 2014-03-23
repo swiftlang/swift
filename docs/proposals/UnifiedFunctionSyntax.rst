@@ -141,6 +141,15 @@ A mapping in the other direction is also important, allowing one to associate a 
     }
   }
 
+Optionality and Ordering of Keyword Arguments
+---------------------------------------------
+A number of programming languages have keyword arguments in one form or another, including Ada, C#, Fortran 95, Lua, Objective-C, OCaml, Perl 6, Python, Ruby, and Smalltalk. All but Objective-C and Smalltalk allow re-ordering of arguments at the call site, and many allow one to provide arguments positionally without their associated name at the call site. However, Cocoa APIs were designed based on the understanding that they would not be re-ordered, and the sentence structure of some selectors depends on that. To that end, a new attribute ``call_arguments(strict)`` can be placed on any function and indicates that keyword arguments are required and cannot be reordered in calls to that function, i.e.::
+
+  @call_arguments(strict)
+  func moveRow atIndex(Int) toIndex(Int)
+
+Swift's Objective-C importer will automatically add this to all imported Objective-C methods, so that Cocoa APIs will retain their sentence structure.
+
 Which Prepositions?
 -------------------
 
