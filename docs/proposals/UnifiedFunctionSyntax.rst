@@ -3,6 +3,8 @@
 Unified Function Syntax via Selector Splitting
 ==============================================
 
+.. contents::
+
 Cocoa Selectors
 ---------------
 A Cocoa selector is intended to convey what a method does or produces as well as what its various parameters are. For example, ``NSTableView`` has the following method::
