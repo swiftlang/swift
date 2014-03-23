@@ -205,3 +205,16 @@ bb0(%0 : $B, %1 : $*Agg1):
   %11 = return %10 : $()
 }
 
+// CHECK-LABEL: sil @store_loaded_value
+// CHECK-NOT: store
+// CHECK: return
+sil @store_loaded_value : $@thin (@inout Agg2, @inout Agg1) -> () {
+bb0(%0 : $*Agg2, %1 : $*Agg1):
+  %2 = load %1 : $*Agg1
+  %3 = load %0 : $*Agg2
+  %4 = store %2 to %1 : $*Agg1
+  %5 = store %3 to %0 : $*Agg2
+  %6 = tuple()
+  %7 = return %6 : $()
+}
+
