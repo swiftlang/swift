@@ -258,3 +258,51 @@ bb3:
   %2 = tuple ()
   return %2 : $()
 }
+
+
+
+sil @useSomeClass : $@thin (@owned SomeClass) -> ()
+
+
+// <rdar://problem/16382973> DI misses destroy_addr because allocbox_to_stack isn't preserving mark_uninitialized invariants
+// When allocbox_to_stack promotes the box, it should rewrite the multiple
+// strong_releases into destroy_addr/dealloc_stack pairs.  However, it needs to
+// make sure to use the MUI result for the destroy addr.
+
+// CHECK-LABEL sil @test_mui
+sil @test_mui : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %2 = alloc_box $SomeClass
+  // CHECK: [[STACK:%[0-9]+]] = alloc_stack
+  %3 = mark_uninitialized [var] %2#1 : $*SomeClass
+  // CHECK: [[MUI:%[0-9]+]] = mark_uninitialized
+  cond_br %0, bb1, bb3
+
+bb1:
+  %7 = function_ref @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %8 = metatype $@thick SomeClass.Type
+  %9 = apply %7(%8) : $@thin (@thick SomeClass.Type) -> @owned SomeClass
+
+  assign %9 to %3 : $*SomeClass
+  %11 = function_ref @useSomeClass : $@thin (@owned SomeClass) -> ()
+  %12 = load %3 : $*SomeClass
+  strong_retain %12 : $SomeClass
+  %14 = apply %11(%12) : $@thin (@owned SomeClass) -> ()
+  
+  strong_release %2#0 : $Builtin.ObjectPointer
+  // CHECK: destroy_addr [[MUI]]
+  // CHECK-NEXT: dealloc_stack [[STACK]]#0
+  br bb2
+
+bb2:
+  %17 = tuple ()
+  return %17 : $()
+
+bb3:
+  strong_release %2#0 : $Builtin.ObjectPointer
+  // CHECK: destroy_addr [[MUI]]
+  // CHECK-NEXT: dealloc_stack [[STACK]]#0
+  br bb2
+}
+
+

@@ -181,6 +181,16 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   // Replace all uses of the pointer operand with the spiffy new AllocStack.
   SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());
 
+  // Check to see if the alloc_box was used by a mark_uninitialized instruction.
+  // If so, any uses of the pointer result need to keep using the MUI, not the
+  // alloc_stack directly.  If we don't do this, DI will miss the uses.
+  SILValue PointerResult = ASI->getAddressResult();
+  for (auto UI : ASI->getAddressResult().getUses())
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
+      PointerResult = MUI;
+      break;
+    }
+
   auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
 
   for (auto LastRelease : FinalReleases) {
@@ -188,7 +198,7 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
 
     if (!Lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
       B2.emitDestroyAddr(CleanupLocation::getCleanupLocation(ABI->getLoc()),
-                         ASI->getAddressResult());
+                         PointerResult);
 
     // Reset the insertion point in case the destroy address expanded to
     // multiple blocks.
