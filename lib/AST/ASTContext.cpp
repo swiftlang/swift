@@ -66,10 +66,10 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
-  
+
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
-  
+
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
 
@@ -118,7 +118,7 @@ struct ASTContext::Implementation {
 
   /// \brief A cached unused pattern-binding initializer context.
   PatternBindingInitializer *UnusedPatternBindingContext = nullptr;
-  
+
   /// \brief A cached unused default-argument initializer context.
   DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
 
@@ -170,12 +170,12 @@ struct ASTContext::Implementation {
         conformance.~InheritedProtocolConformance();
 
       // Call the normal conformance destructors last since they could be
-      // referenced by the conformance types.
+      // referenced by the other conformance types.
       for (auto &conformance : NormalConformances)
         conformance.~NormalProtocolConformance();
     }
   };
-  
+
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
   llvm::DenseMap<std::pair<unsigned, unsigned>, GenericTypeParamType *>
     GenericParamTypes;
@@ -317,7 +317,7 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
 Identifier ASTContext::getIdentifier(StringRef Str) const {
   // Make sure null pointers stay null.
   if (Str.data() == nullptr) return Identifier(0);
-  
+
   return Identifier(Impl.IdentifierTable.GetOrCreateValue(Str).getKeyData());
 }
 
@@ -359,7 +359,7 @@ ValueDecl *ASTContext::getTrueDecl() const {
   auto boolDecl = getBoolDecl();
   if (!boolDecl) return nullptr;
   auto boolTy = boolDecl->getDeclaredType();
-  
+
   SmallVector<ValueDecl*, 1> results;
   lookupInSwiftModule("true", results);
   for (auto result : results) {
@@ -367,14 +367,14 @@ ValueDecl *ASTContext::getTrueDecl() const {
       return result;
   }
   return nullptr;
-  
+
 }
 
 ValueDecl *ASTContext::getFalseDecl() const {
   auto boolDecl = getBoolDecl();
   if (!boolDecl) return nullptr;
   auto boolTy = boolDecl->getDeclaredType();
-  
+
   SmallVector<ValueDecl*, 1> results;
   lookupInSwiftModule("false", results);
   for (auto result : results) {
@@ -382,7 +382,7 @@ ValueDecl *ASTContext::getFalseDecl() const {
       return result;
   }
   return nullptr;
-  
+
 }
 
 /// Find the generic implementation declaration for the named syntactic-sugar
@@ -550,7 +550,7 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
 
   // Look for the function.
   CanType input, output;
-  auto decl = findLibraryIntrinsic(*this, "_unimplemented_initializer", 
+  auto decl = findLibraryIntrinsic(*this, "_unimplemented_initializer",
                                    resolver);
   if (!decl || !isNonGenericIntrinsic(decl, input, output))
     return nullptr;
@@ -708,7 +708,7 @@ FuncDecl *ASTContext::getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
 }
 
 static bool hasOptionalIntrinsics(const ASTContext &ctx, LazyResolver *resolver,
-                                  OptionalTypeKind optionalKind) {    
+                                  OptionalTypeKind optionalKind) {
   return ctx.getDoesOptionalHaveValueDecl(resolver, optionalKind) &&
          ctx.getGetOptionalValueDecl(resolver, optionalKind) &&
          ctx.getInjectValueIntoOptionalDecl(resolver, optionalKind) &&
@@ -764,7 +764,7 @@ Optional<ArrayRef<Substitution>>
 ASTContext::getSubstitutions(BoundGenericType* bound) const {
   auto arena = getArena(bound->getRecursiveProperties());
   assert(bound->isCanonical() && "Requesting non-canonical substitutions");
-  auto &boundGenericSubstitutions 
+  auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
   auto known = boundGenericSubstitutions.find(bound);
   if (known != boundGenericSubstitutions.end())
@@ -781,7 +781,7 @@ ASTContext::getSubstitutions(BoundGenericType* bound) const {
 void ASTContext::setSubstitutions(BoundGenericType* Bound,
                                   ArrayRef<Substitution> Subs) const {
   auto arena = getArena(Bound->getRecursiveProperties());
-  auto &boundGenericSubstitutions 
+  auto &boundGenericSubstitutions
     = Impl.getArena(arena).BoundGenericSubstitutions;
   assert(Bound->isCanonical() && "Requesting non-canonical substitutions");
   assert(boundGenericSubstitutions.count(Bound) == 0 &&
@@ -789,7 +789,7 @@ void ASTContext::setSubstitutions(BoundGenericType* Bound,
   boundGenericSubstitutions[Bound] = Subs;
 }
 
-Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar, 
+Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,
                                            AssociatedTypeDecl *assocType) {
   auto &arena = *Impl.CurrentConstraintSolverArena;
   return arena.GetTypeMember(baseTypeVar, assocType);
@@ -970,7 +970,7 @@ void ASTContext::destroyDefaultArgumentContext(DefaultArgumentInitializer *DC) {
   Impl.UnusedDefaultArgumentContext = DC;
 }
 
-Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type, 
+Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type,
                                                      ProtocolDecl *proto) {
   auto arena = getArena(type->getRecursiveProperties());
   auto &conformsTo = Impl.getArena(arena).ConformsTo;
@@ -981,7 +981,7 @@ Optional<ConformanceEntry> ASTContext::getConformsTo(CanType type,
   return known->second;
 }
 
-void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto, 
+void ASTContext::setConformsTo(CanType type, ProtocolDecl *proto,
                                ConformanceEntry entry) {
   assert(!type->is<GenericTypeParamType>());
   auto arena = getArena(type->getRecursiveProperties());
@@ -1056,7 +1056,7 @@ ASTContext::getSpecializedConformance(Type type,
   // Build a new specialized conformance.
   substitutions = AllocateCopy(substitutions, arena);
   auto result
-    = new (*this, arena) SpecializedProtocolConformance(type, generic, 
+    = new (*this, arena) SpecializedProtocolConformance(type, generic,
                                                         substitutions);
   specializedConformances.InsertNode(result, insertPos);
   return result;
@@ -1070,14 +1070,14 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   // Figure out which arena this conformance should go into.
   AllocationArena arena = getArena(type->getRecursiveProperties());
 
-  // Did we already record the specialized conformance?
+  // Did we already record the normal protocol conformance?
   void *insertPos;
   auto &inheritedConformances = Impl.getArena(arena).InheritedConformances;
   if (auto result
         = inheritedConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
-  // Build a new specialized conformance.
+  // Build a new normal protocol conformance.
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
   return result;
@@ -1167,7 +1167,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   // Make a copy of the fields list into ASTContext owned memory.
   TupleTypeElt *FieldsCopy =
     C.AllocateCopy<TupleTypeElt>(Fields.begin(), Fields.end(), arena);
-  
+
   bool IsCanonical = true;   // All canonical elts means this is canonical.
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType().isNull() || !Elt.getType()->isCanonical()) {
@@ -1177,7 +1177,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   }
 
   Fields = ArrayRef<TupleTypeElt>(FieldsCopy, Fields.size());
-  
+
   TupleType *New = new (C, arena) TupleType(Fields, IsCanonical ? &C : 0,
                                             properties);
   C.Impl.getArena(arena).TupleTypes.InsertNode(New, InsertPos);
@@ -1237,7 +1237,7 @@ BoundGenericType::BoundGenericType(TypeKind theKind,
 
 BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
                                         Type Parent,
-                                        ArrayRef<Type> GenericArgs) {  
+                                        ArrayRef<Type> GenericArgs) {
   ASTContext &C = TheDecl->getDeclContext()->getASTContext();
   llvm::FoldingSetNodeID ID;
   RecursiveTypeProperties properties;
@@ -1442,11 +1442,11 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
     reprKey = static_cast<char>(*Repr) + 1;
   else
     reprKey = 0;
-  
+
   MetatypeType *&Entry = Ctx.Impl.getArena(arena).MetatypeTypes[{T, reprKey}];
   if (Entry) return Entry;
 
-  return Entry = new (Ctx, arena) MetatypeType(T, 
+  return Entry = new (Ctx, arena) MetatypeType(T,
                                                T->isCanonical() ? &Ctx : 0,
                                                properties, Repr);
 }
@@ -1463,10 +1463,10 @@ MetatypeType::MetatypeType(Type T, const ASTContext *C,
 
 ModuleType *ModuleType::get(Module *M) {
   ASTContext &C = M->getASTContext();
-  
+
   ModuleType *&Entry = C.Impl.ModuleTypes[M];
   if (Entry) return Entry;
-  
+
   return Entry = new (C, AllocationArena::Permanent) ModuleType(M, C);
 }
 
@@ -1496,7 +1496,7 @@ FunctionType *FunctionType::get(Type Input, Type Result,
   char attrKey = Info.getFuncAttrKey();
 
   const ASTContext &C = Input->getASTContext();
-  
+
   FunctionType *&Entry
     = C.Impl.getArena(arena).FunctionTypes[{Input, {Result, attrKey} }];
   if (Entry) return Entry;
@@ -1668,7 +1668,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
   SILFunctionTypeBits.CalleeConvention = unsigned(calleeConvention);
   memcpy(getMutableInterfaceParameters().data(), interfaceParams.data(),
          interfaceParams.size() * sizeof(SILParameterInfo));
-      
+
   // Make sure the interface types are sane.
 #ifndef NDEBUG
   if (genericSig) {
@@ -1676,7 +1676,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
       (void)gparam;
       assert(gparam->isCanonical() && "generic signature is not canonicalized");
     }
-    
+
     for (auto param : getInterfaceParameters()) {
       (void)param;
       assert(!param.getType().findIf([](Type t) {
@@ -1729,7 +1729,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
       properties += RecursiveTypeProperties::IsDependent;
       goto did_set_dependent;
     }
-    
+
     for (auto &param : interfaceParams) {
       if (param.getType()->isDependentType()) {
         properties += RecursiveTypeProperties::IsDependent;
@@ -1756,7 +1756,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
   auto arena = getArena(properties);
 
   const ASTContext &C = BaseType->getASTContext();
-  
+
   ArrayType *&Entry
     = C.Impl.getArena(arena).ArrayTypes[std::make_pair(BaseType, Size)];
   if (Entry) return Entry;
@@ -1766,7 +1766,7 @@ ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
 
 ArrayType::ArrayType(Type base, uint64_t size,
                      RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::Array, 
+  : TypeBase(TypeKind::Array,
              base->isCanonical() ? &base->getASTContext() : 0,
              properties),
     Base(base), Size(size) {}
@@ -1846,16 +1846,16 @@ InOutType *InOutType::get(Type objectTy) {
          "can not have ErrorType wrapped inside InOutType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "can not have 'inout' or @lvalue wrapped inside an 'inout'");
-  
+
   auto properties = objectTy->getRecursiveProperties()
                     + RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
-  
+
   auto &C = objectTy->getASTContext();
   auto &entry = C.Impl.getArena(arena).InOutTypes[objectTy];
   if (entry)
     return entry;
-  
+
   const ASTContext *canonicalContext = objectTy->isCanonical() ? &C : nullptr;
   return entry = new (C, arena) InOutType(objectTy, canonicalContext,
                                           properties);
@@ -1939,7 +1939,7 @@ ArchetypeType *ArchetypeType::getOpened(Type existential,
   assert(existential->isExistentialType() && "Not an existential type?");
   existential->isExistentialType(conformsTo);
   ProtocolType::canonicalizeProtocols(conformsTo);
-  
+
   auto result = new (ctx, arena) ArchetypeType(ctx, existential, *knownID,
                                                ctx.AllocateCopy(conformsTo),
                                         existential->getSuperclass(nullptr));
@@ -2008,7 +2008,7 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
                                ArrayRef<Requirement> requirements) {
   for (auto p : genericParams)
     ID.AddPointer(p);
-  
+
   for (auto &reqt : requirements) {
     ID.AddPointer(reqt.getFirstType().getPointer());
     ID.AddPointer(reqt.getSecondType().getPointer());
@@ -2020,16 +2020,16 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
                                         ArrayRef<Requirement> requirements) {
   if (params.empty() && requirements.empty())
     return nullptr;
-  
+
   // Check for an existing generic signature.
   llvm::FoldingSetNodeID ID;
   GenericSignature::Profile(ID, params, requirements);
-  
+
   auto &ctx = getASTContext(params, requirements);
   void *insertPos;
   if (auto *sig = ctx.Impl.GenericSignatures.FindNodeOrInsertPos(ID, insertPos))
     return sig;
-  
+
   // Allocate and construct the new signature.
   size_t bytes = sizeof(GenericSignature)
                + sizeof(GenericTypeParamType *) * params.size()
@@ -2049,7 +2049,7 @@ CanGenericSignature GenericSignature::getCanonical(
   for (auto param : params) {
     canonicalParams.push_back(cast<GenericTypeParamType>(param->getCanonicalType()));
   }
-  
+
   SmallVector<Requirement, 8> canonicalRequirements;
   canonicalRequirements.reserve(requirements.size());
   for (auto &reqt : requirements) {
@@ -2072,22 +2072,22 @@ DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
   case 0:
     SimpleOrCompound = Identifier();
     return;
-      
+
   case 1:
     SimpleOrCompound = components.front();
     return;
-      
+
   default: {
     llvm::FoldingSetNodeID id;
     CompoundDeclName::Profile(id, components);
-    
+
     void *insert = nullptr;
     if (CompoundDeclName *compoundName
           = C.Impl.CompoundNames.FindNodeOrInsertPos(id, insert)) {
       SimpleOrCompound = compoundName;
       return;
     }
-    
+
     auto buf = C.Allocate(sizeof(CompoundDeclName)
                             + components.size() * sizeof(Identifier),
                           alignof(CompoundDeclName));
