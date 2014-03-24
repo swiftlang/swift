@@ -20,19 +20,37 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/AST/Mangle.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 
+static void mangleConstant(NormalProtocolConformance *C,
+                           llvm::raw_ostream &buffer) {
+  using namespace Mangle;
+  Mangler mangler(buffer);
+
+  //   mangled-name ::= '_T' global
+  //   global ::= 'WP' protocol-conformance
+  buffer << "_TWP";
+  mangler.mangleProtocolConformance(C);
+  return;
+}
+
 SILWitnessTable *
-SILWitnessTable::create(SILModule &M,
-                        SILLinkage Linkage,
+SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
+  // Create the mangled name of our witness table...
+  llvm::SmallString<32> buffer;
+  llvm::raw_svector_ostream stream(buffer);
+  mangleConstant(Conformance, stream);
+  Identifier Name = M.getASTContext().getIdentifier(buffer);
+
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance,
-                                                    entries);
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
+                                                    Conformance, entries);
 
   // Update the SILModule state in light of wT.
   M.witnessTables.push_back(wt);
@@ -43,12 +61,18 @@ SILWitnessTable::create(SILModule &M,
 }
 
 SILWitnessTable *
-SILWitnessTable::create(SILModule &M,
-                        SILLinkage Linkage,
+SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance) {
+  // Create the mangled name of our witness table...
+  llvm::SmallString<32> buffer;
+  llvm::raw_svector_ostream stream(buffer);
+  mangleConstant(Conformance, stream);
+  Identifier Name = M.getASTContext().getIdentifier(buffer);
+
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
-  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance);
+  SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
+                                                    Conformance);
 
   // Update the SILModule state in light of wT.
   M.witnessTables.push_back(wt);
@@ -58,11 +82,11 @@ SILWitnessTable::create(SILModule &M,
   return wt;
 }
 
-SILWitnessTable::SILWitnessTable(SILModule &M,
-                                 SILLinkage Linkage,
+SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
-  : Linkage(Linkage), Conformance(Conformance), Entries(), IsDeclaration(false)
+  : Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
+    IsDeclaration(false)
 {
   void *buf = M.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
   memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
@@ -83,10 +107,10 @@ SILWitnessTable::SILWitnessTable(SILModule &M,
   }
 }
 
-SILWitnessTable::SILWitnessTable(SILModule &M,
-                                 SILLinkage Linkage,
+SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance)
-  : Linkage(Linkage), Conformance(Conformance), Entries(), IsDeclaration(true)
+  : Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
+    IsDeclaration(true)
 {}
 
 SILWitnessTable::~SILWitnessTable() {

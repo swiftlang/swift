@@ -140,6 +140,10 @@ public:
   };
   
 private:
+  /// The symbol name of the witness table that will be propagated to the object
+  /// file level.
+  StringRef Name;
+
   /// The linkage of the witness table.
   SILLinkage Linkage;
 
@@ -156,12 +160,12 @@ private:
   bool IsDeclaration;
 
   /// Private constructor for making SILWitnessTable definitions.
-  SILWitnessTable(SILModule &M, SILLinkage Linkage,
+  SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
                   NormalProtocolConformance *Conformance,
                   ArrayRef<Entry> entries);
 
   /// Private constructor for making SILWitnessTable declarations.
-  SILWitnessTable(SILModule &M, SILLinkage Linkage,
+  SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
                   NormalProtocolConformance *Conformance);
 
 public:
@@ -178,6 +182,10 @@ public:
   
   /// Return the AST ProtocolConformance this witness table represents.
   NormalProtocolConformance *getConformance() const { return Conformance; }
+
+  /// Return the symbol name of the witness table that will be propagated to the
+  /// object file level.
+  StringRef getName() { return Name; }
 
   /// Returns true if this witness table is a declaration.
   bool isDeclaration() const { return IsDeclaration; }

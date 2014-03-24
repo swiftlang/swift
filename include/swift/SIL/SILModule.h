@@ -121,9 +121,9 @@ private:
   /// Lookup table for SIL global variables.
   llvm::StringMap<SILGlobalVariable*> GlobalVariableTable;
 
-  /// Lookup cache for SIL witness tables.
-  llvm::DenseMap<const NormalProtocolConformance*,SILWitnessTable*>
-    WitnessTableLookupCache;
+  /// Lookup table for SIL witness tables from conformances.
+  llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
+  WitnessTableLookupCache;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;

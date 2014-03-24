@@ -1604,6 +1604,8 @@ bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
 ///
 /// TODO: This needs to take a flag for the access mode of the witness table,
 /// which may be direct, lazy, or a runtime instantiation template.
+/// TODO: Use name from witness table here to lookup witness table instead of
+/// recomputing it.
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                    llvm::Type *storageTy) {
