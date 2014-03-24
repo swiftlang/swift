@@ -1151,7 +1151,23 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
         "</field_body>"
       "</field>"
     "</field_list>" }, // Correct.
-
+  { { ":foo: bar",
+      "",
+      "(1) aaa",
+      "(2) bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>foo</field_name>"
+        "<field_body>"
+          "<paragraph>bar</paragraph>"
+        "</field_body>"
+      "</field>"
+    "</field_list>"
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>"
+  }, // Correct.
 
   // Definition lists.
   { { "aaa",
@@ -1822,14 +1838,6 @@ struct ParseReSTTestData ParseReSTTests[] = {
 // Notice the inconsistency above.
 // REST-FIXME: both should be blockquotes, or blockquotes at the beginning of
 // every element should be disallowed.
-
-// Complex tests:
-//
-// ":foo: bar"
-// ""
-// " (1) a"
-// " (2) b"
-// ok: field list with text "bar" + nested list
 
 // Misc points:
 // [ReST/Syntax Details/Body Elements/Field Lists]
