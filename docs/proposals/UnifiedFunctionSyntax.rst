@@ -211,7 +211,7 @@ associate a specific Objective-C selector with a method. For example,
 a Boolean property::
 
   var enabled: Bool {
-    @selector(isEnabled) get {
+    @objc(isEnabled) get {
       // ...
     }
 
@@ -297,12 +297,12 @@ initializer from a superclass or we are implementing a method to conform
 to a protocol, the selector can be deduced from method/initializer in
 the superclass or protocol. In those cases where new API is being
 defined in Swift where the selector requires a preposition, one would
-use the ``selector`` attribute::
+use the ``objc`` attribute with a selector::
 
-  @selector(initWithFrame:)
+  @objc(initWithFrame:)
   init(frame: CGRect)
 
-Imported Objective-C methods would have the appropriate ``selector``
+Imported Objective-C methods would have the appropriate ``objc``
 attribute attached to them automatically.
 
 Which Prepositions?
