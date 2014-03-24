@@ -35,8 +35,8 @@ namespace swift {
 
     class FuncTableInfo;
     using SerializedFuncTable = clang::OnDiskChainedHashTable<FuncTableInfo>;
-    std::unique_ptr<SerializedFuncTable> FuncTable;
 
+    std::unique_ptr<SerializedFuncTable> FuncTable;
     std::vector<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;
 
     std::unique_ptr<SerializedFuncTable> VTableList;
@@ -46,7 +46,12 @@ namespace swift {
     std::vector<ModuleFile::Serialized<SILGlobalVariable*>> GlobalVars;
 
     std::unique_ptr<SerializedFuncTable> WitnessTableList;
-    std::vector<ModuleFile::Serialized<SILWitnessTable*>> WitnessTables;
+    std::vector<ModuleFile::PartiallySerialized<SILWitnessTable *>>
+    WitnessTables;
+
+    /// A declaration will only
+    llvm::DenseMap<NormalProtocolConformance *, SILWitnessTable *>
+    ConformanceToWitnessTableMap;
 
     /// Data structures used to perform name lookup for local values.
     llvm::DenseMap<uint32_t, ValueBase*> LocalValues;
@@ -89,7 +94,9 @@ namespace swift {
     SILFunction *lookupSILFunction(StringRef Name);
     SILVTable *readVTable(serialization::DeclID);
     SILGlobalVariable *readGlobalVar(StringRef Name);
-    SILWitnessTable *readWitnessTable(serialization::DeclID);
+    SILWitnessTable *readWitnessTable(serialization::DeclID,
+                                      SILWitnessTable *existingWt,
+                                      bool declarationOnly);
 
 public:
     Identifier getModuleIdentifier() const {
@@ -97,6 +104,7 @@ public:
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc);
     SILVTable *lookupVTable(Identifier Name);
+    SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
 
     /// Deserialize all SILFunctions, VTables, and WitnessTables inside the
     /// module and add them to SILMod.

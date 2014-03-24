@@ -58,6 +58,13 @@ SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
   return nullptr;
 }
 
+SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
+  for (auto &Des : LoadedSILSections)
+    if (auto wT = Des->lookupWitnessTable(WT))
+      return wT;
+  return nullptr;
+}
+
 void SerializedSILLoader::getAll() {
   for (auto &Des : LoadedSILSections)
     Des->getAll();

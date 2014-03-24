@@ -34,7 +34,11 @@ public:
     virtual void didDeserialize(Module *M, SILFunction *fn) {}
 
     /// Observe that we successfully deserialized a function body.
-    virtual void didDeserializeBody(Module *M, SILFunction *fn) {}
+    virtual void didDeserializeFunctionBody(Module *M, SILFunction *fn) {}
+
+    /// Oberve that we successfully deserialized a witness table's entries.
+    virtual void didDeserializeWitnessTableEntries(Module *M,
+                                                   SILWitnessTable *wt) {}
 
     /// Observe that we deserialized a global variable declaration.
     virtual void didDeserialize(Module *M, SILGlobalVariable *var) {}
@@ -68,6 +72,7 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILVTable *lookupVTable(Identifier Name);
+  SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables in all
   /// SILModules.

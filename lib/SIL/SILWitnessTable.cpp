@@ -34,7 +34,7 @@ static void mangleConstant(NormalProtocolConformance *C,
   //   global ::= 'WP' protocol-conformance
   buffer << "_TWP";
   mangler.mangleProtocolConformance(C);
-  return;
+  buffer.flush();
 }
 
 SILWitnessTable *
@@ -136,4 +136,8 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries) {
       break;
     }
   }
+}
+
+Identifier SILWitnessTable::getIdentifier() const {
+  return Mod.getASTContext().getIdentifier(Name);
 }

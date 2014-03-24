@@ -520,7 +520,8 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (fn->empty())
     return nullptr;
 
-  if (Callback) Callback->didDeserializeBody(MF->getAssociatedModule(), fn);
+  if (Callback)
+    Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
 
   cacheEntry.set(fn, /*fully deserialized*/ true);
 
@@ -1598,17 +1599,21 @@ void SILDeserializer::getAllVTables() {
     readVTable(I+1);
 }
 
-SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
+SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
+                                                   SILWitnessTable *existingWt,
+                                                   bool declarationOnly) {
   if (WId == 0)
     return nullptr;
   assert(WId <= WitnessTables.size() && "invalid WitnessTable ID");
+
   auto &wTableOrOffset = WitnessTables[WId-1];
 
-  if (wTableOrOffset.isComplete())
-    return wTableOrOffset;
+  if (wTableOrOffset.isFullyDeserialized() ||
+      (wTableOrOffset.isDeserialized() && declarationOnly))
+    return wTableOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(wTableOrOffset);
+  SILCursor.JumpToBit(wTableOrOffset.getOffset());
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable.\n");
@@ -1627,6 +1632,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
   WitnessTableLayout::readRecord(scratch, TyID, RawLinkage, IsDeclaration);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "WitnessTable conforming typeID is 0.\n");
+    MF->error();
     return nullptr;
   }
   
@@ -1648,14 +1654,35 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
   NormalProtocolConformance *theConformance =
       cast<NormalProtocolConformance>(conformance);
 
-  // If we have a declaration, create the witness table declaration and bail.
-  if (IsDeclaration) {
-    // This witnesstable has no contents and thus is a declaration.
-    SILWitnessTable *wT = SILWitnessTable::create(SILMod, *Linkage,
-                                                  theConformance);
-    wTableOrOffset = wT;
+  if (!existingWt)
+    existingWt = SILMod.lookUpWitnessTable(theConformance).first;
+  auto wT = existingWt;
 
-    if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  // If we have an existing witness table, verify that the conformance matches
+  // up.
+  if (wT) {
+    if (wT->getConformance() != theConformance) {
+      DEBUG(llvm::dbgs() << "Conformance mismatch.\n");
+      MF->error();
+      return nullptr;
+    }
+
+    // Don't override the linkage of a witness table with an existing
+    // declaration.
+
+  } else {
+    // Otherwise, create a new function.
+    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
+    if (Callback)
+      Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  }
+
+  assert(wT->isDeclaration() && "Our witness table at this point must be a "
+                                "declaration.");
+
+  // If we have a declaration, create the witness table declaration and bail.
+  if (IsDeclaration || declarationOnly) {
+    wTableOrOffset.set(wT, /*fully deserialized*/ false);
     return wT;
   }
 
@@ -1726,11 +1753,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
       break;
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
-  SILWitnessTable *wT = SILWitnessTable::create(SILMod, *Linkage, theConformance,
-                                                witnessEntries);
-  wTableOrOffset = wT;
 
-  if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  wT->convertToDefinition(witnessEntries);
+  wTableOrOffset.set(wT, /*fully deserialized*/ true);
+  if (Callback)
+    Callback->didDeserializeWitnessTableEntries(MF->getAssociatedModule(), wT);
   return wT;
 }
 
@@ -1738,9 +1765,32 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId) {
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-
   for (unsigned I = 0, E = WitnessTables.size(); I < E; I++)
-    readWitnessTable(I+1);
+    readWitnessTable(I + 1, nullptr, false);
+}
+
+SILWitnessTable *
+SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
+  assert(existingWt && "Can not deserialize a null witness table declaration.");
+  assert(existingWt->isDeclaration() && "Can not deserialize a witness table "
+                                        "definition.");
+
+  // If we don't have a witness table list, we can't look anything up.
+  if (!WitnessTableList)
+    return nullptr;
+
+  // Use the name of the given witness table to lookup the partially
+  // deserialized value from the witness table list.
+  auto iter = WitnessTableList->find(existingWt->getName());
+  if (iter == WitnessTableList->end())
+    return nullptr;
+
+  // Attempt to read the witness table.
+  auto Wt = readWitnessTable(*iter, existingWt, /*declarationOnly*/ false);
+  if (Wt)
+    DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
+
+  return Wt;
 }
 
 SILDeserializer::~SILDeserializer() = default;

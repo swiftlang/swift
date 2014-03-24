@@ -1291,17 +1291,8 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   }
 }
 
-/// Generates an identifier for a given NormalProtocolConformance. We use
-/// the identifier to look for a witness table in sil_index block.
-static Identifier getIdOfConformance(const NormalProtocolConformance *npc) {
-  // FIXME: generates a better name. Right now, we don't support look up
-  // a specific witness table in deserialization. So this function and the
-  // corresponding sil_index block is not used.
-  return npc->getProtocol()->getName();
-}
-
 void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
-  WitnessTableList[getIdOfConformance(wt.getConformance())] = WitnessTableID++;
+  WitnessTableList[wt.getIdentifier()] = WitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
   WitnessTableLayout::emitRecord(Out, ScratchRecord,
                            SILAbbrCodes[WitnessTableLayout::Code],
@@ -1312,7 +1303,7 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   S.writeConformance(wt.getConformance()->getProtocol(), wt.getConformance(),
                      nullptr, SILAbbrCodes);
 
-  // If we have a declaration, do not attempt to deserialize entries.
+  // If we have a declaration, do not attempt to serialize entries.
   if (wt.isDeclaration())
     return;
 
