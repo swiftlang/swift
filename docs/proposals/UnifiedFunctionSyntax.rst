@@ -429,7 +429,7 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | Pending        | No*     |         | Used as an adjective       |
 +----------------+---------+---------+----------------------------+
-| Per            | Yes*    | No      | Misleading to split        |
+| Per            | Yes*    |         | Misleading to split        |
 +----------------+---------+---------+----------------------------+
 | Plus           | No      |         | Used as an adjective       |
 +----------------+---------+---------+----------------------------+
@@ -481,7 +481,7 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | **Within**     | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
-| Without        | Yes*    | No      | Misleading when split      |
+| Without        | Yes*    |         | Misleading when split      |
 +----------------+---------+---------+----------------------------+
 | Worth          | No      |         |                            |
 +----------------+---------+---------+----------------------------+
