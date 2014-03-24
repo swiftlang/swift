@@ -65,7 +65,7 @@ bb3(%35 : $()):                                   // Preds: bb2
 }
 
 
-//CHECK-LABLE: remove_dead_args
+//CHECK-LABEL: remove_dead_args
 //CHECK-NOT: br bb2([[VAR_21:%[0-9]+]] : $Bool)
 //CHECK: bb2:
 //CHECK-NEXT: tuple ()
@@ -94,3 +94,28 @@ bb3:                                              // Preds: bb0
   br bb2(%5 : $Bool)                              // id: %14
 }
 
+class A {}
+
+//CHECK-LABEL: no_remove_mandatory_dead_args
+//CHECK: checked_cast_br existential_to_concrete {{%.*}} : $AnyObject to $A, bb1
+//CHECK-NOT: bb1
+//CHECK: bb1([[VAR:%[0-9]+]] : $A)
+//CHECK-NOT: [[VAR]]
+//CHECK: return
+sil @no_remove_mandatory_dead_args : $@thin (@owned AnyObject) -> Int {
+bb0(%0 : $AnyObject):
+  checked_cast_br existential_to_concrete %0 : $AnyObject to $A, bb1, bb2 // id: %3
+
+bb1(%1 : $A):
+  %2 = integer_literal $Builtin.Word, 1
+  br bb3(%2 : $Builtin.Word)
+
+bb2:
+  %3 = integer_literal $Builtin.Word, 0
+  br bb3(%3 : $Builtin.Word)
+
+bb3(%4 : $Builtin.Word):
+  %5 = struct $Int (%4 : $Builtin.Word)
+  strong_release %0 : $AnyObject
+  return %5 : $Int
+}

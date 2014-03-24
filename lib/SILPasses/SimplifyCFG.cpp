@@ -588,11 +588,27 @@ removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest, int idx) {
   llvm_unreachable("unsupported terminator");
 }
 
+/// Is an argument from this terminator considered mandatory?
+static bool hasMandatoryArgument(TermInst *term) {
+  // It's more maintainable to just white-list the instructions that
+  // *do* have mandatory arguments.
+  return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
+}
+
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
+  // Ignore blocks with no arguments.
+  if (BB->bbarg_empty())
+    return false;
 
   // Ignore the entry block.
   if (BB->pred_begin() == BB->pred_end())
     return false;
+
+  // Ignore blocks that are successors of terminators with mandatory args.
+  for (SILBasicBlock *pred : BB->getPreds()) {
+    if (hasMandatoryArgument(pred->getTerminator()))
+      return false;
+  }
 
   bool Changed = false;
   for (int i = BB->getNumBBArg() - 1; i >= 0; --i) {
