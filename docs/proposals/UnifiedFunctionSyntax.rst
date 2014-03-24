@@ -204,7 +204,7 @@ a macro supplied by Foundation, i.e.,::
 For 1.0, it is not feasible to mark up the Objective-C headers in the
 various SDKs. Therefore, the compiler will contain a list of mapping
 from Objective-C selectors to Swift method names. Post-1.0, we can
-migreate these mappings to the headers.
+migrate these mappings to the headers.
 
 A mapping in the other direction is also important, allowing one to
 associate a specific Objective-C selector with a method. For example,
