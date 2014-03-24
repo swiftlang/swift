@@ -261,7 +261,7 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   if (Protocols.empty())
     return getClangIdType(clangCtx);
   // id<protocol-list>
-  clang::ObjCProtocolDecl **ProtoQuals = new clang::ObjCProtocolDecl*[Protocols.size()];
+  clang::ObjCProtocolDecl **ProtoQuals = new(clangCtx) clang::ObjCProtocolDecl*[Protocols.size()];
   memcpy(ProtoQuals, Protocols.data(), sizeof(clang::ObjCProtocolDecl*)*Protocols.size());
   auto clangType = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
                      ProtoQuals,
