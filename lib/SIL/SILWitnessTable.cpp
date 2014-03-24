@@ -29,11 +29,16 @@ SILWitnessTable::create(SILModule &M,
                         SILLinkage Linkage,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
-  void *buf = M.allocate(sizeof(SILWitnessTable),
-                         alignof(SILWitnessTable));
+  // Allocate the witness table and initialize it.
+  void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance,
                                                     entries);
+
+  // Update the SILModule state in light of wT.
   M.witnessTables.push_back(wt);
+  M.WitnessTableLookupCache[Conformance] = wt;
+
+  // Return the resulting witness table.
   return wt;
 }
 
@@ -41,9 +46,15 @@ SILWitnessTable *
 SILWitnessTable::create(SILModule &M,
                         SILLinkage Linkage,
                         NormalProtocolConformance *Conformance) {
+  // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Conformance);
+
+  // Update the SILModule state in light of wT.
   M.witnessTables.push_back(wt);
+  M.WitnessTableLookupCache[Conformance] = wt;
+
+  // Return the resulting witness table.
   return wt;
 }
 

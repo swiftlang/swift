@@ -159,19 +159,24 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
                                nullptr);
   }
 
-  // Did we already find this?
+  // Attempt to lookup the witness table from the table.
   auto found = WitnessTableLookupCache.find(NormalC);
   if (found != WitnessTableLookupCache.end())
     return {found->second, Subs};
 
-  // If not, search through the witness table list, caching the entries we
-  // visit.
-  for (SILWitnessTable &WT : witnessTables) {
-    WitnessTableLookupCache[WT.getConformance()] = &WT;
+#ifndef NDEBUG
+  // Make sure that all witness tables are in the witness table lookup
+  // cache.
+  //
+  // This code should not be hit normally since we add witness tables to the
+  // lookup cache when we create them. We don't just assert here since there is
+  // the potential for a conformance without a witness table to be passed to
+  // this function.
+  for (SILWitnessTable &WT : witnessTables)
+    assert(WT.getConformance() != NormalC && "Found witness table that is not"
+           " in the witness table lookup cache.");
+#endif
 
-    if (WT.getConformance() == NormalC)
-      return {&WT, Subs};
-  }
   return {nullptr, Subs};
 }
 
