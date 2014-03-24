@@ -59,12 +59,12 @@ bb0(%0 : $X, %1 : $SwiftGizmo):
   return %7 : $()                                 // id: %8
 }
 
-// CHECK-LABEL: define internal void @_TToFCSo10SwiftGizmoD(i8*, i8*) unnamed_addr
+// CHECK: define internal void @_TToFCSo10SwiftGizmoD([[OPAQUE:%.*]]*, i8*) unnamed_addr
 sil @_TToFCSo10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8
-  // CHECK: [[SGIZMOVAL:%[a-zA-Z0-9]+]] = bitcast i8* %0 to [[SGIZMO]]*
+  // CHECK: [[SGIZMOVAL:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[SGIZMO]]*
 
   // Call to onDestruct()
   // CHECK: call void @_TF12objc_dealloc10onDestructFT_T_()

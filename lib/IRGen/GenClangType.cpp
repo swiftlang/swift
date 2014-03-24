@@ -148,13 +148,27 @@ clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto &clangCtx = getClangASTContext();
   // produce the clang type INTF * if it is imported ObjC object.
-  if (auto *swiftDecl = type->getDecl())
-    if (auto *clangDecl = swiftDecl->getClangDecl())
+  if (auto *swiftDecl = type->getDecl()) {
+    if (auto *clangDecl = swiftDecl->getClangDecl()) {
       if (auto *CDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
         auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
         auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
         return clangCtx.getCanonicalType(ptrTy);
+      }
     }
+    else if (swiftDecl->isObjC()) {
+      clang::IdentifierInfo *ForwardClassId =
+        &clangCtx.Idents.get(swiftDecl->getName().get());
+      if (auto *CDecl = clang::ObjCInterfaceDecl::Create(
+                          clangCtx, clangCtx.getTranslationUnitDecl(),
+                          clang::SourceLocation(), ForwardClassId,
+                          0/*PrevIDecl*/, clang::SourceLocation())) {
+        auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
+        auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+        return clangCtx.getCanonicalType(ptrTy);
+      }
+    }
+  }
   return getClangIdType(clangCtx);
 }
 

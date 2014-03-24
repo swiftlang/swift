@@ -89,9 +89,9 @@ entry(%f : $(Builtin.Word) -> (), %x : $Builtin.Word):
 // CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
 // CHECK-NOT: swift_retain
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(method:)", align 8
-// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to i8*
+// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to [[OPAQUE0:%.*]]*
 // CHECK-NOT: swift_retain
-// CHECK:   call void bitcast (void ()* @objc_msgSend to void (i8*, i8*, i64)*)(i8* [[I8PTRSELF]], i8* [[CMD]], i64 %0)
+// CHECK:   call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE2:%.*]]*, i8*, i64)*)([[OPAQUE2]]* [[I8PTRSELF]], i8* [[CMD]], i64 %0)
 // CHECK:   ret void
 // CHECK: }
 
@@ -111,8 +111,8 @@ entry(%c : $ObjCClass):
 // CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(initFamily)", align 8
-// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to i8*
-// CHECK:   call i8* bitcast (void ()* @objc_msgSend to i8* (i8*, i8*)*)(i8* [[I8PTRSELF]], i8* [[CMD]])
+// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to [[OPAQUE4:%.*]]*
+// CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
 // CHECK:   ret void
 // CHECK: }
 
