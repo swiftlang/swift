@@ -14,6 +14,7 @@
 #define LLVM_REST_LINELIST_H
 
 #include "swift/ReST/SourceLoc.h"
+#include "llvm/ADT/Optional.h"
 
 namespace llvm {
 namespace rest {
@@ -48,6 +49,11 @@ public:
 
   ColumnNum operator+(ColumnNum RHS) const {
     return ColumnNum(Value + RHS.Value);
+  }
+
+  ColumnNum &operator+=(unsigned RHS) {
+    *this = *this + ColumnNum::make(RHS);
+    return *this;
   }
 
   ColumnNum nextTabStop() const {
@@ -135,13 +141,21 @@ enum class EnumeratorStyleKind {
 
 struct LineClassification {
 private:
+  struct EnumeratedExtraData {
+    unsigned EnumeratorStyle : 2;
+    unsigned HasTextAfterEnumerator : 1;
+    unsigned EnumeratorAndWhitespaceBytes : 10;
+  };
+
+  struct FieldListExtraData {
+    unsigned FieldNameBytes : 10;
+    unsigned FieldMarkerAndWhitespaceBytes : 10;
+  };
+
   union {
     unsigned ExtraData;
-    struct {
-      unsigned EnumeratorStyle : 7;
-      unsigned HasText : 1;
-      unsigned EnumeratorAndWhitespaceBytes : 10;
-    };
+    EnumeratedExtraData EnumeratedData;
+    FieldListExtraData FieldListData;
   };
 
 public:
@@ -157,9 +171,18 @@ public:
     return ExtraData;
   }
 
+  EnumeratorStyleKind getEnumeratorStyle() const {
+    return static_cast<EnumeratorStyleKind>(EnumeratedData.EnumeratorStyle);
+  }
+
+  bool hasTextAfterEnumerator() const {
+    assert(isEnumerated(Kind));
+    return EnumeratedData.HasTextAfterEnumerator;
+  }
+
   unsigned getEnumeratorAndWhitespaceBytes() const {
     assert(isEnumerated(Kind));
-    return EnumeratorAndWhitespaceBytes;
+    return EnumeratedData.EnumeratorAndWhitespaceBytes;
   }
 
   ColumnNum getEnumeratorAndWhitespaceCols() const {
@@ -168,14 +191,17 @@ public:
     return ColumnNum::make(getEnumeratorAndWhitespaceBytes());
   }
 
-  unsigned getFieldNameSecondColonByte() const {
+  unsigned getFieldNameBytes() const {
     assert(Kind == LineKind::FieldList);
-    return ExtraData;
+    return FieldListData.FieldNameBytes;
   }
 
-  static LineClassification makeUnknown() {
-    return LineClassification();
+  unsigned getFieldMarkerAndWhitespaceBytes() const {
+    assert(Kind == LineKind::FieldList);
+    return FieldListData.FieldMarkerAndWhitespaceBytes;
   }
+
+  static LineClassification makeUnknown() { return LineClassification(); }
 
   static LineClassification makeBlank() {
     LineClassification Result;
@@ -192,23 +218,29 @@ public:
     return Result;
   }
 
-  static LineClassification makeEnumerated(LineKind Kind,
-                                           EnumeratorStyleKind EnumeratorStyle,
-                                           bool HasText,
-                                           unsigned EnumeratorAndWhitespaceBytes) {
+  static LineClassification
+  makeEnumerated(LineKind Kind, EnumeratorStyleKind EnumeratorStyle,
+                 bool HasTextAfterEnumerator,
+                 unsigned EnumeratorAndWhitespaceBytes) {
     assert(isEnumerated(Kind));
     LineClassification Result;
     Result.Kind = Kind;
-    Result.EnumeratorStyle = static_cast<unsigned>(EnumeratorStyle);
-    Result.HasText = HasText;
-    Result.EnumeratorAndWhitespaceBytes = EnumeratorAndWhitespaceBytes;
+    Result.EnumeratedData.EnumeratorStyle =
+        static_cast<unsigned>(EnumeratorStyle);
+    Result.EnumeratedData.HasTextAfterEnumerator = HasTextAfterEnumerator;
+    Result.EnumeratedData.EnumeratorAndWhitespaceBytes =
+        EnumeratorAndWhitespaceBytes;
     return Result;
   }
 
-  static LineClassification makeFieldList(unsigned FieldNameSecondColonByte) {
+  static LineClassification
+  makeFieldList(unsigned FieldNameBytes,
+                unsigned FieldMarkerAndWhitespaceBytes) {
     LineClassification Result;
     Result.Kind = LineKind::FieldList;
-    Result.ExtraData = FieldNameSecondColonByte;
+    Result.FieldListData.FieldNameBytes = FieldNameBytes;
+    Result.FieldListData.FieldMarkerAndWhitespaceBytes =
+        FieldMarkerAndWhitespaceBytes;
     return Result;
   }
 };
@@ -238,6 +270,11 @@ public:
   Line() : FirstTextByte(0), ClassificationComputed(0) {}
 };
 
+struct LinePart {
+  StringRef Text;
+  SourceRange Range;
+};
+
 class LineListRef;
 
 class LineList {
@@ -254,9 +291,7 @@ public:
     return Lines[i];
   }
 
-  unsigned size() const {
-    return Lines.size();
-  }
+  unsigned size() const { return Lines.size(); }
 
   LineListRef subList(unsigned StartIndex, unsigned Size);
 
@@ -294,25 +329,39 @@ class LineListRef {
   LineList &LL;
   unsigned StartIdx;
   unsigned Size;
+  Optional<Line> FirstLine;
 
 public:
   LineListRef(LineList &LL) : LL(LL), StartIdx(0), Size(LL.size()) {}
+  LineListRef(const LineListRef &LL) = default;
 
   Line &operator[](unsigned i) {
+    if (i == 0 && isFirstLineTruncated())
+      return FirstLine.getValue();
     return LL[StartIdx + i];
   }
 
   const Line &operator[](unsigned i) const {
+    if (i == 0 && isFirstLineTruncated())
+      return FirstLine.getValue();
     return LL[StartIdx + i];
   }
 
-  unsigned size() const {
-    return Size;
-  }
+  unsigned size() const { return Size; }
+
+  bool empty() const { return size() == 0; }
 
   LineListRef subList(unsigned StartIdx, unsigned Size) const {
+    assert(StartIdx <= this->Size);
     assert(this->StartIdx + StartIdx + Size <= this->StartIdx + this->Size);
-    return LL.subList(this->StartIdx + StartIdx, Size);
+    auto Result = LL.subList(this->StartIdx + StartIdx, Size);
+    if (StartIdx == 0 && FirstLine.hasValue())
+      Result.FirstLine = FirstLine;
+    return Result;
+  }
+
+  LineListRef dropFrontLines(unsigned NumLines) {
+    return subList(NumLines, size() - NumLines);
   }
 
   bool isPreviousLineBlank(unsigned i) const {
@@ -322,6 +371,20 @@ public:
   bool isNextLineBlank(unsigned i) const {
     return LL.isNextLineBlank(StartIdx + i);
   }
+
+  void fromFirstLineDropFront(unsigned Bytes);
+
+  LinePart getLinePart(unsigned LineIndex, unsigned StartByte,
+                       unsigned NumBytes) const {
+    LinePart Result;
+    const Line &FirstLine = (*this)[0];
+    Result.Text = FirstLine.Text.substr(StartByte, NumBytes);
+    SourceLoc StartLoc = FirstLine.Range.Start.getAdvancedLoc(StartByte);
+    Result.Range = SourceRange(StartLoc, StartLoc.getAdvancedLoc(NumBytes));
+    return Result;
+  }
+
+  bool isFirstLineTruncated() const { return FirstLine.hasValue(); }
 };
 
 inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) {

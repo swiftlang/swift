@@ -127,7 +127,7 @@ SourceRange SourceManager<ExternalSourceLocTy>::registerLine(
 #ifndef NDEBUG
   // To make debugging easier, make each line start at offset that is equal to
   // 1 mod 1000.
-  NextUnassignedLoc.Value = ((NextUnassignedLoc.Value + 999) % 1000) * 1000 + 1;
+  NextUnassignedLoc.Value = ((NextUnassignedLoc.Value + 999) / 1000) * 1000 + 1;
 #endif
   return SourceRange(Start, End);
 }

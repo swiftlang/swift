@@ -19,6 +19,9 @@ using namespace llvm;
 using namespace rest;
 using namespace llvm::rest::detail;
 
+// In the tests below, test cases that are marked "correct" produce completely
+// correct results and should not be changed without a good reason.
+
 struct ReSTTest : public ::testing::Test {
   SourceManager<unsigned> SM;
 
@@ -140,6 +143,15 @@ struct ClassifyLineBulletListTestData ClassifyLineBulletListTests[] = {
   { "*\ta",   LineKind::BulletListAsterisk, 2 },
   { "*\va",   LineKind::BulletListAsterisk, 2 },
   { "*\fa",   LineKind::BulletListAsterisk, 2 },
+  { "*  a",   LineKind::BulletListAsterisk, 3 },
+  { "* \ta",  LineKind::BulletListAsterisk, 3 },
+  { "* \va",  LineKind::BulletListAsterisk, 3 },
+  { "* \fa",  LineKind::BulletListAsterisk, 3 },
+  { "*\t a",  LineKind::BulletListAsterisk, 3 },
+  { "*\v a",  LineKind::BulletListAsterisk, 3 },
+  { "*\f a",  LineKind::BulletListAsterisk, 3 },
+  { "* \t a", LineKind::BulletListAsterisk, 4 },
+  { "*  ",    LineKind::BulletListAsterisk, 3 },
   { "* ",     LineKind::BulletListAsterisk, 2 },
   { "*",      LineKind::BulletListAsterisk, 1 },
   { "*a",     LineKind::Unknown, 0 },
@@ -299,7 +311,8 @@ INSTANTIATE_TEST_CASE_P(
 struct ClassifyLineFieldListTestData {
   StringRef InText;
   LineKind Kind;
-  unsigned FieldNameSecondColonByte;
+  unsigned FieldNameBytes;
+  unsigned FieldMarkerAndWhitespaceBytes;
 };
 
 struct ClassifyLineFieldListTest
@@ -312,54 +325,76 @@ TEST_P(ClassifyLineFieldListTest, Test) {
   auto Result = classifyLine(LL[0]);
   EXPECT_EQ(Test.Kind, Result.Kind);
   if (Test.Kind == LineKind::FieldList) {
-    EXPECT_EQ(Test.FieldNameSecondColonByte,
-              Result.getFieldNameSecondColonByte());
+    EXPECT_EQ(Test.FieldNameBytes, Result.getFieldNameBytes());
+    EXPECT_EQ(Test.FieldMarkerAndWhitespaceBytes,
+              Result.getFieldMarkerAndWhitespaceBytes());
   }
 }
 
 struct ClassifyLineFieldListTestData ClassifyLineFieldListTests[] = {
   // Missing terminating ':'.
-  { ":",       LineKind::Unknown, 0 },
-  { ":a",      LineKind::Unknown, 0 },
-  { ":foo",    LineKind::Unknown, 0 },
-  { ":\xe4\xbe\x8b", LineKind::Unknown, 0 },
+  { ":",             LineKind::Unknown, 0, 0 },
+  { ":a",            LineKind::Unknown, 0, 0 },
+  { ":foo",          LineKind::Unknown, 0, 0 },
+  { ":\xe4\xbe\x8b", LineKind::Unknown, 0, 0 },
 
   // Field name can not be empty.
-  { "::",      LineKind::Unknown, 0 },
-  { "::foo",   LineKind::Unknown, 0 },
-  { ":: foo",  LineKind::Unknown, 0 },
-  { "::: foo", LineKind::Unknown, 0 },
+  { "::",      LineKind::Unknown, 0, 0 },
+  { "::foo",   LineKind::Unknown, 0, 0 },
+  { ":: foo",  LineKind::Unknown, 0, 0 },
+  { "::: foo", LineKind::Unknown, 0, 0 },
+
+  // Differentiate between interpreted text roles and field lists.
+  { ":foo:``",     LineKind::Unknown,   0, 0 },
+  { ":foo: ``",    LineKind::FieldList, 3, 6 },
+  { ":foo:`bar`",  LineKind::Unknown,   0, 0 },
+  { ":foo: `bar`", LineKind::FieldList, 3, 6 },
+  { ":foo:bar",    LineKind::Unknown,   0, 0 },
+  { ":foo: bar",   LineKind::FieldList, 3, 6 },
 
   // OK.
-  { ":a:",     LineKind::FieldList, 2 },
-  { ": a:",    LineKind::FieldList, 3 },
-  { ":a :",    LineKind::FieldList, 3 },
-  { ": a :",   LineKind::FieldList, 4 },
-  { ":bb:",    LineKind::FieldList, 3 },
-  { ":foo:",   LineKind::FieldList, 4 },
-  { ":\xe4\xbe\x8b:", LineKind::FieldList, 4 },
-  { ":a*b:",   LineKind::FieldList, 4 },
-  { ":a *b*:", LineKind::FieldList, 6 },
-  { ":a *b:",  LineKind::FieldList, 5 },
-  { ":a`b:",   LineKind::FieldList, 4 },
-  { ":a `b`:", LineKind::FieldList, 6 },
+  { ":a:",     LineKind::FieldList, 1, 3 },
+  { ": a:",    LineKind::FieldList, 2, 4 },
+  { ":a :",    LineKind::FieldList, 2, 4 },
+  { ": a :",   LineKind::FieldList, 3, 5 },
+  { ":bb:",    LineKind::FieldList, 2, 4 },
+  { ":\xe4\xbe\x8b:", LineKind::FieldList, 3, 5 },
+  { ":a*b:",   LineKind::FieldList, 3, 5 },
+  { ":a *b*:", LineKind::FieldList, 5, 7 },
+  { ":a *b:",  LineKind::FieldList, 4, 6 },
+  { ":a`b:",   LineKind::FieldList, 3, 5 },
+  { ":a `b`:", LineKind::FieldList, 5, 7 },
+
+  // Count whitespace after the field marker.
+  { ":foo:",       LineKind::FieldList, 3, 5 },
+  { ":foo: ",      LineKind::FieldList, 3, 6 },
+  { ":foo:\t",     LineKind::FieldList, 3, 6 },
+  { ":foo:\v",     LineKind::FieldList, 3, 6 },
+  { ":foo:\f",     LineKind::FieldList, 3, 6 },
+  { ":foo: a",     LineKind::FieldList, 3, 6 },
+  { ":foo:\ta",    LineKind::FieldList, 3, 6 },
+  { ":foo:\va",    LineKind::FieldList, 3, 6 },
+  { ":foo:\fa",    LineKind::FieldList, 3, 6 },
+  { ":foo:\t ",    LineKind::FieldList, 3, 7 },
+  { ":foo: \t",    LineKind::FieldList, 3, 7 },
+  { ":foo: \t a",  LineKind::FieldList, 3, 8 },
 
   // Escaping.
-  { ":\\",                     LineKind::Unknown, 0 },
-  { ":\\:",                    LineKind::Unknown, 0 },
-  { ":\\a",                    LineKind::Unknown, 0 },
-  { ":\\\\",                   LineKind::Unknown, 0 },
-  { ":foo\\",                  LineKind::Unknown, 0 },
-  { ":foo\\: bar",             LineKind::Unknown, 0 },
-  { ":f\\oo\\: bar",           LineKind::Unknown, 0 },
-  { ":f\\oo\\: bar\\",         LineKind::Unknown, 0 },
-  { ":\\::",                   LineKind::FieldList, 3 },
-  { ":\\a:",                   LineKind::FieldList, 3 },
-  { ":\\\\:",                  LineKind::FieldList, 3 },
-  { ":foo\\::",                LineKind::FieldList, 6 },
-  { ":a\\bc\\:\\:def\\ ghi:",  LineKind::FieldList, 17 },
-  { ":abc\\:def: foo:bar:baz", LineKind::FieldList, 9 },
-  { ":\\\xe4\xbe\x8b:",        LineKind::FieldList, 5 },
+  { ":\\",                     LineKind::Unknown, 0, 0 },
+  { ":\\:",                    LineKind::Unknown, 0, 0 },
+  { ":\\a",                    LineKind::Unknown, 0, 0 },
+  { ":\\\\",                   LineKind::Unknown, 0, 0 },
+  { ":foo\\",                  LineKind::Unknown, 0, 0 },
+  { ":foo\\: bar",             LineKind::Unknown, 0, 0 },
+  { ":f\\oo\\: bar",           LineKind::Unknown, 0, 0 },
+  { ":f\\oo\\: bar\\",         LineKind::Unknown, 0, 0 },
+  { ":\\::",                   LineKind::FieldList, 2, 4 },
+  { ":\\a:",                   LineKind::FieldList, 2, 4 },
+  { ":\\\\:",                  LineKind::FieldList, 2, 4 },
+  { ":foo\\::",                LineKind::FieldList, 5, 7 },
+  { ":a\\bc\\:\\:def\\ ghi:",  LineKind::FieldList, 16, 18 },
+  { ":abc\\:def: foo:bar:baz", LineKind::FieldList, 8, 11 },
+  { ":\\\xe4\xbe\x8b:",        LineKind::FieldList, 4, 6 },
 };
 INSTANTIATE_TEST_CASE_P(
     ReSTTest, ClassifyLineFieldListTest,
@@ -368,6 +403,7 @@ INSTANTIATE_TEST_CASE_P(
 struct ExtractBriefTestData {
   std::vector<const char *> InText;
   std::string Brief;
+  std::string DocutilsXML;
 };
 
 struct ExtractBriefTest
@@ -378,110 +414,1108 @@ TEST_P(ExtractBriefTest, Test) {
   const auto &Test = GetParam();
   auto LL = toLineList(Test.InText);
   llvm::SmallString<64> Str;
+
   extractBrief(LL, Str);
-  EXPECT_EQ(Test.Brief, Str.str());
+  EXPECT_EQ(Test.Brief, Str.str().str());
+  Str.clear();
+
+  ReSTContext Context;
+  auto *TheDocument = parseDocument(Context, LL);
+  {
+    llvm::raw_svector_ostream OS(Str);
+    convertToDocutilsXML(TheDocument, OS);
+  }
+  StringRef DocutilsXML = Str.str();
+  if (DocutilsXML.startswith("<document>"))
+    DocutilsXML = DocutilsXML.drop_front(10);
+  if (DocutilsXML.endswith("</document>"))
+    DocutilsXML = DocutilsXML.drop_back(11);
+  EXPECT_EQ(Test.DocutilsXML, DocutilsXML.str());
 }
 
 struct ExtractBriefTestData ExtractBriefTests[] = {
-  { {}, "" },
-  { { "" }, "" },
-  { { "aaa" }, "aaa" },
-  { { "", "aaa" }, "aaa" },
-  { { "", "", "aaa" }, "aaa" },
-  { { "aaa", "bbb" }, "aaa bbb" },
-  { { "aaa", " " }, "aaa" },
-  { { "    aaa", " ", "    bbb" }, "aaa" },
-  { { "aaa", "", "bbb" }, "aaa" },
-  { { "aaa", "", "* bbb" }, "aaa" },
-  { { "aaa", "", "1. bbb" }, "aaa" },
-  { { "aaa", "", "(1) bbb" }, "aaa" },
-  { { "  aaa", "  bbb" }, "aaa bbb" },
-  { { "aaa", "* bbb" }, "aaa * bbb" },
-  { { "aaa", "1. bbb" }, "aaa 1. bbb" },
-  { { "aaa", "(1) bbb" }, "aaa (1) bbb" },
-  { { "aaa", ":bbb: ccc" }, "aaa :bbb: ccc" },
+  { {}, "", "" }, // Correct.
+  { { "" }, "", "" }, // Correct.
+  { { "aaa" }, "aaa", "<paragraph>aaa</paragraph>" }, // Correct.
+  { { "", "aaa" }, "aaa", "<paragraph>aaa</paragraph>" }, // Correct.
+  { { "", "", "aaa" }, "aaa", "<paragraph>aaa</paragraph>" }, // Correct.
+  { { "aaa", "bbb" },
+    "aaa bbb",
+    "<paragraph>aaa\nbbb</paragraph>" }, // Correct.
+  { { "aaa", " " },
+    "aaa",
+    "<paragraph>aaa</paragraph>" }, // Correct.
+  { { "aaa", "", "bbb" },
+    "aaa",
+    "<paragraph>aaa</paragraph>"
+    "<paragraph>bbb</paragraph>" }, // Correct.
+  { { "aaa",
+      "",
+      "* bbb" },
+    "aaa",
+    "<paragraph>aaa</paragraph>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "aaa",
+      "",
+      "1. bbb" },
+    "aaa",
+    "<paragraph>aaa</paragraph>"
+    "<enumerated_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "aaa",
+      "",
+      "(1) bbb" },
+    "aaa",
+    "<paragraph>aaa</paragraph>"
+    "<enumerated_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "aaa",
+      "* bbb" },
+    "aaa * bbb",
+    "<paragraph>aaa\n* bbb</paragraph>" }, // Correct.
+  { { "aaa",
+      "1. bbb" },
+    "aaa 1. bbb",
+    "<paragraph>aaa\n1. bbb</paragraph>" }, // Correct.
+  { { "aaa",
+      "(1) bbb" },
+    "aaa (1) bbb",
+    "<paragraph>aaa\n(1) bbb</paragraph>" }, // Correct.
+  { { "aaa",
+      ":bbb: ccc" },
+      "aaa :bbb: ccc",
+    "<paragraph>aaa\n:bbb: ccc</paragraph>" }, // Correct.
 
-  // Parsed an a bulleted list (at least the first line).
-  { { "* aaa", "bbb" }, "" },
-  { { "  * aaa", "  bbb" }, "" },
-  { { "  * aaa", "    bbb" }, "" },
-  { { "  * aaa", "bbb" }, "" },
+  // Bullet list.
+  { { "* aaa",
+      "bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<paragraph>bbb</paragraph>" }, // Correct.
+  { { "  * aaa",
+      "  bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+      "</bullet_list>"
+      "<paragraph>bbb</paragraph>"
+    "</block_quote>" }, // Correct.
+  { { "  * aaa",
+      "    bbb" },
+    "",
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "</bullet_list>"
+    "</block_quote>" }, // Correct.
+  { { "  * aaa",
+      "bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+      "</bullet_list>"
+    "</block_quote>"
+    "<paragraph>bbb</paragraph>" }, // Correct.
+  { { "  * aaa",
+      "     bbb" },
+    "",
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item>"
+          "<definition_list>"
+            "<definition_list_item>"
+              "<term>aaa</term>"
+              "<definition><paragraph>bbb</paragraph></definition>"
+            "</definition_list_item>"
+          "</definition_list>"
+        "</list_item>"
+      "</bullet_list>"
+    "</block_quote>" },
+  { { "  * aaa",
+      "     bbb",
+      "     ccc" },
+    "",
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item>"
+          "<definition_list>"
+            "<definition_list_item>"
+              "<term>aaa</term>"
+              "<definition><paragraph>bbb\nccc</paragraph></definition>"
+            "</definition_list_item>"
+          "</definition_list>"
+        "</list_item>"
+      "</bullet_list>"
+    "</block_quote>" },
+  { { "  * aaa",
+      "",
+      "bbb" },
+    "",
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+      "</bullet_list>"
+    "</block_quote>"
+    "<paragraph>bbb</paragraph>" }, // Correct.
+  { { "  *  aaa",
+      "     bbb" },
+    "",
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "</bullet_list>"
+    "</block_quote>" }, // Correct.
+  { { "*\taaa",
+      "\tbbb" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "*  \taaa",
+      "       \tbbb",
+      "\tccc" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\nbbb\nccc</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "* bbb" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "* bbb" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "",
+      "* bbb" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "  bbb",
+      "* ccc" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "  bbb",
+      "",
+      "* ccc" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "  bbb",
+      "",
+      "",
+      "* ccc" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
 
-  // Not parsed as enumerated lists because indentation is incorrect.
-  { { "1. aaa", "bbb" }, "1. aaa bbb" },
-  { { "(1) aaa", "bbb" }, "(1) aaa bbb" },
+  // Bullet list.  Different bullets.
+  { { "* aaa",
+      "+ bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "- bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "\xe2\x80\xa2 bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "\xe2\x80\xa3 bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "\xe2\x81\x83 bbb" },
+    "",
+    // FIXME: missing diagnostic.
+    "<bullet_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</bullet_list>"
+    "<bullet_list>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
 
-  // Parsed as enumerated lists.
-  { { "1. aaa", "   bbb" }, "" },
-  { { "(1) aaa", "    bbb" }, "" },
+  // Not parsed as enumerated lists because indentation of the second line is
+  // incorrect.
+  { { "1. aaa",
+      "bbb" },
+    "1. aaa bbb",
+    "<paragraph>1. aaa\nbbb</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "bbb" },
+    "(1) aaa bbb",
+    "<paragraph>(1) aaa\nbbb</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "* bbb" },
+    "(1) aaa * bbb",
+    "<paragraph>(1) aaa\n* bbb</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      ":bbb:" },
+    "(1) aaa :bbb:",
+    "<paragraph>(1) aaa\n:bbb:</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      ":bbb: ccc" },
+    "(1) aaa :bbb: ccc",
+    "<paragraph>(1) aaa\n:bbb: ccc</paragraph>" }, // Correct.
 
-  // Parsed as field list.
-  { { ":aaa: bbb", " ccc" }, "" },
+  // Not parsed as an enumerated list because the second line is not a NEELEL.
+  { { "1. aaa",
+      "2." },
+    "1. aaa 2.",
+    "<paragraph>1. aaa\n2.</paragraph>" }, // Correct.
 
-  // Parsed as a definition list.
-  { { "aaa", "  bbb" }, "" },
-  { { "aaa", "  * bbb" }, "" },
+  // Enumerated list.
+  { { "1. aaa" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "  1. aaa" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "1. aaa",
+      "2. bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "  1. aaa",
+      "  2. bbb" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+        "<list_item><paragraph>bbb</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "1. aaa",
+      "",
+      "2. bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "  1. aaa",
+      "",
+      "  2. bbb" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+        "<list_item><paragraph>bbb</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "1. aaa",
+      "",
+      "",
+      "2. bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "  1. aaa",
+      "",
+      "",
+      "  2. bbb" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa</paragraph></list_item>"
+        "<list_item><paragraph>bbb</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "1. aaa",
+      "         ",
+      "         ",
+      "2. bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "   bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "(1) aaa",
+      "    bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "  1. aaa",
+      "     bbb" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "  1. \taaa",
+      "     \tbbb",
+      "   \tccc",
+      "\tddd" },
+    "",
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>aaa\nbbb\nccc\nddd</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "1. aaa",
+      "    bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<definition_list>"
+          "<definition_list_item>"
+            "<term>aaa</term>"
+            "<definition><paragraph>bbb</paragraph></definition>"
+          "</definition_list_item>"
+        "</definition_list>"
+      "</list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "",
+      "    bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<block_quote><paragraph>bbb</paragraph></block_quote>"
+      "</list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "    bbb",
+      "    ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<definition_list>"
+          "<definition_list_item>"
+            "<term>aaa</term>"
+            "<definition><paragraph>bbb\nccc</paragraph></definition>"
+          "</definition_list_item>"
+        "</definition_list>"
+      "</list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "2. bbb" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+      "<list_item><paragraph>bbb</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "   bbb",
+      "2. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "   bbb",
+      "",
+      "2. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "    bbb",
+      "2. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<definition_list>"
+          "<definition_list_item>"
+            "<term>aaa</term>"
+            "<definition><paragraph>bbb</paragraph></definition>"
+          "</definition_list_item>"
+        "</definition_list>"
+      "</list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+  { { "1. aaa",
+      "",
+      "    bbb",
+      "2. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<block_quote><paragraph>bbb</paragraph></block_quote>"
+      "</list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+
+  // Enumerated list.  Different marker styles.
+  { { "1. aaa",
+      "(2) bbb" },
+    "",
+    "<paragraph>1. aaa\n(2) bbb</paragraph>" }, // Correct.
+  { { "1. aaa",
+      "2) bbb" },
+    "",
+    "<paragraph>1. aaa\n2) bbb</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "2. bbb" },
+    "",
+    "<paragraph>(1) aaa\n2. bbb</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "2) bbb" },
+    "",
+    "<paragraph>(1) aaa\n2) bbb</paragraph>" }, // Correct.
+  { { "1) aaa",
+      "2. bbb" },
+    "",
+    "<paragraph>1) aaa\n2. bbb</paragraph>" }, // Correct.
+  { { "1) aaa",
+      "(2) bbb" },
+    "",
+    "<paragraph>1) aaa\n(2) bbb</paragraph>" }, // Correct.
+  { { "1. aaa",
+      "2. bbb",
+      "(3) ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>2. bbb\n(3) ccc</paragraph>" }, // Correct.
+  { { "1. aaa",
+      "2. bbb",
+      "3) ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>2. bbb\n3) ccc</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "(2) bbb",
+      "3. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>(2) bbb\n3. ccc</paragraph>" }, // Correct.
+  { { "(1) aaa",
+      "(2) bbb",
+      "3) ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>(2) bbb\n3) ccc</paragraph>" }, // Correct.
+  { { "1) aaa",
+      "2) bbb",
+      "3. ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>2) bbb\n3. ccc</paragraph>" }, // Correct.
+  { { "1) aaa",
+      "2) bbb",
+      "(3) ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa</paragraph></list_item>"
+    "</enumerated_list>"
+    "<paragraph>2) bbb\n(3) ccc</paragraph>" }, // Correct.
+  { { "1. aaa",
+      "   bbb",
+      "2) ccc" },
+    "",
+    // FIXME: missing diagnostic.
+    "<enumerated_list>"
+      "<list_item><paragraph>aaa\nbbb</paragraph></list_item>"
+    "</enumerated_list>"
+    "<enumerated_list>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+
+  // Nested lists.
+  { { "(1) (1) aaa",
+      "    (2) bbb",
+      "(2) ccc" },
+    "",
+    "<enumerated_list>"
+      "<list_item>"
+        "<enumerated_list>"
+          "<list_item><paragraph>aaa</paragraph></list_item>"
+          "<list_item><paragraph>bbb</paragraph></list_item>"
+        "</enumerated_list>"
+      "</list_item>"
+      "<list_item><paragraph>ccc</paragraph></list_item>"
+    "</enumerated_list>" }, // Correct.
+
+  // Field list.
+  { { ":aaa:" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa:",
+      " bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa:",
+      " bbb",
+      " ccc" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa:",
+      "      bbb",
+      "      ccc" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb", }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      " ccc" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      " ccc",
+      " ddd" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc\nddd</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "       ccc" }, "",
+    // Note: this should be parsed without the nested definition list, because
+    // in a field list (unlike bullet and enumerated lists), the second line
+    // determines the indentation of the field body.
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "       ccc",
+      "       ddd" }, "",
+    // Note: similarly to the case above, this should be parsed without the
+    // nested definition list.
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc\nddd</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":foo: bar",
+      " * aaa",
+      " * bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>foo</field_name>"
+        "<field_body>"
+          "<paragraph>bar\n* aaa\n* bbb</paragraph>"
+        "</field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":foo: bar",
+      "",
+      " * aaa",
+      " * bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>foo</field_name>"
+        "<field_body>"
+          "<paragraph>bar</paragraph>"
+          "<bullet_list>"
+            "<list_item><paragraph>aaa</paragraph></list_item>"
+            "<list_item><paragraph>bbb</paragraph></list_item>"
+          "</bullet_list>"
+        "</field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":foo: bar",
+      " (1) aaa",
+      " (2) bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>foo</field_name>"
+        "<field_body>"
+          "<paragraph>bar\n(1) aaa\n(2) bbb</paragraph>"
+        "</field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":foo: bar",
+      "",
+      " (1) aaa",
+      " (2) bbb" }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>foo</field_name>"
+        "<field_body>"
+          "<paragraph>bar</paragraph>"
+          "<enumerated_list>"
+            "<list_item><paragraph>aaa</paragraph></list_item>"
+            "<list_item><paragraph>bbb</paragraph></list_item>"
+          "</enumerated_list>"
+        "</field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+
+
+  // Definition lists.
+  { { "aaa",
+      "  bbb" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Correct.
+  { { "aaa",
+      "  bbb",
+      "",
+      "  ccc" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa</term>"
+        "<definition><paragraph>bbb</paragraph><paragraph>ccc</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Correct.
+  { { "aaa",
+      "  bbb",
+      "",
+      " ccc" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa</term>"
+        "<definition>"
+          "<block_quote><paragraph>bbb</paragraph></block_quote>"
+          "<paragraph>ccc</paragraph>"
+        "</definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Correct.
+  { { "aaa",
+      "      bbb", "",
+      "    ccc", "",
+      "  ddd", "",
+      "    eee", "",
+      "  fff" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa</term>"
+        "<definition>"
+          "<block_quote>"
+            "<block_quote><paragraph>bbb</paragraph></block_quote>"
+            "<paragraph>ccc</paragraph>"
+          "</block_quote>"
+          "<paragraph>ddd</paragraph>"
+          "<block_quote><paragraph>eee</paragraph></block_quote>"
+          "<paragraph>fff</paragraph>"
+        "</definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Correct.
+  { { "aaa",
+      "  * bbb" }, "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa</term>"
+        "<definition>"
+          "<bullet_list>"
+            "<list_item><paragraph>bbb</paragraph></list_item>"
+          "</bullet_list>"
+        "</definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Correct.
+
+  // Definition lists with classifiers.
+  // FIXME: classifiers are not recognized.
+  { { "aaa : xxx",
+      "  bbb" }, "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa : xxx</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers.
+  { { "aaa : xxx : yyy",
+      "  bbb" }, "",
+    // REST-FIXME: the spec states that the content model for
+    // definition_list_item is
+    //
+    //   (term, classifier?, definition)
+    //
+    // which should say 'classifier*' instead.
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa : xxx : yyy</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers.
+  { { "aaa : xxx",
+      "    bbb",
+      "",
+      "ccc : yyy",
+      "  ddd" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa : xxx</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+      "<definition_list_item>"
+        "<term>ccc : yyy</term>"
+        "<definition><paragraph>ddd</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" },
+  { { "aaa : xxx",
+      "    bbb",
+      "",
+      "  ccc : yyy",
+      "    ddd" },
+    "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa : xxx</term>"
+          "<definition>"
+            "<block_quote><paragraph>bbb</paragraph></block_quote>"
+            "<definition_list>"
+              "<definition_list_item>"
+                "<term>ccc : yyy</term>"
+                "<definition><paragraph>ddd</paragraph></definition>"
+              "</definition_list_item>"
+            "</definition_list>"
+          "</definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers.  Nesting is correct.
+
+  // Definition lists with inline markup inside the term line.
+  { { "``aaa`` : xxx",
+      "  bbb" }, "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>``aaa`` : xxx</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
+  { { "aaa : ``xxx``",
+      "  bbb" }, "",
+    // REST-FIXME: The spec states that:
+    // [ReST/Syntax Details/Body Elements/Definition Lists]
+    // Quote:
+    //
+    //     Inline markup is parsed in the term line before the classifier
+    //     delimiter (" : ") is recognized.
+    //
+    // But contrary to that, docutils implementation recognizes inline markup
+    // everywhere in the term line.  So does LLVM ReST.
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>aaa : ``xxx``</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
+  { { "``aaa`` : ``xxx``",
+      "  bbb" }, "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>``aaa`` : ``xxx``</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
+  { { "``aaa`` : ``xxx`` : **yyy**",
+      "  bbb" }, "",
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>``aaa`` : ``xxx`` : **yyy**</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: classifiers, inline markup.
+  { { "``aaa : xxx``",
+      "  bbb" }, "",
+    // Classifier delimiter inside inline markup is not recognized.
+    "<definition_list>"
+      "<definition_list_item>"
+        "<term>``aaa : xxx``</term>"
+        "<definition><paragraph>bbb</paragraph></definition>"
+      "</definition_list_item>"
+    "</definition_list>" }, // Incorrect: inline markup.
+
+  // Block quotes.
+  { { "  aaa",
+      "",
+      "bbb" }, "aaa",
+    "<block_quote>"
+      "<paragraph>aaa</paragraph>"
+    "</block_quote>"
+    "<paragraph>bbb</paragraph>" }, // Correct.
+  { { "    aaa",
+      "",
+      "  bbb",
+      "",
+      "ccc" }, "aaa",
+    "<block_quote>"
+      "<block_quote>"
+        "<paragraph>aaa</paragraph>"
+      "</block_quote>"
+      "<paragraph>bbb</paragraph>"
+    "</block_quote>"
+    "<paragraph>ccc</paragraph>" }, // Correct.
+  { { "    aaa",
+      " ",
+      "    bbb" }, "aaa",
+    "<block_quote>"
+      "<paragraph>aaa</paragraph>"
+      "<paragraph>bbb</paragraph>"
+    "</block_quote>" }, // Correct.
+  { { "    aaa",
+      "",
+      "  bbb" }, "aaa",
+    "<block_quote>"
+      "<block_quote>"
+        "<paragraph>aaa</paragraph>"
+      "</block_quote>"
+      "<paragraph>bbb</paragraph>"
+    "</block_quote>" }, // Correct.
+  { { "  aaa",
+      "",
+      "    bbb" }, "aaa",
+    "<block_quote>"
+      "<paragraph>aaa</paragraph>"
+      "<block_quote>"
+        "<paragraph>bbb</paragraph>"
+      "</block_quote>"
+    "</block_quote>" }, // Correct.
+  { { "  aaa",
+      "  bbb" }, "aaa bbb",
+    "<block_quote>"
+      "<paragraph>aaa\nbbb</paragraph>"
+    "</block_quote>" },
 
   // Unexpected indentation.
-  { { "aaa", "bbb", "  ccc" }, "aaa bbb" },
-  { { "aaa", "bbb", "  * ccc" }, "aaa bbb" },
-  { { "aaa", "bbb", "  1. ccc" }, "aaa bbb" },
-  { { "aaa", "bbb", "  (1) ccc" }, "aaa bbb" },
+  { { "aaa",
+      "bbb",
+      "  ccc" }, "aaa bbb",
+    "<paragraph>aaa\nbbb</paragraph>"
+    "<block_quote>"
+      "<paragraph>ccc</paragraph>"
+    "</block_quote>" }, // Correct.
+  { { "aaa",
+      "bbb",
+      "  * ccc" }, "aaa bbb",
+    "<paragraph>aaa\nbbb</paragraph>"
+    "<block_quote>"
+      "<bullet_list>"
+        "<list_item><paragraph>ccc</paragraph></list_item>"
+      "</bullet_list>"
+    "</block_quote>" }, // Correct.
+  { { "aaa",
+      "bbb",
+      "  1. ccc" }, "aaa bbb",
+    "<paragraph>aaa\nbbb</paragraph>"
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>ccc</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
+  { { "aaa",
+      "bbb",
+      "  (1) ccc" }, "aaa bbb",
+    "<paragraph>aaa\nbbb</paragraph>"
+    "<block_quote>"
+      "<enumerated_list>"
+        "<list_item><paragraph>ccc</paragraph></list_item>"
+      "</enumerated_list>"
+    "</block_quote>" }, // Correct.
 
   // FIXME: removing inline markup.
-  { { "*aaa*" }, "*aaa*" },
-  { { "**aaa**" }, "**aaa**" },
-  { { "`aaa`" }, "`aaa`" },
-  { { "``aaa``" }, "``aaa``" },
+  { { "*aaa*" }, "*aaa*", "<paragraph>*aaa*</paragraph>" },
+  { { "**aaa**" }, "**aaa**", "<paragraph>**aaa**</paragraph>" },
+  { { "`aaa`" }, "`aaa`", "<paragraph>`aaa`</paragraph>" },
+  { { "``aaa``" }, "``aaa``", "<paragraph>``aaa``</paragraph>" },
 
   // FIXME: substitution references sholud be substituted.
-  { { "|aaa|" }, "|aaa|" },
-  { { "|aaa|_" }, "|aaa|_" },
-  { { "|aaa|__" }, "|aaa|__" },
+  { { "|aaa|" }, "|aaa|", "<paragraph>|aaa|</paragraph>" },
+  { { "|aaa|_" }, "|aaa|_", "<paragraph>|aaa|_</paragraph>" },
+  { { "|aaa|__" }, "|aaa|__", "<paragraph>|aaa|__</paragraph>" },
 
   // FIXME: removing inline markup.
-  { { "_`aaa`" }, "_`aaa`" },
-  { { "[1]_" }, "[1]_" },
-  { { "[12]_" }, "[12]_" },
-  { { "[#]_" }, "[#]_" },
-  { { "[#aaa]_" }, "[#aaa]_" },
-  { { "[*]_" }, "[*]_" },
-  { { "[aaa]_" }, "[aaa]_" },
-  { { "aaa_" }, "aaa_" },
-  { { "`aaa`_" }, "`aaa`_" },
-  { { "aaa__" }, "aaa__" },
-  { { "`aaa`__" }, "`aaa`__" },
-  { { "`aaa <http://example.org/>`_" }, "`aaa <http://example.org/>`_" },
-  { { "`aaa <foo.txt\\_>`__" }, "`aaa <foo.txt\\_>`__" },
+  { { "_`aaa`" }, "_`aaa`", "<paragraph>_`aaa`</paragraph>" },
+  { { "[1]_" }, "[1]_", "<paragraph>[1]_</paragraph>" },
+  { { "[12]_" }, "[12]_", "<paragraph>[12]_</paragraph>" },
+  { { "[#]_" }, "[#]_", "<paragraph>[#]_</paragraph>" },
+  { { "[#aaa]_" }, "[#aaa]_", "<paragraph>[#aaa]_</paragraph>" },
+  { { "[*]_" }, "[*]_", "<paragraph>[*]_</paragraph>" },
+  { { "[aaa]_" }, "[aaa]_", "<paragraph>[aaa]_</paragraph>" },
+  { { "aaa_" }, "aaa_", "<paragraph>aaa_</paragraph>" },
+  { { "`aaa`_" }, "`aaa`_", "<paragraph>`aaa`_</paragraph>" },
+  { { "aaa__" }, "aaa__", "<paragraph>aaa__</paragraph>" },
+  { { "`aaa`__" }, "`aaa`__", "<paragraph>`aaa`__</paragraph>" },
+  { { "`aaa <http://example.org/>`_" },
+    "`aaa <http://example.org/>`_",
+    "<paragraph>`aaa <http://example.org/>`_</paragraph>"},
+  { { "`aaa <foo.txt\\_>`__" },
+    "`aaa <foo.txt\\_>`__",
+    "<paragraph>`aaa <foo.txt\\_>`__</paragraph>" },
 };
 INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,
     ::testing::ValuesIn(ExtractBriefTests));
 
-// Tests for bulleted lists:
+struct ParseReSTTestData {
+  std::vector<const char *> InText;
+  std::string DocutilsXML;
+};
+
+struct ParseReSTTest
+    : public ReSTTest,
+      public ::testing::WithParamInterface<ExtractBriefTestData> {};
+
+TEST_P(ParseReSTTest, Test) {
+  const auto &Test = GetParam();
+  auto LL = toLineList(Test.InText);
+  llvm::SmallString<64> Str;
+  extractBrief(LL, Str);
+  EXPECT_EQ(Test.Brief, Str.str());
+}
+
+struct ParseReSTTestData ParseReSTTests[] = {
+};
+
+// Tests for bullet lists:
 //
 // "* aaa"
 // "+ bbb"
-// error: bulleted list (*) ends without a blank line
+// error: bullet list (*) ends without a blank line
+//
+// "* aaa"
+// " * bbb"
+// ok: [bullet list "aaa"], [block quote [bullet list "bbb"]]
 //
 // "* aaa"
 // "  * bbb"
-// ok: bulleted list with text "aaa * bbb"
+// ok: [bullet list "aaa * bbb"]
 //
 // "* aaa"
 // "   * bbb"
-// ok: bulleted list item with (text "aaa" + block quote "* bbb"
+// ok: [bullet list (text "aaa", block quote with [list "bbb"])]
 //
 // "aaa"
 // "* bbb"
 // ok: plain text
+//
+// "* aaa"
+// ""
+// "*   bbb"
+// ""
+// " * ccc"
+// ok: bullet list ("aaa", "bbb"), followed by a block quote with [list "ccc"]
+//
+// "* aaa"
+// ""
+// "  * ccc"
+// ok: bullet list ("aaa", [bullet list "bbb"])
 
-// Bulleted lists without text immediately after the bullet:
+// Bullet lists without text immediately after the bullet:
 //
 // "*"
 // "*"
 // "*"
-// ok: bulleted list with three empty items
+// ok: bullet list with three empty items
 //
 // "* "
 // "aaa"
@@ -489,26 +1523,26 @@ INSTANTIATE_TEST_CASE_P(
 //
 // "* "
 // " aaa"
-// ok: bulleted list item with text "aaa"
+// ok: bullet list item with text "aaa"
 // note: the text is on the *next* column after the bullet.
 //
 // "* "
 // "      aaa"
-// ok: bulleted list item with text "aaa"
+// ok: bullet list item with text "aaa"
 //
 // "* "
 // "      aaa"
 // "      bbb"
-// ok: bulleted list item with text "aaa bbb"
+// ok: bullet list item with text "aaa bbb"
 //
 // "* "
 // "      aaa"
 // "       bbb"
-// ok: bulleted list item with (text "aaa" + block quote "bbb")
+// ok: bullet list item with (text "aaa" + block quote "bbb")
 //
 // "*"
 // " aaa"
-// ok: bulleted list item with text "aaa"
+// ok: bullet list item with text "aaa"
 // REST-FIXME: arguably, this is a bug ether in docutils, or in the spec.
 // According to [ReST/Syntax Details/Body Elements/Bullet Lists], the bullet
 // character should be immediately followed by whitespace.  In order to avoid
@@ -518,12 +1552,12 @@ INSTANTIATE_TEST_CASE_P(
 // "*"
 // ""
 // "aaa"
-// ok: bulleted list with one empty item, paragraph with text "aaa"
+// ok: bullet list with one empty item, paragraph with text "aaa"
 //
 // "* "
 // ""
 // "    bbb"
-// docutils: bulleted list item with text "bbb"
+// docutils: bullet list item with text "bbb"
 // REST-FIXME: the standard does not say anything in specifically about this,
 // but it does look weird, and there might be an ambiguity with block quotes.
 // Compare the example above to:
@@ -671,10 +1705,6 @@ INSTANTIATE_TEST_CASE_P(
 // ok: plain text
 // REST-FIXME: this should at least emit a warning.
 //
-// "(1) (1) a"
-// "    (2) b"
-// "(2) c"
-// ok: nested lists
 //
 // "1. a"
 // "2."
@@ -765,7 +1795,7 @@ INSTANTIATE_TEST_CASE_P(
 // without getting a backslash in the output?
 //
 // :foo\: bar
-// ok: not a bulleted list, text, literally ":foo: bar"
+// ok: not a bullet list, text, literally ":foo: bar"
 //
 // :foo\
 // ok: text ":foo"
@@ -776,15 +1806,37 @@ INSTANTIATE_TEST_CASE_P(
 // ":foo: bbb"
 // ok: plain text
 
-// Complex tests:
+// Tests for block quotes:
 //
-// ":foo: bar"
-// " (1) a"
-// " (2) b"
-// ok: field list with plain text
+// "*   aaa"
+// ""
+// "  bbb"
+// docutils: [list "aaa"] [blockquote [paragraph "bbb"]]
+//
+// ":aaa:    bbb"
+// "         ccc"
+// ""
+// "       ddd"
+// docutils: [field list ["aaa", [definition list <does not make any sense>]] [paragraph "ddd"]],
+//
+// Notice the inconsistency above.
+// REST-FIXME: both should be blockquotes, or blockquotes at the beginning of
+// every element should be disallowed.
+
+// Complex tests:
 //
 // ":foo: bar"
 // ""
 // " (1) a"
 // " (2) b"
 // ok: field list with text "bar" + nested list
+
+// Misc points:
+// [ReST/Syntax Details/Body Elements/Field Lists]
+// Quote:
+//   Field names are case-insensitive when further processed or transformed.
+//
+// REST-FIXME: clarify what exactly this means for Unicode.  A reasonable thing
+// would be to say that the above point only applies if the field name is
+// ASCII-only.
+

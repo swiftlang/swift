@@ -124,6 +124,15 @@ void llvm::rest::extractBrief(LineListRef LL,
         // It is a list item.
         return;
       }
+      if (LL[i + 1].FirstTextCol == LL[i].FirstTextCol) {
+        bool IsNEELEL = isEnumerated(LL[i + 1].getClassification().Kind) &&
+                        LL[i + 1].getClassification().hasTextAfterEnumerator();
+        if (IsNEELEL) {
+          // It is a list item.
+          return;
+        }
+      }
+
       if (LL[i + 1].FirstTextCol <
           LL[i].FirstTextCol +
               LL[i].getClassification().getEnumeratorAndWhitespaceCols()) {
