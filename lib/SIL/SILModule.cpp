@@ -121,7 +121,6 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
   SILWitnessTable *WT = SILWitnessTable::create(*this,
                                                 SILLinkage::PublicExternal,
                                                 NormalC);
-  WitnessTableLookupCache[NormalC] = WT;
   return WT;
 }
 
