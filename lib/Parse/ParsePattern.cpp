@@ -968,7 +968,8 @@ ParserResult<Pattern> Parser::parseMatchingPatternIs() {
   ParserResult<TypeRepr> castType = parseType();
   if (castType.isNull() || castType.hasCodeCompletion())
     return nullptr;
-  return makeParserResult(new (Context) IsaPattern(isLoc, castType.get()));
+  return makeParserResult(new (Context) IsaPattern(isLoc, castType.get(),
+                                                   nullptr));
 }
 
 bool Parser::isOnlyStartOfMatchingPattern() {

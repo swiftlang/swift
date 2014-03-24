@@ -450,20 +450,15 @@ static void destructurePattern(SILGenFunction &gen,
       = specializerIsa->getCastTypeLoc().getType()->getCanonicalType();
     CanType newToType = ip->getCastTypeLoc().getType()->getCanonicalType();
     
-    // If a cast pattern casts to the same type, it reduces to a wildcard.
-    // FIXME: 'is' patterns should have a subpattern, in which case they
-    // destructure to that pattern in this case.
+    // If a cast pattern casts to the same type, it reduces to its subpattern.
     if (newFromType == newToType) {
-      destructured.push_back(nullptr);
+      destructured.push_back(ip->getSubPattern());
       return;
     }
     
-    // If the cast pattern casts to a superclass, it reduces to a wildcard.
-    // FIXME: 'is' patterns should have a subpattern, in which case they
-    // destructure to that pattern in this case. We'd need to arrange for the
-    // value to be upcast.
+    // If the cast pattern casts to a superclass, it reduces to its subpattern.
     if (newToType->isSuperclassOf(newFromType, nullptr)) {
-      destructured.push_back(nullptr);
+      destructured.push_back(ip->getSubPattern());
       return;
     }
 
@@ -498,8 +493,9 @@ static void destructurePattern(SILGenFunction &gen,
     // Create the new cast pattern.
     auto *newIsa
       = new (gen.F.getASTContext()) IsaPattern(p->getLoc(),
-                                               ip->getCastTypeLoc(),
-                                               newKind);
+                                     ip->getCastTypeLoc(),
+                                     const_cast<Pattern*>(ip->getSubPattern()),
+                                     newKind);
     newIsa->setType(newFromType);
     
     destructured.push_back(newIsa);

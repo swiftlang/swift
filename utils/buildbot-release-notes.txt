@@ -68,6 +68,45 @@
     // After
     let b3: B = D() as B as D! as B
 
+* 'as' can now be used in 'switch' cases to match the result of a checked cast:
+
+    func printHand(hand: Any) {
+      switch hand {
+      case 1 as Int:
+        print("ace")
+      case 11 as Int:
+        print("jack")
+      case 12 as Int:
+        print("queen")
+      case 13 as Int:
+        print("king")
+      case let numberCard as Int:
+        print("\(numberCard)")
+      case let (a, b) as (Int, Int) where a == b:
+        print("two ")
+        printHand(a)
+        print("s")
+      case let (a, b) as (Int, Int):
+        printHand(a)
+        print(" and a ")
+        printHand(b)
+      case let (a, b, c) as (Int, Int, Int) where a == b && b == c:
+        print("three ")
+        printHand(a)
+        print("s")
+      case let (a, b, c) as (Int, Int, Int):
+        printHand(a)
+        print(", ")
+        printHand(b)
+        print(", and a ")
+        printHand(c)
+      default:
+        print("unknown hand")
+      }
+    }
+    printHand(1, 1, 1) // prints "three aces"
+    printHand(12, 13) // prints "queen and a king"
+
 2014-03-19
 ----------
 

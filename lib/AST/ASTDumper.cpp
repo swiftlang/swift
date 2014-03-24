@@ -160,6 +160,10 @@ namespace {
     void visitIsaPattern(IsaPattern *P) {
       printCommon(P, "pattern_isa") << ' ';
       P->getCastTypeLoc().getType().print(OS);
+      if (auto sub = P->getSubPattern()) {
+        OS << '\n';
+        printRec(sub);
+      }
       OS << ')';
     }
     void visitNominalTypePattern(NominalTypePattern *P) {
@@ -176,7 +180,10 @@ namespace {
     void visitExprPattern(ExprPattern *P) {
       printCommon(P, "pattern_expr");
       OS << '\n';
-      printRec(P->getSubExpr());
+      if (auto m = P->getMatchExpr())
+        printRec(m);
+      else
+        printRec(P->getSubExpr());
       OS << ')';
     }
     void visitVarPattern(VarPattern *P) {

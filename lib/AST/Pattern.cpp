@@ -270,6 +270,8 @@ Pattern *Pattern::clone(ASTContext &context,
     auto isa = cast<IsaPattern>(this);
     result = new(context) IsaPattern(isa->getLoc(),
                                      isa->getCastTypeLoc().clone(context),
+                                     isa->getSubPattern()->clone(context,
+                                                                 options),
                                      isa->getCastKind());
     break;
   }

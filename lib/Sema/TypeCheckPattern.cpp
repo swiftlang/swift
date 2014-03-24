@@ -222,6 +222,23 @@ public:
     return new (TC.Context) AnyPattern(E->getLoc(), E->isImplicit());
   }
   
+  // Cast expressions 'x as T' get resolved to checked cast patterns.
+  // Pattern resolution occurs before sequence resolution, so the cast will
+  // appear as a SequenceExpr.
+  Pattern *visitSequenceExpr(SequenceExpr *E) {
+    if (E->getElements().size() != 3)
+      return nullptr;
+    auto cast = dyn_cast<ConditionalCheckedCastExpr>(E->getElement(1));
+    if (!cast)
+      return nullptr;
+    
+    Pattern *subPattern = getSubExprPattern(E->getElement(0));
+    return new (TC.Context) IsaPattern(cast->getLoc(),
+                                       cast->getCastTypeLoc(),
+                                       subPattern,
+                                       CheckedCastKind::Unresolved);
+  }
+  
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
     if (Pattern *subPattern = visit(E->getSubExpr()))
@@ -839,6 +856,15 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     }
     
     IP->setType(type);
+    
+    // Coerce the subpattern to the destination type.
+    if (Pattern *sub = IP->getSubPattern()) {
+      if (coercePatternToType(sub, dc, IP->getCastTypeLoc().getType(),
+                              subOptions|TR_FromNonInferredPattern))
+        return true;
+      IP->setSubPattern(sub);
+    }
+    
     return false;
   }
       

@@ -398,6 +398,8 @@ public:
 class IsaPattern : public Pattern {
   SourceLoc IsLoc;
   
+  Pattern *SubPattern;
+  
   /// The semantics of the type check (class downcast, archetype-to-concrete,
   /// etc.)
   CheckedCastKind CastKind;
@@ -407,10 +409,12 @@ class IsaPattern : public Pattern {
   
 public:
   IsaPattern(SourceLoc IsLoc, TypeLoc CastTy,
+             Pattern *SubPattern,
              CheckedCastKind Kind = CheckedCastKind::Unresolved,
              Optional<bool> implicit = {})
     : Pattern(PatternKind::Isa),
       IsLoc(IsLoc),
+      SubPattern(SubPattern),
       CastKind(Kind),
       CastType(CastTy) {
     assert(IsLoc.isValid() == CastTy.hasLocation());
@@ -421,9 +425,14 @@ public:
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
   
+  Pattern *getSubPattern() { return SubPattern; }
+  const Pattern *getSubPattern() const { return SubPattern; }
+  void setSubPattern(Pattern *p) { SubPattern = p; }
+  
   SourceLoc getLoc() const { return IsLoc; }
   SourceRange getSourceRange() const {
-    return {IsLoc, CastType.getSourceRange().End};
+    return {SubPattern ? SubPattern->getSourceRange().Start : IsLoc,
+            CastType.getSourceRange().End};
   }
   
   TypeLoc &getCastTypeLoc() { return CastType; }

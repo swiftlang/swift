@@ -105,29 +105,6 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   if (expr.isNull())
     return nullptr;
   
-  // If we got a bare identifier inside a 'var' pattern, it forms a variable
-  // binding pattern. Raise an error if the identifier shadows an existing
-  // binding.
-  //
-  // TODO: We could check for a bare identifier followed by a non-postfix
-  // token first thing with a lookahead.
-  if (InVarOrLetPattern) {
-    if (auto *declRef = dyn_cast<DeclRefExpr>(expr.get())) {
-      // This is ill-formed, but the problem will be caught later by scope
-      // resolution.
-      auto pattern = createBindingFromPattern(declRef->getLoc(),
-                                              declRef->getDecl()->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
-      return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-    }
-    if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(expr.get())) {
-      auto pattern = createBindingFromPattern(udre->getLoc(),
-                                              udre->getName(),
-                                              InVarOrLetPattern == IVOLP_InLet);
-      return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
-    }
-  }
-
   return makeParserResult(expr.get());
 }
 
@@ -198,6 +175,32 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       return makeParserCodeCompletionResult<Expr>();
     if (Primary.isNull())
       return nullptr;
+    
+    // If we got a bare identifier inside a 'var' pattern, it forms a variable
+    // binding pattern. Raise an error if the identifier shadows an existing
+    // binding.
+    //
+    // TODO: We could check for a bare identifier followed by a non-postfix
+    // token first thing with a lookahead.
+    if (InVarOrLetPattern) {
+      if (auto *declRef = dyn_cast<DeclRefExpr>(Primary.get())) {
+        // This is ill-formed, but the problem will be caught later by scope
+        // resolution.
+        auto pattern = createBindingFromPattern(declRef->getLoc(),
+                                              declRef->getDecl()->getName(),
+                                              InVarOrLetPattern == IVOLP_InLet);
+        Primary
+          = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
+      }
+      if (auto *udre = dyn_cast<UnresolvedDeclRefExpr>(Primary.get())) {
+        auto pattern = createBindingFromPattern(udre->getLoc(),
+                                              udre->getName(),
+                                              InVarOrLetPattern == IVOLP_InLet);
+        Primary
+          = makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
+      }
+    }
+    
     SequencedExprs.push_back(Primary.get());
     
 parse_operator:
