@@ -25,9 +25,9 @@ However, there are only two selector pieces: "moveRowAtIndex" and
 it reads well in English because the preposition "at" separates the
 action (``moveRow``) from the first argument (``AtIndex``), while the
 second selector piece conveys #3. Cocoa conventions in this area are
-fairly strong, where the first selector piece describes both the
-operation and the first argument, and subsequent selector pieces
-describe the remaining arguments. 
+fairly strong, where the first selector piece describes what the
+operation is doing or produces, and well as what the first argument
+is, and subsequent selector pieces describe the remaining arguments.
 
 Splitting Selectors at Prepositions
 -----------------------------------
@@ -101,7 +101,7 @@ syntax directly::
 
 Now, sometimes the argument name that works well at the call site
 doesn't work well for the body of the function. For example, splitting
-the selector for ``UIView``'s ``contentHuggingPriorityForAxis::``
+the selector for ``UIView``'s ``contentHuggingPriorityForAxis:``
 results in::
 
   func contentHuggingPriority(forAxis: UILayoutConstraintAxis) -> UILayoutPriority
@@ -153,7 +153,7 @@ Initializers
 ------------
 Objective-C ``init`` methods correspond to initializers in
 Swift. Swift splits the selector name after the ``init``. For example,
-``NSView``'s ``initWitFrame:`` method becomes the initializer::
+``NSView``'s ``initWithFrame:`` method becomes the initializer::
 
   init(withFrame: NSRect)
 
