@@ -260,7 +260,8 @@ are more than simply a connector. zFor example, consider calls to the
 ``NSImage`` method ``-drawInRect:fromRect:operation:fraction:`` with
 the leading prepositions retained and removed, respectively::
 
-  image.drawInRect(inRect:dstRect, fromRect:srcRect, operation: op, fraction:0.5  image.drawInRect(rect:dstRect, rect:srcRect, operation: op, fraction:0.5)
+  image.drawInRect(inRect:dstRect, fromRect:srcRect, operation: op, fraction:0.5)
+  image.drawInRect(rect:dstRect, rect:srcRect, operation: op, fraction:0.5)
 
 
 Here, dropping the leading prepositions is actively harmful, because
