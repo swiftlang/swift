@@ -24,6 +24,13 @@ typedef struct {
   intptr_t length;
 } _SwiftNSRange;
 
+typedef struct {
+    unsigned long state;
+    id __unsafe_unretained *itemsPtr;
+    unsigned long *mutationsPtr;
+    unsigned long extra[5];
+} _SwiftNSFastEnumerationState;
+
 // A base class we can use to create classes in Swift whose
 // inheritance can be changed at run-time with class_setSuperclass.
 // This technique is used in bridging: for example, to avoid coupling
