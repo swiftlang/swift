@@ -223,9 +223,12 @@ a Boolean property::
 Optionality and Ordering of Keyword Arguments
 ---------------------------------------------
 A number of programming languages have keyword arguments in one form
-or another, including Ada, C#, Fortran 95, Lua, Objective-C, OCaml,
-Perl 6, Python, Ruby, and Smalltalk. All but Objective-C and Smalltalk
-allow re-ordering of arguments at the call site, and many allow one to
+or another, including Ada, C#, Fortran 95, Lua, OCaml,
+Perl 6, Python, and Ruby. Objective-C and Smalltalk's use of selectors
+is roughly equivalent, in the sense that the arguments get names. 
+The languages with keyword arguments (but not Objective-C and
+Smalltalk) all allow re-ordering of
+arguments at the call site, and many allow one to
 provide arguments positionally without their associated name at the
 call site. However, Cocoa APIs were designed based on the
 understanding that they would not be re-ordered, and the sentence
