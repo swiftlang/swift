@@ -256,7 +256,7 @@ prepositions from argument names, so that this call would be::
 
 There are a few concerns with dropping leading prepositions on
 argument names. First, some prepositions are meaningful because they
-are more than simply a connector. zFor example, consider calls to the
+are more than simply a connector. For example, consider calls to the
 ``NSImage`` method ``-drawInRect:fromRect:operation:fraction:`` with
 the leading prepositions retained and removed, respectively::
 
@@ -389,11 +389,11 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | **From**       | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
-| **Given**      | Yes     | No      |                            |
+| **Given**      | Yes*    | No      | Never splits a slector     |
 +----------------+---------+---------+----------------------------+
 | **In**         | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
-| **Including**  | Yes     | No      |                            |
+| **Including**  | Yes*    | No      | Never splits a selector    |
 +----------------+---------+---------+----------------------------+
 | **Inside**     | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
@@ -423,13 +423,13 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | Outside        | Yes*    |         | Misleading when split      |
 +----------------+---------+---------+----------------------------+
-| **Over**       | Yes     | No      |                            |
+| Over           | No*     |         | Used as an adverb          |
 +----------------+---------+---------+----------------------------+
 | Past           | No      |         |                            |
 +----------------+---------+---------+----------------------------+
 | Pending        | No*     |         | Used as an adjective       |
 +----------------+---------+---------+----------------------------+
-| **Per**        | Yes*    | No      |                            |
+| Per            | Yes*    | No      | Misleading to split        |
 +----------------+---------+---------+----------------------------+
 | Plus           | No      |         | Used as an adjective       |
 +----------------+---------+---------+----------------------------+
@@ -481,7 +481,7 @@ circumstances that affect inclusion or exclusion from the list.
 +----------------+---------+---------+----------------------------+
 | **Within**     | Yes     | No      |                            |
 +----------------+---------+---------+----------------------------+
-| **Without**    | Yes     | No      |                            |
+| Without        | Yes*    | No      | Misleading when split      |
 +----------------+---------+---------+----------------------------+
 | Worth          | No      |         |                            |
 +----------------+---------+---------+----------------------------+
