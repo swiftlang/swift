@@ -102,7 +102,7 @@ syntax directly::
 Now, sometimes the argument name that works well at the call site
 doesn't work well for the body of the function. For example, splitting
 the selector for ``UIView``'s ``contentHuggingPriorityForAxis::``
-results in:
+results in::
 
   func contentHuggingPriority(forAxis: UILayoutConstraintAxis) -> UILayoutPriority
 
@@ -250,12 +250,12 @@ Retaining the leading preposition on the first argument name leads to
 somewhat unevent calls. For example, ``NSColor``'s
 ``colorWithRed:green:blue:alpha:`` is called as::
 
-  NSColor.color(withRed:0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+  NSColor.color(withRed: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
 
 The ``with`` in this case feels spurious. We could drop leading
 prepositions from argument names, so that this call would be::
 
-  NSColor.color(red:0.5, green: 0.5, blue: 0.5, alpha: 1.0)
+  NSColor.color(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
 
 
 In addition to improving the call site, this eliminates the need to
