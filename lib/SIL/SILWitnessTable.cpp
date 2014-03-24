@@ -85,31 +85,14 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance,
                                  ArrayRef<Entry> entries)
-  : Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-    IsDeclaration(false)
-{
-  void *buf = M.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
-  memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
-  Entries = ArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
-
-  // Bump the reference count of witness functions referenced by this table.
-  for (auto entry : getEntries()) {
-    switch (entry.getKind()) {
-    case Method:
-      entry.getMethodWitness().Witness->RefCount++;
-      break;
-    case AssociatedType:
-    case AssociatedTypeProtocol:
-    case BaseProtocol:
-    case Invalid:
-      break;
-    }
-  }
+  : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
+    IsDeclaration(true) {
+  convertToDefinition(entries);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
                                  NormalProtocolConformance *Conformance)
-  : Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
+  : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
     IsDeclaration(true)
 {}
 
@@ -122,6 +105,29 @@ SILWitnessTable::~SILWitnessTable() {
     switch (entry.getKind()) {
     case Method:
       entry.getMethodWitness().Witness->RefCount--;
+      break;
+    case AssociatedType:
+    case AssociatedTypeProtocol:
+    case BaseProtocol:
+    case Invalid:
+      break;
+    }
+  }
+}
+
+void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries) {
+  assert(isDeclaration() && "Definitions should never call this method.");
+  IsDeclaration = false;
+
+  void *buf = Mod.allocate(sizeof(Entry)*entries.size(), alignof(Entry));
+  memcpy(buf, entries.begin(), sizeof(Entry)*entries.size());
+  Entries = ArrayRef<Entry>(static_cast<Entry*>(buf), entries.size());
+
+  // Bump the reference count of witness functions referenced by this table.
+  for (auto entry : getEntries()) {
+    switch (entry.getKind()) {
+    case Method:
+      entry.getMethodWitness().Witness->RefCount++;
       break;
     case AssociatedType:
     case AssociatedTypeProtocol:

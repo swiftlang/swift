@@ -140,6 +140,9 @@ public:
   };
   
 private:
+  /// The module which contains the SILWitnessTable.
+  SILModule &Mod;
+
   /// The symbol name of the witness table that will be propagated to the object
   /// file level.
   StringRef Name;
@@ -204,9 +207,14 @@ public:
 
   /// Set the linkage of the witness table.
   void setLinkage(SILLinkage l) { Linkage = l; }
-  
+
+  /// Change a SILWitnessTable declaration into a SILWitnessTable definition.
+  void convertToDefinition(ArrayRef<Entry> newEntries);
+
   /// Print the witness table.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
+
+  /// Dump the witness table to stderr.
   void dump() const;
 };
   
