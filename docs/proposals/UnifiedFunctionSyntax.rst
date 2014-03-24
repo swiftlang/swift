@@ -110,15 +110,15 @@ The name ``forAxis`` works well at the call site, but not within the
 function body. So, we allow one to specify the name of the parameter
 for the body of the function::
 
-  func contentHuggingPriority(forAxis(axis): UILayoutConstraintAxis) -> UILayoutPriority {
+  func contentHuggingPriority(forAxis axis: UILayoutConstraintAxis) -> UILayoutPriority {
     // use 'axis' in the body
   }
 
 One can use '_' in either the argument or parameter name position to
 specify that there is no name. For example::
 
-  func f(_(a): Int)  // no argument name; parameter name is 'a'
-  func g(b(_): Int)  // argument name is 'b'; no parameter name
+  func f(_ a: Int)  // no argument name; parameter name is 'a'
+  func g(b _: Int)  // argument name is 'b'; no parameter name
 
 The first function doesn't support keyword arguments; it is what an
 imported C or C++ function would use. The second function is likely to
@@ -188,7 +188,7 @@ Swift method name for that Objective-C API. For example, by default,
 the ``NSURL`` method ``+bookmarkDataWithContentsOfURL:error:`` will
 come into Swift as::
 
-  class func bookmarkDataWithContents(ofURL(bookmarkFileURL): NSURL, inout error: NSError) -> NSData
+  class func bookmarkDataWithContents(ofURL bookmarkFileURL: NSURL, inout error: NSError) -> NSData
 
 However, one can provide a different mapping with the ``method_name``
 attribute::
@@ -254,14 +254,24 @@ prepositions from argument names, so that this call would be::
 
   NSColor.color(red:0.5, green: 0.5, blue: 0.5, alpha: 1.0)
 
+
+In addition to improving the call site, this eliminates the need to
+rename parameters as often at the declaration site, i.e., this::
+
+  class func color(withRed red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) -> NSColor
+
+becomes::
+
+  class func color(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) -> NSColor
+
 There are a few concerns with dropping leading prepositions on
 argument names. First, some prepositions are meaningful because they
 are more than simply a connector. For example, consider calls to the
 ``NSImage`` method ``-drawInRect:fromRect:operation:fraction:`` with
 the leading prepositions retained and removed, respectively::
 
-  image.drawInRect(inRect:dstRect, fromRect:srcRect, operation: op, fraction:0.5)
-  image.drawInRect(rect:dstRect, rect:srcRect, operation: op, fraction:0.5)
+  image.drawInRect(inRect: dstRect, fromRect: srcRect, operation: op, fraction: 0.5)
+  image.drawInRect(rect: dstRect, rect: srcRect, operation: op, fraction: 0.5)
 
 
 Here, dropping the leading prepositions is actively harmful, because
