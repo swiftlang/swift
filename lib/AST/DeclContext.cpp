@@ -373,10 +373,15 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
   case DeclContextKind::TopLevelCodeDecl:
     OS << " line=" << getLineNumber(cast<TopLevelCodeDecl>(this));
     break;
-  case DeclContextKind::AbstractFunctionDecl:
-    OS << " name=" << cast<AbstractFunctionDecl>(this)->getName();
-    OS << " : " << cast<AbstractFunctionDecl>(this)->getType();
+  case DeclContextKind::AbstractFunctionDecl: {
+    auto *AFD = cast<AbstractFunctionDecl>(this);
+    OS << " name=" << AFD->getName();
+    if (AFD->hasType())
+      OS << " : " << AFD->getType();
+    else
+      OS << " : (no type set)";
     break;
+  }
   case DeclContextKind::Initializer:
     switch (cast<Initializer>(this)->getInitializerKind()) {
     case InitializerKind::PatternBinding: {
