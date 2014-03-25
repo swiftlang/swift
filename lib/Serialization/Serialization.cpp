@@ -1154,7 +1154,7 @@ static void checkAllowedAttributes(const Decl *D) {
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a function declaration.
-static void verifyAttrFunctionSerializable(const Decl *D) {
+static void verifyAttrSerializable(const FuncDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1174,7 +1174,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for an extension.
-static void verifyExtensionSerializable(const Decl *D) {
+static void verifyAttrSerializable(const ExtensionDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1194,7 +1194,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a pattern binding.
-static void verifyAttrPatternBindingSerializable(const Decl *D) {
+static void verifyAttrSerializable(const PatternBindingDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1214,7 +1214,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for an operator.
-static void verifyAttrOperatorSerializable(const Decl *D) {
+static void verifyAttrOperatorSerializable(const OperatorDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1234,7 +1234,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a type alias.
-static void verifyAttrTypeAliasSerializable(const Decl *D) {
+static void verifyAttrSerializable(const TypeAliasDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1254,7 +1254,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a type declarations.
-static void verifyAttrTypeSerializable(const Decl *D) {
+static void verifyAttrTypeSerializable(const TypeDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1274,7 +1274,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a struct declarations.
-static void verifyAttrStructSerializable(const Decl *D) {
+static void verifyAttrSerializable(const StructDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1294,7 +1294,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a struct declarations.
-static void verifyAttrEnumSerializable(const Decl *D) {
+static void verifyAttrSerializable(const EnumDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1314,7 +1314,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a class declarations.
-static void verifyAttrClassSerializable(const Decl *D) {
+static void verifyAttrSerializable(const ClassDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1334,7 +1334,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a class declarations.
-static void verifyAttrProtocolSerializable(const Decl *D) {
+static void verifyAttrSerializable(const ProtocolDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1354,7 +1354,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a class declarations.
-static void verifyAttrVarSerializable(const Decl *D) {
+static void verifyAttrSerializable(const VarDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1410,7 +1410,7 @@ void Serializer::writeDecl(const Decl *D) {
     // @transparent on extensions is propagated down to the methods and
     // constructors during serialization.
     checkAllowedAttributes<AK_transparent>(extension);
-    verifyExtensionSerializable(D);
+    verifyAttrSerializable(extension);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
@@ -1440,7 +1440,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
     checkAllowedAttributes<>(binding);
-    verifyAttrPatternBindingSerializable(D);
+    verifyAttrSerializable(binding);
 
     const Decl *DC = getDeclForContext(binding->getDeclContext());
 
@@ -1463,7 +1463,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(D);
+    verifyAttrOperatorSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
     auto associativity = getRawStableAssociativity(op->getAssociativity());
@@ -1480,7 +1480,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(D);
+    verifyAttrOperatorSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1494,7 +1494,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(D);
+    verifyAttrOperatorSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1511,7 +1511,7 @@ void Serializer::writeDecl(const Decl *D) {
     assert(typeAlias->getProtocols().empty() &&
            "concrete typealiases cannot have protocols");
     checkAllowedAttributes<>(typeAlias);
-    verifyAttrTypeAliasSerializable(D);
+    verifyAttrSerializable(typeAlias);
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
@@ -1532,7 +1532,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     checkAllowedAttributes<>(genericParam);
-    verifyAttrTypeSerializable(D);
+    verifyAttrTypeSerializable(genericParam);
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
@@ -1556,7 +1556,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
     checkAllowedAttributes<>(assocType);
-    verifyAttrTypeSerializable(D);
+    verifyAttrTypeSerializable(assocType);
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
@@ -1580,7 +1580,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Struct: {
     auto theStruct = cast<StructDecl>(D);
     checkAllowedAttributes<>(theStruct);
-    verifyAttrStructSerializable(D);
+    verifyAttrSerializable(theStruct);
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
@@ -1601,7 +1601,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Enum: {
     auto theEnum = cast<EnumDecl>(D);
     checkAllowedAttributes<>(theEnum);
-    verifyAttrEnumSerializable(D);
+    verifyAttrSerializable(theEnum);
 
     const Decl *DC = getDeclForContext(theEnum->getDeclContext());
 
@@ -1625,7 +1625,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_IBDesignable, AK_objc, AK_resilient, AK_fragile,
       AK_born_fragile, AK_requires_stored_property_inits>(theClass);
-    verifyAttrClassSerializable(D);
+    verifyAttrSerializable(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
@@ -1653,7 +1653,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
     checkAllowedAttributes<AK_class_protocol, AK_objc>(proto);
-    verifyAttrProtocolSerializable(D);
+    verifyAttrSerializable(proto);
 
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
@@ -1681,7 +1681,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_IBOutlet, AK_objc, AK_optional, AK_unowned, AK_weak, AK_transparent
     >(var);
-    verifyAttrVarSerializable(D);
+    verifyAttrSerializable(var);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
@@ -1734,8 +1734,7 @@ void Serializer::writeDecl(const Decl *D) {
       AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
-
-    verifyAttrFunctionSerializable(D);
+    verifyAttrSerializable(fn);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 
