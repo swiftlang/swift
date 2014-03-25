@@ -627,7 +627,26 @@ namespace {
     }
     
     void visitIfConfigDecl(IfConfigDecl *ICD) {
-      // Since this is conditional, nothing to print.
+      OS.indent(Indent) << "(#if_decl\n";
+      printRec(ICD->getCond());
+      OS << '\n';
+      Indent += 2;
+
+      OS.indent(Indent) << "(active";
+      for (auto D : ICD->getActiveMembers()) {
+        OS << '\n';
+        printRec(D);
+      }
+
+      OS << '\n';
+      OS.indent(Indent) << "(inactive";
+      for (auto D : ICD->getInactiveMembers()) {
+        OS << '\n';
+        printRec(D);
+      }
+
+      Indent -= 2;
+      OS << ')';
     }
     
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
@@ -855,7 +874,7 @@ public:
     printRec(S->getThenStmt());
     if (S->getElseStmt()) {
       OS << '\n';
-      OS << "(#else_stmt\n";
+      OS.indent(Indent) << "(#else_stmt\n";
       printRec(S->getElseStmt());
       OS << ')';
     }
