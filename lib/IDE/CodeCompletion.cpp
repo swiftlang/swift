@@ -655,10 +655,11 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
              !isa<AbstractFunctionDecl>(DCToTypeCheck))
         DCToTypeCheck = DCToTypeCheck->getParent();
       // First, type check the nominal decl that contains the function.
-      typecheckContextImpl(DCToTypeCheck->getParent());
       // Then type check the function itself.
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck))
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
+        typecheckContextImpl(DCToTypeCheck->getParent());
         return typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
+      }
       return false;
     }
     if (DC->getContextKind() == DeclContextKind::NominalTypeDecl) {
