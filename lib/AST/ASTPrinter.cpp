@@ -161,7 +161,7 @@ private:
 
     template <typename DeclWithSuperclass>
     void printInheritedWithSuperclass(DeclWithSuperclass *decl);
-    
+
     void printInherited(const TypeDecl *decl);
     void printInherited(const EnumDecl *D);
     void printInherited(const ExtensionDecl *decl);
@@ -181,7 +181,7 @@ private:
 
 #define STMT(Name, Parent) void visit##Name##Stmt(Name##Stmt *stmt);
 #include "swift/AST/StmtNodes.def"
-    
+
   public:
     PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) { }
@@ -304,7 +304,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
     isa->getCastTypeLoc().getType().print(Printer, Options);
     break;
   }
-      
+
   case PatternKind::NominalType: {
     auto type = cast<NominalTypePattern>(pattern);
     type->getCastTypeLoc().getType().print(Printer, Options);
@@ -318,7 +318,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
                });
     break;
   }
-      
+
   case PatternKind::EnumElement: {
     auto elt = cast<EnumElementPattern>(pattern);
     // FIXME: Print element expr.
@@ -326,11 +326,11 @@ void PrintAST::printPattern(const Pattern *pattern) {
       printPattern(elt->getSubPattern());
     break;
   }
-      
+
   case PatternKind::Expr:
     // FIXME: Print expr.
     break;
-      
+
   case PatternKind::Var:
     Printer << "var ";
     printPattern(cast<VarPattern>(pattern)->getSubPattern());
@@ -395,7 +395,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     // contract that it isn't mutable.
     if (!ASD->isSettable(ASD->getDeclContext()))
       Printer << " { get }";
-    
+
     return;
   }
 
@@ -482,7 +482,7 @@ void PrintAST::printInherited(const Decl *decl,
         return;
     }
   }
-  
+
   if (inherited.empty()) {
     bool PrintedColon = false;
     bool PrintedInherited = false;
@@ -514,7 +514,7 @@ void PrintAST::printInherited(const Decl *decl,
                 || Proto->isSpecificProtocol(KnownProtocolKind::Hashable)))
           continue;
       }
-      
+
       if (PrintedInherited)
         Printer << ", ";
       else if (!PrintedColon)
@@ -527,7 +527,7 @@ void PrintAST::printInherited(const Decl *decl,
       Printer << ">";
   } else {
     Printer << " : ";
-    
+
     interleave(inherited, [&](TypeLoc TL) {
       TL.getType()->print(Printer, Options);
     }, [&]() {
@@ -612,7 +612,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   recordDeclLoc(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  
+
   // FIXME: We're not printing proper "{ get set }" annotations in pattern
   // binding decls.  As a hack, scan the decl to find out if any of the
   // variables are immutable, and if so, we print as 'let'.  This allows us to
@@ -622,7 +622,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     if (!V->isSettable(V->getDeclContext()))
       isMutable = false;
   });
-       
+
   Printer << (isMutable ? "var " : "let ");
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
@@ -753,8 +753,8 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   // Print in selector style.
   for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
-    if (isa<ConstructorDecl>(AFD) || 
-        (isa<FuncDecl>(AFD) && 
+    if (isa<ConstructorDecl>(AFD) ||
+        (isa<FuncDecl>(AFD) &&
          (i != 0 || cast<FuncDecl>(AFD)->isFirstParamIncludedInName()))) {
       Printer << " ";
       auto ArgName = ArgTuple->getFields()[i].getPattern()->getBoundName();
@@ -852,11 +852,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       Printer << " -> ";
       ResultTy->print(Printer, Options);
     }
-    
+
     if (!Options.FunctionDefinitions || !decl->getBody()) {
       return;
     }
-    
+
     Printer << " ";
     visit(decl->getBody());
   }
@@ -865,7 +865,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 static void printEnumElement(ASTPrinter &Printer, const PrintOptions &Options,
                              EnumElementDecl *elt) {
   Printer << elt->getName().str();
-  
+
   if (elt->hasArgumentType())
     elt->getArgumentType().print(Printer, Options);
 }
@@ -874,7 +874,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
   // FIXME: Attributes?
   recordDeclLoc(decl);
   Printer << "case ";
-  
+
   interleave(decl->getElements().begin(), decl->getElements().end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(Printer, Options, elt);
@@ -1549,7 +1549,7 @@ public:
     Printer << " -> ";
     T->getResult().print(Printer, Options);
   }
-  
+
   void printGenericSignature(ArrayRef<GenericTypeParamType *> genericParams,
                              ArrayRef<Requirement> requirements) {
     // Print the generic parameters.
@@ -1715,14 +1715,14 @@ public:
     });
     return paramLists.rbegin()[depth];
   }
-  
+
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     // Substitute a context archetype if we have context generic params.
     if (Options.ContextGenericParams) {
       return visit(getGenericParamListAtDepth(T->getDepth())
                      ->getPrimaryArchetypes()[T->getIndex()]);
     }
-    
+
     auto Name = T->getName();
     if (Name.empty())
       Printer << "<anonymous>";
