@@ -1953,7 +1953,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     // TODO: we need to handle overloaded members for other MethodInsts as well.
     // The majority of work is in updating testing cases.
-    if (Opcode == ValueKind::ClassMethodInst) {
+    if (Opcode == ValueKind::ClassMethodInst ||
+        Opcode == ValueKind::SuperMethodInst) {
       // Parse the type for SILDeclRef.
       ParserResult<TypeRepr> TyR = P.parseType();
       if (TyR.isNull())

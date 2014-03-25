@@ -905,7 +905,8 @@ public:
   }
   void visitSuperMethodInst(SuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "super_method");
-    OS << " : " << AMI->getType();
+    OS << " : " << AMI->getMember().getDecl()->getType() << " , ";
+    OS << AMI->getType();
   }
   void visitWitnessMethodInst(WitnessMethodInst *AMI) {
     OS << "witness_method ";
