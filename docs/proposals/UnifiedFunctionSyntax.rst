@@ -121,10 +121,10 @@ specify that there is no name. For example::
   func g(b _: Int)  // argument name is 'b'; no parameter name
 
 The first function doesn't support keyword arguments; it is what an
-imported C or C++ function would use. The second function is likely to
-be fairly common, and is therefore less interesting: an argument name
-for its only parameter, but the parameter itself is no longer used
-within the function, and is presumably only kept around for backward
+imported C or C++ function would use. The second function supports a
+keyword argument (``b``), but the parameter is not named (and
+therefore cannot be used) within the body. The second form is fairly
+uncommon, and will presumably only to be used for backward
 compatibility.
 
 Method Names
