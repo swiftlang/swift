@@ -771,7 +771,7 @@ public:
     if (e->isSuper()) {
       applySuper(e);
     } else if (applyInitDelegation(e)) {
-      // Already done */
+      // Already done
     } else {
       callSites.push_back(e);
       visit(e->getFn());

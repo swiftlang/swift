@@ -113,6 +113,7 @@ struct QuickLookObject {
     Sound,
     Color,
     BezierPath,
+    AttributedString,
     Raw,
   } Kind;
 };
@@ -137,12 +138,6 @@ struct OptionalQuickLookObject {
     } optional;
     QuickLookObject payload;
   };
-};
-  
-/// The enumeration of mirror dispositions.
-enum class MirrorDisposition : bool {
-  Aggregate,
-  Container,
 };
   
 /// A Mirror witness table for use by MagicMirror.
@@ -577,7 +572,12 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
     *reinterpret_cast<id *>(&any.Value) = [obj retain];
   };
   
-  if ([object isKindOfClass:NSClassFromString(@"NSImage")]
+  if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
+    setAnyToObject(result.payload.Any, object);
+    result.payload.Kind = QuickLookObject::Tag::AttributedString;
+    result.optional.isNone = false;
+    return result;
+  } else if ([object isKindOfClass:NSClassFromString(@"NSImage")]
       || [object isKindOfClass:NSClassFromString(@"UIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSImageView")]
       || [object isKindOfClass:NSClassFromString(@"UIImageView")]
