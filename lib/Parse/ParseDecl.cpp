@@ -224,6 +224,32 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
       break;
     }
+    case DAK_unavailable: {
+      StringRef UnavailableText;
+
+      if (consumeIf(tok::l_paren)) {
+        if (Tok.isNot(tok::string_literal)) {
+          diagnose(Loc, diag::attr_expected_string_literal, AttrName)
+            .highlight(SourceRange(Tok.getRange().getStart()));
+          return false;
+        }
+
+        UnavailableText =
+            getStringLiteralIfNotInterpolated(*this, Loc, Tok,
+                                              "'unavailable' text");
+        consumeToken(tok::string_literal);
+
+        if (!consumeIf(tok::r_paren)) {
+          diagnose(Loc, diag::attr_expected_rparen, AttrName);
+          return false;
+        }
+      }
+
+      if (!DiscardAttribute)
+        Attributes.add(new (Context) UnavailableAttr(AttrRange,
+                                                     UnavailableText));
+      break;
+    }
   };
 
   if (DuplicateAttribute) {

@@ -282,6 +282,21 @@ public:
   }
 };
 
+/// Defines the @unavailable attribute.
+class UnavailableAttr : public DeclAttribute {
+public:
+  UnavailableAttr(SourceRange Range, StringRef Msg)
+  : DeclAttribute(DAK_unavailable, Range),
+    Message(Message) {}
+
+  /// The optional message.
+  const StringRef Message;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_unavailable;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Source locations for every possible attribute that can be parsed in

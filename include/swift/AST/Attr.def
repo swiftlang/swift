@@ -60,6 +60,7 @@ TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 
 DECL_ATTR(asmname)
+DECL_ATTR(unavailable)
 
 ATTR(assignment)
 ATTR(class_protocol)

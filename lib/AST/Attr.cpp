@@ -101,6 +101,14 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     case DAK_asmname:
       Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
       break;
+    case DAK_unavailable: {
+      Printer << "@unavailable";
+      auto Attr = cast<UnavailableAttr>(this);
+      if (!Attr->Message.empty()) {
+        Printer << "(\"" << Attr->Message << "\")";
+      }
+      break;
+    }
     case DAK_Count:
       llvm_unreachable("exceed declaration attribute kinds");
   }
