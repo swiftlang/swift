@@ -247,16 +247,16 @@ sentence structure.
 Dropping Leading Prepositions from Argument Names
 -------------------------------------------------
 Retaining the leading preposition on the first argument name leads to
-somewhat unevent calls. For example, ``NSColor``'s
+somewhat uneven calls. For example, ``NSColor``'s
 ``colorWithRed:green:blue:alpha:`` is called as::
 
   NSColor.color(withRed: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
 
-The ``with`` in this case feels spurious. We could drop leading
-prepositions from argument names, so that this call would be::
+The ``with`` in this case feels spurious. Therefore, we will drop
+certain leading prepositions from argument names, so that this call
+becomes::
 
   NSColor.color(red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0)
-
 
 In addition to improving the call site, this eliminates the need to
 rename parameters as often at the declaration site, i.e., this::
@@ -273,16 +273,15 @@ are more than simply a connector. For example, consider calls to the
 ``NSImage`` method ``-drawInRect:fromRect:operation:fraction:`` with
 the leading prepositions retained and removed, respectively::
 
-  image.drawInRect(inRect: dstRect, fromRect: srcRect, operation: op, fraction: 0.5)
-  image.drawInRect(rect: dstRect, rect: srcRect, operation: op, fraction: 0.5)
-
+  image.draw(inRect: dstRect, fromRect: srcRect, operation: op, fraction: 0.5)
+  image.draw(rect: dstRect, rect: srcRect, operation: op, fraction: 0.5)
 
 Here, dropping the leading prepositions is actively harmful, because
 we've lost the directionality provided by ``in`` and ``from`` in the
 first two arguments. Therefore we should choose the prepositions we
-drop carefully: ``with`` is a good candidate, ``to`` is not. The
-preposition table at the end of this document specifies which
-prepositions would be dropped.
+drop carefully: ``with`` and ``for`` are (the only) good candidates,
+``to`` (and the other prepositions we use) are not. The preposition
+table at the end of this document provides more detail.
 
 The second concern with dropping leading preposition is that we need
 to either specify or infer the prepositions when declaring a
