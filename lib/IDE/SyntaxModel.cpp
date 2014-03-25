@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -146,6 +147,7 @@ public:
   bool walkToTypeReprPre(TypeRepr *T) override;
 
 private:
+  bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
   bool handleAttrLocs(SourceLoc AtLoc, ArrayRef<SourceLoc> Locs);
@@ -234,6 +236,29 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, BraceRange);
       pushStructureNode(SN);
     }
+
+  } else if (auto ConfigS = dyn_cast<IfConfigStmt>(S)) {
+    if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+          CharSourceRange(ConfigS->getIfLoc(), 3/*'#if'*/) }))
+      return { false, nullptr };
+    if (!annotateIfConfigConditionIdentifiers(ConfigS->getCond()))
+      return { false, nullptr };
+    if (Stmt *S = ConfigS->getThenStmt())
+      if (!S->walk(*this))
+        return { false, nullptr };
+    if (ConfigS->hasElse()) {
+      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+            CharSourceRange(ConfigS->getElseLoc(), 5/*'#else'*/) }))
+        return { false, nullptr };
+
+      if (Stmt *S = ConfigS->getElseStmt())
+        if (!S->walk(*this))
+          return { false, nullptr };
+    }
+    if (ConfigS->getEndLoc().isValid())
+      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+            CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
+        return { false, nullptr };
   }
 
   return { true, S };
@@ -341,6 +366,29 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.Attrs = VD->getAttrs();
       pushStructureNode(SN);
     }
+
+  } else if (auto ConfigD = dyn_cast<IfConfigDecl>(D)) {
+    if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+          CharSourceRange(ConfigD->getIfLoc(), 3/*'#if'*/) }))
+      return false;
+    if (!annotateIfConfigConditionIdentifiers(ConfigD->getCond()))
+      return false;
+    for (auto D : ConfigD->getThenMembers())
+      if (D->walk(*this))
+        return false;
+    if (ConfigD->hasElse()) {
+      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+            CharSourceRange(ConfigD->getElseLoc(), 5/*'#else'*/) }))
+        return false;
+
+      for (auto D : ConfigD->getElseMembers())
+        if (D->walk(*this))
+          return false;
+    }
+    if (ConfigD->getEndLoc().isValid())
+      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
+            CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
+        return false;
   }
   return true;
 }
@@ -382,6 +430,42 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
                           }))
       return false;
   }
+  return true;
+}
+
+namespace {
+template <typename FnTy>
+class IdRefWalker : public ASTWalker {
+  const FnTy &Fn;
+
+public:
+  IdRefWalker(const FnTy &Fn) : Fn(Fn) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto DRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+      if (!DRE->hasName())
+        return { true, E };
+      if (DRE->getRefKind() != DeclRefKind::Ordinary)
+        return { true, E };
+      if (!Fn(CharSourceRange(DRE->getSourceRange().Start,
+                              DRE->getName().getLength())))
+        return { false, nullptr };
+    }
+    return { true, E };
+  }
+};
+}
+
+bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
+  if (!Cond)
+    return true;
+  auto passNode = [&](CharSourceRange R) {
+    return passNonTokenNode({ SyntaxNodeKind::BuildConfigId, R });
+  };
+
+  IdRefWalker<decltype(passNode)> Walker(passNode);
+  if (!Cond->walk(Walker))
+    return false;
   return true;
 }
 
