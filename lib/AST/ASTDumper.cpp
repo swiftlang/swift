@@ -1342,8 +1342,8 @@ public:
     OS << ')';
   }
 
-  void visitAddressOfExpr(AddressOfExpr *E) {
-    printCommon(E, "address_of_expr") << '\n';
+  void visitInOutExpr(InOutExpr *E) {
+    printCommon(E, "inout_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

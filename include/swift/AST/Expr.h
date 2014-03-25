@@ -2007,16 +2007,16 @@ public:
   }
 };
 
-/// AddressOfExpr - Using the builtin unary '&' operator, convert the
-/// given l-value into an explicit l-value.
-class AddressOfExpr : public Expr {
+/// The builtin unary '&' operator, which converts the
+/// given lvalue into an 'inout' argument value.
+class InOutExpr : public Expr {
   Expr *SubExpr;
   SourceLoc OperLoc;
 
 public:
-  AddressOfExpr(SourceLoc operLoc, Expr *subExpr, Type type,
+  InOutExpr(SourceLoc operLoc, Expr *subExpr, Type type,
                 bool isImplicit = false)
-    : Expr(ExprKind::AddressOf, isImplicit, type),
+    : Expr(ExprKind::InOut, isImplicit, type),
       SubExpr(subExpr), OperLoc(operLoc) {}
 
   SourceRange getSourceRange() const {
@@ -2028,7 +2028,7 @@ public:
   void setSubExpr(Expr *e) { SubExpr = e; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AddressOf;
+    return E->getKind() == ExprKind::InOut;
   }
 };
 

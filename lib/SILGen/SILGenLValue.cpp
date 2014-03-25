@@ -168,7 +168,7 @@ public:
   
   // Expressions that wrap lvalues
   
-  LValue visitAddressOfExpr(AddressOfExpr *e);
+  LValue visitInOutExpr(InOutExpr *e);
   LValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e);
 };
 
@@ -625,7 +625,7 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
   return std::move(lv);
 }
 
-LValue SILGenLValue::visitAddressOfExpr(AddressOfExpr *e) {
+LValue SILGenLValue::visitInOutExpr(InOutExpr *e) {
   return visitRec(e->getSubExpr());
 }
 

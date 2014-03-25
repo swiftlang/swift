@@ -751,7 +751,7 @@ namespace {
       return expr->getType();
     }
 
-    Type visitAddressOfExpr(AddressOfExpr *expr) {
+    Type visitInOutExpr(InOutExpr *expr) {
       // The address-of operator produces an explicit inout T from an lvalue T.
       // We model this with the constraint
       //

@@ -608,12 +608,12 @@ struct ASTNodeBase {};
       verifyCheckedBase(S);
     }
 
-    void verifyChecked(AddressOfExpr *E) {
+    void verifyChecked(InOutExpr *E) {
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
-                                "result of AddressOfExpr");
+                                "result of InOutExpr");
       auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
       
-      checkSameType(DestTy, srcObj, "object types for AddressOfExpr");
+      checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
     }
 

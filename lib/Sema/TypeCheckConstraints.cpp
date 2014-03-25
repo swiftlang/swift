@@ -691,7 +691,7 @@ bool TypeChecker::typeCheckExpression(
   } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
     // We explicitly took a reference to the result, but didn't use it.
     // Complain and emit a Fix-It to zap the '&'.
-    auto addressOf = cast<AddressOfExpr>(result->getSemanticsProvidingExpr());
+    auto addressOf = cast<InOutExpr>(result->getSemanticsProvidingExpr());
     diagnose(addressOf->getLoc(), diag::reference_non_inout,
              ioTy->getObjectType())
       .highlight(addressOf->getSubExpr()->getSourceRange())
@@ -1232,7 +1232,7 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
     // Emit a fixit if we can find the & expression that turned this into an
     // inout.
     if (auto addrOf =
-        dyn_cast<AddressOfExpr>(expr->getSemanticsProvidingExpr())) {
+        dyn_cast<InOutExpr>(expr->getSemanticsProvidingExpr())) {
       diagnose(expr->getLoc(), diag::load_of_explicit_lvalue,
                iot->getObjectType())
       .fixItRemove(SourceRange(addrOf->getLoc()));

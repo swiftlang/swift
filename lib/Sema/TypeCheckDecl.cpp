@@ -3951,7 +3951,7 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
     Expr *declRef = new (tc.Context) DeclRefExpr(decl, SourceLoc(),
                                                  /*Implicit=*/true);
     if (decl->getType()->is<InOutType>()) {
-      declRef = new (tc.Context) AddressOfExpr(SourceLoc(), declRef,
+      declRef = new (tc.Context) InOutExpr(SourceLoc(), declRef,
                                                Type(), /*isImplicit=*/true);
     }
     return declRef;

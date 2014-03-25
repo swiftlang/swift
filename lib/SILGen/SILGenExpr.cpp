@@ -145,7 +145,7 @@ namespace {
     }
 
     // These always produce lvalues.
-    RValue visitAddressOfExpr(AddressOfExpr *E, SGFContext C) {
+    RValue visitInOutExpr(InOutExpr *E, SGFContext C) {
       LValue lv = SGF.emitLValue(E->getSubExpr());
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }

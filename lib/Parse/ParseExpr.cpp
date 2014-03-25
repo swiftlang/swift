@@ -352,7 +352,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     if (SubExpr.isNull())
       return nullptr;
     return makeParserResult(
-        new (Context) AddressOfExpr(Loc, SubExpr.get(), Type()));
+        new (Context) InOutExpr(Loc, SubExpr.get(), Type()));
   }
 
   case tok::oper_postfix:

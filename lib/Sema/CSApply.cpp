@@ -1842,7 +1842,7 @@ namespace {
 
     Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
 
-    Expr *visitAddressOfExpr(AddressOfExpr *expr) {
+    Expr *visitInOutExpr(InOutExpr *expr) {
       // Compute the type of the address-of expression.
       auto lv = expr->getSubExpr()->getType()->castTo<LValueType>();
       expr->setType(InOutType::get(lv->getObjectType()));
@@ -3153,7 +3153,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an @assignment operator like "++i", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      return new (tc.Context) AddressOfExpr(expr->getStartLoc(), expr,
+      return new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
                                             toType, /*isImplicit*/true);
     }
 
@@ -3324,9 +3324,9 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   auto &ctx = cs.getTypeChecker().Context;
 
-  // Use AddressOfExpr to convert it to an explicit inout argument for the
+  // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  return new (ctx) AddressOfExpr(expr->getStartLoc(), expr,
+  return new (ctx) InOutExpr(expr->getStartLoc(), expr,
                                  toType, /*isImplicit*/true);
 }
 
