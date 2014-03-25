@@ -287,7 +287,7 @@ class UnavailableAttr : public DeclAttribute {
 public:
   UnavailableAttr(SourceRange Range, StringRef Msg)
   : DeclAttribute(DAK_unavailable, Range),
-    Message(Message) {}
+    Message(Msg) {}
 
   /// The optional message.
   const StringRef Message;
