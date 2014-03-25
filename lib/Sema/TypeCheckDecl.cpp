@@ -3715,7 +3715,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       bool isObjC = true;
 
       for (auto inherited : proto->getProtocols()) {
-        if (!inherited->getAttrs().isObjC()) {
+        if (!inherited->isObjC()) {
           diagnose(proto->getLoc(),
                    diag::objc_protocol_inherits_non_objc_protocol,
                    proto->getDeclaredType(), inherited->getDeclaredType());
