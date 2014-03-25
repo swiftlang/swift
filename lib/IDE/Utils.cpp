@@ -125,9 +125,9 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     RootEndTag = "</Other>";
   }
 
-  {
-    // Print line and column number.
-    auto Loc = D->getLoc();
+  // Print line and column number.
+  SourceLoc Loc = D->getLoc();
+  if (Loc.isValid()) {
     const auto &SM = D->getASTContext().SourceMgr;
     unsigned BufferID = SM.findBufferContainingLoc(Loc);
     StringRef FileName = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
