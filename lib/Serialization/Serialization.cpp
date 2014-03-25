@@ -1214,7 +1214,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for an operator.
-static void verifyAttrOperatorSerializable(const OperatorDecl *D) {
+static void verifyAttrSerializable(const OperatorDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1254,7 +1254,7 @@ return;
 
 /// Returns true if the represented set of attributes can be serialized
 /// for a type declarations.
-static void verifyAttrTypeSerializable(const TypeDecl *D) {
+static void verifyAttrSerializable(const TypeDecl *D) {
 #ifndef NDEBUG
   for (auto Attr : D->getAttrs()) {
     switch (Attr->getKind()) {
@@ -1463,7 +1463,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(op);
+    verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
     auto associativity = getRawStableAssociativity(op->getAssociativity());
@@ -1480,7 +1480,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(op);
+    verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1494,7 +1494,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
-    verifyAttrOperatorSerializable(op);
+    verifyAttrSerializable(op);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1532,7 +1532,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     checkAllowedAttributes<>(genericParam);
-    verifyAttrTypeSerializable(genericParam);
+    verifyAttrSerializable(genericParam);
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
@@ -1556,7 +1556,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
     checkAllowedAttributes<>(assocType);
-    verifyAttrTypeSerializable(assocType);
+    verifyAttrSerializable(assocType);
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
