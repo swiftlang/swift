@@ -108,11 +108,16 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak2) {
   NSPrefixWordBreakBareBass,
 };
 
+typedef NS_ENUM(NSInteger, NSPrefixWordBreak3) {
+  NSPrefixWordBreak1Bob,
+  NSPrefixWordBreak1Ben,
+};
+
 typedef NS_ENUM(NSInteger, NSSingleConstantEnum) {
   NSSingleConstantValue,
 };
 
-typedef NS_ENUM(unsigned char, NSEnumWithAliases) {
+typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesOriginal = 129,
   NSAliasesBySameValue = 129,
   NSAliasesByEquivalentValue = -127,

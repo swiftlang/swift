@@ -837,21 +837,15 @@ namespace {
     /// enum. We'll elide this prefix from then names in
     /// the Swift interface because Swift enum cases are naturally namespaced
     /// by the enum type.
-    void computeEnumCommonWordPrefix(const clang::EnumDecl *decl) {
-      auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
-      if (ec != ecEnd) {
-        StringRef commonPrefix = (*ec)->getName();
-        ++ec;
-        if (ec == ecEnd) {
-          // If there's only one enum constant, try to find a common prefix
-          // between the type name and the constant.
-          commonPrefix = getCommonWordPrefix(commonPrefix, decl->getName());
-        } else {
-          for (; ec != ecEnd; ++ec)
-            commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
-        }
-        Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
-      }
+    void computeEnumCommonWordPrefix(const clang::EnumDecl *decl,
+                                     Identifier enumName) {
+      auto enumerators = decl->enumerators();
+      if (enumerators.begin() == enumerators.end())
+        return;
+      StringRef commonPrefix = enumName.str();
+      for (auto nextValue : enumerators)
+        commonPrefix = getCommonWordPrefix(commonPrefix, nextValue->getName());
+      Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
     }
     
     /// Import an NS_ENUM constant as a case of a Swift enum.
@@ -1022,7 +1016,7 @@ namespace {
         enumDecl->setProtocols(protoList);
         
         result = enumDecl;
-        computeEnumCommonWordPrefix(decl);
+        computeEnumCommonWordPrefix(decl, name);
         
         break;
       }
@@ -1096,7 +1090,7 @@ namespace {
           SourceRange());
 
         result = structDecl;
-        computeEnumCommonWordPrefix(decl);
+        computeEnumCommonWordPrefix(decl, name);
 
         break;
       }
