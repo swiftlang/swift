@@ -529,7 +529,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   for (const Arg *A : make_range(Args.filtered_begin(OPT_D),
                                  Args.filtered_end())) {
-    Opts.BuildConfigOptions[A->getValue()] = A->getValue();
+    Opts.setBuildConfig(A->getValue());
   }
 
   Opts.EnableObjCOptional = Args.hasArg(OPT_enable_objc_optional);

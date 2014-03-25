@@ -18,8 +18,10 @@
 #ifndef SWIFT_LANGOPTIONS_H
 #define SWIFT_LANGOPTIONS_H
 
-#include "llvm/ADT/StringMap.h"
-#include <map>
+#include "llvm/ADT/StringRef.h"
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace swift {
   
@@ -75,12 +77,16 @@ namespace swift {
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
     ///     arch - The active arch target (X64, I386, ARM, ARM64)
-    std::map<std::string, std::string> TargetConfigOptions;
+    std::unordered_map<std::string, std::string> TargetConfigOptions;
     
     /// \brief Explicit build configuration options, initialized via the '-D'
     /// compiler flag.
-    std::map<std::string, std::string> BuildConfigOptions;
+    std::unordered_set<std::string> BuildConfigOptions;
     
+    void setBuildConfig(llvm::StringRef Name) {
+      BuildConfigOptions.insert(Name);
+    }
+
     /// \brief A convenience method for determining if a given build
     /// configuration has been defined
     bool hasBuildConfig(llvm::StringRef name) {
