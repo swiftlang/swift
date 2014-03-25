@@ -668,6 +668,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown SIL linking option!");
   }
 
+  Opts.RemoveRuntimeAsserts = Args.hasArg(OPT_remove_runtime_asserts);
   Opts.EnableARCOptimizations = !Args.hasArg(OPT_disable_arc_opts);
   Opts.VerifyAll = Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll = Args.hasArg(OPT_sil_print_all);

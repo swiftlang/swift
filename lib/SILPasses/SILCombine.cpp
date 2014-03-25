@@ -151,7 +151,8 @@ namespace swift {
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
 public:
-  SILCombiner() : Worklist(), MadeChange(false), Iteration(0), Builder(0) { }
+  SILCombiner(bool removeCondFails) : Worklist(), MadeChange(false),
+      RemoveCondFails(removeCondFails), Iteration(0), Builder(0) { }
 
   bool runOnFunction(SILFunction &F) {
     clear();
@@ -275,6 +276,8 @@ private:
   SILCombineWorklist Worklist;
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
+  /// If set to true then the optimizer is free to erase cond_fail instructions.
+  bool RemoveCondFails;
   /// The current iteration of the SILCombine.
   unsigned Iteration;
   /// Builder used to insert instructions.
@@ -811,6 +814,10 @@ void deleteDeadFunctions(SILModule *M) {
 }
 
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
+  // Remove runtime asserts such as overflow checks and bounds checks.
+  if (RemoveCondFails)
+    return eraseInstFromFunction(*CFI);
+
   // Erase. (cond_fail 0)
   if (auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand()))
     if (!I->getValue().getBoolValue())
@@ -883,7 +890,7 @@ class SILCombine : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
-    SILCombiner Combiner;
+    SILCombiner Combiner(getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

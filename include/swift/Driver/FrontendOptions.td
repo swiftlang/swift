@@ -77,6 +77,9 @@ def debugger_support : Flag<["-"], "debugger-support">,
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 
+def remove_runtime_asserts : Flag<["-"], "remove-runtime-asserts">,
+HelpText<"Remove runtime asserts.">;
+
 def disable_all_runtime_checks : Flag<["-"], "disable-all-runtime-checks">,
   HelpText<"Disable all intrinsic runtime safety checks">;
 

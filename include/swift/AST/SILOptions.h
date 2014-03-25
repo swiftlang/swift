@@ -44,6 +44,9 @@ public:
   /// Controls how  perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
+  /// Remove all runtime assertions during optimizations.
+  bool RemoveRuntimeAsserts = false;
+
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 

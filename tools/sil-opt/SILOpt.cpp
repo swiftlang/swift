@@ -198,6 +198,12 @@ EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::desc("Run sil verifications after every pass."));
 
 static llvm::cl::opt<bool>
+RemoveRuntimeAsserts("remove-runtime-asserts",
+                     llvm::cl::Hidden,
+                     llvm::cl::init(false),
+                     llvm::cl::desc("Remove runtime assertions (cond_fail)."));
+
+static llvm::cl::opt<bool>
 EnableSILPrintAll("-sil-print-all",
                   llvm::cl::Hidden,
                   llvm::cl::init(false),
@@ -300,6 +306,7 @@ int main(int argc, char **argv) {
   SILOpts.DevirtThreshold = SILDevirtThreshold;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.PrintAll = EnableSILPrintAll;
+  SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
 
   SILPassManager PM(CI.getSILModule(), SILOpts);
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
