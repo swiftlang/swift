@@ -73,7 +73,7 @@ namespace swift {
   /// otherwise.
   bool canValueEscape(SILValue V);
 
-  /// \returns True of the type T has unbound generic types.
+  /// \returns True if the type T has unbound generic types.
   bool hasUnboundGenericTypes(Type T);
 
 } // end namespace swift
