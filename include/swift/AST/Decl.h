@@ -1493,9 +1493,12 @@ public:
   }
   
   Expr *getCond() { return Cond; }
+
+  bool hasElse() const { return ElseLoc.isValid(); }
   
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return getIfLoc(); }
   
   SourceRange getSourceRange() const;
