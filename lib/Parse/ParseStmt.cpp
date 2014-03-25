@@ -812,15 +812,13 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     skipUntilConfigBlockClose();
   }
   
-  auto ifConfigStmt = new (Context) IfConfigStmt(IfLoc,
+  auto ifConfigStmt = new (Context) IfConfigStmt(ifBlockIsActive,
+                                                 IfLoc,
                                                  Configuration.getPtrOrNull(),
                                                  NormalBody.get(),
                                                  ElseLoc,
                                                  ElseBody.getPtrOrNull(),
                                                  EndLoc);
-  ifConfigStmt->setActiveStmt(ifBlockIsActive ?
-                                NormalBody.get() :
-                                ElseBody.getPtrOrNull());
   
   return makeParserResult(ifConfigStmt);
 }

@@ -1276,6 +1276,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
   }
   
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
+                                                 ifBlockIsActive,
                                                  IfLoc,
                                                  ElseLoc,
                                                  EndLoc,
@@ -1284,15 +1285,11 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
     ICD->setActiveMembers(Context.AllocateCopy(IfDecls));
   } else {
     ICD->setInactiveMembers(Context.AllocateCopy(IfDecls));
-    ICD->setInactiveSourceRange(SourceRange(IfLoc, ElseLoc.isValid() ?
-                                                    ElseLoc :
-                                                    EndLoc));
   }
   
   if (ElseLoc.isValid()) {
     if (ifBlockIsActive) {
       ICD->setInactiveMembers(Context.AllocateCopy(ElseDecls));
-      ICD->setInactiveSourceRange(SourceRange(IfLoc, EndLoc));
     } else {
       ICD->setActiveMembers(Context.AllocateCopy(ElseDecls));
     }

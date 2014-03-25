@@ -1463,20 +1463,22 @@ public:
 class IfConfigDecl : public Decl {
   ArrayRef<Decl*> ActiveMembers;
   ArrayRef<Decl*> InactiveMembers;
+  bool IfBlockIsActive;
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
   SourceLoc EndLoc;
-  SourceRange InactiveSourceRange;
   Expr *Cond;
   
 public:
   
   IfConfigDecl(DeclContext *Parent,
+               bool IfBlockIsActive,
                SourceLoc ifLoc,
                SourceLoc elseLoc,
                SourceLoc endLoc,
                Expr *cond):
           Decl(DeclKind::IfConfig, Parent),
+          IfBlockIsActive(IfBlockIsActive),
           IfLoc(ifLoc),
           ElseLoc(elseLoc),
           EndLoc(endLoc),
@@ -1494,6 +1496,7 @@ public:
   
   Expr *getCond() { return Cond; }
 
+  bool isIfBlockActive() const { return IfBlockIsActive; }
   bool hasElse() const { return ElseLoc.isValid(); }
   
   SourceLoc getIfLoc() const { return IfLoc; }
@@ -1503,11 +1506,16 @@ public:
   
   SourceRange getSourceRange() const;
   
-  void setInactiveSourceRange(SourceRange range) {
-    InactiveSourceRange = range;
+  SourceRange getInactiveSourceRange() const {
+    if (isIfBlockActive()) {
+      if (hasElse())
+        return SourceRange(ElseLoc, EndLoc);
+      else
+        return SourceRange();
+    }
+    return SourceRange(IfLoc, ElseLoc.isValid() ? ElseLoc : EndLoc);
   }
-  SourceRange getInactiveSourceRange() const { return InactiveSourceRange; }
-  
+
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::IfConfig;
   }

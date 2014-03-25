@@ -216,18 +216,19 @@ public:
 /// IfConfigStmt - This class models the statement-side representation of
 /// #if/#else/#endif blocks.
 class IfConfigStmt : public Stmt {
+  bool IfBlockIsActive;
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
   SourceLoc EndLoc;
   Expr *Cond = nullptr;
   Stmt *Then = nullptr;
   Stmt *Else = nullptr;
-  Stmt *ActiveStmt = nullptr;
-  
+
 public:
-  IfConfigStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-               Stmt *Else, SourceLoc EndLoc)
+  IfConfigStmt(bool IfBlockIsActive, SourceLoc IfLoc, Expr *Cond, Stmt *Then,
+               SourceLoc ElseLoc, Stmt *Else, SourceLoc EndLoc)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
+    IfBlockIsActive(IfBlockIsActive),
     IfLoc(IfLoc), ElseLoc(ElseLoc), EndLoc(EndLoc),
     Cond(Cond), Then(Then), Else(Else) {}
   
@@ -240,13 +241,15 @@ public:
   Stmt *getThenStmt() const { return Then; }
   void setThenStmt(Stmt *s) { Then = s; }
   
+  bool isIfBlockActive() const { return IfBlockIsActive; }
   bool hasElse() const { return ElseLoc.isValid(); }
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
   
-  Stmt *getActiveStmt() const { return ActiveStmt; }
-  void setActiveStmt(Stmt *s) { ActiveStmt = s; }
-  
+  Stmt *getActiveStmt() const {
+    return IfBlockIsActive ? Then : Else;
+  }
+
   Expr* getCond() const { return Cond; }
   void setCond(Expr* e) { Cond = e; }
   
