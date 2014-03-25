@@ -1142,7 +1142,8 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 /// Whether we should short-circuit a disjunction that already has a
 /// solution when we encounter the given constraint.
-static bool shortCircuitDisjunctionAt(Constraint *constraint) {
+static bool shortCircuitDisjunctionAt(Constraint *constraint,
+                                      Constraint *successfulConstraint) {
   // Non-optional conversions are better than optional-to-optional
   // conversions.
   if (auto restriction = constraint->getRestriction()) {
@@ -1159,8 +1160,27 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint) {
   // For a conjunction, check if any of the terms should be skipped.
   if (constraint->getKind() == ConstraintKind::Conjunction)
     for (auto nested : constraint->getNestedConstraints())
-      if (shortCircuitDisjunctionAt(nested))
+      if (shortCircuitDisjunctionAt(nested, successfulConstraint))
         return true;
+
+  // Binding an operator overloading to a generic operator is weaker than
+  // binding to a non-generic operator, always.
+  // Note: this is a hack to improve performance when we're dealing with
+  // overloaded operators.
+  if (constraint->getKind() == ConstraintKind::BindOverload &&
+      constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
+      constraint->getOverloadChoice().getDecl()->getName().isOperator() &&
+      successfulConstraint->getKind() == ConstraintKind::BindOverload &&
+      successfulConstraint->getOverloadChoice().getKind()
+        == OverloadChoiceKind::Decl &&
+      successfulConstraint->getOverloadChoice().getDecl()->getName()
+        .isOperator() &&
+      constraint->getOverloadChoice().getDecl()->getInterfaceType()
+        ->is<GenericFunctionType>() &&
+      !successfulConstraint->getOverloadChoice().getDecl()->getInterfaceType()
+         ->is<GenericFunctionType>()) {
+    return true;
+  }
 
   return false;
 }
@@ -1270,7 +1290,7 @@ bool ConstraintSystem::solveSimplified(
   CG.removeConstraint(disjunction);
 
   // Try each of the constraints within the disjunction.
-  bool anySolved = false;
+  Constraint *firstSolvedConstraint = nullptr;
   ++solverState->NumDisjunctions;
   auto constraints = disjunction->getNestedConstraints();
   for (auto index : indices(constraints)) {
@@ -1278,7 +1298,8 @@ bool ConstraintSystem::solveSimplified(
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
-    if (anySolved && shortCircuitDisjunctionAt(constraint))
+    if (firstSolvedConstraint &&
+        shortCircuitDisjunctionAt(constraint, firstSolvedConstraint))
       break;
 
     // Try to solve the system with this option in the disjunction.
@@ -1322,7 +1343,7 @@ bool ConstraintSystem::solveSimplified(
     solverState->generatedConstraints.push_back(constraint);
 
     if (!solve(solutions, allowFreeTypeVariables)) {
-      anySolved = true;
+      firstSolvedConstraint = constraint;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
       // FIXME: This should be more general.
@@ -1353,5 +1374,5 @@ bool ConstraintSystem::solveSimplified(
   InactiveConstraints.insert(afterDisjunction, disjunction);
   CG.addConstraint(disjunction);
 
-  return !anySolved;
+  return !firstSolvedConstraint;
 }

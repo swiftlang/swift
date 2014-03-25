@@ -323,6 +323,28 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       return new (TC.Context) ErrorExpr(Loc);
     }
 
+    // For operators, sort the results so that non-generic operations come
+    // first.
+    // Note: this is part of a performance hack to prefer non-generic operators
+    // to generic operators, because the former is far more efficient to check.
+    if (UDRE->getRefKind() != DeclRefKind::Ordinary) {
+      std::stable_sort(ResultValues.begin(), ResultValues.end(),
+                       [&](ValueDecl *x, ValueDecl *y) -> bool {
+        auto xGeneric = x->getInterfaceType()->getAs<GenericFunctionType>();
+        auto yGeneric = y->getInterfaceType()->getAs<GenericFunctionType>();
+        if (static_cast<bool>(xGeneric) != static_cast<bool>(yGeneric)) {
+          return xGeneric? false : true;
+        }
+
+        if (!xGeneric)
+          return false;
+
+        unsigned xDepth = xGeneric->getGenericParams().back()->getDepth();
+        unsigned yDepth = yGeneric->getGenericParams().back()->getDepth();
+        return xDepth < yDepth;
+      });
+    }
+
     return TC.buildRefExpr(ResultValues, Context, Loc, UDRE->isImplicit(),
                            UDRE->isSpecialized());
   }
