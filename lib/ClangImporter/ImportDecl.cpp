@@ -1575,6 +1575,12 @@ namespace {
       assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
              "Clang method in Swift context?");
 
+      // FIXME: We should support returning "Self.Type" for a root class
+      // instance method mirrored as a class method, but it currently causes
+      // problems for the type checker.
+      if (forceClassMethod && decl->hasRelatedResultType())
+        return nullptr;
+
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;

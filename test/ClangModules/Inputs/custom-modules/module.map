@@ -45,3 +45,8 @@ module CoreData {
   header "NSManagedObject.h"
   export *
 }
+
+module AnotherBase {
+  header "AnotherBase.h"
+  export *
+}
