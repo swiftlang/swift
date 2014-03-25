@@ -144,6 +144,13 @@ namespace {
     void printTypedPattern(const TypedPattern *TP,
                            bool StripOuterSliceType = false);
 
+    void printName(Identifier name) {
+      if (name.empty())
+        Printer << "_";
+      else
+        Printer << name.str(); // FIXME: use backticks for keywords.
+    }
+
 public:
     void printPattern(const Pattern *pattern);
 
@@ -750,6 +757,38 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   auto ArgTuple = cast<TuplePattern>(ArgPatterns[0]);
   auto BodyTuple = cast<TuplePattern>(BodyPatterns[0]);
+
+  // If we're doing selector splitting, print with the new syntax.
+  if (AFD->getASTContext().LangOpts.SplitPrepositions 
+        != SelectorSplitKind::None) {
+    Printer << "(";
+    for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
+      if (i > 0)
+        Printer << ", ";
+
+      // Print argument name.
+      auto argPattern = ArgTuple->getFields()[i].getPattern();
+      auto argName = argPattern->getBoundName();
+      auto bodyName = BodyTuple->getFields()[i].getPattern()->getBoundName();
+      printName(argName);
+
+      // If the parameter name is different, print it.
+      if (bodyName != argName) {
+        Printer << " ";
+        printName(bodyName);
+      }
+
+      Printer << ": ";
+      // FIXME: inout is in the wrong place
+      if (auto typedArgPattern = dyn_cast<TypedPattern>(argPattern)) {
+        printTypeLoc(typedArgPattern->getTypeLoc());
+      } else if (auto type = typedArgPattern->getType()) {
+        type.print(Printer, Options);
+      }
+    }
+    Printer << ")";
+    return;
+  }
 
   // Print in selector style.
   for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
