@@ -19,7 +19,7 @@
 #endif
 
 #ifndef DECL_ATTR
-#define DECL_ATTR(X)
+#define DECL_ATTR(X, ...)
 #endif
 
 #ifndef TYPE_ATTR
@@ -59,8 +59,25 @@ TYPE_ATTR(callee_guaranteed)
 TYPE_ATTR(objc_metatype)
 TYPE_ATTR(opened)
 
-DECL_ATTR(asmname)
-DECL_ATTR(unavailable)
+// Schema for DECL_ATTR:
+//
+// - Attribute name.
+// - Serialization: valid for functions?
+// - Serialization: valid for extensions?
+// - Serialization: valid for pattern binding?
+// - Serialization: valid for operators?
+// - Serialization: valid for typealias?
+// - Serialization: valid for type declarations?
+// - Serialization: valid for struct declarations?
+// - Serialization: valid for enum declarations?
+// - Serialization: valid for class declarations?
+// - Serialization: valid for protocol declarations?
+// - Serialization: valid for var declarations?
+
+DECL_ATTR(asmname, true, false, false, false, false,
+          /* type */ false, false, false, false, false, false)
+DECL_ATTR(unavailable, true, false, false, false, false,
+          /* type */ false, true, true, true, true, true)
 
 ATTR(assignment)
 ATTR(class_protocol)

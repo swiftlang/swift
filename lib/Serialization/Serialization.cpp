@@ -1152,34 +1152,225 @@ static void checkAllowedAttributes(const Decl *D) {
 #endif
 }
 
-/// Asserts if the declaration has any declaration attributes other than the
-/// ones specified in the template parameters.
-///
-/// This is a no-op in release builds.
-///
-/// This is blatant duplication from checkAllowedAttributes.  The idea is
-/// to provide a migratory path for attributes to move to the new
-/// attribute representation.
-template <DeclAttrKind ...KINDS>
-static void checkAllowedDeclAttributes(const Decl *D) {
+/// Returns true if the represented set of attributes can be serialized
+/// for a function declaration.
+static void verifyAttrFunctionSerializable(const Decl *D) {
 #ifndef NDEBUG
-  auto attrs = D->getAttrs();
-
-  llvm::DenseSet<int> Kinds;
-  for (DeclAttrKind AK : { KINDS... })
-    Kinds.insert((int)AK);
-
-  for (auto Attr : attrs) {
-    if (!Kinds.count((int)Attr->getKind())) {
-      llvm::errs() << "Serialization: unhandled attributes ";
-      Attr->print(llvm::errs());
-      llvm::errs() << "\n";
-      llvm_unreachable("TODO: handle the above attributes");
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a function");\
+return;
+#include "swift/AST/Attr.def"
     }
   }
 #endif
 }
 
+/// Returns true if the represented set of attributes can be serialized
+/// for an extension.
+static void verifyExtensionSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for an extension");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a pattern binding.
+static void verifyAttrPatternBindingSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for an pattern");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for an operator.
+static void verifyAttrOperatorSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for an operator");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a type alias.
+static void verifyAttrTypeAliasSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a type alias");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a type declarations.
+static void verifyAttrTypeSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a type decl");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a struct declarations.
+static void verifyAttrStructSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, X6, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a type decl");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a struct declarations.
+static void verifyAttrEnumSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, X6, X7, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for an enum");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a class declarations.
+static void verifyAttrClassSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, X6, X7, X8, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a class");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a class declarations.
+static void verifyAttrProtocolSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, X6, X7, X8, X9, Y, ...)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a protocol");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
+
+/// Returns true if the represented set of attributes can be serialized
+/// for a class declarations.
+static void verifyAttrVarSerializable(const Decl *D) {
+#ifndef NDEBUG
+  for (auto Attr : D->getAttrs()) {
+    switch (Attr->getKind()) {
+      case DAK_Count:
+        llvm_unreachable("DAK_Count should never be triggered");
+        return;
+#define DECL_ATTR(NAME, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, Y)\
+case DAK_##NAME:\
+if (!Y) llvm_unreachable("DAK_" #NAME\
+" should never be serialized for a 'var'");\
+return;
+#include "swift/AST/Attr.def"
+    }
+  }
+#endif
+}
 
 static bool isForced(const Decl *D,
                      const llvm::DenseMap<Serializer::DeclTypeUnion,
@@ -1219,6 +1410,7 @@ void Serializer::writeDecl(const Decl *D) {
     // @transparent on extensions is propagated down to the methods and
     // constructors during serialization.
     checkAllowedAttributes<AK_transparent>(extension);
+    verifyExtensionSerializable(D);
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
@@ -1248,6 +1440,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PatternBinding: {
     auto binding = cast<PatternBindingDecl>(D);
     checkAllowedAttributes<>(binding);
+    verifyAttrPatternBindingSerializable(D);
 
     const Decl *DC = getDeclForContext(binding->getDeclContext());
 
@@ -1270,6 +1463,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::InfixOperator: {
     auto op = cast<InfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
+    verifyAttrOperatorSerializable(D);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
     auto associativity = getRawStableAssociativity(op->getAssociativity());
@@ -1286,6 +1480,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PrefixOperator: {
     auto op = cast<PrefixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
+    verifyAttrOperatorSerializable(D);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1299,6 +1494,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::PostfixOperator: {
     auto op = cast<PostfixOperatorDecl>(D);
     checkAllowedAttributes<>(op);
+    verifyAttrOperatorSerializable(D);
 
     const Decl *DC = getDeclForContext(op->getDeclContext());
 
@@ -1315,6 +1511,7 @@ void Serializer::writeDecl(const Decl *D) {
     assert(typeAlias->getProtocols().empty() &&
            "concrete typealiases cannot have protocols");
     checkAllowedAttributes<>(typeAlias);
+    verifyAttrTypeAliasSerializable(D);
 
     const Decl *DC = getDeclForContext(typeAlias->getDeclContext());
 
@@ -1335,6 +1532,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::GenericTypeParam: {
     auto genericParam = cast<GenericTypeParamDecl>(D);
     checkAllowedAttributes<>(genericParam);
+    verifyAttrTypeSerializable(D);
 
     const Decl *DC = getDeclForContext(genericParam->getDeclContext());
 
@@ -1358,6 +1556,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
     checkAllowedAttributes<>(assocType);
+    verifyAttrTypeSerializable(D);
 
     const Decl *DC = getDeclForContext(assocType->getDeclContext());
 
@@ -1381,6 +1580,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Struct: {
     auto theStruct = cast<StructDecl>(D);
     checkAllowedAttributes<>(theStruct);
+    verifyAttrStructSerializable(D);
 
     const Decl *DC = getDeclForContext(theStruct->getDeclContext());
 
@@ -1401,6 +1601,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Enum: {
     auto theEnum = cast<EnumDecl>(D);
     checkAllowedAttributes<>(theEnum);
+    verifyAttrEnumSerializable(D);
 
     const Decl *DC = getDeclForContext(theEnum->getDeclContext());
 
@@ -1424,6 +1625,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_IBDesignable, AK_objc, AK_resilient, AK_fragile,
       AK_born_fragile, AK_requires_stored_property_inits>(theClass);
+    verifyAttrClassSerializable(D);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
 
@@ -1451,6 +1653,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
     checkAllowedAttributes<AK_class_protocol, AK_objc>(proto);
+    verifyAttrProtocolSerializable(D);
 
     const Decl *DC = getDeclForContext(proto->getDeclContext());
 
@@ -1478,6 +1681,7 @@ void Serializer::writeDecl(const Decl *D) {
     checkAllowedAttributes<
       AK_IBOutlet, AK_objc, AK_optional, AK_unowned, AK_weak, AK_transparent
     >(var);
+    verifyAttrVarSerializable(D);
 
     const Decl *DC = getDeclForContext(var->getDeclContext());
     Type type = var->hasType() ? var->getType() : nullptr;
@@ -1530,7 +1734,8 @@ void Serializer::writeDecl(const Decl *D) {
       AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
-    checkAllowedDeclAttributes<DAK_asmname>(fn);
+
+    verifyAttrFunctionSerializable(D);
 
     const Decl *DC = getDeclForContext(fn->getDeclContext());
 

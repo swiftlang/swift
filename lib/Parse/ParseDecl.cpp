@@ -148,7 +148,7 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 /// return the kind.  Otherwise, return DAK_Count as a sentinel.
 static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   return llvm::StringSwitch<DeclAttrKind>(Str)
-#define DECL_ATTR(X) .Case(#X, DAK_##X)
+#define DECL_ATTR(X, ...) .Case(#X, DAK_##X)
 #include "swift/AST/Attr.def"
   .Default(DAK_Count);
 }

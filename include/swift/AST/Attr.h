@@ -132,7 +132,7 @@ enum AttrKind {
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
 enum DeclAttrKind {
-#define DECL_ATTR(X) DAK_##X,
+#define DECL_ATTR(X, Y, ...) DAK_##X,
 #include "swift/AST/Attr.def"
   DAK_Count
 };
