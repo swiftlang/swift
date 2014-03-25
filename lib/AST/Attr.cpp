@@ -99,11 +99,12 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
 void DeclAttribute::print(ASTPrinter &Printer) const {
   switch (getKind()) {
     case DAK_asmname:
-      Printer << "@asmname=\"" << cast<AsmnameAttr>(this)->Name << "\" ";
+      Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
       break;
     case DAK_Count:
       llvm_unreachable("exceed declaration attribute kinds");
   }
+  Printer << ' ';
 }
 
 void DeclAttribute::print(llvm::raw_ostream &OS) const {
