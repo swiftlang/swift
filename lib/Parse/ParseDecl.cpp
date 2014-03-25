@@ -153,6 +153,24 @@ static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   .Default(DAK_Count);
 }
 
+static StringRef getStringLiteralIfNotInterpolated(Parser &P,
+                                                   SourceLoc Loc,
+                                                   const Token &Tok,
+                                                   StringRef DiagText) {
+  SmallVector<Lexer::StringSegment, 1> Segments;
+  P.L->getStringLiteralSegments(Tok, Segments);
+  if (Segments.size() != 1 ||
+      Segments.front().Kind == Lexer::StringSegment::Expr) {
+   P.diagnose(Loc, diag::attr_interpolated_string, DiagText);
+   return StringRef();
+  }
+
+  SourceManager &SourceMgr = P.SourceMgr;
+  return StringRef(SourceMgr->getMemoryBuffer(P.BufferID)->getBufferStart() +
+              SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, P.BufferID),
+              Segments.front().Length);
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                    StringRef AttrName,
                                    DeclAttrKind DK){
@@ -186,20 +204,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return false;
       }
 
-      SmallVector<Lexer::StringSegment, 1> Segments;
-      StringRef AsmName;
+      StringRef AsmName =
+        getStringLiteralIfNotInterpolated(*this, Loc, Tok, "asmname");
 
-      L->getStringLiteralSegments(Tok, Segments);
-      if (Segments.size() != 1 ||
-          Segments.front().Kind == Lexer::StringSegment::Expr) {
-        diagnose(Loc, diag::asmname_interpolated_string);
-      } else {
-        AsmName = StringRef(
-                SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
-                SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, BufferID),
-                Segments.front().Length);
+      if (!AsmName.empty())
         AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-      }
+      else
+        DiscardAttribute = true;
+
       consumeToken(tok::string_literal);
 
       if (!consumeIf(tok::r_paren)) {

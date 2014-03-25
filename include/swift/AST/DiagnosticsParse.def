@@ -852,9 +852,8 @@ ERROR(attr_expected_rparen,attribute_parsing,none,
 ERROR(attr_expected_string_literal,attribute_parsing,none,
 "expected string literal in '%0' attribute", (StringRef))
 
-// asmname
-ERROR(asmname_interpolated_string,attribute_parsing,none,
-      "asmname cannot be an interpolated string literal", ())
+ERROR(attr_interpolated_string,attribute_parsing,none,
+"%0 cannot be an interpolated string literal", (StringRef))
 
 // cc
 ERROR(cc_attribute_expected_lparen,attribute_parsing,none,
