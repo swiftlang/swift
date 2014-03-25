@@ -556,7 +556,12 @@ public:
                                       SILValue Length,
                                       Expr *ArrayInjectionFunction,
                                       SILLocation Loc);
-                        
+
+
+  SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
+                                          const TypeLowering &valueTL);
+
+
   /// Emit the empty tuple value by emitting
   SILValue emitEmptyTuple(SILLocation loc);
   /// "Emit" an RValue representing an empty tuple.

@@ -615,14 +615,20 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   ManagedValue Result;
   if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.
-    Result = ManagedValue::forUnmanaged(B.createStructExtract(loc,
-                                                              base.getValue(),
-                                                              FieldDecl));
+    SILValue Scalar = B.createStructExtract(loc, base.getValue(), FieldDecl);
+    Result = ManagedValue::forUnmanaged(Scalar);
 
-    // If we have an abstraction change or if we have to produce a result at
-    // +1, then emit a copyvalue.
-    if (hasAbstractionChange || !C.isPlusZeroOk())
+    if (Result.getSwiftType()->is<ReferenceStorageType>()) {
+      // For @weak and @unowned types, convert the reference to the right
+      // pointer, producing a +1.
+      Scalar = emitConversionToSemanticRValue(loc, Scalar, lowering);
+      Result = emitManagedRValueWithCleanup(Scalar, lowering);
+
+    } else if (hasAbstractionChange || !C.isPlusZeroOk()) {
+      // If we have an abstraction change or if we have to produce a result at
+      // +1, then emit a copyvalue.
       Result = Result.copyUnmanaged(*this, loc);
+    }
   } else {
     // For address-only sequences, the base is in memory.  Emit a
     // struct_element_addr to get to the field, and then load the element as an

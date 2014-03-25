@@ -381,7 +381,6 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
     requireOptionalIntrinsics(value->getLoc());
 
     return optTy;
-
   }
 
   // Ignore @unowned qualification.
@@ -457,9 +456,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
     if (doesVarDeclMemberProduceLValue(VD, baseType, UseDC))
       return LValueType::get(getTypeOfRValue(value, wantInterfaceType));
 
-
-  Type requestedType =
-    wantInterfaceType ? value->getInterfaceType() : value->getType();
+  Type requestedType = getTypeOfRValue(value, wantInterfaceType);
 
   // Check to see if the subscript-decl produces an lvalue.
   if (auto *SD = dyn_cast<SubscriptDecl>(value))

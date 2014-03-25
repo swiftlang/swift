@@ -931,6 +931,26 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
   return emitApplyOfLibraryIntrinsic(loc, fn, sub, src, C);
 }
 
+SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
+                                                        SILValue src,
+                                                  const TypeLowering &valueTL) {
+  // For @weak types, we need to create an Optional<T>.
+  // Optional<T> is currently loadable, but it probably won't be forever.
+  if (src.getType().is<WeakStorageType>())
+    return emitRefToOptional(*this, loc, src, valueTL);
+
+  // For @unowned types, we need to strip the unowned box.
+  if (auto unownedType = src.getType().getAs<UnownedStorageType>()) {
+    B.createStrongRetainUnowned(loc, src);
+    return B.createUnownedToRef(loc, src,
+                SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+  }
+
+
+  llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
+}
+
+
 /// Given that the type-of-rvalue differs from the type-of-storage,
 /// and given that the type-of-rvalue is loadable, produce a +1 scalar
 /// of the type-of-rvalue.
