@@ -804,8 +804,9 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
     ElseLoc = consumeToken(tok::pound_else);
     ElseBody = parseIfConfigStmtBlock(!ifBlockIsActive, Kind);
   }
+  SourceLoc EndLoc;
   if (Tok.is(tok::pound_endif)) {
-    consumeToken(tok::pound_endif);
+    EndLoc = consumeToken(tok::pound_endif);
   } else {
     diagnose(Tok, diag::expected_close_to_config_stmt);
     skipUntilConfigBlockClose();
@@ -815,7 +816,8 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
                                                  Configuration.getPtrOrNull(),
                                                  NormalBody.get(),
                                                  ElseLoc,
-                                                 ElseBody.getPtrOrNull());
+                                                 ElseBody.getPtrOrNull(),
+                                                 EndLoc);
   ifConfigStmt->setActiveStmt(ifBlockIsActive ?
                                 NormalBody.get() :
                                 ElseBody.getPtrOrNull());

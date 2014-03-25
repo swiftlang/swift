@@ -218,6 +218,7 @@ public:
 class IfConfigStmt : public Stmt {
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
+  SourceLoc EndLoc;
   Expr *Cond = nullptr;
   Stmt *Then = nullptr;
   Stmt *Else = nullptr;
@@ -225,18 +226,21 @@ class IfConfigStmt : public Stmt {
   
 public:
   IfConfigStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-               Stmt *Else)
+               Stmt *Else, SourceLoc EndLoc)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
-    IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
+    IfLoc(IfLoc), ElseLoc(ElseLoc), EndLoc(EndLoc),
+    Cond(Cond), Then(Then), Else(Else) {}
   
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
   
   SourceRange getSourceRange() const;
   
   Stmt *getThenStmt() const { return Then; }
   void setThenStmt(Stmt *s) { Then = s; }
   
+  bool hasElse() const { return ElseLoc.isValid(); }
   Stmt *getElseStmt() const { return Else; }
   void setElseStmt(Stmt *s) { Else = s; }
   
