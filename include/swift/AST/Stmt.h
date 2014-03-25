@@ -225,8 +225,8 @@ class IfConfigStmt : public Stmt {
   
 public:
   IfConfigStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc,
-         Stmt *Else, Optional<bool> implicit = {})
-  : Stmt(StmtKind::IfConfig, getDefaultImplicitFlag(implicit, IfLoc)),
+               Stmt *Else)
+  : Stmt(StmtKind::IfConfig, /*implicit=*/false),
     IfLoc(IfLoc), ElseLoc(ElseLoc), Cond(Cond), Then(Then), Else(Else) {}
   
   SourceLoc getIfLoc() const { return IfLoc; }
