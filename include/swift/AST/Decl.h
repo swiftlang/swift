@@ -1461,8 +1461,8 @@ public:
 /// separately, with the intention being that active members will be handed
 /// back to the enclosing declaration.
 class IfConfigDecl : public Decl {
-  ArrayRef<Decl*> ActiveMembers;
-  ArrayRef<Decl*> InactiveMembers;
+  ArrayRef<Decl*> ThenMembers;
+  ArrayRef<Decl*> ElseMembers;
   bool IfBlockIsActive;
   SourceLoc IfLoc;
   SourceLoc ElseLoc;
@@ -1476,24 +1476,29 @@ public:
                SourceLoc ifLoc,
                SourceLoc elseLoc,
                SourceLoc endLoc,
-               Expr *cond):
+               Expr *cond,
+               ArrayRef<Decl*> ThenMembers,
+               ArrayRef<Decl*> ElseMembers):
           Decl(DeclKind::IfConfig, Parent),
+          ThenMembers(ThenMembers),
+          ElseMembers(ElseMembers),
           IfBlockIsActive(IfBlockIsActive),
           IfLoc(ifLoc),
           ElseLoc(elseLoc),
           EndLoc(endLoc),
           Cond(cond) {}
-  
-  ArrayRef<Decl*> getActiveMembers() const { return ActiveMembers; }
-  void setActiveMembers(ArrayRef<Decl*>activeMembers) {
-    ActiveMembers = activeMembers;
+
+  ArrayRef<Decl*> getThenMembers() const { return ThenMembers; }
+  ArrayRef<Decl*> getElseMembers() const { return ElseMembers; }
+
+  ArrayRef<Decl*> getActiveMembers() const {
+    return IfBlockIsActive ? ThenMembers : ElseMembers;
   }
-  
-  ArrayRef<Decl*> getInactiveMembers() const { return InactiveMembers; }
-  void setInactiveMembers(ArrayRef<Decl*> inactiveMembers) {
-    InactiveMembers = inactiveMembers;
+
+  ArrayRef<Decl*> getInactiveMembers() const {
+    return !IfBlockIsActive ? ThenMembers : ElseMembers;
   }
-  
+
   Expr *getCond() { return Cond; }
 
   bool isIfBlockActive() const { return IfBlockIsActive; }
