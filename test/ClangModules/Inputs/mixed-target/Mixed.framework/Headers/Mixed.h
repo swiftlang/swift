@@ -9,7 +9,17 @@ void doSomething(ForwardClass *arg);
 - (ForwardClass *)unsafeOverrideReturn:(ForwardClass *)arg;
 @end
 
-@protocol UseForwardProto
+@protocol ForwardClassUser
 - (void)consumeForwardClass:(ForwardClass *)arg;
 @property ForwardClass *forward;
+@end
+
+
+@protocol ForwardProto;
+void doSomethingProto(id <ForwardProto> arg);
+
+@interface Base ()
+- (NSObject *)safeOverrideProto:(id <ForwardProto>)arg;
+- (NSObject *)unsafeOverrideProtoParam:(NSObject *)arg;
+- (id <ForwardProto>)unsafeOverrideProtoReturn:(id <ForwardProto>)arg;
 @end

@@ -2780,25 +2780,30 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDecl(const U *decl, Identifier name, const DeclContext *dc) {
+    T *resolveSwiftDecl(const U *decl, Identifier name, Module *adapter) {
+      SmallVector<ValueDecl *, 4> results;
+      adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
+      if (results.size() == 1) {
+        if (auto singleResult = dyn_cast<T>(results.front())) {
+          if (auto typeResolver = Impl.getTypeResolver())
+            typeResolver->resolveDeclSignature(singleResult);
+          Impl.ImportedDecls[decl->getCanonicalDecl()] = singleResult;
+          return singleResult;
+        }
+      }
+
+      return nullptr;
+    }
+
+    template <typename T, typename U>
+    T *resolveSwiftDeclIfAnnotated(const U *decl, Identifier name,
+                                   const DeclContext *dc) {
       using clang::AnnotateAttr;
       for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
         if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
           auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-          SmallVector<ValueDecl *, 4> results;
-          wrapperUnit->getAdapterModule()->lookupValue({}, name,
-                                                       NLKind::QualifiedLookup,
-                                                       results);
-          if (results.size() == 1) {
-            if (auto singleResult = dyn_cast<T>(results.front())) {
-              if (auto typeResolver = Impl.getTypeResolver())
-                typeResolver->resolveDeclSignature(singleResult);
-              Impl.ImportedDecls[decl->getCanonicalDecl()] = singleResult;
-              return singleResult;
-            }
-          }
-
-          break;
+          return resolveSwiftDecl<T>(decl, name,
+                                     wrapperUnit->getAdapterModule());
         }
       }
 
@@ -2806,14 +2811,6 @@ namespace {
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      // FIXME: Figure out how to deal with incomplete protocols, since that
-      // notion doesn't exist in Swift.
-      decl = decl->getDefinition();
-      if (!decl) {
-        forwardDeclaration = true;
-        return nullptr;
-      }
-
       // Form the protocol name, using the renaming table when necessary.
       Identifier name;
       if (false) { }
@@ -2829,11 +2826,29 @@ namespace {
       if (name.empty())
         return nullptr;
 
+      // FIXME: Figure out how to deal with incomplete protocols, since that
+      // notion doesn't exist in Swift.
+      if (!decl->hasDefinition()) {
+        // Check if this protocol is implemented in its adapter.
+        // FIXME: This only matters for the module currently being built.
+        if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
+          if (auto adapter = clangModule->getAdapterModule())
+            if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
+                                                             adapter))
+              return native;
+
+        forwardDeclaration = true;
+        return nullptr;
+      }
+
+      decl = decl->getDefinition();
+
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
 
-      if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name, dc))
+      if (auto native = resolveSwiftDeclIfAnnotated<ProtocolDecl>(decl, name,
+                                                                  dc))
         return native;
 
       // Create the protocol declaration and record it.
@@ -2940,21 +2955,10 @@ namespace {
 
         // Otherwise, check if this class is implemented in its adapter.
         // FIXME: This only matters for the module currently being built.
-        if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
-          if (auto adapter = clangModule->getAdapterModule()) {
-            SmallVector<ValueDecl *, 4> swiftClasses;
-            adapter->lookupValue({}, name, NLKind::UnqualifiedLookup,
-                                 swiftClasses);
-            if (swiftClasses.size() == 1) {
-              if (auto swiftClass = dyn_cast<ClassDecl>(swiftClasses.front())) {
-                if (auto typeResolver = Impl.getTypeResolver())
-                  typeResolver->resolveDeclSignature(swiftClass);
-                Impl.ImportedDecls[decl->getCanonicalDecl()] = swiftClass;
-                return swiftClass;
-              }
-            }
-          }
-        }
+        if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
+          if (auto adapter = clangModule->getAdapterModule())
+            if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, adapter))
+              return native;
       }
 
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -2969,7 +2973,7 @@ namespace {
       if (!dc)
         return nullptr;
 
-      if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, dc))
+      if (auto native = resolveSwiftDeclIfAnnotated<ClassDecl>(decl, name, dc))
         return native;
 
       // Create the class declaration and record it.
