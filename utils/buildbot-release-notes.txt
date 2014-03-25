@@ -107,6 +107,21 @@
     printHand(1, 1, 1) // prints "three aces"
     printHand(12, 13) // prints "queen and a king"
 
+* Enums and option sets imported from C/Objective-C still strip common
+  prefixes, but the name of the enum itself is now taken into consideration as
+  well. This keeps us from dropping important parts of a name that happen to be
+  shared by all members.
+
+  // NSFileManager.h
+  typedef NS_OPTIONS(NSUInteger, NSDirectoryEnumerationOptions) {
+      NSDirectoryEnumerationSkipsSubdirectoryDescendants = 1UL << 0,
+      NSDirectoryEnumerationSkipsPackageDescendants      = 1UL << 1,
+      NSDirectoryEnumerationSkipsHiddenFiles             = 1UL << 2
+  } NS_ENUM_AVAILABLE(10_6, 4_0);
+
+  // Swift
+  let opts: NSDirectoryEnumerationOptions = .SkipsPackageDescendants
+
 2014-03-19
 ----------
 
