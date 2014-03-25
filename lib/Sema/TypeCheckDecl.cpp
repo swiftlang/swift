@@ -1134,10 +1134,12 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
                                     Type(), VD->getDeclContext());
   *ValueDecl = Arg;
   Arg->setImplicit();
-    
+
+  auto VDTy = VD->getType()->getReferenceStorageReferent();
+
   Pattern *ValuePattern
     = new (Context) TypedPattern(new (Context) NamedPattern(Arg),
-                                 TypeLoc::withoutLoc(VD->getType()));
+                                 TypeLoc::withoutLoc(VDTy));
   ValuePattern->setImplicit();
   
   TuplePatternElt ValueElt(ValuePattern);
@@ -1163,11 +1165,13 @@ static FuncDecl *createGetterPrototype(VarDecl *VD) {
   };
   
   SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
-  
+
+  auto Ty = VD->getType()->getReferenceStorageReferent();
+
   auto Get = FuncDecl::create(
       Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
       /*GenericParams=*/nullptr, Type(), GetterParams, GetterParams,
-      TypeLoc::withoutLoc(VD->getType()), VD->getDeclContext());
+      TypeLoc::withoutLoc(Ty), VD->getDeclContext());
   Get->setImplicit();
   return Get;
 }
@@ -1175,7 +1179,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD) {
 static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
-  
+
   // Create the parameter list for the setter.
   Pattern *SetterParams[] = {
     // The implicit 'self' argument.

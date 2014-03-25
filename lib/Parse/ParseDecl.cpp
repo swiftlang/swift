@@ -1353,8 +1353,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
   return makeParserResult(Status, TAD);
 }
 
-/// createGetterFunc - This function creates the getter function (with no body)
-/// for a computed property or subscript.
+/// This function creates an accessor function (with no body) for a computed
+/// property or subscript.
 static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     TypedPattern *NamePattern,
                                     TypeLoc ElementTy,

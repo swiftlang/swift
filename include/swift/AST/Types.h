@@ -496,6 +496,10 @@ public:
   /// tuples, lvalue types, and metatypes.
   Type getRValueInstanceType();
 
+  /// For a ReferenceStorageType like @unowned, this returns the referent.
+  /// Otherwise, it returns the type itself.
+  Type getReferenceStorageReferent();
+
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
   ///
@@ -3256,6 +3260,14 @@ inline Type TypeBase::getLValueOrInOutObjectType() {
     return iot->getObjectType();
   if (auto lv = getAs<LValueType>())
     return lv->getObjectType();
+  return this;
+}
+
+/// For a ReferenceStorageType like @unowned, this returns the referent.
+/// Otherwise, it returns the type itself.
+inline Type TypeBase::getReferenceStorageReferent() {
+  if (auto rst = getAs<ReferenceStorageType>())
+    return rst->getReferentType();
   return this;
 }
 
