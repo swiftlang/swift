@@ -608,8 +608,7 @@ public:
                                             bool isAssociatedType,
                                             DeclAttributes &Attributes);
   
-  ParserResult<IfConfigDecl> parseDeclIfConfig(SmallVectorImpl<Decl*> &Entries,
-                                               ParseDeclOptions Flags);
+  ParserResult<IfConfigDecl> parseDeclIfConfig(ParseDeclOptions Flags);
 
   void setLocalDiscriminator(ValueDecl *D);
 

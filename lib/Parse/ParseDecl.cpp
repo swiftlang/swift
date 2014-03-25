@@ -842,10 +842,19 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     DeclResult = parseDeclProtocol(Flags, Attributes);
     Status = DeclResult;
     break;
-  case tok::pound_if:
-    DeclResult = parseDeclIfConfig(Entries, Flags);
+  case tok::pound_if: {
+    auto IfConfigResult = parseDeclIfConfig(Flags);
+    Status = IfConfigResult;
 
-    Status = DeclResult;
+    if (auto ICD = IfConfigResult.getPtrOrNull()) {
+      // The IfConfigDecl is ahead of its members in source order.
+      Entries.push_back(ICD);
+      // Copy the active members into the entries list.
+      for (auto activeMember : ICD->getActiveMembers()) {
+        Entries.push_back(activeMember);
+      }
+    }
+    }
     break;
 
   case tok::kw_func:
@@ -1217,7 +1226,6 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 }
 
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
-                                            SmallVectorImpl<Decl*> &Entries,
                                             ParseDeclOptions Flags) {
   SourceLoc IfLoc = consumeToken(tok::pound_if);
   SourceLoc ElseLoc;
@@ -1289,12 +1297,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
       ICD->setActiveMembers(Context.AllocateCopy(ElseDecls));
     }
   }
-  
-  // Copy the active members into the entries list.
-  for (auto activeMember : ICD->getActiveMembers()) {
-    Entries.push_back(activeMember);
-  }
-  
+
   return makeParserResult(ICD);
 }
 

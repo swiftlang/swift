@@ -259,8 +259,20 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         NeedParseErrorRecovery = true;
         continue;
       }
-        
-      IfConfigStmt *ICS = dyn_cast<IfConfigStmt>(Result.dyn_cast<Stmt*>());
+
+      // Add the #if block itself as a TLCD if necessary
+      if (Kind == BraceItemListKind::TopLevelCode) {
+        auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
+        auto Brace = BraceStmt::create(Context, StartLoc,
+                                       {Result}, Tok.getLoc());
+        Brace->markAsConfigBlock();
+        TLCD->setBody(Brace);
+        Entries.push_back(TLCD);
+      } else {
+        Entries.push_back(Result);
+      }
+
+      IfConfigStmt *ICS = cast<IfConfigStmt>(Result.get<Stmt*>());
       
       if (auto activeStmt = ICS->getActiveStmt()) {
         // Pass on any members of the active block
@@ -274,18 +286,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           }
         }
       }
-      
-      // Add the #if block itself as a TLCD if necessary
-      if (Kind == BraceItemListKind::TopLevelCode) {
-        auto *TLCD = new (Context) TopLevelCodeDecl(CurDeclContext);
-        auto Brace = BraceStmt::create(Context, StartLoc,
-                                       {Result}, Tok.getLoc());
-        Brace->markAsConfigBlock();
-        TLCD->setBody(Brace);
-        Entries.push_back(TLCD);
-      } else {
-        Entries.push_back(Result);
-      }      
     } else if (IsTopLevel) {
       // If this is a statement or expression at the top level of the module,
       // Parse it as a child of a TopLevelCodeDecl.
