@@ -620,7 +620,8 @@ public:
   }
   bool parseDeclAttributeListPresent(DeclAttributes &Attributes);
   bool parseDeclAttribute(DeclAttributes &Attributes);
-  bool parseNewDeclAttribute(DeclAttributes &Attributes, DeclAttrKind DK );
+  bool parseNewDeclAttribute(DeclAttributes &Attributes, StringRef AttrName,
+                             DeclAttrKind DK );
 
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))

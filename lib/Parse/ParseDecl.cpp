@@ -153,7 +153,9 @@ static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   .Default(DAK_Count);
 }
 
-bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, DeclAttrKind DK){
+bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
+                                   StringRef AttrName,
+                                   DeclAttrKind DK){
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
@@ -174,31 +176,40 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, DeclAttrKind DK){
     case DAK_Count:
       llvm_unreachable("DAK_Count should not appear in parsing switch");
     case DAK_asmname: {
-      if (!consumeIf(tok::equal)) {
-        diagnose(Loc, diag::asmname_expected_equals);
+      if (!consumeIf(tok::l_paren)) {
+        diagnose(Loc, diag::attr_expected_lparen, AttrName);
         return false;
       }
 
       if (Tok.isNot(tok::string_literal)) {
-        diagnose(Loc, diag::asmname_expected_string_literal);
+        diagnose(Loc, diag::attr_expected_string_literal, AttrName);
         return false;
       }
 
       SmallVector<Lexer::StringSegment, 1> Segments;
+      StringRef AsmName;
+
       L->getStringLiteralSegments(Tok, Segments);
       if (Segments.size() != 1 ||
           Segments.front().Kind == Lexer::StringSegment::Expr) {
         diagnose(Loc, diag::asmname_interpolated_string);
       } else {
-        StringRef Name(
+        AsmName = StringRef(
                 SourceMgr->getMemoryBuffer(BufferID)->getBufferStart() +
                 SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, BufferID),
                 Segments.front().Length);
         AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-        if (!DiscardAttribute)
-          Attributes.add(new (Context) AsmnameAttr(Name, AttrRange));
       }
       consumeToken(tok::string_literal);
+
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Loc, diag::attr_expected_rparen, AttrName);
+        return false;
+      }
+
+      if (!DiscardAttribute)
+        Attributes.add(new (Context) AsmnameAttr(AsmName, AttrRange));
+
       break;
     }
   };
@@ -215,7 +226,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, DeclAttrKind DK){
 
 /// \verbatim
 ///   attribute:
-///     'asmname' '=' identifier
+///     'asmname' '(' identifier ')'
 ///     'infix' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'
@@ -252,7 +263,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     // over to the alternate parsing path.
     DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
     if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, DK);
+      return parseNewDeclAttribute(Attributes, Tok.getText(), DK);
 
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);

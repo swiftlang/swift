@@ -843,11 +843,16 @@ ERROR(typealias_attributes,attribute_parsing,none,
 ERROR(operator_attributes,attribute_parsing,none,
       "invalid attributes specified for operator", ())
 
+ERROR(attr_expected_lparen,attribute_parsing,none,
+"expected '(' in '%0' attribute", (StringRef))
+
+ERROR(attr_expected_rparen,attribute_parsing,none,
+"expected ')' in '%0' attribute", (StringRef))
+
+ERROR(attr_expected_string_literal,attribute_parsing,none,
+"expected string literal in '%0' attribute", (StringRef))
+
 // asmname
-ERROR(asmname_expected_equals,attribute_parsing,none,
-      "expected '=' in asmname attribute", ())
-ERROR(asmname_expected_string_literal,attribute_parsing,none,
-      "expected string literal in asmname attribute", ())
 ERROR(asmname_interpolated_string,attribute_parsing,none,
       "asmname cannot be an interpolated string literal", ())
 
