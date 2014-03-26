@@ -215,7 +215,9 @@ static bool useCaptured(Operand *UI) {
   // These instructions do not cause the address to escape.
   if (isa<CopyAddrInst>(User) ||
       isa<LoadInst>(User) ||
-      isa<ProtocolMethodInst>(User))
+      isa<ProtocolMethodInst>(User) ||
+      isa<DebugValueInst>(User) ||
+      isa<DebugValueAddrInst>(User))
     return false;
 
   if (auto *Store = dyn_cast<StoreInst>(User)) {
@@ -253,6 +255,10 @@ swift::canValueEscape(SILValue V) {
     // apply instructions do not capture the pointer when it is passed
     // indirectly
     if (auto apply = dyn_cast<ApplyInst>(User)) {
+      // Applying a function does not cause the function to escape.
+      if (UI->getOperandNumber() == 0)
+        continue;
+
       if (apply->getSubstCalleeType()
           ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect()) {
         continue;
