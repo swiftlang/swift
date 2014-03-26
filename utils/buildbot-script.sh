@@ -33,6 +33,8 @@ KNOWN_SETTINGS=(
     skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
+    skip-test-ios-device        ""               "set to skip testing Swift stdlibs for iOS devices (i.e. test simulators only)"
+    skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
     skip-package-swift          ""               "set to skip packaging Swift"
@@ -200,14 +202,19 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_IOS" ]]; then
     IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64 swift_stdlib_ios_armv7 swift_stdlib_ios_simulator_i386)
-    # FIXME: iOS tests for some platforms are not yet clean enough to enable
-    IOS_TEST_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
+    IOS_SIMULATOR_TEST_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
+    IOS_DEVICE_TEST_PRODUCTS=(swift_stdlib_ios_arm64 swift_stdlib_ios_armv7)
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
         SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
     fi
     if [[ ! "$SKIP_TEST_IOS" ]]; then
-        SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}")
+        if [[ ! "$SKIP_TEST_IOS_SIMULATOR" ]]; then
+            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_SIMULATOR_TEST_PRODUCTS[@]}")
+        fi
+        if [[ ! "$SKIP_TEST_IOS_DEVICE" ]]; then
+            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_DEVICE_TEST_PRODUCTS[@]}")
+        fi
     fi
 fi
 
