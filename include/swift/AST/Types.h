@@ -1064,7 +1064,7 @@ BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   }
   CanTupleEltTypeArrayRef getElementTypes() const {
     return CanTupleEltTypeArrayRef(getPointer()->getFields());
-  };  
+  }
 END_CAN_TYPE_WRAPPER(TupleType, Type)
 
 /// UnboundGenericType - Represents a generic nominal type where the

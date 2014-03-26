@@ -77,7 +77,7 @@ namespace swift {
     void injectFunction(SILFunction *Func) { F = Func; }
 
   protected:
-    SILFunction *getFunction() { return F; };
+    SILFunction *getFunction() { return F; }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(F, K);
@@ -102,7 +102,7 @@ namespace swift {
     void injectModule(SILModule *Mod) { M = Mod; }
 
   protected:
-    SILModule *getModule() { return M; };
+    SILModule *getModule() { return M; }
 
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
       PM->invalidateAnalysis(K);

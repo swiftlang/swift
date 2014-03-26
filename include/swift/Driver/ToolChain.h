@@ -46,7 +46,7 @@ class ToolChain {
   Tool *getLinker() const;
 
 protected:
-  ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {};
+  ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {}
 
   virtual std::unique_ptr<Tool> buildLinker() const = 0;
   virtual Tool *getTool(Action::ActionClass AC) const;

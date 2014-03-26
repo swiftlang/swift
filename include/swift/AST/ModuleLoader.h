@@ -66,7 +66,7 @@ public:
   /// contains decls conforming to this protocol loaded from any generation up
   /// to and including this one.
   virtual void loadDeclsConformingTo(KnownProtocolKind kind,
-                                     unsigned previousGeneration) { };
+                                     unsigned previousGeneration) { }
 
   /// \brief Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

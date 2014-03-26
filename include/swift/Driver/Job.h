@@ -62,7 +62,7 @@ private:
   bool OwnsJobs;
 
 public:
-  JobList() : Job(JobListClass), OwnsJobs(true) {};
+  JobList() : Job(JobListClass), OwnsJobs(true) {}
   virtual ~JobList();
 
   bool getOwnsJobs() const { return OwnsJobs; }
