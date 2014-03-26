@@ -2200,17 +2200,15 @@ enum OptionalTypeKind : unsigned {
   OTK_UncheckedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
-  
-/// \brief DelayedDecl - An implicitly created member decl, used when importing
-/// a Clang enum type.  These are not added to their enclosing type unless
-/// forced.
-typedef std::function<Decl*()> DelayedDecl;
-  
-/// \brief DelayedProtocolDecl - An implicitly created protocol decl, used when
-/// importing a Clang enum type.  These are not added to their enclosing type
-/// unless forced.
-typedef std::function<ProtocolDecl*()> DelayedProtocolDecl;
-  
+
+/// An implicitly created member decl, used when importing a Clang enum type.
+/// These are not added to their enclosing type unless forced.
+typedef std::function<Decl *()> DelayedDecl;
+
+/// An implicitly created protocol decl, used when importing a Clang enum type.
+/// These are not added to their enclosing type unless forced.
+typedef std::function<ProtocolDecl *()> DelayedProtocolDecl;
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {

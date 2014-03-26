@@ -1065,13 +1065,9 @@ namespace {
         DelayedProtocolDecl delayedProtocols[] = {
           [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSet);}
         };
-        
-        structDecl->setDelayedProtocolDecls(Impl.
-                                            SwiftContext.
-                                              AllocateCopy(
-                                                  llvm::makeArrayRef(
-                                                      delayedProtocols)));
-        
+        structDecl->setDelayedProtocolDecls(
+            Impl.SwiftContext.AllocateCopy(delayedProtocols));
+
         // Add delayed implicit members to the type.
         DelayedDecl delayedMembers[] = {
           [=](){return makeOptionSetFactoryMethod(structDecl, var,
