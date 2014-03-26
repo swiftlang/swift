@@ -30,6 +30,8 @@ KNOWN_SETTINGS=(
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
     skip-build-swift            ""               "set to skip building Swift"
     skip-build-ios              ""               "set to skip building Swift stdlibs for iOS"
+    skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
+    skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
@@ -201,19 +203,23 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 # Swift stdlib build products
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_IOS" ]]; then
-    IOS_BUILD_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_arm64 swift_stdlib_ios_armv7 swift_stdlib_ios_simulator_i386)
-    IOS_SIMULATOR_TEST_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
-    IOS_DEVICE_TEST_PRODUCTS=(swift_stdlib_ios_arm64 swift_stdlib_ios_armv7)
+    IOS_SIMULATOR_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
+    IOS_DEVICE_PRODUCTS=(swift_stdlib_ios_arm64 swift_stdlib_ios_armv7)
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
-        SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+        if [[ ! "$SKIP_BUILD_IOS_SIMULATOR" ]]; then
+            SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
+        fi
+        if [[ ! "$SKIP_BUILD_IOS_DEVICE" ]]; then
+            SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
+        fi
     fi
     if [[ ! "$SKIP_TEST_IOS" ]]; then
         if [[ ! "$SKIP_TEST_IOS_SIMULATOR" ]]; then
-            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_SIMULATOR_TEST_PRODUCTS[@]}")
+            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
         fi
         if [[ ! "$SKIP_TEST_IOS_DEVICE" ]]; then
-            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_DEVICE_TEST_PRODUCTS[@]}")
+            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
         fi
     fi
 fi
