@@ -911,19 +911,6 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
       // through the list.
     } while (Impl.CurrentCacheState != Implementation::CacheState::InProgress);
 
-    auto &ClangPP = Impl.getClangPreprocessor();
-    for (auto I = ClangPP.macro_begin(), E = ClangPP.macro_end(); I != E; ++I) {
-      if (!I->first->hasMacroDefinition())
-        continue;
-      auto Name = Impl.importName(I->first);
-      if (Name.empty())
-        continue;
-      if (auto *Imported =
-              Impl.importMacro(Name, I->second->getMacroInfo())) {
-        Impl.CachedVisibleDecls.push_back(Imported);
-      }
-    }
-
     Impl.CurrentCacheState = Implementation::CacheState::Valid;
   }
 
