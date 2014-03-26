@@ -149,7 +149,6 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-I", searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_PROTOCOL=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-    "-fretain-comments-from-system-headers",
     "swift.m"
   };
 
