@@ -122,6 +122,16 @@
   // Swift
   let opts: NSDirectoryEnumerationOptions = .SkipsPackageDescendants
 
+* Init methods in Objective-C protocols are now imported as
+  initializers. To conform to NSCoding, you will now need to provide
+
+    init withCoder(aDecoder: NSCoder) { ... }
+
+  rather than
+
+    func initWithCoder(aDecoder: NSCoder) { ... }
+
+
 2014-03-19
 ----------
 

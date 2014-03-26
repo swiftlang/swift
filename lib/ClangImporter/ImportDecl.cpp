@@ -1715,6 +1715,7 @@ namespace {
       return startsWithWord(first->getName(), "init");
     }
 
+  public:
     /// \brief Given an imported method, try to import it as some kind of
     /// special declaration, e.g., a constructor or subscript.
     Decl *importSpecialMethod(Decl *decl, DeclContext *dc) {
@@ -1761,6 +1762,7 @@ namespace {
       }
     }
 
+  private:
     /// Record the function override by the given Swift method (along with
     /// it's Objective-C counterpart).
     void recordObjCMethodOverride(AbstractFunctionDecl *swiftMethod,
@@ -1848,8 +1850,6 @@ namespace {
       assert(containerTy && "Method in non-type context?");
 
       // Only methods in the 'init' family can become constructors.
-      FuncDecl *alloc = nullptr;
-
       assert(objcMethod->getMethodFamily() == clang::OMF_init &&
              "Not an init method");
       assert(isReallyInitMethod(objcMethod) && "Not a real init method");
@@ -1860,42 +1860,18 @@ namespace {
       if (known != Impl.Constructors.end())
         return known->second;
 
-      // Make sure we have a usable 'alloc' method. Otherwise, we can't
-      // build this constructor anyway.
+      // Find the interface, if we can.
       const clang::ObjCInterfaceDecl *interface;
       if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
-        // For a protocol method, look into the context in which we'll be
-        // mirroring the method to find 'alloc'.
         // FIXME: Part of the mirroring hack.
-        auto classDecl = containerTy->getClassOrBoundGenericClass();
-        if (!classDecl)
-          return nullptr;
-
-        interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                      classDecl->getClangDecl());
+        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
+          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                        classDecl->getClangDecl());
       } else {
         // For non-protocol methods, just look for the interface.
         interface = objcMethod->getClassInterface();
       }
 
-      // If we couldn't find a class, we're done.
-      if (!interface)
-        return nullptr;
-
-      // Form the Objective-C selector for alloc.
-      auto &clangContext = Impl.getClangASTContext();
-      auto allocId = &clangContext.Idents.get("alloc");
-      auto allocSel = clangContext.Selectors.getNullarySelector(allocId);
-
-      // Find the 'alloc' class method.
-      auto allocMethod = interface->lookupClassMethod(allocSel);
-      if (!allocMethod)
-        return nullptr;
-
-      // Import the 'alloc' class method.
-      alloc = cast_or_null<FuncDecl>(Impl.importDecl(allocMethod));
-      if (!alloc)
-        return nullptr;
 
       auto loc = decl->getLoc();
       auto name = Impl.SwiftContext.Id_init;
@@ -1946,11 +1922,25 @@ namespace {
       auto result = new (Impl.SwiftContext)
          ConstructorDecl(name, loc, selfPat, argPatterns.back(),
                          selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
-      result->setType(allocType);
-      result->setInitializerType(initType);
       result->setIsObjC(true);
       result->setClangNode(objcMethod);
-      
+
+      // Fix the types when we've imported into a protocol.
+      if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
+        Type interfaceAllocType;
+        Type interfaceInitType;
+        std::tie(allocType, interfaceAllocType)
+          = getProtocolMethodType(proto, allocType->castTo<AnyFunctionType>());
+        std::tie(initType, interfaceInitType)
+          = getProtocolMethodType(proto, initType->castTo<AnyFunctionType>());
+
+        result->setInitializerInterfaceType(interfaceInitType);
+        result->setInterfaceType(interfaceAllocType);
+      }
+
+      result->setType(allocType);
+      result->setInitializerType(initType);
+
       if (hasSelectorStyleSignature)
         result->setHasSelectorStyleSignature();
       if (implicit)
@@ -2652,12 +2642,12 @@ namespace {
             continue;
           }
 
-          auto func = dyn_cast<FuncDecl>(member);
-          if (!func || func->isAccessor())
-            continue;
+          if (auto func = dyn_cast<FuncDecl>(member))
+            if (func->isAccessor())
+              continue;
 
           auto objcMethod =
-            dyn_cast_or_null<clang::ObjCMethodDecl>(func->getClangDecl());
+            dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
           if (!objcMethod)
             continue;
 
@@ -2667,10 +2657,6 @@ namespace {
 
           if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
             members.push_back(imported);
-
-            // Import any special methods based on this member.
-            if (auto special = importSpecialMethod(imported, dc))
-              members.push_back(special);
 
             if (isRoot && objcMethod->isInstanceMethod() &&
                 !decl->getClassMethod(sel, /*AllowHidden=*/true)) {
@@ -3414,6 +3400,11 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   }
 
   if (result) {
+    if (!forceClassMethod) {
+      if (auto special = converter.importSpecialMethod(result, dc))
+        result = special;
+    }
+
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(decl);
   }
