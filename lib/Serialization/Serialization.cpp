@@ -1170,8 +1170,11 @@ DEF_VERIFY_ATTR(Type)
 DEF_VERIFY_ATTR(Struct)
 DEF_VERIFY_ATTR(Enum)
 DEF_VERIFY_ATTR(Class)
-DEF_VERIFY_ATTR(Var)
 DEF_VERIFY_ATTR(Protocol)
+DEF_VERIFY_ATTR(Var)
+DEF_VERIFY_ATTR(Subscript)
+DEF_VERIFY_ATTR(Constructor)
+DEF_VERIFY_ATTR(Destructor)
 
 #undef DEF_VERIFY_ATTR
 #else
@@ -1429,7 +1432,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
     checkAllowedAttributes<
-      AK_IBDesignable, AK_objc, AK_resilient, AK_fragile,
+      AK_IBDesignable, AK_resilient, AK_fragile,
       AK_born_fragile, AK_requires_stored_property_inits>(theClass);
     verifyAttrSerializable(theClass);
 
@@ -1458,7 +1461,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    checkAllowedAttributes<AK_class_protocol, AK_objc>(proto);
+    checkAllowedAttributes<AK_class_protocol>(proto);
     verifyAttrSerializable(proto);
 
     const Decl *DC = getDeclForContext(proto->getDeclContext());
@@ -1485,7 +1488,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_IBOutlet, AK_objc, AK_optional, AK_unowned, AK_weak, AK_transparent
+      AK_IBOutlet, AK_optional, AK_unowned, AK_weak, AK_transparent
     >(var);
     verifyAttrSerializable(var);
 
@@ -1537,7 +1540,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
       AK_assignment, AK_conversion, AK_IBAction, AK_infix,
-      AK_noreturn, AK_objc, AK_optional, AK_postfix, AK_prefix, AK_transparent,
+      AK_noreturn, AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
     verifyAttrSerializable(fn);
@@ -1609,7 +1612,8 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Subscript: {
     auto subscript = cast<SubscriptDecl>(D);
-    checkAllowedAttributes<AK_objc, AK_optional>(subscript);
+    checkAllowedAttributes<AK_optional>(subscript);
+    verifyAttrSerializable(subscript);
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
 
@@ -1633,7 +1637,8 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-    checkAllowedAttributes<AK_objc, AK_required, AK_transparent>(ctor);
+    checkAllowedAttributes<AK_required, AK_transparent>(ctor);
+    verifyAttrSerializable(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
 
@@ -1662,7 +1667,8 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Destructor: {
     auto dtor = cast<DestructorDecl>(D);
-    checkAllowedAttributes<AK_objc>(dtor);
+    checkAllowedAttributes<>(dtor);
+    verifyAttrSerializable(dtor);
 
     const Decl *DC = getDeclForContext(dtor->getDeclContext());
 

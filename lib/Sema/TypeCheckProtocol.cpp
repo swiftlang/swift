@@ -556,7 +556,7 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
         // significant.
         // FIXME: Specialize the match failure kind.
         // FIXME: Constructors care about the first name.
-        if (protocol->getAttrs().isObjC() && i > 0)
+        if (protocol->isObjC() && i > 0)
           return RequirementMatch(witness, MatchKind::TypeConflict,
                                   witnessType);
       }

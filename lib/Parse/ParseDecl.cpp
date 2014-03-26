@@ -326,7 +326,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                        AvailabilityAttr(R, Platform, Message, true));
       break;
     }
-  };
+
+    case DAK_objc:
+      Attributes.add(new (Context) ObjCAttr(SourceRange(Loc)));
+      break;
+  }
 
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute)
@@ -497,6 +501,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     bool isDeclAttribute = false
 #define ATTR(X) || Text == #X
 #define VIRTUAL_ATTR(X)
+#define DECL_ATTR(X, Options) || Text == #X
 #include "swift/AST/Attr.def"
     ;
     

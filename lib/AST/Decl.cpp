@@ -1313,7 +1313,7 @@ bool ProtocolDecl::requiresClassSlow() {
     ProtocolDeclBits.RequiresClassValid = true;
   }
 
-  if (getAttrs().isClassProtocol() || getAttrs().isObjC() || isObjC()) {
+  if (getAttrs().isClassProtocol() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
     return true;
   }

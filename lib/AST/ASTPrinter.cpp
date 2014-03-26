@@ -168,7 +168,7 @@ namespace {
       if (Options.SkipImplicit)
         return;
 
-      if (D->getAttrs().isObjC())
+      if (D->getAttrs().hasAttribute<ObjCAttr>())
         return;
 
       auto *VD = dyn_cast<ValueDecl>(D);

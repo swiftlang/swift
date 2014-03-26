@@ -22,6 +22,7 @@
 #include "swift/AST/Ownership.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 class ASTPrinter;
@@ -281,9 +282,12 @@ protected:
     OnStruct = 1 << 7,
     OnEnum = 1 << 8,
     OnClass = 1 << 9,
-    OnVar = 1 << 10,
-    OnProtocol = 1 << 11,
-    AllowMultipleAttributes = 1 << 12
+    OnProtocol = 1 << 10,
+    OnVar = 1 << 11,
+    OnSubscript = 1 << 12,
+    OnConstructor = 1 << 13,
+    OnDestructor = 1 << 14,
+    AllowMultipleAttributes = 1 << 15
   };
 
   static unsigned getOptions(DeclAttrKind DK);
@@ -348,14 +352,31 @@ public:
     return getOptions() & OnClass;
   }
 
+  /// Returns true if this attribute can appear on a protocol.
+  bool canAppearOnProtocol() const {
+    return getOptions() & OnProtocol;
+  }
+
   /// Returns true if this attribute can appear on a var declaration.
   bool canAppearOnVar() const {
     return getOptions() & OnVar;
   }
 
-  /// Returns true if this attribute can appear on a protocol.
-  bool canAppearOnProtocol() const {
-    return getOptions() & OnProtocol;
+  /// Returns true if this attribute can appear on a subscript declaration.
+  bool canAppearOnSubscript() const {
+    return getOptions() & OnSubscript;
+  }
+
+  /// Returns true if this attribute can appear on a constructor/initializer
+  /// declaration.
+  bool canAppearOnConstructor() const {
+    return getOptions() & OnConstructor;
+  }
+
+  /// Returns true if this attribute can appear on a deinitializer
+  /// declaration.
+  bool canAppearOnDestructor() const {
+    return getOptions() & OnDestructor;
   }
 
   /// Returns true if multiple instances of an attribute kind
@@ -409,6 +430,16 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_availability;
+  }
+};
+
+/// Indicates that the given declaration is visible to Objective-C.
+class ObjCAttr : public DeclAttribute {
+public:
+  ObjCAttr(SourceRange Range) : DeclAttribute(DAK_objc, Range) { }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_objc;
   }
 };
 
@@ -531,7 +562,6 @@ public:
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
-  bool isObjC() const { return has(AK_objc); }
   bool isIBOutlet() const { return has(AK_IBOutlet); }
   bool isIBAction() const { return has(AK_IBAction); }
   bool isIBDesignable() const { return has(AK_IBDesignable); }
@@ -618,6 +648,7 @@ public:
   const_iterator begin() const { return DeclAttrs; }
   const_iterator end() const { return nullptr; }
 
+  /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
   const ATTR* getAttribute() const {
     for (auto Attr : *this)
@@ -626,15 +657,37 @@ public:
     return nullptr;
   }
 
+  /// Determine whether there is an attribute with the given attribute class.
   template <typename ATTR>
   bool hasAttribute() const { return getAttribute<ATTR>() != nullptr; }
 
+  /// Retrieve the first attribute with the given kind.
   const DeclAttribute *getAttribute(DeclAttrKind DK) const {
     for (auto Attr : *this)
       if (Attr->getKind() == DK)
         return Attr;
     return nullptr;
   }
+
+  // Remove the given attribute from the list of attributes. Used when
+  // the attribute was semantically invalid.
+  void removeAttribute(const DeclAttribute *attr) {
+    // If it's the first attribute, remove it.
+    if (DeclAttrs == attr) {
+      DeclAttrs = attr->Next;
+      return;
+    }
+
+    // Otherwise, find it in the list. This is inefficient, but rare.
+    for (auto **prev = &DeclAttrs; *prev; prev = &(*prev)->Next) {
+      if ((*prev)->Next == attr) {
+        (*prev)->Next = attr->Next;
+        return;
+      }
+    }
+    llvm_unreachable("Attribute not found for removal");
+  }
+
 };
   
 } // end namespace swift

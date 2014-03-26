@@ -1637,7 +1637,7 @@ public:
       bool isMemberOfObjCProtocol =
           protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
-      if (VD->getAttrs().isObjC())
+      if (VD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
       else if (VD->getAttrs().isIBOutlet())
         reason = ObjCReason::ExplicitlyIBOutlet;
@@ -1821,7 +1821,7 @@ public:
       bool isMemberOfObjCProtocol =
           protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
-      if (SD->getAttrs().isObjC())
+      if (SD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
@@ -2807,7 +2807,7 @@ public:
       bool isMemberOfObjCProtocol =
           protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
-      if (FD->getAttrs().isObjC())
+      if (FD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
@@ -3480,7 +3480,7 @@ public:
       bool isMemberOfObjCProtocol =
           protocolContext && protocolContext->isObjC();
       ObjCReason reason = ObjCReason::DontDiagnose;
-      if (CD->getAttrs().isObjC())
+      if (CD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
@@ -3660,7 +3660,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (CD->hasSuperclass())
         superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
 
-      CD->setIsObjC(CD->getAttrs().isObjC() ||
+      CD->setIsObjC(CD->getAttrs().hasAttribute<ObjCAttr>() ||
                     (superclassDecl && superclassDecl->isObjC()));
 
       // Determine whether we require in-class initializers.
@@ -3711,7 +3711,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
-    if (proto->getAttrs().isObjC()) {
+    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       bool isObjC = true;
 
       for (auto inherited : proto->getProtocols()) {
@@ -4612,7 +4612,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
            ContextTy->is<ProtocolType>();
   };
 
-  if (Attrs.isObjC()) {
+  if (auto objcAttr = Attrs.getAttribute<ObjCAttr>()) {
     // Only classes, class protocols, instance properties, methods,
     // constructors, and subscripts can be ObjC.
     Optional<Diag<>> error;
@@ -4640,7 +4640,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     if (error) {
       TC.diagnose(D->getStartLoc(), *error);
-      D->getMutableAttrs().clearAttribute(AK_objc);
+      D->getMutableAttrs().removeAttribute(objcAttr);
       return;
     }
   }
@@ -4996,7 +4996,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(Attrs.getLoc(AK_optional),
                   diag::optional_attribute_non_protocol);
       D->getMutableAttrs().clearAttribute(AK_optional);
-    } else if (!cast<ProtocolDecl>(D->getDeclContext())->getAttrs().isObjC()) {
+    } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
       TC.diagnose(Attrs.getLoc(AK_optional),
                   diag::optional_attribute_non_objc_protocol);
       D->getMutableAttrs().clearAttribute(AK_optional);

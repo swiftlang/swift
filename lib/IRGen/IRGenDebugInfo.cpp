@@ -1121,8 +1121,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto *Decl = ClassTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      auto Attrs = Decl->getAttrs();
-      auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
+      auto RuntimeLang = Decl->isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
       if (auto *ClangDecl = Decl->getClangDecl()) {
         auto ClangSrcLoc = ClangDecl->getLocStart();
         clang::SourceManager &ClangSM =
@@ -1223,8 +1222,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
     if (auto Decl = ClassTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      auto Attrs = Decl->getAttrs();
-      auto RuntimeLang = Attrs.isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
+      auto RuntimeLang = Decl->isObjC()? DW_LANG_ObjC : DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,

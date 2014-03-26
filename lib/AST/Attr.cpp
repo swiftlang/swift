@@ -47,8 +47,11 @@ void DeclAttributes::print(llvm::raw_ostream &OS) const {
 }
 
 void DeclAttributes::print(ASTPrinter &Printer) const {
-  if (NumAttrsSet == 0)
+  if (NumAttrsSet == 0 && !DeclAttrs)
     return;
+
+  for (auto DA : *this)
+    DA->print(Printer);
 
   if (isAssignment())
     Printer << "@assignment ";
@@ -68,8 +71,6 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@noreturn ";
   if (isPostfix())
     Printer << "@postfix ";
-  if (isObjC())
-    Printer << "@objc ";
   if (requiresStoredPropertyInits())
     Printer << "@requires_stored_property_inits ";
   if (isIBOutlet())
@@ -91,9 +92,6 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@required ";
   if (isOverride())
     Printer << "@override ";
-
-  for (auto DA : *this)
-    DA->print(Printer);
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
@@ -115,10 +113,14 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
       Printer << ')';
       break;
     }
+    case DAK_objc: {
+      Printer << "@objc";
+      break;
+    }
     case DAK_Count:
       llvm_unreachable("exceed declaration attribute kinds");
   }
-  Printer << ' ';
+  Printer << " ";
 }
 
 void DeclAttribute::print(llvm::raw_ostream &OS) const {
