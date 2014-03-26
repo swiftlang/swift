@@ -190,6 +190,8 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   SILValue PointerResult = ASI->getAddressResult();
   for (auto UI : ASI->getAddressResult().getUses())
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(UI->getUser())) {
+      assert(ASI->getAddressResult().hasOneUse() &&
+             "alloc_stack used by mark_uninialized, but not exclusively!");
       PointerResult = MUI;
       break;
     }
