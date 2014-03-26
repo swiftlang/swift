@@ -818,6 +818,8 @@ static Type DecodeIntrinsicType(ArrayRef<llvm::Intrinsic::IITDescriptor> &Table,
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  default:
+    llvm_unreachable("Unhandled case");
   case IITDescriptor::Half:
   case IITDescriptor::MMX:
   case IITDescriptor::Metadata:
