@@ -62,10 +62,12 @@ TYPE_ATTR(opened)
 // Schema for DECL_ATTR:
 //
 // - Attribute name.
-// - Declarations the attribute can be attached.
+// - Options for the attribute, including the declarations the
+//   attribute can appear, and whether duplicates are allowed.
 DECL_ATTR(asmname, OnFunc)
-DECL_ATTR(unavailable, OnStruct | OnEnum |
-                       OnClass | OnProtocol | OnVar)
+DECL_ATTR(availability, OnStruct | OnEnum |
+                        OnClass | OnProtocol | OnVar |
+                        AllowMultipleAttributes)
 
 ATTR(assignment)
 ATTR(class_protocol)

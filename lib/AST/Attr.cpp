@@ -101,12 +101,18 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     case DAK_asmname:
       Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
       break;
-    case DAK_unavailable: {
-      Printer << "@unavailable";
-      auto Attr = cast<UnavailableAttr>(this);
+    case DAK_availability: {
+      Printer << "@availability(";
+      auto Attr = cast<AvailabilityAttr>(this);
+      if (!Attr->hasPlatform())
+        Printer << '*';
+      else
+        Printer << Attr->Platform;
+
       if (!Attr->Message.empty()) {
-        Printer << "(\"" << Attr->Message << "\")";
+        Printer << ", message=\""<< Attr->Message << "\"";
       }
+      Printer << ')';
       break;
     }
     case DAK_Count:
@@ -120,10 +126,10 @@ void DeclAttribute::print(llvm::raw_ostream &OS) const {
   print(P);
 }
 
-unsigned DeclAttribute::canAppear() const {
-  switch (getKind()) {
+unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
+  switch (DK) {
     case DAK_Count:
-      llvm_unreachable("canAppear needs a valid attribute");
+      llvm_unreachable("getOptions needs a valid attribute");
       break;
 #define DECL_ATTR(NAME, OPTIONS)\
 case DAK_##NAME: return OPTIONS;

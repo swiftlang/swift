@@ -177,14 +177,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
-  const
 
   // Diagnose duplicated attributes.
-  auto DuplicateAttribute = Attributes.getAttribute(DK);
-  if (DuplicateAttribute) {
-    // Delay issuing the diagnostic until we parse the attribute.
-    DiscardAttribute = true;
-  }
+  const DeclAttribute *DuplicateAttribute = nullptr;
+  if (!DeclAttribute::allowMultipleAttributes(DK))
+    if ((DuplicateAttribute = Attributes.getAttribute(DK))) {
+      // Delay issuing the diagnostic until we parse the attribute.
+      DiscardAttribute = true;
+    }
 
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
@@ -224,30 +224,106 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
       break;
     }
-    case DAK_unavailable: {
-      StringRef UnavailableText;
+    case DAK_availability: {
+      if (!consumeIf(tok::l_paren)) {
+        diagnose(Loc, diag::attr_expected_lparen, AttrName);
+        return false;
+      }
 
-      if (consumeIf(tok::l_paren)) {
-        if (Tok.isNot(tok::string_literal)) {
-          diagnose(Loc, diag::attr_expected_string_literal, AttrName)
-            .highlight(SourceRange(Tok.getRange().getStart()));
+      // platform:
+      //   *
+      //   identifier
+
+      StringRef Platform;
+
+      if (Tok.is(tok::identifier)) {
+        // FIXME: This is a hard coded list probably doesn't belong
+        // here.  Putting here now for bringup.
+        bool IsValid =
+          llvm::StringSwitch<bool>(Tok.getText())
+            .Case("ios", true)
+            .Case("macosx", true)
+            .Case("ios_app_extension", true)
+            .Case("macosx_app_extension", true)
+            .Default(false);
+        if (!IsValid) {
+          diagnose(Loc, diag::attr_availability_unknown_platform,
+                   Tok.getText(), AttrName)
+            .highlight(SourceRange(Tok.getLoc()));
+          return false;
+        }
+        Platform = Tok.getText();
+      }
+      else if (!(Tok.isAnyOperator() && Tok.getText() == "*")) {
+        diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
+          .highlight(SourceRange(Tok.getLoc()));
+        return false;
+      }
+
+      consumeToken();
+
+      // Parse the kind, looking for 'unavailable'.  This needs to be
+      // relaxed later, but this is strict now for bringup.
+
+      if (!consumeIf(tok::comma)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName);
+        return false;
+      }
+
+      if (!Tok.is(tok::identifier) || Tok.getText() != "unavailable") {
+        diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
+                 AttrName)
+          .highlight(SourceRange(Tok.getLoc()));
+        return false;
+      }
+
+      consumeToken();
+
+      StringRef Message;
+
+      if (consumeIf(tok::comma)) {
+        if (!Tok.is(tok::identifier) || Tok.getText() != "message") {
+          diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
+                   AttrName)
+          .highlight(SourceRange(Tok.getLoc()));
           return false;
         }
 
-        UnavailableText =
-            getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                              "'unavailable' text");
+        consumeToken();
+
+        if (!consumeIf(tok::equal)) {
+          diagnose(Tok.getLoc(), diag::attr_availability_expected_equal,
+                   AttrName, "message");
+          return false;
+        }
+
+        if (Tok.isNot(tok::string_literal)) {
+          diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+          return false;
+        }
+
+        Message =
+          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "message");
+
+        // FIXME: an empty message is still possible if parsing was valid.
+        // We need to updategetStringLiteralIfNotInterpolated().
+        if (Message.empty())
+          return false;
+
         consumeToken(tok::string_literal);
 
-        if (!consumeIf(tok::r_paren)) {
-          diagnose(Loc, diag::attr_expected_rparen, AttrName);
-          return false;
-        }
+      }
+
+      SourceRange R(Loc, Tok.getLoc());
+
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName);
+        return false;
       }
 
       if (!DiscardAttribute)
-        Attributes.add(new (Context) UnavailableAttr(AttrRange,
-                                                     UnavailableText));
+        Attributes.add(new (Context)
+                       AvailabilityAttr(R, Platform, Message, true));
       break;
     }
   };

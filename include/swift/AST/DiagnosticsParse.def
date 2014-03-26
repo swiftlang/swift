@@ -849,11 +849,28 @@ ERROR(attr_expected_lparen,attribute_parsing,none,
 ERROR(attr_expected_rparen,attribute_parsing,none,
 "expected ')' in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_comma,attribute_parsing,none,
+"expected ',' in '%0' attribute", (StringRef))
+
 ERROR(attr_expected_string_literal,attribute_parsing,none,
 "expected string literal in '%0' attribute", (StringRef))
 
 ERROR(attr_interpolated_string,attribute_parsing,none,
 "%0 cannot be an interpolated string literal", (StringRef))
+
+// availability
+ERROR(attr_availability_platform,attribute_parsing,none,
+"expected platform name or '*' for '%0' attribute", (StringRef))
+
+ERROR(attr_availability_unknown_platform,attribute_parsing,none,
+"unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+
+ERROR(attr_availability_expected_option,attribute_parsing,none,
+"expected '%0' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', or 'message'",
+(StringRef))
+
+ERROR(attr_availability_expected_equal,attribute_parsing,none,
+"expected '=' after '%1' in '%0' attribute", (StringRef, StringRef))
 
 // cc
 ERROR(cc_attribute_expected_lparen,attribute_parsing,none,

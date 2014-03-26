@@ -257,7 +257,7 @@ protected:
     DK(DK),
     Next(nullptr) {}
 
-  enum DeclCanAppear {
+  enum DeclAttrOptions {
     OnFunc = 0x1,
     OnExtension = 1 << 2,
     OnPatternBinding = 1 << 3,
@@ -268,10 +268,15 @@ protected:
     OnEnum = 1 << 8,
     OnClass = 1 << 9,
     OnVar = 1 << 10,
-    OnProtocol = 1 << 11
+    OnProtocol = 1 << 11,
+    AllowMultipleAttributes = 1 << 12
   };
 
-  unsigned canAppear() const;
+  static unsigned getOptions(DeclAttrKind DK);
+
+  unsigned getOptions() const {
+    return getOptions(DK);
+  }
 
 public:
   DeclAttrKind getKind() const { return DK; }
@@ -284,57 +289,63 @@ public:
 
   /// Returns true if this attribute can appear on a function.
   bool canAppearOnFunc() const {
-    return canAppear() & OnFunc;
+    return getOptions() & OnFunc;
   }
 
   /// Returns true if this attribute can appear on an extension.
   bool canAppearOnExtension() const {
-    return canAppear() & OnExtension;
+    return getOptions() & OnExtension;
   }
 
   /// Returns true if this attribute can appear on an pattern binding.
   bool canAppearOnPatternBinding() const {
-    return canAppear() & OnPatternBinding;
+    return getOptions() & OnPatternBinding;
   }
 
   /// Returns true if this attribute can appear on an operator.
   bool canAppearOnOperator() const {
-    return canAppear() & OnOperator;
+    return getOptions() & OnOperator;
   }
 
   /// Returns true if this attribute can appear on a typealias.
   bool canAppearOnTypeAlias() const {
-    return canAppear() & OnTypeAlias;
+    return getOptions() & OnTypeAlias;
   }
 
   /// Returns true if this attribute can appear on a type declaration.
   bool canAppearOnType() const {
-    return canAppear() & OnType;
+    return getOptions() & OnType;
   }
 
   /// Returns true if this attribute can appear on a struct.
   bool canAppearOnStruct() const {
-    return canAppear() & OnStruct;
+    return getOptions() & OnStruct;
   }
 
   /// Returns true if this attribute can appear on an enum.
   bool canAppearOnEnum() const {
-    return canAppear() & OnEnum;
+    return getOptions() & OnEnum;
   }
 
   /// Returns true if this attribute can appear on a class.
   bool canAppearOnClass() const {
-    return canAppear() & OnClass;
+    return getOptions() & OnClass;
   }
 
   /// Returns true if this attribute can appear on a var declaration.
   bool canAppearOnVar() const {
-    return canAppear() & OnVar;
+    return getOptions() & OnVar;
   }
 
   /// Returns true if this attribute can appear on a protocol.
   bool canAppearOnProtocol() const {
-    return canAppear() & OnProtocol;
+    return getOptions() & OnProtocol;
+  }
+
+  /// Returns true if multiple instances of an attribute kind
+  /// can appear on a delcaration.
+  static bool allowMultipleAttributes(DeclAttrKind DK) {
+   return getOptions(DK) & AllowMultipleAttributes;
   }
 };
 
@@ -353,18 +364,35 @@ public:
   }
 };
 
-/// Defines the @unavailable attribute.
-class UnavailableAttr : public DeclAttribute {
+/// Defines the @availability attribute.
+class AvailabilityAttr : public DeclAttribute {
 public:
-  UnavailableAttr(SourceRange Range, StringRef Msg)
-  : DeclAttribute(DAK_unavailable, Range),
-    Message(Msg) {}
+  AvailabilityAttr(SourceRange Range,
+                   StringRef Platform,
+                   StringRef Message,
+                   bool IsUnavailable)
+   : DeclAttribute(DAK_availability, Range),
+     Platform(Platform),
+     Message(Message),
+     IsUnvailable(IsUnavailable) {}
+
+  /// The platform of the availability.
+  const StringRef Platform;
 
   /// The optional message.
   const StringRef Message;
 
+  /// Indicates if the declaration is unconditionally unavailable.
+  const bool IsUnvailable;
+
+  /// Returns true if the availability applies to a specific
+  /// platform.
+  bool hasPlatform() const {
+    return !Platform.empty();
+  }
+
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_unavailable;
+    return DA->getKind() == DAK_availability;
   }
 };
 
