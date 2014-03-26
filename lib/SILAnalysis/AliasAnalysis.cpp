@@ -18,6 +18,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -503,25 +504,31 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 
 /// \brief return True if the aggregate type \p Aggregate contains the type
 /// \p Record.
-static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record) {
+static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record, SILModule &Mod) {
   llvm::SmallVector<NominalTypeDecl*, 8> Worklist;
   Worklist.push_back(Aggregate);
   while(!Worklist.empty()) {
     NominalTypeDecl *T = Worklist.back();
     Worklist.pop_back();
     for (auto Var : T->getStoredProperties()) {
-
-      // We don't handle unbound generic types.
-      if (hasUnboundGenericTypes(Var->getType()))
-        return true;
+      // The record type could be generic. In here we find the the substituted
+      // record type.
+      Type RecTy = T->getType()->getTypeOfMember(Mod.getSwiftModule(),
+                                                 Var, nullptr);
 
       // Is this the record we were looking for ?
-      if (Var->getType().getPointer() == Record.getPointer())
+      if (RecTy.getPointer() == Record.getPointer())
         return true;
 
       // If the record is a nominal type add it to the worklist.
-      if (auto D = Var->getType()->getNominalOrBoundGenericNominal())
+      if (auto D = RecTy->getNominalOrBoundGenericNominal()) {
         Worklist.push_back(D);
+        continue;
+      }
+
+      // We don't handle unbound generic typed records.
+      if (hasUnboundGenericTypes(RecTy))
+        return true;
     }
   }
 
@@ -531,7 +538,7 @@ static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record) {
 
 /// \brief return True if the TBAA rules for \p T1 and \p T2 dictate that typed
 /// access to these types is undefined. False means that types may alias.
-static bool typesForbidAliasing(SILType T1, SILType T2) {
+static bool typesForbidAliasing(SILType T1, SILType T2, SILModule &Mod) {
   if (T1 == T2)
     return false;
 
@@ -574,8 +581,8 @@ static bool typesForbidAliasing(SILType T1, SILType T2) {
 
   // If one type is an aggregate and it contains the other type then
   // the record reference may alias the aggregate reference.
-  if ((AsNominal1 && aggregateContainsRecord(AsNominal1, CT2)) ||
-      (AsNominal2 && aggregateContainsRecord(AsNominal2, CT1)))
+  if ((AsNominal1 && aggregateContainsRecord(AsNominal1, CT2, Mod)) ||
+      (AsNominal2 && aggregateContainsRecord(AsNominal2, CT1, Mod)))
     return false;
 
   // Structs don't alias non-structs.
@@ -616,7 +623,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
 
-  if (typesForbidAliasing(V1.getType(), V2.getType()))
+  if (typesForbidAliasing(V1.getType(), V2.getType(), *Mod))
    return AliasResult::NoAlias;
 
   // Strip off any casts on V1, V2.
