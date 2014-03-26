@@ -1862,7 +1862,7 @@ namespace {
         return known->second;
 
       // Find the interface, if we can.
-      const clang::ObjCInterfaceDecl *interface;
+      const clang::ObjCInterfaceDecl *interface = nullptr;
       if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
         // FIXME: Part of the mirroring hack.
         if (auto classDecl = containerTy->getClassOrBoundGenericClass())
