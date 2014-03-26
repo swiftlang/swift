@@ -137,11 +137,8 @@ void getFinalReleases(AllocBoxInst *ABI,
       addLastRelease(Box, BB, Releases);
 }
 
-/// optimizeAllocBox - Try to promote an alloc_box instruction to an
-/// alloc_stack.  On success, this updates the IR and returns true, but does not
-/// remove the alloc_box itself.
-static bool optimizeAllocBox(AllocBoxInst *ABI) {
-
+/// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
+static bool canPromoteAllocBox(AllocBoxInst *ABI) {
   // Scan all of the uses of the alloc_box to see if any of them cause
   // address of the held value to escape, in which case we can't
   // promote it to live on the stack.
@@ -169,13 +166,20 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
     return false;
   }
 
+  // Okay, it looks like this value doesn't escape.
+  return true;
+}
+
+/// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
+/// new alloc_stack, but do not delete the alloc_box yet.
+static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   llvm::SmallVector<SILInstruction*, 4> FinalReleases;
   getFinalReleases(ABI, FinalReleases);
 
-  // Okay, it looks like this value doesn't escape.  Promote it to an
-  // alloc_stack.  Start by inserting the alloc stack after the alloc_box.
+  // Promote this alloc_box to an alloc_stack.  Start by inserting the
+  // alloc_stack after the alloc_box.
   SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
   auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
   ASI->setDebugScope(ABI->getDebugScope());
@@ -221,8 +225,6 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
 
     User->eraseFromParent();
   }
-
-  return true;
 }
 
 namespace {
@@ -235,7 +237,8 @@ class AllocBoxToStack : public SILFunctionTransform {
       auto I = BB.begin(), E = BB.end();
       while (I != E) {
         if (auto *ABI = dyn_cast<AllocBoxInst>(I))
-          if (optimizeAllocBox(ABI)) {
+          if (canPromoteAllocBox(ABI)) {
+            rewriteAllocBoxAsAllocStack(ABI);
             ++NumStackPromoted;
             // Carefully move iterator to avoid invalidation problems.
             ++I;
