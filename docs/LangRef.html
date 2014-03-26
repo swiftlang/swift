@@ -1715,9 +1715,17 @@ ill-formed if the type does not conform to the protocol.</p>
     expr-literal ::= <a href="#floating_literal">floating_literal</a>
     expr-literal ::= <a href="#character_literal">character_literal</a>
     expr-literal ::= <a href="#string_literal">string_literal</a>
+    expr-literal ::= expr-array
+    expr-literal ::= expr-dictionary
     expr-literal ::= '__FILE__'
     expr-literal ::= '__LINE__'
     expr-literal ::= '__COLUMN__'
+
+    expr-array ::= '[' expr (',' expr)* ','? ']'
+    expr-array ::= '[' ']'
+
+    expr-dictionary ::= '[' expr ':' expr (',' expr ':' expr)* ','? ']'
+    expr-dictionary ::= '[' ':' ']'
   </pre>
 
   <p>Numeric literals are either integer, floating point, character, or string
