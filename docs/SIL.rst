@@ -1561,7 +1561,7 @@ debug_value_addr
   
   debug_value_addr %7 : $*SomeProtocol
   
-This indicates that the value of a declaration with addres-only type has changed
+This indicates that the value of a declaration with address-only type has changed
 value to the specified operand.  The declaration in question is identified by
 the SILLocation attached to the debug_value_addr instruction.
 
