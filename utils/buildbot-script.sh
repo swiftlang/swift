@@ -213,6 +213,7 @@ if [[ ! "$SKIP_IOS" ]]; then
         if [[ ! "$SKIP_BUILD_IOS_DEVICE" ]]; then
             IOS_BUILD_PRODUCTS=("${IOS_BUILD_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
         fi
+        SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
     fi
     if [[ ! "$SKIP_TEST_IOS" ]]; then
         if [[ ! "$SKIP_TEST_IOS_SIMULATOR" ]]; then
@@ -221,11 +222,12 @@ if [[ ! "$SKIP_IOS" ]]; then
         if [[ ! "$SKIP_TEST_IOS_DEVICE" ]]; then
             IOS_TEST_PRODUCTS=("${IOS_TEST_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
         fi
+        SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}")
     fi
 fi
 
 # All build products, in the order they must be built
-ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}")
+ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}")
 
 #
 # Calculate source directories for each product.
