@@ -55,7 +55,7 @@ public:
   /// contains extensions loaded from any generation up to and including this
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
-                              unsigned previousGeneration) { };
+                              unsigned previousGeneration) { }
   
   /// \brief Load decls that provide conformances to the given compiler-known
   /// protocol.

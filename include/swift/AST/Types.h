@@ -1026,7 +1026,7 @@ public:
 
   TupleEltTypeArrayRef getElementTypes() const {
     return TupleEltTypeArrayRef(getFields());
-  };
+  }
   
   /// getNamedElementId - If this tuple has a field with the specified name,
   /// return the field index, otherwise return -1.
