@@ -439,19 +439,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     break;
       
       
-  // Resilience attributes.
-  case AK_resilient:
-  case AK_fragile:
-  case AK_born_fragile:
-    // Test for duplicate entries by temporarily removing this one.
-    Attributes.clearAttribute(attr);
-    if (Attributes.getResilienceKind() != Resilience::Default) {
-      diagnose(Loc, diag::duplicate_attribute);
-      break;
-    }
-    Attributes.setAttr(attr, Loc);
-    break;
-      
   case AK_prefix:
     if (Attributes.isPostfix()) {
       diagnose(Loc, diag::cannot_combine_attribute, "postfix");

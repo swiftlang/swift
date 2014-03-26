@@ -584,17 +584,6 @@ public:
     return Nothing;
   }
 
-  Resilience getResilienceKind() const {
-    if (has(AK_resilient))
-      return Resilience::Resilient;
-    if (has(AK_fragile))
-      return Resilience::Fragile;
-    if (has(AK_born_fragile))
-      return Resilience::InherentlyFragile;
-    return Resilience::Default;
-  }
-
-  
   bool hasOwnership() const { return isWeak() || isUnowned(); }
   Ownership getOwnership() const {
     if (isWeak()) return Ownership::Weak;

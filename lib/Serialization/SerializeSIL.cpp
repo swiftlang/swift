@@ -1427,12 +1427,11 @@ void SILSerializer::writeModule(const SILModule *SILMod) {
 
     // Write out VTables first because it may require serializations of
     // non-transparent SILFunctions (body is not needed).
-    // Go through all SILVTables in SILMod, and if it is fragile, write out the
-    // VTable.
+    // Go through all SILVTables in SILMod and write them if we should
+    // serialize everything.
+    // FIXME: Resilience: could write out vtable for fragile classes.
     for (const SILVTable &vt : SILMod->getVTables()) {
-      const ClassDecl *cd = vt.getClass();
-      if (ShouldSerializeAll ||
-          cd->getAttrs().getResilienceKind() == Resilience::Fragile)
+      if (ShouldSerializeAll)
         writeVTable(vt);
     }
 

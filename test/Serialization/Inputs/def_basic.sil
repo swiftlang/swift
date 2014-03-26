@@ -938,7 +938,6 @@ entry(%0 : $GenericStruct<Int64>):
   return %1 : $Int64
 }
 
-@fragile
 class Foo {
   subscript (x: Int, y: Int) -> Int { get set }
   var x: Int

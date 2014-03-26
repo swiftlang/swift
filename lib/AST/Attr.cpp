@@ -61,12 +61,6 @@ void DeclAttributes::print(ASTPrinter &Printer) const {
     Printer << "@transparent ";
   if (isInfix())
     Printer << "@infix ";
-  switch (getResilienceKind()) {
-  case Resilience::Default: break;
-  case Resilience::Fragile: Printer << "@fragile "; break;
-  case Resilience::InherentlyFragile: Printer << "@born_fragile "; break;
-  case Resilience::Resilient: Printer << "@resilient "; break;
-  }
   if (isNoReturn())
     Printer << "@noreturn ";
   if (isPostfix())

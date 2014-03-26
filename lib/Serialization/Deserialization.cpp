@@ -1996,10 +1996,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit, isObjC, isIBDesignable, attrRequiresStoredPropertyInits;
     bool requiresStoredPropertyInits;
     TypeID superclassID;
-    unsigned resilienceKind;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC, isIBDesignable,
-                                         resilienceKind,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
                                          superclassID);
@@ -2025,12 +2023,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->setImplicit();
     if (superclassID)
       theClass->setSuperclass(getType(superclassID));
-    if ((Resilience)resilienceKind == Resilience::Fragile)
-      theClass->getMutableAttrs().setAttr(AK_fragile, SourceLoc());
-    else if ((Resilience)resilienceKind == Resilience::InherentlyFragile)
-      theClass->getMutableAttrs().setAttr(AK_born_fragile, SourceLoc());
-    else if ((Resilience)resilienceKind == Resilience::Resilient)
-      theClass->getMutableAttrs().setAttr(AK_resilient, SourceLoc());
     if (attrRequiresStoredPropertyInits)
       theClass->getMutableAttrs().setAttr(AK_requires_stored_property_inits,
                                           SourceLoc());
