@@ -208,18 +208,18 @@ if [[ ! "$SKIP_IOS" ]]; then
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
         if [[ ! "$SKIP_BUILD_IOS_SIMULATOR" ]]; then
-            SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
+            IOS_BUILD_PRODUCTS=("${IOS_BUILD_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
         fi
         if [[ ! "$SKIP_BUILD_IOS_DEVICE" ]]; then
-            SWIFT_BUILD_PRODUCTS=("${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
+            IOS_BUILD_PRODUCTS=("${IOS_BUILD_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
         fi
     fi
     if [[ ! "$SKIP_TEST_IOS" ]]; then
         if [[ ! "$SKIP_TEST_IOS_SIMULATOR" ]]; then
-            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
+            IOS_TEST_PRODUCTS=("${IOS_TEST_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
         fi
         if [[ ! "$SKIP_TEST_IOS_DEVICE" ]]; then
-            SWIFT_TEST_PRODUCTS=("${SWIFT_TEST_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
+            IOS_TEST_PRODUCTS=("${IOS_TEST_PRODUCTS[@]}" "${IOS_DEVICE_PRODUCTS[@]}")
         fi
     fi
 fi
@@ -233,7 +233,7 @@ ALL_BUILD_PRODUCTS=(llvm "${SWIFT_BUILD_PRODUCTS[@]}" "${IOS_BUILD_PRODUCTS[@]}"
 
 # iOS build products use the same source directory as swift itself.
 # Default to $WORKSPACE/swift if SWIFT_SOURCE_DIR if not set above.
-for product in "${IOS_BUILD_PRODUCTS[@]}" ; do
+for product in "${IOS_BUILD_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}" ; do
     varname="$(toupper "${product}")"_SOURCE_DIR
     eval $varname=${SWIFT_SOURCE_DIR:-$WORKSPACE/swift}
 done
@@ -266,7 +266,7 @@ done
 
 # iOS build products use their own build directories, which are
 # subdirectories of swift's build directory if BUILD_DIR is not set.
-for product in "${IOS_BUILD_PRODUCTS[@]}" ; do
+for product in "${IOS_BUILD_PRODUCTS[@]}" ${IOS_TEST_PRODUCTS[@]}" ; do
     _PRODUCT_BUILD_DIR="$(toupper "${product}")"_BUILD_DIR
     if [[ "${BUILD_DIR}" ]] ; then
         eval ${_PRODUCT_BUILD_DIR}="${BUILD_DIR}/${product}"
