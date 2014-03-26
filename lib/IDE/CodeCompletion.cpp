@@ -461,7 +461,7 @@ struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
   static size_t
   getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
     return V.Sink.Allocator.getTotalMemory();
-  };
+  }
 };
 } // namespace sys
 } // namespace swift

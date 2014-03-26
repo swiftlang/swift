@@ -427,11 +427,11 @@ public:
 
   CanType getOrigFormalType() const {
     return OrigFormalOldType;
-  };
+  }
 
   CanAnyFunctionType getSubstFormalType() const {
     return SubstFormalType;
-  };
+  }
 
   unsigned getNaturalUncurryLevel() const {
     switch (kind) {

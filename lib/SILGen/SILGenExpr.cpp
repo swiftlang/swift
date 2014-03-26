@@ -2257,7 +2257,7 @@ namespace {
     
     SILValue getAddressOrNull() const override {
       return slot;
-    };
+    }
   };
 }
 

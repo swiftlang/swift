@@ -39,7 +39,7 @@ public:
   ~BCOffsetRAII() {
     if (Cursor)
       Cursor->JumpToBit(Offset);
-  };
+  }
 };
 
 } // end namespace serialization
