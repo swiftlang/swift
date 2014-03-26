@@ -37,3 +37,9 @@ void doSomethingPartialSub(PartialSubClass *arg);
 - (PartialSubClass *)unsafeOverridePartialSubReturn:(PartialSubClass *)arg;
 @end
 
+@interface PartialBaseClass ()
+- (void)doPartialClassCategoryThing;
+@end
+@interface PartialSubClass ()
+- (void)doPartialClassCategoryThing;
+@end

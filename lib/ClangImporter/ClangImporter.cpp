@@ -1016,6 +1016,8 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                      nominal->getClangDecl());
   if (!objcClass) {
+    if (auto typeResolver = Impl.getTypeResolver())
+      typeResolver->resolveDeclSignature(nominal);
     if (nominal->isObjC()) {
       // Map the name. If we can't represent the Swift name in Clang, bail out
       // now.
