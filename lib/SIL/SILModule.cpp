@@ -340,12 +340,14 @@ public:
     if (Mode == LinkingMode::LinkNone)
       return false;
 
-    auto NewFn = Loader->lookupSILFunction(F);
+    // If F is a declaration, first deserialize it.
+    auto NewFn = F->isExternalDeclaration() ? Loader->lookupSILFunction(F) : F;
     if (!NewFn || NewFn->empty())
       return false;
 
     ++NumFuncLinked;
 
+    // Transitively deserialize everything referenced by NewFn.
     Worklist.push_back(NewFn);
     while (!Worklist.empty()) {
       auto Fn = Worklist.pop_back_val();
@@ -447,4 +449,12 @@ private:
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(SILLoader, Mode, ExternalSource).process(Fun);
+}
+
+void SILModule::linkAllWitnessTables() {
+  SILLoader->getAllWitnessTables();
+}
+
+void SILModule::linkAllVTables() {
+  SILLoader->getAllVTables();
 }

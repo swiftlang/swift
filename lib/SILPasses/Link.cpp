@@ -21,126 +21,21 @@
 
 using namespace swift;
 
-STATISTIC(NumFuncLinked, "Number of SIL functions linked");
-
-namespace {
-  class Callback : public SerializedSILLoader::Callback {
-    void didDeserialize(Module *M, SILFunction *fn) override {
-      updateLinkage(fn);
-    }
-
-    void didDeserialize(Module *M, SILGlobalVariable *var) override {
-      updateLinkage(var);
-    }
-
-    void didDeserialize(Module *M, SILVTable *vtable) override {
-      // TODO: should vtables get linkage?
-      //updateLinkage(vtable);
-    }
-
-    template <class T> void updateLinkage(T *decl) {
-      switch (decl->getLinkage()) {
-      case SILLinkage::Public:
-        decl->setLinkage(SILLinkage::PublicExternal);
-        return;
-      case SILLinkage::Hidden:
-        decl->setLinkage(SILLinkage::HiddenExternal);
-        return;
-      case SILLinkage::Shared:
-        decl->setLinkage(SILLinkage::Shared);
-        return;
-      case SILLinkage::Private: // ?
-      case SILLinkage::PublicExternal:
-      case SILLinkage::HiddenExternal:
-        return;
-      }
-    }
-  };
-}
-
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
 void swift::performSILLinking(SILModule *M, bool LinkAll) {
-  Callback callback;
-  SerializedSILLoader *SILLoader = SerializedSILLoader::create(
-                                     M->getASTContext(), M, &callback);
-
-  SILExternalSource *ExternalSource = M->getExternalSource();
-
-  SmallVector<SILFunction*, 128> Worklist;
+  auto LinkMode = LinkAll? SILModule::LinkingMode::LinkAll :
+    SILModule::LinkingMode::LinkNormal;
   for (auto &Fn : *M)
-    Worklist.push_back(&Fn);
+    M->linkFunction(&Fn, LinkMode);
 
-  while (!Worklist.empty()) {
-    auto Fn = Worklist.pop_back_val();
+  if (!LinkAll)
+    return;
 
-    for (auto &BB : *Fn) {
-      for (auto I = BB.begin(), E = BB.end(); I != E; I++) {
-        SILFunction *CalleeFunction = nullptr;
-        bool TryLinking = false;
-        if (ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-          SILValue Callee = AI->getCallee();
-          // Handles FunctionRefInst only.
-          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
-            CalleeFunction = FRI->getReferencedFunction();
-            // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = LinkAll || AI->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Shared;
-          }
-        }
-        else if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(I)) {
-          SILValue Callee = PAI->getCallee();
-          // Handles FunctionRefInst only.
-          if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Callee.getDef())) {
-            CalleeFunction = FRI->getReferencedFunction();
-            // When EnableLinkAll is true, we always link the Callee.
-            TryLinking = LinkAll || CalleeFunction->isTransparent() ||
-                         CalleeFunction->getLinkage() == SILLinkage::Shared;
-          } else {
-            continue;
-          }
-        }
-        else if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(I)) {
-          // When EnableLinkAll is true, we link the function referenced by
-          // FunctionRefInst.
-          CalleeFunction = LinkAll ? FRI->getReferencedFunction() :
-                                           nullptr;
-          TryLinking = LinkAll;
-        }
-
-        if (!CalleeFunction)
-          continue;
-        
-        // The ExternalSource may wish to rewrite non-empty bodies.
-        if (ExternalSource) {
-          if (auto NewFn = ExternalSource->lookupSILFunction(CalleeFunction)) {
-            Worklist.push_back(NewFn);
-            ++NumFuncLinked;
-            continue;
-          }
-        }
-
-        CalleeFunction->setBare(IsBare);
-
-        if (CalleeFunction->empty()) {
-          // Try to find the definition in a serialized module when callee is
-          // currently empty.
-          if (TryLinking) {
-            if (auto NewFn = SILLoader->lookupSILFunction(CalleeFunction)) {
-              Worklist.push_back(NewFn);
-              ++NumFuncLinked;
-              continue;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (LinkAll) {
-    SILLoader->getAllVTables();
-    SILLoader->getAllWitnessTables();
-  }
+  M->linkAllWitnessTables();
+  M->linkAllVTables();
 }
+
+

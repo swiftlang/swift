@@ -294,6 +294,12 @@ public:
   bool linkFunction(SILFunction *Fun,
                     LinkingMode LinkAll=LinkingMode::LinkNormal);
 
+  /// Link in all Witness Tables in the module.
+  void linkAllWitnessTables();
+
+  /// Link in all VTables in the module.
+  void linkAllVTables();
+
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
   SILFunction *getOrCreateSharedFunction(SILLocation loc,
