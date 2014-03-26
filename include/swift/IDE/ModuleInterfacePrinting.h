@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_MODULE_INTERFACE_PRINTING_H
-#define SWIFT_AST_MODULE_INTERFACE_PRINTING_H
+#ifndef SWIFT_IDE_MODULE_INTERFACE_PRINTING_H
+#define SWIFT_IDE_MODULE_INTERFACE_PRINTING_H
 
 #include "swift/Basic/LLVM.h"
 
@@ -20,10 +20,12 @@ class ASTPrinter;
 class Module;
 struct PrintOptions;
 
+namespace ide {
 void printModuleInterface(Module *M, ASTPrinter &Printer,
-	                      const PrintOptions &Options);
+                          const PrintOptions &Options);
+} // namespace ide
 
 } // namespace swift
 
-#endif // SWIFT_AST_MODULE_INTERFACE_PRINTING_H
+#endif // SWIFT_IDE_MODULE_INTERFACE_PRINTING_H
 

@@ -22,7 +22,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ModuleInterfacePrinting.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Stmt.h"
@@ -1927,64 +1926,4 @@ void TypeBase::print(ASTPrinter &Printer, const PrintOptions &PO) const {
   Type(const_cast<TypeBase *>(this)).print(Printer, PO);
 }
 
-void swift::printModuleInterface(Module *M, ASTPrinter &Printer,
-                                 const PrintOptions &Options) {
-  auto AdjustedOptions = Options;
-
-  // Don't print empty curly braces while printing the module interface.
-  AdjustedOptions.FunctionDefinitions = false;
-
-  AdjustedOptions.PrintGetSetOnRWProperties = false;
-
-  // Print var declarations separately, one variable per decl.
-  AdjustedOptions.ExplodePatternBindingDecls = true;
-  AdjustedOptions.VarInitializers = false;
-
-  SmallVector<Decl *, 1> Decls;
-  M->getDisplayDecls(Decls);
-
-  // Sort the declarations so that we print them in a consistent order.
-  std::sort(Decls.begin(), Decls.end(),
-            [](Decl *LHS, Decl *RHS) {
-    auto *LHSValue = dyn_cast<ValueDecl>(LHS);
-    auto *RHSValue = dyn_cast<ValueDecl>(RHS);
-    if (LHSValue && RHSValue) {
-      StringRef LHSName = LHSValue->getName().str();
-      StringRef RHSName = RHSValue->getName().str();
-      if (int Ret = LHSName.compare(RHSName))
-        return Ret < 0;
-      // FIXME: this is not sufficient to establish a total order for overloaded
-      // decls.
-      return LHS->getKind() < RHS->getKind();
-    }
-
-    auto *LHSImport = dyn_cast<ImportDecl>(LHS);
-    auto *RHSImport = dyn_cast<ImportDecl>(RHS);
-    if (LHSImport && RHSImport) {
-      auto LHSPath = LHSImport->getFullAccessPath();
-      auto RHSPath = RHSImport->getFullAccessPath();
-      for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size());
-           i != e; i++) {
-        if (int Ret = LHSPath[i].first.str().compare(RHSPath[i].first.str()))
-          return Ret < 0;
-      }
-      return LHSPath.size() < RHSPath.size();
-    }
-    return LHS->getKind() < RHS->getKind();
-  });
-
-  for (auto *D : Decls) {
-    if (isa<ExtensionDecl>(D))
-      continue;
-
-    D->print(Printer, AdjustedOptions);
-    Printer << "\n";
-    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      for (auto Ext : NTD->getExtensions()) {
-        Ext->print(Printer, AdjustedOptions);
-        Printer << "\n";
-      }
-    }
-  }
-}
 
