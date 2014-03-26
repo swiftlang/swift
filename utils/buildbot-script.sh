@@ -266,7 +266,7 @@ done
 
 # iOS build products use their own build directories, which are
 # subdirectories of swift's build directory if BUILD_DIR is not set.
-for product in "${IOS_BUILD_PRODUCTS[@]}" ${IOS_TEST_PRODUCTS[@]}" ; do
+for product in "${IOS_BUILD_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}" ; do
     _PRODUCT_BUILD_DIR="$(toupper "${product}")"_BUILD_DIR
     if [[ "${BUILD_DIR}" ]] ; then
         eval ${_PRODUCT_BUILD_DIR}="${BUILD_DIR}/${product}"
