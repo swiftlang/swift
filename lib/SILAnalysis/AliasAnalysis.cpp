@@ -536,15 +536,15 @@ static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record, SIL
   return false;
 }
 
-/// \brief return True if the TBAA rules for \p T1 and \p T2 dictate that typed
-/// access to these types is undefined. False means that types may alias.
-static bool typesForbidAliasing(SILType T1, SILType T2, SILModule &Mod) {
+/// \brief return True if the types \p T1 and \p T2 may alias.
+/// See the TBAA section in the SIL reference manual.
+static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
   if (T1 == T2)
-    return false;
+    return true;
 
   // We only operate on address types.
   if(!T1.isAddress() || !T2.isAddress())
-    return false;
+    return true;
 
   CanType CT1 = T1.getSwiftRValueType();
   CanType CT2 = T2.getSwiftRValueType();
@@ -565,42 +565,42 @@ static bool typesForbidAliasing(SILType T1, SILType T2, SILModule &Mod) {
 
   // Raw pointers may alias anything.
   if (IsRawPtr1 || IsRawPtr2)
-    return false;
+    return true;
 
   // If the types have unbound generic arguments then we don't know the possible
   // range of the type. A type such as $Array<Int> may alias $Array<T>.
   // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
   // may alias.
   if (hasUnboundGenericTypes(CT1) || hasUnboundGenericTypes(CT2))
-    return false;
+    return true;
 
   // Builtin.ObjectPointer is the root of the class hierarchy may alias classes.
   if ((IsObjPtr1 && AsClass2)||
       (IsObjPtr2 && AsClass1))
-    return false;
+    return true;
 
   // If one type is an aggregate and it contains the other type then
   // the record reference may alias the aggregate reference.
   if ((AsNominal1 && aggregateContainsRecord(AsNominal1, CT2, Mod)) ||
       (AsNominal2 && aggregateContainsRecord(AsNominal2, CT1, Mod)))
-    return false;
+    return true;
 
   // Structs don't alias non-structs.
   if (AsStruct1 || AsStruct2)
-    return true;
+    return false;
 
   // Enums don't alias non-enums.
   if (AsEnum1 || AsEnum2)
-    return true;
+    return false;
 
   // Classes don't alias non-classes. At the moment we don't follow the
   // class hierarchy so we can't tell if two classes inherit from one another.
   if ((AsClass1 && !AsClass2) ||
       (AsClass2 && !AsClass1))
-    return true;
+    return false;
 
   // MayAlias.
-  return false;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -623,7 +623,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
 
-  if (typesForbidAliasing(V1.getType(), V2.getType(), *Mod))
+  if (!typesMayAlias(V1.getType(), V2.getType(), *Mod))
    return AliasResult::NoAlias;
 
   // Strip off any casts on V1, V2.
