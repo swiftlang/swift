@@ -1142,8 +1142,9 @@ namespace {
       // location of the '{'.
       if (addEnumeratorsAsMembers) {
         auto nomResult = cast<NominalTypeDecl>(result);
-        enumeratorDecls.append(nomResult->getMembers().begin(),
-                               nomResult->getMembers().end());
+        // Do not force the creation of the implicit members just yet.
+        enumeratorDecls.append(nomResult->getMembers(false).begin(),
+                               nomResult->getMembers(false).end());
         nomResult->setMembers(Impl.SwiftContext.AllocateCopy(enumeratorDecls),
                                 Impl.importSourceRange(clang::SourceRange(
                                                        decl->getLocation(),
@@ -3359,7 +3360,8 @@ void ClangImporter::Implementation::finishPendingActions() {
     SwiftContext.addedExternalDecl(D);
     if (auto typeResolver = getTypeResolver())
       if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-        typeResolver->resolveExternalDeclImplicitMembers(nominal);
+        if (!nominal->hasDelayedMembers())
+          typeResolver->resolveExternalDeclImplicitMembers(nominal);
   }
 }
 

@@ -698,12 +698,14 @@ static void loadAllMembers(const T *container,
   --NumUnloadedLazyMembers;
 }
 
-ArrayRef<Decl*> NominalTypeDecl::getMembers() const {
+ArrayRef<Decl*> NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
   loadAllMembers(this, Resolver, ResolverContextData);
+  if (forceDelayedMembers)
+    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
   return Members;
 }
 
-ArrayRef<Decl*> ExtensionDecl::getMembers() const {
+ArrayRef<Decl*> ExtensionDecl::getMembers(bool forceDelayedMembers) const {
   loadAllMembers(this, Resolver, ResolverContextData);
   return Members;
 }
@@ -761,6 +763,14 @@ void NominalTypeDecl::forceDelayedProtocolDecls() {
   // Set the delayed protocol list to empty so we don't attempt to re-force it
   // later.
   DelayedProtocols = {};
+}
+
+ArrayRef<ProtocolDecl *>
+NominalTypeDecl::getProtocols(bool forceDelayedMembers) const {
+  if (forceDelayedMembers)
+    const_cast<NominalTypeDecl*>(this)->forceDelayedProtocolDecls();
+  
+  return Protocols;
 }
 
 void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,

@@ -73,10 +73,15 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     if (nominal->hasDelayedProtocolDecls() ||
         nominal->hasDelayedMemberDecls()) {
       nominal->forceDelayed();
-      
+    }
+    
+    if (nominal->hasDelayedMembers()) {
       // Because this is a component reference, we need to resolve the
       // external decl that represents the LHS.
       handleExternalDecl(nominal);
+      
+      // The nominal type declaration is now fully realized.
+      nominal->setHasDelayedMembers(false);
     }
     
     if (nominal->getGenericParams() && !isSpecialized) {
@@ -439,8 +444,12 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           if (nomDecl->hasDelayedProtocolDecls() ||
               nomDecl->hasDelayedMemberDecls()) {
             nomDecl->forceDelayed();
-            
+          }
+          
+          if (nomDecl->hasDelayedMembers()) {
             TC.handleExternalDecl(nomDecl);
+            
+            nomDecl->setHasDelayedMembers(false);
           }
         }
 

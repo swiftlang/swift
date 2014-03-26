@@ -309,8 +309,16 @@ class alignas(8) Decl {
 
   enum { NumTypeDeclBits = NumValueDeclBits + 2 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
-
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits};
+  
+  class NominalTypeDeclBitFields {
+    friend class NominalTypeDecl;
+    unsigned : NumTypeDeclBits;
+    
+    /// Whether or not the nominal type decl has delayed protocol or member
+    /// declarations.
+    unsigned HasDelayedMembers : 1;
+  };
+  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 1 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -416,6 +424,7 @@ protected:
     FuncDeclBitfields FuncDeclBits;
     ConstructorDeclBitfields ConstructorDeclBits;
     TypeDeclBitfields TypeDeclBits;
+    NominalTypeDeclBitFields NominalTypeDeclBits;
     ProtocolDeclBitfields ProtocolDeclBits;
     ClassDeclBitfields ClassDeclBits;
     EnumDeclBitfields EnumDeclBits;
@@ -1269,7 +1278,9 @@ public:
   }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
+  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const {
+    return Protocols;
+  }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     Protocols = protocols;
@@ -1285,7 +1296,7 @@ public:
   }
   void setConformances(ArrayRef<ProtocolConformance *> c);
 
-  ArrayRef<Decl*> getMembers() const;
+  ArrayRef<Decl*> getMembers(bool forceDelayedMembers = true) const;
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
@@ -1661,9 +1672,6 @@ public:
 class TypeDecl : public ValueDecl {
   MutableArrayRef<TypeLoc> Inherited;
 
-  /// \brief The set of protocols to which this type conforms.
-  ArrayRef<ProtocolDecl *> Protocols;
-
 protected:
   TypeDecl(DeclKind K, DeclContext *DC, Identifier name, SourceLoc NameLoc,
            MutableArrayRef<TypeLoc> inherited) :
@@ -1672,6 +1680,9 @@ protected:
     TypeDeclBits.CheckedInheritanceClause = false;
     TypeDeclBits.ProtocolsSet = false;
   }
+  
+  /// \brief The set of protocols to which this type conforms.
+  ArrayRef<ProtocolDecl *> Protocols;
 
 public:
   Type getDeclaredType() const;
@@ -1697,7 +1708,9 @@ public:
   ///
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
+  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const {
+    return Protocols;
+  }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&
@@ -2282,6 +2295,7 @@ protected:
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
     GenericParams(nullptr), DeclaredTy(nullptr) {
     setGenericParams(GenericParams);
+    NominalTypeDeclBits.HasDelayedMembers = false;
   }
 
   friend class ProtocolType;
@@ -2289,14 +2303,25 @@ protected:
 public:
   using TypeDecl::getASTContext;
 
-  ArrayRef<Decl*> getMembers() const;
+  ArrayRef<Decl*> getMembers(bool forceDelayedMembers = true) const;
   SourceRange getBraces() const { return Braces; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
     return Resolver;
   }
-
+  
+  /// \brief Returns true if this this decl contains delayed value or protocol
+  /// declarations.
+  bool hasDelayedMembers() const {
+    return NominalTypeDeclBits.HasDelayedMembers;
+  }
+  
+  /// \brief Mark this declaration as having delayed members or not.
+  void setHasDelayedMembers(bool hasDelayedMembers = true) {
+    NominalTypeDeclBits.HasDelayedMembers = hasDelayedMembers;
+  }
+  
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   /// Provide the set of parameters to a generic type, or null if
@@ -2417,6 +2442,7 @@ public:
   
   void setDelayedMemberDecls(ArrayRef<DelayedDecl> delayedMembers) {
     DelayedMembers = delayedMembers;
+    setHasDelayedMembers();
   }
   
   bool hasDelayedProtocolDecls() {
@@ -2425,6 +2451,7 @@ public:
   
   void setDelayedProtocolDecls(ArrayRef<DelayedProtocolDecl> delayedProtocols) {
     DelayedProtocols = delayedProtocols;
+    setHasDelayedMembers();
   }
   
   /// Force delayed implicit member and protocol declarations to be added to the
@@ -2433,6 +2460,10 @@ public:
     forceDelayedProtocolDecls();
     forceDelayedMemberDecls();
   }
+  
+  /// Override of getProtocols that forces any delayed protocol members to be
+  /// resolved before returning the protocol array.
+  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -1593,7 +1593,9 @@ public:
   void checkExplicitConformance(DeclType *D, Type T) {
     assert(isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D));
     SmallVector<ProtocolConformance *, 4> conformances;
-    for (auto proto : D->getProtocols()) {
+    // Don't force delayed protocols to be created if they haven't already been
+    // resolved.
+    for (auto proto : D->getProtocols(false)) {
       ProtocolConformance *conformance = nullptr;
       // FIXME: Better location info
       if (TC.conformsToProtocol(T, proto, D, &conformance,
