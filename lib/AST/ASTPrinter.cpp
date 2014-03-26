@@ -725,8 +725,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printImplicitObjCNote(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  // Always print "var" here for a variable, even if it was defined as a
-  Printer << "var ";
+  Printer << (decl->isLet() ? "let " : "var ");
   recordDeclLoc(decl);
   Printer << decl->getName().str();
   if (decl->hasType()) {
