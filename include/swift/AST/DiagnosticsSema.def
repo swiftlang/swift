@@ -1029,6 +1029,17 @@ ERROR(objc_invalid_on_func_result_type,sema_objc,none,
       "method cannot be marked @objc because its result type cannot be "
       "represented in Objective-C", ())
 
+//------------------------------------------------------------------------------
+// @availability
+//------------------------------------------------------------------------------
+
+ERROR(availability_decl_unavailable, sema_avail, none,
+  "%0 is unavailable", (Identifier))
+
+NOTE(availability_marked_unavailable, sema_avail, none,
+  "%0 has been explicitly marked unavailable here", (Identifier))
+
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

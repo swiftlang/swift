@@ -392,6 +392,71 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
 }
 
 //===--------------------------------------------------------------------===//
+// Diagnose availability.
+//===--------------------------------------------------------------------===//
+
+/// Diagnose specific availability for a declaration.
+///
+/// Returns true if no further availability checking is needed to reject
+/// the use of this declaration.
+static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
+                             const ValueDecl *D, SourceRange R,
+                             const DeclContext *DC) {
+
+
+  // FIXME: Implement matching on the platform.  For now just
+  // do the '*' platform (all platforms).
+  if (Attr->hasPlatform())
+    return false;
+
+  if (Attr->IsUnvailable) {
+    auto Name = D->getName();
+    TC.diagnose(R.Start, diag::availability_decl_unavailable, Name)
+      .highlight(R);
+
+    auto DLoc = D->getLoc();
+    if (DLoc.isValid())
+      TC.diagnose(DLoc, diag::availability_marked_unavailable, Name)
+        .highlight(Attr->getRange());
+  }
+
+  return false;
+}
+
+/// Diagnose uses of unavailable declarations.
+static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
+                             SourceRange R, const DeclContext *DC) {
+  for (auto Attr : D->getAttrs())
+    if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
+      if (diagAvailability(TC, AvailAttr, D, R, DC))
+        return;
+}
+
+
+namespace {
+class AvailabilityWalker : public ASTWalker {
+  TypeChecker &TC;
+  const DeclContext *DC;
+public:
+  AvailabilityWalker(TypeChecker &TC, const DeclContext *DC)
+    : TC(TC), DC(DC) {}
+
+  virtual Expr *walkToExprPost(Expr *E) override {
+    if (auto DR = dyn_cast<DeclRefExpr>(E))
+      diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
+    return E;
+  }
+};
+}
+
+/// Diagnose uses of unavailable declarations.
+static void diagAvailability(TypeChecker &TC, const Expr *E,
+                             const DeclContext *DC) {
+  AvailabilityWalker walker(TC, DC);
+  const_cast<Expr*>(E)->walk(walker);
+}
+
+//===--------------------------------------------------------------------===//
 // High-level entry points.
 //===--------------------------------------------------------------------===//
 
@@ -401,6 +466,7 @@ void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagModuleOrMetatypeValue(TC, E);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E);
+  diagAvailability(TC, E, DC);
 }
 
 void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
