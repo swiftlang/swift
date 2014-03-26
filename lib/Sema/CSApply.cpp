@@ -1033,7 +1033,10 @@ namespace {
                                                             resultTy);
       return refExpr;
     }
-
+    
+    TypeAliasDecl *MaxIntegerTypeDecl = nullptr;
+    TypeAliasDecl *MaxFloatTypeDecl = nullptr;
+    
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution)
       : cs(cs), dc(cs.DC), solution(solution) { }
@@ -1081,28 +1084,31 @@ namespace {
       }
 
       // Find the maximum-sized builtin integer type.
-      // FIXME: Cache name lookup.
-      auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinIntegerType");
-      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(dc), &tc);
-      auto maxTypeDecl
-        = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
-      if (!maxTypeDecl ||
-          !maxTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
+      
+      if(!MaxIntegerTypeDecl) {
+        UnqualifiedLookup lookup(tc.Context.Id_MaxBuiltinIntegerType,
+                                 tc.getStdlibModule(dc),
+                                 &tc);
+        MaxIntegerTypeDecl =
+            dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+      }
+      if (!MaxIntegerTypeDecl ||
+          !MaxIntegerTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
         return nullptr;
       }
-      auto maxType = maxTypeDecl->getUnderlyingType();
+      auto maxType = MaxIntegerTypeDecl->getUnderlyingType();
 
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
-               tc.Context.getIdentifier("IntegerLiteralType"),
-               tc.Context.getIdentifier("convertFromIntegerLiteral"),
+               tc.Context.Id_IntegerLiteralType,
+               tc.Context.Id_ConvertFromIntegerLiteral,
                builtinProtocol,
                maxType,
-               tc.Context.getIdentifier("_convertFromBuiltinIntegerLiteral"),
+               tc.Context.Id_ConvertFromBuiltinIntegerLiteral,
                nullptr,
                diag::integer_literal_broken_proto,
                diag::builtin_integer_literal_broken_proto);
@@ -1131,27 +1137,30 @@ namespace {
 
       // Find the maximum-sized builtin float type.
       // FIXME: Cache name lookup.
-      auto maxTypeName = tc.Context.getIdentifier("MaxBuiltinFloatType");
-      UnqualifiedLookup lookup(maxTypeName, tc.getStdlibModule(dc), &tc);
-      auto maxTypeDecl
-      = dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
-      if (!maxTypeDecl ||
-          !maxTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
+      if (!MaxFloatTypeDecl) {
+        UnqualifiedLookup lookup(tc.Context.Id_MaxBuiltinFloatType,
+                                 tc.getStdlibModule(dc),
+                                 &tc);
+        MaxFloatTypeDecl =
+          dyn_cast_or_null<TypeAliasDecl>(lookup.getSingleTypeResult());
+      }
+      if (!MaxFloatTypeDecl ||
+          !MaxFloatTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
-      auto maxType = maxTypeDecl->getUnderlyingType();
+      auto maxType = MaxFloatTypeDecl->getUnderlyingType();
 
       return convertLiteral(
                expr,
                type,
                expr->getType(),
                protocol,
-               tc.Context.getIdentifier("FloatLiteralType"),
-               tc.Context.getIdentifier("convertFromFloatLiteral"),
+               tc.Context.Id_FloatLiteralType,
+               tc.Context.Id_ConvertFromFloatLiteral,
                builtinProtocol,
                maxType,
-               tc.Context.getIdentifier("_convertFromBuiltinFloatLiteral"),
+               tc.Context.Id_ConvertFromBuiltinFloatLiteral,
                nullptr,
                diag::float_literal_broken_proto,
                diag::builtin_float_literal_broken_proto);
@@ -1179,11 +1188,11 @@ namespace {
                type,
                expr->getType(),
                protocol,
-               tc.Context.getIdentifier("CharacterLiteralType"),
-               tc.Context.getIdentifier("convertFromCharacterLiteral"),
+               tc.Context.Id_CharacterLiteralType,
+               tc.Context.Id_ConvertFromCharacterLiteral,
                builtinProtocol,
                Type(BuiltinIntegerType::get(32, tc.Context)),
-               tc.Context.getIdentifier("_convertFromBuiltinCharacterLiteral"),
+               tc.Context.Id_ConvertFromBuiltinCharacterLiteral,
                [] (Type type) -> bool {
                  if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
                    return builtinInt->isFixedWidth(32);
@@ -1219,7 +1228,7 @@ namespace {
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
 
-      Identifier CFSLID = tc.Context.getIdentifier("convertFromStringLiteral");
+      Identifier CFSLID = tc.Context.Id_ConvertFromStringLiteral;
 
 
       // If the type can handle UTF-16 string literals, prefer them.
@@ -1230,8 +1239,7 @@ namespace {
             KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
       ArrayRef<TupleTypeElt> elements;
       if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
-        CFBSLID = tc.Context.getIdentifier(
-                    "_convertFromBuiltinUTF16StringLiteral");
+        CFBSLID = tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
         elements = llvm::makeArrayRef(elementsArray).slice(0, 2);
         if (stringLiteral)
           stringLiteral->setEncoding(StringLiteralExpr::UTF16);
@@ -1242,7 +1250,7 @@ namespace {
         builtinProtocol
           = tc.getProtocol(expr->getLoc(),
                            KnownProtocolKind::BuiltinStringLiteralConvertible);
-        CFBSLID = tc.Context.getIdentifier("_convertFromBuiltinStringLiteral");
+        CFBSLID = tc.Context.Id_ConvertFromBuiltinStringLiteral;
         elements = elementsArray;
         if (stringLiteral)
           stringLiteral->setEncoding(StringLiteralExpr::UTF8);
@@ -1254,7 +1262,7 @@ namespace {
                             type,
                             expr->getType(),
                             protocol,
-                            tc.Context.getIdentifier("StringLiteralType"),
+                            tc.Context.Id_StringLiteralType,
                             CFSLID,
                             builtinProtocol,
                             TupleType::get(elements, tc.Context),
@@ -1283,7 +1291,7 @@ namespace {
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       // FIXME: Cache name,
-      auto name = tc.Context.getIdentifier("convertFromStringInterpolation");
+      auto name = tc.Context.Id_ConvertFromStringInterpolation;
       auto member = findNamedWitness(tc, dc, type, interpolationProto, name,
                                      diag::interpolation_broken_proto);
       if (!member)
@@ -1762,7 +1770,7 @@ namespace {
                                          expr->getLoc(),
                                          MetatypeType::get(arrayTy,
                                                            tc.Context));
-      auto name = tc.Context.getIdentifier("convertFromArrayLiteral");
+      auto name = tc.Context.Id_ConvertFromArrayLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
                                     name, arg, diag::array_protocol_broken);
@@ -1799,7 +1807,7 @@ namespace {
                                          expr->getLoc(),
                                          MetatypeType::get(dictionaryTy,
                                                            tc.Context));
-      auto name = tc.Context.getIdentifier("convertFromDictionaryLiteral");
+      auto name = tc.Context.Id_ConvertFromDictionaryLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
                                     conformance, name, arg,
@@ -3903,8 +3911,8 @@ Solution::convertToLogicValue(Expr *expr, ConstraintLocator *locator) const {
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
                                  KnownProtocolKind::LogicValue),
-                  tc.Context.getIdentifier("getLogicValue"),
-                  tc.Context.getIdentifier("_getBuiltinLogicValue"),
+                  tc.Context.Id_GetLogicValue,
+                  tc.Context.Id_GetBuiltinLogicValue,
                   diag::condition_broken_proto,
                   diag::broken_bool);
   if (result && !result->getType()->isBuiltinIntegerType(1)) {
@@ -3923,8 +3931,8 @@ Solution::convertToArrayBound(Expr *expr, ConstraintLocator *locator) const {
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
                                  KnownProtocolKind::ArrayBound),
-                  tc.Context.getIdentifier("getArrayBoundValue"),
-                  tc.Context.getIdentifier("_getBuiltinArrayBoundValue"),
+                  tc.Context.Id_GetArrayBoundValue,
+                  tc.Context.Id_GetBuiltinArrayBoundValue,
                   diag::broken_array_bound_proto,
                   diag::broken_builtin_array_bound);
   if (result && !result->getType()->is<BuiltinIntegerType>()) {

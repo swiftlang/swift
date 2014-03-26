@@ -2200,12 +2200,29 @@ enum OptionalTypeKind : unsigned {
   OTK_UncheckedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
-
+  
+/// \brief DelayedDecl - An implicitly created member decl, used when importing
+/// a Clang enum type.  These are not added to their enclosing type unless
+/// forced.
+typedef std::function<Decl*()> DelayedDecl;
+  
+/// \brief DelayedProtocolDecl - An implicitly created protocol decl, used when
+/// importing a Clang enum type.  These are not added to their enclosing type
+/// unless forced.
+typedef std::function<ProtocolDecl*()> DelayedProtocolDecl;
+  
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
   SourceRange Braces;
   ArrayRef<Decl*> Members;
+  
+  /// \brief The sets of implicit members and protocols added to imported enum
+  /// types.  These members and protocols are added to the NominalDecl only if
+  /// the nominal type is directly or indirectly referenced.
+  ArrayRef<DelayedDecl> DelayedMembers;
+  ArrayRef<DelayedProtocolDecl> DelayedProtocols;
+  
   GenericParamList *GenericParams;
   
   /// Global declarations that were synthesized on this type's behalf, such as
@@ -2374,6 +2391,14 @@ private:
   /// Predicate used to filter StoredPropertyRange.
   static bool isStoredProperty(VarDecl *vd); // at end of file
   
+  /// Force delayed implicit protocol declarations to be added to the type
+  /// declaration.
+  void forceDelayedProtocolDecls();
+  
+  /// Force delayed implicit member declarations to be added to the type
+  /// declaration.
+  void forceDelayedMemberDecls();
+  
 public:
   /// A range for iterating the stored member variables of a structure.
   using StoredPropertyRange = DeclFilterRange<VarDecl, isStoredProperty>;
@@ -2387,7 +2412,30 @@ public:
   void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
     DerivedGlobalDecls = decls;
   }
-
+  
+  bool hasDelayedMemberDecls() {
+    return DelayedMembers.size() != 0;
+  }
+  
+  void setDelayedMemberDecls(ArrayRef<DelayedDecl> delayedMembers) {
+    DelayedMembers = delayedMembers;
+  }
+  
+  bool hasDelayedProtocolDecls() {
+    return DelayedProtocols.size() != 0;
+  }
+  
+  void setDelayedProtocolDecls(ArrayRef<DelayedProtocolDecl> delayedProtocols) {
+    DelayedProtocols = delayedProtocols;
+  }
+  
+  /// Force delayed implicit member and protocol declarations to be added to the
+  /// type declaration.
+  void forceDelayed() {
+    forceDelayedProtocolDecls();
+    forceDelayedMemberDecls();
+  }
+  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_NominalTypeDecl &&

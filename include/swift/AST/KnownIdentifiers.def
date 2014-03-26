@@ -32,5 +32,38 @@ IDENTIFIER(subscript)
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 
+// Built-in identifiers
+IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "MaxBuiltinIntegerType");
+IDENTIFIER_WITH_NAME(IntegerLiteralType, "IntegerLiteralType");
+IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,
+                     "_convertFromBuiltinIntegerLiteral");
+IDENTIFIER_WITH_NAME(MaxBuiltinFloatType, "MaxBuiltinFloatType");
+IDENTIFIER_WITH_NAME(FloatLiteralType, "FloatLiteralType");
+IDENTIFIER_WITH_NAME(ConvertFromFloatLiteral, "convertFromFloatLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinFloatLiteral,
+                     "_convertFromBuiltinFloatLiteral");
+IDENTIFIER_WITH_NAME(CharacterLiteralType, "CharacterLiteralType");
+IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,
+                     "convertFromCharacterLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinCharacterLiteral,
+                     "_convertFromBuiltinCharacterLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromStringLiteral, "convertFromStringLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinUTF16StringLiteral,
+                     "_convertFromBuiltinUTF16StringLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinStringLiteral,
+                     "_convertFromBuiltinStringLiteral");
+IDENTIFIER_WITH_NAME(StringLiteralType,
+                     "StringLiteralType");
+IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
+                     "convertFromStringInterpolation");
+IDENTIFIER_WITH_NAME(ConvertFromArrayLiteral, "convertFromArrayLiteral");
+IDENTIFIER_WITH_NAME(ConvertFromDictionaryLiteral,
+                     "convertFromDictionaryLiteral");
+IDENTIFIER_WITH_NAME(GetLogicValue, "getLogicValue");
+IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue");
+IDENTIFIER_WITH_NAME(GetArrayBoundValue, "getArrayBoundValue");
+IDENTIFIER_WITH_NAME(GetBuiltinArrayBoundValue, "_getBuiltinArrayBoundValue");
+
 #undef IDENTIFIER
 #undef IDENTIFIER_WITH_NAME

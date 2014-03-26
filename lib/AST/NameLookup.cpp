@@ -722,6 +722,47 @@ void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
   Braces = B;
 }
 
+void NominalTypeDecl::forceDelayedMemberDecls() {
+  if (!hasDelayedMemberDecls())
+    return;
+  
+  SmallVector<Decl *, 4> members;
+  
+  for (auto prevMember : Members) {
+    members.push_back(prevMember);
+  }
+  
+  for (auto delayedDeclCreator : DelayedMembers) {
+    members.push_back(delayedDeclCreator());
+  }
+  
+  // Copy over the members.  There's no need to create a new block, since
+  // these are all implicit.
+  Members = (getASTContext()).AllocateCopy(llvm::makeArrayRef(members));
+  
+  // Set the delayed members list to empty so we don't attempt to re-force it
+  // later.
+  DelayedMembers = {};
+}
+
+void NominalTypeDecl::forceDelayedProtocolDecls() {
+  if (!hasDelayedProtocolDecls())
+    return;
+  
+  SmallVector<ProtocolDecl *, 4> protocols;
+  
+  for (auto delayedProtocolCreator : DelayedProtocols) {
+    protocols.push_back(delayedProtocolCreator());
+  }
+  
+  setProtocols((getASTContext()).AllocateCopy(
+                                       llvm::makeArrayRef(protocols)));
+  
+  // Set the delayed protocol list to empty so we don't attempt to re-force it
+  // later.
+  DelayedProtocols = {};
+}
+
 void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
                                       uint64_t contextData) {
   assert(!Resolver && "already have a resolver");
@@ -827,7 +868,7 @@ bool DeclContext::lookupQualified(Type type,
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
-
+    
     wantProtocolMembers = (options & NL_ProtocolMembers) &&
                           !isa<ProtocolDecl>(nominal);
 

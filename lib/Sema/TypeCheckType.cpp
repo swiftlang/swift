@@ -68,6 +68,17 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   // provided, and we are in the context of that generic type or one of its
   // extensions, imply the generic arguments
   if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+    
+    // Force any delayed members added to the nominal type declaration.
+    if (nominal->hasDelayedProtocolDecls() ||
+        nominal->hasDelayedMemberDecls()) {
+      nominal->forceDelayed();
+      
+      // Because this is a component reference, we need to resolve the
+      // external decl that represents the LHS.
+      handleExternalDecl(nominal);
+    }
+    
     if (nominal->getGenericParams() && !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
         switch (dc->getContextKind()) {
@@ -422,6 +433,16 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl());
         if (!typeDecl)
           continue;
+        
+        // If necessary, add delayed members to the declaration.
+        if (auto nomDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
+          if (nomDecl->hasDelayedProtocolDecls() ||
+              nomDecl->hasDelayedMemberDecls()) {
+            nomDecl->forceDelayed();
+            
+            TC.handleExternalDecl(nomDecl);
+          }
+        }
 
         ArrayRef<TypeRepr *> genericArgs;
         if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))

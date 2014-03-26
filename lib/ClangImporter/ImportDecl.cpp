@@ -934,7 +934,9 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
-
+      
+      ASTContext &cxt = Impl.SwiftContext;
+      
       // Create the enum declaration and record it.
       Decl *result;
       auto enumKind = Impl.classifyEnum(decl);
@@ -1004,16 +1006,15 @@ namespace {
         // Set up the C underlying type as its Swift raw type.
         enumDecl->setRawType(underlyingType);
         
-        auto getProtocol = [&](KnownProtocolKind k) {
-          return Impl.SwiftContext.getProtocol(k);
+        // Add delayed protocol declarations to the enum declaration.
+        DelayedProtocolDecl delayedProtocols[] = {
+          [&]() {return cxt.getProtocol(KnownProtocolKind::RawRepresentable);},
+          [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);},
+          [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);}
         };
-        ProtocolDecl *protocols[] = {
-          getProtocol(KnownProtocolKind::RawRepresentable),
-          getProtocol(KnownProtocolKind::Equatable),
-          getProtocol(KnownProtocolKind::Hashable),
-        };
-        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
-        enumDecl->setProtocols(protoList);
+        auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
+                                                      delayedProtocols);
+        enumDecl->setDelayedProtocolDecls(delayedProtoList);
         
         result = enumDecl;
         computeEnumCommonWordPrefix(decl, name);
@@ -1060,30 +1061,36 @@ namespace {
         Decl *varDecl = var;
         auto valueConstructor = createValueConstructor(structDecl, varDecl);
 
-        // Build a RawOptionSet conformance for the type.
-        ProtocolDecl *rawOptionSet = Impl.SwiftContext
-          .getProtocol(KnownProtocolKind::RawOptionSet);
-        auto protoList = Impl.SwiftContext.AllocateCopy(
-                                          llvm::makeArrayRef(rawOptionSet));
-        structDecl->setProtocols(protoList);
-
-        auto fromMask = makeOptionSetFactoryMethod(structDecl, var,
-                                             OptionSetFactoryMethod::FromMask);
-        auto fromRaw = makeOptionSetFactoryMethod(structDecl, var,
-                                            OptionSetFactoryMethod::FromRaw);
-        auto toRaw = makeOptionSetToRawMethod(structDecl, var);
-        auto getLV = makeOptionSetGetLogicValueMethod(structDecl, var);
+        // Build a delayed RawOptionSet conformance for the type.
+        DelayedProtocolDecl delayedProtocols[] = {
+          [&]() {return cxt.getProtocol(KnownProtocolKind::RawOptionSet);}
+        };
+        
+        structDecl->setDelayedProtocolDecls(Impl.
+                                            SwiftContext.
+                                              AllocateCopy(
+                                                  llvm::makeArrayRef(
+                                                      delayedProtocols)));
+        
+        // Add delayed implicit members to the type.
+        DelayedDecl delayedMembers[] = {
+          [=](){return makeOptionSetFactoryMethod(structDecl, var,
+                                         OptionSetFactoryMethod::FromMask);},
+          [=](){return makeOptionSetFactoryMethod(structDecl, var,
+                                         OptionSetFactoryMethod::FromRaw);},
+          [=](){return makeOptionSetToRawMethod(structDecl, var);},
+          [=](){return makeOptionSetGetLogicValueMethod(structDecl, var);}
+        };
+        
+        structDecl->setDelayedMemberDecls(Impl.SwiftContext.AllocateCopy(
+                                                              delayedMembers));
         
         // Set the members of the struct.
         Decl *members[] = {
           defaultConstructor,
           valueConstructor,
           patternBinding,
-          var,
-          fromMask,
-          fromRaw,
-          toRaw,
-          getLV,
+          var
         };
         structDecl->setMembers(
           Impl.SwiftContext.AllocateCopy(members),
