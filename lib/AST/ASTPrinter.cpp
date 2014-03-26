@@ -27,8 +27,12 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/raw_ostream.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -88,6 +92,76 @@ namespace {
     /// be printed.
     void recordDeclLoc(Decl *decl) {
       Printer.printDeclLoc(decl);
+    }
+
+    void printClangDocumentationComment(const clang::Decl *D) {
+      const auto &ClangContext = D->getASTContext();
+      const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
+      if (!RC)
+        return;
+
+      // FIXME: print a blank line.
+      //Printer << "\n";
+      //indent();
+
+      bool Invalid;
+      unsigned StartLocCol =
+          ClangContext.getSourceManager().getSpellingColumnNumber(
+              RC->getLocStart(), &Invalid);
+      if (Invalid)
+        StartLocCol = 0;
+
+      unsigned WhitespaceToTrim = StartLocCol - 1;
+      bool IsFirstLine = true;
+
+      SmallVector<StringRef, 8> Lines;
+
+      StringRef RawText =
+          RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
+      while (!RawText.empty()) {
+        size_t Pos = RawText.find_first_of("\n\r");
+        if (Pos == StringRef::npos)
+          Pos = RawText.size();
+
+        StringRef Line = RawText.substr(0, Pos);
+        Lines.push_back(Line);
+        if (!IsFirstLine) {
+          size_t NonWhitespacePos = RawText.find_first_not_of(' ');
+          if (NonWhitespacePos != StringRef::npos)
+            WhitespaceToTrim =
+                std::min(WhitespaceToTrim,
+                         static_cast<unsigned>(NonWhitespacePos));
+        }
+        IsFirstLine = false;
+
+        RawText = RawText.drop_front(Pos);
+        unsigned NewlineBytes = measureNewline(RawText);
+        RawText = RawText.drop_front(NewlineBytes);
+      }
+
+      IsFirstLine = true;
+      for (auto Line : Lines) {
+        if (!IsFirstLine) {
+          Line = Line.drop_front(WhitespaceToTrim);
+        }
+        IsFirstLine = false;
+        Printer << Line << "\n";
+        indent();
+      }
+    }
+
+    void printDocumentationComment(Decl *D) {
+      if (!Options.PrintDocumentationComments)
+        return;
+
+      auto MaybeClangNode = D->getClangNode();
+      if (MaybeClangNode) {
+        if (auto *CD = MaybeClangNode.getAsDecl())
+          printClangDocumentationComment(CD);
+        return;
+      }
+
+      // FIXME: print native Swift documentation comments.
     }
 
     void printImplicitObjCNote(Decl *D) {
@@ -698,6 +772,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printAttributes(decl->getAttrs());
+  printDocumentationComment(decl);
   printImplicitObjCNote(decl);
   Printer << "class ";
   recordDeclLoc(decl);
@@ -710,6 +785,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printAttributes(decl->getAttrs());
+  printDocumentationComment(decl);
   printImplicitObjCNote(decl);
   Printer << "protocol ";
   recordDeclLoc(decl);
@@ -722,10 +798,12 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl->getAttrs());
+  printDocumentationComment(decl);
   printImplicitObjCNote(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
-  // Always print "var" here for a variable, even if it was defined as a
+  // Always print "var" here for a variable, even if it was defined using
+  // "let".
   Printer << "var ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
@@ -830,6 +908,7 @@ bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isAccessor()) {
+    printDocumentationComment(decl);
     // FIXME: Attributes
     printImplicitObjCNote(decl);
     recordDeclLoc(decl);
@@ -868,6 +947,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     }
     Printer << "}";
   } else {
+    printDocumentationComment(decl);
     printAttributes(decl->getAttrs());
     printImplicitObjCNote(decl);
     if (decl->isStatic() && !decl->isOperator())
@@ -942,6 +1022,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 }
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
+  printDocumentationComment(decl);
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
@@ -966,6 +1047,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
+  printDocumentationComment(decl);
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);

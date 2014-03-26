@@ -64,6 +64,9 @@ struct PrintOptions {
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
+  /// \brief Whether to print documentation comments attached to declarations.
+  bool PrintDocumentationComments = false;
+
   /// \brief Print dependent types as references into this generic parameter
   /// list.
   GenericParamList *ContextGenericParams = nullptr;

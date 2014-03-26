@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ReST/Parser.h"
 #include "swift/Parse/Lexer.h"
@@ -148,28 +149,6 @@ RawComment Decl::getRawComment() const {
 
   // Give up.
   return RawComment();
-}
-
-static unsigned measureNewline(const char *BufferPtr, const char *BufferEnd) {
-  if (BufferPtr == BufferEnd)
-    return 0;
-
-  if (*BufferPtr == '\n')
-    return 1;
-
-  assert(*BufferPtr == '\r');
-  unsigned Bytes = 1;
-  if (BufferPtr != BufferEnd && *BufferPtr == '\n')
-    Bytes++;
-  return Bytes;
-}
-
-static unsigned measureNewline(StringRef S) {
-  return measureNewline(S.data(), S.data() + S.size());
-}
-
-static bool startsWithNewline(StringRef S) {
-  return S.startswith("\n") || S.startswith("\r\n");
 }
 
 static unsigned measureASCIIArt(StringRef S) {
