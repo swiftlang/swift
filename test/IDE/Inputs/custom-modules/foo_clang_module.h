@@ -48,3 +48,15 @@ enum BarforwardDeclaredEnum;
 #define FOO_MACRO_4 0xffffffffu
 #define FOO_MACRO_5 0xffffffffffffffffull
 
+#define FOO_MACRO_UNDEF_1 0
+#undef FOO_MACRO_UNDEF_1
+
+#define FOO_MACRO_REDEF_1 0
+#undef FOO_MACRO_REDEF_1
+#define FOO_MACRO_REDEF_1 1
+
+#define FOO_MACRO_REDEF_2 0
+#define FOO_MACRO_REDEF_2 1
+
+void theLastDeclInFooClangModuleH();
+

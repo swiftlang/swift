@@ -391,8 +391,9 @@ ClangImporter::Implementation::getWrapperForModule(ClangImporter &importer,
   return file;
 }
 
-static clang::Module *getBestOwningModule(const clang::Decl *D,
-                                          bool allowForwardDeclaration) {
+clang::Module *ClangImporter::Implementation::getClangSubmoduleForDecl(
+    const clang::Decl *D,
+    bool allowForwardDeclaration) {
   const clang::Decl *actual = nullptr;
   if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
     // Put the Objective-C class into the module that contains the @interface
@@ -416,7 +417,7 @@ static clang::Module *getBestOwningModule(const clang::Decl *D,
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
     const clang::Decl *D,
     bool allowForwardDeclaration) {
-  clang::Module *M = getBestOwningModule(D, allowForwardDeclaration);
+  clang::Module *M = getClangSubmoduleForDecl(D, allowForwardDeclaration);
   if (!M)
     return nullptr;
 
@@ -851,7 +852,7 @@ public:
                                const ClangModuleUnit *CMU)
       : NextConsumer(consumer), ModuleFilter(CMU) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (isVisibleFromModule(ModuleFilter, VD))
       NextConsumer.foundDecl(VD, Reason);
   }
@@ -866,7 +867,7 @@ public:
                                 const ClangModuleUnit *CMU)
       : NextConsumer(consumer), ModuleFilter(CMU) {}
 
-  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (isDeclaredInModule(ModuleFilter, VD))
       NextConsumer.foundDecl(VD, Reason);
   }
@@ -909,6 +910,19 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
       // imported, so most of the work is just the lookup and then going
       // through the list.
     } while (Impl.CurrentCacheState != Implementation::CacheState::InProgress);
+
+    auto &ClangPP = Impl.getClangPreprocessor();
+    for (auto I = ClangPP.macro_begin(), E = ClangPP.macro_end(); I != E; ++I) {
+      if (!I->first->hasMacroDefinition())
+        continue;
+      auto Name = Impl.importName(I->first);
+      if (Name.empty())
+        continue;
+      if (auto *Imported =
+              Impl.importMacro(Name, I->second->getMacroInfo())) {
+        Impl.CachedVisibleDecls.push_back(Imported);
+      }
+    }
 
     Impl.CurrentCacheState = Implementation::CacheState::Valid;
   }

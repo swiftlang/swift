@@ -378,10 +378,17 @@ public:
     return Instance->getPreprocessor();
   }
 
+  clang::Module *getClangSubmoduleForDecl(const clang::Decl *D,
+                                          bool allowForwardDeclaration = false);
+
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
+
+  clang::Module *getClangSubmoduleForMacro(const clang::MacroInfo *MI);
+
+  ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
   /// \brief Import the given Swift identifier into Clang.
   clang::DeclarationName importName(Identifier name);
