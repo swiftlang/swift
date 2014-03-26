@@ -265,9 +265,6 @@ append_if(CXX_SUPPORTS_UNREACHABLE_CODE_FLAG "-Wunreachable-code" CMAKE_CXX_FLAG
 check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
 append_if(CXX_SUPPORTS_OVERLOADED_VIRTUAL "-Woverloaded-virtual" CMAKE_CXX_FLAGS)
 
-check_cxx_compiler_flag("-Werror -Wextra-semi" CXX_SUPPORTS_EXTRA_SEMI)
-append_if(CXX_SUPPORTS_EXTRA_SEMI "-Wextra-semi" CMAKE_CXX_FLAGS)
-
 # Set sizeof(void*) if cross-compiling.
 if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "64$")
