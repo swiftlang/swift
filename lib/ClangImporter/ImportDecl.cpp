@@ -2896,6 +2896,17 @@ namespace {
       return result;
     }
 
+    // Hack: support Clang source that doesn't have @partial_interface.
+    template <typename T = clang::ObjCInterfaceDecl,
+              bool (T::*Pred)() const = &T::isPartialInterface>
+    static bool isPartialInterface(const clang::ObjCInterfaceDecl *objcClass) {
+      return (objcClass->*Pred)();
+    }
+    template <typename T>
+    static bool isPartialInterface(const T *) {
+      return false;
+    }
+
     // Add inferred attributes.
     void addInferredAttributes(Decl *decl, unsigned attributes) {
       using namespace inferred_attributes;
@@ -2961,6 +2972,18 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
+
+      // Resolve @partial_interfaces to a definition in the adapter, just like
+      // @class. If it fails, don't bring it in as a new class -- that's likely
+      // to lead to problems down the line.
+      // FIXME: This only matters for the module currently being built.
+      if (isPartialInterface(decl)) {
+        auto clangModule = cast<ClangModuleUnit>(dc->getModuleScopeContext());
+        if (auto adapter = clangModule->getAdapterModule())
+          if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, adapter))
+            return native;
+        return nullptr;
+      }
 
       if (auto native = resolveSwiftDeclIfAnnotated<ClassDecl>(decl, name, dc))
         return native;
