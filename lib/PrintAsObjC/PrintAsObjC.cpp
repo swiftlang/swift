@@ -128,8 +128,11 @@ private:
     os << "@end\n";
   }
 
-  void printSingleMethodParam(const Pattern *param) {
-    os << ":(";
+  StringRef printSingleMethodParam(StringRef selectorString,
+                                   const Pattern *param) {
+    StringRef firstPiece, restOfSelector;
+    std::tie(firstPiece, restOfSelector) = selectorString.split(':');
+    os << firstPiece << ":(";
     this->print(param->getType());
     os << ")";
 
@@ -137,10 +140,11 @@ private:
       os << "_";
     else
       os << cast<NamedPattern>(param)->getBoundName();
+
+    return restOfSelector;
   }
 
-  void printAbstractFunction(AbstractFunctionDecl *AFD, StringRef name,
-                             bool isClassMethod) {
+  void printAbstractFunction(AbstractFunctionDecl *AFD, bool isClassMethod) {
     if (isClassMethod)
       os << "+ (";
     else
@@ -158,42 +162,38 @@ private:
       print(methodTy->getResult());
     }
 
-    os << ")" << name;
+    os << ")";
 
     auto bodyPatterns = AFD->getBodyParamPatterns();
     assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
-    auto argPatterns = AFD->getArgParamPatterns();
-    assert(argPatterns.size() == 2 && "not an ObjC-compatible method");
 
-    if (isa<ParenPattern>(argPatterns.back())) {
-      assert(isa<ParenPattern>(bodyPatterns.back()));
+    llvm::SmallString<128> selectorBuf;
+    StringRef selectorString = AFD->getObjCSelector(selectorBuf);
 
+    if (isa<ParenPattern>(bodyPatterns.back())) {
+      // One argument.
       auto bodyPattern = bodyPatterns.back()->getSemanticsProvidingPattern();
-      printSingleMethodParam(bodyPattern);
+      selectorString = printSingleMethodParam(selectorString, bodyPattern);
 
     } else {
-      const TuplePattern *argParams = cast<TuplePattern>(argPatterns.back());
-      assert(!argParams->hasVararg() && "can't handle variadic methods");
-
       const TuplePattern *bodyParams = cast<TuplePattern>(bodyPatterns.back());
-
-      bool isFirst = true;
-      for_each(argParams->getFields(), bodyParams->getFields(),
-               [this, &isFirst] (const TuplePatternElt &argParam,
-                                 const TuplePatternElt &bodyParam) {
-        // FIXME: Handle default arguments.
-        if (!isFirst) {
-          auto argPattern = argParam.getPattern();
-          argPattern = argPattern->getSemanticsProvidingPattern();
-          os << " " << cast<NamedPattern>(argPattern)->getBoundName();
-        }
-
-        auto bodyPattern = bodyParam.getPattern();
-        printSingleMethodParam(bodyPattern->getSemanticsProvidingPattern());
-
-        isFirst = false;
-      });
+      if (bodyParams->getNumFields() == 0) {
+        // Zero arguments.
+        os << selectorString;
+        selectorString = "";
+      } else {
+        // Two or more arguments, or one argument with name and type.
+        interleave(bodyParams->getFields(),
+                   [this, &selectorString] (const TuplePatternElt &param) {
+                     auto pattern = param.getPattern();
+                     pattern = pattern->getSemanticsProvidingPattern();
+                     selectorString = printSingleMethodParam(selectorString,
+                                                             pattern);
+                   },
+                   [this] { os << " "; });
+      }
     }
+    assert(selectorString.empty());
 
     // Swift subobject initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -208,26 +208,11 @@ private:
   void visitFuncDecl(FuncDecl *FD) {
     assert(FD->getDeclContext()->isTypeContext() &&
            "cannot handle free functions right now");
-    printAbstractFunction(FD, FD->getName().str(), FD->isStatic());
+    printAbstractFunction(FD, FD->isStatic());
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    llvm::SmallString<64> nameBuf("init");
-
-    if (auto paramTuple = dyn_cast<TuplePattern>(CD->getArgParamPatterns()[1])){
-      // FIXME: Somewhat copied from ConstructorDecl::getObjCSelector.
-      if (paramTuple->getNumFields() > 0) {
-        auto firstPattern = paramTuple->getFields().front().getPattern();
-        firstPattern = firstPattern->getSemanticsProvidingPattern();
-        if (auto firstNamed = dyn_cast<NamedPattern>(firstPattern)) {
-          StringRef nameStr = firstNamed->getBoundName().str();
-          nameBuf += (char)toupper(nameStr.front());
-          nameBuf += nameStr.substr(1);
-        }
-      }
-    }
-    
-    printAbstractFunction(CD, nameBuf, false);
+    printAbstractFunction(CD, false);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -272,51 +257,10 @@ private:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    os << "- (";
-    print(SD->getElementType());
-    os << ')';
-
-    switch (SD->getObjCSubscriptKind()) {
-    case ObjCSubscriptKind::None:
-      llvm_unreachable("subscript is already marked @objc");
-    case ObjCSubscriptKind::Indexed:
-      os << "objectAtIndexedSubscript";
-      break;
-    case ObjCSubscriptKind::Keyed:
-      os << "objectForKeyedSubscript";
-      break;
-    }
-
-    const Pattern *P = SD->getIndices();
-    if (auto tuple = dyn_cast<TuplePattern>(P)) {
-      assert(tuple->getNumFields() == 1);
-      assert(!tuple->hasVararg());
-      P = tuple->getFields().front().getPattern();
-    }
-    P = P->getSemanticsProvidingPattern();
-    
-    printSingleMethodParam(P);
-    os << ";\n";
-
-    if (SD->isSettable()) {
-      os << "- (void)setObject:(";
-      print(SD->getElementType());
-      os << ")value ";
-
-      switch (SD->getObjCSubscriptKind()) {
-      case ObjCSubscriptKind::None:
-        llvm_unreachable("subscript is already marked @objc");
-      case ObjCSubscriptKind::Indexed:
-        os << "atIndexedSubscript";
-        break;
-      case ObjCSubscriptKind::Keyed:
-        os << "forKeyedSubscript";
-        break;
-      }
-
-      printSingleMethodParam(P);
-      os << ";\n";
-    }
+    assert(SD->isInstanceMember() && "static subscripts not supported");
+    printAbstractFunction(SD->getGetter(), false);
+    if (auto setter = SD->getSetter())
+      printAbstractFunction(setter, false);
   }
 
   /// Visit part of a type, such as the base of a pointer type.
