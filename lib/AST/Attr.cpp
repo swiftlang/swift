@@ -119,3 +119,16 @@ void DeclAttribute::print(llvm::raw_ostream &OS) const {
   StreamPrinter P(OS);
   print(P);
 }
+
+unsigned DeclAttribute::canAppear() const {
+  switch (getKind()) {
+    case DAK_Count:
+      llvm_unreachable("canAppear needs a valid attribute");
+      break;
+#define DECL_ATTR(NAME, OPTIONS)\
+case DAK_##NAME: return OPTIONS;
+#include "swift/AST/Attr.def"
+  }
+  return 0;
+}
+

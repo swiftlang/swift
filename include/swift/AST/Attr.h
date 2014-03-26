@@ -132,7 +132,7 @@ enum AttrKind {
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
 enum DeclAttrKind {
-#define DECL_ATTR(X, Y, ...) DAK_##X,
+#define DECL_ATTR(X, Y) DAK_##X,
 #include "swift/AST/Attr.def"
   DAK_Count
 };
@@ -257,6 +257,22 @@ protected:
     DK(DK),
     Next(nullptr) {}
 
+  enum DeclCanAppear {
+    OnFunc = 0x1,
+    OnExtension = 1 << 2,
+    OnPatternBinding = 1 << 3,
+    OnOperator = 1 << 4,
+    OnTypeAlias = 1 << 5,
+    OnType = 1 << 6,
+    OnStruct = 1 << 7,
+    OnEnum = 1 << 8,
+    OnClass = 1 << 9,
+    OnVar = 1 << 10,
+    OnProtocol = 1 << 11
+  };
+
+  unsigned canAppear() const;
+
 public:
   DeclAttrKind getKind() const { return DK; }
 
@@ -265,6 +281,61 @@ public:
 
   /// Print the attribute to the provided stream.
   void print(llvm::raw_ostream &OS) const;
+
+  /// Returns true if this attribute can appear on a function.
+  bool canAppearOnFunc() const {
+    return canAppear() & OnFunc;
+  }
+
+  /// Returns true if this attribute can appear on an extension.
+  bool canAppearOnExtension() const {
+    return canAppear() & OnExtension;
+  }
+
+  /// Returns true if this attribute can appear on an pattern binding.
+  bool canAppearOnPatternBinding() const {
+    return canAppear() & OnPatternBinding;
+  }
+
+  /// Returns true if this attribute can appear on an operator.
+  bool canAppearOnOperator() const {
+    return canAppear() & OnOperator;
+  }
+
+  /// Returns true if this attribute can appear on a typealias.
+  bool canAppearOnTypeAlias() const {
+    return canAppear() & OnTypeAlias;
+  }
+
+  /// Returns true if this attribute can appear on a type declaration.
+  bool canAppearOnType() const {
+    return canAppear() & OnType;
+  }
+
+  /// Returns true if this attribute can appear on a struct.
+  bool canAppearOnStruct() const {
+    return canAppear() & OnStruct;
+  }
+
+  /// Returns true if this attribute can appear on an enum.
+  bool canAppearOnEnum() const {
+    return canAppear() & OnEnum;
+  }
+
+  /// Returns true if this attribute can appear on a class.
+  bool canAppearOnClass() const {
+    return canAppear() & OnClass;
+  }
+
+  /// Returns true if this attribute can appear on a var declaration.
+  bool canAppearOnVar() const {
+    return canAppear() & OnVar;
+  }
+
+  /// Returns true if this attribute can appear on a protocol.
+  bool canAppearOnProtocol() const {
+    return canAppear() & OnProtocol;
+  }
 };
 
 /// Defines the @asmname attribute.

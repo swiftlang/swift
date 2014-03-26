@@ -62,22 +62,10 @@ TYPE_ATTR(opened)
 // Schema for DECL_ATTR:
 //
 // - Attribute name.
-// - Serialization: valid for functions?
-// - Serialization: valid for extensions?
-// - Serialization: valid for pattern binding?
-// - Serialization: valid for operators?
-// - Serialization: valid for typealias?
-// - Serialization: valid for type declarations?
-// - Serialization: valid for struct declarations?
-// - Serialization: valid for enum declarations?
-// - Serialization: valid for class declarations?
-// - Serialization: valid for protocol declarations?
-// - Serialization: valid for var declarations?
-
-DECL_ATTR(asmname, true, false, false, false, false,
-          /* type */ false, false, false, false, false, false)
-DECL_ATTR(unavailable, true, false, false, false, false,
-          /* type */ false, true, true, true, true, true)
+// - Declarations the attribute can be attached.
+DECL_ATTR(asmname, OnFunc)
+DECL_ATTR(unavailable, OnStruct | OnEnum |
+                       OnClass | OnProtocol | OnVar)
 
 ATTR(assignment)
 ATTR(class_protocol)
