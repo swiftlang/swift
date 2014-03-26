@@ -10,14 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "link"
 #include "swift/SILPasses/Passes.h"
-#include "swift/AST/Module.h"
-#include "swift/Serialization/SerializedSILLoader.h"
-#include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILModule.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
