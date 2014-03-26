@@ -24,31 +24,67 @@
 #include <cassert>
 #include <pthread.h>
 #include <vector>
+#include <functional>
 #include <sys/mman.h>
 #include <errno.h>
 #include <unistd.h>
 
 using namespace swift;
 
-__attribute__((visibility("hidden")))
-malloc_zone_t _swift_zone = {
-  NULL, // ignore -- for CF
-  NULL, // ignore -- for CF
-  _swift_zone_size,
-  _swift_zone_malloc,
-  _swift_zone_calloc,
-  _swift_zone_valloc,
-  _swift_zone_free,
-  _swift_zone_realloc,
-  _swift_zone_destroy,
-  "SwiftZone", // name
-  NULL, // optional batch malloc
-  NULL, // optional batch free
-  NULL, // FIXME -- struct malloc_introspection_t *
-  0, // version
-  NULL, // XXX -- add support for memalign and free_definite_size?
-  NULL, // XXX -- add support for memalign and free_definite_size?
-  NULL, // XXX -- add support for pressure_relief?
+static kern_return_t _swift_zone_enumerator(task_t task, void *,
+                                            unsigned type_mask,
+                                            vm_address_t zone_address,
+                                            memory_reader_t reader,
+                                            vm_range_recorder_t recorder);
+static size_t _swift_zone_good_size(malloc_zone_t *zone, size_t size);
+static boolean_t _swift_zone_check(malloc_zone_t *zone);
+static void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose);
+static void _swift_zone_log(malloc_zone_t *zone, void *address);
+static void _swift_zone_force_lock(malloc_zone_t *zone);
+static void _swift_zone_force_unlock(malloc_zone_t *zone);
+static void _swift_zone_statistics(malloc_zone_t *zone,
+                                   malloc_statistics_t *stats);
+static boolean_t _swift_zone_locked(malloc_zone_t *zone);
+
+static malloc_introspection_t introspectionSupport = {
+  _swift_zone_enumerator,
+  _swift_zone_good_size,
+  _swift_zone_check,
+  _swift_zone_print,
+  _swift_zone_log,
+  _swift_zone_force_lock,
+  _swift_zone_force_unlock,
+  _swift_zone_statistics,
+  _swift_zone_locked,
+  /* Discharge checking. Present in version >= 7. */
+  NULL, // enable_discharge_checking
+  NULL, // disable_discharge_checking
+  NULL, // discharge
+  NULL, // enumerate_discharged_pointers
+};
+
+static struct {
+  malloc_zone_t header;
+} swiftZone = {
+  {
+    NULL, // ignore -- for CF
+    NULL, // ignore -- for CF
+    _swift_zone_size,
+    _swift_zone_malloc,
+    _swift_zone_calloc,
+    _swift_zone_valloc,
+    _swift_zone_free,
+    _swift_zone_realloc,
+    _swift_zone_destroy,
+    "SwiftZone", // name
+    NULL, // optional batch malloc
+    NULL, // optional batch free
+    &introspectionSupport,
+    0, // version
+    NULL, // XXX -- add support for memalign and free_definite_size?
+    NULL, // XXX -- add support for memalign and free_definite_size?
+    NULL, // XXX -- add support for pressure_relief?
+  },
 };
 
 extern "C" pthread_key_t _swiftAllocOffset = -1;
@@ -84,8 +120,9 @@ static llvm::DenseMap<const void *, size_t> hugeAllocations;
 class Arena {
 public:
   void *base;
-  size_t byteSize;
-  Arena(size_t idx, size_t size) : byteSize(size) {
+  uint16_t byteSize; // max 4096
+  uint8_t  index;    // max 56 or 64
+  Arena(size_t idx, size_t size) : byteSize(size), index(idx) {
     assert(size > 0);
     base = mmapWrapper(arenaSize * 2, /*huge*/ false);
     assert(base != MAP_FAILED);
@@ -123,7 +160,7 @@ static void _swift_key_destructor(void *);
 __attribute__((constructor))
 static void registerZone() {
   assert(sizeof(pthread_key_t) == sizeof(long));
-  malloc_zone_register(&_swift_zone);
+  malloc_zone_register(&swiftZone.header);
   pthread_key_t key, prev_key;
   int r = pthread_key_create(&key, _swift_key_destructor);
   assert(r == 0);
@@ -189,6 +226,51 @@ void swift::_swift_zone_destroy(malloc_zone_t *zone) {
   // nobody should ever destroy this zone
   abort();
 }
+
+kern_return_t
+_swift_zone_enumerator(task_t task, void *, unsigned type_mask,
+                       vm_address_t zone_address, memory_reader_t reader,
+                       vm_range_recorder_t recorder) {
+  abort();
+}
+
+size_t _swift_zone_good_size(malloc_zone_t *zone, size_t size) {
+  // XXX -- Switch to raw swift heap calls
+  void *temp = _swift_zone_malloc(zone, size);
+  size_t r = _swift_zone_size(zone, temp);
+  _swift_zone_free(zone, temp);
+  return r;
+}
+
+boolean_t _swift_zone_check(malloc_zone_t *zone) {
+  return true; // we don't have any self-consistency checks; true == good/okay
+}
+
+void _swift_zone_log(malloc_zone_t *zone, void *address) {
+  abort();
+}
+
+void _swift_zone_force_lock(malloc_zone_t *zone) {
+  int r = pthread_rwlock_wrlock(&globalLock);
+  assert(r == 0);
+}
+
+void _swift_zone_force_unlock(malloc_zone_t *zone) {
+  int r = pthread_rwlock_unlock(&globalLock);
+  assert(r == 0);
+}
+
+boolean_t _swift_zone_locked(malloc_zone_t *zone) {
+  int r = pthread_rwlock_trywrlock(&globalLock);
+  assert(r == 0 || errno == EBUSY);
+  if (r == 0) {
+    r = pthread_rwlock_unlock(&globalLock);
+    assert(r == 0);
+    return false;
+  }
+  return true;
+}
+
 
 // Plain old memory allocation
 
@@ -293,7 +375,7 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   if (r) return r;
 
   do {
-    r = _swift_zone.malloc(NULL, size);
+    r = swiftZone.header.malloc(NULL, size);
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
   return r;
@@ -356,7 +438,7 @@ void swift::swift_dealloc(void *ptr, AllocIndex idx) {
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   if (bytes == 0) {
-    bytes = _swift_zone.size(NULL, ptr);
+    bytes = swiftZone.header.size(NULL, ptr);
   }
   assert(bytes != 0);
 
@@ -422,4 +504,75 @@ _swift_key_destructor(void *arg) {
   r = pthread_rwlock_unlock(&globalLock);
   assert(r == 0);
   abort();
+}
+
+kern_return_t _swift_memory_reader(task_t task,
+                                   vm_address_t remote_address,
+                                   vm_size_t size, void **local_memory) {
+    /* given a task, "reads" the memory at the given address and size
+local_memory: set to a contiguous chunk of memory; validity of local_memory is assumed to be limited (until next call) */
+
+#define MALLOC_PTR_IN_USE_RANGE_TYPE    1   /* for allocated pointers */
+#define MALLOC_PTR_REGION_RANGE_TYPE    2   /* for region containing pointers */
+#define MALLOC_ADMIN_REGION_RANGE_TYPE  4   /* for region used internally */
+#define MALLOC_ZONE_SPECIFIC_FLAGS  0xff00  /* bits reserved for zone-specific purposes */
+  abort();
+}
+
+void _swift_vm_range_recorder(task_t task, void *, unsigned type,
+                              vm_range_t *, unsigned) {
+    /* given a task and context, "records" the specified addresses */
+}
+
+static void
+enumerateBlocks(std::function<void(const void *, size_t)> func) {
+  // XXX switch to a bitmap or a set
+  // FIXME scan other threads
+  llvm::DenseMap<const void *, bool> unusedBlocks;
+  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+    for (AllocCacheEntry pointer = globalCache[i]; pointer;
+         pointer = pointer->next) {
+      unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
+    }
+    for (AllocCacheEntry pointer = getAllocCacheEntry(i); pointer;
+         pointer = pointer->next) {
+      unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
+    }
+  }
+
+  for (auto &pair : arenas) {
+    Arena &arena = pair.second;
+    size_t count = arenaSize / arena.byteSize;
+    for (size_t i = 0; i < count; i += arena.byteSize) {
+      auto pointer = (const void *)((uint8_t *)arena.base + i);
+      if (!unusedBlocks[pointer]) {
+        func(pointer, arena.byteSize);
+      }
+    }
+  }
+  for (auto &pair : hugeAllocations) {
+    func(pair.first, pair.second);
+  }
+}
+
+void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose) {
+  enumerateBlocks([&](const void *pointer, size_t size) {
+    abort(); // FIXME -- what should we do?
+  });
+}
+
+void _swift_zone_statistics(malloc_zone_t *zone,
+                            malloc_statistics_t *statistics) {
+  memset(statistics, 0, sizeof(*statistics));
+  enumerateBlocks([&](const void *pointer, size_t size) {
+    ++statistics->blocks_in_use;
+    statistics->size_in_use += size;
+    if (size > statistics->max_size_in_use) {
+      statistics->max_size_in_use = size;
+    }
+  });
+  statistics->size_allocated = arenas.size() * arenaSize;
+  for (auto &pair : hugeAllocations) {
+    statistics->size_allocated += pair.second;
+  }
 }
