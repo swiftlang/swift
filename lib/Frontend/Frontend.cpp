@@ -46,9 +46,9 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   
   // Set the "os" target configuration.
   if (triple.isMacOSX()) {
-    LangOpts.TargetConfigOptions["os"] = "OSX";
+    LangOpts.addTargetConfigOption("os", "OSX");
   } else if (triple.isiOS()) {
-    LangOpts.TargetConfigOptions["os"] = "iOS";
+    LangOpts.addTargetConfigOption("os", "iOS");
   } else {
     assert(false && "Unsupported target OS");
   }
@@ -56,18 +56,18 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   // Set the "arch" target configuration.
   switch (triple.getArch()) {
   case llvm::Triple::ArchType::arm:
-    LangOpts.TargetConfigOptions["arch"] = "arm";
+    LangOpts.addTargetConfigOption("arch", "arm");
     break;
   case llvm::Triple::ArchType::x86:
-    LangOpts.TargetConfigOptions["arch"] = "i386";
+    LangOpts.addTargetConfigOption("arch", "i386");
     break;
   case llvm::Triple::ArchType::x86_64:
-    LangOpts.TargetConfigOptions["arch"] = "x86_64";
+    LangOpts.addTargetConfigOption("arch", "x86_64");
     break;
   default:
     // FIXME: Use `case llvm::Triple::arm64` when underlying LLVM is new enough
     if (StringRef("arm64") == llvm::Triple::getArchTypeName(triple.getArch()))
-      LangOpts.TargetConfigOptions["arch"] = "arm64";
+      LangOpts.addTargetConfigOption("arch", "arm64");
       break;
     llvm_unreachable("Unsupported target architecture");
   }

@@ -18,10 +18,10 @@
 #ifndef SWIFT_LANGOPTIONS_H
 #define SWIFT_LANGOPTIONS_H
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace swift {
   
@@ -72,26 +72,33 @@ namespace swift {
 
     /// How to split imported Objective-C selectors, if at all.
     SelectorSplitKind SplitPrepositions = SelectorSplitKind::None;
-
-    /// \brief Implicit target configuration options.  There are currently two
+    
+    /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)
     ///     arch - The active arch target (X64, I386, ARM, ARM64)
-    std::unordered_map<std::string, std::string> TargetConfigOptions;
+    void addTargetConfigOption(StringRef Name, StringRef Value) {
+      assert(!Name.empty() && !Value.empty());
+      TargetConfigOptions.push_back(std::make_pair(Name, Value));
+    }
     
-    /// \brief Explicit build configuration options, initialized via the '-D'
+    /// Returns the value for the given target configuration or an empty string.
+    StringRef getTargetConfigOption(StringRef Name);
+    
+    /// Explicit build configuration options, initialized via the '-D'
     /// compiler flag.
-    std::unordered_set<std::string> BuildConfigOptions;
-    
-    void setBuildConfig(llvm::StringRef Name) {
-      BuildConfigOptions.insert(Name);
+    void addBuildConfigOption(StringRef Name) {
+      assert(!Name.empty());
+      BuildConfigOptions.push_back(Name);
     }
 
-    /// \brief A convenience method for determining if a given build
-    /// configuration has been defined
-    bool hasBuildConfig(llvm::StringRef name) {
-      return BuildConfigOptions.count(name) != 0;
-    }
+    /// Determines if a given build configuration has been defined.
+    bool hasBuildConfigOption(StringRef Name);
+    
+  private:
+    llvm::SmallVector<std::pair<std::string, std::string>, 2>
+        TargetConfigOptions; 
+    llvm::SmallVector<std::string, 2> BuildConfigOptions; 
   };
 }
 

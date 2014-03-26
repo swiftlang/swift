@@ -724,7 +724,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
     // look up name
     auto name = UDRE->getName().str();
-    return Context.LangOpts.hasBuildConfig(name);
+    return Context.LangOpts.hasBuildConfigOption(name);
   }
   
   // Evaluate a negation (unary "!") expression.
@@ -761,7 +761,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       if(auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
         auto argValue = UDRE->getName().str();
         return
-          !Context.LangOpts.TargetConfigOptions[targetValue].compare(argValue);
+          !Context.LangOpts.getTargetConfigOption(targetValue).compare(argValue);
       } else {
         diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
         return false;
