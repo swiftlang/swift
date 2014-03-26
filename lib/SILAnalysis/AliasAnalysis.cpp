@@ -501,54 +501,98 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 //                                TBAA
 //===----------------------------------------------------------------------===//
 
+/// \brief return True if the aggregate type \p Aggregate contains the type
+/// \p Record.
+static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record) {
+  llvm::SmallVector<NominalTypeDecl*, 8> Worklist;
+  Worklist.push_back(Aggregate);
+  while(!Worklist.empty()) {
+    NominalTypeDecl *T = Worklist.back();
+    Worklist.pop_back();
+    for (auto Var : T->getStoredProperties()) {
+
+      // We don't handle unbound generic types.
+      if (hasUnboundGenericTypes(Var->getType()))
+        return true;
+
+      // Is this the record we were looking for ?
+      if (Var->getType().getPointer() == Record.getPointer())
+        return true;
+
+      // If the record is a nominal type add it to the worklist.
+      if (auto D = Var->getType()->getNominalOrBoundGenericNominal())
+        Worklist.push_back(D);
+    }
+  }
+
+  // Could not find the record in the aggregate.
+  return false;
+}
+
 /// \brief return True if the TBAA rules for \p T1 and \p T2 dictate that typed
-/// access to these types is undefined.
-static bool typesForbidAliasing(SILType T1, SILType T2, SILModule *M) {
+/// access to these types is undefined. False means that types may alias.
+static bool typesForbidAliasing(SILType T1, SILType T2) {
   if (T1 == T2)
     return false;
 
-  // Address types do not alias value types.
-  if (T1.getCategory() != T2.getCategory())
+  // We only operate on address types.
+  if(!T1.isAddress() || !T2.isAddress())
     return false;
 
-  // Strip the SIL address type.
-  T1 = T1.getObjectType();
-  T2 = T2.getObjectType();
+  CanType CT1 = T1.getSwiftRValueType();
+  CanType CT2 = T2.getSwiftRValueType();
 
-  bool IsObjPtr1 = isa<BuiltinObjectPointerType>(T1.getSwiftRValueType());
-  bool IsClass1 = T1.getClassOrBoundGenericClass();
-  bool IsStruct1 = T1.getStructOrBoundGenericStruct();
-  bool IsEnum1 = T1.getEnumOrBoundGenericEnum();
+  bool IsObjPtr1 = isa<BuiltinObjectPointerType>(CT1);
+  bool IsRawPtr1 = isa<BuiltinRawPointerType>(CT1);
+  NominalTypeDecl *AsNominal1 = CT1.getNominalOrBoundGenericNominal();
+  ClassDecl *AsClass1 = CT1.getClassOrBoundGenericClass();
+  StructDecl *AsStruct1 = CT1.getStructOrBoundGenericStruct();
+  EnumDecl *AsEnum1 = CT1.getEnumOrBoundGenericEnum();
 
-  bool IsObjPtr2 = isa<BuiltinObjectPointerType>(T2.getSwiftRValueType());
-  bool IsClass2 = T2.getClassOrBoundGenericClass();
-  bool IsStruct2 = T2.getStructOrBoundGenericStruct();
-  bool IsEnum2 = T2.getEnumOrBoundGenericEnum();
+  bool IsObjPtr2 = isa<BuiltinObjectPointerType>(CT2);
+  bool IsRawPtr2 = isa<BuiltinRawPointerType>(CT2);
+  NominalTypeDecl *AsNominal2 = CT2.getNominalOrBoundGenericNominal();
+  ClassDecl *AsClass2 = CT2.getClassOrBoundGenericClass();
+  StructDecl *AsStruct2 = CT2.getStructOrBoundGenericStruct();
+  EnumDecl *AsEnum2 = CT2.getEnumOrBoundGenericEnum();
 
-  // Builtin.ObjectPointer aliases with classes.
-  if (IsObjPtr1 && IsClass2) return false;
-  if (IsObjPtr2 && IsClass1) return false;
-
-  // Classes don't alias non-classes.
-  if (IsClass1 && !IsClass2) return true;
-  if (IsClass2 && !IsClass1) return true;
+  // Raw pointers may alias anything.
+  if (IsRawPtr1 || IsRawPtr2)
+    return false;
 
   // If the types have unbound generic arguments then we don't know the possible
   // range of the type. A type such as $Array<Int> may alias $Array<T>.
   // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
-  // don't alias.
-  // TODO: implement the full comparison of generic types.
-  bool hasUnboundTypes = hasUnboundGenericTypes(T1.getSwiftRValueType()) ||
-                         hasUnboundGenericTypes(T2.getSwiftRValueType());
+  // may alias.
+  if (hasUnboundGenericTypes(CT1) || hasUnboundGenericTypes(CT2))
+    return false;
+
+  // Builtin.ObjectPointer is the root of the class hierarchy may alias classes.
+  if ((IsObjPtr1 && AsClass2)||
+      (IsObjPtr2 && AsClass1))
+    return false;
+
+  // If one type is an aggregate and it contains the other type then
+  // the record reference may alias the aggregate reference.
+  if ((AsNominal1 && aggregateContainsRecord(AsNominal1, CT2)) ||
+      (AsNominal2 && aggregateContainsRecord(AsNominal2, CT1)))
+    return false;
 
   // Structs don't alias non-structs.
-  if (IsStruct1 && !hasUnboundTypes) return true;
-  if (IsStruct2 && !hasUnboundTypes) return true;
+  if (AsStruct1 || AsStruct2)
+    return true;
 
   // Enums don't alias non-enums.
-  if (IsEnum1 && !hasUnboundTypes) return true;
-  if (IsEnum2 && !hasUnboundTypes) return true;
+  if (AsEnum1 || AsEnum2)
+    return true;
 
+  // Classes don't alias non-classes. At the moment we don't follow the
+  // class hierarchy so we can't tell if two classes inherit from one another.
+  if ((AsClass1 && !AsClass2) ||
+      (AsClass2 && !AsClass1))
+    return true;
+
+  // MayAlias.
   return false;
 }
 
@@ -572,7 +616,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
 
-  if (typesForbidAliasing(V1.getType(), V2.getType(), Mod))
+  if (typesForbidAliasing(V1.getType(), V2.getType()))
    return AliasResult::NoAlias;
 
   // Strip off any casts on V1, V2.

@@ -93,7 +93,7 @@ struct StructLvl1 {
 // CHECK: PAIR #19.
 // CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #20.
 // CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
 // CHECK-NEXT: (0):   %3 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.x
@@ -125,7 +125,7 @@ struct StructLvl1 {
 // CHECK: PAIR #61.
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
 // CHECK-NEXT: (1):   %0 = alloc_stack $StructLvl1
-// CHECK-NEXT: NoAlias
+// CHECK-NEXT: MayAlias
 // CHECK: PAIR #62.
 // CHECK-NEXT: (0):   %2 = struct_element_addr %0#1 : $*StructLvl1, #StructLvl1.sub
 // CHECK-NEXT: (0):   %1 = alloc_stack $StructLvl1
