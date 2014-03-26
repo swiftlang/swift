@@ -131,7 +131,7 @@ enum AttrKind {
 // FIXME: DeclAttrKind and AttrKind should eventually be merged, but
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
-enum DeclAttrKind {
+enum DeclAttrKind : unsigned {
 #define DECL_ATTR(X, Y) DAK_##X,
 #include "swift/AST/Attr.def"
   DAK_Count
@@ -249,13 +249,27 @@ class DeclAttributes;
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
 protected:
-  const DeclAttrKind DK;
+  class DeclAttrBitFields {
+    friend class DeclAttribute;
+
+    // The kind.
+    unsigned Kind : 8;
+  };
+  enum { NumDeclAttrBits = 8 };
+  static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
+
+  union {
+    DeclAttrBitFields DeclAttrBits;
+  };
+
   DeclAttribute *Next;
 
   DeclAttribute(DeclAttrKind DK, SourceRange Range) :
     AttributeBase(Range),
-    DK(DK),
-    Next(nullptr) {}
+    Next(nullptr)
+  {
+    DeclAttrBits.Kind = static_cast<unsigned>(DK);
+  }
 
   enum DeclAttrOptions {
     OnFunc = 0x1,
@@ -275,11 +289,13 @@ protected:
   static unsigned getOptions(DeclAttrKind DK);
 
   unsigned getOptions() const {
-    return getOptions(DK);
+    return getOptions(getKind());
   }
 
 public:
-  DeclAttrKind getKind() const { return DK; }
+  DeclAttrKind getKind() const {
+    return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
+  }
 
   /// Print the attribute to the provided ASTPrinter.
   void print(ASTPrinter &Printer) const;
