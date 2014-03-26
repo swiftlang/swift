@@ -95,10 +95,12 @@ void getFinalReleases(AllocBoxInst *ABI,
   auto seenRelease = false;
   SILInstruction *OneRelease = nullptr;
 
+  auto Box = ABI->getContainerResult();
+
   // We'll treat this like a liveness problem where the alloc_box is
   // the def. Each block that has a use of the owning pointer has the
   // value live-in unless it is the block with the alloc_box.
-  for (auto UI : SILValue(ABI, 0).getUses()) {
+  for (auto UI : Box.getUses()) {
     auto *User = UI->getUser();
     auto *BB = User->getParent();
 
@@ -132,7 +134,7 @@ void getFinalReleases(AllocBoxInst *ABI,
   // release/dealloc.
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
-      addLastRelease(SILValue(ABI, 0), BB, Releases);
+      addLastRelease(Box, BB, Releases);
 }
 
 /// optimizeAllocBox - Try to promote an alloc_box instruction to an
@@ -140,15 +142,15 @@ void getFinalReleases(AllocBoxInst *ABI,
 /// remove the alloc_box itself.
 static bool optimizeAllocBox(AllocBoxInst *ABI) {
 
-  // Scan all of the uses of the alloc_box to see if any of them cause the
-  // allocated memory to escape.  If so, we can't promote it to the stack.  If
-  // not, we can turn it into an alloc_stack.
-  if (canValueEscape(SILValue(ABI, 1)))
+  // Scan all of the uses of the alloc_box to see if any of them cause
+  // address of the held value to escape, in which case we can't
+  // promote it to live on the stack.
+  if (canValueEscape(ABI->getAddressResult()))
     return false;
 
   // Scan all of the uses of the retain count value, collecting all the releases
   // and validating that we don't have an unexpected user.
-  for (auto UI : SILValue(ABI, 0).getUses()) {
+  for (auto UI : ABI->getContainerResult().getUses()) {
     auto *User = UI->getUser();
 
     if (isa<StrongRetainInst>(User))
@@ -178,8 +180,9 @@ static bool optimizeAllocBox(AllocBoxInst *ABI) {
   auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
   ASI->setDebugScope(ABI->getDebugScope());
 
-  // Replace all uses of the pointer operand with the spiffy new AllocStack.
-  SILValue(ABI, 1).replaceAllUsesWith(ASI->getAddressResult());
+  // Replace all uses of the address of the box's contained value with
+  // the address of the stack location.
+  ABI->getAddressResult().replaceAllUsesWith(ASI->getAddressResult());
 
   // Check to see if the alloc_box was used by a mark_uninitialized instruction.
   // If so, any uses of the pointer result need to keep using the MUI, not the

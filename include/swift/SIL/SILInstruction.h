@@ -329,6 +329,9 @@ public:
     return getType(1).getObjectType();
   }
 
+  SILValue getContainerResult() const { return SILValue(this, 0); }
+  SILValue getAddressResult() const { return SILValue(this, 1); }
+
   /// getDecl - Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
