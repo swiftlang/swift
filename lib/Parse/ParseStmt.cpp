@@ -181,6 +181,14 @@ static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConfigKind) {
+  
+  // In the case of a catastrophic parse error, consume any trailing
+  // #else or #endif and move on to the next statement or declaration
+  // block.
+  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_endif)) {
+    consumeToken();
+  }
+  
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
   bool isActiveConfigBlock = ConfigKind == BraceItemListKind::ActiveConfigBlock;
@@ -253,7 +261,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       
       // We'll want to parse the #if block, but not wrap it in a top-level
       // code declaration immediately.
-      Result = parseStmtIfConfig(Kind).get();
+      auto IfConfigResult = parseStmtIfConfig(Kind);
+      
+      if (IfConfigResult.isParseError()) {
+        NeedParseErrorRecovery = true;
+        continue;
+      }
+      
+      Result = IfConfigResult.get();
       
       if (!Result) {
         NeedParseErrorRecovery = true;
@@ -496,10 +511,6 @@ ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
   ParserStatus Status = parseBraceItems(Entries,
                                         Kind,
                                         configKind);
-  
-  if (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
-    diagnose(Tok, diag::expected_close_to_config_stmt);
-  }
   
   RBloc = Tok.getLoc();
   
