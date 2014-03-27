@@ -1041,12 +1041,12 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   Attributes.clearAttribute(AK_exported);
   if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::import_attributes);
-
-  if (!(Flags & PD_AllowTopLevel)) {
+    
+  if (!Context.LangOpts.DebuggerSupport && !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;
   }
-
+    
   ImportKind Kind = ImportKind::Module;
   SourceLoc KindLoc;
   if (Tok.isKeyword()) {
