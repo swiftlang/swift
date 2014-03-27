@@ -20,6 +20,7 @@
 
 namespace clang {
   class ASTContext;
+  class Module;
   class TargetInfo;
   class VisibleDeclConsumer;
 }
@@ -28,6 +29,7 @@ namespace swift {
 
 class ASTContext;
 class ClangModuleUnit;
+class ClangNode;
 class LazyResolver;
 class Module;
 class NominalTypeDecl;
@@ -109,6 +111,8 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
+
+  const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   void verifyAllModules() override;
 

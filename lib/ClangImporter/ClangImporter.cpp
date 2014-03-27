@@ -1270,6 +1270,10 @@ clang::ASTContext &ClangImporter::getClangASTContext() const {
   return Impl.getClangASTContext();
 }
 
+const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
+  return ::getClangOwningModule(Node, getClangASTContext());
+}
+
 void ClangImporter::verifyAllModules() {
 #ifndef NDEBUG
   if (Impl.ImportCounter == Impl.VerifiedImportCounter)
