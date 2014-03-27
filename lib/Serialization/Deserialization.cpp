@@ -1819,8 +1819,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (hasSelectorStyleSignature)
       fn->setHasSelectorStyleSignature();
     if (!asmname.empty())
-      // FIXME: deserialize range.
-      fn->getMutableAttrs().add(new (ctx) AsmnameAttr(asmname, SourceRange()));
+      fn->getMutableAttrs().add(new (ctx) AsmnameAttr(asmname));
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
         fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());

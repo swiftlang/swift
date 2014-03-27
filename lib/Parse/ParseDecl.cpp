@@ -172,8 +172,9 @@ static StringRef getStringLiteralIfNotInterpolated(Parser &P,
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
+                                   SourceLoc AtLoc,
                                    StringRef AttrName,
-                                   DeclAttrKind DK){
+                                   DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
   bool DiscardAttribute = false;
@@ -220,7 +221,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
 
       if (!DiscardAttribute)
-        Attributes.add(new (Context) AsmnameAttr(AsmName, AttrRange));
+        Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange));
 
       break;
     }
@@ -323,12 +324,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
       if (!DiscardAttribute)
         Attributes.add(new (Context)
-                       AvailabilityAttr(R, Platform, Message, true));
+                       AvailabilityAttr(AtLoc, R, Platform, Message, true));
       break;
     }
 
     case DAK_objc:
-      Attributes.add(new (Context) ObjCAttr(SourceRange(Loc)));
+      Attributes.add(new (Context) ObjCAttr(AtLoc, SourceRange(Loc)));
       break;
   }
 
@@ -356,7 +357,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     '!'? 'mutating'
 ///     'requires_stored_property_inits'
 /// \endverbatim
-bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
+bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   SourceLoc InversionLoc = Tok.getLoc();
   bool isInverted = consumeIf(tok::exclaim_postfix);
 
@@ -368,6 +369,12 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     diagnose(Tok, diag::expected_attribute_name);
     return true;
   }
+
+  // FIXME: This is bogus to only honor the first '@', but this
+  // will be fixed once the attribute refactoring completes for
+  // all existing declaration attributes.
+  if (Attributes.AtLoc.isInvalid())
+    Attributes.AtLoc = AtLoc;
 
   // Determine which attribute it is, and diagnose it if unknown.
   AttrKind attr = llvm::StringSwitch<AttrKind>(Tok.getText())
@@ -381,7 +388,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes) {
     // over to the alternate parsing path.
     DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
     if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, Tok.getText(), DK);
+      return parseNewDeclAttribute(Attributes, AtLoc, Tok.getText(), DK);
 
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);
@@ -656,29 +663,20 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   return false;
 }
 
-
-/// \brief This is the internal implementation of \c parseDeclAttributeList,
-/// which we expect to be inlined to handle the common case of an absent
-/// attribute list.
-///
 /// \verbatim
 ///   attribute-list:
 ///     /*empty*/
 ///     attribute-list-clause attribute-list
 ///   attribute-list-clause:
 ///     '@' attribute
-///     '@' attribute ','? attribute-list-clause
 /// \endverbatim
-bool Parser::parseDeclAttributeListPresent(DeclAttributes &Attributes) {
-  Attributes.AtLoc = Tok.getLoc();
-  do {
-    if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
-        parseDeclAttribute(Attributes))
+bool Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
+  while (Tok.is(tok::at_sign)) {
+    SourceLoc AtLoc = Tok.getLoc();
+    consumeToken();
+    if (parseDeclAttribute(Attributes, AtLoc))
       return true;
- 
-    // Attribute lists allow, but don't require, separating commas.
-  } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
-  
+  }
   return false;
 }
 

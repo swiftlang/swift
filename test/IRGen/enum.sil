@@ -976,7 +976,7 @@ end:
 }
 
 @class_protocol protocol PC {}
-@objc, @class_protocol protocol PO {}
+@objc @class_protocol protocol PO {}
 
 enum SinglePayloadClassProtocol {
   case x(PC)
@@ -1982,7 +1982,7 @@ end:
 // <rdar://problem/15787975> part 1: Make sure String's Owner union is
 // efficiently packed. It comprises a class existential, a class handle, and
 // an empty case.
-@objc, @class_protocol protocol CP {}
+@objc @class_protocol protocol CP {}
 
 enum StringOwnerLike {
   case x(C)

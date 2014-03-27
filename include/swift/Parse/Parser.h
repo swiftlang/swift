@@ -612,15 +612,14 @@ public:
 
   void setLocalDiscriminator(ValueDecl *D);
 
-  bool parseDeclAttributeList(DeclAttributes &Attributes) {
-    if (Tok.is(tok::at_sign))
-      return parseDeclAttributeListPresent(Attributes);
-    return false;
-  }
-  bool parseDeclAttributeListPresent(DeclAttributes &Attributes);
-  bool parseDeclAttribute(DeclAttributes &Attributes);
-  bool parseNewDeclAttribute(DeclAttributes &Attributes, StringRef AttrName,
-                             DeclAttrKind DK );
+  /// Parse the optional attributes before a declaration.
+  bool parseDeclAttributeList(DeclAttributes &Attributes);
+
+  /// Parse a specific attribute.
+  bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
+
+  bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
+                             StringRef AttrName, DeclAttrKind DK);
 
   bool parseTypeAttributeList(TypeAttributes &Attributes) {
     if (Tok.is(tok::at_sign))

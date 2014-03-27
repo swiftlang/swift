@@ -1,6 +1,19 @@
 2014-03-26
 ----------
 
+* Attributes on declarations are no longer comma separated.
+
+  Old syntax:
+  
+    @asmname("foo"), @objc func bar() {}
+
+  New syntax:
+
+    @asmname("foo") @objc
+    
+
+  The ',' was vestigial when the attribute syntax consisted of bracked lists.
+
 * 'switch' now always requires a statement after a 'case' or 'default'.
 
   Old syntax:

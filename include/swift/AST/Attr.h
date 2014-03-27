@@ -219,6 +219,9 @@ public:
 
 class AttributeBase {
 public:
+  /// The location of the '@'.
+  const SourceLoc AtLoc;
+
   /// The source range of the attribute.
   const SourceRange Range;
 
@@ -241,7 +244,8 @@ public:
   AttributeBase(const AttributeBase &) = delete;
 
 protected:
-  AttributeBase(SourceRange Range) : Range(Range) {}
+  AttributeBase(SourceLoc AtLoc, SourceRange Range)
+    : AtLoc(AtLoc), Range(Range) {}
 };
 
 class DeclAttributes;
@@ -265,8 +269,8 @@ protected:
 
   DeclAttribute *Next;
 
-  DeclAttribute(DeclAttrKind DK, SourceRange Range) :
-    AttributeBase(Range),
+  DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range) :
+    AttributeBase(AtLoc, Range),
     Next(nullptr)
   {
     DeclAttrBits.Kind = static_cast<unsigned>(DK);
@@ -389,9 +393,12 @@ public:
 /// Defines the @asmname attribute.
 class AsmnameAttr : public DeclAttribute {
 public:
-  AsmnameAttr(StringRef Name, SourceRange Range)
-    : DeclAttribute(DAK_asmname, Range),
+  AsmnameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range)
+    : DeclAttribute(DAK_asmname, AtLoc, Range),
       Name(Name) {}
+
+  AsmnameAttr(StringRef Name)
+    : AsmnameAttr(Name, SourceLoc(), SourceRange()) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -404,11 +411,11 @@ public:
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
-  AvailabilityAttr(SourceRange Range,
+  AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
                    StringRef Platform,
                    StringRef Message,
                    bool IsUnavailable)
-   : DeclAttribute(DAK_availability, Range),
+   : DeclAttribute(DAK_availability, AtLoc, Range),
      Platform(Platform),
      Message(Message),
      IsUnvailable(IsUnavailable) {}
@@ -436,7 +443,8 @@ public:
 /// Indicates that the given declaration is visible to Objective-C.
 class ObjCAttr : public DeclAttribute {
 public:
-  ObjCAttr(SourceRange Range) : DeclAttribute(DAK_objc, Range) { }
+  ObjCAttr(SourceLoc AtLoc, SourceRange Range) :
+    DeclAttribute(DAK_objc, AtLoc, Range) { }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;
