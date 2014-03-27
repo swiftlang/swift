@@ -64,6 +64,21 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
+  {
+    // Temporary hack to reject literals with ud-suffix.
+    // FIXME: remove this when the following radar is implemented:
+    // <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for
+    // Clang
+    llvm::SmallString<32> SpellingBuffer;
+    bool Invalid = false;
+    StringRef TokSpelling =
+        Impl.getClangPreprocessor().getSpelling(tok, SpellingBuffer, &Invalid);
+    if (Invalid)
+      return nullptr;
+    if (TokSpelling.find('_') != StringRef::npos)
+      return nullptr;
+  }
+
   clang::ActionResult<clang::Expr*> result =
     Impl.getClangSema().ActOnNumericConstant(tok);
   if (result.isUsable()) {
