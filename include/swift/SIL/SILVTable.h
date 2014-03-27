@@ -46,12 +46,16 @@ public:
   SILVTable &operator=(const SILVTable &) = delete;
 
 private:
+  /// The ClassDecl mapped to this VTable.
   ClassDecl *Class;
+
+  /// The number of SILVTables entries.
   unsigned NumEntries;
 
-  // Tail-allocated.
+  /// Tail-allocated SILVTable entires.
   Pair Entries[1];
 
+  /// Private constructor. Create SILVTables by calling SILVTable::create.
   SILVTable(ClassDecl *c, ArrayRef<Pair> entries);
 
 public:
