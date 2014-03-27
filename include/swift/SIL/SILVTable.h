@@ -25,7 +25,6 @@
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
-#include <string>
 
 namespace swift {
   class ClassDecl;
