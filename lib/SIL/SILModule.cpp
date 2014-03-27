@@ -479,3 +479,11 @@ void SILModule::linkAllWitnessTables() {
 void SILModule::linkAllVTables() {
   SILLoader->getAllVTables();
 }
+
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
+  auto R = VTableLookupTable.find(C);
+  if (R == VTableLookupTable.end())
+    return nullptr;
+
+  return R->second;
+}

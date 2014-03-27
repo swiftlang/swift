@@ -125,6 +125,9 @@ private:
   llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
   WitnessTableLookupCache;
 
+  /// Lookup table for SIL vtables from class decls.
+  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
+
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
 
@@ -313,6 +316,9 @@ public:
   /// witnesses, if any.
   std::pair<SILWitnessTable *, ArrayRef<Substitution>>
   lookUpWitnessTable(const ProtocolConformance *C);
+
+  /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
+  SILVTable *lookUpVTable(const ClassDecl *C);
 
   // Given a protocol conformance, attempt to create a witness table declaration
   // for it.
