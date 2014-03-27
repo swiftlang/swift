@@ -534,6 +534,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableObjCOptional = Args.hasArg(OPT_enable_objc_optional);
 
+  Opts.EnableAppExtensionRestrictions = Args.hasArg(OPT_enable_app_extension);
+
   if (const Arg *A = Args.getLastArg(OPT_split_objc_selectors,
                                      OPT_split_objc_selectors_before,
                                      OPT_split_objc_selectors_after)) {

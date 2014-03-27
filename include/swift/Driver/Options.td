@@ -155,6 +155,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption]>, MetaVarName<"<path>">,
   HelpText<"Emit an Objective-C header file to <path>">;
 
+// Platform options.
+def enable_app_extension : Flag<["-"], "application-extension">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Restrict code to those available for App Extensions">;
+
 // Linker options
 
 def linker_option_Group : OptionGroup<"<linker-specific options>">;

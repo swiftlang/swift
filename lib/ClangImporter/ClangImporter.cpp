@@ -152,6 +152,10 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "swift.m"
   };
 
+  if (ctx.LangOpts.EnableAppExtensionRestrictions) {
+    invocationArgStrs.push_back("-fapplication-extension");
+  }
+
   // FIXME: Once we're all building with the internal Clang, remove this guard.
   // It might also make more sense to put this in a header.
   if (hasObjCCompleteDefinitionAttr()) {

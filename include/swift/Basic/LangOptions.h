@@ -70,6 +70,9 @@ namespace swift {
     /// references and optional closures, respectively.
     bool EnableObjCOptional = false;
 
+    /// Enable 'availability' restrictions for App Extensions.
+    bool EnableAppExtensionRestrictions = false;
+
     /// How to split imported Objective-C selectors, if at all.
     SelectorSplitKind SplitPrepositions = SelectorSplitKind::None;
     

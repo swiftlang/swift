@@ -114,6 +114,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_g);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
@@ -427,6 +428,12 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   Args.AddAllArgs(Arguments, options::OPT_F);
+
+  if (Args.hasArg(options::OPT_enable_app_extension)) {
+    // Keep this string fixed in case the option used by the
+    // compiler itself changes.
+    Arguments.push_back("-application_extension");
+  }
 
   if (!OI.SDKPath.empty()) {
     Arguments.push_back("-syslibroot");
