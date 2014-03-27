@@ -379,6 +379,17 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, anchor, getPath());
   }
+  
+  /// \brief Determine whether or not constraint failures associated with this
+  /// locator should be discarded.
+  bool shouldDiscardFailures() {
+    return discardFailures;
+  }
+  
+  /// \brief Toggle option to discard constraint failures.
+  void setDiscardFailures(bool shouldDiscard = true) {
+    discardFailures = shouldDiscard;
+  }
 
   /// \brief Produce a debugging dump of this locator.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -391,7 +402,9 @@ private:
   /// \brief Initialize a constraint locator with an anchor and a path.
   ConstraintLocator(Expr *anchor, ArrayRef<PathElement> path,
                     unsigned flags)
-    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags) {
+    : anchor(anchor), numPathElements(path.size()), summaryFlags(flags),
+      discardFailures(false)
+  {
     // FIXME: Alignment.
     std::copy(path.begin(), path.end(),
               reinterpret_cast<PathElement *>(this + 1));
@@ -423,7 +436,12 @@ private:
   unsigned numPathElements : 24;
 
   /// \brief A set of flags summarizing interesting properties of the path.
-  unsigned summaryFlags : 8;
+  unsigned summaryFlags : 7;
+  
+  /// \brief Determines whether or not we should record constraint application
+  /// failures associated with this locator. This information cannot be
+  /// inferred from the path itself, so it is not stored as a summary flag.
+  unsigned discardFailures: 1;
 
   friend class ConstraintSystem;
 };

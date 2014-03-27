@@ -1299,7 +1299,8 @@ public:
   void recordFailure(ConstraintLocator *locator, Failure::FailureKind kind,
                      Args &&...args) {
     // If we don't want to record failures, don't.
-    if (!shouldRecordFailures())
+    if (!shouldRecordFailures() ||
+        (locator && locator->shouldDiscardFailures()))
       return;
 
     recordFailureSimplified(locator, kind,
