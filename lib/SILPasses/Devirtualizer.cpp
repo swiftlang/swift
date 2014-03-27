@@ -273,8 +273,10 @@ struct SILDevirtualizer {
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
   ///
+  /// \code
   /// %XX = alloc_ref $Foo
   /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+  /// \endcode
   ///
   ///  or
   ///
