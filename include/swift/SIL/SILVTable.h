@@ -27,15 +27,15 @@
 #include "llvm/ADT/ilist.h"
 
 namespace swift {
-  class ClassDecl;
-  class SILFunction;
-  class SILModule;
-  
+
+class ClassDecl;
+class SILFunction;
+class SILModule;
+
 /// A mapping from each dynamically-dispatchable method of a class to the
 /// SILFunction that implements the method for that class.
 class SILVTable : public llvm::ilist_node<SILVTable>,
-                  public SILAllocated<SILVTable>
-{
+                  public SILAllocated<SILVTable> {
 public:
   // TODO: Entry should include substitutions needed to invoke an overridden
   // generic base class method.
@@ -48,46 +48,46 @@ public:
 private:
   ClassDecl *Class;
   unsigned NumEntries;
-  
+
   // Tail-allocated.
   Pair Entries[1];
-  
+
   SILVTable(ClassDecl *c, ArrayRef<Pair> entries);
 
 public:
   ~SILVTable();
-  
+
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
   /// through the class.
   static SILVTable *create(SILModule &M, ClassDecl *Class,
                            ArrayRef<Pair> Entries);
-  
+
   /// Return the class that the vtable represents.
   ClassDecl *getClass() const { return Class; }
-  
+
   /// Return all of the method entries.
   ArrayRef<Pair> getEntries() const { return {Entries, NumEntries}; }
-  
+
   /// Look up the implementation function for the given method.
   SILFunction *getImplementation(SILModule &M, SILDeclRef method) const;
-  
+
   /// Verify that the vtable is well-formed for the given class.
   void verify(const SILModule &M) const;
-  
+
   /// Print the vtable.
   void print(llvm::raw_ostream &OS, bool Verbose = false) const;
   void dump() const;
 };
-  
-}
+
+} // end swift namespace
 
 //===----------------------------------------------------------------------===//
 // ilist_traits for SILVTable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-  
+
 template <>
 struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
@@ -106,7 +106,7 @@ public:
   SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
   static void noteHead(SILVTable*, SILVTable*) {}
   static void deleteNode(SILVTable *V) {}
-  
+
 private:
   void createNode(const SILVTable &);
 };
