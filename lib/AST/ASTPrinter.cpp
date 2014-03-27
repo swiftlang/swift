@@ -291,7 +291,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
         printPattern(Elt.getPattern());
       }
       if (Options.VarInitializers && Elt.getInit()) {
-        // FIXME: Print initializer here.
+        // FIXME: Print initializer here, unless VarInitializerPlaceholder
+        // is enabled, in which case we just print " = default" instead.
+        if (Options.VarInitializerPlaceholder)
+          Printer << " = default";
       }
     }
     if (TP->hasVararg())
