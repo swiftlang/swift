@@ -137,28 +137,44 @@ void getFinalReleases(AllocBoxInst *ABI,
       addLastRelease(Box, BB, Releases);
 }
 
-/// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
-static bool canPromoteAllocBox(AllocBoxInst *ABI) {
-  // Scan all of the uses of the alloc_box to see if any of them cause
-  // address of the held value to escape, in which case we can't
-  // promote it to live on the stack.
-  if (canValueEscape(ABI->getAddressResult()))
-    return false;
+
+/// findUnexpectedBoxUse - Validate that the uses of a pointer to a
+/// box do not eliminate it from consideration for promotion to a
+/// stack element. Return the instruction with the unexpected use if
+/// we find one.
+static SILInstruction* findUnexpectedBoxUse(SILValue Box) {
+  assert((Box.getType() ==
+          SILType::getObjectPointerType(Box.getType().getASTContext())) &&
+         "Expected an object pointer!");
 
   // Scan all of the uses of the retain count value, collecting all the releases
   // and validating that we don't have an unexpected user.
-  for (auto UI : ABI->getContainerResult().getUses()) {
+  for (auto UI : Box.getUses()) {
     auto *User = UI->getUser();
 
-    if (isa<StrongRetainInst>(User))
+    // Retains, releases, and deallocs are fine.
+    if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
+        isa<DeallocBoxInst>(User))
       continue;
 
-    // Release doesn't either, but we want to keep track of where this value
-    // gets released.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User))
-      continue;
+    return User;
+  }
 
-    // Otherwise, this looks like it escapes.
+  return nullptr;
+}
+
+/// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
+static bool canPromoteAllocBox(AllocBoxInst *ABI) {
+  // Scan all of the uses of the address of the box's contained value
+  // to see if any of them cause address to escape, in which case we
+  // can't promote it to live on the stack.
+  if (canValueEscape(ABI->getAddressResult()))
+    return false;
+
+  // Scan all of the uses of the address of the box to see if any
+  // disqualifies the box from being promoted tot he stack.
+  if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult())) {
+    // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
           << "    Due to user: " << *User << "\n");
