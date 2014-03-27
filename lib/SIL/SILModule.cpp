@@ -434,6 +434,27 @@ public:
     return true;
   }
 
+  bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
+    ProtocolConformance *C = WMI->getConformance();
+    if (!C)
+      return false;
+
+    SILWitnessTable *WT = WMI->getModule().lookUpWitnessTable(C).first;
+    if (!WT || WT->isDeclaration())
+      return false;
+
+    SILDeclRef Member = WMI->getMember();
+    for (auto &E : WT->getEntries()) {
+      if (E.getKind() == SILWitnessTable::WitnessKind::Method &&
+          E.getMethodWitness().Requirement == Member) {
+        addCalleeFunction(E.getMethodWitness().Witness);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
 private:
   /// Add a function to our callee list for processing.
   void addCalleeFunction(SILFunction *F) {
