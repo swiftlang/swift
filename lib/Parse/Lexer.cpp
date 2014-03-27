@@ -1445,6 +1445,8 @@ Restart:
 
   case ' ':
   case '\t':
+  case '\f':
+  case '\v':
     goto Restart;  // Skip whitespace.
 
   case -1:
