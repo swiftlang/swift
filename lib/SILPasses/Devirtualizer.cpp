@@ -261,6 +261,8 @@ struct SILDevirtualizer {
   bool recordResolvedArgs(ApplyInst *AI, SILFunction *Callee,
                           const SILResolvedArgList &ResArgs);
 
+  ClassDecl *findClassDeclForSILValue(SILValue S);
+
   bool resolveArgs(ApplyInst *AI);
 
   SILFunction *specializeFuncForCall(SpecializeRequest &Request);
@@ -268,7 +270,22 @@ struct SILDevirtualizer {
   void specializeForArgTypes();
   void replaceCallsToSpecializedFunctions();
 
+  /// Optimize a class_method and alloc_ref pair into a direct function
+  /// reference:
+  ///
+  /// %XX = alloc_ref $Foo
+  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+  ///
+  ///  or
+  ///
+  /// %XX = metatype $...
+  /// %YY = class_method %XX : ...
+  ///
+  ///  into
+  ///
+  /// %YY = function_ref @...
   void optimizeClassMethodInst(ClassMethodInst *CMI);
+
   void optimizeApplyInst(ApplyInst *Inst);
   void optimizeFuncBody(SILFunction *F);
   bool run();
@@ -958,71 +975,80 @@ static ClassDecl *findClassTypeForOperand(SILValue S) {
   }
 }
 
+static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
+  Type T = Class->getSuperclass();
+  if (!T)
+    return nullptr;
+  return T->getClassOrBoundGenericClass();
+}
+
+ClassDecl *SILDevirtualizer::findClassDeclForSILValue(SILValue Cls) {
+  SILValue OperDef = findOrigin(Cls);
+  SILArgument *Arg = dyn_cast<SILArgument>(OperDef);
+  if (!Arg)
+    return findClassTypeForOperand(OperDef);
+
+  CanType Ty = SpecializedArgsMap->lookupSpecializedArg(Arg);
+  if (!Ty.isNull())
+    return Ty->getClassOrBoundGenericClass();
+
+  addPolyArg(Arg, PolyArgMap[Arg->getFunction()], true);
+  return nullptr;
+}
+
 void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *CMI);
-  // Optimize a class_method and alloc_ref pair into a direct function
-  // reference:
-  //
-  // %XX = alloc_ref $Foo
-  // %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
-  //
-  //  or
-  //
-  //  %XX = metatype $...
-  //  %YY = class_method %XX : ...
-  //
-  //  into
-  //
-  //  %YY = function_ref @...
-  ClassDecl *Class = nullptr;
-  SILValue OperDef = findOrigin(CMI->getOperand());
-  if (SILArgument *Arg = dyn_cast<SILArgument>(OperDef)) {
-    CanType Ty = SpecializedArgsMap->lookupSpecializedArg(Arg);
-    if (Ty.isNull())
-      addPolyArg(Arg, PolyArgMap[Arg->getFunction()], true);
-    else
-      Class = Ty->getClassOrBoundGenericClass();
-  }
-  else
-    Class = findClassTypeForOperand(OperDef);
+
+  // Attempt to find a ClassDecl for our operand.
+  ClassDecl *Class = findClassDeclForSILValue(CMI->getOperand());
+
+  // If we fail, bail...
   if (!Class)
     return;
 
-  // Walk up the class hierarchy and scan all members.
-  // TODO: There has to be a faster way of doing this scan.
+  // Otherwise walk up the class heirarchy until there are no more super classes
+  // (i.e. Class becomes null) or we find a match with member.
   SILDeclRef Member = CMI->getMember();
-  while (Class) {
-    // Search all of the vtables in the module.
-    for (auto &Vtbl : CMI->getModule().getVTableList()) {
-      if (Vtbl.getClass() != Class)
-        continue;
 
-      // If found the requested method.
-      if (SILFunction *F = Vtbl.getImplementation(CMI->getModule(), Member)) {
-        // Create a direct reference to the method.
-        SILInstruction *FRI =
-        new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
-        DEBUG(llvm::dbgs() << " *** Devirtualized : " << *CMI);
-        CMI->getParent()->getInstList().insert(CMI, FRI);
-        CMI->replaceAllUsesWith(FRI);
-        CMI->eraseFromParent();
-        for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
-          if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
-            collectPolyArgs(AI);
-        NumDevirtualized++;
-        Changed = true;
-        return;
-      }
+  // Until we reach the top of the class hierarchy...
+  while (Class) {
+    // Try to lookup a VTable for Class from the module...
+    auto *Vtbl = CMI->getModule().lookUpVTable(Class);
+
+    // If the lookup fails, skip Class and attempt to resolve the method in
+    // the VTable of the super class of Class if it exists...
+    if (!Vtbl) {
+      Class = getClassDeclSuperClass(Class);
+      continue;
     }
 
-    // We could not find the member in our class. Moving to our superclass.
-    if (Type T = Class->getSuperclass())
-      Class = T->getClassOrBoundGenericClass();
-    else
-      break;
-  }
+    // Ok, we have a VTable. Try to lookup the SILFunction implementation from
+    // the VTable.
+    SILFunction *F = Vtbl->getImplementation(CMI->getModule(), Member);
 
-  return;
+    // If we fail to lookup the SILFunction, again skip Class and attempt to
+    // resolve the method in the VTable of the super class of Class if such a
+    // super class exists.
+    if (!F) {
+      Class = getClassDeclSuperClass(Class);
+      continue;
+    }
+
+    // Success! We found the method! Create a direct reference to it.
+    SILInstruction *FRI =
+        new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
+
+    DEBUG(llvm::dbgs() << " *** Devirtualized : " << *CMI);
+    CMI->getParent()->getInstList().insert(CMI, FRI);
+    CMI->replaceAllUsesWith(FRI);
+    CMI->eraseFromParent();
+    for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
+        collectPolyArgs(AI);
+    NumDevirtualized++;
+    Changed = true;
+    break;
+  }
 }
 
 /// \brief Scan the uses of the protocol object and return the initialization
