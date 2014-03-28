@@ -2130,8 +2130,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   
   // Work out the interface type for the witness.
   auto reqtIfaceTy
-    = cast<GenericFunctionType>(Types.getConstantInfo(requirement)
-                                     .FormalInterfaceType);
+    = cast<GenericFunctionType>(requirementInfo.FormalInterfaceType);
   // Substitute the 'self' type into the requirement to get the concrete witness
   // type, leaving the other generic parameters open.
   CanAnyFunctionType witnessSubstIfaceTy = cast<AnyFunctionType>(
