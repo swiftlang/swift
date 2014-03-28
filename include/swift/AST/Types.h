@@ -471,15 +471,18 @@ public:
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
-  /// Replace the result type of the given function type with a new
-  /// result type.
+  /// Replace the base type of the result type of the given function
+  /// type with a new result type, as per a DynamicSelf or other
+  /// covariant return transformation.  The optionality of the
+  /// existing result will be preserved.
   ///
   /// \param newResultType The new result type.
   ///
   /// \param uncurryLevel The number of uncurry levels to apply before
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
-  Type replaceResultType(Type newResultType, unsigned uncurryLevel = 1);
+  Type replaceCovariantResultType(Type newResultType,
+                                  unsigned uncurryLevel = 1);
 
   /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.

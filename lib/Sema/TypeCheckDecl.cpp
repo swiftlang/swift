@@ -2876,7 +2876,7 @@ public:
         });
       }
     } else if (isa<ConstructorDecl>(decl)) {
-      type = type->replaceResultType(subclass, /*uncurryLevel=*/2);
+      type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);
     }
 
     return type;

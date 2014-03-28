@@ -462,6 +462,23 @@ namespace {
       return std::make_tuple(archetypeVal, archetype);
     }
 
+    /// Is the given function a constructor of a class or protocol?
+    /// Such functions are subject to DynamicSelf manipulations.
+    ///
+    /// We want to avoid taking the DynamicSelf paths for other
+    /// constructors for two reasons:
+    ///   - it's an unnecessary cost
+    ///   - optionality preservation has a problem with constructors on
+    ///     optional types
+    static bool isPolymorphicConstructor(AbstractFunctionDecl *fn) {
+      if (!isa<ConstructorDecl>(fn))
+        return false;
+      DeclContext *parent = fn->getParent();
+      if (auto extension = dyn_cast<ExtensionDecl>(parent))
+        parent = extension->getExtendedType()->getAnyNominal();
+      return (isa<ClassDecl>(parent) || isa<ProtocolDecl>(parent));
+    }
+
     /// \brief Build a new member reference with the given base and member.
     Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
                          ValueDecl *member, SourceLoc memberLoc,
@@ -531,14 +548,14 @@ namespace {
       // construction, replace the result type with the actual object type.
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
-            isa<ConstructorDecl>(func)) {
+            isPolymorphicConstructor(func)) {
           // For a DynamicSelf method on an existential, open up the
           // existential.
           if (func->getExtensionType()->is<ProtocolType>() &&
               baseTy->isExistentialType()) {
             std::tie(base, baseTy) = openExistentialReference(base);
             containerTy = baseTy;
-            openedType = openedType->replaceResultType(
+            openedType = openedType->replaceCovariantResultType(
                            baseTy,
                            func->getNumParamPatterns()-1);
 
@@ -566,9 +583,9 @@ namespace {
                                         newSubstitutions);
           }
 
-          refTy = refTy->replaceResultType(containerTy,
-                                           func->getNumParamPatterns());
-          dynamicSelfFnType = refTy->replaceResultType(
+          refTy = refTy->replaceCovariantResultType(containerTy,
+                                                  func->getNumParamPatterns());
+          dynamicSelfFnType = refTy->replaceCovariantResultType(
                                 baseTy,
                                 func->getNumParamPatterns());
 

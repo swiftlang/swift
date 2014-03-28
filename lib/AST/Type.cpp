@@ -445,15 +445,32 @@ Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
-Type TypeBase::replaceResultType(Type newResultType, unsigned uncurryLevel) {
-  if (uncurryLevel == 0)
+Type TypeBase::replaceCovariantResultType(Type newResultType,
+                                          unsigned uncurryLevel) {
+  if (uncurryLevel == 0) {
+    // Preserve optionality of the result.
+    assert(!newResultType->getAnyOptionalObjectType());
+    if (auto boundGeneric = getAs<BoundGenericType>()) {
+      switch (boundGeneric->getDecl()->classifyAsOptionalType()) {
+      case OTK_None:
+        return newResultType;
+      case OTK_Optional:
+        return OptionalType::get(newResultType);
+      case OTK_UncheckedOptional:
+        return UncheckedOptionalType::get(newResultType);
+      }
+      llvm_unreachable("bad optional type kind");
+    }
+
     return newResultType;
+  }
 
   // Determine the input and result types of this function.
   auto fnType = this->castTo<AnyFunctionType>();
   Type inputType = fnType->getInput();
-  Type resultType = fnType->getResult()->replaceResultType(newResultType, 
-                                                           uncurryLevel - 1);
+  Type resultType =
+    fnType->getResult()->replaceCovariantResultType(newResultType,
+                                                    uncurryLevel - 1);
   
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
