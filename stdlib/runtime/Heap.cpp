@@ -89,12 +89,32 @@ static struct {
 
 extern "C" pthread_key_t _swiftAllocOffset = -1;
 
+// The normal fast-path
+static void *_swift_alloc_fast(AllocIndex idx);
+static void *_swift_tryAlloc_fast(AllocIndex idx);
+static void *_swift_slowAlloc_fast(size_t size, uintptr_t flags);
+static void _swift_dealloc_fast(void *ptr, AllocIndex idx);
+static void _swift_slowDealloc_fast(void *ptr, size_t bytes);
+
+// A slower path to support various introspection and debug technologies
+static void *_swift_alloc_debug(AllocIndex idx);
+static void *_swift_tryAlloc_debug(AllocIndex idx);
+static void *_swift_slowAlloc_debug(size_t size, uintptr_t flags);
+static void _swift_dealloc_debug(void *ptr, AllocIndex idx);
+static void _swift_slowDealloc_debug(void *ptr, size_t bytes);
+
 namespace {
 
 const size_t  pageSize = getpagesize();
 const size_t  pageMask = getpagesize() - 1;
 const size_t arenaSize = 0x10000;
 const size_t arenaMask =  0xFFFF;
+
+void *(*_swift_alloc)(AllocIndex idx) = _swift_alloc_fast;
+void *(*_swift_tryAlloc)(AllocIndex idx) = _swift_tryAlloc_fast;
+void *(*_swift_slowAlloc)(size_t size, uintptr_t flags) = _swift_slowAlloc_fast;
+void (*_swift_dealloc)(void *ptr, AllocIndex idx) = _swift_dealloc_fast;
+void (*_swift_slowDealloc)(void *ptr, size_t bytes) = _swift_slowDealloc_fast;
 
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
@@ -174,6 +194,13 @@ static void registerZone() {
     assert(key == prev_key + 1);
     prev_key = key;
   }
+  if (getenv("SWIFT_ZONE_DEBUG")) {
+    _swift_alloc = _swift_alloc_debug;
+    _swift_tryAlloc = _swift_tryAlloc_debug;
+    _swift_slowAlloc = _swift_slowAlloc_debug;
+    _swift_dealloc = _swift_dealloc_debug;
+    _swift_slowDealloc = _swift_slowDealloc_debug;
+  }
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
@@ -190,7 +217,7 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
-  return swift::swift_slowAlloc(size, SWIFT_TRYALLOC);
+  return _swift_slowAlloc_fast(size, SWIFT_TRYALLOC);
 }
 
 void *swift::_swift_zone_calloc(malloc_zone_t *zone,
@@ -272,14 +299,40 @@ boolean_t _swift_zone_locked(malloc_zone_t *zone) {
 }
 
 
-// Plain old memory allocation
+static inline size_t indexToSize(AllocIndex idx) {
+  size_t size;
+  idx++;
+
+  // we could do a table based lookup if we think it worthwhile
+#ifdef __LP64__
+  if        (idx <= 16) { size =  idx       << 3;
+  } else if (idx <= 24) { size = (idx -  8) << 4;
+  } else if (idx <= 32) { size = (idx - 16) << 5;
+  } else if (idx <= 40) { size = (idx - 24) << 6;
+  } else if (idx <= 48) { size = (idx - 32) << 7;
+  } else if (idx <= 56) { size = (idx - 40) << 8;
+#else
+  if        (idx <= 16) { size =  idx       << 2;
+  } else if (idx <= 24) { size = (idx -  8) << 3;
+  } else if (idx <= 32) { size = (idx - 16) << 4;
+  } else if (idx <= 40) { size = (idx - 24) << 5;
+  } else if (idx <= 48) { size = (idx - 32) << 6;
+  } else if (idx <= 56) { size = (idx - 40) << 7;
+  } else if (idx <= 64) { size = (idx - 48) << 8;
+#endif
+  } else {
+    __builtin_trap();
+  }
+
+  return size;
+}
 
 __attribute__((noinline,used))
 static void *
 _swift_alloc_slow(AllocIndex idx, uintptr_t flags)
 {
   AllocCacheEntry ptr = NULL;
-  size_t sz;
+  size_t size;
   int r;
 
 again:
@@ -296,32 +349,9 @@ again:
     return ptr;
   }
 
-  idx++;
+  size = indexToSize(idx);
 
-  // we could do a table based lookup if we think it worthwhile
-#ifdef __LP64__
-  if        (idx <= 16) { sz =  idx       << 3;
-  } else if (idx <= 24) { sz = (idx -  8) << 4;
-  } else if (idx <= 32) { sz = (idx - 16) << 5;
-  } else if (idx <= 40) { sz = (idx - 24) << 6;
-  } else if (idx <= 48) { sz = (idx - 32) << 7;
-  } else if (idx <= 56) { sz = (idx - 40) << 8;
-#else
-  if        (idx <= 16) { sz =  idx       << 2;
-  } else if (idx <= 24) { sz = (idx -  8) << 3;
-  } else if (idx <= 32) { sz = (idx - 16) << 4;
-  } else if (idx <= 40) { sz = (idx - 24) << 5;
-  } else if (idx <= 48) { sz = (idx - 32) << 6;
-  } else if (idx <= 56) { sz = (idx - 40) << 7;
-  } else if (idx <= 64) { sz = (idx - 48) << 8;
-#endif
-  } else {
-    __builtin_trap();
-  }
-
-  idx--;
-
-  Arena::newArena(idx, sz);
+  Arena::newArena(idx, size);
   // FIXME -- SWIFT_TRYALLOC
   goto again;
 }
@@ -335,7 +365,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   swift_dealloc(tmp, idx);
 }
 
-void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
+void *_swift_slowAlloc_fast(size_t size, uintptr_t flags) {
   size_t idx = SIZE_MAX;
   if (size == 0) idx = 0;
   --size;
@@ -404,7 +434,7 @@ setAllocCacheEntry(unsigned long idx, AllocCacheEntry entry) {
   _os_tsd_set_direct(idx + _swiftAllocOffset, entry);
 }
 
-void *swift::swift_alloc(AllocIndex idx) {
+void *_swift_alloc_fast(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry r = getAllocCacheEntry(idx);
   if (r) {
@@ -414,7 +444,7 @@ void *swift::swift_alloc(AllocIndex idx) {
   return _swift_alloc_slow(idx, 0);
 }
 
-void *swift::swift_tryAlloc(AllocIndex idx) {
+void *_swift_tryAlloc_fast(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry r = getAllocCacheEntry(idx);
   if (r) {
@@ -424,7 +454,7 @@ void *swift::swift_tryAlloc(AllocIndex idx) {
   return _swift_alloc_slow(idx, SWIFT_TRYALLOC);
 }
 
-void swift::swift_dealloc(void *ptr, AllocIndex idx) {
+void _swift_dealloc_fast(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   auto cur = static_cast<AllocCacheEntry>(ptr);
   AllocCacheEntry prev = getAllocCacheEntry(idx);
@@ -436,7 +466,7 @@ void swift::swift_dealloc(void *ptr, AllocIndex idx) {
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
 
-void swift::swift_slowDealloc(void *ptr, size_t bytes) {
+void _swift_slowDealloc_fast(void *ptr, size_t bytes) {
   if (bytes == 0) {
     bytes = swiftZone.header.size(NULL, ptr);
   }
@@ -575,4 +605,46 @@ void _swift_zone_statistics(malloc_zone_t *zone,
   for (auto &pair : hugeAllocations) {
     statistics->size_allocated += pair.second;
   }
+}
+
+void *_swift_alloc_debug(AllocIndex idx) {
+  return _swift_slowAlloc_debug(indexToSize(idx), 0);
+}
+
+void *_swift_tryAlloc_debug(AllocIndex idx) {
+  return _swift_slowAlloc_debug(indexToSize(idx), SWIFT_TRYALLOC);
+}
+
+void *_swift_slowAlloc_debug(size_t size, uintptr_t flags) {
+  void *r;
+  // the zone API does not have a notion of try-vs-not
+  do {
+    r = malloc_zone_malloc(&swiftZone.header, size);
+  } while ((r == NULL) && (flags & SWIFT_TRYALLOC));
+  return r;
+}
+
+void _swift_dealloc_debug(void *ptr, AllocIndex idx) {
+  malloc_zone_free(&swiftZone.header, ptr);
+}
+
+void _swift_slowDealloc_debug(void *ptr, size_t bytes) {
+  malloc_zone_free(&swiftZone.header, ptr);
+}
+
+// Shims to select between the fast and
+// introspectable/debugging paths at runtime
+void *swift::swift_alloc(AllocIndex idx) {
+  return _swift_alloc(idx);
+}
+void *swift::swift_tryAlloc(AllocIndex idx) {
+  return _swift_tryAlloc(idx);
+}
+void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
+  return _swift_slowAlloc(size, flags);
+}
+void swift::swift_dealloc(void *ptr, AllocIndex idx) {
+  _swift_dealloc(ptr, idx); }
+void swift::swift_slowDealloc(void *ptr, size_t bytes) {
+  return _swift_slowDealloc(ptr, bytes);
 }
