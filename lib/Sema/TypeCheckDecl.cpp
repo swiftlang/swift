@@ -2638,6 +2638,36 @@ public:
     if (!typeRepr)
       return false;
       
+    return checkDynamicSelfReturn(func, typeRepr, 0);
+  }
+
+  bool checkDynamicSelfReturn(FuncDecl *func, TypeRepr *typeRepr,
+                              unsigned optionalDepth) {
+    // Look through parentheses.
+    if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
+      if (!parenRepr->isParenType()) return false;
+      return checkDynamicSelfReturn(func, parenRepr->getElements()[0],
+                                    optionalDepth);
+    }
+
+    // Look through attributes.
+    if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+      // Only allow @unchecked.
+      TypeAttributes attrs = attrRepr->getAttrs();
+      attrs.clearAttribute(TAK_unchecked);
+      if (!attrs.empty()) return false;
+      return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
+                                    optionalDepth);
+    }
+
+    // Look through optional types.
+    if (auto attrRepr = dyn_cast<OptionalTypeRepr>(typeRepr)) {
+      // But only one level.
+      if (optionalDepth != 0) return false;
+      return checkDynamicSelfReturn(func, attrRepr->getBase(),
+                                    optionalDepth + 1);
+    }
+
     // Check whether we have a simple identifier type.
     auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
     if (!simpleRepr)

@@ -944,6 +944,15 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
+      // Lower @unchecked Self? as if it were @unchecked Whatever?.
+      if (D == TC.Context.getUncheckedOptionalDecl()) {
+        auto valueType = cast<BoundGenericType>(structType).getGenericArgs()[0];
+        if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {
+          return &TC.getTypeLowering(
+                      UncheckedOptionalType::get(dynamicSelf->getSelfType()));
+        }
+      }
+
       bool hasOnlyTrivialChildren = true;
       for (auto field : D->getStoredProperties()) {
         auto origFieldType = AbstractionPattern(field->getType());
@@ -969,6 +978,14 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(enumType);
       
+      // Lower Self? as if it were Whatever?.
+      if (D == TC.Context.getOptionalDecl()) {
+        auto valueType = cast<BoundGenericType>(enumType).getGenericArgs()[0];
+        if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {
+          return &TC.getTypeLowering(OptionalType::get(dynamicSelf->getSelfType()));
+        }
+      }
+
       typedef LoadableEnumTypeLowering::NonTrivialElement NonTrivialElement;
       SmallVector<NonTrivialElement, 8> nonTrivialElts;
       

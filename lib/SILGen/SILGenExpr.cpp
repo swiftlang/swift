@@ -927,17 +927,33 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
+static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ManagedValue input,
+                                         SILType resultTy) {
+  SILType objectPtrTy = SILType::getObjectPointerType(gen.getASTContext());
+  SILValue result = gen.B.createRefToObjectPointer(loc,
+                                                   input.forward(gen),
+                                                   objectPtrTy);
+  result = gen.B.createObjectPointerToRef(loc, result, resultTy);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
 RValue RValueEmitter::visitCovariantReturnConversionExpr(
                         CovariantReturnConversionExpr *e,
                         SGFContext C) {
+  SILType resultType = SGF.getLoweredType(e->getType());
+
   ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
-  SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
-  SILValue result = SGF.B.createRefToObjectPointer(e,
-                                                   original.forward(SGF),
-                                                   objectPtrTy);
-  SILType resultTy = SGF.getLoweredType(e->getType());
-  result = SGF.B.createObjectPointerToRef(e, result, resultTy);
-  return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
+  ManagedValue result;
+  if (resultType.getSwiftRValueType().getAnyOptionalObjectType()) {
+    result = SGF.emitOptionalToOptional(e, original, resultType,
+                                        createUnsafeDowncast);
+  } else {
+    result = createUnsafeDowncast(SGF, e, original, resultType);
+  }
+
+  return RValue(SGF, e, result);
 }
 
 namespace {
