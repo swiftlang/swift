@@ -81,6 +81,7 @@ struct PrintOptions {
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.SkipImplicit = false;
+    result.PrintDocumentationComments = true;
     return result;
   }
 };
