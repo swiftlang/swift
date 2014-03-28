@@ -1249,6 +1249,11 @@ StringRef ClassDecl::getObjCRuntimeName(
         = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
     return clangDecl->getName();
 
+  // If there is an 'asmname' attribute on the class, use that name.
+  if (auto asmname = getAttrs().getAttribute<AsmnameAttr>()) {
+    return asmname->Name;
+  }
+
   // If we aren't mangling Objective-C class and protocol names, there's nothing
   // special to do here.
   // FIXME: The SwiftObject check here is a hack.
@@ -1382,6 +1387,11 @@ StringRef ProtocolDecl::getObjCRuntimeName(
   if (auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(
                           getClangNode().getAsDecl()))
     return clangProto->getName();
+
+  // If there is an 'asmname' attribute on the protocol, use that name.
+  if (auto asmname = getAttrs().getAttribute<AsmnameAttr>()) {
+    return asmname->Name;
+  }
 
   // If we aren't mangling Objective-C class and protocol names, just
   // return the protocol name.

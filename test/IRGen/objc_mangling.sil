@@ -27,6 +27,16 @@ extension Foo {
   func fooExtMethod() { }
 }
 
+// CHECK: @"OBJC_METACLASS_$_NSBar" = global %objc_class {{.*}}* @_METACLASS_DATA_NSBar to i64) }
+// CHECK: @_DATA_NSBar = private constant 
+@objc @asmname("NSBar") class Bar {
+  func barMethod() { }
+}
+
+// CHECK: @"_CATEGORY_NSBar_$_objc_mangling" = private constant
+extension Bar {
+  func barExtMethod() { }
+}
 
 // CHECK: @"_CATEGORY_Gizmo_$_objc_mangling" = private constant {
 // CHECK:   i8* getelementptr inbounds ([14 x i8]* [[CATEGORYNAME]], i64 0, i64 0), 
@@ -55,6 +65,23 @@ bb0(%0 : $Foo):
 
 sil @_TToFC13objc_mangling3Foo12fooExtMethodfS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> () {
 bb0(%0 : $Foo):
+  %1 = tuple ()
+  return %1 : $() 
+}
+
+sil @_TToFC13objc_mangling3Bar9barMethodfS0_FT_T_ : $@cc(objc_method) @thin (Bar) -> () {
+bb0(%0 : $Bar):
+  %1 = tuple ()
+  return %1 : $() 
+}
+
+sil @_TToFC13objc_mangling3BarcfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned Bar) -> @owned Bar {
+bb0(%0 : $Bar):
+  return %0 : $Bar
+}
+
+sil @_TToFC13objc_mangling3Bar12barExtMethodfS0_FT_T_ : $@cc(objc_method) @thin (Bar) -> () {
+bb0(%0 : $Bar):
   %1 = tuple ()
   return %1 : $() 
 }
