@@ -62,6 +62,7 @@ namespace swift {
   class Module;
   class ProtocolConformance;
   class Substitution;
+  enum OptionalTypeKind : unsigned;
 
   enum class TypeKind {
 #define TYPE(id, parent) id,
@@ -542,7 +543,11 @@ public:
 
   /// Return T if this type is Optional<T> or UncheckedOptional<T>;
   /// otherwise, return the null type.
-  Type getAnyOptionalObjectType();
+  Type getAnyOptionalObjectType(OptionalTypeKind &kind);
+  Type getAnyOptionalObjectType() {
+    OptionalTypeKind ignored;
+    return getAnyOptionalObjectType(ignored);
+  }
 
   void dump() const;
   void print(raw_ostream &OS,

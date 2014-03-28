@@ -367,10 +367,11 @@ Type TypeBase::getUncheckedOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getAnyOptionalObjectType() {
+Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   if (auto boundTy = getAs<BoundGenericType>())
-    if (boundTy->getDecl()->classifyAsOptionalType())
+    if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
       return boundTy->getGenericArgs()[0];
+  kind = OTK_None;
   return Type();
 }
 
