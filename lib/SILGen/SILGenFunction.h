@@ -841,6 +841,17 @@ public:
                                         const TypeLowering &optTL,
                                         SGFContext C);
 
+  typedef std::function<ManagedValue(SILGenFunction &gen,
+                                     SILLocation loc,
+                                     ManagedValue input,
+                                     SILType loweredResultTy)> ValueTransform;
+
+  /// Emit a transformation on the value of an optional type.
+  ManagedValue emitOptionalToOptional(SILLocation loc,
+                                      ManagedValue input,
+                                      SILType loweredResultTy,
+                                      const ValueTransform &transform);
+
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//

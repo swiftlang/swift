@@ -3592,94 +3592,90 @@ static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
-typedef ManagedValue ValueTransform(SILGenFunction &gen,
-                                    SILLocation loc,
-                                    ManagedValue v,
-                                    CanType loweredResultTy);
-
 /// Emit an optional-to-optional transformation.
-static ManagedValue emitOptionalToOptional(SILGenFunction &gen,
-                                           SILLocation loc,
-                                           ManagedValue input,
-                                           CanType loweredResultTy,
-                                           ValueTransform &transformValue) {
-  auto isNotPresentBB = gen.createBasicBlock();
-  auto isPresentBB = gen.createBasicBlock();
-  auto contBB = gen.createBasicBlock();
+ManagedValue
+SILGenFunction::emitOptionalToOptional(SILLocation loc,
+                                       ManagedValue input,
+                                       SILType resultTy,
+                                       const ValueTransform &transformValue) {
+  auto isNotPresentBB = createBasicBlock();
+  auto isPresentBB = createBasicBlock();
+  auto contBB = createBasicBlock();
 
   // Create a temporary for the output optional.
-  SILType resultTy = SILType::getPrimitiveObjectType(loweredResultTy);
-  auto &resultTL = gen.getTypeLowering(resultTy);
-  auto resultTemp = gen.emitTemporaryAllocation(loc, resultTy);
+  auto &resultTL = getTypeLowering(resultTy);
+  auto resultTemp = emitTemporaryAllocation(loc, resultTy);
 
   // Materialize the input.
   SILValue inputTemp;
   if (input.getType().isAddress()) {
-    inputTemp = input.forward(gen);
+    inputTemp = input.forward(*this);
   } else {
-    inputTemp = gen.emitTemporaryAllocation(loc, input.getType());
-    input.forwardInto(gen, loc, inputTemp);
+    inputTemp = emitTemporaryAllocation(loc, input.getType());
+    input.forwardInto(*this, loc, inputTemp);
   }
 
   // Branch on whether the input is optional.
-  auto isPresent = gen.emitDoesOptionalHaveValue(loc, inputTemp);
-  gen.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
+  auto isPresent = emitDoesOptionalHaveValue(loc, inputTemp);
+  B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
 
   // If it's present, apply the recursive transformation to the value.
-  gen.B.emitBlock(isPresentBB);
+  B.emitBlock(isPresentBB);
   {
     // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+    FullExpr presentScope(Cleanups, CleanupLocation::getCleanupLocation(loc));
 
-    CanType loweredResultValueTy = loweredResultTy.getAnyOptionalObjectType();
-    assert(loweredResultValueTy);
+    CanType resultValueTy =
+      resultTy.getSwiftRValueType().getAnyOptionalObjectType();
+    assert(resultValueTy);
+    SILType loweredResultValueTy = getLoweredType(resultValueTy);
 
     // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = gen.getTypeLowering(input.getType());
-    auto inputValue = gen.emitGetOptionalValueFrom(loc,
+    auto &inputTL = getTypeLowering(input.getType());
+    auto inputValue = emitGetOptionalValueFrom(loc,
                                         ManagedValue::forUnmanaged(inputTemp),
-                                                   inputTL,
-                                                   SGFContext());
+                                               inputTL,
+                                               SGFContext());
 
     // Transform it.
-    auto resultValue = transformValue(gen, loc, inputValue,
+    auto resultValue = transformValue(*this, loc, inputValue,
                                       loweredResultValueTy);
 
     // Inject that into the result type.
-    RValueSource resultValueRV(loc, RValue(resultValue, loweredResultValueTy));
-    gen.emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                    resultTemp, resultTL);
-
+    RValueSource resultValueRV(loc, RValue(resultValue, resultValueTy));
+    emitInjectOptionalValueInto(loc, std::move(resultValueRV),
+                                resultTemp, resultTL);
   }
-  gen.B.createBranch(loc, contBB);
+  B.createBranch(loc, contBB);
 
   // If it's not present, inject 'nothing' into the result.
-  gen.B.emitBlock(isNotPresentBB);
+  B.emitBlock(isNotPresentBB);
   {
-    gen.emitInjectOptionalNothingInto(loc, resultTemp, resultTL);
+    emitInjectOptionalNothingInto(loc, resultTemp, resultTL);
   }
-  gen.B.createBranch(loc, contBB);
+  B.createBranch(loc, contBB);
 
   // Continue.
-  gen.B.emitBlock(contBB);
+  B.emitBlock(contBB);
   if (resultTL.isAddressOnly()) {
-    return gen.emitManagedBufferWithCleanup(resultTemp, resultTL);
+    return emitManagedBufferWithCleanup(resultTemp, resultTL);
   } else {
-    return gen.emitLoad(loc, resultTemp, resultTL, SGFContext(), IsTake);
+    return emitLoad(loc, resultTemp, resultTL, SGFContext(), IsTake);
   }
 }
 
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
                                               SILLocation loc,
                                               ManagedValue v,
-                                              CanType loweredBridgedTy) {
-  auto loweredNativeTy = v.getType().getSwiftRValueType();
+                                              SILType bridgedTy) {
+  CanType loweredBridgedTy = bridgedTy.getSwiftRValueType();
+  CanType loweredNativeTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
     return v;
 
   if (loweredNativeTy.getAnyOptionalObjectType()) {
-    return emitOptionalToOptional(gen, loc, v, loweredBridgedTy,
-                                  emitNativeToCBridgedValue);
+    return gen.emitOptionalToOptional(loc, v, bridgedTy,
+                                      emitNativeToCBridgedValue);
   }
 
   // If the input is a native type with a bridged mapping, convert it.
@@ -3716,7 +3712,8 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
     return v;
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    return emitNativeToCBridgedValue(*this, loc, v, loweredBridgedTy);
+    return emitNativeToCBridgedValue(*this, loc, v,
+                           SILType::getPrimitiveObjectType(loweredBridgedTy));
   }
   llvm_unreachable("bad CC");
 }
@@ -3724,14 +3721,15 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
                                               SILLocation loc,
                                               ManagedValue v,
-                                              CanType loweredNativeTy) {
-  auto loweredBridgedTy = v.getType().getSwiftRValueType();
+                                              SILType nativeTy) {
+  CanType loweredNativeTy = nativeTy.getSwiftRValueType();
+  CanType loweredBridgedTy = v.getType().getSwiftRValueType();
   if (loweredNativeTy == loweredBridgedTy)
     return v;
 
   if (loweredNativeTy.getAnyOptionalObjectType()) {
-    return emitOptionalToOptional(gen, loc, v, loweredNativeTy,
-                                  emitCBridgedToNativeValue);
+    return gen.emitOptionalToOptional(loc, v, nativeTy,
+                                      emitCBridgedToNativeValue);
   }
 
   // If the output is a bridged type, convert it back to a native type.
@@ -3757,7 +3755,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
 ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
                                                       ManagedValue v,
                                                       AbstractCC srcCC,
-                                                      CanType loweredNativeTy) {
+                                                      CanType nativeTy) {
   switch (srcCC) {
   case AbstractCC::Freestanding:
   case AbstractCC::Method:
@@ -3767,7 +3765,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
 
   case AbstractCC::C:
   case AbstractCC::ObjCMethod:
-    return emitCBridgedToNativeValue(*this, loc, v, loweredNativeTy);
+    return emitCBridgedToNativeValue(*this, loc, v, getLoweredType(nativeTy));
   }
   llvm_unreachable("bad CC");
 }
