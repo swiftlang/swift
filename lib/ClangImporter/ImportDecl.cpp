@@ -1631,8 +1631,11 @@ namespace {
         result->setDynamicSelf(true);
         resultTy = result->getDynamicSelf();
         assert(resultTy && "failed to get dynamic self");
-        if (Impl.EnableOptional)
+        Type interfaceSelfTy = result->getDynamicSelfInterface();
+        if (Impl.EnableOptional) {
           resultTy = UncheckedOptionalType::get(resultTy);
+          interfaceSelfTy = UncheckedOptionalType::get(interfaceSelfTy);
+        }
         
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();
@@ -1640,8 +1643,7 @@ namespace {
                                  methodTy->getExtInfo());
 
         // Create the interface type of the method.
-        interfaceType = FunctionType::get(methodTy->getInput(),
-                                          result->getDynamicSelfInterface(),
+        interfaceType = FunctionType::get(methodTy->getInput(), interfaceSelfTy,
                                           methodTy->getExtInfo());
         interfaceType = FunctionType::get(selfVar->getType(), interfaceType);
       }
