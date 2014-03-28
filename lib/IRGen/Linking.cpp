@@ -226,14 +226,21 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
 
   // An Objective-C class reference;  not a swift mangling.
-  case Kind::ObjCClass:
-    buffer << "OBJC_CLASS_$_" << getDecl()->getName().str();
+  case Kind::ObjCClass: {
+    llvm::SmallString<64> nameBuffer;
+    buffer << "OBJC_CLASS_$_" 
+           << cast<ClassDecl>(getDecl())->getObjCRuntimeName(nameBuffer);
     return;
+  }
 
   // An Objective-C metaclass reference;  not a swift mangling.
-  case Kind::ObjCMetaclass:
-    buffer << "OBJC_METACLASS_$_" << getDecl()->getName().str();
+  case Kind::ObjCMetaclass: {
+    llvm::SmallString<64> nameBuffer;
+    buffer << "OBJC_METACLASS_$_"
+           << cast<ClassDecl>(getDecl())->getObjCRuntimeName(nameBuffer);
     return;
+  }
+
   case Kind::SILFunction:
     buffer << getSILFunction()->getName();
     return;

@@ -155,6 +155,13 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption]>, MetaVarName<"<path>">,
   HelpText<"Emit an Objective-C header file to <path>">;
 
+def disable_objc_mangling : Flag<["-"], "disable-objc-mangling">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable mangled names for @objc classes and protocols">;
+def enable_objc_mangling : Flag<["-"], "enable-objc-mangling">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable mangled names for @objc classes and protocols">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[DriverOption, FrontendOption]>,

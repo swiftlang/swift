@@ -955,14 +955,15 @@ namespace {
     
     llvm::Constant *emitProtocol() {
       SmallVector<llvm::Constant*, 11> fields;
-      
+      llvm::SmallString<64> nameBuffer;
+
       assert(isBuildingProtocol() && "not emitting a protocol");
       
       // struct protocol_t {
       //   Class super;
       fields.push_back(null());
       //   char const *name;
-      fields.push_back(IGM.getAddrOfGlobalString(getEntityName()));
+      fields.push_back(IGM.getAddrOfGlobalString(getEntityName(nameBuffer)));
       //   const protocol_list_t *baseProtocols;
       fields.push_back(buildProtocolList());
       //   const method_list_t *requiredInstanceMethods;
@@ -1088,21 +1089,8 @@ namespace {
     llvm::Constant *buildName() {
       if (Name) return Name;
 
-      // If the class is being exported as an Objective-C class, we
-      // should export it under its formal name.
-      if (getClass()->isObjC()) {
-        Name = IGM.getAddrOfGlobalString(getClass()->getName().str());
-        return Name;
-      }
-
-      // Otherwise, we need to mangle the type.
-      auto type = getClass()->getDeclaredType()->getCanonicalType();
-
-      // We add the "_Tt" prefix to make this a reserved name that
-      // will not conflict with any valid Objective-C class name.
-      llvm::SmallString<128> buffer;
-      buffer += "_Tt";
-      Name = IGM.getAddrOfGlobalString(IGM.mangleType(type, buffer));
+      llvm::SmallString<64> buffer;
+      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer));
       return Name;
     }
 
@@ -1527,13 +1515,13 @@ namespace {
     
     /// Get the name of the class or protocol to mangle into the ObjC symbol
     /// name.
-    StringRef getEntityName() const {
+    StringRef getEntityName(llvm::SmallVectorImpl<char> &buffer) const {
       if (auto theClass = TheEntity.dyn_cast<ClassDecl*>()) {
-        return theClass->getName().str();
+        return theClass->getObjCRuntimeName(buffer);
       }
       
       if (auto theProtocol = TheEntity.dyn_cast<ProtocolDecl*>()) {
-        return getObjCProtocolName(theProtocol);
+        return theProtocol->getObjCRuntimeName(buffer);
       }
       
       llvm_unreachable("not a class or protocol?!");
@@ -1543,13 +1531,14 @@ namespace {
     /// given fields.
     llvm::Constant *buildGlobalVariable(ArrayRef<llvm::Constant*> fields,
                                         StringRef nameBase) {
+      llvm::SmallString<64> nameBuffer;
       auto init = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
       auto var = new llvm::GlobalVariable(IGM.Module, init->getType(),
                                         /*constant*/ true,
                                         llvm::GlobalVariable::PrivateLinkage,
                                         init,
                                         Twine(nameBase) 
-                                          + getEntityName()
+                                          + getEntityName(nameBuffer)
                                           + (TheExtension
                                              ? Twine("_$_") + CategoryName.str()
                                              : Twine()));
@@ -1649,5 +1638,6 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
                                            Context.TheBuiltinModule);
   SwiftRootClass->computeType();
   SwiftRootClass->setIsObjC(true);
+  SwiftRootClass->setImplicit();
   return SwiftRootClass;
 }

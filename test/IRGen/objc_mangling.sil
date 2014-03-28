@@ -1,0 +1,67 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import -enable-objc-mangling %s -emit-ir | FileCheck %s
+
+import gizmo
+
+// CHECK: @"OBJC_METACLASS_$__TtC13objc_mangling3Foo" = global %objc_class {
+// CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject",
+// CHECK:   %objc_class* @"OBJC_METACLASS_$_SwiftObject", 
+// CHECK:   %swift.opaque* @_objc_empty_cache, 
+// CHECK:   %swift.opaque* @_objc_empty_vtable, 
+// CHECK:   i64 ptrtoint ({{.*}}* @_METACLASS_DATA__TtC13objc_mangling3Foo to i64)
+// CHECK: }
+
+// CHECK: [[FOONAME:@[0-9]+]] = private unnamed_addr constant [24 x i8] c"_TtC13objc_mangling3Foo\00"
+// CHECK: @_METACLASS_DATA__TtC13objc_mangling3Foo = private constant { i32, i32, i32, i32, i8*, i8*, i8*, i8*, i8*, i8*, i8* } { i32 129, i32 0, i32 0, i32 0, i8* null, i8* getelementptr inbounds ([24 x i8]* [[FOONAME]], i64 0, i64 0), i8* null, i8* null, i8* null, i8* null, i8* null }, section "__DATA, __objc_const", align 8
+
+// CHECK: @_INSTANCE_METHODS__TtC13objc_mangling3Foo
+@objc class Foo {
+  func fooMethod() { }
+}
+
+// CHECK: [[CATEGORYNAME:@[0-9]+]] = private unnamed_addr constant [14 x i8] c"objc_mangling\00"
+// CHECK: @"_CATEGORY__TtC13objc_mangling3Foo_$_objc_mangling" = private constant  {
+// CHECK:   i8* getelementptr inbounds ([14 x i8]* [[CATEGORYNAME]], i64 0, i64 0), 
+// CHECK:   %swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_mangling3Foo to %swift.full_heapmetadata*), 
+extension Foo {
+  func fooExtMethod() { }
+}
+
+
+// CHECK: @"_CATEGORY_Gizmo_$_objc_mangling" = private constant {
+// CHECK:   i8* getelementptr inbounds ([14 x i8]* [[CATEGORYNAME]], i64 0, i64 0), 
+// CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo", 
+// CHECK: { i32, i32, [1 x { i8*, i8*, i8* }] }* @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_mangling", i8* null, i8* null, i8* null }, section "__DATA, __objc_const", align 8
+extension Gizmo {
+  @objc func gizmoExtMethod() { }
+}
+
+// CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$__TtP13objc_mangling5Proto_" = weak hidden global
+// CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13objc_mangling5Proto_" = weak hidden global
+@objc protocol Proto {
+  func protoMethod()
+}
+
+sil @_TToFC13objc_mangling3Foo9fooMethodfS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> () {
+bb0(%0 : $Foo):
+  %1 = tuple ()
+  return %1 : $() 
+}
+
+sil @_TToFC13objc_mangling3FoocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned Foo) -> @owned Foo {
+bb0(%0 : $Foo):
+  return %0 : $Foo
+}
+
+sil @_TToFC13objc_mangling3Foo12fooExtMethodfS0_FT_T_ : $@cc(objc_method) @thin (Foo) -> () {
+bb0(%0 : $Foo):
+  %1 = tuple ()
+  return %1 : $() 
+}
+
+sil @_TToFCSo5Gizmo14gizmoExtMethodfS_FT_T_ : $@cc(objc_method) @thin (Gizmo) -> () {
+bb0(%0 : $Gizmo):
+  %1 = tuple ()
+  return %1 : $() 
+}
+

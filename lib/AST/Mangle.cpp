@@ -159,13 +159,19 @@ void Mangler::mangleContextOf(ValueDecl *decl, BindGenerics shouldBind) {
   // Classes and protocols published to Objective-C have a special context
   // mangling.
   //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && (clangDecl || decl->isObjC())) {
+  if (isa<ClassDecl>(decl) && 
+      (clangDecl || 
+       (decl->isObjC() &&
+        !decl->getASTContext().LangOpts.MangleObjCClassProtocolNames))) {
     assert(!clangDecl || isa<clang::ObjCInterfaceDecl>(clangDecl));
     Buffer << "So";
     return;
   }
   
-  if (isa<ProtocolDecl>(decl) && (clangDecl || decl->isObjC())) {
+  if (isa<ProtocolDecl>(decl) && 
+      (clangDecl || 
+       (decl->isObjC() &&
+        !decl->getASTContext().LangOpts.MangleObjCClassProtocolNames))) {
     assert(!clangDecl || isa<clang::ObjCProtocolDecl>(clangDecl));
     Buffer << "So";
     return; 

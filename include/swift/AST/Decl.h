@@ -2670,6 +2670,10 @@ public:
     ClassDeclBits.AddedImplicitInitializers = true;
   }
 
+  /// Retrieve the name to use for this class when interoperating with
+  /// the Objective-C runtime.
+  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Class;
@@ -2785,6 +2789,10 @@ public:
   void setCircularityCheck(CircularityCheck circularity) {
     ProtocolDeclBits.Circularity = static_cast<unsigned>(circularity);
   }
+
+  /// Retrieve the name to use for this protocol when interoperating
+  /// with the Objective-C runtime.
+  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

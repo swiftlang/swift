@@ -4495,15 +4495,6 @@ llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
                                  protoRefsBuf.getAddress());
 }
 
-StringRef irgen::getObjCProtocolName(ProtocolDecl *proto) {
-  // For a Clang protocol, use the name on the Clang AST node directly.
-  if (auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(
-                          proto->getClangNode().getAsDecl()))
-    return clangProto->getName();
-
-  return proto->getName().str();
-}
-
 bool irgen::requiresProtocolWitnessTable(ProtocolDecl *protocol) {
   return !protocol->isObjC();
 }

@@ -72,7 +72,7 @@ import gizmo
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* @_objc_empty_vtable,
-// CHECK:   @_DATA_RootNonGeneric
+// CHECK:   @_DATA__TtC15generic_classes14RootNonGeneric
 // CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
 // CHECK:   i64 33,
 // CHECK:   i64 7

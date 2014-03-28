@@ -254,6 +254,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   Args.AddLastArg(Arguments, options::OPT_module_link_name);
 
+  Args.AddAllArgs(Arguments, options::OPT_enable_objc_mangling, 
+                  options::OPT_disable_objc_mangling);
+
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
 

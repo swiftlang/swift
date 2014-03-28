@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/Mangle.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1219,6 +1220,48 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   return true;
 }
 
+/// Mangle the name of a protocol or class for use in the Objective-C
+/// runtime.
+static StringRef mangleObjCRuntimeName(NominalTypeDecl *nominal,
+                                       llvm::SmallVectorImpl<char> &buffer) {
+  {
+    buffer.clear();
+    llvm::raw_svector_ostream os(buffer);
+
+    // We add the "_Tt" prefix to make this a reserved name that will
+    // not conflict with any valid Objective-C class or protocol name.
+    os << "_Tt";
+
+    // Mangle the type.
+    Mangle::Mangler mangler(os);
+    mangler.mangleType(nominal->getDeclaredType()->getCanonicalType(), 
+                       ResilienceExpansion::Minimal, 0);
+  }
+
+  return StringRef(buffer.data(), buffer.size());
+}
+
+StringRef ClassDecl::getObjCRuntimeName(
+                       llvm::SmallVectorImpl<char> &buffer) {
+  // If this class was defined in Objective-C, use the name on the
+  // Clang node.
+  if (auto clangDecl
+        = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
+    return clangDecl->getName();
+
+  // If we aren't mangling Objective-C class and protocol names, there's nothing
+  // special to do here.
+  // FIXME: The SwiftObject check here is a hack.
+  auto &ctx = getASTContext();
+  if (isObjC() && 
+      (!ctx.LangOpts.MangleObjCClassProtocolNames || 
+       (isImplicit() && getName().str().equals("SwiftObject"))))
+    return getName().str();
+
+  // Produce the mangled name for this class.
+  return mangleObjCRuntimeName(this, buffer);
+}
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
@@ -1331,6 +1374,23 @@ bool ProtocolDecl::requiresClassSlow() {
 
 GenericTypeParamDecl *ProtocolDecl::getSelf() const {
   return getGenericParams()->getParams()[0].getAsTypeParam();
+}
+
+StringRef ProtocolDecl::getObjCRuntimeName(
+                          llvm::SmallVectorImpl<char> &buffer) {
+  // If this protocol was defined in Objective-C, use its name directly.
+  if (auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(
+                          getClangNode().getAsDecl()))
+    return clangProto->getName();
+
+  // If we aren't mangling Objective-C class and protocol names, just
+  // return the protocol name.
+  auto &ctx = getASTContext();
+  if (isObjC() && !ctx.LangOpts.MangleObjCClassProtocolNames)
+    return getName().str();
+
+  // Produce the mangled name for this protocol.
+  return mangleObjCRuntimeName(this, buffer);
 }
 
 void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,

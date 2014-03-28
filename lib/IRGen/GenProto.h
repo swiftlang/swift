@@ -216,9 +216,6 @@ namespace irgen {
                                            SILType destType,
                                            CheckedCastMode mode);
   
-  /// Get the ObjC name of an ObjC protocol.
-  StringRef getObjCProtocolName(ProtocolDecl *proto);
-  
   /// True if the protocol requires a witness table for method dispatch.
   bool requiresProtocolWitnessTable(ProtocolDecl *protocol);
   

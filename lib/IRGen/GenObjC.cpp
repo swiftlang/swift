@@ -248,13 +248,15 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolRecord = llvm::ConstantExpr::getBitCast(protocolRecord, Int8PtrTy);
 
   // Introduce a variable to label the protocol.
+  llvm::SmallString<64> nameBuffer;
+  StringRef protocolName = proto->getObjCRuntimeName(nameBuffer);
   auto *protocolLabel
     = new llvm::GlobalVariable(Module, protocolRecord->getType(),
                                /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_LABEL_PROTOCOL_$_")
-                                 + getObjCProtocolName(proto));
+                                 + protocolName);
   protocolLabel->setAlignment(getPointerAlignment().getValue());
   protocolLabel->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolLabel->setSection("__DATA,__objc_protolist,coalesced,no_dead_strip");
@@ -266,7 +268,7 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
                                llvm::Twine("\01l_OBJC_PROTOCOL_REFERENCE_$_")
-                                 + getObjCProtocolName(proto));
+                                 + protocolName);
   protocolRef->setAlignment(getPointerAlignment().getValue());
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection("__DATA,__objc_protorefs,coalesced,no_dead_strip");
