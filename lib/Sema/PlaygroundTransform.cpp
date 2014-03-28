@@ -50,6 +50,12 @@ public:
       return transformBraceStmt(llvm::cast<BraceStmt>(S));
     case StmtKind::If:
       return transformIfStmt(llvm::cast<IfStmt>(S));
+    case StmtKind::While:
+      return transformWhileStmt(llvm::cast<WhileStmt>(S));
+    case StmtKind::DoWhile:
+      return transformDoWhileStmt(llvm::cast<DoWhileStmt>(S));
+    case StmtKind::For:
+      return transformForStmt(llvm::cast<ForStmt>(S));
     }
   }
     
@@ -71,6 +77,50 @@ public:
     }
 
     return IS;
+  }
+
+  WhileStmt *transformWhileStmt(WhileStmt *WS) {
+    if (Stmt *B = WS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        WS->setBody(NB);
+      }
+    }
+      
+    return WS;
+  }
+
+  DoWhileStmt *transformDoWhileStmt(DoWhileStmt *DWS) {
+    if (Stmt *B = DWS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        DWS->setBody(NB);
+      }
+    }
+      
+    return DWS;
+  }
+
+  ForStmt *transformForStmt(ForStmt *FS) {
+    if (Stmt *B = FS->getBody()) {
+      Stmt *NB = transformStmt(B);
+      if (NB != B) {
+        FS->setBody(NB);
+      }
+    }
+      
+    return FS;
+  }
+
+  ForEachStmt *transformForEachStmt(ForEachStmt *FES) {
+    if (BraceStmt *B = FES->getBody()) {
+      BraceStmt *NB = transformBraceStmt(B);
+      if (NB != B) {
+        FES->setBody(NB);
+      }
+    }
+      
+    return FES;
   }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS) {
@@ -114,11 +164,51 @@ public:
           Elements.insert(Elements.begin() + (EI + 3), NAE);
           EI += 3;
         }
+        else if (CallExpr *CE = llvm::dyn_cast<CallExpr>(E)) {
+          if (CE->getType()->getCanonicalType() ==
+              Context.TheEmptyTupleType) {
+            if (DotSyntaxCallExpr *DSCE =
+                llvm::dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+              Expr *TargetExpr = DSCE->getArg();
+              DeclRefExpr *TargetDRE = nullptr;
+              VarDecl *TargetVD = nullptr;
+
+              if ((TargetDRE = llvm::dyn_cast<DeclRefExpr>(TargetExpr))) {
+                TargetVD = llvm::dyn_cast<VarDecl>(TargetDRE->getDecl());
+              }
+              else if (LoadExpr *LE = llvm::dyn_cast<LoadExpr>(TargetExpr)) {
+                if ((TargetDRE =
+                     llvm::dyn_cast<DeclRefExpr>(LE->getSubExpr()))) {
+                  TargetVD = llvm::dyn_cast<VarDecl>(TargetDRE->getDecl());
+                }
+              }
+
+              if (TargetVD) {
+                Expr *Log = logDeclRef(TargetDRE);
+                if (Log) {
+                  Modified = true;
+                  Elements.insert(Elements.begin() + (EI + 1), Log);
+                  ++EI;
+                }
+              }
+            }
+          } else {
+            // do the same as for all other expressions
+            Expr *Log = logExpr(E);
+            if (Log) {
+              Modified = true;
+              Elements[EI] = Log;
+            }
+          }
+        }
         else {
-          Expr *Log = logExpr(E);
-          if (Log) {
-            Modified = true;
-            Elements[EI] = Log;
+          if (E->getType()->getCanonicalType() !=
+              Context.TheEmptyTupleType) {
+            Expr *Log = logExpr(E);
+            if (Log) {
+              Modified = true;
+              Elements[EI] = Log;
+            }
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
@@ -162,6 +252,17 @@ public:
                                 false, // uses direct property access
                                 Type()),
       VD->getSourceRange());
+  }
+
+  Expr *logDeclRef(DeclRefExpr *DRE) {
+    VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
+    return buildLoggerCall(
+      new (Context) DeclRefExpr(ConcreteDeclRef(VD),
+                                SourceLoc(),
+                                true, // implicit
+                                false, // uses direct property access
+                                Type()),
+      DRE->getSourceRange());
   }
 
   std::pair<PatternBindingDecl*, VarDecl*>
