@@ -362,8 +362,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       auto &PrevOv = CheckOverloads[VD->getName()];
       if (i >= StartElem) {
         for (ValueDecl *PrevD : PrevOv) {
-          if (PrevD->getType()->isEqual(VD->getType()) &&
-              !haveDifferentFixity(PrevD, VD)) {
+          if (isa<TypeDecl>(VD) || isa<VarDecl>(VD) ||
+              (PrevD->getType()->isEqual(VD->getType()) &&
+               !haveDifferentFixity(PrevD, VD))) {
             TC.diagnose(VD->getStartLoc(), diag::invalid_redecl);
             TC.diagnose(PrevD, diag::invalid_redecl_prev,
                         VD->getName());

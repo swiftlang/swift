@@ -256,35 +256,6 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   // import statements after the first "chunk" should be rare, though.)
   // FIXME: Can we make this more efficient?
 
-  llvm::DenseMap<Identifier, ValueDecl*> CheckTypes;
-  for (unsigned i = 0, e = SF.Decls.size(); i != e; ++i) {
-    Decl *D = SF.Decls[i];
-    if (D->isInvalid())
-      // No need to diagnose redeclarations of invalid declarations, we have
-      // already complained about them in some other way.
-      continue;
-
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
-      // Check for declarations with the same name which aren't overloaded
-      // vars/funcs.
-      // FIXME: We don't have enough information to do this properly here,
-      // because we need resolved types to find duplicates.
-      if (!VD->hasName())
-        continue;
-      ValueDecl *&LookupD = CheckTypes[VD->getName()];
-      ValueDecl *PrevD = LookupD;
-      LookupD = VD;
-      if (i >= StartElem) {
-        if (PrevD && !((isa<VarDecl>(VD)    || isa<FuncDecl>(VD)) &&
-                       (isa<VarDecl>(PrevD) || isa<FuncDecl>(PrevD)))) {
-          Binder.diagnose(VD->getStartLoc(), diag::invalid_redecl);
-          Binder.diagnose(PrevD, diag::invalid_redecl_prev,
-                          VD->getName());
-        }
-      }
-    }
-  }
-
   SF.ASTStage = SourceFile::NameBound;
   verify(SF);
 }
