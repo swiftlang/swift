@@ -781,21 +781,38 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
-static bool checkSuperInit(TypeChecker &tc, ApplyExpr *apply,
-                           bool suppressDiagnostics) {
-  // If we refer to a subobject initializer, we're done.
+static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
+                           bool implicitlyGenerated) {
+  // Make sure we are referring to a designated initializer.
   auto otherCtorRef = cast<OtherConstructorDeclRefExpr>(
                         apply->getFn()->getSemanticsProvidingExpr());
   auto ctor = otherCtorRef->getDecl();
-  if (ctor->isSubobjectInit())
-    return false;
-
-  if (!suppressDiagnostics) {
-    tc.diagnose(apply->getArg()->getLoc(), diag::chain_complete_object_init,
-                apply->getArg()->getType());
-    tc.diagnose(ctor, diag::complete_object_init_here);
+  if (!ctor->isSubobjectInit()) {
+    if (!implicitlyGenerated) {
+      tc.diagnose(apply->getArg()->getLoc(), diag::chain_complete_object_init,
+                  apply->getArg()->getType());
+      tc.diagnose(ctor, diag::complete_object_init_here);
+    }
+    return true;
   }
-  return true;
+  
+  // For an implicitly generated super.init() call, make sure there's
+  // only one designated initializer.
+  if (implicitlyGenerated) {
+    auto superclassTy = ctor->getExtensionType();
+    for (auto member : tc.lookupConstructors(superclassTy, dc)) {
+      auto superclassCtor = dyn_cast<ConstructorDecl>(member);
+      if (!superclassCtor || superclassCtor->isCompleteObjectInit() ||
+          superclassCtor == ctor)
+        continue;
+      
+      // Found another designated initializer in the superclass. Don't add the
+      // super.init() call.
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
@@ -832,7 +849,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       break;
 
     case ConstructorDecl::BodyInitKind::Chained:
-      checkSuperInit(*this, initExpr, false);
+      checkSuperInit(*this, ctor, initExpr, false);
       SWIFT_FALLTHROUGH;
 
     case ConstructorDecl::BodyInitKind::None:
@@ -888,7 +905,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
       FindOtherConstructorRef finder;
       SuperInitCall->walk(finder);
-      if (!checkSuperInit(*this, finder.Found, true)) {
+      if (!checkSuperInit(*this, ctor, finder.Found, true)) {
         // Store the super.init expression within the constructor declaration
         // to be emitted during SILGen.
         ctor->setSuperInitCall(SuperInitCall);

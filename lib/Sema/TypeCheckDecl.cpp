@@ -4544,8 +4544,14 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           continue;
 
         auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
-        if (!paramTuple)
+        if (!paramTuple) {
+          // A subobject initializer other than a default initializer
+          // means we can't call super.init().
+          if (ctor->isSubobjectInit())
+            return;
+
           continue;
+        }
 
         // Check whether any of the tuple elements are missing an initializer.
         bool missingInit = false;
@@ -4556,8 +4562,14 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           missingInit = true;
           break;
         }
-        if (missingInit)
+        if (missingInit) {
+          // A subobject initializer other than a default initializer
+          // means we can't call super.init().
+          if (ctor->isSubobjectInit())
+            return;
+
           continue;
+        }
 
         // We found a constructor that can be invoked with an empty tuple.
         if (foundDefaultConstructor) {
