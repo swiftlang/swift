@@ -12,6 +12,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SIL/CallGraph.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -208,6 +209,37 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
 
+static bool operandEscapesApply(Operand *O) {
+  auto *Apply = cast<ApplyInst>(O->getUser());
+
+  auto Type = Apply->getSubstCalleeType();
+
+  // TODO: We do not yet handle generics.
+  if (Apply->hasSubstitutions() || Type->isPolymorphic())
+    return true;
+
+  // It's not a direct call? Bail out.
+  auto Callee = Apply->getCallee();
+  if (!isa<FunctionRefInst>(Callee))
+    return true;
+
+  auto *FRI = cast<FunctionRefInst>(Callee);
+
+  // We don't have a function body to examine?
+  SILFunction *F = FRI->getReferencedFunction();
+  if (F->empty())
+    return true;
+
+  // The applied function is the first operand.
+  auto ParamIndex = O->getOperandNumber() - 1;
+  auto &Entry = F->front();
+  auto *Box = Entry.getBBArg(ParamIndex);
+
+  // Check the uses of the operand, but do not recurse down into other
+  // apply instructions.
+  return !canValueEscape(SILValue(Box), /* examineApply = */ false);
+}
+
 /// \brief Returns True if the operand or one of its users is captured.
 static bool useCaptured(Operand *UI) {
   auto *User = UI->getUser();
@@ -232,7 +264,7 @@ static bool useCaptured(Operand *UI) {
 }
 
 bool
-swift::canValueEscape(SILValue V) {
+swift::canValueEscape(SILValue V, bool examineApply) {
   for (auto UI : V.getUses()) {
     auto *User = UI->getUser();
 
@@ -247,22 +279,26 @@ swift::canValueEscape(SILValue V) {
         isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
         isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
         isa<PointerToAddressInst>(User)) {
-      if (canValueEscape(User))
+      if (canValueEscape(User, examineApply))
         return true;
       continue;
     }
 
-    // apply instructions do not capture the pointer when it is passed
-    // indirectly
     if (auto apply = dyn_cast<ApplyInst>(User)) {
       // Applying a function does not cause the function to escape.
       if (UI->getOperandNumber() == 0)
         continue;
 
+      // apply instructions do not capture the pointer when it is passed
+      // indirectly
       if (apply->getSubstCalleeType()
-          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect()) {
+          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
         continue;
-      }
+
+      // Optionally drill down into an apply to see if the operand is
+      // captured in or returned from the apply.
+      if (examineApply && !operandEscapesApply(UI))
+        continue;
     }
 
     // partial_apply instructions do not allow the pointer to escape
@@ -274,7 +310,7 @@ swift::canValueEscape(SILValue V) {
         ->getInterfaceParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
-        if (canValueEscape(User))
+        if (canValueEscape(User, examineApply))
           return true;
         continue;
       }
@@ -282,7 +318,7 @@ swift::canValueEscape(SILValue V) {
 
     return true;
   }
-  
+
   return false;
 }
 

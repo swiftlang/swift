@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
@@ -26,6 +27,9 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //===----------------------------------------------------------------------===//
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
+
+static SILInstruction* findUnexpectedBoxUse(SILValue Box,
+                                            bool examinePartialApply);
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
@@ -137,18 +141,62 @@ void getFinalReleases(AllocBoxInst *ABI,
       addLastRelease(Box, BB, Releases);
 }
 
+/// checkPartialApplyBody - Check the body of a partial apply to see
+/// if the box pointer argument passed to it has uses that would
+/// disqualify it from being protmoted to a stack location.  Return
+/// true if this partial apply will not block our promoting the box.
+static bool checkPartialApplyBody(PartialApplyInst *PAI,
+                                  Operand *O) {
+  auto ClosureType = PAI->getSubstCalleeType();
+
+  // TODO: We currently can only handle non-polymorphic closures.
+  if (PAI->hasSubstitutions() || ClosureType->isPolymorphic())
+    return false;
+
+  auto Callee = PAI->getCallee();
+  if (!isa<FunctionRefInst>(Callee))
+    return true;
+
+  auto *FRI = cast<FunctionRefInst>(Callee);
+
+  SILFunction *F = FRI->getReferencedFunction();
+  if (F->empty())
+    return false;
+
+  auto Args = PAI->getArguments();
+  auto Params = ClosureType->getInterfaceParameters();
+  assert((Params.size() >= Args.size())
+         && "Expected fewer args to function!");
+  auto OperandIndex = O->getOperandNumber();
+  assert((OperandIndex > 0) && "Box pointer cannot be the applied function!");
+
+  int ParamIndex = (Params.size() - Args.size()) + OperandIndex - 1;
+  auto &Entry = F->front();
+  auto *Box = Entry.getBBArg(ParamIndex);
+
+  // Examine the uses of the parameter to see if there is anything
+  // that would block us from promoting the box to the stack.
+  // We won't examine the bodies of partial_apply when checking.
+  auto *Found = findUnexpectedBoxUse(SILValue(Box),
+                                     /* examinePartialApply =*/ false);
+  return !Found;
+}
+
 
 /// findUnexpectedBoxUse - Validate that the uses of a pointer to a
 /// box do not eliminate it from consideration for promotion to a
-/// stack element. Return the instruction with the unexpected use if
-/// we find one.
-static SILInstruction* findUnexpectedBoxUse(SILValue Box) {
+/// stack element. Optionally examine the body of partial_apply
+/// to see if there is an unexpected use inside.  Return the
+/// instruction with the unexpected use if we find one.
+static SILInstruction* findUnexpectedBoxUse(SILValue Box,
+                                            bool examinePartialApply) {
   assert((Box.getType() ==
           SILType::getObjectPointerType(Box.getType().getASTContext())) &&
          "Expected an object pointer!");
 
-  // Scan all of the uses of the retain count value, collecting all the releases
-  // and validating that we don't have an unexpected user.
+  // Scan all of the uses of the retain count value, collecting all
+  // the releases and validating that we don't have an unexpected
+  // user.
   for (auto UI : Box.getUses()) {
     auto *User = UI->getUser();
 
@@ -156,6 +204,17 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box) {
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
         isa<DeallocBoxInst>(User))
       continue;
+
+    // For partial_apply, if we've been asked to examine the body, the
+    // uses of the argument are okay there, and the partial_apply
+    // itself cannot escape, then everything is fine.
+    if (auto *PAI = dyn_cast<PartialApplyInst>(User))
+      if (examinePartialApply && checkPartialApplyBody(PAI, UI) &&
+          // FIXME: Change false to true to enable once the
+          //        appropriate partial_apply cloning and rewrites are
+          //        in place.
+          !canValueEscape(PAI, /* examineApply = */ false))
+        continue;
 
     return User;
   }
@@ -168,12 +227,13 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI) {
   // Scan all of the uses of the address of the box's contained value
   // to see if any of them cause address to escape, in which case we
   // can't promote it to live on the stack.
-  if (canValueEscape(ABI->getAddressResult()))
+  if (canValueEscape(ABI->getAddressResult(), /* examineApply = */ false))
     return false;
 
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted tot he stack.
-  if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult())) {
+  if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
+                                        /* examinePartialApply = */ true)) {
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
