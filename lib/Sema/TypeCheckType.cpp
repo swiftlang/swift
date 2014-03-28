@@ -693,6 +693,42 @@ resolveIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   return type;
 }
 
+static bool diagnoseAvailability(DeclContext *DC, Type ty,
+                                 IdentTypeRepr *IdType,
+                                 SourceLoc Loc,
+                                 TypeChecker &TC) {
+  CanType canTy = ty.getCanonicalTypeOrNull();
+  if (canTy.isNull())
+    return false;
+  auto D = canTy.getAnyNominal();
+  if (!D)
+    return false;
+  for (auto Attr : D->getAttrs()) {
+    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+      // FIXME: unify this checking with declarations.
+      if (AvAttr->hasPlatform())
+        continue;
+      if (AvAttr->IsUnvailable) {
+        if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
+          StringRef Message = AvAttr->Message;
+          if (Message.empty()) {
+            TC.diagnose(Loc, diag::availability_decl_unavailable,
+                        CI->getIdentifier())
+              .highlight(SourceRange(Loc, Loc));
+          }
+          else {
+            TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                        CI->getIdentifier(), Message)
+            .highlight(SourceRange(Loc, Loc));
+          }
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// \brief Returns a valid type or ErrorType in case of an error.
 Type TypeChecker::resolveIdentifierType(DeclContext *DC,
                                         IdentTypeRepr *IdType,
@@ -711,6 +747,14 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     if (diagnoseErrors)
       diagnose(Components.back()->getIdLoc(),
                diag::use_module_as_type, mod->Name);
+    Type ty = ErrorType::get(Context);
+    Components.back()->setValue(ty);
+    return ty;
+  }
+
+  // Check the availability of the type.
+  if (diagnoseAvailability(DC, result.get<Type>(), IdType,
+      Components.back()->getIdLoc(), *this)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;
