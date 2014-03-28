@@ -7,6 +7,7 @@ typedef signed char BOOL;
 
 @class NSString;
 
+/// Aaa.  NSArray.  Bbb.
 @interface NSArray : NSObject
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
@@ -80,6 +81,7 @@ typedef CGRect NSRect;
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 #define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
 
+/// Aaa.  NSRuncingMode.  Bbb.
 typedef NS_ENUM(NSUInteger, NSRuncingMode) {
   NSRuncingMince,
   NSRuncingQuince
@@ -124,6 +126,7 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesByName = NSAliasesOriginal,
 };
 
+/// Aaa.  NSRuncingOptions.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
   NSRuncingEnableMince = 1,
   NSRuncingEnableQuince = 2,

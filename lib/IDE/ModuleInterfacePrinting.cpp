@@ -25,6 +25,8 @@ void swift::ide::printModuleInterface(Module *M, ASTPrinter &Printer,
   AdjustedOptions.ExplodePatternBindingDecls = true;
   AdjustedOptions.VarInitializers = false;
 
+  AdjustedOptions.PrintDocumentationComments = true;
+
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
