@@ -514,6 +514,14 @@ public:
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
 
+  /// Create an implicit nullary Objective-C attribute, which has a
+  /// single name with no colon following it.
+  ///
+  /// Note that a nullary Objective-C attribute may represent either a
+  /// selector for a zero-parameter function or some other Objective-C
+  /// entity, such as a class or protocol.
+  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name);
+
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
   static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 

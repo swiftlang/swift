@@ -182,6 +182,10 @@ namespace {
                     SourceLoc RParenLoc)
       : ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc), 1, /*Implicit=*/false),
         Name(Name), NameLoc(NameLoc), ParenRange(LParenLoc, RParenLoc) { }
+
+    explicit NullaryObjCAttr(Identifier Name)
+      : ObjCAttr(SourceLoc(), SourceRange(), 1, /*Implicit=*/true),
+        Name(Name) { }
   };
 
   // Private subclass of ObjCAttr used to store the identifiers and
@@ -251,6 +255,10 @@ ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc RParenLoc) {
   return new (Ctx) NullaryObjCAttr(AtLoc, ObjCLoc, LParenLoc, NameLoc, Name,
                                    RParenLoc);
+}
+
+ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name) {
+  return new (Ctx) NullaryObjCAttr(Name);
 }
 
 ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 

@@ -29,7 +29,7 @@ extension Foo {
 
 // CHECK: @"OBJC_METACLASS_$_NSBar" = global %objc_class {{.*}}* @_METACLASS_DATA_NSBar to i64) }
 // CHECK: @_DATA_NSBar = private constant 
-@objc @asmname("NSBar") class Bar {
+@objc(NSBar) class Bar {
   func barMethod() { }
 }
 

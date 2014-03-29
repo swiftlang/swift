@@ -1249,18 +1249,16 @@ StringRef ClassDecl::getObjCRuntimeName(
         = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
     return clangDecl->getName();
 
-  // If there is an 'asmname' attribute on the class, use that name.
-  if (auto asmname = getAttrs().getAttribute<AsmnameAttr>()) {
-    return asmname->Name;
+  // If there is an 'objc' attribute with a name, use that name.
+  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+    if (objc->getKind() == ObjCAttr::Nullary)
+      return objc->getNames().front().str();
   }
 
   // If we aren't mangling Objective-C class and protocol names, there's nothing
   // special to do here.
-  // FIXME: The SwiftObject check here is a hack.
   auto &ctx = getASTContext();
-  if (isObjC() && 
-      (!ctx.LangOpts.MangleObjCClassProtocolNames || 
-       (isImplicit() && getName().str().equals("SwiftObject"))))
+  if (isObjC() && !ctx.LangOpts.MangleObjCClassProtocolNames)
     return getName().str();
 
   // Produce the mangled name for this class.
@@ -1388,9 +1386,10 @@ StringRef ProtocolDecl::getObjCRuntimeName(
                           getClangNode().getAsDecl()))
     return clangProto->getName();
 
-  // If there is an 'asmname' attribute on the protocol, use that name.
-  if (auto asmname = getAttrs().getAttribute<AsmnameAttr>()) {
-    return asmname->Name;
+  // If there is an 'objc' attribute with a name, use that name.
+  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+    if (objc->getKind() == ObjCAttr::Nullary)
+      return objc->getNames().front().str();
   }
 
   // If we aren't mangling Objective-C class and protocol names, just
