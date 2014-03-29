@@ -168,8 +168,10 @@ namespace {
       if (Options.SkipImplicit)
         return;
 
-      if (D->getAttrs().hasAttribute<ObjCAttr>())
-        return;
+      if (auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>()) {
+        if (!objcAttr->isImplicit())
+          return;
+      }
 
       auto *VD = dyn_cast<ValueDecl>(D);
       if (!VD)
@@ -277,7 +279,10 @@ private:
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
-  Attrs.print(Printer, Options);
+  // Always skip implicit attributes.
+  PrintOptions AttrOptions = Options;
+  AttrOptions.SkipImplicit = true;
+  Attrs.print(Printer, AttrOptions);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,

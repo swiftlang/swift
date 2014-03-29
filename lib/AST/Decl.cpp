@@ -1243,12 +1243,6 @@ static StringRef mangleObjCRuntimeName(NominalTypeDecl *nominal,
 
 StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) {
-  // If this class was defined in Objective-C, use the name on the
-  // Clang node.
-  if (auto clangDecl
-        = dyn_cast_or_null<clang::ObjCInterfaceDecl>(getClangDecl()))
-    return clangDecl->getName();
-
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (objc->getKind() == ObjCAttr::Nullary)
@@ -1381,11 +1375,6 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
 
 StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) {
-  // If this protocol was defined in Objective-C, use its name directly.
-  if (auto clangProto = cast_or_null<clang::ObjCProtocolDecl>(
-                          getClangNode().getAsDecl()))
-    return clangProto->getName();
-
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (objc->getKind() == ObjCAttr::Nullary)

@@ -2804,6 +2804,7 @@ namespace {
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
       // Form the protocol name, using the renaming table when necessary.
       Identifier name;
+      Identifier origName = Impl.importName(decl->getDeclName());
       if (false) { }
 #define RENAMED_PROTOCOL(ObjCName, SwiftName)                  \
       else if (decl->getName().equals(#ObjCName)) {            \
@@ -2811,7 +2812,7 @@ namespace {
       }
 #include "RenamedProtocols.def"
       else {
-        name = Impl.importName(decl->getDeclName());
+        name = origName;
       }
 
       if (name.empty())
@@ -2850,7 +2851,9 @@ namespace {
                                    name,
                                    { });
       result->computeType();
-      
+      result->getMutableAttrs().add(
+        ObjCAttr::createNullary(Impl.SwiftContext, origName));
+
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
       // Create the archetype for the implicit 'Self'.
@@ -2951,6 +2954,8 @@ namespace {
           result->setSuperclass(nsObjectTy);
           result->setCheckedInheritanceClause();
           result->setIsObjC(true);
+          result->getMutableAttrs().add(
+            ObjCAttr::createNullary(Impl.SwiftContext, name));
           Impl.registerExternalDecl(result);
           return result;
         }
@@ -3000,6 +3005,8 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
+      result->getMutableAttrs().add(
+        ObjCAttr::createNullary(Impl.SwiftContext, name));
 
       // If this Objective-C class has a supertype, import it.
       if (auto objcSuper = decl->getSuperClass()) {
