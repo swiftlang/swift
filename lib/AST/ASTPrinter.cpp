@@ -277,7 +277,7 @@ private:
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
-  Attrs.print(Printer);
+  Attrs.print(Printer, Options);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,

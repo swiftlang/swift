@@ -43,15 +43,21 @@ DeclAttributes &Decl::getMutableAttrs() {
 
 void DeclAttributes::print(llvm::raw_ostream &OS) const {
   StreamPrinter P(OS);
-  print(P);
+  PrintOptions PO = PrintOptions::printEverything();
+  print(P, PO);
 }
 
-void DeclAttributes::print(ASTPrinter &Printer) const {
+void DeclAttributes::print(ASTPrinter &Printer, 
+                           const PrintOptions &Options) const {
   if (NumAttrsSet == 0 && !DeclAttrs)
     return;
 
-  for (auto DA : *this)
+  for (auto DA : *this) {
+    if (Options.SkipImplicit && DA->isImplicit())
+      continue;
+
     DA->print(Printer);
+  }
 
   if (isAssignment())
     Printer << "@assignment ";

@@ -221,7 +221,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
 
       if (!DiscardAttribute)
-        Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange));
+        Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange,
+                                                 /*Implicit=*/false));
 
       break;
     }
@@ -324,12 +325,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
       if (!DiscardAttribute)
         Attributes.add(new (Context)
-                       AvailabilityAttr(AtLoc, R, Platform, Message, true));
+                       AvailabilityAttr(AtLoc, R, Platform, Message, true,
+                                        /*Implicit=*/false));
       break;
     }
 
     case DAK_objc:
-      Attributes.add(new (Context) ObjCAttr(AtLoc, SourceRange(Loc)));
+      Attributes.add(new (Context) ObjCAttr(AtLoc, SourceRange(Loc),
+                                            /*Implicit=*/false));
       break;
   }
 

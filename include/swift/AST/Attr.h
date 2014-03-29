@@ -27,6 +27,7 @@
 namespace swift {
 class ASTPrinter;
 class ASTContext;
+struct PrintOptions;
 
 /// The associativity of a binary operator.
 enum class Associativity {
@@ -259,8 +260,11 @@ protected:
 
     // The kind.
     unsigned Kind : 8;
+
+    // Whether this attribute was implicitly added.
+    unsigned Implicit : 1;
   };
-  enum { NumDeclAttrBits = 8 };
+  enum { NumDeclAttrBits = 9 };
   static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
 
   union {
@@ -269,11 +273,13 @@ protected:
 
   DeclAttribute *Next;
 
-  DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range) :
+  DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range,
+                bool Implicit) :
     AttributeBase(AtLoc, Range),
     Next(nullptr)
   {
     DeclAttrBits.Kind = static_cast<unsigned>(DK);
+    DeclAttrBits.Implicit = Implicit;
   }
 
   enum DeclAttrOptions {
@@ -303,6 +309,14 @@ protected:
 public:
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
+  }
+
+  /// Whether this attribute was implicitly added.
+  bool isImplicit() const { return DeclAttrBits.Implicit; }
+
+  /// Set whether this attribute was implicitly added.
+  void setImplicit(bool Implicit) {
+    DeclAttrBits.Implicit = Implicit;
   }
 
   /// Print the attribute to the provided ASTPrinter.
@@ -393,12 +407,12 @@ public:
 /// Defines the @asmname attribute.
 class AsmnameAttr : public DeclAttribute {
 public:
-  AsmnameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range)
-    : DeclAttribute(DAK_asmname, AtLoc, Range),
+  AsmnameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_asmname, AtLoc, Range, Implicit),
       Name(Name) {}
 
   AsmnameAttr(StringRef Name)
-    : AsmnameAttr(Name, SourceLoc(), SourceRange()) {}
+    : AsmnameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
 
   /// The symbol name.
   const StringRef Name;
@@ -414,8 +428,9 @@ public:
   AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
                    StringRef Platform,
                    StringRef Message,
-                   bool IsUnavailable)
-   : DeclAttribute(DAK_availability, AtLoc, Range),
+                   bool IsUnavailable,
+                   bool Implicit)
+    : DeclAttribute(DAK_availability, AtLoc, Range, Implicit),
      Platform(Platform),
      Message(Message),
      IsUnvailable(IsUnavailable) {}
@@ -443,8 +458,8 @@ public:
 /// Indicates that the given declaration is visible to Objective-C.
 class ObjCAttr : public DeclAttribute {
 public:
-  ObjCAttr(SourceLoc AtLoc, SourceRange Range) :
-    DeclAttribute(DAK_objc, AtLoc, Range) { }
+  ObjCAttr(SourceLoc AtLoc, SourceRange Range, bool Implicit) :
+    DeclAttribute(DAK_objc, AtLoc, Range, Implicit) { }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;
@@ -609,7 +624,7 @@ public:
   }
 
   void print(llvm::raw_ostream &OS) const;
-  void print(ASTPrinter &Printer) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   template <typename T, typename DERIVED> class iterator_base {
     T* Impl;
