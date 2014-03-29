@@ -222,76 +222,79 @@ static bool canValueEscape(SILValue V, bool examineApply) {
   return false;
 }
 
-static bool operandEscapesApply(Operand *O) {
-  auto *Apply = cast<ApplyInst>(O->getUser());
+/// Given an operand of a direct apply or partial_apply, return the
+/// value that represents the formal parameter that the operand is
+/// copied to in the applied function.
+static SILValue getParameterForOperand(Operand *O) {
+  assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
+         "Expected apply or partial_apply!");
 
-  auto Type = Apply->getSubstCalleeType();
+  CanSILFunctionType Type;
+  SILValue Callee;
+  size_t ArgCount;
+  if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
+    Type = Apply->getSubstCalleeType();
+    Callee = Apply->getCallee();
+    ArgCount = Apply->getArguments().size();
+    assert(Type->getInterfaceParameters().size() == ArgCount &&
+           "Expected all arguments to be supplied!");
+  } else {
+    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
+    Type = PartialApply->getSubstCalleeType();
+    Callee = PartialApply->getCallee();
+    ArgCount = PartialApply->getArguments().size();
+  }
 
-  // TODO: We do not yet handle generics.
-  if (Apply->hasSubstitutions() || Type->isPolymorphic())
-    return true;
+  // TODO: Support generics at some point.
+  if (Type->isPolymorphic())
+    return SILValue();
 
   // It's not a direct call? Bail out.
-  auto Callee = Apply->getCallee();
   if (!isa<FunctionRefInst>(Callee))
-    return true;
+    return SILValue();
 
   auto *FRI = cast<FunctionRefInst>(Callee);
 
-  // We don't have a function body to examine?
+  // We don't have a function body to examine? Bail out.
   SILFunction *F = FRI->getReferencedFunction();
   if (F->empty())
-    return true;
+    return SILValue();
+
+  size_t ParamCount = Type->getInterfaceParameters().size();
+  assert(ParamCount >= ArgCount && "Expected fewer arguments to function!");
+
+  auto OperandIndex = O->getOperandNumber();
+  assert(OperandIndex != 0 && "Operand cannot be the applied function!");
 
   // The applied function is the first operand.
-  auto ParamIndex = O->getOperandNumber() - 1;
+  int ParamIndex = (ParamCount - ArgCount) + OperandIndex - 1;
+
   auto &Entry = F->front();
   auto *Box = Entry.getBBArg(ParamIndex);
+  return SILValue(Box);
+}
 
+
+/// Could this operand to an apply escape that function by being
+/// stored or returned?
+static bool operandEscapesApply(Operand *O) {
   // Check the uses of the operand, but do not recurse down into other
   // apply instructions.
-  return canValueEscape(SILValue(Box), /* examineApply = */ false);
+  if (auto Param = getParameterForOperand(O))
+    return canValueEscape(Param, /* examineApply = */ false);
+
+  return true;
 }
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
 /// if the box pointer argument passed to it has uses that would
 /// disqualify it from being protmoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
-static bool checkPartialApplyBody(PartialApplyInst *PAI,
-                                  Operand *O) {
-  auto ClosureType = PAI->getSubstCalleeType();
+static bool checkPartialApplyBody(Operand *O) {
+  if (auto Param = getParameterForOperand(O))
+    return !findUnexpectedBoxUse(Param, /* examinePartialApply =*/ false);
 
-  // TODO: We currently can only handle non-polymorphic closures.
-  if (PAI->hasSubstitutions() || ClosureType->isPolymorphic())
-    return false;
-
-  auto Callee = PAI->getCallee();
-  if (!isa<FunctionRefInst>(Callee))
-    return false;
-
-  auto *FRI = cast<FunctionRefInst>(Callee);
-
-  SILFunction *F = FRI->getReferencedFunction();
-  if (F->empty())
-    return false;
-
-  auto Args = PAI->getArguments();
-  auto Params = ClosureType->getInterfaceParameters();
-  assert((Params.size() >= Args.size())
-         && "Expected fewer args to function!");
-  auto OperandIndex = O->getOperandNumber();
-  assert((OperandIndex > 0) && "Box pointer cannot be the applied function!");
-
-  int ParamIndex = (Params.size() - Args.size()) + OperandIndex - 1;
-  auto &Entry = F->front();
-  auto *Box = Entry.getBBArg(ParamIndex);
-
-  // Examine the uses of the parameter to see if there is anything
-  // that would block us from promoting the box to the stack.
-  // We won't examine the bodies of partial_apply when checking.
-  auto *Found = findUnexpectedBoxUse(SILValue(Box),
-                                     /* examinePartialApply =*/ false);
-  return !Found;
+  return false;
 }
 
 
@@ -321,7 +324,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
     // uses of the argument are okay there, and the partial_apply
     // itself cannot escape, then everything is fine.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User))
-      if (examinePartialApply && checkPartialApplyBody(PAI, UI) &&
+      if (examinePartialApply && checkPartialApplyBody(UI) &&
           // FIXME: Change false to true to enable once the
           //        appropriate partial_apply cloning and rewrites are
           //        in place.
