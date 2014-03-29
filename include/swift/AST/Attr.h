@@ -19,6 +19,7 @@
 
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Ownership.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -237,10 +238,11 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(AttributeBase));
 
-  // Make placement new and vanilla new/delete illegal for attributes.
+  void operator delete(void *Data) throw() { }
+  void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
+
+  // Make vanilla new/delete illegal for attributes.
   void *operator new(size_t Bytes) throw() = delete;
-  void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
 
   AttributeBase(const AttributeBase &) = delete;
 
@@ -267,8 +269,24 @@ protected:
   enum { NumDeclAttrBits = 9 };
   static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
 
+  class ObjCAttrBitFields {
+    friend class ObjCAttr;
+    unsigned : NumDeclAttrBits;
+
+    // The arity of the name.
+    //
+    // 0 indicates that there is no name.
+    // 1 indicates that there is a single identifier as the name.
+    // 2+ indicates that there are N-1 identifiers, each of which is followed
+    // by a colon.
+    unsigned Arity : 8;
+  };
+  enum { NumObjCAttrBits = NumDeclAttrBits + 8 };
+  static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
+
   union {
     DeclAttrBitFields DeclAttrBits;
+    ObjCAttrBitFields ObjCAttrBits;
   };
 
   DeclAttribute *Next;
@@ -457,9 +475,73 @@ public:
 
 /// Indicates that the given declaration is visible to Objective-C.
 class ObjCAttr : public DeclAttribute {
+protected:
+  unsigned getArity() const { return ObjCAttrBits.Arity; }
+
+  ObjCAttr(SourceLoc AtLoc, SourceRange Range, unsigned Arity, bool Implicit) 
+    : DeclAttribute(DAK_objc, AtLoc, Range, Implicit) 
+  { 
+    ObjCAttrBits.Arity = Arity;
+  }
+
 public:
-  ObjCAttr(SourceLoc AtLoc, SourceRange Range, bool Implicit) :
-    DeclAttribute(DAK_objc, AtLoc, Range, Implicit) { }
+  /// Describes the kind of @objc attribute, which indicates how it
+  /// was named.
+  enum Kind {
+    /// A bare @objc attribute that was not provided with a name.
+    Unnamed,
+    /// An @objc attribute that has a single name with no trailing
+    /// colon.
+    Nullary,
+    /// An @objc attribute that has one or more names with colons
+    /// trailing each name.
+    Selector
+  };
+
+public:
+  /// Create an unnamed Objective-C attribute, i.e., @objc.
+  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+                                 SourceLoc ObjCLoc);
+
+  /// Create a nullary Objective-C attribute, which has a single name
+  /// with no colon following it.
+  ///
+  /// Note that a nullary Objective-C attribute may represent either a
+  /// selector for a zero-parameter function or some other Objective-C
+  /// entity, such as a class or protocol.
+  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
+                                 SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+                                 SourceLoc NameLoc, Identifier Name,
+                                 SourceLoc RParenLoc);
+
+  /// Create a "selector" Objective-C attribute, which has some number
+  /// of identifiers followed by colons.
+  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+                                  ArrayRef<SourceLoc> NameLocs,
+                                  ArrayRef<Identifier> Names,
+                                  SourceLoc RParenLoc);
+
+  /// Determine what kind of @objc attribute this is.
+  Kind getKind() const {
+    switch (getArity()) {
+    case 0:
+      return Unnamed;
+
+    case 1:
+      return Nullary;
+
+    default:
+      return Selector;
+    }
+  }
+
+  /// Retrieve the names for a nullary or selector attribute.
+  ArrayRef<Identifier> getNames() const;
+
+  /// Retrieve the source locations for the names in a non-implicit
+  /// nullary or selector attribute.
+  ArrayRef<SourceLoc> getNameLocs() const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;

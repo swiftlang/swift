@@ -330,10 +330,105 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       break;
     }
 
-    case DAK_objc:
-      Attributes.add(new (Context) ObjCAttr(AtLoc, SourceRange(Loc),
-                                            /*Implicit=*/false));
+    case DAK_objc: {
+      // Unnamed @objc attribute.
+      if (Tok.isNot(tok::l_paren)) {
+        Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+        break;
+      }
+
+      // Parse the leading '('.
+      SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+      // Parse the names, with trailing colons (if there are present).
+      SmallVector<Identifier, 4> Names;
+      SmallVector<SourceLoc, 4> NameLocs;
+      bool sawColon = false;
+      while (true) {
+        // Empty selector piece.
+        if (Tok.is(tok::colon)) {
+          Names.push_back(Identifier());
+          NameLocs.push_back(Tok.getLoc());
+          sawColon = true;
+          consumeToken();
+          continue;
+        }
+
+        // Name.
+        if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+          Names.push_back(Context.getIdentifier(Tok.getText()));
+          NameLocs.push_back(Tok.getLoc());
+          consumeToken();
+
+          // If we have a colon, consume it.
+          if (Tok.is(tok::colon)) {
+            consumeToken();
+            sawColon = true;
+            continue;
+          } 
+          
+          // If we see a closing parentheses, we're done.
+          if (Tok.is(tok::r_paren)) {
+            // If we saw more than one identifier, there's a ':'
+            // missing here. Complain and pretend we saw it.
+            if (Names.size() > 1) {
+              SourceLoc afterLast
+                = Lexer::getLocForEndOfToken(Context.SourceMgr, 
+                                             NameLocs.back());
+              diagnose(Tok, diag::attr_objc_missing_colon)
+                .fixItInsert(afterLast, ":");
+              sawColon = true;
+            }
+
+            break;
+          }
+
+          // If we see another identifier or keyword, complain about
+          // the missing colon and keep going.
+          if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+            SourceLoc afterLast
+              = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
+            diagnose(Tok, diag::attr_objc_missing_colon)
+              .fixItInsert(afterLast, ":");
+            sawColon = true;
+            continue;
+          }
+
+          // We don't know what happened. Break out.
+          break;
+        }
+
+        break;
+      }
+      
+      // Parse the matching ')'.
+      SourceLoc RParenLoc;
+      bool Invalid = false;
+      if (parseMatchingToken(tok::r_paren, RParenLoc, 
+                             diag::attr_objc_expected_rparen, LParenLoc)) {
+        RParenLoc = Tok.getLoc();
+        Invalid = true;
+      }
+
+      if (Names.empty()) {
+        // When there are no names, recover as if there were no parentheses.
+        if (!Invalid)
+          diagnose(LParenLoc, diag::attr_objc_empty_name);
+        Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+      } else if (!sawColon) {
+        // When we didn't see a colon, this is a nullary name.
+        assert(Names.size() == 1 && "Forgot to set sawColon?");
+        Attributes.add(ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
+                                               NameLocs.front(), Names.front(),
+                                               RParenLoc));
+      } else {
+        // When we did see a colon, this is a selector.
+        Attributes.add(ObjCAttr::createSelector(Context, AtLoc, Loc,
+                                                LParenLoc, NameLocs, Names,
+                                                RParenLoc));
+      }
       break;
+    }
   }
 
   if (DuplicateAttribute) {
