@@ -549,6 +549,7 @@ sil @sil_extract_of_string : $@thin () -> Builtin.Word {
 sil @helper : $@thin (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
 sil @helper2 : $@thin (UInt8, UInt8) -> Builtin.Word
 
+// CHECK-LABEL: sil @sil_string_different_encodings
 sil @sil_string_different_encodings : $@thin () -> Builtin.Word {
   %0 = string_literal utf8 "help"
   %1 = string_literal utf16 "help"

@@ -241,8 +241,9 @@ namespace {
     }
 
     bool visitStringLiteralInst(const StringLiteralInst *RHS) {
-      StringRef X = cast<StringLiteralInst>(LHS)->getValue();
-      return X.equals(RHS->getValue());
+      auto LHS_ = cast<StringLiteralInst>(LHS);
+      return LHS_->getEncoding() == RHS->getEncoding()
+        && LHS_->getValue().equals(RHS->getValue());
     }
 
     bool visitStructInst(const StructInst *RHS) {
