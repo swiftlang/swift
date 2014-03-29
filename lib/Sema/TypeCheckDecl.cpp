@@ -4712,6 +4712,15 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                                     objcAttr->getRParenLoc()));
           D->getMutableAttrs().removeAttribute(objcAttr);
         }
+      } 
+      // Subscripts can never have names.
+      else if (isa<SubscriptDecl>(D)) {
+        TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);
+        D->getMutableAttrs().add(
+          ObjCAttr::createUnnamed(TC.Context,
+                                  objcAttr->AtLoc,
+                                  objcAttr->Range.Start));
+        D->getMutableAttrs().removeAttribute(objcAttr);
       }
     }
   }
