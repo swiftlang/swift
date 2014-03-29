@@ -250,7 +250,7 @@ static bool operandEscapesApply(Operand *O) {
 
   // Check the uses of the operand, but do not recurse down into other
   // apply instructions.
-  return !canValueEscape(SILValue(Box), /* examineApply = */ false);
+  return canValueEscape(SILValue(Box), /* examineApply = */ false);
 }
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
