@@ -92,6 +92,8 @@ public:
     ConstructorMember,
     /// \brief Address of subexpression.
     AddressOf,
+    /// \brief Inout conversion subexpression.
+    InOutConversion,
     /// \brief Rvalue adjustment.
     RvalueAdjustment,
     /// \brief The result of a closure.
@@ -143,6 +145,7 @@ public:
     case SubscriptResult:
     case ConstructorMember:
     case AddressOf:
+    case InOutConversion:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -186,6 +189,7 @@ public:
 
   static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
     switch (kind) {
+    case InOutConversion:
     case AddressOf:
     case ApplyArgument:
     case ApplyFunction:

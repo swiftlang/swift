@@ -377,7 +377,7 @@ namespace {
                         ->getRValueInstanceType();
 
         Expr * base = new (ctx) MetatypeExpr(nullptr, loc,
-                                             MetatypeType::get(baseTy, ctx));
+                                             MetatypeType::get(baseTy));
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
@@ -452,7 +452,7 @@ namespace {
       // metatype, it's a metatype.
       Type opaqueType = archetype;
       if (isMetatype)
-        opaqueType = MetatypeType::get(archetype, ctx);
+        opaqueType = MetatypeType::get(archetype);
       auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
       archetypeVal->setUniquelyReferenced(true);
 
@@ -650,8 +650,7 @@ namespace {
         base = coerceToType(base,
                             MetatypeType::get(isArchetypeOrExistentialRef
                                                 ? baseTy
-                                                : containerTy,
-                                              context),
+                                                : containerTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -1317,7 +1316,7 @@ namespace {
       // Build a reference to the convertFromStringInterpolation member.
       auto typeRef = new (tc.Context) MetatypeExpr(
                                         nullptr, expr->getStartLoc(),
-                                        MetatypeType::get(type, tc.Context));
+                                        MetatypeType::get(type));
       Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
                                                        expr->getStartLoc(),
                                                        member,
@@ -1388,7 +1387,7 @@ namespace {
           return nullptr;
 
         // Refer to the metatype of this type.
-        return MetatypeType::get(type, cs.getASTContext());
+        return MetatypeType::get(type);
       }
 
       return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
@@ -1578,7 +1577,7 @@ namespace {
       // type of this expression.
       Type baseTy = simplifyType(expr->getType())->getRValueType();
       auto &tc = cs.getTypeChecker();
-      auto baseMetaTy = MetatypeType::get(baseTy, tc.Context);
+      auto baseMetaTy = MetatypeType::get(baseTy);
 
       // Find the selected member.
       auto selected = getOverloadChoice(
@@ -1785,8 +1784,7 @@ namespace {
       // FIXME: Cache the name.
       Expr *typeRef = new (tc.Context) MetatypeExpr(nullptr,
                                          expr->getLoc(),
-                                         MetatypeType::get(arrayTy,
-                                                           tc.Context));
+                                         MetatypeType::get(arrayTy));
       auto name = tc.Context.Id_ConvertFromArrayLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
@@ -1822,8 +1820,7 @@ namespace {
       Expr *typeRef = new (tc.Context) MetatypeExpr(
                                          nullptr,
                                          expr->getLoc(),
-                                         MetatypeType::get(dictionaryTy,
-                                                           tc.Context));
+                                         MetatypeType::get(dictionaryTy));
       auto name = tc.Context.Id_ConvertFromDictionaryLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
@@ -1871,38 +1868,13 @@ namespace {
       auto &C = cs.getASTContext();
       
       // Determine the disjunction choice.
-      auto locator = cs.getConstraintLocator(expr,ConstraintLocator::AddressOf);
+      auto locator = cs.getConstraintLocator(expr,
+                                           ConstraintLocator::InOutConversion);
       // The order of the disjunction choices.
       enum InOutConversion : unsigned {
         InOut,
         AddressConversion,
-        WritebackConversion,
-      } choice;
-      
-      // We may not have set up a disjunction if the inout conversion protocols
-      // are unavailable.
-      ProtocolDecl *addressConvertible, *writebackConvertible;
-      
-      if (solution.DisjunctionChoices.count(locator)) {
-        unsigned idx = solution.getDisjunctionChoice(locator);
-        
-        // If the choice is a conversion, which conversion depends on what
-        // conversion protocols are available.
-        SmallVector<InOutConversion, 3> choices;
-        choices.push_back(InOut);
-        addressConvertible = cs.TC.getProtocol(SourceLoc(),
-                             KnownProtocolKind::BuiltinInOutAddressConvertible);
-        if (addressConvertible)
-          choices.push_back(AddressConversion);
-        writebackConvertible = cs.TC.getProtocol(SourceLoc(),
-                           KnownProtocolKind::BuiltinInOutWritebackConvertible);
-        if (writebackConvertible)
-          choices.push_back(WritebackConversion);
-        
-        choice = choices[idx];
-      } else {
-        choice = InOut;
-      }
+      } choice = InOutConversion(solution.getDisjunctionChoice(locator));
       
       switch (choice) {
       case InOut: {
@@ -1914,68 +1886,86 @@ namespace {
       }
           
       case AddressConversion: {
-        // Retrieve the conversion protocol conformance for the result type.
         auto resultTy = simplifyType(expr->getType());
-        ProtocolConformance *conformance = nullptr;
-        bool conformed = cs.TC.conformsToProtocol(resultTy, addressConvertible,
-                                                  cs.DC, &conformance);
-        if (!conformed)
-          return nullptr;
         
-        // Get the _InOutType at its original abstraction level.
-        NormalProtocolConformance *rootConformance = nullptr;
-        if (conformance)
-          rootConformance = const_cast<NormalProtocolConformance*>(
-                                       conformance->getRootNormalConformance());
-        auto abstractionTy = cs.TC.getWitnessType(resultTy, addressConvertible,
-                              rootConformance, C.getIdentifier("_InOutType"),
-                              diag::inout_address_convertible_protocol_broken);
+        // Find the conversion method we chose.
+        auto choice = getOverloadChoice(locator);
         
         // Get the address of the lvalue as a pointer, at the abstraction
-        // level the result type expects for its _InOutType.
-        auto lv = expr->getSubExpr();
-        auto pointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType,
-                                                   abstractionTy);
-        Expr *convertArgs[] = {pointer};
-        
-        // Construct a call to the type's _convertFromInOutAddress()
-        // method.
-        auto metaTy = MetatypeType::get(resultTy, C);
-        auto metatypeExpr = new (C) MetatypeExpr(nullptr, lv->getStartLoc(),
-                                                 metaTy);
-        auto conversion = cs.TC.callWitness(metatypeExpr, cs.DC,
-                              addressConvertible, conformance,
-                              C.getIdentifier("_convertFromInOutAddress"),
-                              convertArgs,
-                              diag::inout_address_convertible_protocol_broken);
-        if (!conversion)
-          goto error;
-        
-        if (!conversion->getType()->isEqual(resultTy)) {
-          cs.TC.diagnose(expr->getLoc(),
-                         diag::inout_address_convertible_protocol_broken);
-          goto error;
+        // level the method expects.
+        auto choiceDecl = choice.choice.getDecl();
+        auto argType = choiceDecl->getType()
+          ->castTo<AnyFunctionType>()
+          ->getResult()
+          ->castTo<AnyFunctionType>()
+          ->getInput();
+        Type abstractionTy;
+        auto argTuple = argType->getAs<TupleType>();
+        // The type may have been a scalar archetype, T or (label: T).
+        if (argTuple && argTuple->getNumElements() != 1) {
+          assert(argTuple->getNumElements() == 2
+                 && "__inout_conversion choice doesn't take two arguments?!");
+          abstractionTy = argTuple->getElementType(1)
+            ->castTo<MetatypeType>()->getInstanceType();
+        } else if (argTuple) {
+          assert(argTuple->getElementType(0)->is<ArchetypeType>()
+                 && "non-tuple __inout_conversion choice can't match a tuple "
+                    "type?!");
+          abstractionTy = argTuple->getElementType(0);
+        } else {
+          assert(argType->is<ArchetypeType>()
+                 && "non-tuple __inout_conversion choice can't match a tuple "
+                    "type?!");
+          abstractionTy = argType;
         }
+        
+        auto lv = expr->getSubExpr();
+        auto lvPointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType,
+                                                     abstractionTy);
+        
+        // Build up a call to the method.
+        auto &C = cs.getASTContext();
+        auto resultMeta = new (C) MetatypeExpr(nullptr,
+                                             expr->getSubExpr()->getStartLoc(),
+                                             MetatypeType::get(resultTy));
+        auto memberRef = buildMemberRef(resultMeta, choice.openedFullType,
+                                    expr->getSubExpr()->getStartLoc(),
+                                    choice.choice.getDecl(),
+                                    expr->getSubExpr()->getStartLoc(),
+                                    choice.openedType,
+                                    ConstraintLocatorBuilder(locator),
+                                    /*implicit*/ true,
+                                    /*directPropertyAccess*/ false);
+        auto lvMeta = new (C) MetatypeExpr(nullptr,
+                           expr->getSubExpr()->getStartLoc(),
+                           MetatypeType::get(expr->getSubExpr()->getType()
+                                               ->getLValueOrInOutObjectType()));
+        Expr *tupleElts[] = {
+          lvPointer,
+          lvMeta,
+        };
+        auto tupleArgs = new (C) TupleExpr(expr->getSubExpr()->getStartLoc(),
+                                           C.AllocateCopy(tupleElts),
+                                           nullptr,
+                                           expr->getSubExpr()->getEndLoc(),
+                                           /*trailingClosure*/ false,
+                                           /*implicit*/ true);
+        auto methodTy = memberRef->getType()->castTo<AnyFunctionType>();
+        tupleArgs->setType(methodTy->getInput());
+        
+        ApplyExpr *call
+          = new (C) CallExpr(memberRef, tupleArgs, /*implicit*/ true);
+        call->setType(methodTy->getResult());
+        Expr *conversion = finishApply(call, choice.openedType,
+                                       ConstraintLocatorBuilder(locator));
+        conversion = coerceToType(conversion, resultTy,
+                                  ConstraintLocatorBuilder(locator));
         
         // Wrap the call in an InOutConversion node to mark its special
         // writeback semantics.
         return new (C) InOutConversionExpr(expr->getLoc(), conversion);
       }
-          
-      case WritebackConversion: {
-        // TODO: Introduce a writeback using the type's create/commit methods
-        // and then a call to the type's _convertFromWritebackAddress()
-        // method.
-        cs.TC.diagnose(expr->getLoc(),
-                       diag::not_implemented, "inout writeback conversion");
-        goto error;
       }
-      }
-      
-    error:
-      auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
-      err->setType(simplifyType(expr->getType()));
-      return err;
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
@@ -2057,7 +2047,7 @@ namespace {
         Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(), dc,
                                      SourceLoc(), /*implicit*/ true);
         Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
-                               MetatypeType::get(baseElementType, tc.Context));
+                               MetatypeType::get(baseElementType));
         Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);
         if (tc.typeCheckExpression(applyExpr, dc, Type(), /*discarded*/ false))
           llvm_unreachable("should not fail");
@@ -2075,7 +2065,7 @@ namespace {
         base = tc.coerceToRValue(base);
         if (!base) return nullptr;
         expr->setBase(base);
-        expr->setType(MetatypeType::get(base->getType(), tc.Context));
+        expr->setType(MetatypeType::get(base->getType()));
       }
 
       return expr;
@@ -3078,7 +3068,7 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   Expr *typeBase = new (tc.Context) MetatypeExpr(
                                       nullptr,
                                       expr->getStartLoc(),
-                                      MetatypeType::get(toType,tc.Context));
+                                      MetatypeType::get(toType));
   Expr *declRef = buildMemberRef(typeBase,
                                  selected.openedFullType,
                                  expr->getStartLoc(),
@@ -3502,8 +3492,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
     // Call the builtin conversion operation.
     Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                               MetatypeType::get(type,
-                                                                 tc.Context));
+                                               MetatypeType::get(type));
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, builtinConformance,
                                   builtinLiteralFuncName,
@@ -3545,8 +3534,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Convert the resulting expression to the final literal type.
   Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                             MetatypeType::get(type,
-                                                               tc.Context));
+                                             MetatypeType::get(type));
   literal = tc.callWitness(base, dc,
                            protocol, conformance, literalFuncName,
                            literal, brokenProtocolDiag);

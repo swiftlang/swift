@@ -375,8 +375,7 @@ namespace {
       //
       // for fresh type variables T0 and T1, which pulls out a static
       // member, i.e., an enum case or a static variable.
-      auto &ctx = CS.getASTContext();
-      auto baseMetaTy = MetatypeType::get(baseTy, ctx);
+      auto baseMetaTy = MetatypeType::get(baseTy);
       CS.addValueMemberConstraint(baseMetaTy, expr->getName(), memberTy,
                                   memberLocator);
 
@@ -758,69 +757,62 @@ namespace {
       //     S < lvalue T
       //
       // where T is a fresh type variable.
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto lvalue = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       /*options=*/0);
-      auto bound = LValueType::get(tv);
+      auto bound = LValueType::get(lvalue);
       auto locator = CS.getConstraintLocator(expr,
                                              ConstraintLocator::AddressOf);
+      // Don't track failures on the conversion constraints, so that we don't
+      // spend energy trying to diagnose them. Inout conversions should be
+      // rare.
+      auto conversionLocator = CS.getConstraintLocator(expr,
+                                           ConstraintLocator::InOutConversion);
+      //conversionLocator->setDiscardFailures(true);
+      
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
                        locator);
       
       // The result can either directly be the 'inout T' type or be the result
       // of an inout conversion.
-      auto result = CS.createTypeVariable(locator, /*options=*/0);
+      auto result = CS.createTypeVariable(conversionLocator, /*options=*/0);
       
       // Form the constraints for the inout nonconversion case.
       // The result will be bound to the inout T type of the lvalue.
-      auto inout = InOutType::get(tv);
+      auto inout = InOutType::get(lvalue);
       
       SmallVector<Constraint*, 3> disjunctions;
       
       disjunctions.push_back(Constraint::create(CS, ConstraintKind::Bind,
                                                 inout, result, DeclName(),
-                                                locator));
+                                                conversionLocator));
       
       // Form the constraints for the address conversion case.
-      // The result will be of some type that conforms to the
-      // BuiltinInOutAddressConvertible or BuiltinInOutWritebackConvertible
-      // protocols with an _InOutType equal to the type of the lvalue.
-      auto setUpInOutConversion = [&](KnownProtocolKind kind) -> void {
-        // If the protocol doesn't exist, we just don't attempt this conversion.
-        auto proto = CS.TC.getProtocol(SourceLoc(), kind);
-        if (!proto)
-          return;
-        
-        auto protoTy = proto->getDeclaredType();
-        
-        // The result must conform to the protocol.
-        auto conformsTo = Constraint::create(CS, ConstraintKind::ConformsTo,
-                                             result, protoTy, DeclName(),
-                                             locator);
-        
-        // The result must have an _InOutType associated type equal to the
-        // result type.
-        auto associatedType = Constraint::create(CS, ConstraintKind::TypeMember,
-                        result, tv,
-                        CS.getASTContext().getIdentifier("_InOutType"),
-                        locator);
-        
-        Constraint *constraints[] = {conformsTo, associatedType};
-        disjunctions.push_back(
-                       Constraint::createConjunction(CS, constraints, locator));
+      // The result will be of some type that has a static __inout_conversion
+      // method taking the metatype and a RawPointer as a parameter:
+      //
+      //   $Result.Type -> (Builtin.RawPointer, $LValue.Type) -> $Result
+      auto &C = CS.getASTContext();
+      auto lvMeta = MetatypeType::get(lvalue);
+      TupleTypeElt args[] = {
+        C.TheRawPointerType,
+        lvMeta,
       };
+      auto resultMeta = MetatypeType::get(result);
+      auto argTuple = TupleType::get(args, C);
+      auto methodTy = FunctionType::get(argTuple, result);
       
-      setUpInOutConversion(KnownProtocolKind::BuiltinInOutAddressConvertible);
-      setUpInOutConversion(KnownProtocolKind::BuiltinInOutWritebackConvertible);
+      auto member = Constraint::create(CS, ConstraintKind::ValueMember,
+                                       resultMeta, methodTy,
+                                       C.getIdentifier("__inout_conversion"),
+                                       conversionLocator);
       
-      // If we have any conversion protocols, set up the disjunction.
-      if (disjunctions.size() > 1)
-        CS.addConstraint(Constraint::createDisjunction(CS, disjunctions,
-                                                     locator, RememberChoice));
-      // Otherwise, just add the primitive inout conversion.
-      else
-        CS.addConstraint(disjunctions[0]);
+      disjunctions.push_back(member);
       
+      // TODO: Writeback conversion.
+      
+      CS.addConstraint(Constraint::createDisjunction(CS, disjunctions,
+                                           conversionLocator, RememberChoice));
       return result;
     }
 
@@ -890,13 +882,13 @@ namespace {
         CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
-        return MetatypeType::get(tv, CS.getASTContext());
+        return MetatypeType::get(tv);
       }
 
       if (auto baseTyR = expr->getBaseTypeRepr()) {
         auto type = CS.TC.resolveType(baseTyR, CS.DC, None);
         if (type)
-          return MetatypeType::get(type, CS.getASTContext());
+          return MetatypeType::get(type);
 
         return Type();
       }
@@ -952,7 +944,7 @@ namespace {
       Type superclassTy = typeContext->getDeclaredTypeInContext()
                             ->getSuperclass(&tc);
       if (selfDecl->getType()->is<MetatypeType>())
-        superclassTy = MetatypeType::get(superclassTy, CS.getASTContext());
+        superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
     }
     

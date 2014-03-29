@@ -59,6 +59,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "address of";
       break;
 
+    case InOutConversion:
+      out << "inout conversion";
+      break;
+
     case ArrayElementType:
       out << "array element";
       break;

@@ -734,10 +734,6 @@ ERROR(array_protocol_broken,sema_tce,none,
 ERROR(dictionary_protocol_broken,sema_tce,none,
       "DictionaryLiteralConvertible protocol definition is broken", ())
 
-// Inout conversion
-ERROR(inout_address_convertible_protocol_broken,sema_tce,none,
-      "BuiltinInOutAddressConvertible protocol definition is broken", ())
-
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,
       "cannot explicitly specialize a generic function", ())
