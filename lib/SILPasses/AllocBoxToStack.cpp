@@ -418,31 +418,31 @@ static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   }
 }
 
+static void
+rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst*> &Promoted) {
+  for (auto *ABI : Promoted) {
+    rewriteAllocBoxAsAllocStack(ABI);
+    ++NumStackPromoted;
+    ABI->eraseFromParent();
+  }
+}
+
 namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    bool Changed = false;
+    llvm::SmallVector<AllocBoxInst*, 8> Promoted;
 
-    for (auto &BB : *getFunction()) {
-      auto I = BB.begin(), E = BB.end();
-      while (I != E) {
-        if (auto *ABI = dyn_cast<AllocBoxInst>(I))
-          if (canPromoteAllocBox(ABI)) {
-            rewriteAllocBoxAsAllocStack(ABI);
-            ++NumStackPromoted;
-            // Carefully move iterator to avoid invalidation problems.
-            ++I;
-            ABI->eraseFromParent();
-            Changed = true;
-            continue;
-          }
+    for (auto &BB : *getFunction())
+      for (auto &I : BB)
+        if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
+          if (canPromoteAllocBox(ABI))
+            Promoted.push_back(ABI);
 
-        ++I;
-      }
-    }
-    if (Changed)
+    if (!Promoted.empty()) {
+      rewritePromotedBoxes(Promoted);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 
   StringRef getName() override { return "AllocBox-To-Stack Optimization"; }
