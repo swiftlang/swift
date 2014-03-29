@@ -314,6 +314,9 @@ namespace {
 class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   using LinkingMode = SILModule::LinkingMode;
 
+  /// The SILModule that we are loading from.
+  SILModule &Mod;
+
   /// The SILLoader that this visitor is using to link.
   SerializedSILLoader *Loader;
 
@@ -331,13 +334,14 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
   LinkingMode Mode;
 public:
 
-  SILLinkerVisitor(SerializedSILLoader *L, SILModule::LinkingMode M,
+  SILLinkerVisitor(SILModule &M, SerializedSILLoader *L,
+                   SILModule::LinkingMode LinkingMode,
                    SILExternalSource *E = nullptr)
-    : Loader(L), ExternalSource(E), Worklist(),
-      FunctionDeserializationWorklist(), Mode(M) { }
+    : Mod(M), Loader(L), ExternalSource(E), Worklist(),
+      FunctionDeserializationWorklist(), Mode(LinkingMode) { }
 
   /// Process F, recursively deserializing any thing F may reference.
-  bool process(SILFunction *F) {
+  bool processFunction(SILFunction *F) {
     if (Mode == LinkingMode::LinkNone)
       return false;
 
@@ -348,44 +352,40 @@ public:
 
     ++NumFuncLinked;
 
-    // Transitively deserialize everything referenced by NewFn.
+    // Try to transitively deserialize everything referenced by NewFn.
     Worklist.push_back(NewFn);
-    while (!Worklist.empty()) {
-      auto Fn = Worklist.pop_back_val();
-      for (auto &BB : *Fn) {
-        for (auto &I : BB) {
-          // Should we try linking?
-          if (visit(&I)) {
-            for (auto F : FunctionDeserializationWorklist) {
-              // The ExternalSource may wish to rewrite non-empty bodies.
-              if (!F->empty() && ExternalSource)
-                if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
-                  NewFn->verify();
-                  Worklist.push_back(NewFn);
-                  ++NumFuncLinked;
-                  continue;
-                }
+    process();
 
-              F->setBare(IsBare);
-
-              if (F->empty())
-                if (auto NewFn = Loader->lookupSILFunction(F)) {
-                  NewFn->verify();
-                  Worklist.push_back(NewFn);
-                  ++NumFuncLinked;
-                }
-            }
-            FunctionDeserializationWorklist.clear();
-          } else {
-            assert(FunctionDeserializationWorklist.empty() && "Worklist should "
-                   "always be empty if visit does not return true.");
-          }
-        }
-      }
-    }
-
-    // If we return true, we deserialized at least one function.
+    // Since we successfully processed at least one function, return true.
     return true;
+  }
+
+  /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
+  /// transitively references.
+  ///
+  /// This method assumes that the caller made sure that no vtable existed in
+  /// Mod.
+  SILVTable *processClassDecl(const ClassDecl *C) {
+    // If we are not linking anything, bail.
+    if (Mode == LinkingMode::LinkNone)
+      return nullptr;
+
+    // Attempt to load the VTable from the SerializedSILLoader. If we
+    // fail... bail...
+    SILVTable *Vtbl = Loader->lookupVTable(C);
+    if (!Vtbl)
+      return nullptr;
+
+    // Otherwise, add all the vtable functions in Vtbl to the function
+    // processing list...
+    for (auto &E : Vtbl->getEntries())
+      Worklist.push_back(E.second);
+
+    // And then transitively deserialize all SIL referenced by those functions.
+    process();
+
+    // Return the deserialized Vtbl.
+    return Vtbl;
   }
 
   /// We do not want to visit callee functions if we just have a value base.
@@ -456,6 +456,25 @@ public:
     return false;
   }
 
+  bool visitAllocRefInst(AllocRefInst *ARI) {
+    // Grab the class decl from the alloc ref inst.
+    ClassDecl *D = ARI->getType().getClassOrBoundGenericClass();
+    if (!D)
+      return false;
+
+    return linkInVTable(D);
+  }
+
+  bool visitMetatypeInst(MetatypeInst *MI) {
+    CanType MetaTy = MI->getType().getSwiftRValueType();
+    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
+    ClassDecl *C = T->getClassOrBoundGenericClass();
+    if (!C)
+      return false;
+
+    return linkInVTable(C);
+  }
+
 private:
   /// Add a function to our function worklist for processing.
   void addFunctionToWorklist(SILFunction *F) {
@@ -465,12 +484,80 @@ private:
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
   bool isLinkAll() const { return Mode == LinkingMode::LinkAll; }
+
+  bool linkInVTable(ClassDecl *D) {
+    // Attempt to lookup the Vtbl from the SILModule.
+    SILVTable *Vtbl = Mod.lookUpVTable(D);
+
+    // If the SILModule does not have the VTable, attempt to deserialize the
+    // VTable. If we fail to do that as well, bail.
+    if (!Vtbl || !(Vtbl = Loader->lookupVTable(D->getName())))
+      return false;
+
+    // Ok we found our VTable. Visit each function referenced by the VTable. If
+    // any of the functions are external declarations, add them to the worklist
+    // for processing.
+    bool Result = false;
+    for (auto P : Vtbl->getEntries()) {
+      if (P.second->isExternalDeclaration()) {
+        Result = true;
+        addFunctionToWorklist(P.second);
+      }
+    }
+    return Result;
+  }
+
+  // Main loop of the visitor. Called by one of the other *visit* methods.
+  bool process() {
+    // Process everything transitively referenced by one of the functions in the
+    // worklist.
+    bool Result = false;
+    while (!Worklist.empty()) {
+      auto Fn = Worklist.pop_back_val();
+      for (auto &BB : *Fn) {
+        for (auto &I : BB) {
+          // Should we try linking?
+          if (visit(&I)) {
+            for (auto F : FunctionDeserializationWorklist) {
+              // The ExternalSource may wish to rewrite non-empty bodies.
+              if (!F->empty() && ExternalSource)
+                if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
+                  NewFn->verify();
+                  Worklist.push_back(NewFn);
+                  ++NumFuncLinked;
+                  Result = true;
+                  continue;
+                }
+
+              F->setBare(IsBare);
+
+              if (F->empty())
+                if (auto NewFn = Loader->lookupSILFunction(F)) {
+                  NewFn->verify();
+                  Worklist.push_back(NewFn);
+                  Result = true;
+                  ++NumFuncLinked;
+                }
+            }
+            FunctionDeserializationWorklist.clear();
+          } else {
+            assert(FunctionDeserializationWorklist.empty() && "Worklist should "
+                   "always be empty if visit does not return true.");
+          }
+        }
+      }
+    }
+
+    // If we return true, we deserialized at least one function.
+    return Result;
+  }
 };
 
 } // end anonymous namespace.
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(SILLoader, Mode, ExternalSource).process(Fun);
+  return SILLinkerVisitor(*this, SILLoader, Mode,
+                          ExternalSource).processFunction(Fun);
 }
 
 void SILModule::linkAllWitnessTables() {
@@ -482,9 +569,22 @@ void SILModule::linkAllVTables() {
 }
 
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
-  auto R = VTableLookupTable.find(C);
-  if (R == VTableLookupTable.end())
+  if (!C)
     return nullptr;
 
-  return R->second;
+  // First try to look up R from the lookup table.
+  auto R = VTableLookupTable.find(C);
+  if (R != VTableLookupTable.end())
+    return R->second;
+
+  // If that fails, try to deserialize it. If that fails, return nullptr.
+  SILVTable *Vtbl = SILLinkerVisitor(*this, SILLoader,
+                                     SILModule::LinkingMode::LinkAll,
+                                     ExternalSource).processClassDecl(C);
+  if (!Vtbl)
+    return nullptr;
+
+  // If we succeeded, map C -> VTbl in the table and return VTbl.
+  VTableLookupTable[C] = Vtbl;
+  return Vtbl;
 }

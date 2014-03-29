@@ -353,8 +353,10 @@ static SILValue findOrigin(SILValue S) {
           break;
 
         SILFunction *F = FR->getReferencedFunction();
-        if (!F->size())
-          break;
+        if (F->isExternalDeclaration()) {
+          if (!F->getModule().linkFunction(F, SILModule::LinkingMode::LinkAll))
+            break;
+        }
 
         // Does this function return one of its arguments ?
         int RetArg = functionReturnsArgument(F);

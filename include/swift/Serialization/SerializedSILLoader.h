@@ -72,6 +72,9 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILVTable *lookupVTable(Identifier Name);
+  SILVTable *lookupVTable(const ClassDecl *C) {
+    return lookupVTable(C->getName());
+  }
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
 
   /// Deserialize all SILFunctions, VTables, and WitnessTables in all
