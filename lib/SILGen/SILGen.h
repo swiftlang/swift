@@ -84,6 +84,10 @@ public:
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> StringDefaultInitFn;
+  Optional<SILDeclRef> CConstPointerToUnsafePointerFn;
+  Optional<SILDeclRef> CMutablePointerToUnsafePointerFn;
+  Optional<SILDeclRef> UnsafePointerToCConstPointerFn;
+  Optional<SILDeclRef> UnsafePointerToCMutablePointerFn;
   
 public:
   SILGenModule(SILModule &M, Module *SM);
@@ -248,6 +252,10 @@ public:
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getStringDefaultInitFn();
+  SILDeclRef getCMutablePointerToUnsafePointerFn();
+  SILDeclRef getCConstPointerToUnsafePointerFn();
+  SILDeclRef getUnsafePointerToCMutablePointerFn();
+  SILDeclRef getUnsafePointerToCConstPointerFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

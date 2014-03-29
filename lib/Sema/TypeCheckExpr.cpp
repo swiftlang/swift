@@ -579,12 +579,30 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   return *type;
 }
 
-NominalTypeDecl *TypeChecker::getUnsafePointerDecl(const DeclContext *DC) {
-  return UnsafePointerDecl.cache([&] {
-    UnqualifiedLookup lookup(Context.getIdentifier("UnsafePointer"),
-                             getStdlibModule(DC), nullptr);
+static NominalTypeDecl *getKnownPointerDecl(Module *Stdlib,
+                                          ASTContext &Context,
+                                          Optional<NominalTypeDecl*> &cacheSlot,
+                                          StringRef name) {
+  return cacheSlot.cache([&] {
+    UnqualifiedLookup lookup(Context.getIdentifier(name),
+                             Stdlib, nullptr);
     return cast_or_null<NominalTypeDecl>(lookup.getSingleTypeResult());
   });
+}
+
+NominalTypeDecl *TypeChecker::getUnsafePointerDecl(const DeclContext *DC) {
+  return getKnownPointerDecl(getStdlibModule(DC), Context,
+                             UnsafePointerDecl, "UnsafePointer");
+}
+
+NominalTypeDecl *TypeChecker::getCConstPointerDecl(const DeclContext *DC) {
+  return getKnownPointerDecl(getStdlibModule(DC), Context,
+                             CConstPointerDecl, "CConstPointer");
+}
+
+NominalTypeDecl *TypeChecker::getCMutablePointerDecl(const DeclContext *DC) {
+  return getKnownPointerDecl(getStdlibModule(DC), Context,
+                             CMutablePointerDecl, "CMutablePointer");
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {

@@ -1807,6 +1807,22 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isTriviallyRepresentableInObjC(DC, T);
     }
+    // A CConstPointer<T> is representable in ObjC if T
+    // is a trivially representable type.
+    if (NTD == getCConstPointerDecl(DC)) {
+      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+      return isTriviallyRepresentableInObjC(DC, T);
+    }
+    
+    // A CMutablePointer<T> is representable in ObjC if T
+    // is a trivially representable type and *not* an ObjC pointer type.
+    if (NTD == getCMutablePointerDecl(DC)) {
+      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+      return isTriviallyRepresentableInObjC(DC, T)
+        && !isObjCPointerType(T);
+    }
+    
+    // TODO: C*VoidPointer, ObjCMutablePointer
   }
 
   // If it's a mapped type, it's representable.

@@ -118,6 +118,52 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   }
 #include "swift/SIL/BridgedTypes.def"
 
+static NominalTypeDecl *getKnownNominalPointerType(
+                                         Optional<NominalTypeDecl*> &cacheSlot,
+                                         ASTContext &C,
+                                         StringRef moduleName,
+                                         StringRef typeName) {
+  return cacheSlot.cache([&]()->NominalTypeDecl* {
+    Optional<UnqualifiedLookup> lookup
+      = UnqualifiedLookup::forModuleAndName(C, moduleName, typeName);
+    if (!lookup)
+      return nullptr;
+    if (TypeDecl *typeDecl = lookup->getSingleTypeResult()) {
+      assert(typeDecl->getDeclaredType() &&
+             "bridged type must be type-checked");
+      NominalTypeDecl *nomDecl = dyn_cast<NominalTypeDecl>(typeDecl);
+      if (!nomDecl)
+        return nullptr;
+      // Pointer types should have one unbounded type parameter.
+      auto params = nomDecl->getGenericParams();
+      if (!params)
+        return nullptr;
+      if (params->size() != 1)
+        return nullptr;
+      if (!params->getParams()[0].getAsTypeParam()->getConformances().empty())
+        return nullptr;
+      return nomDecl;
+    }
+    return nullptr;
+    
+  });
+}
+
+NominalTypeDecl *TypeConverter::getUnsafePointerDecl() {
+  return getKnownNominalPointerType(UnsafePointerDecl, M.getASTContext(),
+                                    "Swift", "UnsafePointer");
+}
+
+NominalTypeDecl *TypeConverter::getCMutablePointerDecl() {
+  return getKnownNominalPointerType(CMutablePointerDecl, M.getASTContext(),
+                                    "Swift", "CMutablePointer");
+}
+
+NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
+  return getKnownNominalPointerType(CConstPointerDecl, M.getASTContext(),
+                                    "Swift", "CConstPointer");
+}
+
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
     // If captured directly, the variable is captured by box.
@@ -1980,6 +2026,14 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
   }
 };
 
+static bool isCPointerType(TypeConverter &TC,
+                           Type ty) {
+  return ty->getNominalOrBoundGenericNominal()
+      == TC.getCMutablePointerDecl()
+    || ty->getNominalOrBoundGenericNominal()
+      == TC.getCConstPointerDecl();
+}
+
 Type TypeConverter::getLoweredCBridgedType(Type t) {
 #define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType, Opt) \
   { auto nativeType = get##NativeType##Type();                               \
@@ -1995,6 +2049,14 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
       return MetatypeType::get(metaTy->getInstanceType(),
                                MetatypeRepresentation::ObjC);
     }
+  }
+  
+  // C*Pointer arguments bridge to UnsafePointer.
+  if (isCPointerType(*this, t)) {
+    auto args = t->castTo<BoundGenericType>()->getGenericArgs();
+    assert(args.size() == 1 && "pointer type has more than one arg?!");
+    return BoundGenericType::get(getUnsafePointerDecl(),
+                                 Type(), args);
   }
 
   // Blocks?

@@ -253,7 +253,11 @@ private:
 
   /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> UnsafePointerDecl;
-
+  /// The \c Swift.CConstPointer<T> declaration.
+  Optional<NominalTypeDecl *> CConstPointerDecl;
+  /// The \c Swift.CMutablePointer<T> declaration.
+  Optional<NominalTypeDecl *> CMutablePointerDecl;
+  
   /// A set of types that can be trivially mapped to Objective-C types.
   llvm::DenseSet<CanType> ObjCMappedTypes;
 
@@ -728,7 +732,11 @@ public:
 
   /// \brief Retrieve the \c Swift.UnsafePointer<T> declaration.
   NominalTypeDecl *getUnsafePointerDecl(const DeclContext *DC);
-
+  /// \brief Retrieve the \c Swift.CConstPointer<T> declaration.
+  NominalTypeDecl *getCConstPointerDecl(const DeclContext *DC);
+  /// \brief Retrieve the \c Swift.CMutablePointer<T> declaration.
+  NominalTypeDecl *getCMutablePointerDecl(const DeclContext *DC);
+  
   /// \brief Convert the given expression to the given type.
   ///
   /// \param expr The expression, which will be updated in place.

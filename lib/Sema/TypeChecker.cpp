@@ -333,6 +333,14 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
   }
 #include "swift/SIL/BridgedTypes.def"
+  if (Module *module = SF.getASTContext().LoadedModules.lookup("Swift")) {
+    checkBridgingFunctions(TC, module, "CMutablePointer",
+                           "convertUnsafePointerToCMutablePointer",
+                           "convertCMutablePointerToUnsafePointer");
+    checkBridgingFunctions(TC, module, "CConstPointer",
+                           "convertUnsafePointerToCConstPointer",
+                           "convertCConstPointerToUnsafePointer");
+  }
 
   // Define any pending implicitly declarations.
   TC.definePendingImplicitDecls();
