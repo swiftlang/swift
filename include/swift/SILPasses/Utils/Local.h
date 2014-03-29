@@ -68,11 +68,6 @@ namespace swift {
   // known function reference.
   void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);
 
-  /// \brief - Recursively scan all of the uses of the
-  /// specified value, returning true if a use may escape, or false
-  /// otherwise.
-  bool canValueEscape(SILValue V, bool examineApply);
-
   /// \returns True if the type T has unbound generic types.
   bool hasUnboundGenericTypes(Type T);
 

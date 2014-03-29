@@ -15,7 +15,6 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -30,6 +29,7 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply);
+static bool operandEscapesApply(Operand *O);
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
@@ -139,6 +139,118 @@ void getFinalReleases(AllocBoxInst *ABI,
   for (auto *BB : UseBlocks)
     if (!successorHasLiveIn(BB, LiveIn))
       addLastRelease(Box, BB, Releases);
+}
+
+/// \brief Returns True if the operand or one of its users is captured.
+static bool useCaptured(Operand *UI) {
+  auto *User = UI->getUser();
+
+  // These instructions do not cause the address to escape.
+  if (isa<CopyAddrInst>(User) ||
+      isa<LoadInst>(User) ||
+      isa<ProtocolMethodInst>(User) ||
+      isa<DebugValueInst>(User) ||
+      isa<DebugValueAddrInst>(User))
+    return false;
+
+  if (auto *Store = dyn_cast<StoreInst>(User)) {
+    if (Store->getDest() == UI->get())
+      return false;
+  } else if (auto *Assign = dyn_cast<AssignInst>(User)) {
+    if (Assign->getDest() == UI->get())
+      return false;
+  }
+
+  return true;
+}
+
+static bool canValueEscape(SILValue V, bool examineApply) {
+  for (auto UI : V.getUses()) {
+    auto *User = UI->getUser();
+
+    // These instructions do not cause the address to escape.
+    if (!useCaptured(UI))
+      continue;
+
+    // These instructions only cause the value to escape if they are used in
+    // a way that escapes.  Recursively check that the uses of the instruction
+    // don't escape and collect all of the uses of the value.
+    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
+        isa<ProjectExistentialInst>(User) || isa<OpenExistentialInst>(User) ||
+        isa<MarkUninitializedInst>(User) || isa<AddressToPointerInst>(User) ||
+        isa<PointerToAddressInst>(User)) {
+      if (canValueEscape(User, examineApply))
+        return true;
+      continue;
+    }
+
+    if (auto apply = dyn_cast<ApplyInst>(User)) {
+      // Applying a function does not cause the function to escape.
+      if (UI->getOperandNumber() == 0)
+        continue;
+
+      // apply instructions do not capture the pointer when it is passed
+      // indirectly
+      if (apply->getSubstCalleeType()
+          ->getInterfaceParameters()[UI->getOperandNumber()-1].isIndirect())
+        continue;
+
+      // Optionally drill down into an apply to see if the operand is
+      // captured in or returned from the apply.
+      if (examineApply && !operandEscapesApply(UI))
+        continue;
+    }
+
+    // partial_apply instructions do not allow the pointer to escape
+    // when it is passed indirectly, unless the partial_apply itself
+    // escapes
+    if (auto partialApply = dyn_cast<PartialApplyInst>(User)) {
+      auto args = partialApply->getArguments();
+      auto params = partialApply->getSubstCalleeType()
+        ->getInterfaceParameters();
+      params = params.slice(params.size() - args.size(), args.size());
+      if (params[UI->getOperandNumber()-1].isIndirect()) {
+        if (canValueEscape(User, examineApply))
+          return true;
+        continue;
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+static bool operandEscapesApply(Operand *O) {
+  auto *Apply = cast<ApplyInst>(O->getUser());
+
+  auto Type = Apply->getSubstCalleeType();
+
+  // TODO: We do not yet handle generics.
+  if (Apply->hasSubstitutions() || Type->isPolymorphic())
+    return true;
+
+  // It's not a direct call? Bail out.
+  auto Callee = Apply->getCallee();
+  if (!isa<FunctionRefInst>(Callee))
+    return true;
+
+  auto *FRI = cast<FunctionRefInst>(Callee);
+
+  // We don't have a function body to examine?
+  SILFunction *F = FRI->getReferencedFunction();
+  if (F->empty())
+    return true;
+
+  // The applied function is the first operand.
+  auto ParamIndex = O->getOperandNumber() - 1;
+  auto &Entry = F->front();
+  auto *Box = Entry.getBBArg(ParamIndex);
+
+  // Check the uses of the operand, but do not recurse down into other
+  // apply instructions.
+  return !canValueEscape(SILValue(Box), /* examineApply = */ false);
 }
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
