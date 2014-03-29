@@ -1919,8 +1919,8 @@ namespace {
         ProtocolConformance *conformance = nullptr;
         bool conformed = cs.TC.conformsToProtocol(resultTy, addressConvertible,
                                                   cs.DC, &conformance);
-        assert(conformed && "inout address conversion type does not conform?!");
-        (void)conformed;
+        if (!conformed)
+          return nullptr;
         
         // Get the _InOutType at its original abstraction level.
         NormalProtocolConformance *rootConformance = nullptr;
@@ -1933,7 +1933,7 @@ namespace {
         
         // Get the address of the lvalue as a pointer, at the abstraction
         // level the result type expects for its _InOutType.
-        auto lv = expr->getSubExpr();        
+        auto lv = expr->getSubExpr();
         auto pointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType,
                                                    abstractionTy);
         Expr *convertArgs[] = {pointer};
