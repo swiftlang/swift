@@ -225,7 +225,7 @@ private:
       auto proto = cast<ProtocolDecl>(member->getDeclContext());
       auto type = proto->getSelf()->getArchetype()->getCanonicalType();
       if (!member->isInstanceMember())
-        type = CanType(MetatypeType::get(type, SGM.getASTContext()));
+        type = CanMetatypeType::get(type);
       return type;
     } else if (kind == Kind::WitnessMethod) {
       return method.selfValue.getType().getSwiftRValueType();
@@ -693,8 +693,7 @@ public:
                          site->getFn()->getSemanticsProvidingExpr());
         auto fnType = ctorRef->getType()->castTo<FunctionType>();
         auto selfTy = MetatypeType::get(
-                        fnType->getInput()->getInOutObjectType(),
-                        gen.getASTContext());
+                        fnType->getInput()->getInOutObjectType());
         return CanFunctionType::get(selfTy->getCanonicalType(),
                                     fnType->getResult()->getCanonicalType(),
                                     fnType->getExtInfo());
@@ -789,8 +788,7 @@ public:
 
     // Convert to an Objective-C metatype representation, if needed.
     CanType objcMetaType
-      = CanMetatypeType::get(type, MetatypeRepresentation::ObjC,
-                             type->getASTContext());
+      = CanMetatypeType::get(type, MetatypeRepresentation::ObjC);
     ManagedValue selfMetaObjC;
     if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
       selfMetaObjC = selfMeta;
@@ -2343,7 +2341,7 @@ namespace {
     auto param = CanGenericTypeParamType::get(0, 0, C);
     auto reqt = Requirement(RequirementKind::WitnessMarker,
                             param, param);
-    auto metaTy = CanMetatypeType::get(param, MetatypeRepresentation::Thick, C);
+    auto metaTy = CanMetatypeType::get(param, MetatypeRepresentation::Thick);
     auto sig = GenericSignature::get(param.getPointer(), reqt)
       ->getCanonicalSignature();
     auto boolTy = BuiltinIntegerType::get(1, C)

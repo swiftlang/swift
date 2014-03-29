@@ -1451,14 +1451,25 @@ class MetatypeType : public TypeBase {
   Type InstanceType;
 
   static MetatypeType *get(Type T, Optional<MetatypeRepresentation> Repr,
-                           const ASTContext &Ctx);
+                           const ASTContext &C);
 
 public:
   /// \brief Return the MetatypeType for the specified type declaration.
   ///
   /// This leaves the 'representation' property unavailable.
-  static MetatypeType *get(Type T, const ASTContext &Ctx) {
-    return get(T, Nothing, Ctx);
+  ///
+  /// The type must be resolvable to its canonical type in order for the
+  /// ASTContext parameter to be elided. During parsing, the form of 'get'
+  /// that takes an explicit ASTContext parameter must be used.
+  static MetatypeType *get(Type T) {
+    return get(T, Nothing, T->getASTContext());
+  }
+  
+  /// \brief Return the MetatypeType for the specified type declaration.
+  ///
+  /// This leaves the 'representation' property unavailable.
+  static MetatypeType *get(Type T, const ASTContext &C) {
+    return get(T, Nothing, C);
   }
   
   /// Return the MetatypeType for the specified type declaration with
@@ -1466,9 +1477,8 @@ public:
   ///
   /// Metatype representation is a SIL-only property. Thin metatypes
   /// can be lowered away to empty types in IR.
-  static MetatypeType *get(Type T, MetatypeRepresentation repr, 
-                           const ASTContext &Ctx) {
-    return get(T, Optional<MetatypeRepresentation>(repr), Ctx);
+  static MetatypeType *get(Type T, MetatypeRepresentation repr) {
+    return get(T, Optional<MetatypeRepresentation>(repr), T->getASTContext());
   }
 
   Type getInstanceType() const { return InstanceType; }
@@ -1497,19 +1507,18 @@ public:
   }
   
 private:
-  MetatypeType(Type T, const ASTContext *Ctx,
+  MetatypeType(Type T, const ASTContext *C,
                RecursiveTypeProperties properties,
                Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
-  static CanMetatypeType get(CanType type, const ASTContext &ctx) {
-    return CanMetatypeType(MetatypeType::get(type, ctx));
+  static CanMetatypeType get(CanType type) {
+    return CanMetatypeType(MetatypeType::get(type));
   }
-  static CanMetatypeType get(CanType type, MetatypeRepresentation repr, 
-                             const ASTContext &ctx) {
-    return CanMetatypeType(MetatypeType::get(type, repr, ctx));
+  static CanMetatypeType get(CanType type, MetatypeRepresentation repr) {
+    return CanMetatypeType(MetatypeType::get(type, repr));
   }
 END_CAN_TYPE_WRAPPER(MetatypeType, Type)
   

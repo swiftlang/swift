@@ -381,8 +381,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      Type BaseTy = MetatypeType::get(NTD->getDeclaredTypeInContext(),
-                                      TC.Context);
+      Type BaseTy = MetatypeType::get(NTD->getDeclaredTypeInContext());
       BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
     } else {
       BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, /*implicit=*/true);

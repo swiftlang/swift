@@ -947,7 +947,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
             attrs.clearAttribute(TAK_objc_metatype);
           }
 
-          ty = MetatypeType::get(instanceTy, *storedRepr, Context);
+          ty = MetatypeType::get(instanceTy, *storedRepr);
         }
       }
     }
@@ -1406,10 +1406,10 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   // in resolveAttributedType.
   if (options & TR_SILType) {
     TC.diagnose(repr->getStartLoc(), diag::sil_metatype_without_repr);
-    return MetatypeType::get(ty, MetatypeRepresentation::Thick, Context);
+    return MetatypeType::get(ty, MetatypeRepresentation::Thick);
   }
   
-  return MetatypeType::get(ty, Context);
+  return MetatypeType::get(ty);
 }
 
 Type TypeChecker::substType(Module *module, Type type,

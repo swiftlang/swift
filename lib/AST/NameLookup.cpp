@@ -361,7 +361,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
-            ExtendedType = MetatypeType::get(ExtendedType, M.getASTContext());
+            ExtendedType = MetatypeType::get(ExtendedType);
 
         // If we're not in the body of the function, the base declaration
         // is the nominal type, not 'self'.

@@ -1554,8 +1554,7 @@ static void configureConstructorType(ConstructorDecl *ctor,
   } else {
     fnType = FunctionType::get(argType, resultType);
   }
-  auto &ctx = ctor->getASTContext();
-  Type selfMetaType = MetatypeType::get(resultType, ctx);
+  Type selfMetaType = MetatypeType::get(resultType);
   if (outerGenericParams) {
     allocFnType = PolymorphicFunctionType::get(selfMetaType, fnType,
                                                outerGenericParams);
@@ -2982,7 +2981,7 @@ public:
 
     // Look for members with the same name and matching types as this
     // one.
-    auto superclassMetaTy = MetatypeType::get(superclass, TC.Context);
+    auto superclassMetaTy = MetatypeType::get(superclass);
     LookupResult members = TC.lookupMember(superclassMetaTy, decl->getName(),
                                            decl->getDeclContext(),
                                            /*allowDynamicLookup=*/false);
@@ -3310,7 +3309,7 @@ public:
 
     // If we have a simple element, just set the type.
     if (EED->getArgumentType().isNull()) {
-      Type argTy = MetatypeType::get(ElemTy, TC.Context);
+      Type argTy = MetatypeType::get(ElemTy);
       Type fnTy;
       if (auto gp = ED->getGenericParamsOfContext())
         fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp);
@@ -3324,10 +3323,10 @@ public:
 
     Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy);
     if (auto gp = ED->getGenericParamsOfContext())
-      fnTy = PolymorphicFunctionType::get(MetatypeType::get(ElemTy, TC.Context),
+      fnTy = PolymorphicFunctionType::get(MetatypeType::get(ElemTy),
                                           fnTy, gp);
     else
-      fnTy = FunctionType::get(MetatypeType::get(ElemTy, TC.Context), fnTy);
+      fnTy = FunctionType::get(MetatypeType::get(ElemTy), fnTy);
     EED->setType(fnTy);
 
     if (EED->getDeclContext()->isGenericContext())

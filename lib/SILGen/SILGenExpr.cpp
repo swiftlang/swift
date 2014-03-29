@@ -1706,7 +1706,7 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   // For class, archetype, and protocol types, look up the dynamic metatype.
   SILType metaTy = getLoweredLoadableType(
-    MetatypeType::get(base.getType().getSwiftRValueType(), F.getASTContext()));
+    MetatypeType::get(base.getType().getSwiftRValueType()));
   if (base.getType().getSwiftRValueType()->isExistentialType())
     return B.createExistentialMetatype(loc, metaTy, base);
   if (base.getType().getClassOrBoundGenericClass()
@@ -2689,8 +2689,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
       auto metaTy = allocArg.getType().getSwiftRValueType()
                       ->castTo<MetatypeType>();
       metaTy = MetatypeType::get(metaTy->getInstanceType(),
-                                 MetatypeRepresentation::ObjC,
-                                 metaTy->getASTContext());
+                                 MetatypeRepresentation::ObjC);
       allocArg = B.createThickToObjCMetatype(Loc, allocArg,
                                              getLoweredType(metaTy));
     }
@@ -3589,8 +3588,7 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringDefaultInitFn());
   SILValue strMetaty
     = gen.B.createMetatype(loc, gen.getLoweredLoadableType(
-                   MetatypeType::get(gen.SGM.Types.getStringType(),
-                                     gen.getASTContext())->getCanonicalType()));
+                         CanMetatypeType::get(gen.SGM.Types.getStringType())));
   SILValue strInit = gen.B.createApply(loc, strInitFn,
                       strInitFn.getType(),
                       gen.getLoweredLoadableType(gen.SGM.Types.getStringType()),

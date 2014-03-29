@@ -73,7 +73,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
 
       Type protoType = proto->getDeclaredType();
       if (isMetatype)
-        protoType = MetatypeType::get(protoType, Context);
+        protoType = MetatypeType::get(protoType);
 
       SmallVector<ValueDecl *, 4> requirements;
       if (dc->lookupQualified(protoType, name, options, this, requirements)) {

@@ -71,7 +71,7 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
   ASTContext &C = DC->getASTContext();
 
   if (isStaticMethod)
-    selfType = MetatypeType::get(selfType, C);
+    selfType = MetatypeType::get(selfType);
 
   bool isLet = true;
   if (auto *ND = selfType->getAnyNominal())
@@ -582,7 +582,7 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
                                                         ValueDecl *valueDecl) {
   ASTContext &C = optionSetDecl->getASTContext();
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
-  auto metaTy = MetatypeType::get(optionSetType, C);
+  auto metaTy = MetatypeType::get(optionSetType);
 
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, false);
   Pattern *selfPattern = createTypedNamedPattern(selfDecl);
@@ -741,7 +741,7 @@ namespace {
 
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
-      auto selfMetatype = MetatypeType::get(selfType, context);
+      auto selfMetatype = MetatypeType::get(selfType);
       auto selfDecl = createSelfDecl(structDecl, false);
 
       Pattern *selfPattern = createTypedNamedPattern(selfDecl);
@@ -890,7 +890,7 @@ namespace {
                                         theEnum);
 
       // Give the enum element the appropriate type.
-      auto argTy = MetatypeType::get(theEnum->getDeclaredType(), context);
+      auto argTy = MetatypeType::get(theEnum->getDeclaredType());
       element->overwriteType(FunctionType::get(argTy,
                                                theEnum->getDeclaredType()));
       element->setClangNode(decl);
@@ -2000,8 +2000,7 @@ namespace {
           inputTy = tupleTy->getElementType(0);
       }
       if (inputTy->is<MetatypeType>())
-        interfaceInputTy = MetatypeType::get(interfaceInputTy,
-                                             Impl.SwiftContext);
+        interfaceInputTy = MetatypeType::get(interfaceInputTy);
 
       auto interfaceResultTy = fnType->getResult().transform(
         [&](Type type) -> Type {
@@ -3574,7 +3573,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   if (dc->isTypeContext()) {
     auto selfTy = dc->getDeclaredTypeInContext();
     if (isStatic)
-      selfTy = MetatypeType::get(selfTy, context);
+      selfTy = MetatypeType::get(selfTy);
     Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
     anyP->setType(selfTy);
     getterArgs.push_back(anyP);
@@ -3609,7 +3608,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   case ConstantConvertKind::Construction: {
     auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
-                                              MetatypeType::get(type, context));
+                                              MetatypeType::get(type));
     expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
     break;
    }

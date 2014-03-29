@@ -807,10 +807,9 @@ CanType TypeBase::getCanonicalType() {
     MetatypeType *MT = cast<MetatypeType>(this);
     Type InstanceTy = MT->getInstanceType()->getCanonicalType();
     if (MT->hasRepresentation())
-      Result = MetatypeType::get(InstanceTy, MT->getRepresentation(),
-                                 InstanceTy->getASTContext());
+      Result = MetatypeType::get(InstanceTy, MT->getRepresentation());
     else
-      Result = MetatypeType::get(InstanceTy, InstanceTy->getASTContext());
+      Result = MetatypeType::get(InstanceTy);
     break;
   }
   case TypeKind::DynamicSelf: {
@@ -2085,9 +2084,8 @@ case TypeKind::Id:
       return *this;
 
     if (meta->hasRepresentation())
-      return MetatypeType::get(instanceTy, meta->getRepresentation(), 
-                               instanceTy->getASTContext());
-    return MetatypeType::get(instanceTy, instanceTy->getASTContext());
+      return MetatypeType::get(instanceTy, meta->getRepresentation());
+    return MetatypeType::get(instanceTy);
   }
 
   case TypeKind::DynamicSelf: {

@@ -892,7 +892,7 @@ ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
-  auto metaType = MetatypeType::get(Adoptee, TC.Context);
+  auto metaType = MetatypeType::get(Adoptee);
 
   // Gather the witnesses.
   SmallVector<ValueDecl *, 4> witnesses;
@@ -1153,7 +1153,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
-  auto metaType = MetatypeType::get(Adoptee, TC.Context);
+  auto metaType = MetatypeType::get(Adoptee);
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(metaType, assocType->getName(), DC);

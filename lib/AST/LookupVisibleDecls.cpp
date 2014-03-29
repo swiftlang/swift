@@ -682,7 +682,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
         if (auto *FD = dyn_cast<FuncDecl>(AFD))
           if (FD->isStatic())
-            ExtendedType = MetatypeType::get(ExtendedType, M.getASTContext());
+            ExtendedType = MetatypeType::get(ExtendedType);
       }
 
       // Look in the generic parameters after checking our local declaration.

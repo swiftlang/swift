@@ -722,7 +722,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
       return { type, type };
 
     // If it's a value reference, refer to the metatype.
-    type = MetatypeType::get(type, getASTContext());
+    type = MetatypeType::get(type);
     return { type, type };
   }
 
@@ -894,7 +894,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
       Type memberTy = archetype->getNestedTypeValue(value->getName());
       if (!isTypeReference)
-        memberTy = MetatypeType::get(memberTy, TC.Context);
+        memberTy = MetatypeType::get(memberTy);
 
       auto openedType = FunctionType::get(baseObjTy, memberTy);
       return { openedType, memberTy };
@@ -910,7 +910,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
           conformance->isComplete()) {
         auto memberTy = conformance->getTypeWitness(assocType, &TC).Replacement;
         if (!isTypeReference)
-          memberTy = MetatypeType::get(memberTy, TC.Context);
+          memberTy = MetatypeType::get(memberTy);
 
         auto openedType = FunctionType::get(baseObjTy, memberTy);
         return { openedType, memberTy };

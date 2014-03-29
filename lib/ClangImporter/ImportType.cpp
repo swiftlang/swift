@@ -491,7 +491,7 @@ namespace {
 
       // Class maps to AnyObject.Type.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
-      return MetatypeType::get(proto->getDeclaredType(), Impl.SwiftContext);
+      return MetatypeType::get(proto->getDeclaredType());
     }
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {

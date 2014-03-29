@@ -1193,8 +1193,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       }
       
       // Regardless of thinness, metatypes are always trivial.
-      auto thinnedTy = CanMetatypeType::get(instanceType, repr,
-                                           substMeta->getASTContext());
+      auto thinnedTy = CanMetatypeType::get(instanceType, repr);
       loweredTy = SILType::getPrimitiveObjectType(thinnedTy);
     }
     
@@ -1994,8 +1993,7 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
   if (auto metaTy = t->getAs<MetatypeType>()) {
     if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
       return MetatypeType::get(metaTy->getInstanceType(),
-                               MetatypeRepresentation::ObjC,
-                               metaTy->getASTContext());
+                               MetatypeRepresentation::ObjC);
     }
   }
 

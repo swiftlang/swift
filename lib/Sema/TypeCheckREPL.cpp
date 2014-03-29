@@ -186,7 +186,7 @@ void StmtBuilder::printClass(VarDecl *Arg, Type SugarT, ClassDecl *CD,
   // type of the instance.
   bool showedDynamicType = false;
   Identifier MemberName = Context.getIdentifier("className");
-  Type MetaT = MetatypeType::get(SugarT, Context);
+  Type MetaT = MetatypeType::get(SugarT);
   if (TC.lookupMember(MetaT, MemberName, CD,
                       /*allowDynamicLookup=*/false)){
     Expr *ArgRef = getArgRefExpr(Arg, MemberIndexes, Loc);

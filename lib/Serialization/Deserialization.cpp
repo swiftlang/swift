@@ -2491,25 +2491,22 @@ Type ModuleFile::getType(TypeID TID) {
 
     switch (repr) {
     case serialization::MetatypeRepresentation::MR_None:
-      typeOrOffset = MetatypeType::get(getType(instanceID), ctx);
+      typeOrOffset = MetatypeType::get(getType(instanceID));
       break;
 
     case serialization::MetatypeRepresentation::MR_Thin:
       typeOrOffset = MetatypeType::get(getType(instanceID),
-                                       MetatypeRepresentation::Thin,
-                                       ctx);
+                                       MetatypeRepresentation::Thin);
       break;
 
     case serialization::MetatypeRepresentation::MR_Thick:
       typeOrOffset = MetatypeType::get(getType(instanceID),
-                                       MetatypeRepresentation::Thick,
-                                       ctx);
+                                       MetatypeRepresentation::Thick);
       break;
 
     case serialization::MetatypeRepresentation::MR_ObjC:
       typeOrOffset = MetatypeType::get(getType(instanceID),
-                                       MetatypeRepresentation::ObjC,
-                                       ctx);
+                                       MetatypeRepresentation::ObjC);
       break;
 
     default:
