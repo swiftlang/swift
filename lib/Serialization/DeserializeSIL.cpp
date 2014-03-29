@@ -29,6 +29,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
+using namespace llvm::support;
 
 static Optional<StringLiteralInst::Encoding>
 fromStableStringEncoding(unsigned value) {
@@ -72,9 +73,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace clang::io;
-    unsigned keyLength = ReadUnalignedLE16(data);
-    unsigned dataLength = ReadUnalignedLE16(data);
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
     return { keyLength, dataLength };
   }
 
@@ -84,10 +84,8 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace clang::io;
-
     assert(length == 4 && "Expect a single DeclID.");
-    data_type result = ReadUnalignedLE32(data);
+    data_type result = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
 };

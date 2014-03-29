@@ -28,6 +28,7 @@
 
 using namespace swift;
 using namespace swift::serialization;
+using namespace llvm::support;
 
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
   for (unsigned char byte : MODULE_SIGNATURE)
@@ -214,9 +215,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace clang::io;
-    unsigned keyLength = ReadUnalignedLE16(data);
-    unsigned dataLength = ReadUnalignedLE16(data);
+    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
     return { keyLength, dataLength };
   }
 
@@ -226,12 +226,10 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    using namespace clang::io;
-
     data_type result;
     while (length > 0) {
       uint8_t kind = *data++;
-      DeclID offset = ReadUnalignedLE32(data);
+      DeclID offset = endian::readNext<uint32_t, little, unaligned>(data);
       result.push_back({ kind, offset });
       length -= 5;
     }
@@ -396,34 +394,31 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    using namespace clang::io;
-    unsigned keyLength = ReadUnalignedLE32(data);
-    unsigned dataLength = ReadUnalignedLE32(data);
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
     return { keyLength, dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
-    using namespace clang::io;
     return StringRef(reinterpret_cast<const char *>(data), length);
   }
 
   data_type ReadData(internal_key_type key, const uint8_t *data,
                      unsigned length) {
-    using namespace clang::io;
     data_type result;
 
     {
-      unsigned BriefSize = ReadUnalignedLE32(data);
+      unsigned BriefSize = endian::readNext<uint32_t, little, unaligned>(data);
       result.Brief = StringRef(reinterpret_cast<const char *>(data), BriefSize);
       data += BriefSize;
     }
 
-    unsigned NumComments = ReadUnalignedLE32(data);
+    unsigned NumComments = endian::readNext<uint32_t, little, unaligned>(data);
     MutableArrayRef<SingleRawComment> Comments =
         F.getContext().AllocateUninitialized<SingleRawComment>(NumComments);
 
     for (unsigned i = 0; i != NumComments; ++i) {
-      unsigned RawSize = ReadUnalignedLE32(data);
+      unsigned RawSize = endian::readNext<uint32_t, little, unaligned>(data);
       auto RawText = StringRef(reinterpret_cast<const char *>(data), RawSize);
       data += RawSize;
 

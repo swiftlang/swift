@@ -33,6 +33,7 @@
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -40,6 +41,7 @@
 using namespace swift;
 using namespace swift::serialization;
 using clang::OnDiskChainedHashTableGenerator;
+using namespace llvm::support;
 
 namespace {
   /// Used to serialize the on-disk decl hash table.
@@ -58,11 +60,11 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      using namespace clang::io;
       uint32_t keyLength = key.str().size();
       uint32_t dataLength = (sizeof(DeclID) + 1) * data.size();
-      Emit16(out, keyLength);
-      Emit16(out, dataLength);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -73,10 +75,10 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(sizeof(DeclID) <= 4, "DeclID too large");
-      using namespace clang::io;
+      endian::Writer<little> writer(out);
       for (auto entry : data) {
-        Emit8(out, entry.first);
-        Emit32(out, entry.second);
+        writer.write<uint8_t>(entry.first);
+        writer.write<uint32_t>(entry.second);
       }
     }
   };
@@ -2337,7 +2339,7 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    clang::io::Emit32(blobStream, 0);
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
     tableOffset = generator.Emit(blobStream);
   }
 
@@ -2365,7 +2367,6 @@ public:
 
   std::pair<unsigned, unsigned>
   EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-    using namespace clang::io;
     uint32_t keyLength = key.size();
 
     // Data consists of brief comment length and brief comment text,
@@ -2376,8 +2377,9 @@ public:
     for (auto C : data.Raw.Comments)
       dataLength += 4 + C.RawText.size();
 
-    Emit32(out, keyLength);
-    Emit32(out, dataLength);
+    endian::Writer<little> writer(out);
+    writer.write<uint32_t>(keyLength);
+    writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
   }
 
@@ -2387,12 +2389,12 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    using namespace clang::io;
-    Emit32(out, data.Brief.size());
+    endian::Writer<little> writer(out);
+    writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
-    Emit32(out, data.Raw.Comments.size());
+    writer.write<uint32_t>(data.Raw.Comments.size());
     for (auto C : data.Raw.Comments) {
-      Emit32(out, C.RawText.size());
+      writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }
   }
@@ -2451,7 +2453,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    clang::io::Emit32(blobStream, 0);
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 

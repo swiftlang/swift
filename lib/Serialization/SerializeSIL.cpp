@@ -23,10 +23,12 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/EndianStream.h"
 
 using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
+using namespace llvm::support;
 
 static unsigned toStableStringEncoding(StringLiteralInst::Encoding encoding) {
   switch (encoding) {
@@ -65,11 +67,11 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      using namespace clang::io;
       uint32_t keyLength = key.str().size();
       uint32_t dataLength = sizeof(DeclID);
-      Emit16(out, keyLength);
-      Emit16(out, dataLength);
+      endian::Writer<little> writer(out);
+      writer.write<uint16_t>(keyLength);
+      writer.write<uint16_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -80,8 +82,7 @@ namespace {
     void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                   unsigned len) {
       static_assert(sizeof(DeclID) <= 32, "DeclID too large");
-      using namespace clang::io;
-      Emit32(out, data);
+      endian::Writer<little>(out).write<uint32_t>(data);
     }
   };
 
@@ -1229,7 +1230,7 @@ static void writeTable(const sil_index_block::ListLayout &List,
 
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0.
-    clang::io::Emit32(blobStream, 0);
+    endian::Writer<little>(blobStream).write<uint32_t>(0);
     tableOffset = generator.Emit(blobStream);
   }
   SmallVector<uint64_t, 8> scratch;
