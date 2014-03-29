@@ -422,7 +422,6 @@ static void
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst*> &Promoted) {
   for (auto *ABI : Promoted) {
     rewriteAllocBoxAsAllocStack(ABI);
-    ++NumStackPromoted;
     ABI->eraseFromParent();
   }
 }
@@ -441,6 +440,7 @@ class AllocBoxToStack : public SILFunctionTransform {
 
     if (!Promoted.empty()) {
       rewritePromotedBoxes(Promoted);
+      NumStackPromoted += Promoted.size();
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
