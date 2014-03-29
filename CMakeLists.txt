@@ -192,11 +192,6 @@ option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
 set(SWIFT_ASAN_BUILD OFF CACHE BOOL "This is an AddressSanitizer build")
 
-# This will be removed as soon as rdar://14747929 is fixed so we can
-# inline from the stdlib.
-option(SWIFT_ENABLE_BENCHMARKS "Include benchmarks in the stdlib" NO)
-
-
 set(SWIFT_EXTRA_FLAGS "" CACHE STRING
   "Extra flags to pass when compiling swift files")
 

@@ -85,10 +85,6 @@ set(SWIFTLIB_SOURCES
   Zip.swift
   )
 
-if(SWIFT_ENABLE_BENCHMARKS)
-  list(APPEND SWIFTLIB_SOURCES "Benchmark.swift")
-endif()
-
 set(SWIFT_CHECK_ESSENTIAL_STDLIB NO CACHE BOOL
   "Check core standard library layering by linking its essential subset")
 
