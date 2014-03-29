@@ -85,8 +85,8 @@ enum class ImportTypeKind {
   /// \brief Import the type of a function parameter.
   ///
   /// This provides special treatment for C++ references (which become
-  /// [inout] parameters), among other things, and enables the conversion of
-  /// bridged types.
+  /// [inout] parameters) and C pointers (which become magic [inout]-able types),
+  /// among other things, and enables the conversion of bridged types.
   Parameter,
 
   /// \brief Import the type of an ObjC property.

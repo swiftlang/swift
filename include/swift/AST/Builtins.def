@@ -195,6 +195,10 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// Triggers a runtime failure if the condition is true.
 BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
 
+/// fixLifetime(T) -> ()
+/// Fixes the lifetime of any heap references in a value.
+BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.

@@ -2164,6 +2164,18 @@ namespace {
     return emitBuiltinAssignOrInit(gen, loc, substitutions, args, C,
                                    /*isInitialization*/ true);
   }
+  
+  /// Specialized emitter for Builtin.fixLifetime.
+  static ManagedValue emitBuiltinFixLifetime(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ArrayRef<Substitution> substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+    for (auto arg : args) {
+      gen.B.createFixLifetime(loc, arg.getValue());
+    }
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
+  }
 
   /// Specialized emitter for Builtin.castToObjectPointer.
   static ManagedValue emitBuiltinCastToObjectPointer(SILGenFunction &gen,

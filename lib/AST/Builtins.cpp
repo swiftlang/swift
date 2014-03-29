@@ -597,6 +597,20 @@ static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, CondElt, VoidTy);
 }
 
+static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
+  // <T> T -> ()
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(C);
+  
+  TupleTypeElt ArgParam[] = { GenericTy };
+  TupleTypeElt ArgBody[] = { ArchetypeTy };
+  Type Void = TupleType::getEmpty(C);
+  
+  return getBuiltinGenericFunction(Id, ArgParam,ArgBody, Void,Void, ParamList);
+}
+
 static ValueDecl *getExtractElementOperation(ASTContext &Context, Identifier Id,
                                              Type FirstTy, Type SecondTy) {
   // (Vector<N, T>, Int32) -> T
@@ -1144,6 +1158,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
+      
+  case BuiltinValueKind::FixLifetime:
+    return getFixLifetimeOperation(Context, Id);
       
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
