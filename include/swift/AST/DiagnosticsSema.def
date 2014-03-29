@@ -979,6 +979,9 @@ ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a generic class "
       "cannot be represented in Objective-C", (int))
 
+ERROR(objc_name_req_nullary,sema_objc,none,
+      "'objc' %select{class|protocol|property}0 must have a simple name", (int))
+
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be marked %select{@objc|@IBOutlet}0 because its type "
       "cannot be represented in Objective-C", (unsigned))

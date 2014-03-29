@@ -543,6 +543,12 @@ public:
   /// nullary or selector attribute.
   ArrayRef<SourceLoc> getNameLocs() const;
 
+  /// Retrieve the location of the opening parentheses, if there is one.
+  SourceLoc getLParenLoc() const;
+
+  /// Retrieve the location of the closing parentheses, if there is one.
+  SourceLoc getRParenLoc() const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;
   }

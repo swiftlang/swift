@@ -4686,6 +4686,34 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       D->getMutableAttrs().removeAttribute(objcAttr);
       return;
     }
+
+    // If there is a name, check whether the kind of name is
+    // appropriate.
+    if (objcAttr->getKind() != ObjCAttr::Unnamed) {
+      if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)) {
+        // Protocols, classes, and properties can only have nullary
+        // names. Complain and recover by chopping off everything
+        // after the first name.
+        if (objcAttr->getKind() != ObjCAttr::Nullary) {
+          int which = isa<ClassDecl>(D)? 0 
+                    : isa<ProtocolDecl>(D)? 1
+                    : 2;
+          SourceLoc firstNameLoc = objcAttr->getNameLocs().front();
+          SourceLoc afterFirstNameLoc = 
+            Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
+          TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
+            .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
+          D->getMutableAttrs().add(
+            ObjCAttr::createNullary(TC.Context, objcAttr->AtLoc,
+                                    objcAttr->Range.Start,
+                                    objcAttr->getLParenLoc(),
+                                    objcAttr->getNameLocs().front(),
+                                    objcAttr->getNames().front(),
+                                    objcAttr->getRParenLoc()));
+          D->getMutableAttrs().removeAttribute(objcAttr);
+        }
+      }
+    }
   }
 
   // Ownership attributes (weak, unowned).

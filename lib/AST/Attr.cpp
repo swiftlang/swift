@@ -193,7 +193,8 @@ namespace {
                      ArrayRef<SourceLoc> NameLocs, ArrayRef<Identifier> Names,
                      SourceLoc RParenLoc)
       : ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc), Names.size() + 1,
-                 /*Implicit=*/false) 
+                 /*Implicit=*/false),
+        ParenRange(LParenLoc, RParenLoc)
     { 
       assert(Names.size() >= 1 && "No names in selector style");
       assert(NameLocs.size() == Names.size() && "# names != # locations");
@@ -290,3 +291,30 @@ ArrayRef<SourceLoc> ObjCAttr::getNameLocs() const {
     return static_cast<const SelectorObjCAttr *>(this)->getNameLocs();
   }
 }
+
+SourceLoc ObjCAttr::getLParenLoc() const {
+  switch (getKind()) {
+  case Unnamed:
+    return SourceLoc();
+
+  case Nullary:
+    return static_cast<const NullaryObjCAttr *>(this)->ParenRange.Start;
+
+  case Selector:
+    return static_cast<const SelectorObjCAttr *>(this)->ParenRange.Start;
+  }
+}
+
+SourceLoc ObjCAttr::getRParenLoc() const {
+  switch (getKind()) {
+  case Unnamed:
+    return SourceLoc();
+
+  case Nullary:
+    return static_cast<const NullaryObjCAttr *>(this)->ParenRange.End;
+
+  case Selector:
+    return static_cast<const SelectorObjCAttr *>(this)->ParenRange.End;
+  }
+}
+
