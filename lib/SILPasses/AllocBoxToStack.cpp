@@ -267,7 +267,7 @@ static bool checkPartialApplyBody(PartialApplyInst *PAI,
 
   auto Callee = PAI->getCallee();
   if (!isa<FunctionRefInst>(Callee))
-    return true;
+    return false;
 
   auto *FRI = cast<FunctionRefInst>(Callee);
 
