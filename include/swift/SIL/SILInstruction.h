@@ -1964,7 +1964,18 @@ public:
   UnownedReleaseInst(SILLocation Loc, SILValue Operand)
     : UnaryInstructionBase(Loc, Operand) {}
 };
-
+  
+/// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
+/// RVO optimizations.
+class FixLifetimeInst :
+  public UnaryInstructionBase<ValueKind::FixLifetimeInst,
+                              SILInstruction, /*HAS_RESULT*/ false>
+{
+public:
+  FixLifetimeInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
+};
+  
 //===----------------------------------------------------------------------===//
 // DeallocationInsts
 //===----------------------------------------------------------------------===//

@@ -1007,6 +1007,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
     .Case("dynamic_method_br", ValueKind::DynamicMethodBranchInst)
     .Case("enum", ValueKind::EnumInst)
+    .Case("fix_lifetime", ValueKind::FixLifetimeInst)
     .Case("float_literal", ValueKind::FloatLiteralInst)
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
@@ -1409,6 +1410,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (parseTypedValueRef(Val)) return true; \
     ResultVal = B.create##ID(InstLoc, Val);   \
     break;
+  UNARY_INSTRUCTION(FixLifetime)
   UNARY_INSTRUCTION(StrongRetain)
   UNARY_INSTRUCTION(StrongRelease)
   UNARY_INSTRUCTION(StrongRetainAutoreleased)

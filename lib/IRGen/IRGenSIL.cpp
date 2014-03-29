@@ -605,6 +605,7 @@ public:
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
+  void visitFixLifetimeInst(FixLifetimeInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *i);
@@ -2251,6 +2252,10 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
   } else {
     weakTI.weakAssign(*this, source, dest);
   }
+}
+
+void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
+  // TODO: Emit an intrinsic call as a signal to the LLVM ARC optimizer.
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {

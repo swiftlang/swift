@@ -252,6 +252,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::DebugValueInst:
     case ValueKind::DebugValueAddrInst:
     case ValueKind::StringLiteralInst:
+    case ValueKind::FixLifetimeInst:
       return InlineCost::Free;
 
     // Private symbol references cannot be inlined into transparent functions.

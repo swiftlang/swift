@@ -670,6 +670,11 @@ public:
                                            SILValue Operand) {
     return insert(new (F.getModule()) UnownedReleaseInst(Loc, Operand));
   }
+  FixLifetimeInst *createFixLifetime(SILLocation Loc,
+                                     SILValue Operand) {
+    return insert(new (F.getModule()) FixLifetimeInst(Loc, Operand));
+  }
+  
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));
   }

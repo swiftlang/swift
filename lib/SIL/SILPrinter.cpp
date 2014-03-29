@@ -971,6 +971,9 @@ public:
     OS << "metatype " << MI->getType();
   }
   
+  void visitFixLifetimeInst(FixLifetimeInst *RI) {
+    OS << "fix_lifetime " << getIDAndType(RI->getOperand());
+  }
   void visitStrongRetainInst(StrongRetainInst *RI) {
     OS << "strong_retain " << getIDAndType(RI->getOperand());
   }

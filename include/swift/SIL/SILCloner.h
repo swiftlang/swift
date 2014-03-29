@@ -892,6 +892,14 @@ visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitFixLifetimeInst(FixLifetimeInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createFixLifetime(getOpLocation(Inst->getLoc()),
+                              getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   doPostProcess(Inst,
     Builder.createStrongRelease(getOpLocation(Inst->getLoc()),

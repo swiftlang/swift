@@ -179,6 +179,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::ReturnInst:
   case ValueKind::AutoreleaseReturnInst:
   case ValueKind::UpcastExistentialInst:
+  case ValueKind::FixLifetimeInst:
     return false;
 
   case ValueKind::AddressToPointerInst:

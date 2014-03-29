@@ -589,7 +589,7 @@ to multiple-value instructions choose the value by following the ``%name`` with
   // value address %box#1
   %box = alloc_box $Int64
   // Refer to the refcounted pointer
-  %1 = strong_retain %box#0 : $Builtin.ObjectPointer
+  strong_retain %box#0 : $Builtin.ObjectPointer
   // Refer to the address
   store %value to %box#1 : $*Int64
 
@@ -750,9 +750,9 @@ different SIL modules are *linked*, i.e. treated as the same object.
 A linkage is *external* if it ends with the suffix ``external``.  An
 object must be a definition if its linkage is not external.
 
-All functions and global variables have linkage.  The default linkage
-of a definition is ``public``.  The default linkage of a declaration
-is ``public_external``.  (These may eventually change to ``hidden``
+All functions, global variables, and witness tables have linkage. 
+The default linkage of a definition is ``public``.  The default linkage of a
+declaration is ``public_external``.  (These may eventually change to ``hidden``
 and ``hidden_external``, respectively.)
 
 On a global variable, an external linkage is what indicates that the
@@ -804,7 +804,7 @@ a function might copy a value out of an address parameter, while
 another may have had an analysis applied to prove that said value is
 not needed.
 
-If an object has any uses, then it must be linked to an definition
+If an object has any uses, then it must be linked to a definition
 with non-external linkage.
 
 Summary
@@ -846,8 +846,7 @@ VTables
   sil-vtable-entry ::= sil-decl-ref ':' sil-function-name
 
 SIL represents dynamic dispatch for class methods using the `class_method`_,
-`super_method`_, and `dynamic_method`_
-instructions. The potential destinations
+`super_method`_, and `dynamic_method`_ instructions. The potential destinations
 for these dispatch operations are tracked in ``sil_vtable`` declarations for
 every class type. The declaration contains a mapping from every method of the
 class (including those inherited from its base class) to the SIL function that
@@ -1983,6 +1982,22 @@ This operation must be atomic with respect to the final ``strong_release`` on
 the operand (source) heap object.  It need not be atomic with respect to
 ``store_weak`` or ``load_weak`` operations on the same address.
 
+fix_lifetime
+````````````
+
+::
+
+  sil-instruction :: 'fix_lifetime' sil-operand
+
+  fix_lifetime %0 : $T
+  // Fix the lifetime of a value %0
+  fix_lifetime %1 : $*T
+  // Fix the lifetime of the memory object referenced by %1
+
+Acts as a use of a value operand, or of the value in memory referenced by an
+address operand. Optimizations may not move operations that would destroy the
+value, such as ``destroy_value``, ``strong_release``, ``copy_addr [take]``, or
+``destroy_addr``, past this instruction.
 
 Literals
 ~~~~~~~~

@@ -626,6 +626,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MarkUninitializedInst:
+  case ValueKind::FixLifetimeInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongRetainAutoreleasedInst:

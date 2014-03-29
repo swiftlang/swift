@@ -104,6 +104,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnownedRetainInst, RefCountingInst, MayHaveSideEffects)
     INST(UnownedReleaseInst, RefCountingInst, MayHaveSideEffects)
     VALUE_RANGE(RefCountingInst, StrongRetainInst, UnownedReleaseInst)
+  // FIXME: Is MayHaveSideEffects appropriate?
+  INST(FixLifetimeInst, SILInstruction, MayHaveSideEffects)
 
   // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
