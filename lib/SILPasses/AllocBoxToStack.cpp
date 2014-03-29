@@ -270,8 +270,8 @@ static SILValue getParameterForOperand(Operand *O) {
   int ParamIndex = (ParamCount - ArgCount) + OperandIndex - 1;
 
   auto &Entry = F->front();
-  auto *Box = Entry.getBBArg(ParamIndex);
-  return SILValue(Box);
+  auto *Param = Entry.getBBArg(ParamIndex);
+  return SILValue(Param);
 }
 
 
