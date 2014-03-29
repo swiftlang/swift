@@ -1719,7 +1719,18 @@ public:
     return E->getKind() == ExprKind::BridgeToBlock;
   }
 };
-
+  
+/// Convert the address of an lvalue to a raw pointer.
+class LValueToPointerExpr : public ImplicitConversionExpr {
+public:
+  LValueToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::LValueToPointer, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LValueToPointer;
+  }
+};
+  
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.
@@ -2646,7 +2657,7 @@ public:
     return E->getKind() == ExprKind::ConstructorRefCall;
   }
 };
-
+  
 /// DotSyntaxBaseIgnoredExpr - When a.b resolves to something that does not need
 /// the actual value of the base (e.g. when applied to a metatype, module, or
 /// the base of a 'static' function) this expression node is created.  The
@@ -2678,6 +2689,41 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
+  }
+};
+  
+/// Indicates that the enclosed apply expression is an inout conversion.
+///
+/// Unlike a normal call, calls inside the inout conversion do not get their
+/// own writeback scope, but instead extend the writeback chain for the
+/// surrounding call. This ensures that in an expression like:
+///   foo(&a)
+/// 'a' is not written back to until the end of 'foo', even if passing
+/// '&a' to foo involves an inout conversion.
+class InOutConversionExpr : public Expr {
+  SourceLoc OperLoc;
+  Expr *SubExpr;
+public:
+  InOutConversionExpr(SourceLoc OperLoc, Expr *SubExpr, bool Implicit = false)
+    : Expr(ExprKind::InOutConversion, Implicit, SubExpr->getType()),
+      OperLoc(OperLoc), SubExpr(SubExpr)
+  {}
+  
+  Expr *getSubExpr() const {
+    return SubExpr;
+  }
+  void setSubExpr(Expr *apply) {
+    SubExpr = apply;
+  }
+  
+  /// Location of the '&' operator for the inout expression.
+  SourceLoc getLoc() const { return OperLoc; }
+  SourceRange getSourceRange() const {
+    return {OperLoc, SubExpr->getSourceRange().End};
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::InOutConversion;
   }
 };
 

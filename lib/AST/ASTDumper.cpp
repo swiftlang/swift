@@ -1336,6 +1336,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitLValueToPointerExpr(LValueToPointerExpr *E) {
+    printCommon(E, "lvalue_to_pointer") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
     printRec(E->getSubExpr());
@@ -1347,6 +1352,12 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitInOutConversionExpr(InOutConversionExpr *E) {
+    printCommon(E, "inout_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  
   void visitSequenceExpr(SequenceExpr *E) {
     printCommon(E, "sequence_expr");
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {

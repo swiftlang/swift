@@ -1868,17 +1868,41 @@ namespace {
     Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
 
     Expr *visitInOutExpr(InOutExpr *expr) {
+      auto &C = cs.getASTContext();
+      
       // Determine the disjunction choice.
       auto locator = cs.getConstraintLocator(expr,ConstraintLocator::AddressOf);
-      unsigned choice;
-      enum { InOut, AddressConversion, WritebackConversion };
+      // The order of the disjunction choices.
+      enum InOutConversion : unsigned {
+        InOut,
+        AddressConversion,
+        WritebackConversion,
+      } choice;
       
       // We may not have set up a disjunction if the inout conversion protocols
       // are unavailable.
-      if (solution.DisjunctionChoices.count(locator))
-        choice = solution.getDisjunctionChoice(locator);
-      else
+      ProtocolDecl *addressConvertible, *writebackConvertible;
+      
+      if (solution.DisjunctionChoices.count(locator)) {
+        unsigned idx = solution.getDisjunctionChoice(locator);
+        
+        // If the choice is a conversion, which conversion depends on what
+        // conversion protocols are available.
+        SmallVector<InOutConversion, 3> choices;
+        choices.push_back(InOut);
+        addressConvertible = cs.TC.getProtocol(SourceLoc(),
+                             KnownProtocolKind::BuiltinInOutAddressConvertible);
+        if (addressConvertible)
+          choices.push_back(AddressConversion);
+        writebackConvertible = cs.TC.getProtocol(SourceLoc(),
+                           KnownProtocolKind::BuiltinInOutWritebackConvertible);
+        if (writebackConvertible)
+          choices.push_back(WritebackConversion);
+        
+        choice = choices[idx];
+      } else {
         choice = InOut;
+      }
       
       switch (choice) {
       case InOut: {
@@ -1890,13 +1914,37 @@ namespace {
       }
           
       case AddressConversion: {
-        // TODO: Construct a call to the type's _convertFromInOutAddress()
+        // Get the address of the lvalue as a pointer.
+        auto lv = expr->getSubExpr();
+        auto pointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType);
+        Expr *convertArgs[] = {pointer};
+        
+        // Construct a call to the type's _convertFromInOutAddress()
         // method.
-        cs.TC.diagnose(expr->getLoc(),
-                       diag::not_implemented, "inout address conversion");
-        auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
-        err->setType(simplifyType(expr->getType()));
-        return err;
+        auto resultTy = simplifyType(expr->getType());
+        ProtocolConformance *conformance = nullptr;
+        bool conformed = cs.TC.conformsToProtocol(resultTy, addressConvertible,
+                                                  cs.DC, &conformance);
+        assert(conformed && "inout address conversion type does not conform?!");
+        (void)conformed;
+        
+        auto metaTy = MetatypeType::get(resultTy, C);
+        auto metatypeExpr = new (C) MetatypeExpr(nullptr, lv->getStartLoc(),
+                                                 metaTy);
+        auto conversion = cs.TC.callWitness(metatypeExpr, cs.DC,
+                              addressConvertible, conformance,
+                              C.getIdentifier("_convertFromInOutAddress"),
+                              convertArgs,
+                              diag::inout_address_convertible_protocol_broken);
+        if (!conversion->getType()->isEqual(resultTy)) {
+          cs.TC.diagnose(expr->getLoc(),
+                         diag::inout_address_convertible_protocol_broken);
+          goto error;
+        }
+        
+        // Wrap the call in an InOutConversion node to mark its special
+        // writeback semantics.
+        return new (C) InOutConversionExpr(expr->getLoc(), conversion);
       }
           
       case WritebackConversion: {
@@ -1905,14 +1953,14 @@ namespace {
         // method.
         cs.TC.diagnose(expr->getLoc(),
                        diag::not_implemented, "inout writeback conversion");
-        auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
-        err->setType(simplifyType(expr->getType()));
-        return err;
+        goto error;
       }
-          
-      default:
-        llvm_unreachable("invalid disjunction choice for inout");
       }
+      
+    error:
+      auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
+      err->setType(simplifyType(expr->getType()));
+      return err;
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
@@ -2458,7 +2506,10 @@ namespace {
     Expr *visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-
+    Expr *visitInOutConversionExpr(InOutConversionExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    
     void finalize() {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();

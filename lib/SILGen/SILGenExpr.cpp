@@ -14,6 +14,7 @@
 #include "Scope.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTWalker.h"
@@ -150,8 +151,9 @@ namespace {
       return RValue(SGF, E, SGF.emitAddressOfLValue(E->getSubExpr(), lv));
     }
     
+    RValue visitInOutConversionExpr(InOutConversionExpr *E, SGFContext C);
     RValue visitApplyExpr(ApplyExpr *E, SGFContext C);
-
+    
     RValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, SGFContext C) {
       llvm_unreachable("cannot appear in rvalue");
     }
@@ -210,6 +212,7 @@ namespace {
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
+    RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
@@ -3427,6 +3430,18 @@ RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
   SILValue block = SGF.B.createBridgeToBlock(E, func.forward(SGF),
                                     SGF.getLoweredLoadableType(E->getType()));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(block));
+}
+
+RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
+                                               SGFContext C) {
+  SGF.SGM.diagnose(E, diag::not_implemented, "lvalue to pointer conversion");
+  exit(1);
+}
+
+RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,
+                                               SGFContext C) {
+  SGF.SGM.diagnose(E, diag::not_implemented, "inout conversion");
+  exit(1);
 }
 
 namespace {

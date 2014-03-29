@@ -168,6 +168,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
             Diagnose = Diagnostic::TypeOfMetatypeValue;
             break;
               
+          case ExprKind::InOutConversion:
           case ExprKind::IntegerLiteral:
           case ExprKind::FloatLiteral:
           case ExprKind::CharacterLiteral:
@@ -217,6 +218,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::ScalarToTuple:
           case ExprKind::InjectIntoOptional:
           case ExprKind::BridgeToBlock:
+          case ExprKind::LValueToPointer:
           case ExprKind::ConditionalCheckedCast:
           case ExprKind::Isa:
           case ExprKind::Coerce:

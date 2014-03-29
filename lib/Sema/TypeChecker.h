@@ -789,7 +789,7 @@ public:
                     Identifier name,
                     MutableArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
-
+  
   /// \brief Determine whether the given type conforms to the given protocol.
   ///
   /// \param DC The context in which to check conformance. This affects, for

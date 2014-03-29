@@ -17,6 +17,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Mangle.h"
 #include "swift/Basic/SourceManager.h"
@@ -943,6 +944,28 @@ struct ASTNodeBase {};
         }
       }
 
+      verifyCheckedBase(E);
+    }
+    
+    void verifyChecked(LValueToPointerExpr *E) {
+      if (!E->getSubExpr()->getType()->is<LValueType>()) {
+        Out << "LValueToPointerExpr subexpression must be an lvalue";
+        abort();
+      }
+      if (!E->getType()->isEqual(
+                             E->getType()->getASTContext().TheRawPointerType)) {
+        Out << "LValueToPointerExpr result type must be RawPointer";
+        abort();
+      }
+      
+      verifyCheckedBase(E);
+    }
+    
+    void verifyChecked(InOutConversionExpr *E) {
+      if (!E->getSubExpr()->getType()->isEqual(E->getType())) {
+        Out << "InOutConversionExpr must have the same type as its subexpression";
+        abort();
+      }
       verifyCheckedBase(E);
     }
 
