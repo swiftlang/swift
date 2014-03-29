@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -326,3 +327,50 @@ SourceLoc ObjCAttr::getRParenLoc() const {
   }
 }
 
+void ObjCAttr::printName(llvm::raw_ostream &OS) const {
+  auto printId = [&](Identifier name) {
+    if (name.empty())
+      return;
+    
+    OS << name.str();
+  };
+
+  switch (getKind()) {
+  case Unnamed:
+    break;
+
+  case Nullary:
+    printId(static_cast<const NullaryObjCAttr *>(this)->Name);
+    break;
+
+  case Selector:
+    for (auto Name : getNames()) {
+      printId(Name);
+      OS << ":";
+    }
+    break;
+  }
+}
+
+StringRef ObjCAttr::getName(llvm::SmallVectorImpl<char> &buffer) const {
+  switch (getKind()) {
+  case Unnamed:
+    return "";
+
+  case Nullary: {
+    auto Name = static_cast<const NullaryObjCAttr *>(this)->Name;
+    if (Name.empty())
+      return "";
+    return Name.str();
+  }
+  
+  case Selector: {
+    buffer.clear(); 
+    {
+      llvm::raw_svector_ostream OS(buffer);
+      printName(OS);
+    }
+    return StringRef(buffer.data(), buffer.size());
+  }
+  }
+}

@@ -544,6 +544,9 @@ public:
     }
   }
 
+  /// Determine whether this attribute has a name associated with it.
+  bool hasName() const { return getKind() != Unnamed; }
+
   /// Retrieve the names for a nullary or selector attribute.
   ArrayRef<Identifier> getNames() const;
 
@@ -556,6 +559,14 @@ public:
 
   /// Retrieve the location of the closing parentheses, if there is one.
   SourceLoc getRParenLoc() const;
+
+  /// Print the name (if any) to the given stream.
+  void printName(llvm::raw_ostream &OS) const;
+
+  /// Get the name associated with this attribute.
+  ///
+  /// \param buffer A buffer used to store the data for the returned name.
+  StringRef getName(llvm::SmallVectorImpl<char> &buffer) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;
