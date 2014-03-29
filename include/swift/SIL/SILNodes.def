@@ -107,7 +107,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   // FIXME: Is MayHaveSideEffects appropriate?
   INST(FixLifetimeInst, SILInstruction, MayHaveSideEffects)
 
-  // Literalsr
+  // Literals
   ABSTRACT_VALUE(LiteralInst, SILInstruction)
     INST(FunctionRefInst, LiteralInst, None)
     INST(BuiltinFunctionRefInst, LiteralInst, None)
