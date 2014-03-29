@@ -750,6 +750,10 @@ namespace {
       // The base must always be an rvalue.
       base = cs.getTypeChecker().coerceToRValue(base);
       if (!base) return nullptr;
+      if (auto objTy = cs.lookThroughUncheckedOptionalType(base->getType())) {
+        base = coerceUncheckedOptionalToValue(base, objTy, locator);
+        if (!base) return nullptr;
+      }
 
       auto result = new (context) DynamicMemberRefExpr(base, dotLoc, *memberRef,
                                                        memberLoc);
