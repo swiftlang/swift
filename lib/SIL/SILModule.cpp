@@ -325,7 +325,7 @@ class SILLinkerVisitor : public SILInstructionVisitor<SILLinkerVisitor, bool> {
 
   /// A list of callees of the current instruction being visited. cleared after
   /// every instruction is visited.
-  llvm::SmallVector<SILFunction *, 4> CalleeFunctions;
+  llvm::SmallVector<SILFunction *, 4> FunctionDeserializationWorklist;
 
   /// The current linking mode.
   LinkingMode Mode;
@@ -333,7 +333,8 @@ public:
 
   SILLinkerVisitor(SerializedSILLoader *L, SILModule::LinkingMode M,
                    SILExternalSource *E = nullptr)
-    : Loader(L), ExternalSource(E), Worklist(), CalleeFunctions(), Mode(M) { }
+    : Loader(L), ExternalSource(E), Worklist(),
+      FunctionDeserializationWorklist(), Mode(M) { }
 
   /// Process F, recursively deserializing any thing F may reference.
   bool process(SILFunction *F) {
@@ -355,7 +356,7 @@ public:
         for (auto &I : BB) {
           // Should we try linking?
           if (visit(&I)) {
-            for (auto F : CalleeFunctions) {
+            for (auto F : FunctionDeserializationWorklist) {
               // The ExternalSource may wish to rewrite non-empty bodies.
               if (!F->empty() && ExternalSource)
                 if (auto NewFn = ExternalSource->lookupSILFunction(F)) {
@@ -374,10 +375,10 @@ public:
                   ++NumFuncLinked;
                 }
             }
-            CalleeFunctions.clear();
+            FunctionDeserializationWorklist.clear();
           } else {
-            assert(CalleeFunctions.empty() && "CalleeFunctions should always "
-                   "be empty if visit does not return true.");
+            assert(FunctionDeserializationWorklist.empty() && "Worklist should "
+                   "always be empty if visit does not return true.");
           }
         }
       }
@@ -408,7 +409,7 @@ public:
 
     // Otherwise we want to try and link in the callee... Add it to the callee
     // list and return true.
-    addCalleeFunction(Callee);
+    addFunctionToWorklist(Callee);
     return true;
   }
 
@@ -422,7 +423,7 @@ public:
         Callee->getLinkage() != SILLinkage::Shared)
       return false;
 
-    addCalleeFunction(Callee);
+    addFunctionToWorklist(Callee);
     return true;
   }
 
@@ -430,7 +431,7 @@ public:
     if (!isLinkAll())
       return false;
 
-    addCalleeFunction(FRI->getReferencedFunction());
+    addFunctionToWorklist(FRI->getReferencedFunction());
     return true;
   }
 
@@ -447,7 +448,7 @@ public:
     for (auto &E : WT->getEntries()) {
       if (E.getKind() == SILWitnessTable::WitnessKind::Method &&
           E.getMethodWitness().Requirement == Member) {
-        addCalleeFunction(E.getMethodWitness().Witness);
+        addFunctionToWorklist(E.getMethodWitness().Witness);
         return true;
       }
     }
@@ -456,9 +457,9 @@ public:
   }
 
 private:
-  /// Add a function to our callee list for processing.
-  void addCalleeFunction(SILFunction *F) {
-    CalleeFunctions.push_back(F);
+  /// Add a function to our function worklist for processing.
+  void addFunctionToWorklist(SILFunction *F) {
+    FunctionDeserializationWorklist.push_back(F);
   }
 
   /// Is the current mode link all? Link all implies we should try and link
