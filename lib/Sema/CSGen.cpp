@@ -767,7 +767,7 @@ namespace {
       // rare.
       auto conversionLocator = CS.getConstraintLocator(expr,
                                            ConstraintLocator::InOutConversion);
-      //conversionLocator->setDiscardFailures(true);
+      conversionLocator->setDiscardFailures(true);
       
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
