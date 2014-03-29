@@ -984,6 +984,11 @@ ERROR(objc_name_req_nullary,sema_objc,none,
 ERROR(objc_name_subscript,sema_objc,none,
       "'objc' subscript cannot have a name; did you mean to put "
       "the name on the getter or setter?", ())
+ERROR(objc_name_func_mismatch,sema_objc,none,
+      "'objc' %select{initializer|method}0 name provides "
+      "%select{one argument name|names for %1 arguments}2, but "
+      "%select{initializer|method}0 has %select{one parameter|%3 parameters}4", 
+      (bool, unsigned, bool, unsigned, bool))
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be marked %select{@objc|@IBOutlet}0 because its type "

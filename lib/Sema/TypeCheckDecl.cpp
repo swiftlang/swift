@@ -4720,6 +4720,34 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
                                   objcAttr->AtLoc,
                                   objcAttr->Range.Start));
         D->getMutableAttrs().removeAttribute(objcAttr);
+      } else {
+        // We have a function. Make sure that the number of parameters
+        // matches the "number of colons" in the name.
+        auto func = cast<AbstractFunctionDecl>(D);
+        auto argPattern = func->getArgParamPatterns()[1];
+        unsigned numParameters;
+        if (auto tuple = dyn_cast<TuplePattern>(argPattern))
+          numParameters = tuple->getNumFields() - tuple->hasVararg();
+        else
+          numParameters = 1;
+
+        unsigned numArgumentNames = objcAttr->getKind() == ObjCAttr::Nullary 
+                                      ? 0 
+                                      : objcAttr->getNames().size();
+        if (numArgumentNames != numParameters) {
+          TC.diagnose(objcAttr->getNameLocs().front(), 
+                      diag::objc_name_func_mismatch,
+                      isa<FuncDecl>(func), 
+                      numArgumentNames, 
+                      numArgumentNames != 1,
+                      numParameters,
+                      numParameters != 1);
+          D->getMutableAttrs().add(
+            ObjCAttr::createUnnamed(TC.Context,
+                                    objcAttr->AtLoc,
+                                    objcAttr->Range.Start));
+          D->getMutableAttrs().removeAttribute(objcAttr);
+        }
       }
     }
   }
