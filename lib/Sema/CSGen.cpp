@@ -755,18 +755,72 @@ namespace {
       // The address-of operator produces an explicit inout T from an lvalue T.
       // We model this with the constraint
       //
-      //     S < inout T
+      //     S < lvalue T
       //
       // where T is a fresh type variable.
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       /*options=*/0);
       auto bound = LValueType::get(tv);
-      auto result = InOutType::get(tv);
-
+      auto locator = CS.getConstraintLocator(expr,
+                                             ConstraintLocator::AddressOf);
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
-                       CS.getConstraintLocator(expr,
-                                               ConstraintLocator::AddressOf));
+                       locator);
+      
+      // The result can either directly be the 'inout T' type or be the result
+      // of an inout conversion.
+      auto result = CS.createTypeVariable(locator, /*options=*/0);
+      
+      // Form the constraints for the inout nonconversion case.
+      // The result will be bound to the inout T type of the lvalue.
+      auto inout = InOutType::get(tv);
+      
+      SmallVector<Constraint*, 3> disjunctions;
+      
+      disjunctions.push_back(Constraint::create(CS, ConstraintKind::Bind,
+                                                inout, result, DeclName(),
+                                                locator));
+      
+      // Form the constraints for the address conversion case.
+      // The result will be of some type that conforms to the
+      // BuiltinInOutAddressConvertible or BuiltinInOutWritebackConvertible
+      // protocols with an _InOutType equal to the type of the lvalue.
+      auto setUpInOutConversion = [&](KnownProtocolKind kind) -> void {
+        // If the protocol doesn't exist, we just don't attempt this conversion.
+        auto proto = CS.TC.getProtocol(SourceLoc(), kind);
+        if (!proto)
+          return;
+        
+        auto protoTy = proto->getDeclaredType();
+        
+        // The result must conform to the protocol.
+        auto conformsTo = Constraint::create(CS, ConstraintKind::ConformsTo,
+                                             result, protoTy, DeclName(),
+                                             locator);
+        
+        // The result must have an _InOutType associated type equal to the
+        // result type.
+        auto associatedType = Constraint::create(CS, ConstraintKind::TypeMember,
+                        result, tv,
+                        CS.getASTContext().getIdentifier("_InOutType"),
+                        locator);
+        
+        Constraint *constraints[] = {conformsTo, associatedType};
+        disjunctions.push_back(
+                       Constraint::createConjunction(CS, constraints, locator));
+      };
+      
+      setUpInOutConversion(KnownProtocolKind::BuiltinInOutAddressConvertible);
+      setUpInOutConversion(KnownProtocolKind::BuiltinInOutWritebackConvertible);
+      
+      // If we have any conversion protocols, set up the disjunction.
+      if (disjunctions.size() > 1)
+        CS.addConstraint(Constraint::createDisjunction(CS, disjunctions,
+                                                     locator, RememberChoice));
+      // Otherwise, just add the primitive inout conversion.
+      else
+        CS.addConstraint(disjunctions[0]);
+      
       return result;
     }
 

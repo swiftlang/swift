@@ -1868,10 +1868,51 @@ namespace {
     Expr *visitModuleExpr(ModuleExpr *expr) { return expr; }
 
     Expr *visitInOutExpr(InOutExpr *expr) {
-      // Compute the type of the address-of expression.
-      auto lv = expr->getSubExpr()->getType()->castTo<LValueType>();
-      expr->setType(InOutType::get(lv->getObjectType()));
-      return expr;
+      // Determine the disjunction choice.
+      auto locator = cs.getConstraintLocator(expr,ConstraintLocator::AddressOf);
+      unsigned choice;
+      enum { InOut, AddressConversion, WritebackConversion };
+      
+      // We may not have set up a disjunction if the inout conversion protocols
+      // are unavailable.
+      if (solution.DisjunctionChoices.count(locator))
+        choice = solution.getDisjunctionChoice(locator);
+      else
+        choice = InOut;
+      
+      switch (choice) {
+      case InOut: {
+        // The type is simply inout.
+        // Compute the type of the inout expression.
+        auto lv = expr->getSubExpr()->getType()->castTo<LValueType>();
+        expr->setType(InOutType::get(lv->getObjectType()));
+        return expr;
+      }
+          
+      case AddressConversion: {
+        // TODO: Construct a call to the type's _convertFromInOutAddress()
+        // method.
+        cs.TC.diagnose(expr->getLoc(),
+                       diag::not_implemented, "inout address conversion");
+        auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
+        err->setType(simplifyType(expr->getType()));
+        return err;
+      }
+          
+      case WritebackConversion: {
+        // TODO: Introduce a writeback using the type's create/commit methods
+        // and then a call to the type's _convertFromWritebackAddress()
+        // method.
+        cs.TC.diagnose(expr->getLoc(),
+                       diag::not_implemented, "inout writeback conversion");
+        auto err = new (cs.getASTContext()) ErrorExpr(expr->getSourceRange());
+        err->setType(simplifyType(expr->getType()));
+        return err;
+      }
+          
+      default:
+        llvm_unreachable("invalid disjunction choice for inout");
+      }
     }
 
     Expr *visitNewArrayExpr(NewArrayExpr *expr) {
