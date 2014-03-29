@@ -148,9 +148,11 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
 
 const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
-  ObjCClassPtrTI = createPrimitive(IGM.ObjCClassPtrTy,
-                                   IGM.getPointerSize(),
-                                   IGM.getPointerAlignment());
+  // ObjC class objects are guaranteed to be pointer-aligned.
+  ObjCClassPtrTI = createPrimitiveForAlignedPointer(IGM.ObjCClassPtrTy,
+                                                    IGM.getPointerSize(),
+                                                    IGM.getPointerAlignment(),
+                                                    IGM.getPointerAlignment());
   ObjCClassPtrTI->NextConverted = FirstType;
   FirstType = ObjCClassPtrTI;
   return *ObjCClassPtrTI;

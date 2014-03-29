@@ -518,6 +518,22 @@ const TypeInfo *TypeConverter::createPrimitive(llvm::Type *type,
                                align);
 }
 
+/// Constructs a type info which performs simple loads and stores of
+/// the given IR type, given that it's a pointer to an aligned pointer
+/// type.
+const TypeInfo *
+TypeConverter::createPrimitiveForAlignedPointer(llvm::PointerType *type,
+                                                Size size,
+                                                Alignment align,
+                                                Alignment pointerAlignment) {
+  llvm::BitVector spareBits = IGM.TargetInfo.PointerSpareBits;
+  for (unsigned bit = 0; Alignment(1 << bit) != pointerAlignment; ++bit) {
+    spareBits.set(bit);
+  }
+
+  return new PrimitiveTypeInfo(type, size, std::move(spareBits), align);
+}
+
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
@@ -583,9 +599,11 @@ const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
 
 const TypeInfo &TypeConverter::getWitnessTablePtrTypeInfo() {
   if (WitnessTablePtrTI) return *WitnessTablePtrTI;
-  WitnessTablePtrTI = createPrimitive(IGM.WitnessTablePtrTy,
-                                      IGM.getPointerSize(),
-                                      IGM.getPointerAlignment());
+  WitnessTablePtrTI =
+    createPrimitiveForAlignedPointer(IGM.WitnessTablePtrTy,
+                                     IGM.getPointerSize(),
+                                     IGM.getPointerAlignment(),
+                                     IGM.getWitnessTableAlignment());
   WitnessTablePtrTI->NextConverted = FirstType;
   FirstType = WitnessTablePtrTI;
   return *WitnessTablePtrTI;
@@ -597,9 +615,11 @@ const TypeInfo &IRGenModule::getTypeMetadataPtrTypeInfo() {
 
 const TypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   if (TypeMetadataPtrTI) return *TypeMetadataPtrTI;
-  TypeMetadataPtrTI = createPrimitive(IGM.TypeMetadataPtrTy,
-                                      IGM.getPointerSize(),
-                                      IGM.getPointerAlignment());
+  TypeMetadataPtrTI =
+    createPrimitiveForAlignedPointer(IGM.TypeMetadataPtrTy,
+                                     IGM.getPointerSize(),
+                                     IGM.getPointerAlignment(),
+                                     IGM.getTypeMetadataAlignment());
   TypeMetadataPtrTI->NextConverted = FirstType;
   FirstType = TypeMetadataPtrTI;
   return *TypeMetadataPtrTI;

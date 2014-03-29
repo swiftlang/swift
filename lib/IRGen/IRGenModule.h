@@ -187,6 +187,12 @@ public:
     // We always use the pointer's width as its swift ABI alignment.
     return Alignment(PtrSize.getValue());
   }
+  Alignment getWitnessTableAlignment() const {
+    return getPointerAlignment();
+  }
+  Alignment getTypeMetadataAlignment() const {
+    return getPointerAlignment();
+  }
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.

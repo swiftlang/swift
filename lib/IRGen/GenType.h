@@ -23,10 +23,6 @@
 #include "llvm/ADT/ilist.h"
 #include "IRGenModule.h"
 
-namespace llvm {
-  class Constant;
-}
-
 namespace swift {
   class ArchetypeBuilder;
   class ArchetypeType;
@@ -90,6 +86,9 @@ private:
   
   const TypeInfo *createPrimitive(llvm::Type *T,
                                   Size size, Alignment align);
+  const TypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
+                                                   Size size, Alignment align,
+                                                   Alignment pointerAlignment);
 
   void addForwardDecl(TypeBase *key, llvm::Type *type);
 

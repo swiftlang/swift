@@ -2711,6 +2711,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                          getAddrOfWitnessTable(wt->getConformance(), tableTy));
   global->setConstant(true);
   global->setInitializer(initializer);
+  global->setAlignment(getWitnessTableAlignment().getValue());
   
   // TODO: We should record what access mode the witness table requires:
   // direct, lazily initialized, or runtime instantiated template.
