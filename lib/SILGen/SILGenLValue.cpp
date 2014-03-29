@@ -195,13 +195,6 @@ SILValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
   return temp.address;
 }
 
-WritebackScope::WritebackScope(SILGenFunction &gen)
-  : gen(&gen), wasInWritebackScope(gen.InWritebackScope),
-    savedDepth(gen.getWritebackStack().size())
-{
-  gen.InWritebackScope = true;
-}
-
 ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
   auto &addressTL = gen.getTypeLowering(address.getType());
   if (addressTL.isAddressOnly()) {
@@ -215,6 +208,18 @@ ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
   if (valueCleanup.isValid())
     gen.Cleanups.setCleanupState(valueCleanup, CleanupState::Dead);
   return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
+}
+
+WritebackScope::WritebackScope(SILGenFunction &g)
+  : gen(&g), wasInWritebackScope(g.InWritebackScope),
+    savedDepth(g.getWritebackStack().size())
+{
+  // If we're in an inout conversion scope, disable nested writeback scopes.
+  if (g.InInOutConversionScope) {
+    gen = nullptr;
+    return;
+  }
+  g.InWritebackScope = true;
 }
 
 WritebackScope::~WritebackScope() {
@@ -248,6 +253,21 @@ WritebackScope &WritebackScope::operator=(WritebackScope &&o) {
   savedDepth = o.savedDepth;
   o.gen = nullptr;
   return *this;
+}
+
+InOutConversionScope::InOutConversionScope(SILGenFunction &gen)
+  : gen(gen)
+{
+  assert(gen.InWritebackScope
+         && "inout conversions should happen in writeback scopes");
+  assert(!gen.InInOutConversionScope
+         && "inout conversions should not be nested");
+  gen.InInOutConversionScope = true;
+}
+
+InOutConversionScope::~InOutConversionScope() {
+  assert(gen.InInOutConversionScope && "already exited conversion scope?!");
+  gen.InInOutConversionScope = false;
 }
 
 void PathComponent::_anchor() {}

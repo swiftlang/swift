@@ -3434,14 +3434,30 @@ RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
 
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
                                                SGFContext C) {
-  SGF.SGM.diagnose(E, diag::not_implemented, "lvalue to pointer conversion");
-  exit(1);
+  LValue lv = SGF.emitLValue(E->getSubExpr());
+  SILValue address = SGF.emitAddressOfLValue(E->getSubExpr(), lv)
+    .getUnmanagedValue();
+  // TODO: Reabstract the lvalue to match the abstraction level expected by
+  // the inout address conversion's InOutType. For now, just report cases where
+  // we would need a reabstraction as unsupported.
+  SILType abstractedTy
+    = SGF.getLoweredType(AbstractionPattern(E->getAbstractionPatternType()),
+                         E->getSubExpr()->getType()->getLValueOrInOutObjectType());
+  if (address.getType().getObjectType() != abstractedTy)
+    SGF.SGM.diagnose(E, diag::not_implemented,
+                     "abstraction difference in inout conversion");
+  
+  SILValue ptr = SGF.B.createAddressToPointer(E, address,
+                              SILType::getRawPointerType(SGF.getASTContext()));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(ptr));
 }
 
 RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,
                                                SGFContext C) {
-  SGF.SGM.diagnose(E, diag::not_implemented, "inout conversion");
-  exit(1);
+  // Disable nested writeback scopes for any calls evaluated in the
+  // subexpression.
+  InOutConversionScope scope(SGF);
+  return visit(E->getSubExpr());
 }
 
 namespace {

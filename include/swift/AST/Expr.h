@@ -1722,9 +1722,18 @@ public:
   
 /// Convert the address of an lvalue to a raw pointer.
 class LValueToPointerExpr : public ImplicitConversionExpr {
+  Type AbstractionPattern;
 public:
-  LValueToPointerExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::LValueToPointer, subExpr, ty) {}
+  LValueToPointerExpr(Expr *subExpr, Type ty, Type abstractionTy)
+    : ImplicitConversionExpr(ExprKind::LValueToPointer, subExpr, ty),
+      AbstractionPattern(abstractionTy) {}
+  
+  /// Get the declared type of the type for which we are performing this
+  /// conversion. This defines the abstraction level at which the lvalue should
+  /// be emitted before taking its address.
+  Type getAbstractionPatternType() const {
+    return AbstractionPattern;
+  }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::LValueToPointer;

@@ -272,6 +272,15 @@ public:
     gen.InWritebackScope = wasInWritebackScope;
   }
 };
+  
+/// RAII object used to enter an inout conversion scope. Writeback scopes formed
+/// during the inout conversion scope will be no-ops.
+class InOutConversionScope {
+  SILGenFunction &gen;
+public:
+  InOutConversionScope(SILGenFunction &gen);
+  ~InOutConversionScope();
+};
 
 } // end namespace Lowering
 } // end namespace swift

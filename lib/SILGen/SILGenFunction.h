@@ -135,6 +135,7 @@ public:
   std::vector<LValueWriteback> &getWritebackStack();
 
   bool InWritebackScope = false;
+  bool InInOutConversionScope = false;
 
   /// freeWritebackStack - Just deletes WritebackStack.  Out of line to avoid
   /// having to put the definition of LValueWriteback in this header.

@@ -1914,13 +1914,7 @@ namespace {
       }
           
       case AddressConversion: {
-        // Get the address of the lvalue as a pointer.
-        auto lv = expr->getSubExpr();
-        auto pointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType);
-        Expr *convertArgs[] = {pointer};
-        
-        // Construct a call to the type's _convertFromInOutAddress()
-        // method.
+        // Retrieve the conversion protocol conformance for the result type.
         auto resultTy = simplifyType(expr->getType());
         ProtocolConformance *conformance = nullptr;
         bool conformed = cs.TC.conformsToProtocol(resultTy, addressConvertible,
@@ -1928,6 +1922,24 @@ namespace {
         assert(conformed && "inout address conversion type does not conform?!");
         (void)conformed;
         
+        // Get the _InOutType at its original abstraction level.
+        NormalProtocolConformance *rootConformance = nullptr;
+        if (conformance)
+          rootConformance = const_cast<NormalProtocolConformance*>(
+                                       conformance->getRootNormalConformance());
+        auto abstractionTy = cs.TC.getWitnessType(resultTy, addressConvertible,
+                              rootConformance, C.getIdentifier("_InOutType"),
+                              diag::inout_address_convertible_protocol_broken);
+        
+        // Get the address of the lvalue as a pointer, at the abstraction
+        // level the result type expects for its _InOutType.
+        auto lv = expr->getSubExpr();        
+        auto pointer = new (C) LValueToPointerExpr(lv, C.TheRawPointerType,
+                                                   abstractionTy);
+        Expr *convertArgs[] = {pointer};
+        
+        // Construct a call to the type's _convertFromInOutAddress()
+        // method.
         auto metaTy = MetatypeType::get(resultTy, C);
         auto metatypeExpr = new (C) MetatypeExpr(nullptr, lv->getStartLoc(),
                                                  metaTy);
@@ -1936,6 +1948,9 @@ namespace {
                               C.getIdentifier("_convertFromInOutAddress"),
                               convertArgs,
                               diag::inout_address_convertible_protocol_broken);
+        if (!conversion)
+          goto error;
+        
         if (!conversion->getType()->isEqual(resultTy)) {
           cs.TC.diagnose(expr->getLoc(),
                          diag::inout_address_convertible_protocol_broken);
