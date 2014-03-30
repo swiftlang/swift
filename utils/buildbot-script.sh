@@ -505,7 +505,9 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
     
         build_cmd=("$CMAKE" --build "${!_PRODUCT_BUILD_DIR}" -- ${BUILD_ARGS})
 
-        if [[ "${product}" != SourceKit ]] ; then
+        if [[ "${product}" == SourceKit ]] ; then
+            "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SourceKitUnitTests
+        else
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
         fi
 
