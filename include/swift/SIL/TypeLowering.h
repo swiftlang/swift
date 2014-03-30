@@ -298,9 +298,9 @@ public:
   /// Emit a lowered 'copy_value' operation.
   ///
   /// This type must be loadable.
-  virtual SILValue emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
-                                        SILValue value,
-                                        LoweringStyle style) const = 0;
+  virtual void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+                                    SILValue value,
+                                    LoweringStyle style) const = 0;
 
   /// Emit a lowered 'copy_value' operation.
   ///
@@ -333,16 +333,16 @@ public:
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
-                                 SILValue value) const = 0;
+  virtual void emitCopyValue(SILBuilder &B, SILLocation loc,
+                             SILValue value) const = 0;
 
-  SILValue emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
-                                     SILValue value,
-                                     LoweringStyle style) const {    
+  void emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
+                                 SILValue value,
+                                 LoweringStyle style) const {
     if (style != LoweringStyle::Shallow) {
-      return emitLoweredCopyValue(B, loc, value, style);
+      emitLoweredCopyValue(B, loc, value, style);
     } else {
-      return emitCopyValue(B, loc, value);
+      emitCopyValue(B, loc, value);
     }
   }
 

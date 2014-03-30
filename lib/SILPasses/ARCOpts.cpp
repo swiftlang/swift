@@ -353,14 +353,6 @@ processBBTopDown(SILBasicBlock &BB,
       ReferenceCountState &RefCountState = BBState[Operand];
       NestingDetected |= RefCountState.initWithInst(&I);
 
-      // If we have a copy value add in an additional state for its output
-      // pointer.
-      if (isa<CopyValueInst>(I)) {
-        ReferenceCountState &OutputRefCountState = BBState[SILValue(&I, 0)];
-        OutputRefCountState.initWithInst(&I);
-        NestingDetected |= OutputRefCountState.initWithInst(&I);
-      }
-
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
             << (RefCountState.isKnownSafe()?"yes":"no") << "\n");
 
@@ -385,22 +377,6 @@ processBBTopDown(SILBasicBlock &BB,
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:           "
               << *RefCountState.getInstruction());
-
-        // If we have matched up a copy_value, find the other copy of its state
-        // and remove it so we do not attempt to remove the copy_value twice.
-        if (auto *CV =
-              dyn_cast<CopyValueInst>(RefCountState.getInstruction())) {
-          SILValue CVOperand = RefCountState.getValue();
-          if (CVOperand == Operand) {
-            // We matched the copy value's operand, clear the state associated
-            // with its result.
-            BBState[SILValue(CV, 0)].clear();
-          } else {
-            // We matched the copy value's result, clear the state associated
-            // with its operand.
-            BBState[CVOperand].clear();
-          }
-        }
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
@@ -477,11 +453,6 @@ performCodeMotion(llvm::MapVector<SILInstruction *,
       // Add our deleted instructions to the delete list.
       DeleteList.push_back(Pair.first);
       DeleteList.push_back(Inst);
-
-      // If we are going to remove a copy value, propagate the operand of the
-      // copy value to all uses of the copy value.
-      if (isa<CopyValueInst>(Inst))
-        SILValue(Inst, 0).replaceAllUsesWith(Inst->getOperand(0));
 
       ++NumIncrementsRemoved;
       continue;

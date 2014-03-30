@@ -146,6 +146,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::WitnessMethodInst:
   case ValueKind::BuiltinFunctionRefInst:
   case ValueKind::CopyAddrInst:
+  case ValueKind::CopyValueInst:
   case ValueKind::DeallocBoxInst:
   case ValueKind::DeallocRefInst:
   case ValueKind::DeallocStackInst:
@@ -190,7 +191,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::ClassMethodInst:
   case ValueKind::CondBranchInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::CopyValueInst:
   case ValueKind::DynamicMethodInst:
   case ValueKind::EnumInst:
   case ValueKind::IndexAddrInst:

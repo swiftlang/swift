@@ -29,13 +29,13 @@ struct S {
 // CHECK-NEXT: return
 sil @simple_copyvalue_destroyvalue_pair : $@thin (S) -> S {
 bb0(%0 : $S):
-  %1 = copy_value %0 : $S
-  destroy_value %1 : $S
-  %2 = copy_value %0 : $S
+  copy_value %0 : $S
   destroy_value %0 : $S
-  %3 = copy_value %1 : $S
+  copy_value %0 : $S
   destroy_value %0 : $S
-  return %2 : $S
+  copy_value %0 : $S
+  destroy_value %0 : $S
+  return %0 : $S
 }
 
 // CHECK-LABEL: sil @delete_retain_over_non_side_effect_instructions : $@thin (Builtin.ObjectPointer, Builtin.Int64) -> Builtin.Int1

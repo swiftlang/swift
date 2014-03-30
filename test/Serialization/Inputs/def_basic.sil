@@ -862,12 +862,12 @@ sil @test_mark_fn_escape : $@thin () -> () {
 // CHECK-LABEL: sil public_external @test_copy_destroy_value
 sil @test_copy_destroy_value : $@thin (Val) -> (Val) {
 bb0(%0 : $Val):
-  %1 = copy_value %0 : $Val
+  copy_value %0 : $Val
   destroy_value %0 : $Val
-  return %1 : $Val
-  // CHECK:      [[T1:%.*]] = copy_value [[T0:%.*]] : $Val
+  return %0 : $Val
+  // CHECK:      copy_value [[T0:%.*]] : $Val
   // CHECK-NEXT: destroy_value [[T0]] : $Val
-  // CHECK-NEXT: return [[T1]] : $Val
+  // CHECK-NEXT: return [[T0]] : $Val
 }
 
 func serialize_all() {

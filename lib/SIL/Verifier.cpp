@@ -561,8 +561,6 @@ public:
   void checkCopyValueInst(CopyValueInst *I) {
     require(I->getOperand().getType().isObject(),
             "Source value should be an object value");
-    require(I->getOperand().getType() == I->getType(),
-            "Result type does not match input type");
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {

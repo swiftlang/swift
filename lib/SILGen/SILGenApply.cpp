@@ -1539,7 +1539,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
     
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
-      scalarResult = actualResultTL.emitCopyValue(gen.B, loc, scalarResult);
+      actualResultTL.emitCopyValue(gen.B, loc, scalarResult);
       break;
     }
 

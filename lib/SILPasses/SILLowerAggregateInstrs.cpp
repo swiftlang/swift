@@ -190,11 +190,9 @@ static bool expandCopyValue(CopyValueInst *CV) {
          "types.");
 
   auto &TL = Module.getTypeLowering(Type);
-  SILValue Result =
-    TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
-                            TypeLowering::LoweringStyle::DeepNoEnum);
-  SILValue(CV, 0).replaceAllUsesWith(Result);
-
+  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
+                          TypeLowering::LoweringStyle::DeepNoEnum);
+  
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
 
   ++NumExpand;

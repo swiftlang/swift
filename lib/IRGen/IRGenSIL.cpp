@@ -2091,8 +2091,9 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out(in.getKind());
-  cast<LoadableTypeInfo>(getTypeInfo(i->getType())).copy(*this, in, out);
-  setLoweredExplosion(SILValue(i, 0), out);
+  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
+    .copy(*this, in, out);
+  out.claimAll();
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {

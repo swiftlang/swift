@@ -61,14 +61,14 @@ bb0:
 // The Baz variable is loaded and copy_value'd, because it is a non-trivial
 // aggregate type
 // CHECK-NEXT: [[LOADBAZ:%.*]] = load {{.*}} : $*Baz
-// CHECK-NEXT: [[COPYBAZ:%.*]] = copy_value [[LOADBAZ:%.*]] : $Baz
+// CHECK-NEXT: copy_value [[LOADBAZ:%.*]] : $Baz
 
 // The Int variable is loaded only, because it is trivial
 // CHECK-NEXT: [[LOADINT:%.*]] = load {{.*}} : $*Int
 
 // The partial apply has one value argument for each pair of arguments that was
 // previously used to capture and pass the variable by reference
-// CHECK-NEXT: {{.*}} = partial_apply [[CLOSURE_PROMOTE]]([[LOADFOO]], [[COPYBAZ]], [[LOADINT]])
+// CHECK-NEXT: {{.*}} = partial_apply [[CLOSURE_PROMOTE]]([[LOADFOO]], [[LOADBAZ]], [[LOADINT]])
 
   %17 = function_ref @closure0 : $@thin (@owned Builtin.ObjectPointer, @inout Foo, @owned Builtin.ObjectPointer, @inout Baz, @owned Builtin.ObjectPointer, @inout Int) -> Int
   strong_retain %1#0 : $Builtin.ObjectPointer

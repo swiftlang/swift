@@ -365,7 +365,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   switch (info.getConvention()) {
   case ParameterConvention::Direct_Unowned:
   case ParameterConvention::Direct_Guaranteed:
-    paramValue = gen.getTypeLowering(paramValue.getType())
+    gen.getTypeLowering(paramValue.getType())
                     .emitCopyValue(gen.B, loc, paramValue);
     SWIFT_FALLTHROUGH;
   case ParameterConvention::Direct_Owned:
@@ -710,8 +710,7 @@ static SILValue getThunkResult(SILGenFunction &gen,
         gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
       break;
     case ResultConvention::Unowned:
-      innerResultValue =
-        innerResultTL.emitCopyValue(gen.B, loc, innerResultValue);
+      innerResultTL.emitCopyValue(gen.B, loc, innerResultValue);
       break;
     }
   }

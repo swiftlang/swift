@@ -376,9 +376,9 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
 // CHECK-NEXT: return
 sil @copy_value_test : $@thin (Builtin.Int8, Builtin.ObjectPointer) -> (Builtin.Int8, Builtin.ObjectPointer) {
 bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
-  %2 = copy_value %0 : $Builtin.Int8
-  %3 = copy_value %1 : $Builtin.ObjectPointer
-  %4 = tuple(%2 : $Builtin.Int8, %3 : $Builtin.ObjectPointer)
+  copy_value %0 : $Builtin.Int8
+  copy_value %1 : $Builtin.ObjectPointer
+  %4 = tuple(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer)
   return %4 : $(Builtin.Int8, Builtin.ObjectPointer)
 }
 

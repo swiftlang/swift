@@ -1322,10 +1322,12 @@ public:
 };
 
 /// CopyValueInst - Copies a loadable value.
-class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst> {
+class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst,
+                                                  SILInstruction,
+                                                  /*HasValue*/ false> {
 public:
   CopyValueInst(SILLocation loc, SILValue operand)
-    : UnaryInstructionBase(loc, operand, operand.getType()) {}
+    : UnaryInstructionBase(loc, operand) {}
 };
 
 /// DestroyValueInst - Destroys a loadable value.

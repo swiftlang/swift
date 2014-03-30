@@ -842,7 +842,7 @@ public:
 
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
-  SILValue emitCopyValueOperation(SILLocation loc, SILValue v) {
+  void emitCopyValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
     auto &lowering = F.getModule().getTypeLowering(v.getType());
     return lowering.emitCopyValue(*this, loc, v);
