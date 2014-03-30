@@ -58,6 +58,9 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
   case llvm::Triple::ArchType::arm:
     LangOpts.addTargetConfigOption("arch", "arm");
     break;
+  case llvm::Triple::ArchType::arm64:
+    LangOpts.addTargetConfigOption("arch", "arm64");
+    break;
   case llvm::Triple::ArchType::x86:
     LangOpts.addTargetConfigOption("arch", "i386");
     break;
@@ -65,10 +68,6 @@ void CompilerInstance::setTargetConfigurations(IRGenOptions &IRGenOpts,
     LangOpts.addTargetConfigOption("arch", "x86_64");
     break;
   default:
-    // FIXME: Use `case llvm::Triple::arm64` when underlying LLVM is new enough
-    if (StringRef("arm64") == llvm::Triple::getArchTypeName(triple.getArch()))
-      LangOpts.addTargetConfigOption("arch", "arm64");
-      break;
     llvm_unreachable("Unsupported target architecture");
   }
 }
