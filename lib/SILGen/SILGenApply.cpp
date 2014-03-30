@@ -1208,6 +1208,18 @@ public:
         continue;
       }
 
+      // Simple optional-to-optional conversions.  This doesn't work
+      // for the full generality of OptionalEvaluationExpr, but it
+      // works given that we check the result for certain forms.
+      if (auto eval = dyn_cast<OptionalEvaluationExpr>(expr)) {
+        if (auto inject = dyn_cast<InjectIntoOptionalExpr>(eval->getSubExpr())) {
+          if (auto bind = dyn_cast<BindOptionalExpr>(inject->getSubExpr())) {
+            if (bind->getDepth() == 0)
+              return bind->getSubExpr();
+          }
+        }
+      }
+
       auto valueProviding = expr->getValueProvidingExpr();
       if (valueProviding != expr) {
         expr = valueProviding;

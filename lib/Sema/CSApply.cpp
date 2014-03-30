@@ -2482,13 +2482,7 @@ namespace {
                                      : CheckedCastKind::ExistentialToConcrete);
         subExpr = cast;
       } else {
-        bool isDynamicLookup = isa<DynamicLookupExpr>(subExpr);
-        
-        Type optType;
-        if (isDynamicLookup)
-          optType = UncheckedOptionalType::get(valueType);
-        else
-          optType = OptionalType::get(valueType);
+        Type optType = OptionalType::get(valueType);
         
         // Coerce the subexpression to the appropriate optional type.
         subExpr = coerceToType(subExpr, optType,
