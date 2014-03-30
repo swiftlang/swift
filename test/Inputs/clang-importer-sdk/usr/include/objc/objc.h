@@ -1,5 +1,8 @@
+#define NS_AUTOMATED_REFCOUNT_UNAVAILABLE __attribute__((unavailable("not available in automatic reference counting mode")))
+
 typedef unsigned long NSUInteger;
 typedef long NSInteger;
+typedef signed char BOOL;
 
 @protocol NSObject
 - description;
@@ -12,6 +15,7 @@ typedef long NSInteger;
 - performSelector:(SEL)selector withObject:(id)obj;
 - (Class)myClass;
 + description;
+- (BOOL)allowsWeakReference __attribute__((unavailable));
 @end
 
 @interface A : NSObject
@@ -127,3 +131,7 @@ SEL sel_registerName(const char *str);
 - (A*) objectForKeyedSubscript:(id)key;
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
 @end
+
+void NSDeallocateObject(id object) NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
+
+#undef NS_AUTOMATED_REFCOUNT_UNAVAILABLE

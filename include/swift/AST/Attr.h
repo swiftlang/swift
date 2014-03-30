@@ -468,6 +468,11 @@ public:
     return !Platform.empty();
   }
 
+  /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
+  /// This attribute is considered "implicit".
+  static AvailabilityAttr *createImplicitUnavailableAttr(ASTContext &C,
+                                                         StringRef Message);
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_availability;
   }

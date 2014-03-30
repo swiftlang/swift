@@ -3305,6 +3305,26 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (!Result)
     return nullptr;
 
+  if (Result) {
+    // Scan through Clang attributes and map them onto Swift
+    // equivalents.
+    for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
+         AE = ClangDecl->attr_end(); AI != AE; ++AI) {
+      //
+      // __attribute__((uanavailable)
+      //
+      // Mapping: @availability(*,unavailable)
+      //
+      if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
+        auto Message = unavailable->getMessage();
+        auto attr =
+          AvailabilityAttr::createImplicitUnavailableAttr(SwiftContext,
+                                                          Message);
+        Result->getMutableAttrs().add(attr);
+      }
+    }
+  }
+
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
   (void)Canon;
   // Note that the decl was imported from Clang.  Don't mark Swift decls as

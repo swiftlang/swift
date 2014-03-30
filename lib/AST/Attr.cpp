@@ -374,3 +374,12 @@ StringRef ObjCAttr::getName(llvm::SmallVectorImpl<char> &buffer) const {
   }
   }
 }
+
+AvailabilityAttr *
+AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
+                                                StringRef Message) {
+  return new (C) AvailabilityAttr(SourceLoc(), SourceRange(),
+                                  "", Message, /* isUnavailable */ true,
+                                  /* isImplicit */ true);
+}
+
