@@ -428,6 +428,9 @@ static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
 /// Diagnose uses of unavailable declarations.
 static void diagAvailability(TypeChecker &TC, const ValueDecl *D,
                              SourceRange R, const DeclContext *DC) {
+  if (!D)
+    return;
+
   for (auto Attr : D->getAttrs())
     if (auto AvailAttr = dyn_cast<AvailabilityAttr>(Attr))
       if (diagAvailability(TC, AvailAttr, D, R, DC))
@@ -446,6 +449,8 @@ public:
   virtual Expr *walkToExprPost(Expr *E) override {
     if (auto DR = dyn_cast<DeclRefExpr>(E))
       diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
+    if (auto MR = dyn_cast<MemberRefExpr>(E))
+      diagAvailability(TC, MR->getMember().getDecl(), MR->getSourceRange(), DC);
     return E;
   }
 };

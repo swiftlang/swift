@@ -1000,7 +1000,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // If the requirement is optional, it's okay. We'll satisfy this via
   // our handling of default definitions.
   // FIXME: also check for a default definition here.
-  if (requirement->getAttrs().isOptional()) {
+  //
+  // Treat 'unavailable' implicitly as if it were 'optional'.
+  // The compiler will reject actual uses.
+  auto Attrs = requirement->getAttrs();
+  if (Attrs.isOptional() || Attrs.isUnavailable()) {
     return ResolveWitnessResult::Missing;
   }
 
@@ -1085,7 +1089,9 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
   // An optional requirement is trivially satisfied with an empty requirement.
-  if (requirement->getAttrs().isOptional()) {
+  // An 'unavailable' requirement is treated like optional requirements.
+  auto Attrs = requirement->getAttrs();
+  if (Attrs.isOptional() || Attrs.isUnavailable()) {
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
   }

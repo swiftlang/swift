@@ -6,6 +6,7 @@ typedef signed char BOOL;
 
 @protocol NSObject
 - description;
+- (instancetype)retain NS_AUTOMATED_REFCOUNT_UNAVAILABLE;
 @end
 
 @interface NSObject <NSObject>

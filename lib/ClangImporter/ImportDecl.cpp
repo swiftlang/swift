@@ -2440,7 +2440,11 @@ namespace {
           if (auto func = dyn_cast<AbstractFunctionDecl>(valueReq)){
             // For an optional requirement, record an empty witness:
             // we'll end up querying this at runtime.
-            if (func->getAttrs().isOptional()) {
+            //
+            // Also treat 'unavailable' requirements as optional.
+            //
+            auto Attrs = func->getAttrs();
+            if (Attrs.isOptional() || Attrs.isUnavailable()) {
               conformance->setWitness(valueReq, ConcreteDeclRef());
               continue;
             }
@@ -3283,6 +3287,27 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
   return UnderlyingDecl;
 }
 
+/// Import Clang attributes as Swift attributes.
+static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
+                             Decl *MappedDecl) {
+  // Scan through Clang attributes and map them onto Swift
+  // equivalents.
+  for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
+       AE = ClangDecl->attr_end(); AI != AE; ++AI) {
+    //
+    // __attribute__((uanavailable)
+    //
+    // Mapping: @availability(*,unavailable)
+    //
+    if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
+      auto Message = unavailable->getMessage();
+      auto attr =
+      AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
+      MappedDecl->getMutableAttrs().add(attr);
+    }
+  }
+}
+
 Decl *
 ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
@@ -3305,25 +3330,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (!Result)
     return nullptr;
 
-  if (Result) {
-    // Scan through Clang attributes and map them onto Swift
-    // equivalents.
-    for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
-         AE = ClangDecl->attr_end(); AI != AE; ++AI) {
-      //
-      // __attribute__((uanavailable)
-      //
-      // Mapping: @availability(*,unavailable)
-      //
-      if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
-        auto Message = unavailable->getMessage();
-        auto attr =
-          AvailabilityAttr::createImplicitUnavailableAttr(SwiftContext,
-                                                          Message);
-        Result->getMutableAttrs().add(attr);
-      }
-    }
-  }
+  if (Result)
+    importAttributes(SwiftContext, ClangDecl, Result);
 
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
   (void)Canon;
@@ -3460,6 +3468,9 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(decl);
+
+    // Map the Clang attributes onto Swift attributes.
+    importAttributes(SwiftContext, decl, result);
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;

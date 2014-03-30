@@ -42,6 +42,17 @@ DeclAttributes &Decl::getMutableAttrs() {
   return *const_cast<DeclAttributes*>(&getAttrs());
 }
 
+bool DeclAttributes::isUnavailable() const {
+  for (auto Attr : *this)
+    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+      // FIXME: Unify unavailabilty checking with that in MiscDiagnostics.cpp.
+      if (AvAttr->Platform.empty())
+        if (AvAttr->IsUnvailable)
+          return true;
+    }
+  return false;
+}
+
 void DeclAttributes::print(llvm::raw_ostream &OS) const {
   StreamPrinter P(OS);
   PrintOptions PO = PrintOptions::printEverything();

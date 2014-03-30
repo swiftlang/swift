@@ -706,6 +706,10 @@ public:
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
   bool isOptional() const { return has(AK_optional); }
+
+  // FIXME: eventually take a platform argument.
+  bool isUnavailable() const;
+
   bool isOverride() const { return has(AK_override); }
   bool requiresStoredPropertyInits() const {
     return has(AK_requires_stored_property_inits);
