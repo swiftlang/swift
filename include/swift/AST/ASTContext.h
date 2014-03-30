@@ -32,14 +32,11 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Allocator.h"
 #include <functional>
 #include <memory>
 #include <utility>
 #include <vector>
-
-namespace llvm {
-  class BumpPtrAllocator;
-}
 
 namespace clang {
   class Decl;
