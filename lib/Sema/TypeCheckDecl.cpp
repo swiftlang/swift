@@ -5124,6 +5124,17 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       D->getMutableAttrs().clearAttribute(AK_optional);
     }
   }
+
+  // Only protocols that are @objc can have "unavailable" methods.
+  if (auto AvAttr = Attrs.getUnavailable()) {
+    if (auto PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+      if (!PD->isObjC()) {
+        TC.diagnose(AvAttr->getLocation(),
+                    diag::unavailable_method_non_objc_protocol);
+        D->getMutableAttrs().removeAttribute(AvAttr);
+      }
+    }
+  }
 }
 
 bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
