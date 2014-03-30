@@ -287,6 +287,9 @@ ERROR(optional_attribute_non_protocol,sema_tcd,none,
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
       "'optional' attribute can only be applied to members of an @objc protocol", 
       ())
+ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
+      "protocol members can only be marked unavailable in an @objc protocol",
+      ())
 ERROR(missing_in_class_init_1,sema_tcd,none,
       "stored property %0 requires an initial value", (Identifier))
 ERROR(missing_in_class_init_2,sema_tcd,none,
@@ -468,6 +471,8 @@ NOTE(overridden_here_with_type,sema_tcd,none,
      "overridden declaration here has type %0", (Type))
 ERROR(missing_override,sema_tcd,none,
       "overriding declaration requires an 'override' attribute", ())
+ERROR(override_unavailable,sema_tcd,none,
+"cannot override %0 which has been marked unavailable", (Identifier))
 ERROR(method_does_not_override,sema_tcd,none,
       "method does not override any method from its superclass", ())
 ERROR(property_does_not_override,sema_tcd,none,

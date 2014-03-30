@@ -3218,6 +3218,11 @@ public:
         TC.diagnose(override, diag::missing_override);
       TC.diagnose(base, diag::overridden_here);
     }
+
+    // FIXME: Possibly should extend to more availability checking.
+    if (base->getAttrs().isUnavailable()) {
+      TC.diagnose(override, diag::override_unavailable, override->getName());
+    }
     
     if (auto overridingFunc = dyn_cast<FuncDecl>(override)) {
       overridingFunc->setOverriddenDecl(cast<FuncDecl>(base));

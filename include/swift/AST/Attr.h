@@ -708,7 +708,13 @@ public:
   bool isOptional() const { return has(AK_optional); }
 
   // FIXME: eventually take a platform argument.
-  bool isUnavailable() const;
+  bool isUnavailable() const { return getUnavailable() != nullptr; }
+
+  /// Returns the first @availability attribute that indicates
+  /// a declaration is unavailable, or null otherwise.
+  //
+  // FIXME: eventually take a platform argument.
+  const AvailabilityAttr *getUnavailable() const;
 
   bool isOverride() const { return has(AK_override); }
   bool requiresStoredPropertyInits() const {
