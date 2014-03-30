@@ -284,7 +284,8 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
 namespace {
   class Selector {
     
-    llvm::SmallString<80> Text;
+    llvm::SmallString<80> Buffer;
+    StringRef Text;
 
   public:
 
@@ -309,18 +310,18 @@ namespace {
     Selector() = default;
 
     Selector(FuncDecl *method) {
-      method->getObjCSelector(Text);
+      Text = method->getObjCSelector(Buffer);
     }
     
     Selector(ConstructorDecl *ctor) {
-      ctor->getObjCSelector(Text);
+      Text = ctor->getObjCSelector(Buffer);
     }
     
     Selector(ValueDecl *methodOrCtorOrDtor) {
       if (auto *method = dyn_cast<FuncDecl>(methodOrCtorOrDtor)) {
-        method->getObjCSelector(Text);
+        Text = method->getObjCSelector(Buffer);
       } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtorOrDtor)) {
-        ctor->getObjCSelector(Text);
+        Text = ctor->getObjCSelector(Buffer);
       } else if (isa<DestructorDecl>(methodOrCtorOrDtor)) {
         Text = "dealloc";
       } else {
@@ -330,11 +331,11 @@ namespace {
     }
     
     Selector(AbstractStorageDecl *asd, ForGetter_t) {
-      asd->getObjCGetterSelector(Text);
+      Text = asd->getObjCGetterSelector(Buffer);
     }
 
     Selector(AbstractStorageDecl *asd, ForSetter_t) {
-      asd->getObjCSetterSelector(Text);
+      Text = asd->getObjCSetterSelector(Buffer);
     }
 
     Selector(SILDeclRef ref) {
@@ -351,11 +352,11 @@ namespace {
         break;
           
       case SILDeclRef::Kind::Func:
-        cast<FuncDecl>(ref.getDecl())->getObjCSelector(Text);
+        Text = cast<FuncDecl>(ref.getDecl())->getObjCSelector(Buffer);
         break;
 
-        case SILDeclRef::Kind::Initializer:
-        cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Text);
+      case SILDeclRef::Kind::Initializer:
+        Text = cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Buffer);
         break;
 
       case SILDeclRef::Kind::IVarInitializer:

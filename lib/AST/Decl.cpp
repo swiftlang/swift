@@ -1470,7 +1470,17 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
 
 StringRef AbstractStorageDecl::
 getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If the getter has an @objc attribute with a name, use that.
+  if (auto getter = getGetter()) {
+    if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
+      if (objcAttr->hasName())
+        return objcAttr->getName(buffer);
+    }
+  }
+
   // If we override a property, use its getter selector.
+  // FIXME: We shouldn't need this, because we should be inheriting @objc(name)
+  // when needed.
   if (auto overridden = getOverriddenDecl())
     return overridden->getObjCGetterSelector(buffer);
 
@@ -1510,7 +1520,17 @@ getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
 
 
 StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
+  // If the setter has an @objc attribute with a name, use that.
+  if (auto setter = getSetter()) {
+    if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>()) {
+      if (objcAttr->hasName())
+        return objcAttr->getName(buffer);
+    }
+  }
+
   // If we override a property, use its setter selector.
+  // FIXME: We shouldn't need this, because we should be inheriting @objc(name)
+  // when needed.
   if (auto overridden = getOverriddenDecl())
     return overridden->getObjCSetterSelector(buffer);
 
@@ -2138,6 +2158,12 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
                       : asd->getObjCSetterSelector(buffer);
   }
 
+  // If there is an @objc attribute with a name, use that name.
+  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+    if (objc->hasName())
+      return objc->getName(buffer);
+  }
+
   assert(buffer.empty());
   
   llvm::raw_svector_ostream out(buffer);
@@ -2256,6 +2282,12 @@ Type ConstructorDecl::getResultType() const {
 /// Produce the selector for this "Objective-C method" in the given buffer.
 StringRef
 ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
+  // If there is an @objc attribute with a name, use that name.
+  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+    if (objc->hasName())
+      return objc->getName(buffer);
+  }
+
   assert(buffer.empty());
 
   llvm::raw_svector_ostream out(buffer);
