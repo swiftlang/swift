@@ -4663,8 +4663,23 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       if (!D->getDeclContext()->isModuleScopeContext())
         error = diag::objc_class_not_top_level;
     } else if (isa<FuncDecl>(D) && isInClassOrProtocolContext(D)) {
-      if (isOperator || cast<FuncDecl>(D)->isGetterOrSetter())
+      auto func = cast<FuncDecl>(D);
+      if (isOperator)
         error = diag::invalid_objc_decl;
+      else if (func->isGetterOrSetter()) {
+        auto storage = func->getAccessorStorageDecl();
+        if (!storage->isObjC()) {
+          error = func->isGetter()
+                    ? (isa<VarDecl>(storage) 
+                         ? diag::objc_getter_for_nonobjc_property
+                         : diag::objc_getter_for_nonobjc_subscript)
+                    : (isa<VarDecl>(storage)
+                         ? diag::objc_setter_for_nonobjc_property
+                         : diag::objc_setter_for_nonobjc_subscript);
+        }
+      } else if (func->isAccessor()) {
+        error= diag::objc_observing_accessor;
+      }
     } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
     } else if (isa<SubscriptDecl>(D) && isInClassOrProtocolContext(D)) {
