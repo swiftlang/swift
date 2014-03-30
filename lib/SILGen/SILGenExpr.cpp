@@ -222,6 +222,9 @@ namespace {
     RValue visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
                                        SGFContext C);
     RValue visitForceValueExpr(ForceValueExpr *E, SGFContext C);
+    RValue emitForceValue(SILLocation loc, Expr *E,
+                          unsigned numOptionalEvaluations,
+                          SGFContext C);
     RValue visitOpenExistentialExpr(OpenExistentialExpr *E, SGFContext C);
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
@@ -4114,25 +4117,95 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 }
 
 RValue RValueEmitter::visitForceValueExpr(ForceValueExpr *E, SGFContext C) {
+  return emitForceValue(E, E->getSubExpr(), 0, C);
+}
+
+/// Emit an expression in a forced context.
+///
+/// \param loc - the location that is causing the force
+/// \param E - the forced expression
+/// \param numOptionalEvaluations - the number of enclosing
+///   OptionalEvaluationExprs that we've opened.
+RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
+                                     unsigned numOptionalEvaluations,
+                                     SGFContext C) {
+  auto valueType = E->getType()->getAnyOptionalObjectType();
+  assert(valueType);
+  E = E->getSemanticsProvidingExpr();
+
   // If the subexpression is a conditional checked cast, emit an unconditional
   // cast, which drastically simplifies the generated SIL for something like:
   //
   //   (x as Foo)!
-  if (auto checkedCast = dyn_cast<ConditionalCheckedCastExpr>(
-        E->getSubExpr()->getSemanticsProvidingExpr())) {
+  if (auto checkedCast = dyn_cast<ConditionalCheckedCastExpr>(E)) {
     return emitUnconditionalCheckedCast(checkedCast->getSubExpr(),
-                                        E, E->getType(),
+                                        loc, valueType,
                                         checkedCast->getCastKind(),
                                         C);
   }
 
-  const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  auto optTemp = SGF.emitTemporary(E, optTL);
-  SGF.emitExprInto(E->getSubExpr(), optTemp.get());
+  // If the subexpression is a monadic optional operation, peephole
+  // the emission of the operation.
+  // force down into the operation.
+  if (auto eval = dyn_cast<OptionalEvaluationExpr>(E)) {
+    CleanupLocation cleanupLoc = CleanupLocation::getCleanupLocation(loc);
+    SILBasicBlock *failureBB;
+    JumpDest failureDest(cleanupLoc);
 
-  ManagedValue V = SGF.emitGetOptionalValueFrom(E, optTemp->getManagedAddress(),
-                                                optTL, C);
-  return RValue(SGF, E, V);
+    // Set up an optional-failure scope (which cannot actually return).
+    // We can just borrow the enclosing one if we're in a nested context.
+    if (numOptionalEvaluations) {
+      failureBB = nullptr; // remember that we did this
+      failureDest = SGF.BindOptionalFailureDests.back();
+    } else {
+      failureBB = SGF.createBasicBlock();
+      failureDest = JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(),
+                             cleanupLoc);
+    }
+    RestoreOptionalFailureDest restoreFailureDest(SGF, std::move(failureDest));
+    RValue result = emitForceValue(loc, eval->getSubExpr(),
+                                   numOptionalEvaluations + 1, C);
+
+    // Emit the failure destination, but only if actually used.
+    if (failureBB->pred_empty()) {
+      failureBB->eraseFromParent();
+    } else {
+      SILBuilder failureBuilder(failureBB);
+      auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+      auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
+      failureBuilder.createCondFail(loc, trueV);
+      failureBuilder.createUnreachable(loc);
+    }
+
+    return result;
+  }
+
+  // Handle injections.
+  if (auto injection = dyn_cast<InjectIntoOptionalExpr>(E)) {
+    auto subexpr = injection->getSubExpr()->getSemanticsProvidingExpr();
+
+    // An injection of a bind is the idiom for a conversion between
+    // optional types (e.g. UncheckedOptional<T> -> Optional<T>).
+    // Handle it specially to avoid unnecessary control flow.
+    if (auto bindOptional = dyn_cast<BindOptionalExpr>(subexpr)) {
+      if (bindOptional->getDepth() < numOptionalEvaluations) {
+        return emitForceValue(loc, bindOptional->getSubExpr(),
+                              numOptionalEvaluations, C);
+      }
+    }
+
+    // Otherwise, just emit the injected value directly into the result.
+    return SGF.emitRValue(injection->getSubExpr(), C);
+  }
+
+  // Otherwise, emit the value into memory and use the optional intrinsic.
+  const TypeLowering &optTL = SGF.getTypeLowering(E->getType());
+  auto optTemp = SGF.emitTemporary(E, optTL);
+  SGF.emitExprInto(E, optTemp.get());
+
+  ManagedValue V =
+    SGF.emitGetOptionalValueFrom(loc, optTemp->getManagedAddress(), optTL, C);
+  return RValue(SGF, loc, valueType->getCanonicalType(), V);
 }
 
 RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E, 
