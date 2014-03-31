@@ -207,9 +207,9 @@ namespace {
 
     SelectorObjCAttr(SourceLoc AtLoc, SourceLoc ObjCLoc, SourceLoc LParenLoc,
                      ArrayRef<SourceLoc> NameLocs, ArrayRef<Identifier> Names,
-                     SourceLoc RParenLoc)
+                     SourceLoc RParenLoc, bool Implicit)
       : ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc), Names.size() + 1,
-                 /*Implicit=*/false),
+                 Implicit),
         ParenRange(LParenLoc, RParenLoc)
     { 
       assert(Names.size() >= 1 && "No names in selector style");
@@ -283,7 +283,19 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
                 + NameLocs.size() * sizeof(SourceLoc);
   void *mem = Ctx.Allocate(size, alignof(SelectorObjCAttr));
   return new (mem) SelectorObjCAttr(AtLoc, ObjCLoc, LParenLoc, NameLocs, Names,
-                                    RParenLoc);
+                                    RParenLoc, /*Implicit=*/false);
+}
+
+ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
+                                   ArrayRef<Identifier> Names) {
+  llvm::SmallVector<SourceLoc, 2> NameLocs(Names.size(), SourceLoc());
+  unsigned size = sizeof(SelectorObjCAttr) 
+                + Names.size() * sizeof(Identifier)
+                + NameLocs.size() * sizeof(SourceLoc);
+  void *mem = Ctx.Allocate(size, alignof(SelectorObjCAttr));
+  return new (mem) SelectorObjCAttr(SourceLoc(), SourceLoc(), SourceLoc(), 
+                                    NameLocs, Names, SourceLoc(), 
+                                    /*Implicit=*/true);
 }
 
 ArrayRef<Identifier> ObjCAttr::getNames() const {
@@ -386,6 +398,20 @@ StringRef ObjCAttr::getName(llvm::SmallVectorImpl<char> &buffer) const {
   }
 }
 
+ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
+  switch (getKind()) {
+  case Unnamed:
+    return new (context) ObjCAttr(SourceLoc(), SourceRange(), 0, 
+                                  /*Implicit=*/true);
+
+  case Nullary:
+    return createNullary(context, getNames().front());
+
+  case Selector:
+    return createSelector(context, getNames());
+  }
+}
+
 AvailabilityAttr *
 AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
                                                 StringRef Message) {
@@ -393,4 +419,3 @@ AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
                                   "", Message, /* isUnavailable */ true,
                                   /* isImplicit */ true);
 }
-

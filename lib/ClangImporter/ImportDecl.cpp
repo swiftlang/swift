@@ -1548,6 +1548,23 @@ namespace {
       return nullptr;
     }
 
+    /// Add an @objc(name) attribute that corresponds to the given
+    /// Objective-C selector.
+    void addObjCAttributeForSelector(Decl *decl, clang::Selector sel) {
+      auto &ctx = Impl.SwiftContext;
+      if (sel.isUnarySelector()) {
+        auto name = ctx.getIdentifier(sel.getNameForSlot(0));
+        decl->getMutableAttrs().add(ObjCAttr::createNullary(ctx, name));
+        return;
+      } 
+
+      llvm::SmallVector<Identifier, 4> names;
+      for (unsigned i = 0, n = sel.getNumArgs(); i != n; ++i) {
+        names.push_back(ctx.getIdentifier(sel.getNameForSlot(i)));
+      }
+      decl->getMutableAttrs().add(ObjCAttr::createSelector(ctx, names));
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
@@ -1671,9 +1688,13 @@ namespace {
       // Mark this as an Objective-C method.
       result->setIsObjC(true);
 
+      // Add the appropriate @objc attribute with the name of this
+      // method.
+      addObjCAttributeForSelector(result, decl->getSelector());
+
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
-        result->setStatic();
+        result->setStatic();      
 
       // If this method overrides another method, mark it as such.
       recordObjCMethodOverride(result, decl);
@@ -1927,6 +1948,7 @@ namespace {
                          selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
       result->setIsObjC(true);
       result->setClangNode(objcMethod);
+      addObjCAttributeForSelector(result, objcMethod->getSelector());
 
       // Fix the types when we've imported into a protocol.
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
@@ -2086,6 +2108,9 @@ namespace {
       thunk->setInterfaceType(interfaceType);
 
       thunk->setIsObjC(true);
+      if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
+        thunk->getMutableAttrs().add(objcAttr->clone(context));
+
       return thunk;
     }
 
@@ -2167,6 +2192,9 @@ namespace {
       thunk->setInterfaceType(interfaceType);
 
       thunk->setIsObjC(true);
+      if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
+        thunk->getMutableAttrs().add(objcAttr->clone(context));
+
       return thunk;
     }
     

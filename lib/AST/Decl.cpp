@@ -29,6 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
 
+#include "clang/Basic/CharInfo.h"
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
@@ -1502,22 +1503,9 @@ getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
     return out.str();
   }
 
-  // If there is an Objective-C @property declaration, use its getter
-  // name.
-  if (auto objc = dyn_cast_or_null<clang::ObjCPropertyDecl>(getClangDecl())) {
-    auto selector = objc->getGetterName();
-    if (!selector.isNull()) {
-      selector.print(out);
-      return out.str();
-    }
-  }
-
   // The getter selector is the property name itself.
-  // FIXME: 'is' prefix for boolean properties?
-  out << getName().str();
-  return out.str();
+  return getName().str();
 }
-
 
 StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
   // If the setter has an @objc attribute with a name, use that.
@@ -1554,22 +1542,13 @@ StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buff
   }
   
 
-  // If there is an Objective-C @property declaration, use its setter
-  // name.
-  if (auto objc = dyn_cast_or_null<clang::ObjCPropertyDecl>(getClangDecl())) {
-    auto selector = objc->getSetterName();
-    if (!selector.isNull()) {
-      selector.print(out);
-      return out.str();
-    }
-  }
-
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
   StringRef name = getName().str();
   assert(name.size() >= 1 && "empty var name?!");
   
-  out << "set" << char(toupper(name[0])) << name.slice(1, name.size()) << ':';
+  out << "set" << clang::toUppercase(name[0]) 
+      << name.slice(1, name.size()) << ':';
   return out.str();
 }
 

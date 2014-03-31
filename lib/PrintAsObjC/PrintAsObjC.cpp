@@ -243,12 +243,12 @@ private:
     }
 
     if (overridesObjC) {
-      llvm::SmallString<64> accessorName;
-      VD->getObjCGetterSelector(accessorName);
-      os << ", getter=" << accessorName;
-      accessorName.clear();
-      VD->getObjCSetterSelector(accessorName);
-      os << ", setter=" << accessorName;
+      llvm::SmallString<64> buffer;
+      os << ", getter=" << VD->getObjCGetterSelector(buffer);
+      if (VD->isSettable(nullptr)) {
+        buffer.clear();
+        os << ", setter=" << VD->getObjCSetterSelector(buffer);
+      }
     }
 
     os << ") ";

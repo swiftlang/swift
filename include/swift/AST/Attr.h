@@ -535,6 +535,10 @@ public:
                                   ArrayRef<Identifier> Names,
                                   SourceLoc RParenLoc);
 
+  /// Create an implicit "selector" Objective-C attribute, which has
+  /// some number of identifiers followed by colons.
+  static ObjCAttr *createSelector(ASTContext &Ctx, ArrayRef<Identifier> Names);
+
   /// Determine what kind of @objc attribute this is.
   Kind getKind() const {
     switch (getArity()) {
@@ -572,6 +576,10 @@ public:
   ///
   /// \param buffer A buffer used to store the data for the returned name.
   StringRef getName(llvm::SmallVectorImpl<char> &buffer) const;
+
+  /// Clone the given attribute, producing an implicit copy of the
+  /// original without source location information.
+  ObjCAttr *clone(ASTContext &context) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_objc;
