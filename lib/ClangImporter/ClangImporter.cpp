@@ -1284,6 +1284,9 @@ clang::ASTContext &ClangImporter::getClangASTContext() const {
   return Impl.getClangASTContext();
 }
 
+clang::Preprocessor &ClangImporter::getClangPreprocessor() const {
+  return Impl.getClangPreprocessor();
+}
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
   return ::getClangOwningModule(Node, getClangASTContext());
 }

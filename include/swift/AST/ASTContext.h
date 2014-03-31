@@ -18,6 +18,7 @@
 #define SWIFT_AST_ASTCONTEXT_H
 
 #include "llvm/Support/DataTypes.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SearchPathOptions.h"
@@ -487,7 +488,7 @@ public:
   /// \brief Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null smart pointer.
-  llvm::IntrusiveRefCntPtr<ModuleLoader> getClangModuleLoader() const;
+  llvm::IntrusiveRefCntPtr<ClangModuleLoader> getClangModuleLoader() const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.

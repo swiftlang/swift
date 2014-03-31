@@ -10,12 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/Mangle.h"
-#include "clang/Index/USRGeneration.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Index/USRGeneration.h"
+#include "clang/Lex/PreprocessingRecord.h"
+#include "clang/Lex/Preprocessor.h"
 
 using namespace swift;
 using namespace ide;
@@ -27,18 +31,30 @@ static inline StringRef getUSRSpacePrefix() {
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   using namespace Mangle;
 
-  ValueDecl *VD = const_cast<ValueDecl*>(D);
+  ValueDecl *VD = const_cast<ValueDecl *>(D);
 
   if (ClangNode ClangN = VD->getClangNode()) {
+    llvm::SmallString<128> Buf;
     if (auto ClangD = ClangN.getAsDecl()) {
-      llvm::SmallString<128> Buf;
       bool Ignore = clang::index::generateUSRForDecl(ClangD, Buf);
       if (!Ignore)
         OS << Buf.str();
       return Ignore;
     }
-    // MacroInfos not handled.
-    return true;
+
+    auto &Importer = *D->getASTContext().getClangModuleLoader();
+
+    auto ClangMacroInfo = ClangN.getAsMacro();
+    auto PPRecord = Importer.getClangPreprocessor().getPreprocessingRecord();
+    assert(PPRecord && "Clang importer should be created with "
+                       "-detailed-preprocessing-record option");
+    auto ClangMacroDef = PPRecord->findMacroDefinition(ClangMacroInfo);
+
+    bool Ignore = clang::index::generateUSRForMacro(
+        ClangMacroDef, Importer.getClangASTContext().getSourceManager(), Buf);
+    if (!Ignore)
+      OS << Buf.str();
+    return Ignore;
   }
 
   OS << getUSRSpacePrefix();

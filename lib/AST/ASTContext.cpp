@@ -100,7 +100,7 @@ struct ASTContext::Implementation {
 
   /// \brief The module loader used to load Clang modules.
   // FIXME: We shouldn't be special-casing Clang.
-  llvm::IntrusiveRefCntPtr<swift::ModuleLoader> ClangModuleLoader;
+  llvm::IntrusiveRefCntPtr<ClangModuleLoader> TheClangModuleLoader;
 
   /// \brief Map from Swift declarations to the Clang nodes from which
   /// they were imported.
@@ -799,8 +799,9 @@ void ASTContext::addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
                                  bool IsClang) {
   Impl.ModuleLoaders.push_back(loader);
   if (IsClang) {
-    assert(!Impl.ClangModuleLoader && "Already have a Clang module loader");
-    Impl.ClangModuleLoader = std::move(loader);
+    assert(!Impl.TheClangModuleLoader && "Already have a Clang module loader");
+    Impl.TheClangModuleLoader =
+        static_cast<ClangModuleLoader *>(loader.getPtr());
   }
 }
 
@@ -811,8 +812,9 @@ void ASTContext::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
-llvm::IntrusiveRefCntPtr<ModuleLoader> ASTContext::getClangModuleLoader() const{
-  return Impl.ClangModuleLoader;
+llvm::IntrusiveRefCntPtr<ClangModuleLoader>
+ASTContext::getClangModuleLoader() const {
+  return Impl.TheClangModuleLoader;
 }
 
 static void recordKnownProtocol(Module *Stdlib, StringRef Name,
