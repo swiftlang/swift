@@ -395,11 +395,14 @@ function(compile_swift_files)
     set(stdlib_dep swift_stdlib_core)
   endif()
 
+  set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
+
   add_custom_command(
     OUTPUT ${objfile} ${module_file}
     ${create_module_dir}
-    COMMAND ${SWIFT_COMPILER} "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
-    DEPENDS ${SWIFT_COMPILER} ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS}
+    COMMAND "${line_directive_tool}" ${source_files} -- 
+      "$<TARGET_FILE:${SWIFT_COMPILER}>" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
+    DEPENDS "${SWIFT_COMPILER}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
   
