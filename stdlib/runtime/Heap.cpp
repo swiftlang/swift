@@ -40,81 +40,77 @@ static size_t _swift_zone_good_size(malloc_zone_t *zone, size_t size);
 static boolean_t _swift_zone_check(malloc_zone_t *zone);
 static void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose);
 static void _swift_zone_log(malloc_zone_t *zone, void *address);
-static void _swift_zone_force_lock(malloc_zone_t *zone);
-static void _swift_zone_force_unlock(malloc_zone_t *zone);
 static void _swift_zone_statistics(malloc_zone_t *zone,
                                    malloc_statistics_t *stats);
-static boolean_t _swift_zone_locked(malloc_zone_t *zone);
 
-static malloc_introspection_t introspectionSupport = {
-  _swift_zone_enumerator,
-  _swift_zone_good_size,
-  _swift_zone_check,
-  _swift_zone_print,
-  _swift_zone_log,
-  _swift_zone_force_lock,
-  _swift_zone_force_unlock,
-  _swift_zone_statistics,
-  _swift_zone_locked,
-  /* Discharge checking. Present in version >= 7. */
-  NULL, // enable_discharge_checking
-  NULL, // disable_discharge_checking
-  NULL, // discharge
-  NULL, // enumerate_discharged_pointers
-};
+namespace {
 
-static struct {
-  malloc_zone_t header;
-} swiftZone = {
-  {
-    NULL, // ignore -- for CF
-    NULL, // ignore -- for CF
-    _swift_zone_size,
-    _swift_zone_malloc,
-    _swift_zone_calloc,
-    _swift_zone_valloc,
-    _swift_zone_free,
-    _swift_zone_realloc,
-    _swift_zone_destroy,
-    "SwiftZone", // name
-    NULL, // optional batch malloc
-    NULL, // optional batch free
-    &introspectionSupport,
-    0, // version
-    NULL, // XXX -- add support for memalign and free_definite_size?
-    NULL, // XXX -- add support for memalign and free_definite_size?
-    NULL, // XXX -- add support for pressure_relief?
-  },
+class SwiftZone {
+private:
+  static malloc_zone_t zone;
+  static malloc_introspection_t zoneInspection;
+  static SwiftZone swiftZone;
+  static pthread_rwlock_t lock;
+
+  void *operator new(size_t size) = delete;
+  SwiftZone(SwiftZone const &) = delete;
+  SwiftZone &operator=(SwiftZone const &) = delete;
+
+  SwiftZone();
+  static void threadExitCleanup(void *arg);
+public:
+  // allocations are normally per-thread
+  // this API goes straight to the global pool
+  static void *globalAlloc(AllocIndex idx, uintptr_t flags);
+
+  static void *alloc_optimized(AllocIndex idx);
+  static void *alloc_unoptimized(AllocIndex idx);
+  static void *tryAlloc_optimized(AllocIndex idx);
+  static void *tryAlloc_unoptimized(AllocIndex idx);
+  static void *slowAlloc_optimized(size_t size, uintptr_t flags);
+  static void *slowAlloc_unoptimized(size_t size, uintptr_t flags);
+  static void dealloc_optimized(void *ptr, AllocIndex idx);
+  static void dealloc_unoptimized(void *ptr, AllocIndex idx);
+  static void slowDealloc_optimized(void *ptr, size_t bytes);
+  static void slowDealloc_unoptimized(void *ptr, size_t bytes);
+  static bool tryWriteLock() {
+    int r = pthread_rwlock_trywrlock(&lock);
+    assert(r == 0 || errno == EBUSY);
+    return r == 0;
+  }
+  static void writeLock() {
+    int r = pthread_rwlock_wrlock(&lock);
+    assert(r == 0);
+  }
+  static void writeUnlock() {
+    int r = pthread_rwlock_unlock(&lock);
+    assert(r == 0);
+  }
+  static void readLock() {
+    int r = pthread_rwlock_rdlock(&lock);
+    assert(r == 0);
+  }
+  static void readUnlock() {
+    int r = pthread_rwlock_unlock(&lock);
+    assert(r == 0);
+  }
+  void debug() {
+    malloc_zone_print(&zone, true);
+  }
 };
 
 extern "C" pthread_key_t _swiftAllocOffset = -1;
-
-// The normal fast-path
-static void *_swift_alloc_fast(AllocIndex idx);
-static void *_swift_tryAlloc_fast(AllocIndex idx);
-static void *_swift_slowAlloc_fast(size_t size, uintptr_t flags);
-static void _swift_dealloc_fast(void *ptr, AllocIndex idx);
-static void _swift_slowDealloc_fast(void *ptr, size_t bytes);
-
-// A slower path to support various introspection and debug technologies
-static void *_swift_alloc_debug(AllocIndex idx);
-static void *_swift_tryAlloc_debug(AllocIndex idx);
-static void *_swift_slowAlloc_debug(size_t size, uintptr_t flags);
-static void _swift_dealloc_debug(void *ptr, AllocIndex idx);
-static void _swift_slowDealloc_debug(void *ptr, size_t bytes);
-
-namespace {
 
 const size_t  pageSize = getpagesize();
 const size_t  pageMask = getpagesize() - 1;
 const size_t arenaSize = 0x10000;
 const size_t arenaMask =  0xFFFF;
 
-void *(*_swift_alloc)(AllocIndex idx) = _swift_alloc_fast;
-void *(*_swift_tryAlloc)(AllocIndex idx) = _swift_tryAlloc_fast;
-void *(*_swift_slowAlloc)(size_t size, uintptr_t flags) = _swift_slowAlloc_fast;
-void (*_swift_dealloc)(void *ptr, AllocIndex idx) = _swift_dealloc_fast;
-void (*_swift_slowDealloc)(void *ptr, size_t bytes) = _swift_slowDealloc_fast;
+auto _swift_alloc = SwiftZone::alloc_optimized;
+void *(*_swift_tryAlloc)(AllocIndex idx) = SwiftZone::tryAlloc_optimized;
+void *(*_swift_slowAlloc)(size_t size, uintptr_t flags) = SwiftZone::slowAlloc_optimized;
+void (*_swift_dealloc)(void *ptr, AllocIndex idx) = SwiftZone::dealloc_optimized;
+void (*_swift_slowDealloc)(void *ptr, size_t bytes) = SwiftZone::slowDealloc_optimized;
 
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
@@ -124,8 +120,6 @@ void *mmapWrapper(size_t size, bool huge) {
   int tag = VM_MAKE_TAG(huge ? VM_MEMORY_MALLOC_HUGE : VM_MEMORY_MALLOC_SMALL);
   return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, tag, 0);
 }
-
-pthread_rwlock_t globalLock = PTHREAD_RWLOCK_INITIALIZER;
 
 typedef struct AllocCacheEntry_s {
   struct AllocCacheEntry_s *next;
@@ -175,31 +169,28 @@ public:
 
 } // end anonymous namespace
 
-static void _swift_key_destructor(void *);
-
-__attribute__((constructor))
-static void registerZone() {
+SwiftZone::SwiftZone() {
   assert(sizeof(pthread_key_t) == sizeof(long));
-  malloc_zone_register(&swiftZone.header);
+  malloc_zone_register(&this->zone);
   pthread_key_t key, prev_key;
-  int r = pthread_key_create(&key, _swift_key_destructor);
+  int r = pthread_key_create(&key, threadExitCleanup);
   assert(r == 0);
   (void)r;
   prev_key = key;
   _swiftAllocOffset = key;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
-    int r = pthread_key_create(&key, _swift_key_destructor);
+    int r = pthread_key_create(&key, threadExitCleanup);
     assert(r == 0);
     (void)r;
     assert(key == prev_key + 1);
     prev_key = key;
   }
   if (getenv("SWIFT_ZONE_DEBUG")) {
-    _swift_alloc = _swift_alloc_debug;
-    _swift_tryAlloc = _swift_tryAlloc_debug;
-    _swift_slowAlloc = _swift_slowAlloc_debug;
-    _swift_dealloc = _swift_dealloc_debug;
-    _swift_slowDealloc = _swift_slowDealloc_debug;
+    _swift_alloc = SwiftZone::alloc_unoptimized;
+    _swift_tryAlloc = SwiftZone::tryAlloc_unoptimized;
+    _swift_slowAlloc = SwiftZone::slowAlloc_unoptimized;
+    _swift_dealloc = SwiftZone::dealloc_unoptimized;
+    _swift_slowDealloc = SwiftZone::slowDealloc_unoptimized;
   }
 }
 
@@ -217,16 +208,13 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
-  return _swift_slowAlloc_fast(size, SWIFT_TRYALLOC);
+  return SwiftZone::slowAlloc_optimized(size, SWIFT_TRYALLOC);
 }
 
 void *swift::_swift_zone_calloc(malloc_zone_t *zone,
                                 size_t count, size_t size) {
-  void *ptr = swift::_swift_zone_malloc(zone, count * size);
-  if (ptr) {
-    memset(ptr, 0, count * size);
-  }
-  return ptr;
+  void *pointer = swift::_swift_zone_malloc(zone, count * size);
+  return pointer ? memset(pointer, 0, count * size) : pointer;
 }
 
 void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
@@ -277,28 +265,6 @@ void _swift_zone_log(malloc_zone_t *zone, void *address) {
   abort();
 }
 
-void _swift_zone_force_lock(malloc_zone_t *zone) {
-  int r = pthread_rwlock_wrlock(&globalLock);
-  assert(r == 0);
-}
-
-void _swift_zone_force_unlock(malloc_zone_t *zone) {
-  int r = pthread_rwlock_unlock(&globalLock);
-  assert(r == 0);
-}
-
-boolean_t _swift_zone_locked(malloc_zone_t *zone) {
-  int r = pthread_rwlock_trywrlock(&globalLock);
-  assert(r == 0 || errno == EBUSY);
-  if (r == 0) {
-    r = pthread_rwlock_unlock(&globalLock);
-    assert(r == 0);
-    return false;
-  }
-  return true;
-}
-
-
 static inline size_t indexToSize(AllocIndex idx) {
   size_t size;
   idx++;
@@ -328,22 +294,18 @@ static inline size_t indexToSize(AllocIndex idx) {
 }
 
 __attribute__((noinline,used))
-static void *
-_swift_alloc_slow(AllocIndex idx, uintptr_t flags)
+void *SwiftZone::globalAlloc(AllocIndex idx, uintptr_t flags)
 {
   AllocCacheEntry ptr = NULL;
   size_t size;
-  int r;
 
 again:
-  r = pthread_rwlock_wrlock(&globalLock);
-  assert(r == 0);
+  writeLock();
   if ((ptr = globalCache[idx])) {
     globalCache[idx] = globalCache[idx]->next;
   }
   // we should probably refill the cache in bulk
-  r = pthread_rwlock_unlock(&globalLock);
-  assert(r == 0);
+  writeUnlock();
 
   if (ptr) {
     return ptr;
@@ -358,14 +320,14 @@ again:
 
 extern "C" LLVM_LIBRARY_VISIBILITY
 void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
-  void *tmp = _swift_alloc_slow(idx, flags);
+  void *tmp = SwiftZone::globalAlloc(idx, flags);
   if (!tmp) {
     return;
   }
   swift_dealloc(tmp, idx);
 }
 
-void *_swift_slowAlloc_fast(size_t size, uintptr_t flags) {
+void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
   size_t idx = SIZE_MAX;
   if (size == 0) idx = 0;
   --size;
@@ -405,7 +367,7 @@ void *_swift_slowAlloc_fast(size_t size, uintptr_t flags) {
   if (r) return r;
 
   do {
-    r = swiftZone.header.malloc(NULL, size);
+    r = swiftZone.zone.malloc(NULL, size);
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
   return r;
@@ -434,27 +396,27 @@ setAllocCacheEntry(unsigned long idx, AllocCacheEntry entry) {
   _os_tsd_set_direct(idx + _swiftAllocOffset, entry);
 }
 
-void *_swift_alloc_fast(AllocIndex idx) {
+void *SwiftZone::alloc_optimized(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry r = getAllocCacheEntry(idx);
   if (r) {
     setAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_alloc_slow(idx, 0);
+  return globalAlloc(idx, 0);
 }
 
-void *_swift_tryAlloc_fast(AllocIndex idx) {
+void *SwiftZone::tryAlloc_optimized(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry r = getAllocCacheEntry(idx);
   if (r) {
     setAllocCacheEntry(idx, r->next);
     return r;
   }
-  return _swift_alloc_slow(idx, SWIFT_TRYALLOC);
+  return globalAlloc(idx, SWIFT_TRYALLOC);
 }
 
-void _swift_dealloc_fast(void *ptr, AllocIndex idx) {
+void SwiftZone::dealloc_optimized(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   auto cur = static_cast<AllocCacheEntry>(ptr);
   AllocCacheEntry prev = getAllocCacheEntry(idx);
@@ -466,9 +428,9 @@ void _swift_dealloc_fast(void *ptr, AllocIndex idx) {
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
 
-void _swift_slowDealloc_fast(void *ptr, size_t bytes) {
+void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   if (bytes == 0) {
-    bytes = swiftZone.header.size(NULL, ptr);
+    bytes = swiftZone.zone.size(NULL, ptr);
   }
   assert(bytes != 0);
 
@@ -503,8 +465,8 @@ void _swift_slowDealloc_fast(void *ptr, size_t bytes) {
   swift_dealloc(ptr, idx);
 }
 
-static void
-_swift_key_destructor(void *arg) {
+void
+SwiftZone::threadExitCleanup(void *arg) {
   (void)arg;
   AllocCacheEntry threadCache[ALLOC_CACHE_COUNT];
   AllocCacheEntry threadCacheTail[ALLOC_CACHE_COUNT];
@@ -521,9 +483,7 @@ _swift_key_destructor(void *arg) {
     }
     threadCacheTail[i] = temp;
   }
-  int r;
-  r = pthread_rwlock_wrlock(&globalLock);
-  assert(r == 0);
+  writeLock();
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     if (threadCache[i] == NULL) {
       continue;
@@ -531,8 +491,7 @@ _swift_key_destructor(void *arg) {
     threadCacheTail[i]->next = globalCache[i];
     globalCache[i] = threadCache[i];
   }
-  r = pthread_rwlock_unlock(&globalLock);
-  assert(r == 0);
+  writeUnlock();
   abort();
 }
 
@@ -607,30 +566,79 @@ void _swift_zone_statistics(malloc_zone_t *zone,
   }
 }
 
-void *_swift_alloc_debug(AllocIndex idx) {
-  return _swift_slowAlloc_debug(indexToSize(idx), 0);
+void *SwiftZone::alloc_unoptimized(AllocIndex idx) {
+  return swiftZone.slowAlloc_unoptimized(indexToSize(idx), 0);
 }
 
-void *_swift_tryAlloc_debug(AllocIndex idx) {
-  return _swift_slowAlloc_debug(indexToSize(idx), SWIFT_TRYALLOC);
+void *SwiftZone::tryAlloc_unoptimized(AllocIndex idx) {
+  return swiftZone.slowAlloc_unoptimized(indexToSize(idx), SWIFT_TRYALLOC);
 }
 
-void *_swift_slowAlloc_debug(size_t size, uintptr_t flags) {
+void *SwiftZone::slowAlloc_unoptimized(size_t size, uintptr_t flags) {
   void *r;
   // the zone API does not have a notion of try-vs-not
   do {
-    r = malloc_zone_malloc(&swiftZone.header, size);
+    r = malloc_zone_malloc(&swiftZone.zone, size);
   } while ((r == NULL) && (flags & SWIFT_TRYALLOC));
   return r;
 }
 
-void _swift_dealloc_debug(void *ptr, AllocIndex idx) {
-  malloc_zone_free(&swiftZone.header, ptr);
+void SwiftZone::dealloc_unoptimized(void *ptr, AllocIndex idx) {
+  malloc_zone_free(&swiftZone.zone, ptr);
 }
 
-void _swift_slowDealloc_debug(void *ptr, size_t bytes) {
-  malloc_zone_free(&swiftZone.header, ptr);
+void SwiftZone::slowDealloc_unoptimized(void *ptr, size_t bytes) {
+  malloc_zone_free(&swiftZone.zone, ptr);
 }
+
+malloc_zone_t SwiftZone::zone = {
+  nullptr,
+  nullptr,
+  _swift_zone_size,
+  _swift_zone_malloc,
+  _swift_zone_calloc,
+  _swift_zone_valloc,
+  _swift_zone_free,
+  _swift_zone_realloc,
+  _swift_zone_destroy,
+  "SwiftZone",
+  nullptr,
+  nullptr,
+  &SwiftZone::zoneInspection,
+  0,
+  nullptr,
+  nullptr,
+  nullptr,
+};
+
+malloc_introspection_t SwiftZone::zoneInspection = {
+  _swift_zone_enumerator,
+  _swift_zone_good_size,
+  _swift_zone_check,
+  _swift_zone_print,
+  _swift_zone_log,
+  [] (malloc_zone_t *zone) {
+    writeLock();
+  },
+  [] (malloc_zone_t *zone) {
+    writeUnlock();
+  },
+  _swift_zone_statistics,
+  [] (malloc_zone_t *zone) -> boolean_t {
+      if (tryWriteLock()) {
+      writeUnlock(); return false;
+    }
+    return true;
+  },
+  /* Discharge checking. Present in version >= 7. */
+  NULL, // enable_discharge_checking
+  NULL, // disable_discharge_checking
+  NULL, // discharge
+  NULL, // enumerate_discharged_pointers
+};
+
+SwiftZone SwiftZone::swiftZone;
+pthread_rwlock_t SwiftZone::lock = PTHREAD_RWLOCK_INITIALIZER;
 
 // Shims to select between the fast and
 // introspectable/debugging paths at runtime
@@ -644,7 +652,8 @@ void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
   return _swift_slowAlloc(size, flags);
 }
 void swift::swift_dealloc(void *ptr, AllocIndex idx) {
-  _swift_dealloc(ptr, idx); }
+  _swift_dealloc(ptr, idx);
+}
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   return _swift_slowDealloc(ptr, bytes);
 }
