@@ -21,6 +21,7 @@ set(SWIFTLIB_ESSENTIAL
   Array.swift
   ArrayBuffer.swift
   ArrayCore.swift
+  ArrayType.swift
   AssertCommon.swift
   Bool.swift
   BridgeObjectiveC.swift
