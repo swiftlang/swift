@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -33,3 +34,27 @@ void swift::performSILLinking(SILModule *M, bool LinkAll) {
 }
 
 
+namespace {
+
+class SILLinker : public SILModuleTransform {
+
+  /// The entry point to the transformation.
+  void run() {
+    // Remove dead stores, merge duplicate loads, and forward stores to loads.
+    bool Changed = false;
+    SILModule &M = *getModule();
+    for (auto &Fn : M)
+      Changed |= M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll);
+
+    if (Changed)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+  }
+
+  StringRef getName() override { return "SIL Linker"; }
+};
+} // end anonymous namespace
+
+
+SILTransform *swift::createSILLinker() {
+  return new SILLinker();
+}

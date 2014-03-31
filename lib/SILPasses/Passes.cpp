@@ -83,6 +83,11 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.registerAnalysis(createAliasAnalysis(&Module));
     PM.registerAnalysis(createDominanceAnalysis(&Module));
     PM.registerAnalysis(createSpecializedArgsAnalysis(&Module));
+    PM.add(createSILLinker());
+    if (Options.DebugSerialization) {
+      PM.run();
+      return;
+    }
     PM.add(createGenericSpecializer());
     PM.add(createPerfInliner());
     PM.add(createSILCombine());

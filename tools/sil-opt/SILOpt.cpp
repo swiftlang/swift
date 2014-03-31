@@ -62,6 +62,7 @@ enum class PassKind {
   InstCount,
   AADumper,
   LoadStoreOpts,
+  SILLinker,
 };
 
 } // end anonymous namespace
@@ -173,6 +174,10 @@ Passes(llvm::cl::desc("Passes:"),
                                    "load-store-opts",
                                    "Remove duplicate loads, dead stores, and "
                                    "perform load forwarding."),
+                        clEnumValN(PassKind::SILLinker,
+                                   "linker",
+                                   "Link in all serialized SIL referenced by "
+                                   "the given SIL file."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -398,6 +403,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::LoadStoreOpts:
       PM.add(createLoadStoreOpts());
+      break;
+    case PassKind::SILLinker:
+      PM.add(createSILLinker());
       break;
     }
   }
