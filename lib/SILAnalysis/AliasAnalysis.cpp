@@ -505,30 +505,33 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 
 /// \brief return True if the aggregate type \p Aggregate contains the type
 /// \p Record.
-static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record, SILModule &Mod) {
-  llvm::SmallVector<NominalTypeDecl*, 8> Worklist;
+static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record,
+                                    SILModule &Mod) {
+  CanType CanRecordType = Record->getCanonicalType();
+  llvm::SmallVector<NominalTypeDecl *, 8> Worklist;
   Worklist.push_back(Aggregate);
-  while(!Worklist.empty()) {
+  while (!Worklist.empty()) {
     NominalTypeDecl *T = Worklist.back();
     Worklist.pop_back();
     for (auto Var : T->getStoredProperties()) {
       // The record type could be generic. In here we find the the substituted
       // record type.
-      Type RecTy = T->getType()->getTypeOfMember(Mod.getSwiftModule(),
-                                                 Var, nullptr);
+      Type RecTy =
+          T->getType()->getTypeOfMember(Mod.getSwiftModule(), Var, nullptr);
+      CanType CanRecTy = RecTy->getCanonicalType();
 
       // Is this the record we were looking for ?
-      if (RecTy.getPointer() == Record.getPointer())
+      if (CanRecTy == CanRecordType)
         return true;
 
       // If the record is a nominal type add it to the worklist.
-      if (auto D = RecTy->getNominalOrBoundGenericNominal()) {
+      if (auto D = CanRecTy->getNominalOrBoundGenericNominal()) {
         Worklist.push_back(D);
         continue;
       }
 
       // We don't handle unbound generic typed records.
-      if (hasUnboundGenericTypes(RecTy))
+      if (hasUnboundGenericTypes(CanRecTy))
         return true;
     }
   }
