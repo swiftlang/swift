@@ -23,6 +23,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -144,7 +145,12 @@ private:
   std::unique_ptr<SerializationCallback> Callback;
 
   /// The SILLoader used when linking functions into this module.
-  SerializedSILLoader *SILLoader;
+  ///
+  /// This is lazily initialized the first time we attempt to
+  /// deserialize. Previously this was created when the SILModule was
+  /// constructed. In certain cases this was before all Modules had been loaded
+  /// causeing us to not
+  NullablePtr<SerializedSILLoader> SILLoader;
 
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;
@@ -155,6 +161,10 @@ private:
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
+
+  /// Method which returns the SerializedSILLoader, creating the loader if it
+  /// has not been created yet.
+  SerializedSILLoader *getSILLoader();
 
 public:
   ~SILModule();

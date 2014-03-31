@@ -88,9 +88,6 @@ SILModule::SILModule(Module *SwiftModule)
   : TheSwiftModule(SwiftModule), Stage(SILStage::Raw),
     Callback(new SILModule::SerializationCallback()), Types(*this) {
   TypeListUniquing = new SILTypeListUniquingType();
-  SILLoader = SerializedSILLoader::create(getASTContext(), this,
-                                          Callback.get());
-
 }
 
 SILModule::~SILModule() {
@@ -194,7 +191,7 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   //
   // *NOTE* In practice, wT will be deserializedTable, but I do not want to rely
   // on that behavior for now.
-  if (auto deserializedTable = SILLoader->lookupWitnessTable(wT))
+  if (auto deserializedTable = getSILLoader()->lookupWitnessTable(wT))
     return {deserializedTable, Subs};
 
   // If we fail, just return the declaration.
@@ -556,16 +553,16 @@ private:
 } // end anonymous namespace.
 
 bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, SILLoader, Mode,
+  return SILLinkerVisitor(*this, getSILLoader(), Mode,
                           ExternalSource).processFunction(Fun);
 }
 
 void SILModule::linkAllWitnessTables() {
-  SILLoader->getAllWitnessTables();
+  getSILLoader()->getAllWitnessTables();
 }
 
 void SILModule::linkAllVTables() {
-  SILLoader->getAllVTables();
+  getSILLoader()->getAllVTables();
 }
 
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
@@ -578,7 +575,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return R->second;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
-  SILVTable *Vtbl = SILLinkerVisitor(*this, SILLoader,
+  SILVTable *Vtbl = SILLinkerVisitor(*this, getSILLoader(),
                                      SILModule::LinkingMode::LinkAll,
                                      ExternalSource).processClassDecl(C);
   if (!Vtbl)
@@ -587,4 +584,13 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   // If we succeeded, map C -> VTbl in the table and return VTbl.
   VTableLookupTable[C] = Vtbl;
   return Vtbl;
+}
+
+SerializedSILLoader *SILModule::getSILLoader() {
+  // If the SILLoader is null, create it.
+  if (SILLoader.isNull())
+    SILLoader = SerializedSILLoader::create(getASTContext(), this,
+                                            Callback.get());
+  // Return the SerializedSILLoader.
+  return SILLoader.get();
 }
