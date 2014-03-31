@@ -381,11 +381,17 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
     // Check if the unknown type is in the type remappings.
     auto &Remapped = tc.Context.RemappedTypes;
-    auto I = Remapped.find(comp->getIdentifier().str());
+    auto TypeName = comp->getIdentifier().str();
+    auto I = Remapped.find(TypeName);
     if (I != Remapped.end()) {
       auto RemappedTy = I->second->getString();
       tc.diagnose(L, diag::note_remapped_type, RemappedTy)
         .fixItReplace(R, RemappedTy);
+      // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
+      if (TypeName == "NSUInteger") {
+        tc.diagnose(L, diag::note_remapped_type, "UInt")
+          .fixItReplace(R, "UInt");
+      }
     }
 
     return true;
