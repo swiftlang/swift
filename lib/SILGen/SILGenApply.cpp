@@ -2805,6 +2805,13 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                   getSelfTypeForDynamicLookup(*this, operand));
     operand = B.createRefToObjectPointer(e, operand,
                                  SILType::getObjCPointerType(getASTContext()));
+  } else {
+    auto metatype = operand.getType().castTo<MetatypeType>();
+    assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
+    metatype = CanMetatypeType::get(metatype.getInstanceType(),
+                                    MetatypeRepresentation::ObjC);
+    operand = B.createThickToObjCMetatype(e, operand,
+                                    SILType::getPrimitiveObjectType(metatype));
   }
 
   // Create the has-member block.
