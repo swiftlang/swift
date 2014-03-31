@@ -294,11 +294,9 @@ int main(int argc, char **argv) {
     assert(!CI.hasSILModule() &&
            "performParse() should not create a SILModule.");
     CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule()));
-    SerializedSILLoader *SL = SerializedSILLoader::create(CI.getASTContext(),
-                                                          CI.getSILModule(),
-                                                          nullptr);
+    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
+        CI.getASTContext(), CI.getSILModule(), nullptr);
     SL->getAll();
-    delete SL;
   }
 
   // If we're in verify mode, install a custom diagnostic handling for

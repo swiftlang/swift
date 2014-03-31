@@ -64,9 +64,11 @@ public:
   /// Create a new loader.
   ///
   /// \param callback - not owned by the loader
-  static SerializedSILLoader *create(ASTContext &ctx, SILModule *SILMod,
-                                     Callback *callback) {
-    return new SerializedSILLoader(ctx, SILMod, callback);
+  static std::unique_ptr<SerializedSILLoader> create(ASTContext &ctx,
+                                                     SILModule *SILMod,
+                                                     Callback *callback) {
+    return std::unique_ptr<SerializedSILLoader>(
+      new SerializedSILLoader(ctx, SILMod, callback));
   }
   ~SerializedSILLoader();
 

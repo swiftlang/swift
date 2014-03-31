@@ -23,7 +23,6 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -150,7 +149,7 @@ private:
   /// deserialize. Previously this was created when the SILModule was
   /// constructed. In certain cases this was before all Modules had been loaded
   /// causeing us to not
-  NullablePtr<SerializedSILLoader> SILLoader;
+  std::unique_ptr<SerializedSILLoader> SILLoader;
 
   /// The external SIL source to use when linking this module.
   SILExternalSource *ExternalSource = nullptr;

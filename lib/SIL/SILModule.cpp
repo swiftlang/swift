@@ -588,7 +588,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
 
 SerializedSILLoader *SILModule::getSILLoader() {
   // If the SILLoader is null, create it.
-  if (SILLoader.isNull())
+  if (!SILLoader)
     SILLoader = SerializedSILLoader::create(getASTContext(), this,
                                             Callback.get());
   // Return the SerializedSILLoader.
