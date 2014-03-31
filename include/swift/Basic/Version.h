@@ -28,6 +28,8 @@ namespace version {
 /// includes the Swift version number, the repository version, and the vendor
 /// tag.
 std::string getSwiftFullVersion();
+  
+std::string getSwiftSubmitVersionQuad();
 
 } // end namespace version
 } // end namespace swift

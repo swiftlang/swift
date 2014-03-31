@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -181,13 +182,6 @@ static void diagnoseDiscardedClosure(Parser &P, ASTNode &Result) {
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
                                      BraceItemListKind ConfigKind) {
-  
-  // In the case of a catastrophic parse error, consume any trailing
-  // #else or #endif and move on to the next statement or declaration
-  // block.
-  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_endif)) {
-    consumeToken();
-  }
   
   bool IsTopLevel = (Kind == BraceItemListKind::TopLevelCode) ||
                     (Kind == BraceItemListKind::TopLevelLibrary);
@@ -701,22 +695,69 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     auto numElements = SE->getNumElements();
     size_t iOperator = 1;
     size_t iOperand = 2;
+    
     bool result = evaluateConfigConditionExpr(elements[0]);
     
     while (iOperand < numElements) {
+      
+      // FIXME: This clause temporarily supports build configuration comparisons
+      // against the current compiler submit version.
+      // We'll need to remove this functionality for 1.0, per
+      // rdar://problem/16380797
+      if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>
+                           (elements[iOperator - 1]))
+      {
+        auto name = UDRE->getName().str();
+        
+        if (name.equals("compiler_submit_version")) {
+          if (auto *UDREOp =
+              dyn_cast_or_null<UnresolvedDeclRefExpr>(elements[iOperator])) {
+            auto name = UDREOp->getName().str();
+            
+            if (auto *SLEp = dyn_cast<StringLiteralExpr>(elements[iOperand])) {
+              auto submitQuad = StringRef(version::getSwiftSubmitVersionQuad());
+              auto userSubmitQuad = SLEp->getValue();
+              auto compareResult = submitQuad.compare_numeric(userSubmitQuad);
+              
+              if (name.equals("==")) {
+                return !compareResult;
+              }
+              if (name.equals("!=")) {
+                return compareResult;
+              }
+              if (name.equals(">")) {
+                return compareResult == 1;
+              }
+              if (name.equals("<")) {
+                return compareResult == -1;
+              }
+              if (name.equals(">=")) {
+                return (compareResult == 1) || !compareResult;
+              }
+              if (name.equals("<=")) {
+                return (compareResult == -1) || !compareResult;
+              }
+            }
+          }
+        }
+      }
+      
       if (auto *UDREOp =
             dyn_cast_or_null<UnresolvedDeclRefExpr>(elements[iOperator])) {
         auto name = UDREOp->getName().str();
         
         if (name.equals("||")) {
           result = result || evaluateConfigConditionExpr(elements[iOperand]);
+          
+          if (result)
+            break;
+          
         } else if (name.equals("&&")) {
           if (!result) {
             break;
           }
-          else {
-            result = result && evaluateConfigConditionExpr(elements[iOperand]);
-          }
+          
+          result = result && evaluateConfigConditionExpr(elements[iOperand]);
         } else {
           diagnose(SE->getLoc(),
                    diag::unsupported_build_config_binary_expression);
@@ -790,6 +831,11 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
+  
+  if (peekToken().isAtStartOfLine()) {
+    diagnose(Tok.getLoc(), diag::expected_build_configuration_expression);
+  }
+  
   SourceLoc IfLoc = consumeToken(tok::pound_if);
   
   ParserResult<Expr> Configuration;

@@ -97,6 +97,14 @@ bool Parser::parseTopLevel() {
                     allowTopLevelCode() ? BraceItemListKind::TopLevelCode
                                         : BraceItemListKind::TopLevelLibrary);
   }
+  
+  // In the case of a catastrophic parse error, consume any trailing
+  // #else or #endif and move on to the next statement or declaration
+  // block.
+  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_endif)) {
+    diagnose(Tok.getLoc(), diag::unexpected_config_block_terminator);
+    consumeToken();
+  }
 
   // If this is a Main source file, determine if we found code that needs to be
   // executed (this is used by the repl to know whether to compile and run the
@@ -1391,6 +1399,10 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
                                             ParseDeclOptions Flags) {
+  if (peekToken().isAtStartOfLine()) {
+    diagnose(Tok.getLoc(), diag::expected_build_configuration_expression);
+  }
+  
   SourceLoc IfLoc = consumeToken(tok::pound_if);
   SourceLoc ElseLoc;
   SourceLoc EndLoc;

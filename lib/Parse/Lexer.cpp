@@ -1501,7 +1501,7 @@ Restart:
 
     tok Kind = tok::unknown;
     if (getSubstring(TokStart + 1, 2).equals("if") &&
-        isHorizontalWhitespace(CurPtr[2])) {
+        isWhitespace(CurPtr[2])) {
       CurPtr += 2;
       return formToken(tok::pound_if, TokStart);
     } else if (getSubstring(TokStart + 1, 4).equals("else") &&

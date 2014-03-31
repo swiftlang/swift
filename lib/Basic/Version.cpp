@@ -55,5 +55,13 @@ std::string getSwiftFullVersion() {
   return OS.str();
 }
   
+std::string getSwiftSubmitVersionQuad() {
+#ifdef SWIFT_SUBMIT_VERSION_QUAD_STRING
+  return SWIFT_SUBMIT_VERSION_QUAD_STRING;
+#else
+  return "0.0.0.0";
+#endif
+}
+  
 } // end namespace version
 } // end namespace swift

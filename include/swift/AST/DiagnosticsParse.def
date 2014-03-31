@@ -56,6 +56,11 @@ NOTE(previous_definition,parsing,none,
 ERROR(extra_rbrace,parsing,none,
       "extraneous '}' at top level", ())
 
+ERROR(unexpected_config_block_terminator,parsing,none,
+      "unexpected configuration block terminator", ())
+ERROR(expected_build_configuration_expression,parsing,none,
+"expected a build configuration expression to follow the #if clause", ())
+
 WARNING(val_deprecated,lexing,none,
         "'val' is being removed, please switch to 'let'", ())
 
