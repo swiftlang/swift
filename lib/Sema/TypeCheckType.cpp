@@ -375,23 +375,26 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     SourceRange R = SourceRange(comp->getIdLoc(),
                                 components.back()->getIdLoc());
 
-    tc.diagnose(L, diag::use_undeclared_type,
-                comp->getIdentifier())
-      .highlight(R);
-
     // Check if the unknown type is in the type remappings.
     auto &Remapped = tc.Context.RemappedTypes;
     auto TypeName = comp->getIdentifier().str();
     auto I = Remapped.find(TypeName);
     if (I != Remapped.end()) {
       auto RemappedTy = I->second->getString();
-      tc.diagnose(L, diag::note_remapped_type, RemappedTy)
+      tc.diagnose(L, diag::use_undeclared_type_did_you_mean,
+                  comp->getIdentifier(), RemappedTy)
+        .highlight(R)
         .fixItReplace(R, RemappedTy);
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == "NSUInteger") {
         tc.diagnose(L, diag::note_remapped_type, "UInt")
           .fixItReplace(R, "UInt");
       }
+    }
+    else {
+      tc.diagnose(L, diag::use_undeclared_type,
+                  comp->getIdentifier())
+      .highlight(R);
     }
 
     return true;
