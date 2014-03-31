@@ -106,6 +106,9 @@ ERROR(use_unresolved_identifier,sema_nb,none,
       "use of unresolved identifier %0", (Identifier))
 ERROR(use_undeclared_type,sema_nb,none,
       "use of undeclared type %0", (Identifier))
+NOTE(note_remapped_type,sema_nb,none,
+  "did you meant to use '%0'?", (StringRef))
+
 ERROR(use_module_as_type,sema_nb,none,
       "use of module %0 as a type", (Identifier))
 ERROR(use_non_type_value,sema_nb,none,

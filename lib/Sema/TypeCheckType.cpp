@@ -371,10 +371,22 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     }
     
     // Fallback.
-    tc.diagnose(comp->getIdLoc(), diag::use_undeclared_type,
+    SourceLoc L = comp->getIdLoc();
+    SourceRange R = SourceRange(comp->getIdLoc(),
+                                components.back()->getIdLoc());
+
+    tc.diagnose(L, diag::use_undeclared_type,
                 comp->getIdentifier())
-      .highlight(SourceRange(comp->getIdLoc(),
-                             components.back()->getIdLoc()));
+      .highlight(R);
+
+    // Check if the unknown type is in the type remappings.
+    auto &Remapped = tc.Context.RemappedTypes;
+    auto I = Remapped.find(comp->getIdentifier().str());
+    if (I != Remapped.end()) {
+      auto RemappedTy = I->second->getString();
+      tc.diagnose(L, diag::note_remapped_type, RemappedTy)
+        .fixItReplace(R, RemappedTy);
+    }
 
     return true;
   }

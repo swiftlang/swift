@@ -32,6 +32,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
 #include <memory>
@@ -214,7 +215,10 @@ public:
   /// Cache for names of canonical GenericTypeParamTypes.
   mutable llvm::DenseMap<unsigned, Identifier>
     CanonicalGenericTypeParamTypeNames;
-  
+
+  /// Cache of remapped types (useful for diagnostics).
+  llvm::StringMap<Type> RemappedTypes;
+
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.

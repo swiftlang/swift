@@ -692,6 +692,13 @@ namespace {
           Impl.SpecialTypedefNames[Decl] = NameMapping;
 
           if (NameMapping == MappedTypeNameKind::DoNothing) {
+            // Record the remapping using the name of the Clang declaration.
+            // This will be useful for type checker diagnostics when
+            // a user tries to use the Objective-C/C type instead of the
+            // Swift type.
+            Impl.SwiftContext.RemappedTypes[Decl->getNameAsString()]
+              = SwiftType;
+
             // Don't create an extra typealias in the imported module because
             // doing so will cause confusion (or even lookup ambiguity) between
             // the name in the imported module and the same name in the
