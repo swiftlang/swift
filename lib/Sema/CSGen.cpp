@@ -381,12 +381,14 @@ namespace {
 
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        // The result type of the function must be the base type.
+        // The result type of the function must be convertible to the base type.
+        // TODO: we definitely want this to include UncheckedOptional; does it
+        // need to include everything else in the world?
         auto outputTy
           = CS.createTypeVariable(
               CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
               /*options=*/0);
-        CS.addConstraint(ConstraintKind::Equal, outputTy, baseTy,
+        CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
         // The function/enum case must be callable with the given argument.
@@ -398,8 +400,8 @@ namespace {
         return baseTy;
       }
 
-      // Otherwise, the member needs to have the same type as the base.
-      CS.addConstraint(ConstraintKind::Equal, baseTy, memberTy,
+      // Otherwise, the member needs to be convertible to the base type.
+      CS.addConstraint(ConstraintKind::Conversion, memberTy, baseTy,
         CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
 
       return memberTy;
