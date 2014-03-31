@@ -173,9 +173,7 @@ namespace {
           // Const pointers map to CConstPointer.
           return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                 "CConstPointer", pointeeType);
-        } else if (!isa<clang::ObjCObjectPointerType>(type->getPointeeType())
-                   && !isa<clang::ObjCInterfaceType>(type->getPointeeType())
-                   && !isa<clang::ObjCObjectType>(type->getPointeeType())) {
+        } else if (type->getPointeeType()->isObjCObjectPointerType()) {
           // Mutable non-ObjC pointers map to CMutablePointer.
           return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                 "CMutablePointer", pointeeType);
