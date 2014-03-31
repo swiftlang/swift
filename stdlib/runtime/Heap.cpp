@@ -43,12 +43,11 @@ static void _swift_zone_log(malloc_zone_t *zone, void *address);
 static void _swift_zone_statistics(malloc_zone_t *zone,
                                    malloc_statistics_t *stats);
 
+
 namespace {
 
 class SwiftZone {
 private:
-  static malloc_zone_t zone;
-  static malloc_introspection_t zoneInspection;
   static SwiftZone swiftZone;
   static pthread_rwlock_t lock;
 
@@ -59,6 +58,8 @@ private:
   SwiftZone();
   static void threadExitCleanup(void *arg);
 public:
+  static malloc_introspection_t zoneInspection;
+
   // allocations are normally per-thread
   // this API goes straight to the global pool
   static void *globalAlloc(AllocIndex idx, uintptr_t flags);
@@ -95,7 +96,7 @@ public:
     assert(r == 0);
   }
   void debug() {
-    malloc_zone_print(&zone, true);
+    malloc_zone_print(&zoneShims, true);
   }
 };
 
@@ -171,7 +172,7 @@ public:
 
 SwiftZone::SwiftZone() {
   assert(sizeof(pthread_key_t) == sizeof(long));
-  malloc_zone_register(&this->zone);
+  malloc_zone_register(&zoneShims);
   pthread_key_t key, prev_key;
   int r = pthread_key_create(&key, threadExitCleanup);
   assert(r == 0);
@@ -367,7 +368,7 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
   if (r) return r;
 
   do {
-    r = swiftZone.zone.malloc(NULL, size);
+    r = zoneShims.malloc(NULL, size);
   } while (!r && !(flags & SWIFT_TRYALLOC));
 
   return r;
@@ -430,7 +431,7 @@ void SwiftZone::dealloc_optimized(void *ptr, AllocIndex idx) {
 
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   if (bytes == 0) {
-    bytes = swiftZone.zone.size(NULL, ptr);
+    bytes = zoneShims.size(NULL, ptr);
   }
   assert(bytes != 0);
 
@@ -578,20 +579,20 @@ void *SwiftZone::slowAlloc_unoptimized(size_t size, uintptr_t flags) {
   void *r;
   // the zone API does not have a notion of try-vs-not
   do {
-    r = malloc_zone_malloc(&swiftZone.zone, size);
+    r = malloc_zone_malloc(&zoneShims, size);
   } while ((r == NULL) && (flags & SWIFT_TRYALLOC));
   return r;
 }
 
 void SwiftZone::dealloc_unoptimized(void *ptr, AllocIndex idx) {
-  malloc_zone_free(&swiftZone.zone, ptr);
+  malloc_zone_free(&zoneShims, ptr);
 }
 
 void SwiftZone::slowDealloc_unoptimized(void *ptr, size_t bytes) {
-  malloc_zone_free(&swiftZone.zone, ptr);
+  malloc_zone_free(&zoneShims, ptr);
 }
 
-malloc_zone_t SwiftZone::zone = {
+malloc_zone_t swift::zoneShims = {
   nullptr,
   nullptr,
   _swift_zone_size,
