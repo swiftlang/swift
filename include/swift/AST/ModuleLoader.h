@@ -13,6 +13,7 @@
 // This file implements an abstract interface for loading modules.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_AST_MODULE_LOADER_H
 #define SWIFT_AST_MODULE_LOADER_H
 
@@ -20,13 +21,14 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+
 namespace swift {
 
 class Module;
 class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
-  
+
 /// \brief Abstract interface that loads named modules into the AST.
 class ModuleLoader : public llvm::RefCountedBaseVPTR {
   virtual void anchor();
@@ -56,7 +58,7 @@ public:
   /// one.
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) { }
-  
+
   /// \brief Load decls that provide conformances to the given compiler-known
   /// protocol.
   ///
@@ -72,7 +74,6 @@ public:
   virtual void verifyAllModules() { }
 };
 
-}
-
+} // namespace swift
 
 #endif
