@@ -20,7 +20,13 @@ module CoreGraphics {
   export *
 }
 module objc_ext { header "objc_ext.h" }
-module macros { header "macros.h" }
+module macros {
+  header "macros.h"
+  // Don't re-export macros_private_impl.
+  export macros_impl
+}
+module macros_impl { header "macros_impl.h" }
+module macros_private_impl { header "macros_private_impl.h" }
 module user_objc { header "user_objc.h" }
 
 module Properties {

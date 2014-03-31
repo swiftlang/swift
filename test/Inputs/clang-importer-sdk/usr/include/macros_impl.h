@@ -1,0 +1,1 @@
+#define MACRO_FROM_IMPL 42
