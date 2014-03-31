@@ -715,7 +715,8 @@ def executeTemplate(ast, lineDirective='', **localBindings):
 Keyword arguments become local variable bindings in the execution context
 
     >>> ast = parseTemplate('/dummy.file', text=
-    ... '''% if x:
+    ... '''Nothing
+    ... % if x:
     ... %    for i in range(3):
     ... ${i}
     ... %    end
@@ -723,11 +724,13 @@ Keyword arguments become local variable bindings in the execution context
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
     >>> print executeTemplate(ast, lineDirective='//#line', x=1),
-    //#line 3 "/dummy.file"
+    //#line 1 "/dummy.file"
+    Nothing
+    //#line 4 "/dummy.file"
     0
-    //#line 3 "/dummy.file"
+    //#line 4 "/dummy.file"
     1
-    //#line 3 "/dummy.file"
+    //#line 4 "/dummy.file"
     2
 """
     executionContext = ExecutionContext(lineDirective=lineDirective, **localBindings)

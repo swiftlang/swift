@@ -21,9 +21,9 @@ def _make_line_map(filename, stream=None):
     ... line 6
     ... line 7
     ... '''))
-    [(0, 'box', 0), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
+    [(0, 'box', 1), (1, 'foo.bar', 3), (5, 'baz.txt', 20)]
 """
-    result = [(0, filename, 0)]
+    result = [(0, filename, 1)]
     input = stream or open(filename)
     for i, l in enumerate(input.readlines()):
         m = line_pattern.match(l)
@@ -48,7 +48,7 @@ def map_line(filename, line_num):
     return base[1], base[2] + (line_num - base[0]-1)
 
 def run():
-    if len(sys.argv) < 1:
+    if len(sys.argv) <= 1:
         import doctest
         doctest.testmod()
     else:
@@ -68,7 +68,7 @@ def run():
             m = error_pattern.match(line.rstrip('\n'))
             if m:
                 file, line_num = map_line(m.group(1), int(m.group(2)))
-                line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3))+2, m.group(4))
+                line = '%s:%s:%s:%s\n' % (file, line_num, int(m.group(3)), m.group(4))
             sys.stdout.write(line)
         
         sys.exit(command.wait())
