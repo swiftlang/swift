@@ -39,7 +39,7 @@ namespace {
   {
     ClangImporter::Implementation &Impl;
     ImportTypeKind kind;
-
+    
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl, ImportTypeKind kind)
       : Impl(impl), kind(kind) { }
@@ -123,15 +123,18 @@ namespace {
       // anything.
       if (type->getPointeeType()->isFunctionType())
         return Type();
-
+      
       // "const char *" maps to Swift's CString.
+      // FIXME: Map to a bridged type in parameter context?
       clang::ASTContext &clangContext = Impl.getClangASTContext();
       if (clangContext.hasSameType(type->getPointeeType(),
                                    clangContext.CharTy.withConst())) {
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
       }
-
+      
       // Import void* as COpaquePointer.
+      // TODO: Map argument pointers to CConstVoidPointer/CMutableVoidPointer
+      // based on qualifiers.
       if (type->isVoidPointerType()) {
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
       }
@@ -148,18 +151,41 @@ namespace {
             return wrapperTy;
         }
       }
-
-      // All other C pointers to concrete types map to UnsafePointer<T>.
-      auto pointeeType = Impl.importType(type->getPointeeType(),
-                                         ImportTypeKind::Normal);
-      if (pointeeType)
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                    "UnsafePointer", pointeeType);
       
+      // All other C pointers to concrete types map to UnsafePointer<T> or, if
+      // in parameter position, to bridged pointer types.
+      auto pointeeQualType = type->getPointeeType();
+      auto pointeeType = Impl.importType(pointeeQualType,
+                                         ImportTypeKind::Normal);
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.
       // FIXME: Should use something with a stronger type.
-      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+      // FIXME: Should use the bridged C*VoidPointer types in argument position.
+      if (!pointeeType)
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+      
+      // Pointer parameters map to the bridged argument pointer types.
+      // We don't bridge volatile or nontrivial lifetime pointer parameters.
+      if (kind == ImportTypeKind::Parameter
+          && !pointeeQualType.isVolatileQualified()
+          && !pointeeQualType.hasNonTrivialObjCLifetime()) {
+        if (pointeeQualType.isConstQualified()) {
+          // Const pointers map to CConstPointer.
+          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                "CConstPointer", pointeeType);
+        } else if (!isa<clang::ObjCObjectPointerType>(type->getPointeeType())
+                   && !isa<clang::ObjCInterfaceType>(type->getPointeeType())
+                   && !isa<clang::ObjCObjectType>(type->getPointeeType())) {
+          // Mutable non-ObjC pointers map to CMutablePointer.
+          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                "CMutablePointer", pointeeType);
+        }
+        // TODO: Map pointer-to-ObjC-pointer parameters to ObjCMutablePointer.
+      }
+      
+      // Non-parameter pointers map to UnsafePointer.
+      return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                  "UnsafePointer", pointeeType);
     }
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {

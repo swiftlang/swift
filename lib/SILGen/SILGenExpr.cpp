@@ -3856,7 +3856,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
       && isCPointerType(gen, loweredNativeTy)) {
     // C*Pointer types in Swift contain a strong reference field we need to
     // lifetime-extend for the duration of the bridge call.
-    auto copy = v.copy(gen, loc);
+    auto copy = v.copyUnmanaged(gen, loc);
     gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
     
     return emitBridgeCPointerToUnsafePointer(gen, loc, v);

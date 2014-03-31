@@ -17,6 +17,7 @@
 
 #include "GenClangType.h"
 
+#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
@@ -181,7 +182,7 @@ clang::CanQualType GenClangType::visitBoundGenericClassType(
 
 clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
-  // We only expect UnsafePointer<T>, UncheckedOptional<T>, and Optional<T>.
+  // We only expect *Pointer<T>, UncheckedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
   if (auto underlyingTy = type.getAnyOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
@@ -190,17 +191,40 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   }
 
   auto swiftStructDecl = type->getDecl();
-  assert(swiftStructDecl->getName().str() == "UnsafePointer" &&
-         "Unexpected bound generic type in imported Clang module!");
-  (void) swiftStructDecl;
+  
+  enum class StructKind {
+    Invalid,
+    UnsafePointer,
+    CMutablePointer,
+    CConstPointer,
+  } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
+    .Case("UnsafePointer", StructKind::UnsafePointer)
+    .Case("CMutablePointer", StructKind::CMutablePointer)
+    .Case("CConstPointer", StructKind::CConstPointer)
+    .Default(StructKind::Invalid);
+  
   auto args = type->getGenericArgs();
   assert(args.size() == 1 &&
-         "UnsafePointer<> should have a single generic argument!");
-
-  // Convert the bound type to the appropriate clang type and return a
-  // pointer to that type.
-  auto clangCanTy = visit(args.front()->getCanonicalType());
-  return getClangASTContext().getPointerType(clangCanTy);
+         "*Pointer<T> should have a single generic argument!");
+  
+  switch (kind) {
+  case StructKind::Invalid:
+    llvm_unreachable("Unexpected non-pointer generic struct type in imported"
+                     " Clang module!");
+      
+  case StructKind::UnsafePointer: // Assume UnsafePointer is mutable
+  case StructKind::CMutablePointer: {
+    auto clangCanTy = visit(args.front()->getCanonicalType());
+    return getClangASTContext().getPointerType(clangCanTy);
+  }
+      
+  case StructKind::CConstPointer: {
+    clang::QualType clangTy
+      = visit(args.front()->getCanonicalType()).withConst();
+    return getClangASTContext().getCanonicalType(
+                                  getClangASTContext().getPointerType(clangTy));
+  }
+  }  
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {

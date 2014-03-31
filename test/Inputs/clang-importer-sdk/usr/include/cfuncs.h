@@ -24,7 +24,11 @@ inline int createSomething(void);
 
 int renamed(int) __asm("_something_else");
 
+void param_pointer(int *p);
+void param_const_pointer(const int *p);
+
 void decay_param_array(int p[]);
+void decay_param_const_array(const int p[]);
 
 // FIXME: These two should work some day, too.  Right now we don't import
 // function types.
