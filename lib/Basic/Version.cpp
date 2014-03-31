@@ -42,6 +42,8 @@ SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR,SWIFT_VERSION_MINOR)
 namespace swift {
 namespace version {
 
+#define TOSTR(X) #X
+
 std::string getSwiftFullVersion() {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
@@ -50,14 +52,14 @@ std::string getSwiftFullVersion() {
 #endif
   OS << "Swift version " SWIFT_VERSION_STRING;
 #ifdef SWIFT_SUBMIT_VERSION_STRING
-  OS << " (" SWIFT_SUBMIT_VERSION_STRING ")";
+  OS << " (" TOSTR(SWIFT_SUBMIT_VERSION_STRING) ")";
 #endif
   return OS.str();
 }
   
 std::string getSwiftSubmitVersionQuad() {
 #ifdef SWIFT_SUBMIT_VERSION_QUAD_STRING
-  return SWIFT_SUBMIT_VERSION_QUAD_STRING;
+  return TOSTR(SWIFT_SUBMIT_VERSION_QUAD_STRING);
 #else
   return "0.0.0.0";
 #endif
