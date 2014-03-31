@@ -1855,6 +1855,10 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (isTriviallyRepresentableInObjC(DC, T))
     return true;
 
+  if (auto *WST = T->getAs<WeakStorageType>()) {
+    return isObjCPointerType(WST->getReferentType());
+  }
+
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = T->getAnyOptionalObjectType()) {
