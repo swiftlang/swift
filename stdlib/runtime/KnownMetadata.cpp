@@ -212,6 +212,17 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVBo = {
     .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
 };
 
+/// The value-witness table for pointer-aligned unmanaged pointer types.
+const ExtraInhabitantsValueWitnessTable swift::_TWVMBo = {
+  POD_VALUE_WITNESS_TABLE(uintptr_t, sizeof(void*)),
+  (value_witness_types::storeExtraInhabitant*)
+    &swift_storeHeapObjectExtraInhabitant,
+  (value_witness_types::getExtraInhabitantIndex*)
+    &swift_getHeapObjectExtraInhabitantIndex,
+  ExtraInhabitantFlags()
+    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
+};
+
 /*** Objective-C pointers ****************************************************/
 
 // This section can reasonably be suppressed in builds that don't

@@ -1147,7 +1147,7 @@ getMetatypeValueWitnesses(const Metadata *instanceType) {
 
   // For class types, return the unmanaged-pointer witnesses.
   if (instanceType->isClassType())
-    return &getUnmanagedPointerValueWitnesses();
+    return &getUnmanagedPointerPointerValueWitnesses();
 
   // Metatypes preserve the triviality of their instance type.
   if (instanceType->getKind() == MetadataKind::Metatype)

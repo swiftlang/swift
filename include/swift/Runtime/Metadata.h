@@ -517,6 +517,9 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 
 // The () table can be used for arbitrary empty types.
 extern "C" const ValueWitnessTable _TWVT_;        // ()
+
+// The table for aligned-pointer-to-pointer types.
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVMBo; // Builtin.ObjectPointer.Type
   
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -525,6 +528,12 @@ static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
 #else
   return _TWVBi32_;
 #endif
+}
+
+/// Return value witnesses for a pointer-aligned pointer type.
+static inline
+const ValueWitnessTable &getUnmanagedPointerPointerValueWitnesses() {
+  return _TWVMBo;
 }
 
 /// The header before a metadata object which appears on all type
