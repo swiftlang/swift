@@ -15,5 +15,6 @@
 // Note: This file is #included in assembly files.
 
 #define RC_INTERVAL 4
+#define RC_INTERVAL_SHIFT 2
 
 #endif

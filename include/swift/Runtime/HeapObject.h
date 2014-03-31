@@ -222,6 +222,9 @@ static inline HeapObject *_swift_retain(HeapObject *object) {
 /// It's unlikely that a custom CC would be beneficial here.
 extern "C" void swift_release(HeapObject *object);
 
+/// ObjC compatibility. Never call this.
+extern "C" size_t swift_retainCount(HeapObject *object);
+
 /// Deallocate the given memory; it was returned by swift_allocObject
 /// but is otherwise in an unknown state.
 ///

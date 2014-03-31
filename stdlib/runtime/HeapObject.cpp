@@ -238,6 +238,10 @@ void swift::swift_release(HeapObject *object) {
   }
 }
 
+size_t swift::swift_retainCount(HeapObject *object) {
+  return object->refCount >> RC_INTERVAL_SHIFT;
+}
+
 void swift::swift_weakRetain(HeapObject *object) {
   if (!object) return;
 
