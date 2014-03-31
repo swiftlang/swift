@@ -209,7 +209,7 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
   recursivelyDeleteTriviallyDeadInstructions(AI, true);
 }
 
-bool swift::hasUnboundGenericTypes(Type T) {
+bool swift::hasUnboundGenericTypes(CanType T) {
     return T.findIf([](Type type) ->bool {
       return isa<ArchetypeType>(type.getPointer());
     });

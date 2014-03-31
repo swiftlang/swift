@@ -69,7 +69,7 @@ namespace swift {
   void replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF);
 
   /// \returns True if the type T has unbound generic types.
-  bool hasUnboundGenericTypes(Type T);
+  bool hasUnboundGenericTypes(CanType T);
 
 } // end namespace swift
 
