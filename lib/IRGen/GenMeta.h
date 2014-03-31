@@ -45,6 +45,10 @@ namespace irgen {
   /// Is the given class known to have Swift-compatible metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
 
+  /// Is the given class-like type known to have Swift-compatible
+  /// metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
+
   /// Is the given class known to have an implementation in Swift?
   bool hasKnownSwiftImplementation(IRGenModule &IGM, ClassDecl *theClass);
   

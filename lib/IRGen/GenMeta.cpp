@@ -247,6 +247,22 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   return result;
 }
 
+
+bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
+  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
+    return hasKnownSwiftMetadata(IGM, theClass);
+  }
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    if (auto superclass = archetype->getSuperclass()) {
+      return hasKnownSwiftMetadata(IGM, superclass->getCanonicalType());
+    }
+  }
+
+  // Class existentials, etc.
+  return false;
+}
+
 /// Is the given class known to have Swift-compatible metadata?
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
   // For now, the fact that a declaration was not implemented in Swift
@@ -2611,9 +2627,7 @@ llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      SILType objectType,
                                                      bool suppressCast) {
   // If it is known to have swift metadata, just load.
-  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
-  if (hasKnownSwiftMetadata(IGF.IGM, theClass)) {
-    assert(isKnownNotTaggedPointer(IGF.IGM, theClass));
+  if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
     return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
   }
 
@@ -2629,7 +2643,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
                                                         llvm::Value *metatype,
                                                         CanType type) {
   // If the type is known to have Swift metadata, this is trivial.
-  if (hasKnownSwiftMetadata(IGF.IGM, type.getClassOrBoundGenericClass()))
+  if (hasKnownSwiftMetadata(IGF.IGM, type))
     return metatype;
 
   // Otherwise, we inline a little operation here.
