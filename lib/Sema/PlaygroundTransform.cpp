@@ -299,14 +299,11 @@ public:
 
   Expr *buildLoggerCall(Expr *E, SourceRange SR) {
     Expr *Name = new (Context) StringLiteralExpr("", SourceRange());
-    Expr *Header = new (Context) StringLiteralExpr("", SourceRange());
     Name->setImplicit(true);
-    Header->setImplicit(true);
-
+      
     Expr *LoggerArgExprs[] = {
         E,
-        Name,
-        Header
+        Name
       };
 
     TupleExpr *LoggerArgs = new (Context) TupleExpr(
@@ -445,7 +442,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
                                   NLKind::UnqualifiedLookup,
                                   Decls);
 
-        if (Decls.size() != 1)
+        if (Decls.size() == 0)
           OK = false;
 
         Decls.clear();
@@ -456,7 +453,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
           NLKind::UnqualifiedLookup,
           Decls);
 
-        if (Decls.size() != 1)
+        if (Decls.size() == 0)
           OK = false;
 
         if (OK) {
