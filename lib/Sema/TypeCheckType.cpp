@@ -385,6 +385,11 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                   comp->getIdentifier(), RemappedTy)
         .highlight(R)
         .fixItReplace(R, RemappedTy);
+
+      // Replace the computed type with the suggested type.
+      comp->overwriteIdentifier(tc.Context.getIdentifier(RemappedTy));
+      comp->setValue(I->second);
+
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == "NSUInteger") {
         tc.diagnose(L, diag::note_remapped_type, "UInt")
