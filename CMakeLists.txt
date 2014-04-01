@@ -397,11 +397,17 @@ function(compile_swift_files)
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
 
+  if (SWIFT_COMPILER STREQUAL "swift")
+    get_target_property(swift_compiler_path "${SWIFT_COMPILER}" LOCATION)
+  else()
+    set(swift_compiler_path ${SWIFT_COMPILER})
+  endif()
+  
   add_custom_command(
     OUTPUT ${objfile} ${module_file}
     ${create_module_dir}
     COMMAND "${line_directive_tool}" ${source_files} -- 
-      "$<TARGET_FILE:${SWIFT_COMPILER}>" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
+      "${swift_compiler_path}" "-c" ${swift_flags} "-o" "${objfile}" ${source_files}
     DEPENDS "${SWIFT_COMPILER}" ${stdlib_dep} ${source_files} ${SWIFTFILE_DEPENDS}
 #    MAIN_DEPENDENCY ${target}
     COMMENT "Compiling ${objfile}")
