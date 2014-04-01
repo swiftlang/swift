@@ -17,6 +17,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -28,7 +29,8 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //===----------------------------------------------------------------------===//
 
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
-                                            bool examinePartialApply);
+                                            bool examinePartialApply,
+                                            llvm::SmallVectorImpl<Operand*> &);
 static bool operandEscapesApply(Operand *O);
 
 // Propagate liveness backwards from an initial set of blocks in our
@@ -213,7 +215,10 @@ static bool canValueEscape(SILValue V, bool examineApply) {
         ->getInterfaceParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
-        if (canValueEscape(User, examineApply))
+        // FIXME: Change false to true to enable once the
+        //        appropriate partial_apply cloning and rewrites are
+        //        in place.
+        if (canValueEscape(User, /*examineApply = */ false))
           return true;
         continue;
       }
@@ -314,8 +319,12 @@ static bool operandEscapesApply(Operand *O) {
 /// disqualify it from being protmoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
+  // We don't actually use these because we're not recursively
+  // rewriting the partial applies we find.
+  llvm::SmallVector<Operand *, 1> ElidedOperands;
   if (auto Param = getParameterForOperand(O))
-    return !findUnexpectedBoxUse(Param, /* examinePartialApply =*/ false);
+    return !findUnexpectedBoxUse(Param, /* examinePartialApply =*/ false,
+                                 ElidedOperands);
 
   return false;
 }
@@ -327,10 +336,13 @@ static bool checkPartialApplyBody(Operand *O) {
 /// to see if there is an unexpected use inside.  Return the
 /// instruction with the unexpected use if we find one.
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
-                                            bool examinePartialApply) {
+                                            bool examinePartialApply,
+                             llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   assert((Box.getType() ==
           SILType::getObjectPointerType(Box.getType().getASTContext())) &&
          "Expected an object pointer!");
+
+  llvm::SmallVector<Operand *, 4> LocalElidedOperands;
 
   // Scan all of the uses of the retain count value, collecting all
   // the releases and validating that we don't have an unexpected
@@ -351,17 +363,21 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
           // FIXME: Change false to true to enable once the
           //        appropriate partial_apply cloning and rewrites are
           //        in place.
-          !canValueEscape(PAI, /* examineApply = */ false))
+          !canValueEscape(PAI, /* examineApply = */ false)) {
+        LocalElidedOperands.push_back(UI);
         continue;
+      }
 
     return User;
   }
 
+  ElidedOperands.append(LocalElidedOperands.begin(), LocalElidedOperands.end());
   return nullptr;
 }
 
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
-static bool canPromoteAllocBox(AllocBoxInst *ABI) {
+static bool canPromoteAllocBox(AllocBoxInst *ABI,
+                             llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   // Scan all of the uses of the address of the box's contained value
   // to see if any of them cause address to escape, in which case we
   // can't promote it to live on the stack.
@@ -371,7 +387,8 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI) {
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted tot he stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
-                                        /* examinePartialApply = */ true)) {
+                                        /* examinePartialApply = */ true,
+                                        ElidedOperands)) {
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
           << ABI->getFunction()->getName() << ": " << *ABI
@@ -442,7 +459,8 @@ static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
 }
 
 static void
-rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst*> &Promoted) {
+rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
+                     llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   for (auto *ABI : Promoted) {
     rewriteAllocBoxAsAllocStack(ABI);
     ABI->eraseFromParent();
@@ -453,16 +471,17 @@ namespace {
 class AllocBoxToStack : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
-    llvm::SmallVector<AllocBoxInst*, 8> Promoted;
+    llvm::SmallVector<AllocBoxInst *, 8> Promoted;
+    llvm::SmallVector<Operand *, 8> ElidedOperands;
 
     for (auto &BB : *getFunction())
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
-          if (canPromoteAllocBox(ABI))
+          if (canPromoteAllocBox(ABI, ElidedOperands))
             Promoted.push_back(ABI);
 
     if (!Promoted.empty()) {
-      rewritePromotedBoxes(Promoted);
+      rewritePromotedBoxes(Promoted, ElidedOperands);
       NumStackPromoted += Promoted.size();
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
