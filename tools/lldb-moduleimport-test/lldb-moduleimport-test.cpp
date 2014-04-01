@@ -50,6 +50,12 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
 
+static llvm::cl::list<std::string>
+ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
+
+static llvm::cl::list<std::string>
+FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
+
 
 void anchorForGetMainExecutable() {}
 
@@ -80,6 +86,8 @@ int main(int argc, char **argv) {
   Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.setFrameworkSearchPaths(FrameworkPaths);
 
   if (CI.setup(Invocation))
     return 1;
