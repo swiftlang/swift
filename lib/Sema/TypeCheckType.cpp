@@ -1790,7 +1790,15 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
-  bool Result = isRepresentableInObjC(VD->getDeclContext(), VD->getType());
+  Type T = VD->getType();
+  if (auto *RST = T->getAs<ReferenceStorageType>()) {
+    // In-memory layout of @weak and @unowned does not correspond to anything
+    // in Objective-C, but this does not really matter here, since Objective-C
+    // uses getters and setters to operate on the property.
+    // Because of this, look through @weak and @unowned.
+    T = RST->getReferentType();
+  }
+  bool Result = isRepresentableInObjC(VD->getDeclContext(), T);
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
 
   if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
@@ -1935,10 +1943,6 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (isTriviallyRepresentableInObjC(DC, T))
     return true;
-
-  if (auto *WST = T->getAs<WeakStorageType>()) {
-    return isObjCPointerType(WST->getReferentType());
-  }
 
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
