@@ -1226,7 +1226,7 @@ public:
               "downcast operand must be a class type");
       require(toTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(fromTy.isSuperclassOf(toTy, nullptr),
+      require(fromTy.isSuperclassOf(toTy),
               "downcast must convert to a subclass");
       return;
     case CheckedCastKind::SuperToArchetype: {
@@ -1416,7 +1416,7 @@ public:
     } else {
       require(UI->getType().getClassOrBoundGenericClass(),
               "upcast must convert a class instance to a class type");
-      require(UI->getType().isSuperclassOf(UI->getOperand().getType(), nullptr),
+      require(UI->getType().isSuperclassOf(UI->getOperand().getType()),
               "upcast must cast to a superclass");
     }
   }

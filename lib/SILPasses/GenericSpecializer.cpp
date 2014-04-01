@@ -189,7 +189,7 @@ private:
 
     // Ok, we know that we have two classes. If From is a super class of To,
     // insert a checked downcast.
-    if (OpFromTy.isSuperclassOf(OpToTy, nullptr)) {
+    if (OpFromTy.isSuperclassOf(OpToTy)) {
       SILValue OtherOp = getOpValue(Inst->getOperand());
       auto *UCCI = Builder.createUnconditionalCheckedCast(
           Loc, CheckedCastKind::Downcast, OtherOp, OpToTy);
@@ -198,7 +198,7 @@ private:
     }
 
     // If ToTy is a super class of FromTy, we are performing an upcast.
-    if (OpToTy.isSuperclassOf(OpFromTy, nullptr)) {
+    if (OpToTy.isSuperclassOf(OpFromTy)) {
       doPostProcess(Inst, Builder.createUpcast(
                       Loc, getOpValue(Inst->getOperand()), OpToTy));
       return;
@@ -296,7 +296,7 @@ private:
 
     // Ok, we know that we have two classes. If From is a super class of To,
     // insert a downcast...
-    if (OpFromTy.isSuperclassOf(OpToTy, nullptr)) {
+    if (OpFromTy.isSuperclassOf(OpToTy)) {
       SILValue OtherOp = getOpValue(Inst->getOperand());
 
       // FIXME: When we have a unchecked downcast, replace the unconditional
@@ -308,7 +308,7 @@ private:
     }
 
     // If ToTy is a super class of FromTy, we are performing an upcast.
-    if (OpToTy.isSuperclassOf(OpFromTy, nullptr)) {
+    if (OpToTy.isSuperclassOf(OpFromTy)) {
       UpcastInst *Upcast =
           Builder.createUpcast(OpLoc, getOpValue(Inst->getOperand()), OpToTy);
       doPostProcess(Inst, Builder.createBranch(OpLoc, OpSuccBB,

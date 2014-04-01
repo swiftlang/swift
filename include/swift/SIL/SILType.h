@@ -314,7 +314,7 @@ public:
   }
 
   /// Return true if Ty is a subtype of this SILType, or null otherwise.
-  bool isSuperclassOf(SILType Ty, LazyResolver *resolver) const {
+  bool isSuperclassOf(SILType Ty) const {
     return getSwiftRValueType()->isSuperclassOf(Ty.getSwiftRValueType(),
                                                 nullptr);
   }
