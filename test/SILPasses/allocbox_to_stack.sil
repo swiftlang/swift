@@ -269,7 +269,7 @@ sil @useSomeClass : $@thin (@owned SomeClass) -> ()
 // strong_releases into destroy_addr/dealloc_stack pairs.  However, it needs to
 // make sure to use the MUI result for the destroy addr.
 
-// CHECK-LABEL sil @test_mui
+// CHECK-LABEL: sil @test_mui
 sil @test_mui : $@thin (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   %2 = alloc_box $SomeClass
