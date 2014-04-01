@@ -1222,14 +1222,11 @@ public:
     case CheckedCastKind::Coercion:
       llvm_unreachable("invalid for SIL");
     case CheckedCastKind::Downcast:
-      require(fromTy.isObject(),
-              "downcast operand must be an object");
       require(fromTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
       require(toTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
-      require(fromTy.getSwiftType()->isSuperclassOf(toTy.getSwiftType(),
-                                                    nullptr),
+      require(fromTy.isSuperclassOf(toTy, nullptr),
               "downcast must convert to a subclass");
       return;
     case CheckedCastKind::SuperToArchetype: {

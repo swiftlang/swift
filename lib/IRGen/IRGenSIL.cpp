@@ -2573,6 +2573,22 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     llvm_unreachable("invalid for sil");
     
   case CheckedCastKind::Downcast: {
+    // If we have an address, load the value and use the emitDowncast code to
+    // make the check. Then just bitcast addr appropriately.
+    //
+    // FIXME: The assumption of not taking a pointer is heavily baked into emit
+    // IRGEnFunction::emitDowncast. We should refactor it into
+    // emitDowncastPointer or the like.
+    if (operand.getType().isAddress()) {
+      auto fromAddr = IGF.getLoweredAddress(operand);
+      auto toTy = IGF.getTypeInfo(destTy).getStorageType();
+      llvm::Value *fromValue = IGF.Builder.CreateLoad(fromAddr);
+      IGF.emitDowncast(fromValue, destTy, mode);
+      llvm::Value *cast = IGF.Builder.CreateBitCast(
+        fromAddr.getAddress(), toTy->getPointerTo());
+      return Address(cast, fromAddr.getAlignment());
+    }
+
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
     llvm::Value *cast = IGF.emitDowncast(fromValue, destTy, mode);
