@@ -1,3 +1,17 @@
+2014-04-02
+----------
+
+* Prefix splitting for imported enums has been revised again due to feedback:
+  - If stripping off a prefix would leave an invalid identifier (like "10_4"),
+    leave one more word in the result than would otherwise be there
+    ("Behavior10_4").
+  - If all enumerators have a 'k' prefix (for "constant") and the enum doesn't,
+    the 'k' should not be considered when finding the common prefix.
+  - If the enum name is a plural (like "NSSomethingOptions") and the enumerator
+    names use the singular form ("NSSomethingOptionMagic"), this is considered
+    a matching prefix (but only if nothing follows the plural).
+
+
 2014-03-26
 ----------
 
