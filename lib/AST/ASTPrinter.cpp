@@ -38,18 +38,28 @@ using namespace swift;
 
 void ASTPrinter::anchor() {}
 
+void ASTPrinter::printTextImpl(StringRef Text) {
+  if (PendingNewlines != 0) {
+    llvm::SmallString<16> Str;
+    for (unsigned i = 0; i != PendingNewlines; ++i)
+      Str += '\n';
+    PendingNewlines = 0;
+
+    for (unsigned i = 0; i != CurrentIndentation; ++i)
+      Str += ' ';
+
+    printText(Str);
+  }
+
+  printText(Text);
+}
+
 ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   llvm::SmallString<32> Str;
   llvm::raw_svector_ostream OS(Str);
   OS << N;
-  printText(OS.str());
+  printTextImpl(OS.str());
   return *this;
-}
-void ASTPrinter::indent(unsigned NumSpaces){
-  llvm::SmallString<32> Str;
-  llvm::raw_svector_ostream OS(Str);
-  OS.indent(NumSpaces);
-  printText(OS.str());
 }
 
 void StreamPrinter::printText(StringRef Text) {
@@ -85,7 +95,7 @@ namespace {
 
     /// \brief Indent the current number of indentation spaces.
     void indent() {
-      Printer.indent(IndentLevel);
+      Printer.printIndent(IndentLevel);
     }
 
     /// \brief Record the location of this declaration, which is about to
@@ -145,8 +155,8 @@ namespace {
           Line = Line.drop_front(WhitespaceToTrim);
         }
         IsFirstLine = false;
-        Printer << Line << "\n";
-        indent();
+        Printer << Line;
+        Printer.printNewline();
       }
     }
 
@@ -504,7 +514,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     if (!PrintAccessorBody)
       Printer << " " << Label;
     else {
-      Printer << "\n";
+      Printer.printNewline();
       IndentRAII IndentMore(*this);
       indent();
       visit(Accessor);
@@ -520,7 +530,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     PrintAccessor(ASD->getSetter(), "set");
   }
   if (PrintAccessorBody) {
-    Printer << "\n";
+    Printer.printNewline();
     indent();
   } else
     Printer << " ";
@@ -528,7 +538,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
 }
 
 void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
-  Printer << " {\n";
+  Printer << " {";
+  Printer.printNewline();
   {
     IndentRAII indentMore(*this);
     for (auto member : members) {
@@ -542,7 +553,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
       visit(member);
       if (needComma && member != members.back())
         Printer << ",";
-      Printer << "\n";
+      Printer.printNewline();
     }
   }
   indent();
@@ -902,7 +913,7 @@ bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
   bool PrintedSomething = false;
   for (auto element : stmt->getElements()) {
     PrintedSomething = true;
-    Printer << "\n";
+    Printer.printNewline();
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
       if (decl->shouldPrintInContext(Options))
@@ -952,7 +963,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     }
     if (Options.FunctionDefinitions && decl->getBody()) {
       if (printBraceStmtElements(decl->getBody())) {
-        Printer << "\n";
+        Printer.printNewline();
         indent();
       }
     }
@@ -1074,7 +1085,8 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator infix " << decl->getName().str() << " {\n";
+  Printer << "operator infix " << decl->getName().str() << " {";
+  Printer.printNewline();
   {
     IndentRAII indentMore(*this);
     if (decl->getAssociativityLoc().isValid()) {
@@ -1082,19 +1094,21 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
       Printer << "associativity ";
       switch (decl->getAssociativity()) {
       case Associativity::None:
-        Printer << "none\n";
+        Printer << "none";
         break;
       case Associativity::Left:
-        Printer << "left\n";
+        Printer << "left";
         break;
       case Associativity::Right:
-        Printer << "right\n";
+        Printer << "right";
         break;
       }
+      Printer.printNewline();
     }
     if (decl->getPrecedenceLoc().isValid()) {
       indent();
-      Printer << "precedence " << decl->getPrecedence() << "\n";
+      Printer << "precedence " << decl->getPrecedence();
+      Printer.printNewline();
     }
   }
   indent();
@@ -1103,18 +1117,22 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator prefix " << decl->getName().str() << " {\n}";
+  Printer << "operator prefix " << decl->getName().str() << " {";
+  Printer.printNewline();
+  Printer << "}";
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator postfix " << decl->getName().str() << " {\n}";
+  Printer << "operator postfix " << decl->getName().str() << " {";
+  Printer.printNewline();
+  Printer << "}";
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
   Printer << "{";
   printBraceStmtElements(stmt);
-  Printer << "\n";
+  Printer.printNewline();
   indent();
   Printer << "}";
 }
@@ -1141,13 +1159,14 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
 void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
   Printer << "#if ";
   // FIXME: print condition
-  Printer << "\n";
+  Printer.printNewline();
   visit(stmt->getThenStmt());
   if (auto elseStmt = stmt->getElseStmt()) {
     Printer << " #else\n";
     visit(elseStmt);
   }
-  Printer << "\n#endif";
+  Printer.printNewline();
+  Printer << "#endif";
 }
 
 void PrintAST::visitWhileStmt(WhileStmt *stmt) {
@@ -1201,11 +1220,12 @@ void PrintAST::visitFallthroughStmt(FallthroughStmt *stmt) {
 void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
   Printer << "switch ";
   // FIXME: print subject
-  Printer << "{\n";
+  Printer << "{";
+  Printer.printNewline();
   for (CaseStmt *C : stmt->getCases()) {
     visit(C);
   }
-  Printer << "\n";
+  Printer.printNewline();
   indent();
   Printer << "}";
 }
@@ -1226,7 +1246,8 @@ void PrintAST::visitCaseStmt(CaseStmt *CS) {
     interleave(CS->getCaseLabelItems(), PrintCaseLabelItem,
                [&] { Printer << ", "; });
   }
-  Printer << ":\n";
+  Printer << ":";
+  Printer.printNewline();
 
   printBraceStmtElements(cast<BraceStmt>(CS->getBody()));
 }

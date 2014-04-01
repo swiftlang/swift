@@ -23,6 +23,11 @@ namespace swift {
 
 /// An abstract class used to print an AST.
 class ASTPrinter {
+  unsigned PendingNewlines = 0;
+  unsigned CurrentIndentation = 0;
+
+  void printTextImpl(StringRef Text);
+
 public:
   virtual ~ASTPrinter() {}
 
@@ -38,21 +43,29 @@ public:
 
   /// Called when printing the referenced name of a type declaration.
   virtual void printTypeRef(const TypeDecl *TD, StringRef Text) {
-    printText(Text);
+    printTextImpl(Text);
   }
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(const Module *Mod, StringRef Text) {
-    printText(Text);
+    printTextImpl(Text);
   }
 
   // Helper functions.
 
   ASTPrinter &operator<<(StringRef Text) {
-    printText(Text);
+    printTextImpl(Text);
     return *this;
   }
+
   ASTPrinter &operator<<(unsigned long long N);
-  void indent(unsigned NumSpaces);
+
+  void printIndent(unsigned NumSpaces) {
+    CurrentIndentation = NumSpaces;
+  }
+
+  void printNewline() {
+    PendingNewlines++;
+  }
 
 private:
   virtual void anchor();
