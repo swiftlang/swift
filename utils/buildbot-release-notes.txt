@@ -24,8 +24,12 @@
     // void sincos(double, double*, double*);
     sincos(M_PI/2, &s, &c)
 
-  This is currently limited to non-void, non-ObjC pointer types; support for
-  pointers to ObjC pointers, such as 'NSError**', and for void pointers will
+  Note that we don't know whether an API reads or writes the C pointer, so
+  you need to explicitly initialize values (like "s" and "c" above) even if
+  you know that the API overwrites them.
+
+  This support is currently limited to non-void, non-ObjC pointer types; support 
+  for pointers to ObjC pointers, such as 'NSError**', and for void pointers will
   be coming soon.
 
 
