@@ -488,9 +488,17 @@ public:
     return *AttrsAndIsObjC.getPointer();
   }
 
+  /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
+
+  /// Returns the end location of the entire declaration.
   SourceLoc getEndLoc() const { return getSourceRange().End; }
+
+  /// Returns the preferred location when referring to declarations
+  /// in diagnostics.
   SourceLoc getLoc() const;
+
+  /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 
   SourceLoc TrailingSemiLoc;
