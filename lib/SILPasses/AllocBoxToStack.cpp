@@ -387,7 +387,13 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted tot he stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
-                                        /* examinePartialApply = */ true,
+                                        // FIXME: Change false to true
+                                        //        to enable once the
+                                        //        appropriate
+                                        //        partial_apply
+                                        //        cloning and rewrites
+                                        //        are in place.
+                                        /* examinePartialApply = */ false,
                                         ElidedOperands)) {
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
