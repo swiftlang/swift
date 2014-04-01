@@ -3211,9 +3211,9 @@ public:
       // FIXME: rdar://16320042 - For properties, we don't have a useful
       // location for the 'var' token.  Instead of emitting a bogus fixit, only
       // emit the fixit for 'func's.
-      if (!isa<VarDecl>(override))
-        TC.diagnose(override, diag::missing_override)
-          .fixItInsert(override->getStartLoc(), "@override ");
+      if (auto FD = dyn_cast<FuncDecl>(override))
+        TC.diagnose(FD->getStartLoc(), diag::missing_override)
+          .fixItInsert(FD->getStartLoc(), "@override ");
       else
         TC.diagnose(override, diag::missing_override);
       TC.diagnose(base, diag::overridden_here);
