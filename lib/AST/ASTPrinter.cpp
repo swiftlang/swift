@@ -110,9 +110,8 @@ namespace {
       if (!RC)
         return;
 
-      // FIXME: print a blank line.
-      //Printer << "\n";
-      //indent();
+      Printer.printNewline();
+      indent();
 
       bool Invalid;
       unsigned StartLocCol =

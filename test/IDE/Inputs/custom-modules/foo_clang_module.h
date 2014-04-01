@@ -118,5 +118,5 @@ enum BarforwardDeclaredEnum;
 
 #define FOO_MACRO_NOT_IMPORTED_1 10_9
 
-void theLastDeclInFooClangModuleH();
+void theLastDeclInFooClangModule();
 
