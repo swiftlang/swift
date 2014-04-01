@@ -23,8 +23,10 @@ namespace swift {
 
 /// An abstract class used to print an AST.
 class ASTPrinter {
-  unsigned PendingNewlines = 0;
   unsigned CurrentIndentation = 0;
+  unsigned PendingNewlines = 0;
+  const Decl *PendingDeclPreCallback = nullptr;
+  const Decl *PendingDeclLocCallback = nullptr;
 
   void printTextImpl(StringRef Text);
 
@@ -65,6 +67,16 @@ public:
 
   void printNewline() {
     PendingNewlines++;
+  }
+
+  /// Schedule a \c printDeclPre callback to be called as soon as a
+  /// non-whitespace character is printed.
+  void callPrintDeclPre(const Decl *D) {
+    PendingDeclPreCallback = D;
+  }
+
+  void callPrintDeclLoc(const Decl *D) {
+    PendingDeclLocCallback = D;
   }
 
 private:

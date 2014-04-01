@@ -1,134 +1,134 @@
 <decl>import FooClangDepModule</decl>
-<decl>
-/// Aaa.  FooEnum1.  Bbb.
-struct FooEnum1 {<decl>
-  init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl><decl>
-  var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+
+<decl>/// Aaa.  FooEnum1.  Bbb.
+struct FooEnum1 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
-<decl>
-/// Aaa.  FooEnum1X.  Bbb.
+
+<decl>/// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
-<decl>struct FooEnum2 {<decl>
-  init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl><decl>
-  var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+<decl>struct FooEnum2 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 <decl>var FooEnum2X: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl>var FooEnum2Y: <ref:Struct>FooEnum2</ref> { get }</decl>
-<decl>struct FooEnum3 {<decl>
-  init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl><decl>
-  var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+<decl>struct FooEnum3 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 <decl>var FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
 <decl>var FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
-<decl>
-/// Aaa.  FooTypedef1.  Bbb.
+
+<decl>/// Aaa.  FooTypedef1.  Bbb.
 typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
-<decl>
-/// Aaa.  fooIntVar.  Bbb.
+
+<decl>/// Aaa.  fooIntVar.  Bbb.
 var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
-<decl>
-/// Aaa.  fooFunc1.  Bbb.
+
+<decl>/// Aaa.  fooFunc1.  Bbb.
 func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl>func fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl>
-/**
+
+<decl>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
  * Ccc.
  *
  * Ddd.
  */
 func fooFuncWithComment1()</decl>
-<decl>
-/*!
+
+<decl>/*!
   Aaa.  fooFuncWithComment2.  Bbb.
  */
 func fooFuncWithComment2()</decl>
-<decl>
-/**
+
+<decl>/**
  * Aaa.  fooFuncWithComment3.  Bbb.
  */
 /**
  * Ccc.
  */
 func fooFuncWithComment3()</decl>
-<decl>
-/**
+
+<decl>/**
  * Aaa.  fooFuncWithComment4.  Bbb.
  */
 /// Ddd.
 func fooFuncWithComment4()</decl>
-<decl>
-/// Aaa.  fooFuncWithComment5.  Bbb.
+
+<decl>/// Aaa.  fooFuncWithComment5.  Bbb.
 /// Ccc.
 ///
 /// Ddd.
 func fooFuncWithComment5()</decl>
-<decl>
-/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
+
+<decl>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl>
-/// Aaa.  FooProtocol.  Bbb.
-@objc protocol FooProtocol {<decl>
 
-  /// Aaa.  fooProtoFunc.  Bbb.
+<decl>/// Aaa.  FooProtocol.  Bbb.
+@objc protocol FooProtocol {
+
+  <decl>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
-  func fooProtoFunc()</decl><decl>
+  func fooProtoFunc()</decl>
 
-  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  <decl>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
-  func fooProtoFuncWithExtraIndentation1()</decl><decl>
+  func fooProtoFuncWithExtraIndentation1()</decl>
 
-  /**
+  <decl>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
-  func fooProtoFuncWithExtraIndentation2()</decl><decl>
-  class func fooProtoClassFunc()</decl><decl>
-  var fooProperty1: <ref:TypeAlias>CInt</ref> { get set }</decl><decl>
-  var fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl><decl>
-  var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  func fooProtoFuncWithExtraIndentation2()</decl>
+  <decl>class func fooProtoClassFunc()</decl>
+  <decl>var fooProperty1: <ref:TypeAlias>CInt</ref> { get set }</decl>
+  <decl>var fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
+  <decl>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
 }</decl>
-<decl>@objc class FooClass : <ref:Protocol>FooProtocol</ref> {<decl>
-  var fooProperty1: <ref:TypeAlias>CInt</ref></decl><decl>
-  var fooProperty2: <ref:TypeAlias>CInt</ref></decl><decl>
-  var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl><decl>
-  class func fooInstanceFunc0()</decl><decl>
-  func fooInstanceFunc0()</decl><decl>
-  class func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl><decl>
-  func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl><decl>
-  class func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl><decl>
-  func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl><decl>
-  class func fooClassFunc0()</decl><decl>
+<decl>@objc class FooClass : <ref:Protocol>FooProtocol</ref> {
+  <decl>var fooProperty1: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var fooProperty2: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  <decl>class func fooInstanceFunc0()</decl>
+  <decl>func fooInstanceFunc0()</decl>
+  <decl>class func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>class func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl>class func fooClassFunc0()</decl>
 
-  /// Aaa.  fooProtoFunc.  Bbb.
+  <decl>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
-  func fooProtoFunc()</decl><decl>
+  func fooProtoFunc()</decl>
 
-  /// Aaa.  fooProtoFunc.  Bbb.
+  <decl>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
-  class func fooProtoFunc()</decl><decl>
+  class func fooProtoFunc()</decl>
 
-  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  <decl>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
-  func fooProtoFuncWithExtraIndentation1()</decl><decl>
+  func fooProtoFuncWithExtraIndentation1()</decl>
 
-  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  <decl>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
-  class func fooProtoFuncWithExtraIndentation1()</decl><decl>
+  class func fooProtoFuncWithExtraIndentation1()</decl>
 
-  /**
+  <decl>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
-  func fooProtoFuncWithExtraIndentation2()</decl><decl>
+  func fooProtoFuncWithExtraIndentation2()</decl>
 
-  /**
+  <decl>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
-  class func fooProtoFuncWithExtraIndentation2()</decl><decl>
-  class func fooProtoClassFunc()</decl>
+  class func fooProtoFuncWithExtraIndentation2()</decl>
+  <decl>class func fooProtoClassFunc()</decl>
 }</decl>
 <decl>var FOO_MACRO_1: <ref:TypeAlias>CInt</ref> { get }</decl>
 <decl>var FOO_MACRO_2: <ref:TypeAlias>CInt</ref> { get }</decl>

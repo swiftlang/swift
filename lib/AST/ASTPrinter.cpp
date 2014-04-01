@@ -50,6 +50,14 @@ void ASTPrinter::printTextImpl(StringRef Text) {
 
     printText(Str);
   }
+  if (PendingDeclPreCallback) {
+    printDeclPre(PendingDeclPreCallback);
+    PendingDeclPreCallback = 0;
+  }
+  if (PendingDeclLocCallback) {
+    printDeclLoc(PendingDeclLocCallback);
+    PendingDeclLocCallback = 0;
+  }
 
   printText(Text);
 }
@@ -101,7 +109,7 @@ namespace {
     /// \brief Record the location of this declaration, which is about to
     /// be printed.
     void recordDeclLoc(Decl *decl) {
-      Printer.printDeclLoc(decl);
+      Printer.callPrintDeclLoc(decl);
     }
 
     void printClangDocumentationComment(const clang::Decl *D) {
@@ -280,7 +288,7 @@ private:
     using ASTVisitor::visit;
 
     void visit(Decl *D) {
-      Printer.printDeclPre(D);
+      Printer.callPrintDeclPre(D);
       ASTVisitor::visit(D);
       Printer.printDeclPost(D);
     }
