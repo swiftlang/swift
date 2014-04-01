@@ -397,10 +397,10 @@ function(compile_swift_files)
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
 
-  if (SWIFT_COMPILER STREQUAL "swift")
-    get_target_property(swift_compiler_path "${SWIFT_COMPILER}" LOCATION)
+  if (TARGET "${SWIFT_COMPILER}")
+    set(swift_compiler_path "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${SWIFT_COMPILER}")
   else()
-    set(swift_compiler_path ${SWIFT_COMPILER})
+    set(swift_compiler_path "${SWIFT_COMPILER}")
   endif()
   
   add_custom_command(
