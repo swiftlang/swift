@@ -562,9 +562,6 @@ public:
   /// \brief Define the default constructor for the given struct or class.
   void defineDefaultConstructor(NominalTypeDecl *decl);
 
-  /// \brief Define any implicit declarations that are still pending.
-  void definePendingImplicitDecls();
-
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.
   Expr *foldSequence(SequenceExpr *expr, DeclContext *dc);

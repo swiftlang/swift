@@ -342,8 +342,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                            "convertCConstPointerToUnsafePointer");
   }
 
-  // Define any pending implicitly declarations.
-  TC.definePendingImplicitDecls();
   DefinedFunctions.insert(DefinedFunctions.end(),
                           TC.implicitlyDefinedFunctions.begin(),
                           TC.implicitlyDefinedFunctions.end());
@@ -429,8 +427,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
     }
 
-    // Define any pending implicit declarations.
-    TC.definePendingImplicitDecls();
     DefinedFunctions.insert(DefinedFunctions.end(),
                             TC.implicitlyDefinedFunctions.begin(),
                             TC.implicitlyDefinedFunctions.end());

@@ -4602,9 +4602,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
 }
 
-void TypeChecker::definePendingImplicitDecls() {
-}
-
 static bool isDeclOfOperator(const Decl *D) {
   if (const ValueDecl *ValD = dyn_cast<ValueDecl>(D))
     return ValD->isOperator();
