@@ -697,6 +697,23 @@ public:
     return insert(new (F.getModule()) CondFailInst(Loc, Operand));
   }
 
+  BuiltinFunctionRefInst *createBuiltinTrap(SILLocation Loc) {
+    ASTContext &AST = F.getModule().getASTContext();
+    // builtin_function_ref "int_trap" : $@thin @noreturn () -> ()
+    auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
+                                            /*thin*/ true,
+                                            /*noreturn*/ true,
+                                            /*autoclosure*/ false,
+                                            /*block*/ false);
+    SILResultInfo Result(TupleType::getEmpty(AST), ResultConvention::Unowned);
+    auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
+                                          ParameterConvention::Direct_Owned,
+                                          ArrayRef<SILParameterInfo>(), Result,
+                                          AST);
+    return createBuiltinFunctionRef(Loc, "int_trap",
+                                    SILType::getPrimitiveObjectType(bfrFnType));
+  }
+
   //===--------------------------------------------------------------------===//
   // Array indexing instructions
   //===--------------------------------------------------------------------===//
