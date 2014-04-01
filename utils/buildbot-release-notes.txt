@@ -11,6 +11,23 @@
     names use the singular form ("NSSomethingOptionMagic"), this is considered
     a matching prefix (but only if nothing follows the plural).
 
+* Cocoa APIs that take pointers to plain C types as arguments now get imported
+  as taking the new 'CMutablePointer<T>' and 'CConstPointer<T>' types instead
+  of 'UnsafePointer<T>'. These new types allow implicit conversions from
+  Swift 'inout' parameters and from Swift arrays:
+
+    let rgb = CGColorSpaceCreateDeviceRGB()
+    // CGColorRef CGColorCreate(CGColorSpaceRef, const CGFloat*);
+    let white = CGColorCreate(rgb, [1.0, 1.0, 1.0])
+
+    var s = 0.0, c = 0.0
+    // void sincos(double, double*, double*);
+    sincos(M_PI/2, &s, &c)
+
+  This is currently limited to non-void, non-ObjC pointer types; support for
+  pointers to ObjC pointers, such as 'NSError**', and for void pointers will
+  be coming soon.
+
 
 2014-03-26
 ----------
