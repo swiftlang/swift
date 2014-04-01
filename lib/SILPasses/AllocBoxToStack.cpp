@@ -222,43 +222,42 @@ static bool canValueEscape(SILValue V, bool examineApply) {
   return false;
 }
 
-/// Given an operand of a direct apply or partial_apply, return the
-/// value that represents the formal parameter that the operand is
-/// copied to in the applied function.
-static SILValue getParameterForOperand(Operand *O) {
+
+/// Given an apply or partial_apply, return the direct callee or
+/// nullptr if this is not a direct call.
+static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
+  if (auto *Apply = dyn_cast<ApplyInst>(Call))
+    return dyn_cast<FunctionRefInst>(Apply->getCallee());
+  else
+    return dyn_cast<FunctionRefInst>(cast<PartialApplyInst>(Call)->getCallee());
+}
+
+static bool callIsPolymorphic(SILInstruction *Call) {
+  if (auto *Apply = dyn_cast<ApplyInst>(Call))
+    return Apply->getSubstCalleeType()->isPolymorphic();
+  else
+    return cast<PartialApplyInst>(Call)->getSubstCalleeType()->isPolymorphic();
+}
+
+/// Given an operand of a direct apply or partial_apply of a
+/// non-generic function, return the index of the parameter used in
+/// the body of the function to represent this operand.
+size_t getParameterIndexForOperand(Operand *O) {
   assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
          "Expected apply or partial_apply!");
 
   CanSILFunctionType Type;
-  SILValue Callee;
   size_t ArgCount;
   if (auto *Apply = dyn_cast<ApplyInst>(O->getUser())) {
     Type = Apply->getSubstCalleeType();
-    Callee = Apply->getCallee();
     ArgCount = Apply->getArguments().size();
     assert(Type->getInterfaceParameters().size() == ArgCount &&
            "Expected all arguments to be supplied!");
   } else {
     auto *PartialApply = cast<PartialApplyInst>(O->getUser());
     Type = PartialApply->getSubstCalleeType();
-    Callee = PartialApply->getCallee();
     ArgCount = PartialApply->getArguments().size();
   }
-
-  // TODO: Support generics at some point.
-  if (Type->isPolymorphic())
-    return SILValue();
-
-  // It's not a direct call? Bail out.
-  if (!isa<FunctionRefInst>(Callee))
-    return SILValue();
-
-  auto *FRI = cast<FunctionRefInst>(Callee);
-
-  // We don't have a function body to examine? Bail out.
-  SILFunction *F = FRI->getReferencedFunction();
-  if (F->empty())
-    return SILValue();
 
   size_t ParamCount = Type->getInterfaceParameters().size();
   assert(ParamCount >= ArgCount && "Expected fewer arguments to function!");
@@ -267,9 +266,30 @@ static SILValue getParameterForOperand(Operand *O) {
   assert(OperandIndex != 0 && "Operand cannot be the applied function!");
 
   // The applied function is the first operand.
-  int ParamIndex = (ParamCount - ArgCount) + OperandIndex - 1;
+  auto ParamIndex = (ParamCount - ArgCount) + OperandIndex - 1;
+
+  return ParamIndex;
+}
+
+/// Given an operand of a direct apply or partial_apply of a
+/// non-generic function, return the parameter used in the body of the
+/// function to represent this operand.
+static SILValue getParameterForOperand(Operand *O) {
+  auto *FRI = getDirectCallee(O->getUser());
+  if (!FRI)
+    return SILValue();
+
+  auto *F = FRI->getReferencedFunction();
+  if (!F)
+    return SILValue();
+
+  // TODO: Support generics at some point.
+  if (callIsPolymorphic(O->getUser()))
+    return SILValue();
 
   auto &Entry = F->front();
+  size_t ParamIndex = getParameterIndexForOperand(O);
+
   auto *Param = Entry.getBBArg(ParamIndex);
   return SILValue(Param);
 }
