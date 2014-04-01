@@ -327,12 +327,60 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
   return a.slice(0, prefixLength);
 }
 
+/// Returns the common word-prefix of two strings, allowing the second string
+/// to be a common English plural form of the first.
+///
+/// For example, given "NSProperty" and "NSProperties", the full "NSProperty"
+/// is returned. Given "NSMagicArmor" and "NSMagicArmory", only
+/// "NSMagic" is returned.
+///
+/// The "-s", "-es", and "-ies" patterns cover every plural NS_OPTIONS name
+/// in Cocoa and Cocoa Touch.
+///
+/// \see getCommonWordPrefix
+static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
+  assert(!singular.empty());
+  assert(!plural.empty());
+
+  StringRef commonPrefix = getCommonWordPrefix(singular, plural);
+  if (commonPrefix.size() == singular.size() || plural.back() != 's')
+    return commonPrefix;
+
+  StringRef leftover = singular.substr(commonPrefix.size());
+
+  // Is the plural string just "[singular]s"?
+  plural = plural.drop_back();
+  if (plural.endswith(leftover))
+    return singular;
+
+  if (plural.empty() || plural.back() != 'e')
+    return commonPrefix;
+
+  // Is the plural string "[singular]es"?
+  plural = plural.drop_back();
+  if (plural.endswith(leftover))
+    return singular;
+
+  if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
+    return commonPrefix;
+
+  // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
+  plural = plural.drop_back();
+  leftover = leftover.drop_back();
+  if (plural.endswith(leftover))
+    return singular;
+
+  return commonPrefix;
+}
+
+
 namespace {
   enum class OptionSetFactoryMethod {
     FromRaw,
     FromMask,
   };
 }
+
 
 /// Build the 'fromMask' or 'fromRaw' method for an option set.
 /// struct NSSomeOptionSet : RawOptionSet {
@@ -846,7 +894,7 @@ namespace {
       
       return Impl.importName(decl->getDeclName(), /*suffix*/ "", enumPrefix);
     }
-    
+
     /// Determine the common prefix to remove from the element names of an
     /// enum. We'll elide this prefix from then names in
     /// the Swift interface because Swift enum cases are naturally namespaced
@@ -877,7 +925,7 @@ namespace {
           }
         }
 
-        StringRef commonWithEnum = getCommonWordPrefix(checkPrefix, enumName);
+        StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix, enumName);
         commonPrefix = commonPrefix.slice(0, commonWithEnum.size()+dropKPrefix);
       }
       Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});

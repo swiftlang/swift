@@ -143,6 +143,7 @@ typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
   NSSingleValue = 1,
 };
 
+// From CoreFoundation
 typedef CF_OPTIONS(unsigned long, CFCalendarUnit) {
   kCFCalendarUnitEra = (1UL << 1),
   kCFCalendarUnitYear = (1UL << 2),
@@ -158,6 +159,34 @@ typedef CF_OPTIONS(unsigned long, CFCalendarUnit) {
   kCFCalendarUnitWeekOfMonth /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 12),
   kCFCalendarUnitWeekOfYear /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 13),
   kCFCalendarUnitYearForWeekOfYear /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 14),
+};
+
+typedef NS_OPTIONS(NSUInteger, NSKeyValueObservingOptions) {
+  NSKeyValueObservingOptionNew = 0x01,
+  NSKeyValueObservingOptionOld = 0x02,
+  NSKeyValueObservingOptionInitial /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x04,
+  NSKeyValueObservingOptionPrior /*NS_ENUM_AVAILABLE(10_5, 2_0)*/ = 0x08
+};
+
+// From CoreBluetooth
+typedef NS_OPTIONS(NSInteger, CBCharacteristicProperties) {
+  CBCharacteristicPropertyBroadcast = 0x01,
+  CBCharacteristicPropertyRead = 0x02,
+  CBCharacteristicPropertyWriteWithoutResponse = 0x04,
+  CBCharacteristicPropertyWrite = 0x08,
+  CBCharacteristicPropertyNotify = 0x10,
+  CBCharacteristicPropertyIndicate = 0x20,
+  CBCharacteristicPropertyAuthenticatedSignedWrites = 0x40,
+  CBCharacteristicPropertyExtendedProperties = 0x80,
+  CBCharacteristicPropertyNotifyEncryptionRequired /*NS_ENUM_AVAILABLE(10_9, 6_0)*/ = 0x100,
+  CBCharacteristicPropertyIndicateEncryptionRequired /*NS_ENUM_AVAILABLE(10_9, 6_0)*/ = 0x200
+};
+
+// Contrived name with a plural "-es"...normally these are "beeps".
+typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
+  AlertBuzzFunk,
+  AlertBuzzHero,
+  AlertBuzzSosumi
 };
 
 
