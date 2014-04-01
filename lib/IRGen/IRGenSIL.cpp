@@ -2720,12 +2720,23 @@ void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
 }
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
+  auto toTy = getTypeInfo(i->getType()).getStorageType();
+
+  // If we have an address, just bitcast, don't explode.
+  if (i->getOperand().getType().isAddress()) {
+    Address fromAddr = getLoweredAddress(i->getOperand());
+    llvm::Value *toValue = Builder.CreateBitCast(
+      fromAddr.getAddress(), toTy->getPointerTo());
+    Address Addr(toValue, fromAddr.getAlignment());
+    setLoweredAddress(SILValue(i, 0), Addr);
+    return;
+  }
+
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to(from.getKind());
   assert(from.size() == 1 && "class should explode to single value");
-  const TypeInfo &toTI = getTypeInfo(i->getType());
   llvm::Value *fromValue = from.claimNext();
-  to.add(Builder.CreateBitCast(fromValue, toTI.getStorageType()));
+  to.add(Builder.CreateBitCast(fromValue, toTy));
   setLoweredExplosion(SILValue(i, 0), to);
 }
 

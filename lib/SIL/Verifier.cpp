@@ -1417,11 +1417,9 @@ public:
       require(instTy->isSuperclassOf(opInstTy, nullptr),
               "upcast must cast to a superclass");
     } else {
-      require(UI->getType().getSwiftType()->getClassOrBoundGenericClass(),
+      require(UI->getType().getClassOrBoundGenericClass(),
               "upcast must convert a class instance to a class type");
-      require(UI->getType().getSwiftType()
-                ->isSuperclassOf(UI->getOperand().getType().getSwiftType(),
-                                 nullptr),
+      require(UI->getType().isSuperclassOf(UI->getOperand().getType(), nullptr),
               "upcast must cast to a superclass");
     }
   }

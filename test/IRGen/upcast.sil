@@ -1,0 +1,18 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
+// Make sure that we are able to lower upcast addresses.
+
+// CHECK-LABEL: define void @upcast_test(%C6upcast1D** noalias) {
+// CHECK: entry:
+// CHECK-NEXT: bitcast %C6upcast1D** {{%[0-0]+}} to %C6upcast1C**
+// CHECK-NEXT: ret void
+
+class C {}
+class D : C {}
+
+sil @upcast_test : $@thin (@inout D) -> () {
+bb0(%0 : $*D):
+  %1 = upcast %0 : $*D to $*C
+  %33 = tuple()
+  return %33 : $()
+}
