@@ -118,7 +118,7 @@ protected:
 
   SILBuilder Builder;
   SILBasicBlock *InsertBeforeBB;
-  llvm::DenseMap<ValueBase*, SILValue> ValueMap;
+  llvm::DenseMap<SILValue, SILValue> ValueMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
   llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
   TypeSubstitutionMap OpenedExistentialSubs;
@@ -127,12 +127,9 @@ protected:
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::remapValue(SILValue Value) {
-  auto VI = ValueMap.find(Value.getDef());
-  if (VI != ValueMap.end()) {
-    assert(Value.getResultNumber() == 0 &&
-           "Non-zero result number of mapped value used?");
+  auto VI = ValueMap.find(Value);
+  if (VI != ValueMap.end())
     return VI->second;
-  }
 
   if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
     auto II = InstructionMap.find(I);

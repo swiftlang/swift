@@ -701,7 +701,11 @@ namespace llvm {
       return llvm::DenseMapInfo<swift::ValueBase*>::getTombstoneKey();
     }
     static unsigned getHashValue(swift::SILValue V) {
-      return DenseMapInfo<swift::ValueBase*>::getHashValue(V.getDef());
+      auto ResultNumHash =
+        DenseMapInfo<unsigned>::getHashValue(V.getResultNumber());
+      auto ValueBaseHash =
+        DenseMapInfo<swift::ValueBase*>::getHashValue(V.getDef());
+      return hash_combine(ResultNumHash, ValueBaseHash);
     }
     static bool isEqual(swift::SILValue LHS, swift::SILValue RHS) {
       return LHS == RHS;
