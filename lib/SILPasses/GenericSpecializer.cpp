@@ -132,12 +132,229 @@ private:
 
     doPostProcess(Inst,Builder.
                   createWitnessMethod(getOpLocation(Inst->getLoc()),
-                                        getOpType(Inst->getLookupType()),
-                                        getOpConformance(Inst->getLookupType(),
-                                                         sub.Conformance[0]),
-                                        Inst->getMember(),
-                                        getOpType(Inst->getType()),
-                                        Inst->isVolatile()));
+                                      getOpType(Inst->getLookupType()),
+                                      getOpConformance(Inst->getLookupType(),
+                                                       sub.Conformance[0]),
+                                      Inst->getMember(),
+                                      getOpType(Inst->getType()),
+                                      Inst->isVolatile()));
+  }
+
+  // If we are performing an archetype to archetype cast, since we don't do
+  // partial specialization, we know both must types must now be
+  // concrete. Modify the checked cast appropriately.
+  //
+  // If the two types are non-classes, we enforce that after specialization they
+  // must both either be trivially equal (in which case we just propagate the
+  // operand) or trivially different implying we insert a trap + undef propagate
+  // of uses.
+  //
+  //
+  // If the two types are classes, we allow for additionally down/upcast
+  // relationships. Casting in between two unrelated classes means we insert a
+  // runtime trap to match the semantics of the instruction.
+  void
+  visitUncondCheckedArchToArchCast(UnconditionalCheckedCastInst *Inst) {
+    // Grab both the from and to types.
+    SILType OpFromTy = getOpType(Inst->getOperand().getType());
+    SILType OpToTy = getOpType(Inst->getType());
+    SILLocation Loc = getOpLocation(Inst->getLoc());
+
+    // If the from/to type is the same, just propagate the operand along to all
+    // uses.
+    if (OpFromTy == OpToTy) {
+      auto Pair = std::make_pair(SILValue(Inst),
+                                 getOpValue(Inst->getOperand()));
+      ValueMap.insert(Pair);
+      return;
+    }
+
+    // Ok, we know that the types differ. See if we are performing an upcast
+    // or downcast.
+    ClassDecl *FromDecl = OpFromTy.getClassOrBoundGenericClass();
+    ClassDecl *ToDecl = OpToTy.getClassOrBoundGenericClass();
+
+    // If either of the types are not classes, then we are either comparing
+    // non-classes which differ implying a runtime trap *or* a class and a
+    // non-class which yields also a runtime trap.
+    if (!FromDecl || !ToDecl) {
+      Builder.createApply(Loc, Builder.createBuiltinTrap(Loc),
+                          ArrayRef<SILValue>());
+      auto Pair = std::make_pair(SILValue(Inst),
+                                 SILValue(SILUndef::get(OpToTy,
+                                                        Inst->getModule())));
+      ValueMap.insert(Pair);
+      return;
+    }
+
+    // Ok, we know that we have two classes. If From is a super class of To,
+    // insert a checked downcast.
+    if (OpFromTy.isSuperclassOf(OpToTy, nullptr)) {
+      SILValue OtherOp = getOpValue(Inst->getOperand());
+      auto *UCCI = Builder.createUnconditionalCheckedCast(
+          Loc, CheckedCastKind::Downcast, OtherOp, OpToTy);
+      doPostProcess(Inst, UCCI);
+      return;
+    }
+
+    // If ToTy is a super class of FromTy, we are performing an upcast.
+    if (OpToTy.isSuperclassOf(OpFromTy, nullptr)) {
+      doPostProcess(Inst, Builder.createUpcast(
+                      Loc, getOpValue(Inst->getOperand()), OpToTy));
+      return;
+    }
+
+    // Ok, we have an invalid cast. Insert a trap so we trap at runtime as
+    // the spec for the instruction requires and propagate undef to all
+    // uses.
+    Builder.createApply(Loc, Builder.createBuiltinTrap(Loc),
+                        ArrayRef<SILValue>());
+    auto Pair = std::make_pair(SILValue(Inst),
+                               SILValue(SILUndef::get(OpToTy,
+                                                      Inst->getModule())));
+    ValueMap.insert(Pair);
+  }
+
+  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
+    // Change the check kind depending on how our specialization affected.
+    CheckedCastKind Kind = Inst->getCastKind();
+    switch (Kind) {
+    case CheckedCastKind::Unresolved:
+    case CheckedCastKind::Coercion:
+      llvm_unreachable("invalid for SIL");
+
+    // These are not affected by specialization.
+    case CheckedCastKind::Downcast:
+    case CheckedCastKind::ExistentialToConcrete:
+    case CheckedCastKind::ConcreteToUnrelatedExistential:
+      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      return;
+    case CheckedCastKind::SuperToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      return;
+    case CheckedCastKind::ArchetypeToArchetype:
+      visitUncondCheckedArchToArchCast(Inst);
+      return;
+    case CheckedCastKind::ArchetypeToConcrete:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      return;
+    case CheckedCastKind::ExistentialToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      return;
+    case CheckedCastKind::ConcreteToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      return;
+    }
+  }
+
+  // If we are performing an archetype to archetype cast, since we don't do
+  // partial specialization, we know both must types must now be
+  // concrete. Modify the checked cast appropriately.
+  //
+  // If the two types are non-classes, we enforce that after specialization they
+  // must both either be trivially equal (in which case we just propagate the
+  // operand) or trivially different implying we insert a trap + undef propagate
+  // of uses.
+  //
+  //
+  // If the two types are classes, we allow for additionally down/upcast
+  // relationships. Casting in between two unrelated classes means we insert a
+  // runtime trap to match the semantics of the instruction.
+  void visitCheckedCastBrArchToArchCast(CheckedCastBranchInst *Inst) {
+    // Grab both the from and to types.
+    SILType OpFromTy = getOpType(Inst->getOperand().getType());
+    SILType OpToTy = getOpType(Inst->getCastType());
+    SILLocation OpLoc = getOpLocation(Inst->getLoc());
+    SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+    SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+
+    // If the from/to type is the same, create a branch to the success basic
+    // block with the relevant argument.
+    if (OpFromTy == OpToTy) {
+      auto Args = ArrayRef<SILValue>(getOpValue(Inst->getOperand()));
+      auto *Br = Builder.createBranch(OpLoc, OpSuccBB, Args);
+      doPostProcess(Inst, Br);
+      return;
+    }
+
+    // Ok, we know that the types differ. See if we are performing an upcast
+    // or downcast.
+    ClassDecl *FromDecl = OpFromTy.getClassOrBoundGenericClass();
+    ClassDecl *ToDecl = OpToTy.getClassOrBoundGenericClass();
+
+    // If either of the types are not classes, then we are either comparing
+    // non-classes which differ *or* a class and a non-class which implies
+    // branch to the failure BB.
+    if (!FromDecl || !ToDecl) {
+      doPostProcess(Inst, Builder.createBranch(OpLoc, OpFailBB));
+      return;
+    }
+
+    // Ok, we know that we have two classes. If From is a super class of To,
+    // insert a downcast...
+    if (OpFromTy.isSuperclassOf(OpToTy, nullptr)) {
+      SILValue OtherOp = getOpValue(Inst->getOperand());
+
+      // FIXME: When we have a unchecked downcast, replace the unconditional
+      // checked cast here with that.
+      auto *Downcast = Builder.createUnconditionalCheckedCast(
+          OpLoc, CheckedCastKind::Downcast, OtherOp, OpToTy);
+      doPostProcess(Inst, Builder.createBranch(OpLoc, OpSuccBB,
+                                               ArrayRef<SILValue>(Downcast)));
+    }
+
+    // If ToTy is a super class of FromTy, we are performing an upcast.
+    if (OpToTy.isSuperclassOf(OpFromTy, nullptr)) {
+      UpcastInst *Upcast =
+          Builder.createUpcast(OpLoc, getOpValue(Inst->getOperand()), OpToTy);
+      doPostProcess(Inst, Builder.createBranch(OpLoc, OpSuccBB,
+                                               ArrayRef<SILValue>(Upcast)));
+      return;
+    }
+
+    // Ok, we have an invalid cast. Jump to fail BB.
+    doPostProcess(Inst, Builder.createBranch(OpLoc, OpFailBB));
+    return;
+  }
+
+  void visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
+    // Change the check kind depending on how our specialization affected.
+    CheckedCastKind Kind = Inst->getCastKind();
+    switch (Kind) {
+    case CheckedCastKind::Unresolved:
+    case CheckedCastKind::Coercion:
+      llvm_unreachable("invalid for SIL");
+
+    // These are not affected by specialization.
+    case CheckedCastKind::Downcast:
+    case CheckedCastKind::ExistentialToConcrete:
+    case CheckedCastKind::ConcreteToUnrelatedExistential:
+      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      return;
+    case CheckedCastKind::SuperToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      return;
+    case CheckedCastKind::ArchetypeToArchetype:
+      visitCheckedCastBrArchToArchCast(Inst);
+      return;
+    case CheckedCastKind::ArchetypeToConcrete:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      return;
+    case CheckedCastKind::ExistentialToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      return;
+    case CheckedCastKind::ConcreteToArchetype:
+      // Stub implementation.
+      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      return;
+    }
   }
 
   static SILLinkage getSpecializedLinkage(SILLinkage orig) {
