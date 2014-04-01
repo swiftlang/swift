@@ -25,9 +25,10 @@ except KeyError:
 
 # Enable Darwin SDK-dependent tests if we have an SDK.
 # On Linux, assume that SDK path does not point to the Darwin SDK.
-if "@MODULES_SDK@" != "" and platform.system() != 'Linux':
+config.modules_sdk = "@MODULES_SDK@"
+if config.modules_sdk != "" and platform.system() != 'Linux':
   config.available_features.add("sdk")
-  config.substitutions.append(('%sdk', "@MODULES_SDK@"))
+  config.substitutions.append(('%sdk', config.modules_sdk))
 
 if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
   config.available_features.add("long_tests")
