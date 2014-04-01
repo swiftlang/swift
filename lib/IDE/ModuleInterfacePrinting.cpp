@@ -16,7 +16,8 @@ using namespace swift;
 
 void swift::ide::printModuleInterface(Module *M, ASTPrinter &Printer,
                                       const PrintOptions &Options) {
-  printSubmoduleInterface(M, {}, Printer, Options);
+  StringRef FullModuleName[] = { M->Name.str() };
+  printSubmoduleInterface(M, FullModuleName, Printer, Options);
 }
 
 void swift::ide::printSubmoduleInterface(Module *M,
