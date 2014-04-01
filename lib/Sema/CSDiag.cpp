@@ -55,6 +55,10 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     << " vs. " << getSecondType().getString();
     break;
 
+  case IsNotMetatype:
+    out << getFirstType().getString() << " is not a metatype";
+    break;
+
   case IsNotArchetype:
     out << getFirstType().getString() << " is not an archetype";
     break;

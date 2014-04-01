@@ -436,7 +436,7 @@ namespace {
 
       auto baseTy = base->getType()->getRValueType();
       bool isMetatype = false;
-      if (auto metaTy = baseTy->getAs<MetatypeType>()) {
+      if (auto metaTy = baseTy->getAs<AnyMetatypeType>()) {
         isMetatype = true;
         baseTy = metaTy->getInstanceType();
       }
@@ -504,7 +504,7 @@ namespace {
       // Figure out the actual base type, and whether we have an instance of
       // that type or its metatype.
       bool baseIsInstance = true;
-      if (auto baseMeta = baseTy->getAs<MetatypeType>()) {
+      if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
       }
@@ -1437,7 +1437,7 @@ namespace {
 
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
-      if (arg->getType()->is<MetatypeType>()) {
+      if (arg->getType()->is<AnyMetatypeType>()) {
         return buildMemberRef(expr->getSubExpr(),
                               selected.openedFullType,
                               expr->getDotLoc(),
@@ -1910,7 +1910,7 @@ namespace {
           assert(argTuple->getNumElements() == 2
                  && "__inout_conversion choice doesn't take two arguments?!");
           abstractionTy = argTuple->getElementType(1)
-            ->castTo<MetatypeType>()->getInstanceType();
+            ->castTo<AnyMetatypeType>()->getInstanceType();
         } else if (argTuple) {
           assert(argTuple->getElementType(0)->is<ArchetypeType>()
                  && "non-tuple __inout_conversion choice can't match a tuple "
@@ -2069,10 +2069,9 @@ namespace {
         base = tc.coerceToRValue(base);
         if (!base) return nullptr;
         expr->setBase(base);
-        expr->setType(MetatypeType::get(base->getType()));
       }
 
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
@@ -3414,8 +3413,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (fromType->is<MetatypeType>()) {
-    if (auto toMeta = toType->getAs<MetatypeType>()) {
+  if (fromType->is<AnyMetatypeType>()) {
+    if (auto toMeta = toType->getAs<AnyMetatypeType>()) {
       return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
     }
   }
@@ -3638,7 +3637,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We have a type constructor.
-  auto metaTy = fn->getType()->castTo<MetatypeType>();
+  auto metaTy = fn->getType()->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
 
   // If we're "constructing" a tuple type, it's simply a conversion.
@@ -3840,7 +3839,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
 
   // Find the witness we need to use.
   auto type = base->getType();
-  if (auto metaType = type->getAs<MetatypeType>())
+  if (auto metaType = type->getAs<AnyMetatypeType>())
     type = metaType->getInstanceType();
   
   auto witness = findNamedWitness(*this, dc, type->getRValueType(), protocol,

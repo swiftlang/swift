@@ -1363,6 +1363,25 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Printer << ">";
   }
 
+  static bool isSimple(Type type) {
+    switch (type->getKind()) {
+    case TypeKind::Array:
+    case TypeKind::ArraySlice:
+    case TypeKind::Function:
+    case TypeKind::PolymorphicFunction:
+    case TypeKind::GenericFunction:
+    case TypeKind::UncheckedOptional:
+      return false;
+
+    case TypeKind::Metatype:
+    case TypeKind::ExistentialMetatype:
+      return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
+
+    default:
+      return true;
+    }
+  }
+
   /// Helper function for printing a type that is embedded within a larger type.
   ///
   /// This is necessary whenever the inner type may not normally be represented
@@ -1373,19 +1392,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    switch (T->getKind()) {
-    case TypeKind::Array:
-    case TypeKind::ArraySlice:
-    case TypeKind::Function:
-    case TypeKind::PolymorphicFunction:
-    case TypeKind::GenericFunction:
-    case TypeKind::UncheckedOptional:
+    if (!isSimple(T)) {
       Printer << "(";
       visit(T);
       Printer << ")";
-      break;
-
-    default:
+    } else {
       visit(T);
     }
   }
@@ -1616,16 +1627,22 @@ public:
     printTypeDeclName(T);
   }
 
-  void visitMetatypeType(MetatypeType *T) {
+  void visitAnyMetatypeType(AnyMetatypeType *T) {
     if (T->hasRepresentation()) {
       switch (T->getRepresentation()) {
       case MetatypeRepresentation::Thin:  Printer << "@thin ";  break;
       case MetatypeRepresentation::Thick: Printer << "@thick "; break;
-      case MetatypeRepresentation::ObjC: Printer << "@objc_metatype "; break;
+      case MetatypeRepresentation::ObjC:  Printer << "@objc_metatype "; break;
       }
     }
     printWithParensIfNotSimple(T->getInstanceType());
-    Printer << ".Type";
+
+    // We spell normal metatypes of existential types as .Protocol.
+    if (isa<MetatypeType>(T) && T->getInstanceType()->isExistentialType()) {
+      Printer << ".Protocol";
+    } else {
+      Printer << ".Type";
+    }
   }
 
   void visitModuleType(ModuleType *T) {

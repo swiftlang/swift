@@ -31,8 +31,9 @@ using namespace Lowering;
 
 namespace {
   /// A CRTP type visitor for deciding whether the metatype for a type
-  /// has trivial representation.
-  struct HasTrivialMetatype : CanTypeVisitor<HasTrivialMetatype, bool> {
+  /// is a singleton type, i.e. whether there can only ever be one
+  /// such value.
+  struct HasSingletonMetatype : CanTypeVisitor<HasSingletonMetatype, bool> {
     /// Class metatypes have non-trivial representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
@@ -65,17 +66,18 @@ namespace {
       return visit(type.getInstanceType());
     }
 
-    /// Existential metatypes have non-trivial representation because
-    /// they can refer to an arbitrary metatype. Everything else is trivial.
+    /// Everything else is trivial.  Note that ordinary metatypes of
+    /// existential types are still singleton.
     bool visitType(CanType type) {
-      return !type->isExistentialType();
+      return true;
     }
   };
 }
 
-/// Does the metatype for the given type have a trivial representation?
-static bool hasTrivialMetatype(CanType instanceType) {
-  return HasTrivialMetatype().visit(instanceType);
+/// Does the metatype for the given type have a known-singleton
+/// representation?
+static bool hasSingletonMetatype(CanType instanceType) {
+  return HasSingletonMetatype().visit(instanceType);
 }
 
 static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
@@ -254,7 +256,7 @@ namespace {
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
-    IMPL(Metatype, Trivial)
+    IMPL(AnyMetatype, Trivial)
     IMPL(AnyFunction, Reference)
     IMPL(SILFunction, Reference)
     IMPL(Array, AddressOnly) // who knows?
@@ -1103,7 +1105,7 @@ static bool isLoweredType(CanType type) {
         return false;
     return true;
   }
-  if (auto meta = dyn_cast<MetatypeType>(type)) {
+  if (auto meta = dyn_cast<AnyMetatypeType>(type)) {
     return meta->hasRepresentation();
   }
   return true;
@@ -1202,8 +1204,8 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       } else {
         // Otherwise, we're thin if the metatype is thinnable both
         // substituted and in the abstraction pattern.
-        if (hasTrivialMetatype(substMeta.getInstanceType())
-            && hasTrivialMetatype(origMeta.getInstanceType()))
+        if (hasSingletonMetatype(substMeta.getInstanceType())
+            && hasSingletonMetatype(origMeta.getInstanceType()))
           repr = MetatypeRepresentation::Thin;
         else
           repr = MetatypeRepresentation::Thick;
@@ -1222,6 +1224,24 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     }
     
     auto *theInfo
+      = new (*this, key.isDependent()) TrivialTypeLowering(loweredTy);
+    insert(key, theInfo);
+    return *theInfo;
+  }
+
+  // Give existential metatypes @thick representation by default.
+  if (auto existMetatype = dyn_cast<ExistentialMetatypeType>(substType)) {
+    CanType loweredType;
+    if (existMetatype->hasRepresentation()) {
+      loweredType = existMetatype;
+    } else {
+      loweredType =
+        CanExistentialMetatypeType::get(existMetatype.getInstanceType(),
+                                        MetatypeRepresentation::Thick);
+    }
+
+    auto loweredTy = SILType::getPrimitiveObjectType(loweredType);
+    auto theInfo
       = new (*this, key.isDependent()) TrivialTypeLowering(loweredTy);
     insert(key, theInfo);
     return *theInfo;
@@ -2021,11 +2041,18 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
 #include "swift/SIL/BridgedTypes.def"
 
   // Class metatypes bridge to ObjC metatypes.
-  // FIXME: @objc protocol metatypes.
   if (auto metaTy = t->getAs<MetatypeType>()) {
     if (metaTy->getInstanceType()->getClassOrBoundGenericClass()) {
       return MetatypeType::get(metaTy->getInstanceType(),
                                MetatypeRepresentation::ObjC);
+    }
+  }
+
+  // ObjC-compatible existential metatypes.
+  if (auto metaTy = t->getAs<ExistentialMetatypeType>()) {
+    if (metaTy->getInstanceType()->isObjCExistentialType()) {
+      return ExistentialMetatypeType::get(metaTy->getInstanceType(),
+                                          MetatypeRepresentation::ObjC);
     }
   }
   

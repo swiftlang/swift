@@ -47,6 +47,25 @@ static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
                               extInfo);
 }
 
+/// Replace the 'self' parameter in the given type.
+static CanSILFunctionType
+replaceSelfTypeForDynamicLookup(ASTContext &ctx,
+                                CanSILFunctionType fnType,
+                                SILType newSelfType) {
+  auto oldParams = fnType->getInterfaceParameters();
+  SmallVector<SILParameterInfo, 4> newParams;
+  newParams.append(oldParams.begin(), oldParams.end() - 1);
+  newParams.push_back({newSelfType.getSwiftRValueType(),
+                       oldParams.back().getConvention()});
+
+  return SILFunctionType::get(nullptr,
+                              fnType->getExtInfo(),
+                              fnType->getCalleeConvention(),
+                              newParams,
+                              fnType->getInterfaceResult(),
+                              ctx);
+}
+
 namespace {
 
 /// Abstractly represents a callee, and knows how to emit the entry point
@@ -569,10 +588,9 @@ public:
       constantInfo = gen.getConstantInfo(constant);
 
       auto closureType =
-        gen.SGM.Types.getConstantFunctionType(method.methodName,
-                                 cast<AnyFunctionType>(OrigFormalOldType),
-                                 cast<AnyFunctionType>(OrigFormalInterfaceType),
-                                 /*thin*/ true);
+        replaceSelfTypeForDynamicLookup(gen.getASTContext(),
+                                        constantInfo.SILFnType,
+                                        method.selfValue.getType());
 
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           method.selfValue,
@@ -783,16 +801,21 @@ public:
   ///
   /// \returns the self object.
   ManagedValue allocateObjCObject(ManagedValue selfMeta, SILLocation loc) {
-    auto metaType = cast<MetatypeType>(selfMeta.getType().getSwiftRValueType());
+    auto metaType = selfMeta.getType().castTo<AnyMetatypeType>();
     CanType type = metaType.getInstanceType();
 
     // Convert to an Objective-C metatype representation, if needed.
-    CanType objcMetaType
-      = CanMetatypeType::get(type, MetatypeRepresentation::ObjC);
     ManagedValue selfMetaObjC;
     if (metaType->getRepresentation() == MetatypeRepresentation::ObjC) {
       selfMetaObjC = selfMeta;
     } else {
+      CanAnyMetatypeType objcMetaType;
+      if (isa<MetatypeType>(metaType)) {
+        objcMetaType = CanMetatypeType::get(type, MetatypeRepresentation::ObjC);
+      } else {
+        objcMetaType = CanExistentialMetatypeType::get(type,
+                                                  MetatypeRepresentation::ObjC);
+      }
       selfMetaObjC = ManagedValue(
                        gen.B.emitThickToObjCMetatype(
                          loc, selfMeta.getValue(),
@@ -838,7 +861,7 @@ public:
       else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
         ApplyExpr *thisCallSite = callSites.back();
         if (ctor->isRequired() &&
-            thisCallSite->getArg()->getType()->is<MetatypeType>() &&
+            thisCallSite->getArg()->getType()->is<AnyMetatypeType>() &&
             !thisCallSite->getArg()->isStaticallyDerivedMetatype()) {
           isDynamicallyDispatched = true;
 
@@ -1027,7 +1050,7 @@ public:
 
       setSelfParam(RValue(gen, e, protoSelfTy.getSwiftType(), proj), e);
     } else {
-      assert(baseVal.getType().is<MetatypeType>() &&
+      assert(baseVal.getType().is<ExistentialMetatypeType>() &&
              "non-existential-metatype for existential static method?!");
       // FIXME: It is impossible to invoke a class method on a protocol
       // directly, it must be done through an archetype.
@@ -1286,7 +1309,7 @@ public:
                           proj.getType().getSwiftRValueType(), proj),
                    dynamicMemberRef);
     } else {
-      assert(existential.getType().is<MetatypeType>() &&
+      assert(existential.getType().is<ExistentialMetatypeType>() &&
              "non-dynamic-lookup-metatype for static method?!");
       val = existential.getValue();
       ManagedValue proj(val, existential.getCleanup());
@@ -1331,8 +1354,8 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
   if (isa<TupleType>(type2)) return false;
 
   // Either both types should be metatypes or neither should be.
-  if (auto meta1 = dyn_cast<MetatypeType>(type1)) {
-    auto meta2 = dyn_cast<MetatypeType>(type2);
+  if (auto meta1 = dyn_cast<AnyMetatypeType>(type1)) {
+    auto meta2 = dyn_cast<AnyMetatypeType>(type2);
     if (!meta2) return false;
     if (meta1.getInstanceType() != meta2.getInstanceType()) return false;
     return true;
@@ -2806,10 +2829,10 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     operand = B.createRefToObjectPointer(e, operand,
                                  SILType::getObjCPointerType(getASTContext()));
   } else {
-    auto metatype = operand.getType().castTo<MetatypeType>();
+    auto metatype = operand.getType().castTo<ExistentialMetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
-    metatype = CanMetatypeType::get(metatype.getInstanceType(),
-                                    MetatypeRepresentation::ObjC);
+    metatype = CanExistentialMetatypeType::get(metatype.getInstanceType(),
+                                               MetatypeRepresentation::ObjC);
     operand = B.createThickToObjCMetatype(e, operand,
                                     SILType::getPrimitiveObjectType(metatype));
   }

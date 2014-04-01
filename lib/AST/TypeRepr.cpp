@@ -164,6 +164,10 @@ TypeRepr *CloneVisitor::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
   return new (Ctx) MetatypeTypeRepr(visit(T->getBase()), T->getMetaLoc());
 }
 
+TypeRepr *CloneVisitor::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
+  return new (Ctx) ProtocolTypeRepr(visit(T->getBase()), T->getProtocolLoc());
+}
+
 TypeRepr *CloneVisitor::visitInOutTypeRepr(InOutTypeRepr *T) {
   return new (Ctx) InOutTypeRepr(visit(T->getBase()), T->getInOutLoc());
 }
@@ -339,6 +343,12 @@ void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Base->print(Printer, Opts);
   Printer << ".Type";
+}
+
+void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
+                                 const PrintOptions &Opts) const {
+  Base->print(Printer, Opts);
+  Printer << ".Protocol";
 }
 
 

@@ -1571,7 +1571,7 @@ static llvm::Value *getObjCClassForValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::Explosion: {
     Explosion e = lv.getExplosion(IGF);
     llvm::Value *meta = e.claimNext();
-    auto metaType = v.getType().castTo<MetatypeType>();
+    auto metaType = v.getType().castTo<AnyMetatypeType>();
     switch (metaType->getRepresentation()) {
     case swift::MetatypeRepresentation::ObjC:
       return meta;
@@ -1659,7 +1659,7 @@ void IRGenSILFunction::visitApplyInst(swift::ApplyInst *i) {
 
     llvm::Value *selfArg;
     // Convert a metatype 'self' argument to the ObjC Class pointer.
-    if (selfValue.getType().is<MetatypeType>()) {
+    if (selfValue.getType().is<AnyMetatypeType>()) {
       selfArg = getObjCClassForValue(*this, selfValue);
     } else {
       Explosion selfExplosion = getLoweredExplosion(selfValue);
@@ -2525,7 +2525,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
 void IRGenSILFunction::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i){
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *swiftMeta = from.claimNext();
-  CanType instanceType(i->getType().castTo<MetatypeType>()->getInstanceType());
+  CanType instanceType(i->getType().castTo<AnyMetatypeType>().getInstanceType());
   Explosion to(ResilienceExpansion::Maximal);
   llvm::Value *classPtr =
     emitClassHeapMetadataRefForMetatype(*this, swiftMeta, instanceType);

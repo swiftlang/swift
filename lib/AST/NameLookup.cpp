@@ -423,7 +423,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       SmallVector<ValueDecl *, 4> Lookup;
       DC->lookupQualified(ExtendedType, Name, NL_UnqualifiedDefault,
                           TypeResolver, Lookup);
-      bool isMetatypeType = ExtendedType->is<MetatypeType>();
+      bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
       bool FoundAny = false;
       for (auto Result : Lookup) {
         // If we're looking into an instance, skip static functions.
@@ -481,7 +481,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
       // Check the generic parameters for something with the given name.
       auto nominal = isMetatypeType
-                       ? ExtendedType->castTo<MetatypeType>()
+                       ? ExtendedType->castTo<AnyMetatypeType>()
                            ->getInstanceType()->getAnyNominal()
                        : ExtendedType->getAnyNominal();
       if (nominal && nominal->getGenericParams()) {
@@ -838,7 +838,7 @@ bool DeclContext::lookupQualified(Type type,
   type = type->getLValueOrInOutObjectType();
 
   // Look through metatypes.
-  if (auto metaTy = type->getAs<MetatypeType>())
+  if (auto metaTy = type->getAs<AnyMetatypeType>())
     type = metaTy->getInstanceType();
 
   // Look through DynamicSelf.

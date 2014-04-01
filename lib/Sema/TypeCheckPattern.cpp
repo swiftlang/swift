@@ -701,7 +701,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     else if (auto protoTy = type->getAs<ProtocolType>()) {
       shouldRequireType =
         protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-    } else if (auto MTT = type->getAs<MetatypeType>()) {
+    } else if (auto MTT = type->getAs<AnyMetatypeType>()) {
       if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
         shouldRequireType =
           protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);

@@ -854,6 +854,15 @@ namespace {
                                         TypeResolutionOptions options);
     Type resolveMetatypeType(MetatypeTypeRepr *repr,
                              TypeResolutionOptions options);
+    Type resolveProtocolType(ProtocolTypeRepr *repr,
+                             TypeResolutionOptions options);
+
+    Type buildMetatypeType(MetatypeTypeRepr *repr,
+                           Type instanceType,
+                           Optional<MetatypeRepresentation> storedRepr);
+    Type buildProtocolType(ProtocolTypeRepr *repr,
+                           Type instanceType,
+                           Optional<MetatypeRepresentation> storedRepr);
   };
 }
 
@@ -912,6 +921,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
+
+  case TypeReprKind::Protocol:
+    return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -938,9 +950,18 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.has(TAK_objc_metatype)) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
+        TypeRepr *base;
         if (auto metatypeRepr = dyn_cast<MetatypeTypeRepr>(repr)) {
+          base = metatypeRepr->getBase();
+        } else if (auto protocolRepr = dyn_cast<ProtocolTypeRepr>(repr)) {
+          base = protocolRepr->getBase();
+        } else {
+          base = nullptr;
+        }
+
+        if (base) {
           Optional<MetatypeRepresentation> storedRepr;
-          auto instanceTy = resolveType(metatypeRepr->getBase(), options);
+          auto instanceTy = resolveType(base, options);
 
           // Check for @thin.
           if (attrs.has(TAK_thin)) {
@@ -968,7 +989,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
             attrs.clearAttribute(TAK_objc_metatype);
           }
 
-          ty = MetatypeType::get(instanceTy, *storedRepr);
+          if (instanceTy->is<ErrorType>()) {
+            ty = instanceTy;
+          } else if (auto metatype = dyn_cast<MetatypeTypeRepr>(repr)) {
+            ty = buildMetatypeType(metatype, instanceTy, storedRepr);
+          } else {
+            ty = buildProtocolType(cast<ProtocolTypeRepr>(repr),
+                                   instanceTy, storedRepr);
+          }
         }
       }
     }
@@ -1421,17 +1449,62 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   Type ty = resolveType(repr->getBase(), withoutContext(options));
   if (ty->is<ErrorType>())
     return ty;
+
+  Optional<MetatypeRepresentation> storedRepr;
   
   // In SIL mode, a metatype must have a @thin, @thick, or
   // @objc_metatype attribute, so metatypes should have been lowered
   // in resolveAttributedType.
   if (options & TR_SILType) {
     TC.diagnose(repr->getStartLoc(), diag::sil_metatype_without_repr);
-    return MetatypeType::get(ty, MetatypeRepresentation::Thick);
+    storedRepr = MetatypeRepresentation::Thick;
   }
-  
-  return MetatypeType::get(ty);
+
+  return buildMetatypeType(repr, ty, storedRepr);
 }
+
+Type TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr,
+                                     Type instanceType,
+                                     Optional<MetatypeRepresentation> storedRepr) {
+  if (instanceType->isExistentialType()) {
+    // TODO: diagnose invalid representations?
+    return ExistentialMetatypeType::get(instanceType, storedRepr);
+  } else {
+    return MetatypeType::get(instanceType, storedRepr);
+  }
+}
+
+Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
+                                       TypeResolutionOptions options) {
+  // The instance type of a metatype is always abstract, not SIL-lowered.
+  Type ty = resolveType(repr->getBase(), withoutContext(options));
+  if (ty->is<ErrorType>())
+    return ty;
+
+  Optional<MetatypeRepresentation> storedRepr;
+  
+  // In SIL mode, a metatype must have a @thin, @thick, or
+  // @objc_metatype attribute, so metatypes should have been lowered
+  // in resolveAttributedType.
+  if (options & TR_SILType) {
+    TC.diagnose(repr->getStartLoc(), diag::sil_metatype_without_repr);
+    storedRepr = MetatypeRepresentation::Thick;
+  }
+
+  return buildProtocolType(repr, ty, storedRepr);
+}
+
+Type TypeResolver::buildProtocolType(ProtocolTypeRepr *repr,
+                                     Type instanceType,
+                                     Optional<MetatypeRepresentation> storedRepr) {
+  if (!instanceType->isExistentialType()) {
+    TC.diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential);
+    return ErrorType::get(TC.Context);
+  }
+
+  return MetatypeType::get(instanceType, storedRepr);
+}
+
 
 Type TypeChecker::substType(Module *module, Type type,
                             TypeSubstitutionMap &Substitutions,
@@ -1790,7 +1863,7 @@ static bool isObjCPointerType(Type T) {
   // FIXME: Return true for closures, and for anything bridged to a class type.
 
   // Look through a single level of metatype.
-  if (auto MTT = T->getAs<MetatypeType>())
+  if (auto MTT = T->getAs<AnyMetatypeType>())
     T = MTT->getInstanceType();
 
   if (isClassOrObjCProtocol(T))

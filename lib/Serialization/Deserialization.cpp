@@ -2484,6 +2484,38 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
+  case decls_block::EXISTENTIAL_METATYPE_TYPE: {
+    TypeID instanceID;
+    uint8_t repr;
+    decls_block::ExistentialMetatypeTypeLayout::readRecord(scratch,
+                                                           instanceID, repr);
+
+    switch (repr) {
+    case serialization::MetatypeRepresentation::MR_None:
+      typeOrOffset = ExistentialMetatypeType::get(getType(instanceID));
+      break;
+
+    case serialization::MetatypeRepresentation::MR_Thin:
+      error();
+      break;
+
+    case serialization::MetatypeRepresentation::MR_Thick:
+      typeOrOffset = ExistentialMetatypeType::get(getType(instanceID),
+                                       MetatypeRepresentation::Thick);
+      break;
+
+    case serialization::MetatypeRepresentation::MR_ObjC:
+      typeOrOffset = ExistentialMetatypeType::get(getType(instanceID),
+                                       MetatypeRepresentation::ObjC);
+      break;
+
+    default:
+      error();
+      break;
+    }
+    break;
+  }
+
   case decls_block::METATYPE_TYPE: {
     TypeID instanceID;
     uint8_t repr;

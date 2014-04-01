@@ -441,19 +441,27 @@ private:
     printProtocols(protos);
   }
 
-  void visitMetatypeType(MetatypeType *MT) {
+  void visitExistentialMetatypeType(ExistentialMetatypeType *MT) {
     Type instanceTy = MT->getInstanceType();
     if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
       visitProtocolType(protoTy, /*isMetatype=*/true);
     } else if (auto compTy = instanceTy->getAs<ProtocolCompositionType>()) {
       visitProtocolCompositionType(compTy, /*isMetatype=*/true);
     } else {
-      auto classTy = instanceTy->castTo<ClassType>();
-      const ClassDecl *CD = classTy->getClassOrBoundGenericClass();
+      visitType(MT);
+    }
+  }
+
+  void visitMetatypeType(MetatypeType *MT) {
+    Type instanceTy = MT->getInstanceType();
+    if (auto classTy = instanceTy->getAs<ClassType>()) {
+      const ClassDecl *CD = classTy->getDecl();
       if (CD->isObjC())
         os << "SWIFT_METATYPE(" << CD->getName() << ")";
       else
         os << "Class";
+    } else {
+      visitType(MT);
     }
   }
 

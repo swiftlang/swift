@@ -720,13 +720,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // Nothing to do here; try existential and user-defined conversions below.
       break;
 
-    case TypeKind::Metatype: {
-      auto meta1 = cast<MetatypeType>(desugar1);
-      auto meta2 = cast<MetatypeType>(desugar2);
+    case TypeKind::Metatype:
+    case TypeKind::ExistentialMetatype: {
+      auto meta1 = cast<AnyMetatypeType>(desugar1);
+      auto meta2 = cast<AnyMetatypeType>(desugar2);
 
       // metatype<B> < metatype<A> if A < B and both A and B are classes.
       TypeMatchKind subKind = TypeMatchKind::SameType;
-      if (kind != TypeMatchKind::SameType &&
+      if (isa<MetatypeType>(desugar1) &&
+          kind != TypeMatchKind::SameType &&
           (meta1->getInstanceType()->mayHaveSuperclass() ||
            meta2->getInstanceType()->getClassOrBoundGenericClass()))
         subKind = std::min(kind, TypeMatchKind::Subtype);
@@ -1071,6 +1073,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
 #define BUILTIN_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype:
   case TypeKind::Function:
   case TypeKind::Array:
@@ -1335,7 +1338,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Dig out the instance type.
   bool isMetatype = false;
   Type instanceTy = baseObjTy;
-  if (auto baseObjMeta = baseObjTy->getAs<MetatypeType>()) {
+  if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
     isMetatype = true;
   }
@@ -1670,6 +1673,57 @@ ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
+  // Solve forward.
+  TypeVariableType *typeVar2;
+  Type type2 = getFixedTypeRecursive(constraint.getSecondType(), typeVar2,
+                                     /*wantRValue=*/ true);
+  if (!typeVar2) {
+    Type dynamicType2;
+    if (type2->isExistentialType()) {
+      dynamicType2 = ExistentialMetatypeType::get(type2);
+    } else {
+      dynamicType2 = MetatypeType::get(type2);
+    }
+    return matchTypes(constraint.getFirstType(), dynamicType2,
+                      TypeMatchKind::BindType, TMF_GenerateConstraints,
+                      constraint.getLocator());
+  }
+
+  // Okay, can't solve forward.  See what we can do backwards.
+  TypeVariableType *typeVar1;
+  Type type1 = getFixedTypeRecursive(constraint.getFirstType(), typeVar1, true);
+
+  // If we have an existential metatype, that's good enough to solve
+  // the constraint.
+  if (auto metatype1 = type1->getAs<ExistentialMetatypeType>()) {
+    return matchTypes(metatype1->getInstanceType(), type2,
+                      TypeMatchKind::BindType,
+                      TMF_GenerateConstraints, constraint.getLocator());
+
+  // If we have a normal metatype, we can't solve backwards unless we
+  // know what kind of object it is.
+  } else if (auto metatype1 = type1->getAs<MetatypeType>()) {
+    TypeVariableType *instanceTypeVar1;
+    Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
+                                               instanceTypeVar1, true);
+    if (!instanceTypeVar1) {
+      return matchTypes(instanceType1, type2,
+                        TypeMatchKind::BindType,
+                        TMF_GenerateConstraints, constraint.getLocator());
+    }
+
+  // If it's definitely not either kind of metatype, then we can
+  // report failure right away.
+  } else if (!typeVar1) {
+    recordFailure(constraint.getLocator(), Failure::IsNotMetatype, type1);
+    return SolutionKind::Error;
+  }
+
+  return SolutionKind::Unsolved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
 
   // By construction, the left hand side is a type that looks like the
@@ -1747,8 +1801,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   }
 
   // For a metatype, perform a construction.
-  if (desugar2->getKind() == TypeKind::Metatype) {
-    auto meta2 = cast<MetatypeType>(desugar2);
+  if (auto meta2 = dyn_cast<AnyMetatypeType>(desugar2)) {
     auto instanceTy2 = meta2->getInstanceType();
 
     // Bind the result type to the instance type.
@@ -1789,6 +1842,9 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::ApplicableFunction:
     llvm_unreachable("ApplicableFunction constraints don't involve "
                      "type matches");
+
+  case ConstraintKind::DynamicTypeOf:
+    llvm_unreachable("DynamicTypeOf constraints don't involve type matches");
 
   case ConstraintKind::BindOverload:
     llvm_unreachable("Overload binding constraints don't involve type matches");
@@ -1970,6 +2026,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(constraint);
+
+  case ConstraintKind::DynamicTypeOf:
+    return simplifyDynamicTypeOfConstraint(constraint);
 
   case ConstraintKind::BindOverload:
     resolveOverload(constraint.getLocator(), constraint.getFirstType(),

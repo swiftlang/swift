@@ -88,14 +88,23 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
 
   // '.Type' and '?' still leave us with type-simple.
   while (ty.isNonNull()) {
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().is(tok::kw_Type)) {
-      consumeToken();
-      SourceLoc metatypeLoc = consumeToken(tok::kw_Type);
-      ty = makeParserResult(ty,
+    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
+      if (peekToken().is(tok::kw_Type)) {
+        consumeToken();
+        SourceLoc metatypeLoc = consumeToken(tok::kw_Type);
+        ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
-      continue;
+        continue;
+      }
+      if (peekToken().isContextualKeyword("Protocol")) {
+        consumeToken();
+        SourceLoc protocolLoc = consumeToken(tok::identifier);
+        ty = makeParserResult(ty,
+          new (Context) ProtocolTypeRepr(ty.get(), protocolLoc));
+        continue;
+      }
     }
+
     if (!Tok.isAtStartOfLine() && Tok.is(tok::question_postfix)) {
       ty = parseTypeOptional(ty.get());
       continue;

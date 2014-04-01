@@ -57,6 +57,9 @@ enum class MetadataKind : uintptr_t {
   /// An ObjC class wrapper.
   ObjCClassWrapper = 14,
 
+  /// An existential metatype.
+  ExistentialMetatype = 15,
+
   // Array types?
   // L-value types?
 

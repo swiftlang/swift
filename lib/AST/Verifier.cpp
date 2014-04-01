@@ -781,7 +781,7 @@ struct ASTNodeBase {};
         if (isa<SelfApplyExpr>(E)) {
           Type InputExprObjectTy;
           if (InputExprTy->hasReferenceSemantics() ||
-              InputExprTy->is<MetatypeType>())
+              InputExprTy->is<AnyMetatypeType>())
             InputExprObjectTy = InputExprTy;
           else
             InputExprObjectTy = checkLValue(InputExprTy, "object argument");
@@ -843,7 +843,7 @@ struct ASTNodeBase {};
       auto baseTy = E->getBase()->getType();
 
       // The base might be a metatype of AnyObject.
-      if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
+      if (auto baseMetaTy = baseTy->getAs<AnyMetatypeType>()) {
         baseTy = baseMetaTy->getInstanceType();
       }
 
@@ -970,7 +970,7 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MetatypeExpr *E) {
-      auto metatype = E->getType()->getAs<MetatypeType>();
+      auto metatype = E->getType()->getAs<AnyMetatypeType>();
       if (!metatype) {
         Out << "MetatypeExpr must have metatype type\n";
         abort();
@@ -1683,7 +1683,7 @@ struct ASTNodeBase {};
 
     // Verification utilities.
     Type checkMetatypeType(Type type, const char *what) {
-      auto metatype = type->getAs<MetatypeType>();
+      auto metatype = type->getAs<AnyMetatypeType>();
       if (metatype) return metatype->getInstanceType();
 
       Out << what << " is not a metatype: ";
@@ -1714,8 +1714,8 @@ struct ASTNodeBase {};
     void checkTrivialSubtype(Type srcTy, Type destTy, const char *what) {
       if (srcTy->isEqual(destTy)) return;
 
-      if (auto srcMetatype = srcTy->getAs<MetatypeType>()) {
-        if (auto destMetatype = destTy->getAs<MetatypeType>()) {
+      if (auto srcMetatype = srcTy->getAs<AnyMetatypeType>()) {
+        if (auto destMetatype = destTy->getAs<AnyMetatypeType>()) {
           return checkTrivialSubtype(srcMetatype->getInstanceType(),
                                      destMetatype->getInstanceType(),
                                      what);

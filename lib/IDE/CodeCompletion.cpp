@@ -1098,7 +1098,7 @@ public:
     bool IsImplicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
-      IsImplicitlyCurriedInstanceMethod = ExprType->is<MetatypeType>() &&
+      IsImplicitlyCurriedInstanceMethod = ExprType->is<AnyMetatypeType>() &&
                                           !FD->isStatic();
       break;
     case LookupKind::ValueInDeclContext:
@@ -1379,7 +1379,7 @@ public:
       }
 
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (ExprType->is<MetatypeType>()) {
+        if (ExprType->is<AnyMetatypeType>()) {
           if (HaveDot)
             return;
           addConstructorCall(CD, Reason);
@@ -1401,7 +1401,7 @@ public:
         return;
 
       if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-        if (ExprType->is<MetatypeType>())
+        if (ExprType->is<AnyMetatypeType>())
           return;
         addSubscriptCall(SD, Reason);
         return;

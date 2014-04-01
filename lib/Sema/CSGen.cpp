@@ -429,7 +429,7 @@ namespace {
         return Type();
       }
       
-      if (MetatypeType *meta = baseTy->getAs<MetatypeType>()) {
+      if (AnyMetatypeType *meta = baseTy->getAs<AnyMetatypeType>()) {
         if (BoundGenericType *bgt
               = meta->getInstanceType()->getAs<BoundGenericType>()) {
           ArrayRef<Type> typeVars = bgt->getGenericArgs();
@@ -881,18 +881,19 @@ namespace {
       if (auto base = expr->getBase()) {
         auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                         /*options=*/0);
-        CS.addConstraint(ConstraintKind::Equal, tv, base->getType(),
+        CS.addConstraint(ConstraintKind::DynamicTypeOf, tv, base->getType(),
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-
-        return MetatypeType::get(tv);
+        return tv;
       }
 
       if (auto baseTyR = expr->getBaseTypeRepr()) {
         auto type = CS.TC.resolveType(baseTyR, CS.DC, None);
-        if (type)
+        if (!type) return Type();
+        if (type->isExistentialType()) {
+          return ExistentialMetatypeType::get(type);
+        } else {
           return MetatypeType::get(type);
-
-        return Type();
+        }
       }
 
       // This is an artificial MetatypeExpr, so it's fully type-checked.
@@ -945,7 +946,7 @@ namespace {
 
       Type superclassTy = typeContext->getDeclaredTypeInContext()
                             ->getSuperclass(&tc);
-      if (selfDecl->getType()->is<MetatypeType>())
+      if (selfDecl->getType()->is<AnyMetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
     }

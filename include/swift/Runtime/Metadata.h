@@ -1016,7 +1016,7 @@ struct FunctionTypeMetadata : public Metadata {
   const Metadata *ResultType;
 };
 
-/// The structure of metadata for metatypes.
+/// The structure of metadata for metatypes and existential metatypes.
 struct MetatypeMetadata : public Metadata {
   /// The type metadata for the element.
   const Metadata *InstanceType;
@@ -1383,6 +1383,10 @@ extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
+
+/// \brief Fetch a uniqued metadata for an existential metatype type.
+extern "C" const MetatypeMetadata *
+swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.

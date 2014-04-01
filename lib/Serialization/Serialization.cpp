@@ -486,6 +486,22 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   }
 }
 
+static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
+  if (!metatype->hasRepresentation()) {
+    return serialization::MetatypeRepresentation::MR_None;
+  }
+
+  switch (metatype->getRepresentation()) {
+  case swift::MetatypeRepresentation::Thin:
+    return serialization::MetatypeRepresentation::MR_Thin;
+  case swift::MetatypeRepresentation::Thick:
+    return serialization::MetatypeRepresentation::MR_Thick;
+  case swift::MetatypeRepresentation::ObjC:
+    return serialization::MetatypeRepresentation::MR_ObjC;
+  }
+  llvm_unreachable("bad representation");
+}
+
 void Serializer::writePattern(const Pattern *pattern) {
   using namespace decls_block;
 
@@ -1833,29 +1849,26 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::ExistentialMetatype: {
+    auto metatypeTy = cast<ExistentialMetatypeType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ExistentialMetatypeTypeLayout::Code];
+
+    // Map the metatype representation.
+    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
+    ExistentialMetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                     addTypeRef(metatypeTy->getInstanceType()),
+                                              static_cast<uint8_t>(repr));
+    break;
+  }
+
   case TypeKind::Metatype: {
     auto metatypeTy = cast<MetatypeType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[MetatypeTypeLayout::Code];
 
     // Map the metatype representation.
-    auto repr = serialization::MetatypeRepresentation::MR_None;
-    if (metatypeTy->hasRepresentation()) {
-      switch (metatypeTy->getRepresentation()) {
-      case swift::MetatypeRepresentation::Thin:
-        repr = serialization::MetatypeRepresentation::MR_Thin;
-        break;
-
-      case swift::MetatypeRepresentation::Thick:
-        repr = serialization::MetatypeRepresentation::MR_Thick;
-        break;
-
-      case swift::MetatypeRepresentation::ObjC:
-        repr = serialization::MetatypeRepresentation::MR_ObjC;
-        break;
-      }
-    }
-
+    auto repr = getRawStableMetatypeRepresentation(metatypeTy);
     MetatypeTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(metatypeTy->getInstanceType()),
                                    static_cast<uint8_t>(repr));
@@ -2208,6 +2221,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<TupleTypeEltLayout>();
     registerDeclTypeAbbr<FunctionTypeLayout>();
     registerDeclTypeAbbr<MetatypeTypeLayout>();
+    registerDeclTypeAbbr<ExistentialMetatypeTypeLayout>();
     registerDeclTypeAbbr<LValueTypeLayout>();
     registerDeclTypeAbbr<InOutTypeLayout>();
     registerDeclTypeAbbr<ArchetypeTypeLayout>();

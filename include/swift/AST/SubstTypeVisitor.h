@@ -64,6 +64,7 @@ public:
     case TypeKind::Module:
     case TypeKind::DynamicSelf:
     case TypeKind::Enum: // FIXME: not a leaf because of the parent type
+    case TypeKind::ExistentialMetatype:
     case TypeKind::Protocol:
     case TypeKind::ProtocolComposition:
     case TypeKind::Struct: // FIXME: not a leaf because of the parent type

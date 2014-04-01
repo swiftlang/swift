@@ -211,7 +211,7 @@ protected:
     unsigned NumParameters : 32 - 11 - NumTypeBaseBits;
   };
 
-  struct MetatypeTypeBitfields {
+  struct AnyMetatypeTypeBitfields {
     unsigned : NumTypeBaseBits;
     /// The representation of the metatype.
     ///
@@ -219,15 +219,15 @@ protected:
     /// the value is the representation + 1
     unsigned Representation : 2;
   };
-  enum { NumMetatypeTypeBits = NumTypeBaseBits + 2 };
-  static_assert(NumMetatypeTypeBits <= 32, "fits in an unsigned");
+  enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
+  static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
   
   union {
     TypeBaseBitfields TypeBaseBits;
     AnyFunctionTypeBitfields AnyFunctionTypeBits;
     TypeVariableTypeBitfields TypeVariableTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
-    MetatypeTypeBitfields MetatypeTypeBits;
+    AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
   };
 
 protected:
@@ -346,6 +346,11 @@ public:
   /// some set of protocols. Protocol and protocol-conformance types are
   /// existential types.
   bool isExistentialType();
+
+  /// isObjCExistentialType - Determines whether this type is an
+  /// class-bounded existential type whose required conformances are
+  /// all @objc.  Such types are compatible with ObjC.
+  bool isObjCExistentialType();
   
   /// Determines whether this type is an existential type with a class protocol
   /// bound.
@@ -1441,30 +1446,64 @@ enum class MetatypeRepresentation : char {
   ObjC
 };
 
+/// AnyMetatypeType - A common parent class of MetatypeType and
+/// ExistentialMetatypeType.
+class AnyMetatypeType : public TypeBase {
+  Type InstanceType;
+protected:
+  AnyMetatypeType(TypeKind kind, const ASTContext *C,
+                  RecursiveTypeProperties properties,
+                  Type instanceType,
+                  Optional<MetatypeRepresentation> repr);
+
+
+public:
+  Type getInstanceType() const { return InstanceType; }
+
+  /// Does this metatype have a representation?
+  ///
+  /// Only SIL metatype types have a representation.
+  bool hasRepresentation() const {
+    return AnyMetatypeTypeBits.Representation > 0;
+  }
+  
+  /// Retrieve the metatype representation.
+  ///
+  /// The metatype representation is a SIL-only property. Thin
+  /// metatypes can be lowered away to empty types in IR, unless a
+  /// metatype value is required at an abstraction level.
+  MetatypeRepresentation getRepresentation() const {
+    assert(AnyMetatypeTypeBits.Representation &&
+           "metatype has no representation");
+    return static_cast<MetatypeRepresentation>(
+             AnyMetatypeTypeBits.Representation - 1);
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Metatype ||
+           T->getKind() == TypeKind::ExistentialMetatype;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(AnyMetatypeType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
+END_CAN_TYPE_WRAPPER(AnyMetatypeType, Type)
+
 /// MetatypeType - This is the type given to a metatype value.  When a type is
 /// declared, a 'metatype' value is injected into the value namespace to
 /// resolve references to the type.  An example:
 ///
 ///  struct x { ... }  // declares type 'x' and metatype 'x'.
 ///  x.a()             // use of the metatype value since its a value context.
-class MetatypeType : public TypeBase {
-  Type InstanceType;
-
+///
+/// In general, this is spelled X.Type, unless X is an existential
+/// type, in which case the ordinary metatype is spelled X.Protocol
+/// and X.Type connotes the ExistentialMetatypeType.
+class MetatypeType : public AnyMetatypeType {
   static MetatypeType *get(Type T, Optional<MetatypeRepresentation> Repr,
                            const ASTContext &C);
 
 public:
-  /// \brief Return the MetatypeType for the specified type declaration.
-  ///
-  /// This leaves the 'representation' property unavailable.
-  ///
-  /// The type must be resolvable to its canonical type in order for the
-  /// ASTContext parameter to be elided. During parsing, the form of 'get'
-  /// that takes an explicit ASTContext parameter must be used.
-  static MetatypeType *get(Type T) {
-    return get(T, Nothing, T->getASTContext());
-  }
-  
   /// \brief Return the MetatypeType for the specified type declaration.
   ///
   /// This leaves the 'representation' property unavailable.
@@ -1477,30 +1516,11 @@ public:
   ///
   /// Metatype representation is a SIL-only property. Thin metatypes
   /// can be lowered away to empty types in IR.
-  static MetatypeType *get(Type T, MetatypeRepresentation repr) {
-    return get(T, Optional<MetatypeRepresentation>(repr), T->getASTContext());
+  static MetatypeType *get(Type T,
+                           Optional<MetatypeRepresentation> repr = Nothing) {
+    return get(T, repr, T->getASTContext());
   }
 
-  Type getInstanceType() const { return InstanceType; }
-
-  /// Does this metatype have a representation?
-  ///
-  /// Only SIL metatype types have a representation.
-  bool hasRepresentation() const {
-    return MetatypeTypeBits.Representation > 0;
-  }
-  
-  /// Retrieve the metatype representation.
-  ///
-  /// The metatype representation is a SIL-only property. Thin
-  /// metatypes can be lowered away to empty types in IR, unless a
-  /// metatype value is required at an abstraction level.
-  MetatypeRepresentation getRepresentation() const {
-    assert(MetatypeTypeBits.Representation && "metatype has no representation");
-    return static_cast<MetatypeRepresentation>(
-             MetatypeTypeBits.Representation - 1);
-  }
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Metatype;
@@ -1512,15 +1532,63 @@ private:
                Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
 };
-BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
+BEGIN_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
   static CanMetatypeType get(CanType type) {
     return CanMetatypeType(MetatypeType::get(type));
   }
   static CanMetatypeType get(CanType type, MetatypeRepresentation repr) {
     return CanMetatypeType(MetatypeType::get(type, repr));
   }
-END_CAN_TYPE_WRAPPER(MetatypeType, Type)
+END_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
+
+/// ExistentialMetatypeType - This is the type given to an existential
+/// metatype value, i.e. the type of the dynamic type of an
+/// existential value.  The instance type must be an existential type
+/// of some sort.
+///
+/// Formally, this type is \exists t : T... . t.Type.  In contrast,
+/// the MetatypeType for a ProtocolType is a singleton.
+///
+/// This is spelled X.Type, where X is an existential type.
+///
+/// The representation of an existential metatype cannot be thin.
+class ExistentialMetatypeType : public AnyMetatypeType {
+  static ExistentialMetatypeType *get(Type T,
+                                      Optional<MetatypeRepresentation> Repr,
+                                      const ASTContext &C);
+
+public:
+  /// Return the ExistentialMetatypeType for the specified type
+  /// with the given representation.
+  ///
+  /// Metatype representation is a SIL-only property. Existential
+  /// metatypes cannot be thin.
+  static ExistentialMetatypeType *get(Type T,
+                                      Optional<MetatypeRepresentation> repr
+                                        = Nothing) {
+    return get(T, repr, T->getASTContext());
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::ExistentialMetatype;
+  }
+  
+private:
+  ExistentialMetatypeType(Type T, const ASTContext *C,
+                          RecursiveTypeProperties properties,
+                          Optional<MetatypeRepresentation> repr);
+  friend class TypeDecl;
+};
+BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
+  static CanExistentialMetatypeType get(CanType type) {
+    return CanExistentialMetatypeType(ExistentialMetatypeType::get(type));
+  }
+  static CanExistentialMetatypeType get(CanType type,
+                                        MetatypeRepresentation repr) {
+    return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
+  }
+END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
 /// ModuleType - This is the type given to a module value, e.g. the "Builtin" in
 /// "Builtin.int".  This is typically given to a ModuleExpr, but can also exist

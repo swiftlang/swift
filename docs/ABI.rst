@@ -793,6 +793,7 @@ Types
   type ::= 'K' type type                     // @auto_closure function type
   type ::= 'M' type                          // metatype
   type ::= 'P' protocol-list '_'             // protocol type
+  type ::= 'PM' type                         // existential metatype
   type ::= archetype
   type ::= 'R' type                          // inout
   type ::= 'T' tuple-element* '_'            // tuple
@@ -882,6 +883,8 @@ Generics
 ``<protocol-list>`` is unambiguous because protocols are always top-level,
 so the structure is quite simple. If there are associated types in the signature,
 they are mangled following a second ``U``.
+
+``<protocol>`` must not start with ``M``.
 
 ::
 

@@ -1282,9 +1282,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DITy;
   }
 
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
-    auto Metatype = BaseTy->castTo<MetatypeType>();
+    auto Metatype = BaseTy->castTo<AnyMetatypeType>();
     auto Ty = Metatype->getInstanceType();
     // The type this metatype is describing.
     // FIXME: Reusing the size and alignment of the metatype for the type is wrong.

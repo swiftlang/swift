@@ -324,6 +324,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
     break;
 
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
@@ -355,6 +356,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
     break;
 
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
@@ -390,6 +392,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
       break;
     }
     case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
@@ -404,6 +407,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     break;
       
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
@@ -441,6 +445,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
       break;
     }
     case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
@@ -455,6 +460,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     break;
       
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
@@ -1137,6 +1143,9 @@ namespace {
 /// The uniquing structure for metatype type metadata.
 static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
 
+/// The uniquing structure for existential metatype type metadata.
+static MetadataCache<MetatypeCacheEntry> ExistentialMetatypeTypes;
+
 /// \brief Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
 getMetatypeValueWitnesses(const Metadata *instanceType) {
@@ -1175,6 +1184,29 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   metadata->InstanceType = instanceMetadata;
 
   return MetatypeTypes.add(entry)->getData();
+}
+
+/// \brief Fetch a uniqued metadata for a metatype type.
+extern "C" const MetatypeMetadata *
+swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
+  const size_t numGenericArgs = 1;
+
+  const void *args[] = { instanceMetadata };
+  if (auto entry = ExistentialMetatypeTypes.find(args, numGenericArgs)) {
+    return entry->getData();
+  }
+
+  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+
+  // FIXME: the value witnesses should probably account for room for
+  // protocol witness tables
+
+  auto metadata = entry->getData();
+  metadata->setKind(MetadataKind::ExistentialMetatype);
+  metadata->ValueWitnesses = &getUnmanagedPointerPointerValueWitnesses();
+  metadata->InstanceType = instanceMetadata;
+
+  return ExistentialMetatypeTypes.add(entry)->getData();
 }
 
 /*** Existential types ********************************************************/
@@ -2016,6 +2048,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Function:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::HeapArray:
@@ -2107,6 +2140,7 @@ static void defaultPrint(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::Opaque:
   case MetadataKind::Function:
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
     // TODO

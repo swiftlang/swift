@@ -321,9 +321,9 @@ public:
 
   void checkAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     requireReferenceValue(ARDI, "Result of alloc_ref_dynamic");
-    require(ARDI->getOperand().getType().is<MetatypeType>(),
+    require(ARDI->getOperand().getType().is<AnyMetatypeType>(),
             "operand of alloc_ref_dynamic must be of metatype type");
-    auto metaTy = ARDI->getOperand().getType().castTo<MetatypeType>();
+    auto metaTy = ARDI->getOperand().getType().castTo<AnyMetatypeType>();
     require(metaTy->hasRepresentation(),
             "operand of alloc_ref_dynamic must have a metatype representation");
     if (ARDI->isObjC()) {
@@ -686,14 +686,14 @@ public:
             "value_metatype result must be metatype of operand type");
   }
   void checkExistentialMetatypeInst(ExistentialMetatypeInst *MI) {
-    require(MI->getType().is<MetatypeType>(),
+    require(MI->getType().is<ExistentialMetatypeType>(),
             "existential_metatype instruction must be of metatype type");
-    require(MI->getType().castTo<MetatypeType>()->hasRepresentation(),
+    require(MI->getType().castTo<ExistentialMetatypeType>()->hasRepresentation(),
             "value_metatype instruction must have a metatype representation");
     require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
             "existential_metatype operand must be of protocol type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
-            CanType(MI->getType().castTo<MetatypeType>()->getInstanceType()),
+            CanType(MI->getType().castTo<ExistentialMetatypeType>()->getInstanceType()),
             "existential_metatype result must be metatype of operand type");
   }
 
@@ -864,7 +864,7 @@ public:
   }
   CanType getMethodSelfInstanceType(CanSILFunctionType ft) {
     auto selfTy = getMethodSelfType(ft);
-    if (auto metaTy = selfTy.getAs<MetatypeType>())
+    if (auto metaTy = selfTy.getAs<AnyMetatypeType>())
       return metaTy.getInstanceType();
     return selfTy.getSwiftRValueType();
   }
@@ -975,9 +975,9 @@ public:
     } else {
       require(operandType.isObject(),
               "static protocol_method cannot apply to an address");
-      require(operandType.is<MetatypeType>(),
+      require(operandType.is<ExistentialMetatypeType>(),
               "static protocol_method must apply to an existential metatype");
-      require(operandType.castTo<MetatypeType>()
+      require(operandType.castTo<ExistentialMetatypeType>()
                 ->getInstanceType()->isExistentialType(),
               "static protocol_method must apply to an existential metatype");
       require(getMethodSelfType(methodType) == EMI->getOperand().getType(),
@@ -994,12 +994,12 @@ public:
       require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
               "operand must have Builtin.ObjCPointer type");
     } else {
-      require(operandType.getSwiftType()->is<MetatypeType>(),
+      require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<MetatypeType>()
+      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
                 ->getInstanceType()->is<ProtocolType>(),
               "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<MetatypeType>()
+      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
                 ->getInstanceType()->castTo<ProtocolType>()->getDecl()
                 ->isSpecificProtocol(KnownProtocolKind::AnyObject),
               "operand must have metatype of AnyObject type");
@@ -1007,7 +1007,7 @@ public:
   }
 
   static bool isClassOrClassMetatype(Type t) {
-    if (auto *meta = t->getAs<MetatypeType>()) {
+    if (auto *meta = t->getAs<AnyMetatypeType>()) {
       return bool(meta->getInstanceType()->getClassOrBoundGenericClass());
     } else {
       return bool(t->getClassOrBoundGenericClass());
@@ -1112,7 +1112,7 @@ public:
 
     CanType instanceTy = operandType.getSwiftType();
     bool isOperandMetatype = false;
-    if (auto metaTy = dyn_cast<MetatypeType>(instanceTy)) {
+    if (auto metaTy = dyn_cast<AnyMetatypeType>(instanceTy)) {
       instanceTy = metaTy.getInstanceType();
       isOperandMetatype = true;
     }
@@ -1131,9 +1131,11 @@ public:
       require(resultMetaTy->hasRepresentation(),
               "open_existential_ref result metatype must have a "
               "representation");
+      require(operandType.is<ExistentialMetatypeType>(),
+              "open_existential_ref yielding metatype should operate on "
+              "an existential metatype");
       require(resultMetaTy->getRepresentation() == 
-                cast<MetatypeType>(operandType.getSwiftType())
-                  ->getRepresentation(),
+              operandType.castTo<ExistentialMetatypeType>()->getRepresentation(),
               "open_existential_ref result and operand metatypes must have the "
               "same representation");
               
@@ -1344,11 +1346,14 @@ public:
   }
 
   void checkThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCI) {
-    auto opTy = requireObjectType(MetatypeType, TTOCI->getOperand(),
+    auto opTy = requireObjectType(AnyMetatypeType, TTOCI->getOperand(),
                                   "thick_to_objc_metatype operand");
-    auto resTy = requireObjectType(MetatypeType, TTOCI,
+    auto resTy = requireObjectType(AnyMetatypeType, TTOCI,
                                    "thick_to_objc_metatype result");
 
+    require(TTOCI->getOperand().getType().is<MetatypeType>() ==
+            TTOCI->getType().is<MetatypeType>(),
+            "thick_to_objc_metatype cannot change metatype kinds");
     require(opTy->getRepresentation() == MetatypeRepresentation::Thick,
             "operand of thick_to_objc_metatype must be thick");
     require(resTy->getRepresentation() == MetatypeRepresentation::ObjC,
@@ -1359,11 +1364,14 @@ public:
   }
 
   void checkObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTI) {
-    auto opTy = requireObjectType(MetatypeType, OCTTI->getOperand(),
+    auto opTy = requireObjectType(AnyMetatypeType, OCTTI->getOperand(),
                                   "objc_to_thick_metatype operand");
-    auto resTy = requireObjectType(MetatypeType, OCTTI,
+    auto resTy = requireObjectType(AnyMetatypeType, OCTTI,
                                    "objc_to_thick_metatype result");
 
+    require(OCTTI->getOperand().getType().is<MetatypeType>() ==
+            OCTTI->getType().is<MetatypeType>(),
+            "objc_to_thick_metatype cannot change metatype kinds");
     require(opTy->getRepresentation() == MetatypeRepresentation::ObjC,
             "operand of objc_to_thick_metatype must be ObjC");
     require(resTy->getRepresentation() == MetatypeRepresentation::Thick,
@@ -1703,12 +1711,12 @@ public:
       require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
               "operand must have Builtin.ObjCPointer type");
     } else {
-      require(operandType.getSwiftType()->is<MetatypeType>(),
+      require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftType()->castTo<MetatypeType>()
+      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
               ->getInstanceType()->is<ProtocolType>(),
               "operand must have metatype of protocol type");
-      require(operandType.getSwiftType()->castTo<MetatypeType>()
+      require(operandType.getSwiftType()->castTo<ExistentialMetatypeType>()
               ->getInstanceType()->castTo<ProtocolType>()->getDecl()
               ->isSpecificProtocol(KnownProtocolKind::AnyObject),
               "operand must have metatype of AnyObject type");

@@ -3006,7 +3006,7 @@ namespace {
         // Testify to generic parameters in the Self type.
         auto params = fnType->getInterfaceParameters();
         CanType selfTy = params.back().getType();
-        if (auto metaTy = dyn_cast<MetatypeType>(selfTy))
+        if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
           selfTy = metaTy.getInstanceType();
         
         if (auto nomTy = dyn_cast<NominalType>(selfTy))
@@ -3499,7 +3499,7 @@ namespace {
     void visitAnyFunctionType(CanAnyFunctionType fn) {}
     void visitSILFunctionType(CanSILFunctionType fn) {}
     void visitBuiltinType(CanBuiltinType type) {}
-    void visitMetatypeType(CanMetatypeType type) {}
+    void visitAnyMetatypeType(CanAnyMetatypeType type) {}
     void visitModuleType(CanModuleType type) {}
     void visitDynamicSelfType(CanDynamicSelfType type) {}
     void visitProtocolCompositionType(CanProtocolCompositionType type) {}

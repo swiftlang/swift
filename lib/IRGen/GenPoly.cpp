@@ -377,7 +377,7 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   // All these types are leaves, in the sense that they don't directly
   // store any other types.
   bool visitBuiltinType(CanBuiltinType type) { return false; }
-  bool visitMetatypeType(CanMetatypeType type) { return false; }
+  bool visitAnyMetatypeType(CanAnyMetatypeType type) { return false; }
   bool visitModuleType(CanModuleType type) { return false; }
   bool visitDynamicSelfType(CanDynamicSelfType type) { return false; }
   bool visitAnyFunctionType(CanAnyFunctionType type) { return false; }

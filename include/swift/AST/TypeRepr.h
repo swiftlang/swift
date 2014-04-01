@@ -568,6 +568,34 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
+
+/// \brief A 'protocol' type.
+/// \code
+///   Foo.Protocol
+/// \endcode
+class ProtocolTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc ProtocolLoc;
+
+public:
+  ProtocolTypeRepr(TypeRepr *Base, SourceLoc ProtocolLoc)
+    : TypeRepr(TypeReprKind::Protocol), Base(Base), ProtocolLoc(ProtocolLoc) {
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getProtocolLoc() const { return ProtocolLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Protocol;
+  }
+  static bool classof(const ProtocolTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return ProtocolLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
   
 /// \brief An 'inout' type.
 /// \code
@@ -611,6 +639,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
   case TypeReprKind::Metatype:
+  case TypeReprKind::Protocol:
   case TypeReprKind::Named:
   case TypeReprKind::Optional:
   case TypeReprKind::ProtocolComposition:

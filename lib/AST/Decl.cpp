@@ -1651,7 +1651,7 @@ static bool isObjCObjectOrBridgedType(Type type) {
   }
 
   // Unwrap metatypes for remaining checks.
-  if (auto metaTy = type->getAs<MetatypeType>())
+  if (auto metaTy = type->getAs<AnyMetatypeType>())
     type = metaTy->getInstanceType();
 
   // Class types are Objective-C object types.

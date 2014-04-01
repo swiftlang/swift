@@ -163,7 +163,7 @@ namespace {
     /// Transform a metatype value.
     virtual ManagedValue transformMetatype(ManagedValue fn,
                                            AbstractionPattern origType,
-                                           CanMetatypeType substType) = 0;
+                                           CanAnyMetatypeType substType) = 0;
     
     /// Transform a tuple value.
     ManagedValue transformTuple(ManagedValue input,
@@ -201,7 +201,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - metatypes
-  if (auto substMetaType = dyn_cast<MetatypeType>(substFormalType)) {
+  if (auto substMetaType = dyn_cast<AnyMetatypeType>(substFormalType)) {
     return transformMetatype(v, origFormalType, substMetaType);
   }
   
@@ -1015,13 +1015,13 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
                                             SILLocation loc,
                                             ManagedValue meta,
                                             AbstractionPattern origType,
-                                            CanMetatypeType substType) {
+                                            CanAnyMetatypeType substType) {
   assert(!meta.hasCleanup() && "metatype with cleanup?!");
 
   auto substSILType = gen.getLoweredLoadableType(substType);
 
-  auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
-  auto willBeRepr = substSILType.castTo<MetatypeType>()->getRepresentation();
+  auto wasRepr = meta.getType().castTo<AnyMetatypeType>()->getRepresentation();
+  auto willBeRepr = substSILType.castTo<AnyMetatypeType>()->getRepresentation();
   
   // Convert the representation appropriately.
   switch (wasRepr) {
@@ -1029,6 +1029,7 @@ static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
     switch (willBeRepr) {
     case MetatypeRepresentation::Thin: {
       // Thin -> thick conversion.
+      assert(substSILType.is<MetatypeType>());
       auto metaTy = gen.B.createMetatype(loc, substSILType);
       return ManagedValue::forUnmanaged(metaTy);
     }
@@ -1079,13 +1080,13 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
                                             SILLocation loc,
                                             ManagedValue meta,
                                             AbstractionPattern origType,
-                                            CanMetatypeType substType) {
+                                            CanAnyMetatypeType substType) {
   assert(!meta.hasCleanup() && "metatype with cleanup?!");
   
   auto loweredTy = gen.getLoweredType(origType, substType);
 
-  auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
-  auto willBeRepr = loweredTy.castTo<MetatypeType>()->getRepresentation();
+  auto wasRepr = meta.getType().castTo<AnyMetatypeType>()->getRepresentation();
+  auto willBeRepr = loweredTy.castTo<AnyMetatypeType>()->getRepresentation();
   
   // Convert the representation appropriately.
   switch (wasRepr) {
@@ -1152,7 +1153,7 @@ namespace {
     
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
-                                   CanMetatypeType substType) override {
+                                   CanAnyMetatypeType substType) override {
       return emitOrigToSubstMetatype(SGF, Loc, meta, origType, substType);
     }
   };
@@ -1182,7 +1183,7 @@ namespace {
 
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
-                                   CanMetatypeType substType) override {
+                                   CanAnyMetatypeType substType) override {
       return emitOrigToSubstMetatype(SGF, Loc, meta, origType, substType);
     }
     
@@ -1229,7 +1230,7 @@ namespace {
     
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
-                                   CanMetatypeType substType) override {
+                                   CanAnyMetatypeType substType) override {
       return emitSubstToOrigMetatype(SGF, Loc, meta, origType, substType);
     }
   };

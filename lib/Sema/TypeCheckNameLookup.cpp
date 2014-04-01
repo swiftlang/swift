@@ -53,7 +53,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     // here -- default derivation doesn't apply in extensions.)
     bool isMetatype = false;
     NominalTypeDecl *nominalDecl;
-    if (auto metatypeType = type->getAs<MetatypeType>()) {
+    if (auto metatypeType = type->getAs<AnyMetatypeType>()) {
       isMetatype = true;
       nominalDecl = metatypeType->getInstanceType()->getAnyNominal();
     } else {
@@ -101,7 +101,7 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
   LookupTypeResult result;
 
   // Look through the metatype.
-  if (auto metaT = type->getAs<MetatypeType>())
+  if (auto metaT = type->getAs<AnyMetatypeType>())
     type = metaT->getInstanceType();
   
   // Callers must cope with dependent types directly.  

@@ -1500,6 +1500,14 @@ private:
       return metatype;
     }
     if (c == 'P') {
+      if (c == 'M') {
+        NodePointer type = demangleType();
+        if (!type) return nullptr;
+        NodePointer metatype = Node::create(Node::Kind::ExistentialMetatype);
+        metatype->addChild(type);
+        return metatype;
+      }
+
       return demangleProtocolList();
     }
     if (c == 'Q') {
@@ -1976,6 +1984,13 @@ private:
 };
 } // end anonymous namespace
 
+static bool isExistentialType(Node *node) {
+  assert(node->getKind() == Node::Kind::Type);
+  node = node->getChild(0);
+  return (node->getKind() == Node::Kind::ExistentialMetatype ||
+          node->getKind() == Node::Kind::ProtocolList);
+}
+
 void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   // Common code for handling entities.
   auto printEntity = [&](bool hasName, bool hasType, StringRef extraName) {
@@ -2309,6 +2324,16 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   }
   case Node::Kind::Metatype: {
+    Node *type = pointer->getChild(0);
+    print(type);
+    if (isExistentialType(type)) {
+      Printer << ".Protocol";
+    } else {
+      Printer << ".Type";
+    }
+    return;
+  }
+  case Node::Kind::ExistentialMetatype: {
     Node *type = pointer->getChild(0);
     print(type);
     Printer << ".Type";

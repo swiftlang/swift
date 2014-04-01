@@ -1147,6 +1147,12 @@ bool Traversal::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
 bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
   if (doIt(T->getBase()))
     return true;

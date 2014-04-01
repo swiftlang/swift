@@ -463,9 +463,8 @@ public:
   }
 
   bool visitMetatypeInst(MetatypeInst *MI) {
-    CanType MetaTy = MI->getType().getSwiftRValueType();
-    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
-    ClassDecl *C = T->getClassOrBoundGenericClass();
+    CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
+    ClassDecl *C = instTy.getClassOrBoundGenericClass();
     if (!C)
       return false;
 

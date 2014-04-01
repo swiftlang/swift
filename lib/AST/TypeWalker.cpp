@@ -57,7 +57,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitMetatypeType(MetatypeType *ty) {
+  bool visitAnyMetatypeType(AnyMetatypeType *ty) {
     return doIt(ty->getInstanceType());
   }
 

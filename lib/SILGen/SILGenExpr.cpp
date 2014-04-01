@@ -575,8 +575,8 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   // FIXME: This has to be dynamically looked up for classes, and
   // dynamically instantiated for generics.
   if (FieldDecl->isStatic()) {
-    auto baseMeta = base.getType().getSwiftRValueType()->castTo<MetatypeType>()
-    ->getInstanceType(); (void)baseMeta;
+    auto baseMeta = base.getType().castTo<MetatypeType>().getInstanceType();
+    (void)baseMeta;
     assert(!baseMeta->is<BoundGenericType>() &&
            "generic static stored properties not implemented");
     assert((baseMeta->getStructOrBoundGenericStruct() ||
@@ -612,7 +612,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
   // now, not doing this causes us to emit extra pointless copies.
   if (substFormalType->is<AnyFunctionType>() ||
       substFormalType->is<TupleType>() ||
-      substFormalType->is<MetatypeType>()) {
+      substFormalType->is<AnyMetatypeType>()) {
     origFormalType = getOrigFormalRValueType(FieldDecl->getType());
     hasAbstractionChange = origFormalType.getAsType() != substFormalType;
   }
@@ -1366,8 +1366,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-  
-  if (E->getType()->is<MetatypeType>()) {
+
+  if (isa<TypeDecl>(E->getMember().getDecl())) {
     // Emit the metatype for the associated type.
     visit(E->getBase());
     SILValue MT =
@@ -1707,13 +1707,15 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
 }
 
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
+  CanType baseTy = base.getType().getSwiftRValueType();
   // For class, archetype, and protocol types, look up the dynamic metatype.
-  SILType metaTy = getLoweredLoadableType(
-    MetatypeType::get(base.getType().getSwiftRValueType()));
-  if (base.getType().getSwiftRValueType()->isExistentialType())
+  if (baseTy.isExistentialType()) {
+    SILType metaTy = getLoweredLoadableType(CanExistentialMetatypeType::get(baseTy));
     return B.createExistentialMetatype(loc, metaTy, base);
-  if (base.getType().getClassOrBoundGenericClass()
-      || base.getType().getSwiftRValueType()->is<ArchetypeType>())
+  }
+
+  SILType metaTy = getLoweredLoadableType(CanMetatypeType::get(baseTy));
+  if (baseTy.getClassOrBoundGenericClass() || isa<ArchetypeType>(baseTy))
     return B.createValueMetatype(loc, metaTy, base);
   
   // Otherwise, ignore the base and return the static metatype.
@@ -2689,10 +2691,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // When using Objective-C allocation, convert the metatype
     // argument to an Objective-C metatype.
     if (useObjCAllocation) {
-      auto metaTy = allocArg.getType().getSwiftRValueType()
-                      ->castTo<MetatypeType>();
-      metaTy = MetatypeType::get(metaTy->getInstanceType(),
-                                 MetatypeRepresentation::ObjC);
+      auto metaTy = allocArg.getType().castTo<MetatypeType>();
+      metaTy = CanMetatypeType::get(metaTy.getInstanceType(),
+                                    MetatypeRepresentation::ObjC);
       allocArg = B.createThickToObjCMetatype(Loc, allocArg,
                                              getLoweredType(metaTy));
     }
@@ -3843,7 +3844,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
 #include "swift/SIL/BridgedTypes.def"
 
   // Bridge thick to Objective-C metatypes.
-  if (auto bridgedMetaTy = dyn_cast<MetatypeType>(loweredBridgedTy)) {
+  if (auto bridgedMetaTy = dyn_cast<AnyMetatypeType>(loweredBridgedTy)) {
     if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
       SILValue native = gen.B.emitThickToObjCMetatype(loc, v.getValue(),
                            SILType::getPrimitiveObjectType(loweredBridgedTy));
@@ -3908,7 +3909,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
 #include "swift/SIL/BridgedTypes.def"
 
   // Bridge Objective-C to thick metatypes.
-  if (auto bridgedMetaTy = dyn_cast<MetatypeType>(loweredBridgedTy)){
+  if (auto bridgedMetaTy = dyn_cast<AnyMetatypeType>(loweredBridgedTy)){
     if (bridgedMetaTy->getRepresentation() == MetatypeRepresentation::ObjC) {
       SILValue native = gen.B.emitObjCToThickMetatype(loc, v.getValue(),
                                         gen.getLoweredType(loweredNativeTy));

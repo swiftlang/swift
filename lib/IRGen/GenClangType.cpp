@@ -146,6 +146,11 @@ clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
   return getClangMetatypeType(getClangASTContext());
 }
 
+clang::CanQualType
+GenClangType::visitExistentialMetatypeType(CanExistentialMetatypeType type) {
+  return getClangMetatypeType(getClangASTContext());
+}
+
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto &clangCtx = getClangASTContext();
   // produce the clang type INTF * if it is imported ObjC object.

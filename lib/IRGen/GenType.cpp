@@ -989,7 +989,9 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     llvm_unreachable("converting a " #id "Type after canonicalization");
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
-  case TypeKind::LValue: assert(0 && "@lvalue type made it to irgen");
+  case TypeKind::LValue: llvm_unreachable("@lvalue type made it to irgen");
+  case TypeKind::ExistentialMetatype:
+    return convertExistentialMetatypeType(cast<ExistentialMetatypeType>(ty));
   case TypeKind::Metatype:
     return convertMetatypeType(cast<MetatypeType>(ty));
   case TypeKind::Module:
@@ -1188,6 +1190,27 @@ const TypeInfo *TypeConverter::convertMetatypeType(MetatypeType *T) {
   case MetatypeRepresentation::Thin:
     // Thin metatypes are empty.
     return new EmptyTypeInfo(IGM.Int8Ty);
+
+  case MetatypeRepresentation::Thick:
+    // Thick metatypes are represented with a metadata pointer.
+    return &getTypeMetadataPtrTypeInfo();
+
+  case MetatypeRepresentation::ObjC:
+    // ObjC metatypes are represented with an objc_class pointer.
+    return &getObjCClassPtrTypeInfo();
+  }
+}
+
+const TypeInfo *
+TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
+  assert(T->hasRepresentation() &&
+         "metatype should have been assigned a representation by SIL");
+ 
+  // FIXME: include space for value witness tables!
+ 
+  switch (T->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("existential metatypes are never thin!");
 
   case MetatypeRepresentation::Thick:
     // Thick metatypes are represented with a metadata pointer.

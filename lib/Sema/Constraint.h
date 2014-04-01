@@ -81,6 +81,9 @@ enum class ConstraintKind : char {
   /// function type is expected to become a function type. Note, we
   /// do not require the function type attributes to match.
   ApplicableFunction,
+  /// \brief The first type is the type of the dynamicType member of the
+  /// second type.
+  DynamicTypeOf,
   /// \brief Binds the left-hand type to a particular overload choice.
   BindOverload,
   /// \brief The first type has a member with the given name, and the
@@ -326,6 +329,7 @@ public:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
     case ConstraintKind::DynamicLookupValue:
+    case ConstraintKind::DynamicTypeOf:
       return ConstraintClassification::TypeProperty;
 
     case ConstraintKind::Conjunction:

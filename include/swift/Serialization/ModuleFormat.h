@@ -412,6 +412,12 @@ namespace decls_block {
     MetatypeRepresentationField        // representation
   >;
 
+  using ExistentialMetatypeTypeLayout = BCRecordLayout<
+    EXISTENTIAL_METATYPE_TYPE,
+    TypeIDField,                       // instance type
+    MetatypeRepresentationField        // representation
+  >;
+
   using LValueTypeLayout = BCRecordLayout<
     LVALUE_TYPE,
     TypeIDField // object type

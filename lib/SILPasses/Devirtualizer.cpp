@@ -971,9 +971,8 @@ static ClassDecl *findClassTypeForOperand(SILValue S) {
   if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(Meta)) {
     return ARI->getType().getClassOrBoundGenericClass();
   } else if (MetatypeInst *MTI = dyn_cast<MetatypeInst>(Meta)) {
-    CanType MetaTy = MTI->getType().getSwiftRValueType();
-    TypeBase *T = cast<MetatypeType>(MetaTy)->getInstanceType().getPointer();
-    return T->getClassOrBoundGenericClass();
+    CanType instTy = MTI->getType().castTo<MetatypeType>().getInstanceType();
+    return instTy.getClassOrBoundGenericClass();
   } else {
     return nullptr;
   }

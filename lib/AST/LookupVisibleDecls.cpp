@@ -323,7 +323,7 @@ static void lookupVisibleMemberDeclsImpl(
 
   // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
-  if (MetatypeType *MTT = BaseTy->getAs<MetatypeType>()) {
+  if (auto MTT = BaseTy->getAs<AnyMetatypeType>()) {
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();

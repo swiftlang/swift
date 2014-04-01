@@ -115,7 +115,7 @@ Initializer *Expr::findExistingInitializerContext() {
 
 bool Expr::isStaticallyDerivedMetatype() const {
   // IF the result isn't a metatype, there's nothing else to do.
-  if (!getType()->is<MetatypeType>())
+  if (!getType()->is<AnyMetatypeType>())
     return false;
 
   const Expr *expr = this;
@@ -273,7 +273,7 @@ Type OverloadSetRefExpr::getBaseType() const {
 
 bool OverloadSetRefExpr::hasBaseObject() const {
   if (Type BaseTy = getBaseType())
-    return !BaseTy->is<MetatypeType>();
+    return !BaseTy->is<AnyMetatypeType>();
 
   return false;
 }

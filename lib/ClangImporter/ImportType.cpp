@@ -515,7 +515,7 @@ namespace {
 
       // Class maps to AnyObject.Type.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
-      return MetatypeType::get(proto->getDeclaredType());
+      return ExistentialMetatypeType::get(proto->getDeclaredType());
     }
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {

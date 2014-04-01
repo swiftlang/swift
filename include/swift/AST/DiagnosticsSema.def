@@ -911,6 +911,8 @@ ERROR(self_in_nominal,sema_tct,none,
       "method; did you mean %0?", (Identifier))
 ERROR(non_generic_class_with_generic_superclass,sema_tct,none,
       "classes derived from generic classes must also be generic", ())
+ERROR(dot_protocol_on_non_existential,sema_tct,none,
+      "'Protocol' type only applies to existential types", ())
 
 // Ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,

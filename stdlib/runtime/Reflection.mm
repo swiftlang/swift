@@ -748,6 +748,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Enum:
   case MetadataKind::Function:
   case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
     return {T, &_TMdVSs13_OpaqueMirror, &_TWPVSs13_OpaqueMirrorSs6MirrorSs};
       

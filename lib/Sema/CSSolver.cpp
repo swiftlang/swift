@@ -554,6 +554,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
                           result.InvolvesTypeVariables);
       continue;
 
+    case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
     case ConstraintKind::DynamicLookupValue:

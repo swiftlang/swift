@@ -101,6 +101,7 @@ private:
   const TypeInfo *convertFunctionType(SILFunctionType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertInOutType(InOutType *T);
+  const TypeInfo *convertExistentialMetatypeType(ExistentialMetatypeType *T);
   const TypeInfo *convertMetatypeType(MetatypeType *T);
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);

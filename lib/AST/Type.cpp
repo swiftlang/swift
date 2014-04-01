@@ -86,6 +86,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::Enum:
   case TypeKind::Struct:
   case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Module:
   case TypeKind::Array:
   case TypeKind::LValue:
@@ -165,6 +166,28 @@ bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
 
   assert(!T.isExistentialType());
   return false;
+}
+
+bool TypeBase::isObjCExistentialType() {
+  return getCanonicalType().isObjCExistentialType();
+}
+
+bool CanType::isObjCExistentialTypeImpl(CanType type) {
+  if (!type.isExistentialType()) return false;
+
+  SmallVector<ProtocolDecl *, 4> protocols;
+  (void) type->isExistentialType(protocols);
+
+  // Must have at least one protocol to be class-bounded.
+  if (protocols.empty())
+    return false;
+
+  // Any non-@objc protocol makes this no longer ObjC-compatible.
+  for (auto proto : protocols) {
+    if (!proto->isObjC())
+      return false;
+  }
+  return true;
 }
 
 bool TypeBase::isSpecialized() {
@@ -268,8 +291,9 @@ bool TypeBase::isUnspecializedGeneric() {
       return parentTy->isUnspecializedGeneric();
     return false;
 
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype:
-    return cast<MetatypeType>(this)->getInstanceType()
+    return cast<AnyMetatypeType>(this)->getInstanceType()
              ->isUnspecializedGeneric();
 
   case TypeKind::UnownedStorage:
@@ -334,7 +358,7 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 static bool isLegalSILType(CanType type) {
   if (isa<LValueType>(type) || isa<InOutType>(type)) return false;
   if (isa<AnyFunctionType>(type)) return false;
-  if (auto meta = dyn_cast<MetatypeType>(type))
+  if (auto meta = dyn_cast<AnyMetatypeType>(type))
     return meta->hasRepresentation();
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     for (auto eltType : tupleType.getElementTypes()) {
@@ -499,7 +523,7 @@ Type TypeBase::getRValueInstanceType() {
       type = tupleTy->getElementType(0);
   }
   
-  if (auto metaTy = type->getAs<MetatypeType>())
+  if (auto metaTy = type->getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
   // For @mutable value type methods, we need to dig through inout types.
@@ -803,6 +827,16 @@ CanType TypeBase::getCanonicalType() {
     Result = Composition.getPointer();
     break;
   }
+  case TypeKind::ExistentialMetatype: {
+    auto metatype = cast<ExistentialMetatypeType>(this);
+    auto instanceType = metatype->getInstanceType()->getCanonicalType();
+    if (metatype->hasRepresentation())
+      Result = ExistentialMetatypeType::get(instanceType,
+                                            metatype->getRepresentation());
+    else
+      Result = ExistentialMetatypeType::get(instanceType);
+    break;
+  }
   case TypeKind::Metatype: {
     MetatypeType *MT = cast<MetatypeType>(this);
     Type InstanceTy = MT->getInstanceType()->getCanonicalType();
@@ -863,6 +897,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::ProtocolComposition:
+  case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
@@ -1106,6 +1141,11 @@ bool TypeBase::isSpelledLike(Type other) {
         return false;
     return true;
   }
+  case TypeKind::ExistentialMetatype: {
+    auto mMe = cast<ExistentialMetatypeType>(me);
+    auto mThem = cast<ExistentialMetatypeType>(them);
+    return mMe->getInstanceType()->isSpelledLike(mThem->getInstanceType());
+  }
   case TypeKind::Metatype: {
     auto mMe = cast<MetatypeType>(me);
     auto mThem = cast<MetatypeType>(them);
@@ -1218,18 +1258,7 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     return true;
 
   // Pure-ObjC existential types.
-  if (type.isExistentialType()) {
-    SmallVector<ProtocolDecl*, 4> protos;
-    (void) type->isExistentialType(protos);
-
-    // The type must be class-bounded, and all the protocols must be
-    // ObjC (and thus not require protocol witnesses).
-    if (protos.empty())
-      return false;
-    for (auto proto : protos) {
-      if (!proto->isObjC())
-        return false;
-    }
+  if (type.isObjCExistentialType()) {
     return true;
   }
 
@@ -1243,7 +1272,12 @@ static bool hasRetainablePointerRepresentation(CanType type) {
   // Class metatypes.
   if (auto metatype = dyn_cast<MetatypeType>(type)) {
     CanType instanceType = metatype.getInstanceType();
-    return (instanceType.getClassOrBoundGenericClass() != nullptr);
+    return instanceType->mayHaveSuperclass();
+  }
+
+  // @objc protocol metatypes.
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+    return metatype.getInstanceType()->isObjCExistentialType();
   }
 
   return false;
@@ -1868,7 +1902,7 @@ Type TypeBase::getTypeOfMember(Module *module, const ValueDecl *member,
   Type baseTy(getRValueType());
 
   // Look through the metatype; it has no bearing on the result.
-  if (auto metaBase = baseTy->getAs<MetatypeType>()) {
+  if (auto metaBase = baseTy->getAs<AnyMetatypeType>()) {
     baseTy = metaBase->getInstanceType()->getRValueType();
   }
 
@@ -2072,6 +2106,21 @@ case TypeKind::Id:
       return *this;
 
     return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
+  }
+
+  case TypeKind::ExistentialMetatype: {
+    auto meta = cast<ExistentialMetatypeType>(base);
+    auto instanceTy = meta->getInstanceType().transform(fn);
+    if (!instanceTy)
+      return Type();
+
+    if (instanceTy.getPointer() == meta->getInstanceType().getPointer())
+      return *this;
+
+    if (meta->hasRepresentation())
+      return ExistentialMetatypeType::get(instanceTy,
+                                          meta->getRepresentation());
+    return ExistentialMetatypeType::get(instanceTy);
   }
 
   case TypeKind::Metatype: {

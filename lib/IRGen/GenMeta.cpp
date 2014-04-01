@@ -510,13 +510,15 @@ namespace {
       return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
     }
 
-    llvm::Value *visitMetatypeType(CanMetatypeType type) {
+    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;
 
       auto instMetadata = visit(type.getInstanceType());
-      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetMetatypeMetadataFn(),
-                                         instMetadata);
+      auto fn = isa<MetatypeType>(type)
+                  ? IGF.IGM.getGetMetatypeMetadataFn()
+                  : IGF.IGM.getGetExistentialMetatypeMetadataFn();
+      auto call = IGF.Builder.CreateCall(fn, instMetadata);
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
 

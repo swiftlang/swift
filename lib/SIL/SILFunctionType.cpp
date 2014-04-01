@@ -1098,7 +1098,7 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
   case AbstractCC::ObjCMethod: {
     // The "self" parameter should not get bridged unless it's a metatype.
     unsigned skip = 1;
-    if (inputs.front().getType()->is<MetatypeType>())
+    if (inputs.front().getType()->is<AnyMetatypeType>())
       skip = 0;
 
     for (auto &input : make_range(inputs.begin() + skip, inputs.end()))

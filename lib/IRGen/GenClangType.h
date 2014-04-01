@@ -46,6 +46,7 @@ public:
   clang::CanQualType visitStructType(CanStructType type);
   clang::CanQualType visitTupleType(CanTupleType type);
   clang::CanQualType visitMetatypeType(CanMetatypeType type);
+  clang::CanQualType visitExistentialMetatypeType(CanExistentialMetatypeType type);
   clang::CanQualType visitProtocolType(CanProtocolType type);
   clang::CanQualType visitClassType(CanClassType type);
   clang::CanQualType visitBoundGenericClassType(CanBoundGenericClassType type);

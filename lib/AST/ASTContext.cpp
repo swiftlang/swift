@@ -127,6 +127,8 @@ struct ASTContext::Implementation {
   struct Arena {
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
+    llvm::DenseMap<std::pair<Type,char>,
+                   ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
       FunctionTypes;
     llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
@@ -1434,6 +1436,18 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   llvm_unreachable("bad ownership");
 }
 
+AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
+                                 RecursiveTypeProperties properties,
+                                 Type instanceType,
+                                 Optional<MetatypeRepresentation> repr)
+    : TypeBase(kind, C, properties), InstanceType(instanceType) {
+  if (repr) {
+    AnyMetatypeTypeBits.Representation = static_cast<char>(*repr) + 1;
+  } else {
+    AnyMetatypeTypeBits.Representation = 0;
+  }
+}
+
 MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
                                 const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
@@ -1456,11 +1470,38 @@ MetatypeType *MetatypeType::get(Type T, Optional<MetatypeRepresentation> Repr,
 MetatypeType::MetatypeType(Type T, const ASTContext *C,
                            RecursiveTypeProperties properties,
                            Optional<MetatypeRepresentation> repr)
-  : TypeBase(TypeKind::Metatype, C, properties),
-    InstanceType(T) {
-  MetatypeTypeBits.Representation = 0;
-  if (repr)
-    MetatypeTypeBits.Representation = static_cast<char>(*repr) + 1;
+  : AnyMetatypeType(TypeKind::Metatype, C, properties, T, repr) {
+}
+
+ExistentialMetatypeType *
+ExistentialMetatypeType::get(Type T, Optional<MetatypeRepresentation> repr,
+                             const ASTContext &ctx) {
+  auto properties = T->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  char reprKey;
+  if (repr.hasValue())
+    reprKey = static_cast<char>(*repr) + 1;
+  else
+    reprKey = 0;
+
+  auto &entry = ctx.Impl.getArena(arena).ExistentialMetatypeTypes[{T, reprKey}];
+  if (entry) return entry;
+
+  return entry = new (ctx, arena) ExistentialMetatypeType(T,
+                                               T->isCanonical() ? &ctx : 0,
+                                               properties, repr);
+}
+
+ExistentialMetatypeType::ExistentialMetatypeType(Type T,
+                                                 const ASTContext *C,
+                                       RecursiveTypeProperties properties,
+                                       Optional<MetatypeRepresentation> repr)
+  : AnyMetatypeType(TypeKind::ExistentialMetatype, C, properties, T, repr) {
+  if (repr) {
+    assert(*repr != MetatypeRepresentation::Thin &&
+           "creating a thin existential metatype?");
+  }
 }
 
 ModuleType *ModuleType::get(Module *M) {

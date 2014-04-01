@@ -296,6 +296,13 @@ FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, RuntimeCC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// type_metadata_t *swift_getExistentialMetatypeMetadata(type_metadata_t *instanceTy);
+FUNCTION(GetExistentialMetatypeMetadata,
+         swift_getExistentialMetatypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // type_metadata_t *swift_getObjCClassMetadata(struct objc_class *theClass);
 FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),

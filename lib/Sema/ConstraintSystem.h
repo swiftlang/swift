@@ -342,6 +342,8 @@ public:
     IsNotDynamicLookup,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
+    /// \brief The type is not a metatype.
+    IsNotMetatype,
   };
 
 private:
@@ -414,6 +416,7 @@ public:
     case TypesNotSubtypes:
     case DoesNotConformToProtocol:
     case IsForbiddenLValue:
+    case IsNotMetatype:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
 
@@ -1755,6 +1758,9 @@ private:
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(const Constraint &constraint);
+
+  /// \brief Attempt to simplify the given DynamicTypeOf constraint.
+  SolutionKind simplifyDynamicTypeOfConstraint(const Constraint &constraint);
 
   /// \brief Attempt to simplify the given archetype constraint.
   SolutionKind simplifyArchetypeConstraint(const Constraint &constraint);

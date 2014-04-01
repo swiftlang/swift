@@ -202,7 +202,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
 
   // If we aren't performing dynamic lookup, we're done.
   auto instanceTy = base->getRValueType();
-  if (auto metaTy = instanceTy->getAs<MetatypeType>())
+  if (auto metaTy = instanceTy->getAs<AnyMetatypeType>())
     instanceTy = metaTy->getInstanceType();
   auto protoTy = instanceTy->getAs<ProtocolType>();
   if (!*result ||
@@ -876,7 +876,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   Type baseObjTy = getFixedTypeRecursive(baseTy, baseTypeVar, 
                                          /*wantRValue=*/true);
   bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<MetatypeType>()) {
+  if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     baseObjTy = baseMeta->getInstanceType();
     isInstance = false;
   }
@@ -972,7 +972,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     
     // If we have a type reference, look through the metatype.
     if (isTypeReference)
-      openedType = openedType->castTo<MetatypeType>()->getInstanceType();
+      openedType = openedType->castTo<AnyMetatypeType>()->getInstanceType();
 
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.

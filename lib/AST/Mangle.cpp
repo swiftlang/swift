@@ -602,7 +602,9 @@ void Mangler::mangleGenericSignature(GenericSignature *sig,
 /// <type> ::= f <type> <type>       # uncurried function type
 /// <type> ::= G <type> <type>+ _    # bound generic type
 /// <type> ::= O <decl>              # enum (substitutable)
+/// <type> ::= M <type>              # metatype
 /// <type> ::= P <protocol-list> _   # protocol composition
+/// <type> ::= PM <type>             # existential metatype
 /// <type> ::= Q <index>             # archetype with depth=0, index=N
 /// <type> ::= Qd <index> <index>    # archetype with depth=M+1, index=N
 /// <type> ::= 'Qq' index context    # archetype+context (DWARF only)
@@ -675,6 +677,10 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
+  case TypeKind::ExistentialMetatype:
+    Buffer << 'P' << 'M';
+    return mangleType(cast<ExistentialMetatypeType>(type).getInstanceType(),
+                      ResilienceExpansion::Minimal, 0);
   case TypeKind::Metatype:
     Buffer << 'M';
     return mangleType(cast<MetatypeType>(type).getInstanceType(),
