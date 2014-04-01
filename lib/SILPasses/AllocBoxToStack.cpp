@@ -150,7 +150,10 @@ static bool useCaptured(Operand *UI) {
       isa<LoadInst>(User) ||
       isa<ProtocolMethodInst>(User) ||
       isa<DebugValueInst>(User) ||
-      isa<DebugValueAddrInst>(User))
+      isa<DebugValueAddrInst>(User) ||
+      isa<StrongReleaseInst>(User) ||
+      isa<StrongRetainInst>(User) ||
+      isa<DeallocBoxInst>(User))
     return false;
 
   if (auto *Store = dyn_cast<StoreInst>(User)) {
