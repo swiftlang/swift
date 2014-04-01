@@ -305,4 +305,96 @@ bb3:
   br bb2
 }
 
+// CHECK-LABEL: sil @_TF6struct5applyFT1fFT_Si_Si
+// struct.apply (f : () -> Swift.Int) -> Swift.Int
+sil @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int {
+bb0(%0 : $@callee_owned () -> Int):
+  debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
+  strong_retain %0 : $@callee_owned () -> Int     // id: %2
+  %3 = apply %0() : $@callee_owned () -> Int      // user: %5
+  strong_release %0 : $@callee_owned () -> Int    // id: %4
+  return %3 : $Int                                // id: %5
+}
 
+// CHECK-LABEL: sil @_TF6struct6escapeFT1fFT_Si_FT_Si
+// struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
+sil @_TF6struct6escapeFT1fFT_Si_FT_Si : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
+bb0(%0 : $@callee_owned () -> Int):
+  debug_value %0 : $@callee_owned () -> Int  // let f // id: %1
+  return %0 : $@callee_owned () -> Int            // id: %2
+}
+
+// CHECK-LABEL: sil @_TF6struct8useStackFT1tSi_T_
+// struct.useStack (t : Swift.Int) -> ()
+sil @_TF6struct8useStackFT1tSi_T_ : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  debug_value %0 : $Int  // let t                 // id: %1
+  // CHECK: alloc_stack
+  %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %9
+  store %0 to %2#1 : $*Int                        // id: %3
+  // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
+  %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int // user: %8
+  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
+  // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
+  %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %7
+  strong_retain %2#0 : $Builtin.ObjectPointer     // id: %6
+  // CHECK: [[PA:%[a-zA-Z0-9]+]] = partial_apply [[FUNC]]
+  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %8
+  %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> Int
+  strong_release %2#0 : $Builtin.ObjectPointer    // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10 : $()                                // id: %11
+}
+
+// CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
+// CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si
+// struct.(useStack (t : Swift.Int) -> ()).(closure #1)
+sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int {
+bb0(%0 : $Builtin.ObjectPointer, %1 : $*Int):
+  // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %3 = alloc_stack $Int                           // users: %4, %5, %6
+  %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %5 = load %3#1 : $*Int                          // user: %8
+  dealloc_stack %3#0 : $*@local_storage Int       // id: %6
+  strong_release %0 : $Builtin.ObjectPointer      // id: %7
+  return %5 : $Int                                // id: %8
+}
+
+// Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
+sil [transparent] @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+
+// CHECK-LABEL: sil @_TF6struct6useBoxFT1tSi_T_
+// struct.useBox (t : Swift.Int) -> ()
+sil @_TF6struct6useBoxFT1tSi_T_ : $@thin (Int) -> () {
+bb0(%0 : $Int):
+  debug_value %0 : $Int  // let t                 // id: %1
+  // CHECK: alloc_box
+  %2 = alloc_box $Int  // var s                   // users: %3, %6, %7, %7, %10
+  store %0 to %2#1 : $*Int                        // id: %3
+  // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
+  %4 = function_ref @_TF6struct6escapeFT1fFT_Si_FT_Si : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
+  // function_ref struct.(useBox (t : Swift.Int) -> ()).(closure #1)
+  %5 = function_ref @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %7
+  strong_retain %2#0 : $Builtin.ObjectPointer     // id: %6
+  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %8
+  %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
+  %9 = apply %8() : $@callee_owned () -> Int
+  strong_release %2#0 : $Builtin.ObjectPointer    // id: %10
+  %11 = tuple ()                                  // user: %12
+  return %11 : $()                                // id: %12
+}
+
+// CHECK-LABEL: sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si
+// struct.(useBox (t : Swift.Int) -> ()).(closure #1)
+sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int {
+bb0(%0 : $Builtin.ObjectPointer, %1 : $*Int):
+  // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %3 = alloc_stack $Int                           // users: %4, %5, %6
+  %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %5 = load %3#1 : $*Int                          // user: %8
+  dealloc_stack %3#0 : $*@local_storage Int       // id: %6
+  strong_release %0 : $Builtin.ObjectPointer      // id: %7
+  return %5 : $Int                                // id: %8
+}

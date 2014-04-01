@@ -12,11 +12,14 @@
 
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SILPasses/Transforms.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
@@ -28,8 +31,11 @@ STATISTIC(NumStackPromoted, "Number of alloc_box's promoted to the stack");
 //                           alloc_box Promotion
 //===----------------------------------------------------------------------===//
 
+typedef llvm::SmallSet<unsigned int, 4> ParamIndexSet;
+
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
+                                            bool inAppliedFunction,
                                             llvm::SmallVectorImpl<Operand*> &);
 static bool operandEscapesApply(Operand *O);
 
@@ -215,10 +221,7 @@ static bool canValueEscape(SILValue V, bool examineApply) {
         ->getInterfaceParameters();
       params = params.slice(params.size() - args.size(), args.size());
       if (params[UI->getOperandNumber()-1].isIndirect()) {
-        // FIXME: Change false to true to enable once the
-        //        appropriate partial_apply cloning and rewrites are
-        //        in place.
-        if (canValueEscape(User, /*examineApply = */ false))
+        if (canValueEscape(User, /*examineApply = */ true))
           return true;
         continue;
       }
@@ -242,9 +245,9 @@ static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
 
 static bool callIsPolymorphic(SILInstruction *Call) {
   if (auto *Apply = dyn_cast<ApplyInst>(Call))
-    return Apply->getSubstCalleeType()->isPolymorphic();
+    return Apply->hasSubstitutions();
   else
-    return cast<PartialApplyInst>(Call)->getSubstCalleeType()->isPolymorphic();
+    return cast<PartialApplyInst>(Call)->hasSubstitutions();
 }
 
 /// Given an operand of a direct apply or partial_apply of a
@@ -288,8 +291,7 @@ static SILValue getParameterForOperand(Operand *O) {
     return SILValue();
 
   auto *F = FRI->getReferencedFunction();
-  if (!F)
-    return SILValue();
+  assert(F && "Expected a referenced function!");
 
   // TODO: Support generics at some point.
   if (callIsPolymorphic(O->getUser()))
@@ -323,7 +325,8 @@ static bool checkPartialApplyBody(Operand *O) {
   // rewriting the partial applies we find.
   llvm::SmallVector<Operand *, 1> ElidedOperands;
   if (auto Param = getParameterForOperand(O))
-    return !findUnexpectedBoxUse(Param, /* examinePartialApply =*/ false,
+    return !findUnexpectedBoxUse(Param, /* examinePartialApply = */ false,
+                                 /* inAppliedFunction = */ true,
                                  ElidedOperands);
 
   return false;
@@ -337,6 +340,7 @@ static bool checkPartialApplyBody(Operand *O) {
 /// instruction with the unexpected use if we find one.
 static SILInstruction* findUnexpectedBoxUse(SILValue Box,
                                             bool examinePartialApply,
+                                            bool inAppliedFunction,
                              llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
   assert((Box.getType() ==
           SILType::getObjectPointerType(Box.getType().getASTContext())) &&
@@ -350,9 +354,10 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
   for (auto UI : Box.getUses()) {
     auto *User = UI->getUser();
 
-    // Retains, releases, and deallocs are fine.
+    // Retains and releases are fine. Deallocs are fine if we're not
+    // examining a function that the alloc_box was passed into.
     if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
-        isa<DeallocBoxInst>(User))
+        (!inAppliedFunction && isa<DeallocBoxInst>(User)))
       continue;
 
     // For partial_apply, if we've been asked to examine the body, the
@@ -360,10 +365,7 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
     // itself cannot escape, then everything is fine.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User))
       if (examinePartialApply && checkPartialApplyBody(UI) &&
-          // FIXME: Change false to true to enable once the
-          //        appropriate partial_apply cloning and rewrites are
-          //        in place.
-          !canValueEscape(PAI, /* examineApply = */ false)) {
+          !canValueEscape(PAI, /* examineApply = */ true)) {
         LocalElidedOperands.push_back(UI);
         continue;
       }
@@ -387,13 +389,8 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted tot he stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
-                                        // FIXME: Change false to true
-                                        //        to enable once the
-                                        //        appropriate
-                                        //        partial_apply
-                                        //        cloning and rewrites
-                                        //        are in place.
-                                        /* examinePartialApply = */ false,
+                                        /* examinePartialApply = */ true,
+                                        /* inAppliedFunction = */ false,
                                         ElidedOperands)) {
     // Otherwise, we have an unexpected use.
     DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
@@ -464,9 +461,232 @@ static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   }
 }
 
+namespace {
+
+/// \brief A SILCloner subclass which clones a closure function while
+/// removing some of the parameters, which are either completely dead
+/// or only used in retains and releases (which will not be cloned).
+class DeadParamCloner : public SILCloner<DeadParamCloner> {
+  public:
+  friend class SILVisitor<DeadParamCloner>;
+  friend class SILCloner<DeadParamCloner>;
+
+  DeadParamCloner(SILFunction *Orig, ParamIndexSet &DeadParamIndices);
+
+  void populateCloned();
+
+  SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+  private:
+  static SILFunction *initCloned(SILFunction *Orig,
+                                 ParamIndexSet &DeadParamIndices);
+
+  void visitStrongReleaseInst(StrongReleaseInst *Inst);
+  void visitStrongRetainInst(StrongRetainInst *Inst);
+
+  SILFunction *Orig;
+  ParamIndexSet &DeadParamIndices;
+
+  // The values in the original function that are either dead or only
+  // used in retains and releases.
+  llvm::SmallSet<SILValue, 4> DeadParameters;
+};
+} // end anonymous namespace.
+
+DeadParamCloner::DeadParamCloner(SILFunction *Orig,
+                                 ParamIndexSet &DeadParamIndices)
+  : SILCloner<DeadParamCloner>(*initCloned(Orig, DeadParamIndices)),
+    Orig(Orig), DeadParamIndices(DeadParamIndices) {
+}
+
+/// \brief Create the function corresponding to the clone of the
+/// original closure with the signature modified to reflect removed
+/// parameters (which are specified by DeadParamIndices).
+SILFunction*
+DeadParamCloner::initCloned(SILFunction *Orig,
+                            ParamIndexSet &DeadParamIndices) {
+  SILModule &M = Orig->getModule();
+
+  // Suffix the function name with "_specializedX", where X is the first integer
+  // that does not result in a conflict.
+  // TODO: come up with a good mangling for this transformation and
+  // use shared linkage.
+  unsigned Counter = 0;
+  std::string ClonedName;
+  do {
+    ClonedName.clear();
+    llvm::raw_string_ostream buffer(ClonedName);
+    buffer << Orig->getName() << "_specialized" << Counter++;
+  } while (M.lookUpFunction(ClonedName));
+
+  SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
+
+  // Generate a new parameter list with deleted parameters removed.
+  SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
+  unsigned Index = 0;
+  for (auto &param : OrigFTI->getInterfaceParameters()) {
+    if (!DeadParamIndices.count(Index))
+      ClonedInterfaceArgTys.push_back(param);
+    ++Index;
+  }
+
+  // Create the new function type for the cloned function with some of
+  // the parameters removed.
+  auto ClonedTy =
+    SILFunctionType::get(OrigFTI->getGenericSignature(),
+                         OrigFTI->getExtInfo(),
+                         OrigFTI->getCalleeConvention(),
+                         ClonedInterfaceArgTys,
+                         OrigFTI->getInterfaceResult(),
+                         M.getASTContext());
+
+  return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
+                             Orig->getContextGenericParams(),
+                             Orig->getLocation(), Orig->isBare(),
+                             IsNotTransparent, Orig,
+                             Orig->getDebugScope());
+}
+
+/// \brief Populate the body of the cloned closure, modifying instructions as
+/// necessary to take into consideration the removed parameters.
+void
+DeadParamCloner::populateCloned() {
+  SILFunction *Cloned = getCloned();
+  SILModule &M = Cloned->getModule();
+
+  // Create arguments for the entry block
+  SILBasicBlock *OrigEntryBB = Orig->begin();
+  SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
+  unsigned ArgNo = 0;
+  auto I = OrigEntryBB->bbarg_begin(), E = OrigEntryBB->bbarg_end();
+  while (I != E) {
+    if (!DeadParamIndices.count(ArgNo)) {
+      // Create a new argument which copies the original argument.
+      SILValue MappedValue =
+        new (M) SILArgument((*I)->getType(), ClonedEntryBB, (*I)->getDecl());
+      ValueMap.insert(std::make_pair(*I, MappedValue));
+    } else {
+      DeadParameters.insert(SILValue(*I));
+    }
+    ++ArgNo;
+    ++I;
+  }
+
+  getBuilder().setInsertionPoint(ClonedEntryBB);
+  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
+  // Recursively visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions other than terminators.
+  visitSILBasicBlock(OrigEntryBB);
+
+  // Now iterate over the BBs and fix up the terminators.
+  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
+    getBuilder().setInsertionPoint(BI->second);
+    visit(BI->first->getTerminator());
+  }
+}
+
+/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// it is a strong release of a promoted box argument, then it is replaced wit
+/// a destroyValue of the new object type argument, otherwise it is handled
+/// normally.
+void
+DeadParamCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  // If it's a release of a dead parameter, just drop the instruction.
+  if (DeadParameters.count(Inst->getOperand()))
+    return;
+
+  SILCloner<DeadParamCloner>::visitStrongReleaseInst(Inst);
+}
+
+void
+DeadParamCloner::visitStrongRetainInst(StrongRetainInst *Inst) {
+  // If it's a retain of a dead parameter, just drop the instruction.
+  if (DeadParameters.count(Inst->getOperand()))
+    return;
+
+  SILCloner<DeadParamCloner>::visitStrongRetainInst(Inst);
+}
+
+/// Specialize a partial_apply by removing the parameters indicated by
+/// indices. We expect these parameters to be either dead, or used
+/// only by retains and releases.
+static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
+                                              ParamIndexSet &DeadParamIndices) {
+  auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
+  assert(FRI && "Expected a direct partial_apply!");
+  auto *F = FRI->getReferencedFunction();
+  assert(F && "Expected a referenced function!");
+
+  // Clone the function the existing partial_apply references.
+  DeadParamCloner Cloner(F, DeadParamIndices);
+  Cloner.populateCloned();
+
+  // Now create the new partial_apply using the cloned function.
+  llvm::SmallVector<SILValue, 16> Args;
+
+  // Only use the arguments that are not dead.
+  for (auto &O : PartialApply->getArgumentOperands()) {
+    auto ParamIndex = getParameterIndexForOperand(&O);
+    if (!DeadParamIndices.count(ParamIndex))
+      Args.push_back(O.get());
+  }
+
+  // Build the function_ref and partial_apply.
+  SILBuilder Builder(PartialApply);
+  SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
+                                                   Cloner.getCloned());
+  return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
+                                    FunctionRef.getType(), {}, Args,
+                                    PartialApply->getType());
+}
+
+static void
+rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+  llvm::DenseMap<PartialApplyInst *, ParamIndexSet> IndexMap;
+  ParamIndexSet Indices;
+
+  // Build a map from partial_apply to the indices of the operands
+  // that will not be in our rewritten version.
+  for (auto *O : ElidedOperands) {
+    auto ParamIndexNumber = getParameterIndexForOperand(O);
+
+    Indices.clear();
+    Indices.insert(ParamIndexNumber);
+
+    auto *PartialApply = cast<PartialApplyInst>(O->getUser());
+    llvm::DenseMap<PartialApplyInst *, ParamIndexSet>::iterator It;
+    bool Inserted;
+    std::tie(It, Inserted) = IndexMap.insert(std::make_pair(PartialApply,
+                                                            Indices));
+    if (!Inserted)
+      It->second.insert(ParamIndexNumber);
+  }
+
+  // Clone the referenced function of each partial_apply, removing the
+  // operands that we will not need, and remove the existing
+  // partial_apply.
+  for (auto &It : IndexMap) {
+    auto *PartialApply = It.first;
+    auto &Indices = It.second;
+    auto *Replacement = specializePartialApply(PartialApply, Indices);
+    PartialApply->replaceAllUsesWith(Replacement);
+
+    auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
+    PartialApply->eraseFromParent();
+
+    // TODO: Erase from module if there are no more uses.
+    if (FRI->use_empty())
+      FRI->eraseFromParent();
+  }
+}
+
 static void
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
                      llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+  // First we'll rewrite any partial applies that we can to remove the
+  // box container pointer from the operands.
+  rewritePartialApplies(ElidedOperands);
+
   for (auto *ABI : Promoted) {
     rewriteAllocBoxAsAllocStack(ABI);
     ABI->eraseFromParent();
