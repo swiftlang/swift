@@ -143,6 +143,24 @@ typedef NS_OPTIONS(NSUInteger, NSSingleOptions) {
   NSSingleValue = 1,
 };
 
+typedef CF_OPTIONS(unsigned long, CFCalendarUnit) {
+  kCFCalendarUnitEra = (1UL << 1),
+  kCFCalendarUnitYear = (1UL << 2),
+  kCFCalendarUnitMonth = (1UL << 3),
+  kCFCalendarUnitDay = (1UL << 4),
+  kCFCalendarUnitHour = (1UL << 5),
+  kCFCalendarUnitMinute = (1UL << 6),
+  kCFCalendarUnitSecond = (1UL << 7),
+  kCFCalendarUnitWeek /*CF_ENUM_DEPRECATED(10_4, 10_10, 2_0, 8_0)*/ = (1UL << 8),
+  kCFCalendarUnitWeekday = (1UL << 9),
+  kCFCalendarUnitWeekdayOrdinal = (1UL << 10),
+  kCFCalendarUnitQuarter /*CF_ENUM_AVAILABLE(10_6, 4_0)*/ = (1UL << 11),
+  kCFCalendarUnitWeekOfMonth /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 12),
+  kCFCalendarUnitWeekOfYear /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 13),
+  kCFCalendarUnitYearForWeekOfYear /*CF_ENUM_AVAILABLE(10_7, 5_0)*/ = (1UL << 14),
+};
+
+
 @protocol NSWobbling
 -(void)wobble;
 

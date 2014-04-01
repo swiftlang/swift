@@ -853,12 +853,33 @@ namespace {
     /// by the enum type.
     void computeEnumCommonWordPrefix(const clang::EnumDecl *decl,
                                      Identifier enumName) {
-      auto enumerators = decl->enumerators();
-      if (enumerators.begin() == enumerators.end())
+      auto ec = decl->enumerator_begin(), ecEnd = decl->enumerator_end();
+      if (ec == ecEnd)
         return;
-      StringRef commonPrefix = enumName.str();
-      for (auto nextValue : enumerators)
-        commonPrefix = getCommonWordPrefix(commonPrefix, nextValue->getName());
+
+      StringRef commonPrefix = (*ec)->getName();
+      for (++ec; ec != ecEnd; ++ec) {
+        commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
+        if (commonPrefix.empty())
+          break;
+      }
+
+      if (!commonPrefix.empty()) {
+        StringRef enumName = decl->getName();
+        StringRef checkPrefix = commonPrefix;
+
+        // Account for the 'kConstant' naming convention on enumerators.
+        bool dropKPrefix = false;
+        if (checkPrefix.size() >= 2) {
+          if (checkPrefix[0] == 'k' && clang::isUppercase(checkPrefix[1])) {
+            checkPrefix = checkPrefix.substr(1);
+            dropKPrefix = true;
+          }
+        }
+
+        StringRef commonWithEnum = getCommonWordPrefix(checkPrefix, enumName);
+        commonPrefix = commonPrefix.slice(0, commonWithEnum.size()+dropKPrefix);
+      }
       Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
     }
     
