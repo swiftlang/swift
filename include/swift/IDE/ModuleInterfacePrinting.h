@@ -23,6 +23,12 @@ struct PrintOptions;
 namespace ide {
 void printModuleInterface(Module *M, ASTPrinter &Printer,
                           const PrintOptions &Options);
+
+// FIXME: this API should go away when Swift can represent Clang submodules as
+// 'swift::Module *' objects.
+void printSubmoduleInterface(Module *M, ArrayRef<StringRef> FullModuleName,
+                             ASTPrinter &Printer, const PrintOptions &Options);
+
 } // namespace ide
 
 } // namespace swift
