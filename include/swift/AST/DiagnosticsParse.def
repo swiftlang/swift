@@ -540,6 +540,8 @@ ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
       "unexpected '...' before the end of a tuple list", ())
 ERROR(tuple_type_init,pattern_parsing,none,
       "default argument not permitted in a tuple type", ())
+ERROR(protocol_method_argument_init,type_parseing,none,
+      "default argument not permitted in a protocol method", ())
 
 // Protocol Types
 ERROR(expected_langle_protocol,type_parsing,PointsToFirstBadToken,

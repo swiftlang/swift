@@ -754,7 +754,11 @@ public:
   /// arguments of a context.
   struct DefaultArgumentInfo {
     llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
-    unsigned NextIndex = 0;
+    unsigned NextIndex : 31;
+    
+    /// Track whether or not one of the parameters in a signature's argument
+    /// list accepts a default argument.
+    unsigned HasDefaultArgument : 1;
 
     /// Claim the next argument index.  It's important to do this for
     /// all the arguments, not just those that have default arguments.
@@ -763,6 +767,11 @@ public:
     /// Set the parsed context for all the initializers to the given
     /// function.
     void setFunctionContext(DeclContext *DC);
+    
+    DefaultArgumentInfo() {
+      NextIndex = 0;
+      HasDefaultArgument = false;
+    }
   };
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,

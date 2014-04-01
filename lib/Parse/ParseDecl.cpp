@@ -2473,7 +2473,13 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // Trigger delayed parsing, no need to continue.
     return SignatureStatus;
   }
-
+  
+  // Protocol method arguments may not have default values.
+  if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
+    diagnose(FuncLoc, diag::protocol_method_argument_init);
+    return nullptr;
+  }
+  
   // Enter the arguments for the function into a new function-body scope.  We
   // need this even if there is no function body to detect argument name
   // duplication.

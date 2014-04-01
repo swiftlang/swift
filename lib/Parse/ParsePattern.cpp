@@ -89,6 +89,8 @@ static ParserStatus parseDefaultArgument(Parser &P,
     auto inFlight = P.diagnose(equalLoc, diag::non_func_decl_pattern_init);
     if (initR.isNonNull())
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
+  } else {
+    defaultArgs->HasDefaultArgument = true;
   }
 
   if (initR.hasCodeCompletion()) {
