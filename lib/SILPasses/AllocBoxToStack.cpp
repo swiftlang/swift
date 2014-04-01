@@ -41,8 +41,8 @@ static bool operandEscapesApply(Operand *O);
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
-void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
-                       SILBasicBlock *DefBB) {
+static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
+                              SILBasicBlock *DefBB) {
 
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock*, 64> Worklist;
@@ -65,8 +65,8 @@ void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
 }
 
 // Is any successor of BB in the LiveIn set?
-bool successorHasLiveIn(SILBasicBlock *BB,
-                        llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn) {
+static bool successorHasLiveIn(SILBasicBlock *BB,
+                               llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn) {
   for (auto &Succ : BB->getSuccs())
     if (LiveIn.count(Succ))
       return true;
@@ -76,8 +76,8 @@ bool successorHasLiveIn(SILBasicBlock *BB,
 
 // Walk backwards in BB looking for strong_release or dealloc_box of
 // the given value, and add it to Releases.
-void addLastRelease(SILValue V, SILBasicBlock *BB,
-                    llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+static void addLastRelease(SILValue V, SILBasicBlock *BB,
+                           llvm::SmallVectorImpl<SILInstruction*> &Releases) {
   for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
     if (isa<StrongReleaseInst>(*I) || isa<DeallocBoxInst>(*I)) {
       if (I->getOperand(0) != V)
@@ -97,8 +97,8 @@ void addLastRelease(SILValue V, SILBasicBlock *BB,
 // Find the final releases of the alloc_box along any given path.
 // These can include paths from a release back to the alloc_box in a
 // loop.
-void getFinalReleases(AllocBoxInst *ABI,
-                      llvm::SmallVectorImpl<SILInstruction*> &Releases) {
+static void getFinalReleases(AllocBoxInst *ABI,
+                             llvm::SmallVectorImpl<SILInstruction*> &Releases) {
   llvm::SmallPtrSet<SILBasicBlock*, 16> LiveIn;
   llvm::SmallPtrSet<SILBasicBlock*, 16> UseBlocks;
 
@@ -253,7 +253,7 @@ static bool callIsPolymorphic(SILInstruction *Call) {
 /// Given an operand of a direct apply or partial_apply of a
 /// non-generic function, return the index of the parameter used in
 /// the body of the function to represent this operand.
-size_t getParameterIndexForOperand(Operand *O) {
+static size_t getParameterIndexForOperand(Operand *O) {
   assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
          "Expected apply or partial_apply!");
 
