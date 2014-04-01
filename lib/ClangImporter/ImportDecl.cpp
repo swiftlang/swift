@@ -29,6 +29,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Lex/Preprocessor.h"
 
 #include "llvm/ADT/SmallString.h"
@@ -307,17 +308,23 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 /// This is used to derive the common prefix of enum constants so we can elide
 /// it from the Swift interface.
 static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
+  // Ensure that 'b' is the longer string.
+  if (a.size() > b.size())
+    std::swap(a, b);
+
   unsigned prefixLength = 0;
-  unsigned commonSize = std::min(a.size(), b.size());
+  unsigned commonSize = a.size();
   for (size_t i = 0; i < commonSize; ++i) {
     // If this is a camel-case word boundary, advance the prefix length.
-    if (isupper(a[i]) && isupper(b[i]))
+    if (clang::isUppercase(a[i]) && clang::isUppercase(b[i]))
       prefixLength = i;
 
     if (a[i] != b[i])
       return a.slice(0, prefixLength);
   }
-  return a.slice(0, commonSize);
+  if (b.size() == commonSize || clang::isIdentifierHead(b[commonSize]))
+    prefixLength = commonSize;
+  return a.slice(0, prefixLength);
 }
 
 namespace {

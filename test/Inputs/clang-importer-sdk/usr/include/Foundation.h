@@ -126,6 +126,13 @@ typedef NS_ENUM(unsigned char, NSAliasesEnum) {
   NSAliasesByName = NSAliasesOriginal,
 };
 
+typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
+  NSNumberFormatterBehaviorDefault = 0,
+  NSNumberFormatterBehavior10_0 = 1000,
+  NSNumberFormatterBehavior10_4 = 1040,
+};
+
+
 /// Aaa.  NSRuncingOptions.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
   NSRuncingEnableMince = 1,
