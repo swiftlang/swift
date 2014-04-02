@@ -108,10 +108,10 @@ const size_t arenaSize = 0x10000;
 const size_t arenaMask =  0xFFFF;
 
 auto _swift_alloc = SwiftZone::alloc_optimized;
-void *(*_swift_tryAlloc)(AllocIndex idx) = SwiftZone::tryAlloc_optimized;
-void *(*_swift_slowAlloc)(size_t size, uintptr_t flags) = SwiftZone::slowAlloc_optimized;
-void (*_swift_dealloc)(void *ptr, AllocIndex idx) = SwiftZone::dealloc_optimized;
-void (*_swift_slowDealloc)(void *ptr, size_t bytes) = SwiftZone::slowDealloc_optimized;
+auto _swift_tryAlloc = SwiftZone::tryAlloc_optimized;
+auto _swift_slowAlloc = SwiftZone::slowAlloc_optimized;
+auto _swift_dealloc = SwiftZone::dealloc_optimized;
+auto _swift_slowDealloc = SwiftZone::slowDealloc_optimized;
 
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
