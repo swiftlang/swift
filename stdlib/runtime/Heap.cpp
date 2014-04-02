@@ -325,7 +325,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   if (!tmp) {
     return;
   }
-  swift_dealloc(tmp, idx);
+  SwiftZone::dealloc_unoptimized(tmp, idx);
 }
 
 void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
@@ -363,15 +363,16 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
     return r;
   }
 
-  assert(idx != SIZE_MAX);
-  void *r = swift_tryAlloc(idx);
+  void *r = tryAlloc_optimized(idx);
   if (r) return r;
 
-  do {
-    r = zoneShims.malloc(NULL, size);
-  } while (!r && !(flags & SWIFT_TRYALLOC));
+  _swift_refillThreadAllocCache(idx, flags);
 
-  return r;
+  if (flags & SWIFT_TRYALLOC) {
+    return tryAlloc_optimized(idx);
+  } else {
+    return alloc_optimized(idx);
+  }
 }
 
 #if __has_include(<os/tsd.h>)
@@ -463,7 +464,7 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
     return;
   }
 
-  swift_dealloc(ptr, idx);
+  dealloc_optimized(ptr, idx);
 }
 
 void
