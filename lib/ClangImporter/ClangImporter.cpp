@@ -236,6 +236,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
                                           invocationArgs.size()),
                                          *clangDiags))
     return nullptr;
+  importer->Impl.Invocation = invocation;
 
   // Create an almost-empty memory buffer corresponding to the file "swift.m"
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer("extern int __swift;");
@@ -1279,6 +1280,10 @@ clang::Preprocessor &ClangImporter::getClangPreprocessor() const {
 }
 const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
   return ::getClangOwningModule(Node, getClangASTContext());
+}
+
+std::string ClangImporter::getClangModuleHash() const {
+  return Impl.Invocation->getModuleHash();
 }
 
 void ClangImporter::verifyAllModules() {

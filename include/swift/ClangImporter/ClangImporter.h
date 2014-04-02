@@ -121,6 +121,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
+  std::string getClangModuleHash() const;
 };
 
 typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
