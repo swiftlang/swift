@@ -386,10 +386,11 @@ private:
                                Orig->getLoweredFunctionType(),
                                /*dropGenerics = */ true);
 
+    assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
+           && "SILFunction missing location");
+    assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
+           && "SILFunction missing DebugScope");
     // Create a new empty function.
-    assert(Orig->isTransparent() ||
-           Orig->isBare() ||
-           Orig->getLocation() && "SILFunction missing location");
     SILFunction *NewF =
         SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                             NewName, FTy, nullptr,

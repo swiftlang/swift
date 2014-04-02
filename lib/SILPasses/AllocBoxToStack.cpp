@@ -540,9 +540,10 @@ DeadParamCloner::initCloned(SILFunction *Orig,
                          OrigFTI->getInterfaceResult(),
                          M.getASTContext());
 
-  assert(Orig->isTransparent() ||
-         Orig->isBare() ||
-         Orig->getLocation() && "SILFunction missing location");
+  assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
+         && "SILFunction missing location");
+  assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
+         && "SILFunction missing DebugScope");
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
                              Orig->getContextGenericParams(),
                              Orig->getLocation(), Orig->isBare(),

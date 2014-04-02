@@ -654,11 +654,12 @@ protected:
   static SILFunction *initCloned(SILFunction *OrigF, StringRef NewName) {
     SILModule &M = OrigF->getModule();
 
+    assert((OrigF->isTransparent() || OrigF->isBare() || OrigF->getLocation())
+           && "SILFunction missing location");
+    assert((OrigF->isTransparent() || OrigF->isBare() || OrigF->getDebugScope())
+           && "SILFunction missing DebugScope");
     // Create a new empty function.
     // TODO: Use getSpecializedLinkage() once we mangle properly.
-    assert(OrigF->isTransparent() ||
-           OrigF->isBare() ||
-           OrigF->getLocation() && "SILFunction missing location");
     SILFunction *NewF =
       SILFunction::create(M, SILLinkage::Private,
                           NewName,
