@@ -305,6 +305,7 @@ private:
           OpLoc, CheckedCastKind::Downcast, OtherOp, OpToTy);
       doPostProcess(Inst, Builder.createBranch(OpLoc, OpSuccBB,
                                                ArrayRef<SILValue>(Downcast)));
+      return;
     }
 
     // If ToTy is a super class of FromTy, we are performing an upcast.
@@ -318,7 +319,6 @@ private:
 
     // Ok, we have an invalid cast. Jump to fail BB.
     doPostProcess(Inst, Builder.createBranch(OpLoc, OpFailBB));
-    return;
   }
 
   void visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
