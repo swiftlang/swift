@@ -334,6 +334,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   }
 #include "swift/SIL/BridgedTypes.def"
   if (Module *module = SF.getASTContext().LoadedModules.lookup("Swift")) {
+    checkBridgingFunctions(TC, module, "ObjCMutablePointer",
+                           "convertUnsafePointerToObjCMutablePointer",
+                           "convertObjCMutablePointerToUnsafePointer");
     checkBridgingFunctions(TC, module, "CMutablePointer",
                            "convertUnsafePointerToCMutablePointer",
                            "convertCMutablePointerToUnsafePointer");

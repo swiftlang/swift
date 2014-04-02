@@ -86,8 +86,10 @@ public:
   Optional<SILDeclRef> StringDefaultInitFn;
   Optional<SILDeclRef> CConstPointerToUnsafePointerFn;
   Optional<SILDeclRef> CMutablePointerToUnsafePointerFn;
+  Optional<SILDeclRef> ObjCMutablePointerToUnsafePointerFn;
   Optional<SILDeclRef> UnsafePointerToCConstPointerFn;
   Optional<SILDeclRef> UnsafePointerToCMutablePointerFn;
+  Optional<SILDeclRef> UnsafePointerToObjCMutablePointerFn;
   
 public:
   SILGenModule(SILModule &M, Module *SM);
@@ -252,8 +254,10 @@ public:
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getStringDefaultInitFn();
+  SILDeclRef getObjCMutablePointerToUnsafePointerFn();
   SILDeclRef getCMutablePointerToUnsafePointerFn();
   SILDeclRef getCConstPointerToUnsafePointerFn();
+  SILDeclRef getUnsafePointerToObjCMutablePointerFn();
   SILDeclRef getUnsafePointerToCMutablePointerFn();
   SILDeclRef getUnsafePointerToCConstPointerFn();
   

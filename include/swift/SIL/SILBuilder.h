@@ -674,6 +674,12 @@ public:
                                      SILValue Operand) {
     return insert(new (F.getModule()) FixLifetimeInst(Loc, Operand));
   }
+  void emitFixLifetime(SILLocation Loc,
+                       SILValue Operand) {
+    if (F.getModule().getTypeLowering(Operand.getType()).isTrivial())
+      return;
+    createFixLifetime(Loc, Operand);
+  }
   
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));

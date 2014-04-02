@@ -166,6 +166,11 @@ NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
                                     "Swift", "CConstPointer");
 }
 
+NominalTypeDecl *TypeConverter::getObjCMutablePointerDecl() {
+  return getKnownNominalPointerType(ObjCMutablePointerDecl, M.getASTContext(),
+                                    "Swift", "ObjCMutablePointer");
+}
+
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
   if (VarDecl *var = dyn_cast<VarDecl>(capture.getPointer())) {
     // If captured directly, the variable is captured by box.
@@ -2026,10 +2031,10 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
 
 static bool isCPointerType(TypeConverter &TC,
                            Type ty) {
-  return ty->getNominalOrBoundGenericNominal()
-      == TC.getCMutablePointerDecl()
-    || ty->getNominalOrBoundGenericNominal()
-      == TC.getCConstPointerDecl();
+  auto nom = ty->getNominalOrBoundGenericNominal();
+  return nom == TC.getCMutablePointerDecl()
+    || nom == TC.getObjCMutablePointerDecl()
+    || nom == TC.getCConstPointerDecl();
 }
 
 Type TypeConverter::getLoweredCBridgedType(Type t) {

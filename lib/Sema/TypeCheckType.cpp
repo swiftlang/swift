@@ -1872,6 +1872,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   return Result;
 }
 
+/// True if T is representable as a non-nullable ObjC pointer type.
 static bool isObjCPointerType(Type T) {
   // FIXME: Return true for closures, and for anything bridged to a class type.
 
@@ -1886,6 +1887,15 @@ static bool isObjCPointerType(Type T) {
     return true;
 
   return false;
+}
+
+/// True if T is representable as an ObjC pointer type, nullable or otherwise.
+static bool isObjCPointerOrOptionalType(Type T) {
+  // Look through a single layer of optional type.
+  if (auto valueType = T->getAnyOptionalObjectType()) {
+    T = valueType;
+  }
+  return isObjCPointerType(T);
 }
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
@@ -1929,7 +1939,14 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
         && !isObjCPointerType(T);
     }
     
-    // TODO: C*VoidPointer, ObjCMutablePointer
+    // An ObjCMutablePointer<T> is representable in ObjC if T
+    // is a (potentially optional) ObjC pointer type.
+    if (NTD == getObjCMutablePointerDecl(DC)) {
+      T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
+      return isObjCPointerOrOptionalType(T);
+    }
+    
+    // TODO: C*VoidPointer
   }
 
   // If it's a mapped type, it's representable.

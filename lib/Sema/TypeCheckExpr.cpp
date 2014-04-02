@@ -605,6 +605,11 @@ NominalTypeDecl *TypeChecker::getCMutablePointerDecl(const DeclContext *DC) {
                              CMutablePointerDecl, "CMutablePointer");
 }
 
+NominalTypeDecl *TypeChecker::getObjCMutablePointerDecl(const DeclContext *DC) {
+  return getKnownPointerDecl(getStdlibModule(DC), Context,
+                             ObjCMutablePointerDecl, "ObjCMutablePointer");
+}
+
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
   ArrayRef<Expr*> Elts = expr->getElements();
   assert(Elts.size() > 1 && "inadequate number of elements in sequence");

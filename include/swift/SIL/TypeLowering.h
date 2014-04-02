@@ -489,6 +489,7 @@ class TypeConverter {
   Optional<NominalTypeDecl*> UnsafePointerDecl;
   Optional<NominalTypeDecl*> CConstPointerDecl;
   Optional<NominalTypeDecl*> CMutablePointerDecl;
+  Optional<NominalTypeDecl*> ObjCMutablePointerDecl;
   
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
@@ -703,6 +704,7 @@ public:
   CanType get##NativeType##Type();
 #include "swift/SIL/BridgedTypes.def"
   NominalTypeDecl *getCMutablePointerDecl();
+  NominalTypeDecl *getObjCMutablePointerDecl();
   NominalTypeDecl *getCConstPointerDecl();
   NominalTypeDecl *getUnsafePointerDecl();
 

@@ -3696,10 +3696,11 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
 static bool isCPointerType(SILGenFunction &gen,
                            CanType ty) {
-  return ty->getNominalOrBoundGenericNominal()
-        == gen.SGM.Types.getCMutablePointerDecl()
-    || ty->getNominalOrBoundGenericNominal()
-        == gen.SGM.Types.getCConstPointerDecl();
+  auto nom = ty->getNominalOrBoundGenericNominal();
+  
+  return nom == gen.SGM.Types.getCMutablePointerDecl()
+    || nom == gen.SGM.Types.getObjCMutablePointerDecl()
+    || nom == gen.SGM.Types.getCConstPointerDecl();
 }
 
 static bool isUnsafePointerType(SILGenFunction &gen,
@@ -3713,14 +3714,16 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
                                                       ManagedValue v) {
   // func convertC*PointerToUnsafePointer<T>(C*Pointer<T>) -> UnsafePointer<T>
   SILValue cToUnsafePointer;
-  if (v.getType().getNominalOrBoundGenericNominal()
-        == gen.SGM.Types.getCMutablePointerDecl())
+  auto nativeNom = v.getType().getNominalOrBoundGenericNominal();
+  if (nativeNom == gen.SGM.Types.getCMutablePointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                                 gen.SGM.getCMutablePointerToUnsafePointerFn());
-  else if (v.getType().getNominalOrBoundGenericNominal()
-             == gen.SGM.Types.getCConstPointerDecl())
+                             gen.SGM.getCMutablePointerToUnsafePointerFn());
+  else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                                 gen.SGM.getCConstPointerToUnsafePointerFn());
+                             gen.SGM.getCConstPointerToUnsafePointerFn());
+  else if (nativeNom == gen.SGM.Types.getObjCMutablePointerDecl())
+    cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
+                             gen.SGM.getObjCMutablePointerToUnsafePointerFn());
   else
     llvm_unreachable("unhandled C pointer type");
   
@@ -3731,11 +3734,16 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
   auto unsafePtrTy = BoundGenericType::get(gen.SGM.Types.getUnsafePointerDecl(),
                                            Type(), subs[0].Replacement)
     ->getCanonicalType();
+  
+  ParameterConvention convention = gen.getTypeLowering(v.getType()).isTrivial()
+    ? ParameterConvention::Direct_Unowned
+    : ParameterConvention::Direct_Owned;
+  
   auto substFnTy = SILFunctionType::get(nullptr,
                             AnyFunctionType::ExtInfo().withIsThin(true),
                             ParameterConvention::Direct_Unowned,
                             SILParameterInfo(v.getType().getSwiftRValueType(),
-                                             ParameterConvention::Direct_Owned),
+                                             convention),
                             SILResultInfo(unsafePtrTy,
                                           ResultConvention::Unowned),
                             gen.getASTContext());
@@ -3756,14 +3764,16 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
                                                       CanType nativeTy) {
   // func convertUnsafePointerToC*Pointer<T>(UnsafePointer<T>) -> C*Pointer<T>
   SILValue unsafeToCPointer;
-  if (nativeTy->getNominalOrBoundGenericNominal()
-        == gen.SGM.Types.getCMutablePointerDecl())
+  auto nativeNom = nativeTy->getNominalOrBoundGenericNominal();
+  if (nativeNom == gen.SGM.Types.getCMutablePointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                                 gen.SGM.getUnsafePointerToCMutablePointerFn());
-  else if (nativeTy->getNominalOrBoundGenericNominal()
-             == gen.SGM.Types.getCConstPointerDecl())
+                             gen.SGM.getUnsafePointerToCMutablePointerFn());
+  else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                                 gen.SGM.getUnsafePointerToCConstPointerFn());
+                             gen.SGM.getUnsafePointerToCConstPointerFn());
+  else if (nativeNom == gen.SGM.Types.getObjCMutablePointerDecl())
+    unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
+                             gen.SGM.getUnsafePointerToObjCMutablePointerFn());
   else
     llvm_unreachable("unhandled C pointer type");
   
@@ -3771,13 +3781,16 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
     ->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   assert(subs.size() == 1 && "more than one substitution for pointer type?!");
   
+  ResultConvention convention = gen.getTypeLowering(nativeTy).isTrivial()
+    ? ResultConvention::Unowned
+    : ResultConvention::Owned;
+  
   auto substFnTy = SILFunctionType::get(nullptr,
                             AnyFunctionType::ExtInfo().withIsThin(true),
                             ParameterConvention::Direct_Unowned,
                             SILParameterInfo(v.getType().getSwiftRValueType(),
                                              ParameterConvention::Direct_Unowned),
-                            SILResultInfo(nativeTy,
-                                          ResultConvention::Owned),
+                            SILResultInfo(nativeTy, convention),
                             gen.getASTContext());
   
   auto ptr = gen.B.createApply(loc, unsafeToCPointer,
@@ -3797,7 +3810,7 @@ namespace {
   public:
     FixLifetimeCleanup(SILValue value) : value(value) {}
     void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createFixLifetime(l, value);
+      gen.B.emitFixLifetime(l, value);
     }
   };
 }

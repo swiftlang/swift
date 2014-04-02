@@ -211,22 +211,25 @@ SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
                        getBoolTy(*this));
 }
 
-static SILType getCConstPointerInterfaceType(SILGenModule &SGM) {
-  return SILType::getPrimitiveObjectType(
-                  SGM.Types.getCConstPointerDecl()->getDeclaredInterfaceType()
-                                                  ->getCanonicalType());
-}
-
-static SILType getCMutablePointerInterfaceType(SILGenModule &SGM) {
-  return SILType::getPrimitiveObjectType(
-                  SGM.Types.getCMutablePointerDecl()->getDeclaredInterfaceType()
+static SILType getPointerInterfaceType(NominalTypeDecl *pointerDecl) {
+  return SILType::getPrimitiveObjectType(pointerDecl->getDeclaredInterfaceType()
                                                     ->getCanonicalType());
 }
 
+static SILType getCConstPointerInterfaceType(SILGenModule &SGM) {
+  return getPointerInterfaceType(SGM.Types.getCConstPointerDecl());
+}
+
+static SILType getCMutablePointerInterfaceType(SILGenModule &SGM) {
+  return getPointerInterfaceType(SGM.Types.getCMutablePointerDecl());
+}
+
+static SILType getObjCMutablePointerInterfaceType(SILGenModule &SGM) {
+  return getPointerInterfaceType(SGM.Types.getObjCMutablePointerDecl());
+}
+
 static SILType getUnsafePointerInterfaceType(SILGenModule &SGM) {
-  return SILType::getPrimitiveObjectType(
-                  SGM.Types.getUnsafePointerDecl()->getDeclaredInterfaceType()
-                                                  ->getCanonicalType());
+  return getPointerInterfaceType(SGM.Types.getUnsafePointerDecl());
 }
 
 SILDeclRef SILGenModule::getCConstPointerToUnsafePointerFn() {
@@ -243,6 +246,13 @@ SILDeclRef SILGenModule::getCMutablePointerToUnsafePointerFn() {
                        getUnsafePointerInterfaceType(*this));
 }
 
+SILDeclRef SILGenModule::getObjCMutablePointerToUnsafePointerFn() {
+  return getBridgingFn(ObjCMutablePointerToUnsafePointerFn, *this,
+                       STDLIB_NAME, "convertObjCMutablePointerToUnsafePointer",
+                       {getObjCMutablePointerInterfaceType(*this)},
+                       getUnsafePointerInterfaceType(*this));
+}
+
 SILDeclRef SILGenModule::getUnsafePointerToCConstPointerFn() {
   return getBridgingFn(UnsafePointerToCConstPointerFn, *this,
                        STDLIB_NAME, "convertUnsafePointerToCConstPointer",
@@ -255,6 +265,13 @@ SILDeclRef SILGenModule::getUnsafePointerToCMutablePointerFn() {
                        STDLIB_NAME, "convertUnsafePointerToCMutablePointer",
                        {getUnsafePointerInterfaceType(*this)},
                        getCMutablePointerInterfaceType(*this));
+}
+
+SILDeclRef SILGenModule::getUnsafePointerToObjCMutablePointerFn() {
+  return getBridgingFn(UnsafePointerToObjCMutablePointerFn, *this,
+                       STDLIB_NAME, "convertUnsafePointerToObjCMutablePointer",
+                       {getUnsafePointerInterfaceType(*this)},
+                       getObjCMutablePointerInterfaceType(*this));
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
