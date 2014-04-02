@@ -148,6 +148,34 @@ DestroyAddrInst *SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand){
   return createDestroyAddr(Loc, Operand);
 }
 
+static bool couldReduceRefcount(SILInstruction *Inst) {
+  // Simple memory accesses cannot reduce refcounts.
+  if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
+      isa<RetainValueInst>(Inst))
+    return false;
+
+  // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
+  // never can either.  Nontrivial ones can though, because the overwritten
+  // value drops a retain.  We would have to do more alias analysis to be able
+  // to safely ignore one of those.
+  if (auto AI = dyn_cast<AssignInst>(Inst)) {
+    if (AI->getOperand(0).getType().isTrivial(Inst->getModule()))
+      return false;
+  }
+
+  if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
+    if (CAI->isInitializationOfDest() ||
+        CAI->getOperand(0).getType().getObjectType().
+          isTrivial(Inst->getModule()))
+      return false;
+  }
+
+  // This code doesn't try to prove tricky validity constraints about whether
+  // it is safe to push the release past interesting instructions.
+  return Inst->mayHaveSideEffects();
+}
+
+
 /// Perform a strong_release instruction at the current location, attempting
 /// to fold it locally into nearby retain instructions or emitting an explicit
 /// strong release if necessary.  If this inserts a new instruction, it
@@ -173,35 +201,44 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
       continue;
     }
 
-    // Scan past simple memory accesses.  These cannot reduce refcounts.
-    if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
-        isa<RetainValueInst>(Inst))
-      continue;
-
-    // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
-    // never can either.  Nontrivial ones can though, because the overwritten
-    // value drops a retain.  We would have to do more alias analysis to be able
-    // to safely ignore one of those.
-    if (auto AI = dyn_cast<AssignInst>(Inst)) {
-      if (AI->getOperand(0).getType().isTrivial(getModule()))
-        continue;
-    }
-
-    if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-      if (CAI->isInitializationOfDest() ||
-          CAI->getOperand(0).getType().getObjectType().isTrivial(getModule()))
-        continue;
-    }
-
-    // This code doesn't try to prove tricky validity constraints about whether
-    // it is safe to push the release past interesting instructions.
-    if (Inst->mayHaveSideEffects())
+    // Scan past simple instructions that cannot reduce refcounts.
+    if (couldReduceRefcount(Inst))
       break;
   }
 
   // If we didn't find a retain to fold this into, emit the release.
   return createStrongRelease(Loc, Operand);
 }
+
+/// Emit a release_value instruction at the current location, attempting to
+/// fold it locally into another nearby retain_value instruction.  This
+/// returns the new instruction if it inserts one, otherwise it returns null.
+ReleaseValueInst *
+SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
+  // Check to see if the instruction immediately before the insertion point is a
+  // retain_value of the specified operand.  If so, we can zap the pair.
+  auto I = getInsertionPoint(), BBStart = getInsertionBB()->begin();
+  while (I != BBStart) {
+    auto *Inst = &*--I;
+
+    if (auto SRA = dyn_cast<RetainValueInst>(Inst)) {
+      if (SRA->getOperand() == Operand) {
+        SRA->eraseFromParent();
+        return nullptr;
+      }
+      // Skip past unrelated retains.
+      continue;
+    }
+
+    // Scan past simple instructions that cannot reduce refcounts.
+    if (couldReduceRefcount(Inst))
+      break;
+  }
+
+  // If we didn't find a retain to fold this into, emit the release.
+  return createReleaseValue(Loc, Operand);
+}
+
 
 SILValue SILBuilder::emitThickToObjCMetatype(SILLocation Loc, SILValue Op,
                                              SILType Ty) {

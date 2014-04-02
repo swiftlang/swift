@@ -857,6 +857,16 @@ public:
   /// returns it, otherwise it returns null.
   StrongReleaseInst *emitStrongRelease(SILLocation Loc, SILValue Operand);
 
+  /// Emit a release_value instruction at the current location, attempting to
+  /// fold it locally into another nearby retain_value instruction.  This
+  /// returns the new instruction if it inserts one, otherwise it returns null.
+  ///
+  /// This instruction doesn't handle strength reduction of release_value into
+  /// a noop / strong_release / unowned_release.  For that, use the
+  /// emitReleaseValueOperation method below or use the TypeLowering API.
+  ReleaseValueInst *emitReleaseValue(SILLocation Loc, SILValue Operand);
+
+
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
   void emitRetainValueOperation(SILLocation loc, SILValue v) {
@@ -864,14 +874,15 @@ public:
     auto &lowering = F.getModule().getTypeLowering(v.getType());
     return lowering.emitRetainValue(*this, loc, v);
   }
-
-  /// Convenience function for calling emitRelease on the type
+  
+  /// Convenience function for calling TypeLowering.emitRelease on the type
   /// lowering for the non-address value.
   void emitReleaseValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
     auto &lowering = F.getModule().getTypeLowering(v.getType());
     lowering.emitReleaseValue(*this, loc, v);
   }
+
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,
                             unsigned FieldNo, SILType ResultTy) {

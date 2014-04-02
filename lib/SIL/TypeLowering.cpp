@@ -598,7 +598,7 @@ namespace {
 
     void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
-      B.createReleaseValue(loc, aggValue);
+      B.emitReleaseValue(loc, aggValue);
     }
 
     void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
@@ -775,7 +775,7 @@ namespace {
     
     void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      B.createReleaseValue(loc, value);
+      B.emitReleaseValue(loc, value);
     }
 
     void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
@@ -785,7 +785,7 @@ namespace {
              "This method should never be called when performing a shallow "
              "destroy value.");
       if (style == LoweringStyle::DeepNoEnum)
-        B.createReleaseValue(loc, value);
+        B.emitReleaseValue(loc, value);
       else
         ifNonTrivialElement(B, loc, value,
           [&](SILBuilder &B, SILLocation loc, SILValue child,

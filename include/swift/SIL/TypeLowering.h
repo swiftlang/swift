@@ -253,11 +253,9 @@ public:
   void emitLoweredDestroyChildValue(SILBuilder &B, SILLocation loc,
                                     SILValue value,
                                     LoweringStyle loweringStyle) const {
-    if (loweringStyle != LoweringStyle::Shallow) {
+    if (loweringStyle != LoweringStyle::Shallow)
       return emitLoweredReleaseValue(B, loc, value, loweringStyle);
-    } else {
-      return emitReleaseValue(B, loc, value);
-    }
+    return emitReleaseValue(B, loc, value);
   }
 
   /// Emit a lowered 'release_value' operation.
