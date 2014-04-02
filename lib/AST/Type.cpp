@@ -1364,6 +1364,7 @@ static bool canOverride(CanType t1, CanType t2,
   if (allowUnsafeParameterOverride && isParameter) {
     if (auto obj1 = t1->getUncheckedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
+      if (t1 == t2) return true;
     }
   }
 
