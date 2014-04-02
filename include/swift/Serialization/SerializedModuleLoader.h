@@ -144,7 +144,7 @@ class SerializedASTFile final : public LoadedFile {
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file) {}
 
 public:
-  ModuleFile &getFile() { return File; }
+  ModuleFile &getFile() const { return File; }
 
   virtual bool isSystemModule() const override;
 

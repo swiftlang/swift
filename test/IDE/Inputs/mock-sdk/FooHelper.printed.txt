@@ -3,11 +3,3 @@ import FooHelper.FooHelperExplicit
 func fooHelperFunc1(a: CInt) -> CInt
 var FooHelperUnnamedEnumeratorA1: Int { get }
 var FooHelperUnnamedEnumeratorA2: Int { get }
-func fooHelperSubFunc1(a: CInt) -> CInt
-struct FooHelperSubEnum1 {
-  init(value: CUnsignedInt)
-  var value: CUnsignedInt
-}
-var FooHelperSubEnum1X: FooHelperSubEnum1 { get }
-var FooHelperSubEnum1Y: FooHelperSubEnum1 { get }
-var FooHelperSubUnnamedEnumeratorA1: Int { get }

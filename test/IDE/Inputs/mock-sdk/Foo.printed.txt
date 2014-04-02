@@ -165,11 +165,3 @@ var FOO_MACRO_5: CUnsignedLongLong { get }
 var FOO_MACRO_REDEF_1: CInt { get }
 var FOO_MACRO_REDEF_2: CInt { get }
 func theLastDeclInFoo()
-func fooSubFunc1(a: CInt) -> CInt
-struct FooSubEnum1 {
-  init(value: CUnsignedInt)
-  var value: CUnsignedInt
-}
-var FooSubEnum1X: FooSubEnum1 { get }
-var FooSubEnum1Y: FooSubEnum1 { get }
-var FooSubUnnamedEnumeratorA1: Int { get }
