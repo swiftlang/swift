@@ -630,7 +630,7 @@ Type ClangImporter::Implementation::importFunctionType(
     if (index < selector.getNumArgs() &&
         (index > 0 || 
          kind == SpecialMethodKind::Constructor || 
-         SplitPrepositions != SelectorSplitKind::None)) {
+         SplitPrepositions)) {
       // For parameters after the first, or all parameters in a constructor,
       // the name comes from the selector.
       name = importName(selector.getIdentifierInfoForSlot(index));
@@ -642,7 +642,7 @@ Type ClangImporter::Implementation::importFunctionType(
       // acronym anyway).
       if (index == 0 && !name.empty() &&
           (kind == SpecialMethodKind::Constructor || 
-           SplitPrepositions != SelectorSplitKind::None)) {
+           SplitPrepositions)) {
         StringRef newFuncName, newName;
         llvm::SmallString<16> buffer;
         std::tie(newFuncName, newName)

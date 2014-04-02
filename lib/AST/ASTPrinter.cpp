@@ -865,8 +865,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyTuple = cast<TuplePattern>(BodyPatterns[0]);
 
   // If we're doing selector splitting, print with the new syntax.
-  if (AFD->getASTContext().LangOpts.SplitPrepositions 
-        != SelectorSplitKind::None) {
+  if (AFD->getASTContext().LangOpts.SplitPrepositions ) {
     Printer << "(";
     for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
       if (i > 0)

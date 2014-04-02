@@ -71,8 +71,7 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx,
-                             SelectorSplitKind splitPrepositions)
+ClangImporter::ClangImporter(ASTContext &ctx, bool splitPrepositions)
   : Impl(*new Implementation(ctx, splitPrepositions))
 {
 }
@@ -533,7 +532,7 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   
   SmallVector<Identifier, 2> components;
   for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i) {
-    if (i > 0 || SplitPrepositions == SelectorSplitKind::None) {
+    if (i > 0 || !SplitPrepositions) {
       components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
       continue;
     }
@@ -637,27 +636,8 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
       break;
 
     // If this word is a preposition, split here.
-    if (auto prepKind = getPrepositionKind(
-                          selector.substr(wordStart, wordEnd - wordStart))) {
-      unsigned splitLocation;
-      switch (SplitPrepositions) {
-      case SelectorSplitKind::None:
-        llvm_unreachable("not splitting selectors");
-
-      case SelectorSplitKind::BeforePreposition:
-        splitLocation = wordStart;
-        break;
-
-      case SelectorSplitKind::AfterPreposition:
-        splitLocation = wordEnd;
-        break;
-
-      case SelectorSplitKind::DirectionalPreposition:
-        splitLocation = prepKind == PK_Directional ? wordStart : wordEnd;
-        break;
-      }
-
-      return splitSelectorPieceAt(selector, splitLocation, buffer);
+    if (getPrepositionKind(selector.substr(wordStart, wordEnd - wordStart))) {
+      return splitSelectorPieceAt(selector, wordStart, buffer);
     }
 
     // Look for the next word.

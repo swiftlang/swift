@@ -162,6 +162,10 @@ def enable_objc_mangling : Flag<["-"], "enable-objc-mangling">,
   Flags<[FrontendOption]>,
   HelpText<"Enable mangled names for @objc classes and protocols">;
 
+def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Split imported Objective-C selectors based on prepositions">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[DriverOption, FrontendOption]>,

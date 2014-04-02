@@ -539,17 +539,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableAppExtensionRestrictions = Args.hasArg(OPT_enable_app_extension);
-
-  if (const Arg *A = Args.getLastArg(OPT_split_objc_selectors,
-                                     OPT_split_objc_selectors_before,
-                                     OPT_split_objc_selectors_after)) {
-    if (A->getOption().matches(OPT_split_objc_selectors))
-      Opts.SplitPrepositions = SelectorSplitKind::DirectionalPreposition;
-    else if (A->getOption().matches(OPT_split_objc_selectors_before))
-      Opts.SplitPrepositions = SelectorSplitKind::BeforePreposition;
-    else
-      Opts.SplitPrepositions = SelectorSplitKind::AfterPreposition;
-  }
+  Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
 
   return false;
 }
