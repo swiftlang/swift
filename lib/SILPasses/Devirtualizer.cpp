@@ -656,6 +656,9 @@ protected:
 
     // Create a new empty function.
     // TODO: Use getSpecializedLinkage() once we mangle properly.
+    assert(OrigF->isTransparent() ||
+           OrigF->isBare() ||
+           OrigF->getLocation() && "SILFunction missing location");
     SILFunction *NewF =
       SILFunction::create(M, SILLinkage::Private,
                           NewName,

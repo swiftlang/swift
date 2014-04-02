@@ -315,6 +315,9 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
                          M.getASTContext());
   
   // This inserts the new cloned function before the original function.
+  assert(Orig->isTransparent() ||
+         Orig->isBare() ||
+         Orig->getLocation() && "SILFunction missing location");
   return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
                              Orig->getContextGenericParams(),
                              Orig->getLocation(), Orig->isBare(),

@@ -1158,29 +1158,6 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   }
 }
 
-#ifndef NDEBUG
-/// This is a hack that should be removed once we serialize debug scopes.
-static bool isValidFileLocWithoutDebugScope(SILLocation Loc) {
-  while (true) {
-    switch (Loc.getKind()) {
-    /// FIXME: InlinedKind/MandatoryInlinedKind should be able to reference
-    /// their parent location so we can check if it is a SILFileKind.
-    case SILLocation::LocationKind::InlinedKind:
-    case SILLocation::LocationKind::MandatoryInlinedKind:
-    case SILLocation::LocationKind::SILFileKind:
-      return true;
-    case SILLocation::LocationKind::NoneKind:
-    case SILLocation::LocationKind::RegularKind:
-    case SILLocation::LocationKind::ReturnKind:
-    case SILLocation::LocationKind::ImplicitReturnKind:
-    case SILLocation::LocationKind::CleanupKind:
-    case SILLocation::LocationKind::ArtificialUnreachableKind:
-      return false;
-    }
-  }
-}
-#endif
-
 void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   // Insert into the lowered basic block.
   llvm::BasicBlock *llBB = getLoweredBB(BB).bb;
@@ -1244,12 +1221,11 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       auto DS = I.getDebugScope();
       if (!DS) DS = CurSILFn->getDebugScope();
       if (!DS)
-        // We don't expect a scope from transparent functions. They should be
-        // elided during IR generation anyway. Additionally until DebugScopes
-        // are properly serialized, if we have a location of SILFileKind it is
-        // ok to not have a debug scope.
-        assert((CurSILFn->isTransparent() ||
-                isValidFileLocWithoutDebugScope(I.getLoc())) &&
+        // We don't expect a scope from transparent functions. They
+        // should be elided during IR generation anyway. Additionally
+        // until DebugScopes are properly serialized, bare functions
+        // are allowed to not have a scope.
+        assert((CurSILFn->isTransparent() || CurSILFn->isBare()) &&
                "function without a debug scope");
       else if (!KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);

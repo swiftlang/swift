@@ -387,6 +387,9 @@ private:
                                /*dropGenerics = */ true);
 
     // Create a new empty function.
+    assert(Orig->isTransparent() ||
+           Orig->isBare() ||
+           Orig->getLocation() && "SILFunction missing location");
     SILFunction *NewF =
         SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                             NewName, FTy, nullptr,
