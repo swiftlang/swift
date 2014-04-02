@@ -1699,7 +1699,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     uint8_t RawStaticSpelling;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent, isMutating, hasDynamicSelf;
-    bool isFirstParamIncludedInName, isOptional;
+    bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1713,8 +1713,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isStatic, RawStaticSpelling,
                                         isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
-                                        isMutating, hasDynamicSelf, 
-                                        isFirstParamIncludedInName, isOptional,
+                                        isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
@@ -1837,7 +1836,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);
     fn->setDynamicSelf(hasDynamicSelf);
-    fn->setFirstParamIncludedInName(isFirstParamIncludedInName);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 

@@ -481,18 +481,16 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
                                TypeRepr *&retType,
-                               bool &HasSelectorStyleSignature,
-                               bool &FirstParamIncludedInName) {
+                               bool &HasSelectorStyleSignature) {
   HasSelectorStyleSignature = false;
-  FirstParamIncludedInName = false;
-
+  
   SmallVector<Identifier, 4> NamePieces;
   NamePieces.push_back(SimpleName);
   FullName = SimpleName;
   
   ParserStatus Status;
+  // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    // We force first type of a func declaration to be a tuple for consistency.
     Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
     
@@ -508,40 +506,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                                   {}, Tok.getLoc()));
       argPatterns.push_back(bodyPatterns.back());
     }
-  } else if (isAtStartOfBindingName()) {
-    // We have a selector-style declaration where the first parameter name is
-    // significant.
-    SmallVector<TuplePatternElt, 4> ArgElts;
-    SmallVector<TuplePatternElt, 4> BodyElts;
-    SourceLoc LParenLoc = Tok.getLoc(); // FIXME: Weird choice of name.
-    SourceLoc RParenLoc;
-    FirstParamIncludedInName = true;
-    HasSelectorStyleSignature = true;
-    for (;;) {
-      if (isAtStartOfBindingName()) {
-        Status |= parseSelectorArgument(*this, NamePieces, ArgElts, BodyElts,
-                                        defaultArgs, RParenLoc);
-        continue;
-      }
-      
-      if (Tok.is(tok::l_paren)) {
-        // FIXME: Should we assume this is '_'?
-        diagnose(Tok, diag::func_selector_with_curry);
-        // FIXME: better recovery: just parse a tuple instead of skipping 
-        // tokens.
-        skipUntilDeclRBrace(tok::l_brace);
-        Status.setIsParseError();
-      }
-      break;
-    }
-
-    FullName = DeclName(Context, NamePieces[0],
-                        llvm::makeArrayRef(NamePieces.begin() + 1, NamePieces.end()));
-
-    argPatterns.push_back(TuplePattern::create(Context, LParenLoc, ArgElts, 
-                                               RParenLoc));
-    bodyPatterns.push_back(TuplePattern::create(Context, LParenLoc, BodyElts,
-                                                RParenLoc));
   } else {
     diagnose(Tok, diag::func_decl_without_paren);
     Status = makeParserError();

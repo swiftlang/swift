@@ -403,8 +403,7 @@ public:
                         StringRef removePrefix = "");
   
   /// Import the given selector name into Swift.
-  DeclName importName(clang::Selector selector, 
-                      bool *firstParamIncludedInName = nullptr);
+  DeclName importName(clang::Selector selector);
   
   /// Split the first selector piece into a function name and first
   /// parameter name, if possible.

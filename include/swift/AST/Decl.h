@@ -258,14 +258,10 @@ class alignas(8) Decl {
 
     /// Whether this function is a 'mutating' method.
     unsigned Mutating : 1;
-
     /// Whether this function has a dynamic Self return type.
     unsigned HasDynamicSelf : 1;
-
-    /// Whether the first parameter name is part of the function's name
-    unsigned FirstParamIncludedInName : 1;
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 6 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -3484,7 +3480,6 @@ class FuncDecl : public AbstractFunctionDecl {
     setType(Ty);
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
-    FuncDeclBits.FirstParamIncludedInName = false;
   }
 
 public:
@@ -3522,18 +3517,6 @@ public:
   }
   void setMutating(bool Mutating = true) {
     FuncDeclBits.Mutating = Mutating;
-  }
-
-  /// Determine whether the first parameter is included in the name of
-  /// the function.
-  bool isFirstParamIncludedInName() const { 
-    return FuncDeclBits.FirstParamIncludedInName;
-  }
-
-  /// Set whether the first parameter is included in the name of this
-  /// function.
-  void setFirstParamIncludedInName(bool included) {
-    FuncDeclBits.FirstParamIncludedInName = included;
   }
 
   void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,

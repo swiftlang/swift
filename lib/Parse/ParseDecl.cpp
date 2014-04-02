@@ -2461,13 +2461,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   bool HasSelectorStyleSignature;
-  bool FirstParamIncludedInName;
   DeclName FullName;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName,
                              ArgParams, BodyParams, DefaultArgs,
-                             FuncRetTy, HasSelectorStyleSignature,
-                             FirstParamIncludedInName);
+                             FuncRetTy, HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -2495,7 +2493,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     if (HasSelectorStyleSignature)
       FD->setHasSelectorStyleSignature();
-    FD->setFirstParamIncludedInName(FirstParamIncludedInName);
 
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())

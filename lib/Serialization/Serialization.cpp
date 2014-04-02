@@ -1582,7 +1582,6 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isTransparent(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
-                           fn->isFirstParamIncludedInName(),
                            fn->getAttrs().isOptional(),
                            fn->getArgParamPatterns().size(),
                            addTypeRef(fn->getType()),

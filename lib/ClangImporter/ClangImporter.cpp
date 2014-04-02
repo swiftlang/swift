@@ -519,11 +519,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 }
 
 DeclName
-ClangImporter::Implementation::importName(clang::Selector selector,
-                                          bool *firstParamIncludedInName) {
-  if (firstParamIncludedInName)
-    *firstParamIncludedInName = false;
-
+ClangImporter::Implementation::importName(clang::Selector selector) {
   if (selector.isNull())
     return DeclName();
   
@@ -555,9 +551,6 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 
     components.push_back(SwiftContext.getIdentifier(funcName));
     if (!paramName.empty()) {
-      if (firstParamIncludedInName)
-        *firstParamIncludedInName = true;
-
       components.push_back(SwiftContext.getIdentifier(paramName));
     }
   }
