@@ -21,6 +21,7 @@ set(SWIFTLIB_ESSENTIAL
   Array.swift
   Arrays.swift.gyb
   ArrayBuffer.swift
+  ArrayBufferType.swift
   ArrayCore.swift
   ArrayType.swift
   AssertCommon.swift
