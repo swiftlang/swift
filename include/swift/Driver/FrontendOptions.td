@@ -108,9 +108,6 @@ def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
-def enable_objc_optional : Flag<["-"], "enable-objc-optional">,
-  HelpText<"Import Objective-C references using UncheckedOptional">;
-
 def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 

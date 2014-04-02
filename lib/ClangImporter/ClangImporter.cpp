@@ -70,9 +70,9 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx, bool useOptional, 
+ClangImporter::ClangImporter(ASTContext &ctx,
                              SelectorSplitKind splitPrepositions)
-  : Impl(*new Implementation(ctx, useOptional, splitPrepositions))
+  : Impl(*new Implementation(ctx, splitPrepositions))
 {
 }
 
@@ -119,8 +119,7 @@ MAKE_HAS_ATTR(ObjCCompleteDefinition)
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, ctx.LangOpts.EnableObjCOptional,
-                      ctx.LangOpts.SplitPrepositions)
+    new ClangImporter(ctx, ctx.LangOpts.SplitPrepositions)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.

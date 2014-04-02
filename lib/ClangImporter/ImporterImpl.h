@@ -166,10 +166,8 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, bool enableOptional, 
-                 SelectorSplitKind splitPrepositions)
-    : SwiftContext(ctx), EnableOptional(enableOptional),
-      SplitPrepositions(splitPrepositions) { }
+  Implementation(ASTContext &ctx, SelectorSplitKind splitPrepositions)
+    : SwiftContext(ctx), SplitPrepositions(splitPrepositions) { }
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -178,7 +176,6 @@ public:
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
 
-  const bool EnableOptional;
   const SelectorSplitKind SplitPrepositions;
 
 private:

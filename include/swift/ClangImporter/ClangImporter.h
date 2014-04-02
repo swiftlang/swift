@@ -48,8 +48,7 @@ public:
 private:
   Implementation &Impl;
 
-  ClangImporter(ASTContext &ctx, bool useOptional,
-                SelectorSplitKind splitPrepositions);
+  ClangImporter(ASTContext &ctx, SelectorSplitKind splitPrepositions);
 
 public:
   /// \brief Create a new Clang importer that can import a suitable Clang

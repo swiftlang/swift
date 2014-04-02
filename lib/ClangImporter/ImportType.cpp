@@ -347,7 +347,7 @@ namespace {
           mappedType = cast<TypeAliasDecl>(decl)->getUnderlyingType();
           break;
         }
-        if (Impl.EnableOptional && shouldImportAsOptional(type))
+        if (shouldImportAsOptional(type))
           mappedType = UncheckedOptionalType::get(mappedType);
         return mappedType;
       }
@@ -534,7 +534,7 @@ namespace {
 
     Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       Type result = VisitObjCObjectPointerTypeImpl(type);
-      if (!result || !Impl.EnableOptional)
+      if (!result)
         return result;
       return UncheckedOptionalType::get(result);
     }

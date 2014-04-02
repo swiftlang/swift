@@ -66,10 +66,6 @@ namespace swift {
     /// \brief Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 
-    /// Import Objective-C class references and block pointers as optional class
-    /// references and optional closures, respectively.
-    bool EnableObjCOptional = false;
-
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
