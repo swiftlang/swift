@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-darwin13 -split-objc-selectors-before %s -verify
+// RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-darwin13 -split-objc-selectors %s -verify
 // RUN: ls -lR %t/clang-module-cache | grep ObjectiveC.pcm
 
 import AppKit
@@ -37,8 +37,7 @@ func instanceMethods(b: B) {
   // Renaming of redundant parameters.
   b.performMultiply(withValue:1, value:2)
   
-  // Splitting does not split a preposition at the end
-  b.moveFor(5)
+  b.move(`for`: 5)
 
   // Both class and instance methods exist.
   b.description()
@@ -173,13 +172,16 @@ func testProtocols(b: B, bp: BProto) {
 }
 
 // Methods only defined in a protocol
-func testProtocolMethods(b: B) {
+func testProtocolMethods(b: B, p2m: P2.Type) {
   b.otherMethod(1, withFloat:3.14159)
   b.p2Method()
-  b.initViaP2(3.14159, second:3.14159)
+  b.initViaP2(3.14159, second:3.14159) // expected-error{{'B' does not have a member named 'initViaP2'}}
 
   // Imported constructor.
   var b2 = B(3.14159, second:3.14159)
+
+  // Constructor in protocol.
+  p2m(viaP2:3.14159, second: 3.14159) 
 }
 
 func testId(x: AnyObject) {
@@ -241,7 +243,7 @@ class Wobbler : NSWobbling {
 func optionalMemberAccess(w: NSWobbling) {
   w.wobble()
   w.wibble() // expected-error{{'() -> $T3' is not identical to '(() -> Void)?'}}
-  var x: AnyObject = w[5] // expected-error{{type 'AnyObject?' does not conform to protocol 'AnyObject'}}
+  var x: AnyObject = w[5] // expected-error{{type '(@unchecked AnyObject?)?' does not conform to protocol 'AnyObject'}}
 }
 
 func protocolInheritance(s: NSString) {
@@ -371,3 +373,7 @@ func testNoReturn(a : NSAwesomeDocument) -> Int {
   return 17    // TODO: In principle, we should produce an unreachable code diagnostic here.
 }
 
+func splitting(doc: NSDocument, url: NSURL) {
+  doc.copyDocument(fromURL: url, toURL: url)
+  doc.scaleX(by: 5)
+}
