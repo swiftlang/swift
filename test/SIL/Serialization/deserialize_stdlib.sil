@@ -1,5 +1,4 @@
 // Make sure that we can deserialize the stdlib.
-// XFAIL: *
 // RUN: %sil-opt -verify %libdir/swift/macosx/Swift.swiftmodule -module-name=Swift > /dev/null
 // RUN: llvm-bcanalyzer %libdir/swift/macosx/Swift.swiftmodule | FileCheck %s
 
