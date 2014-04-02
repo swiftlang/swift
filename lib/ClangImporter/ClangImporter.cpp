@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -598,19 +599,6 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
   return { selector.substr(0, index), StringRef(buffer.data(), buffer.size()) };
 }
 
-/// Determine whether the given word (which should have its first
-/// letter already capitalized) is a preposition.
-///
-/// The stored boolean indicates whether the preposition has
-/// direction.
-static Optional<bool> isPreposition(StringRef word) {
-  return llvm::StringSwitch<Optional<bool>>(word)
-#define DIRECTIONAL_PREPOSITION(Word) .Case(#Word, true)
-#define PREPOSITION(Word) .Case(#Word, false)
-#include "Prepositions.def"
-    .Default(Nothing);
-}
-
 std::pair<StringRef, StringRef> 
 ClangImporter::Implementation::splitFirstSelectorPiece(
                                  StringRef selector,
@@ -648,8 +636,8 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
       break;
 
     // If this word is a preposition, split here.
-    if (auto isPrep = isPreposition(
-                        selector.substr(wordStart, wordEnd - wordStart))) {
+    if (auto prepKind = getPrepositionKind(
+                          selector.substr(wordStart, wordEnd - wordStart))) {
       unsigned splitLocation;
       switch (SplitPrepositions) {
       case SelectorSplitKind::None:
@@ -664,7 +652,7 @@ ClangImporter::Implementation::splitFirstSelectorPiece(
         break;
 
       case SelectorSplitKind::DirectionalPreposition:
-        splitLocation = *isPrep ? wordStart : wordEnd;
+        splitLocation = prepKind == PK_Directional ? wordStart : wordEnd;
         break;
       }
 

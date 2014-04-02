@@ -9,6 +9,7 @@ add_swift_library(swiftBasic
   Punycode.cpp
   QuotedString.cpp
   SourceLoc.cpp
+  StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
   Version.cpp
