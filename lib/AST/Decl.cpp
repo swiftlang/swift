@@ -25,6 +25,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/TypeLoc.h"
+#include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
@@ -33,6 +34,15 @@
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
+
+clang::SourceLocation ClangNode::getLocation() const {
+  if (auto D = getAsDecl())
+    return D->getLocation();
+  if (auto M = getAsMacro())
+    return M->getDefinitionLoc();
+
+  return clang::SourceLocation();
+}
 
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,

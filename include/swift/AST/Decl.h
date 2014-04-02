@@ -40,6 +40,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class SourceLocation;
 }
 
 namespace swift {
@@ -95,6 +96,8 @@ public:
   clang::MacroInfo *getAsMacro() const {
     return Ptr.dyn_cast<clang::MacroInfo *>();
   }
+
+  clang::SourceLocation getLocation() const;
 };
   
 enum class DeclKind : uint8_t {
