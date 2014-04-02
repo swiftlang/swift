@@ -1954,13 +1954,10 @@ public:
       }
     }
 
-    for (Decl *member : ED->getMembers())
-      visit(member);
-
+    Type rawTy;
     if (!IsFirstPass) {
-      // If we have a raw type, check it and the cases' raw values.
       if (ED->hasRawType()) {
-        auto rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+        rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
 
         // Check that the raw type is convertible from one of the primitive
         // literal protocols.
@@ -1990,13 +1987,26 @@ public:
         if (ED->getAllElements().empty())
           TC.diagnose(ED->getInherited()[0].getSourceRange().Start,
                       diag::empty_enum_raw_type);
-          
+      }
+
+      checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
+    }
+
+    for (Decl *member : ED->getMembers())
+      visit(member);
+    for (Decl *global : ED->getDerivedGlobalDecls())
+      visit(global);
+
+    if (!IsFirstPass) {
+      if (rawTy) {
         // Check the raw values of the cases.
         LiteralExpr *prevValue = nullptr;
         EnumElementDecl *lastExplicitValueElt = nullptr;
         // Keep a map we can use to check for duplicate case values.
         llvm::DenseMap<RawValueKey, RawValueSource> uniqueRawValues;
-        
+
+        auto rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
+
         for (auto elt : ED->getAllElements()) {
           if (elt->isInvalid())
             continue;
@@ -2061,10 +2071,6 @@ public:
           }
         }
       }
-      
-      // NB: Explicit conformance checking must happen *after* raw value
-      // validation for RawRepresentable conformance derivation to work.
-      checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
     }
   }
 
@@ -2087,9 +2093,10 @@ public:
     }
 
     // Visit each of the members.
-    for (Decl *Member : SD->getMembers()) {
+    for (Decl *Member : SD->getMembers())
       visit(Member);
-    }
+    for (Decl *global : SD->getDerivedGlobalDecls())
+      visit(global);
 
     if (!IsFirstPass) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
@@ -2223,6 +2230,8 @@ public:
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
+    for (Decl *global : CD->getDerivedGlobalDecls())
+      visit(global);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -2705,7 +2714,7 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     if (!IsFirstPass) {
-      if (FD->getBody()) {
+      if (FD->hasBody()) {
         // Record the body.
         TC.definedFunctions.push_back(FD);
       } else if (requiresDefinition(FD)) {

@@ -722,6 +722,8 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  if (!AFD->getBody())
+    return false;
   return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
 }
 

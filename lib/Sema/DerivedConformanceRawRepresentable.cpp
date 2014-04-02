@@ -103,8 +103,18 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
 
 static void deriveBodyRawRepresentable_toRaw(AbstractFunctionDecl *toRawDecl) {
   auto enumDecl = cast<EnumDecl>(toRawDecl->getDeclContext());
-  Type enumType = enumDecl->getDeclaredTypeInContext();
+
+  Type rawTy = enumDecl->getRawType();
+  assert(rawTy);
+  for (auto elt : enumDecl->getAllElements()) {
+    if (!elt->getTypeCheckedRawValueExpr() ||
+        !elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy)) {
+      return;
+    }
+  }
+
   ASTContext &C = enumDecl->getASTContext();
+  Type enumType = enumDecl->getDeclaredTypeInContext();
 
   SmallVector<CaseStmt*, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
@@ -204,7 +214,8 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
     interfaceType = type;
   toRawDecl->setInterfaceType(interfaceType);
 
-  tc.implicitlyDefinedFunctions.push_back(toRawDecl);
+  if (enumDecl->hasClangNode())
+    tc.implicitlyDefinedFunctions.push_back(toRawDecl);
 
   return insertMemberDecl(enumDecl, toRawDecl);
 }
@@ -212,8 +223,17 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
 static void
 deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
   auto enumDecl = cast<EnumDecl>(fromRawDecl->getDeclContext());
-  ASTContext &C = enumDecl->getASTContext();
 
+  Type rawTy = enumDecl->getRawType();
+  assert(rawTy);
+  for (auto elt : enumDecl->getAllElements()) {
+    if (!elt->getTypeCheckedRawValueExpr() ||
+        !elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy)) {
+      return;
+    }
+  }
+
+  ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumDecl->getDeclaredTypeInContext();
   Type enumMetaType = MetatypeType::get(enumType);
 
@@ -373,7 +393,8 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
     interfaceType = type;
   fromRawDecl->setInterfaceType(interfaceType);
 
-  tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
+  if (enumDecl->hasClangNode())
+    tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
 
   return insertMemberDecl(enumDecl, fromRawDecl);
 }
@@ -389,26 +410,20 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
   if (!enumDecl)
     return nullptr;
   
-  // It must have a raw type.
-  auto rawType = enumDecl->getRawType();
-  if (!rawType)
+  // It must have a valid raw type.
+  if (!enumDecl->hasRawType())
+    return nullptr;
+  if (!enumDecl->getInherited().empty() &&
+      enumDecl->getInherited().front().isError())
     return nullptr;
   
-  // There must be enum elements, and they must all have type-checked raw
-  // values.
+  // There must be enum elements.
   if (enumDecl->getAllElements().empty())
     return nullptr;
 
-  // Map the interface type into the context of the enum.
-  rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl, rawType);
-
-  for (auto elt : enumDecl->getAllElements()) {
+  for (auto elt : enumDecl->getAllElements())
     tc.validateDecl(elt);
-    if (!elt->getTypeCheckedRawValueExpr()
-        || !elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawType))
-      return nullptr;
-  }
-  
+
   // Start building the conforming decls.
   if (requirement->getName().str() == "toRaw")
     return deriveRawRepresentable_toRaw(tc, enumDecl);

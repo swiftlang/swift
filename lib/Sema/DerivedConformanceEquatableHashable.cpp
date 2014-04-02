@@ -240,8 +240,9 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   }
   eqDecl->setType(fnTy);
   eqDecl->setInterfaceType(interfaceTy);
-  
-  tc.implicitlyDefinedFunctions.push_back(eqDecl);
+
+  if (enumDecl->hasClangNode())
+    tc.implicitlyDefinedFunctions.push_back(eqDecl);
   
   // Since it's an operator we insert the decl after the type at global scope.
   return insertOperatorDecl(enumDecl, eqDecl);
@@ -428,7 +429,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   
   hashValueDecl->setInterfaceType(interfaceType);
   
-  tc.implicitlyDefinedFunctions.push_back(hashValueDecl);
+  if (enumDecl->hasClangNode())
+    tc.implicitlyDefinedFunctions.push_back(hashValueDecl);
   
   return insertMemberDecl(enumDecl, hashValueDecl);
 }

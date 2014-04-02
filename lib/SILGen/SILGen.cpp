@@ -399,8 +399,8 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
   
   // Emit the actual body of the function to a new SILFunction.  Ignore
-  // prototypes.
-  if (fd->getBody()) {
+  // prototypes and methods whose bodies weren't synthesized by now.
+  if (fd->getBody(/*canSynthesize=*/false)) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
