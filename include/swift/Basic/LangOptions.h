@@ -19,6 +19,7 @@
 #define SWIFT_LANGOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -85,7 +86,12 @@ namespace swift {
 
     /// Determines if a given build configuration has been defined.
     bool hasBuildConfigOption(StringRef Name);
-    
+
+    ArrayRef<std::pair<std::string, std::string>>
+        getTargetConfigOptions() const {
+      return TargetConfigOptions;
+    }
+
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
         TargetConfigOptions; 
