@@ -1,4 +1,4 @@
-//===--- ModuleInterfacePrinting.h - Routines to print module interface ---===//
+//===--- ModuleInterfacePrinting.cpp - Routines to print module interface -===//
 //
 // This source file is part of the Swift.org open source project
 //
