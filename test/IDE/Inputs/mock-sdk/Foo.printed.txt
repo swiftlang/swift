@@ -21,7 +21,36 @@ struct FooEnum3 {
 }
 var FooEnum3X: FooEnum3 { get }
 var FooEnum3Y: FooEnum3 { get }
+
+/// Aaa.  FooComparisonResult.  Bbb.
+enum FooComparisonResult : CLong {
+  case OrderedAscending
+  case OrderedSame
+  case OrderedDescending
+}
+
+/// Aaa.  FooRuncingOptions.  Bbb.
+struct FooRuncingOptions {
+  static var EnableMince: FooRuncingOptions { get }
+  static var EnableQuince: FooRuncingOptions { get }
+  init()
+  init(value: CLong)
+  var value: CLong
+  static func fromMask(raw: CLong) -> FooRuncingOptions
+  static func fromRaw(raw: CLong) -> FooRuncingOptions?
+  func toRaw() -> CLong
+  func getLogicValue() -> Bool
+}
 struct FooStruct1 {
+  var x: CInt
+  var y: CDouble
+}
+struct FooStruct2 {
+  var x: CInt
+  var y: CDouble
+}
+typealias FooStructTypedef1 = FooStruct2
+struct FooStructTypedef2 {
   var x: CInt
   var y: CDouble
 }
@@ -36,6 +65,7 @@ var fooIntVar: CInt
 func fooFunc1(a: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
 func fooFunc3(a: CInt, b: CFloat, c: CDouble, d: CMutablePointer<CInt>) -> CInt
+func fooFuncWithBlock(blk: @objc_block (CFloat) -> CInt)
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -73,8 +103,8 @@ func fooFuncWithComment5()
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func redeclaredInMultipleModulesFunc1(a: CInt) -> CInt
 
-/// Aaa.  FooProtocol.  Bbb.
-@objc protocol FooProtocol {
+/// Aaa.  FooProtocolBase.  Bbb.
+@objc protocol FooProtocolBase {
 
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -94,15 +124,21 @@ func redeclaredInMultipleModulesFunc1(a: CInt) -> CInt
   var fooProperty2: CInt { get set }
   var fooProperty3: CInt { get }
 }
-@objc class FooClass : FooProtocol {
+@objc protocol FooProtocolDerived : FooProtocolBase {
+}
+@objc class FooClassBase {
+  class func fooBaseInstanceFunc0()
+  func fooBaseInstanceFunc0()
+  class func fooBaseClassFunc0()
+}
+
+/// Aaa.  FooClassDerived.  Bbb.
+@objc class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty1: CInt
   var fooProperty2: CInt
   var fooProperty3: CInt { get }
-  class func fooInstanceFunc0()
   func fooInstanceFunc0()
-  class func fooInstanceFunc1(a: CInt)
   func fooInstanceFunc1(a: CInt)
-  class func fooInstanceFunc2(a: CInt) withB(b: CInt)
   func fooInstanceFunc2(a: CInt) withB(b: CInt)
   class func fooClassFunc0()
 
@@ -110,29 +146,15 @@ func redeclaredInMultipleModulesFunc1(a: CInt) -> CInt
   /// Ccc.
   func fooProtoFunc()
 
-  /// Aaa.  fooProtoFunc.  Bbb.
-  /// Ccc.
-  class func fooProtoFunc()
-
   /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
   func fooProtoFuncWithExtraIndentation1()
-
-  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
-  /// Ccc.
-  class func fooProtoFuncWithExtraIndentation1()
 
   /**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
   func fooProtoFuncWithExtraIndentation2()
-
-  /**
-   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
-   * Ccc.
-   */
-  class func fooProtoFuncWithExtraIndentation2()
   class func fooProtoClassFunc()
 }
 var FOO_MACRO_1: CInt { get }

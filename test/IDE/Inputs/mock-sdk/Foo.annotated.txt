@@ -21,7 +21,36 @@ var FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
 }</decl>
 <decl>var FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
 <decl>var FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
+
+<decl>/// Aaa.  FooComparisonResult.  Bbb.
+enum FooComparisonResult : <ref:TypeAlias>CLong</ref> {
+  <decl>case OrderedAscending</decl>
+  <decl>case OrderedSame</decl>
+  <decl>case OrderedDescending</decl>
+}</decl>
+
+<decl>/// Aaa.  FooRuncingOptions.  Bbb.
+struct FooRuncingOptions {
+  <decl>static var EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl>static var EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl>init()</decl>
+  <decl>init(value: <ref:TypeAlias>CLong</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CLong</ref></decl>
+  <decl>static func fromMask(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
+  <decl>static func fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
+  <decl>func toRaw() -> <ref:TypeAlias>CLong</ref></decl>
+  <decl>func getLogicValue() -> <ref:Struct>Bool</ref></decl>
+}</decl>
 <decl>struct FooStruct1 {
+  <decl>var x: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var y: <ref:TypeAlias>CDouble</ref></decl>
+}</decl>
+<decl>struct FooStruct2 {
+  <decl>var x: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var y: <ref:TypeAlias>CDouble</ref></decl>
+}</decl>
+<decl>typealias FooStructTypedef1 = <ref:Struct>FooStruct2</ref></decl>
+<decl>struct FooStructTypedef2 {
   <decl>var x: <ref:TypeAlias>CInt</ref></decl>
   <decl>var y: <ref:TypeAlias>CDouble</ref></decl>
 }</decl>
@@ -36,6 +65,7 @@ var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
 func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl>func fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>func fooFuncWithBlock(blk: @objc_block (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
 
 <decl>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -73,8 +103,8 @@ func fooFuncWithComment5()</decl>
 <decl>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 
-<decl>/// Aaa.  FooProtocol.  Bbb.
-@objc protocol FooProtocol {
+<decl>/// Aaa.  FooProtocolBase.  Bbb.
+@objc protocol FooProtocolBase {
 
   <decl>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -94,15 +124,21 @@ func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:Type
   <decl>var fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
   <decl>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
 }</decl>
-<decl>@objc class FooClass : <ref:Protocol>FooProtocol</ref> {
+<decl>@objc protocol FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
+}</decl>
+<decl>@objc class FooClassBase {
+  <decl>class func fooBaseInstanceFunc0()</decl>
+  <decl>func fooBaseInstanceFunc0()</decl>
+  <decl>class func fooBaseClassFunc0()</decl>
+}</decl>
+
+<decl>/// Aaa.  FooClassDerived.  Bbb.
+@objc class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
   <decl>var fooProperty1: <ref:TypeAlias>CInt</ref></decl>
   <decl>var fooProperty2: <ref:TypeAlias>CInt</ref></decl>
   <decl>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
-  <decl>class func fooInstanceFunc0()</decl>
   <decl>func fooInstanceFunc0()</decl>
-  <decl>class func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
   <decl>func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
-  <decl>class func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
   <decl>func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
   <decl>class func fooClassFunc0()</decl>
 
@@ -110,29 +146,15 @@ func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:Type
   /// Ccc.
   func fooProtoFunc()</decl>
 
-  <decl>/// Aaa.  fooProtoFunc.  Bbb.
-  /// Ccc.
-  class func fooProtoFunc()</decl>
-
   <decl>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
   func fooProtoFuncWithExtraIndentation1()</decl>
-
-  <decl>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
-  /// Ccc.
-  class func fooProtoFuncWithExtraIndentation1()</decl>
 
   <decl>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
   func fooProtoFuncWithExtraIndentation2()</decl>
-
-  <decl>/**
-   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
-   * Ccc.
-   */
-  class func fooProtoFuncWithExtraIndentation2()</decl>
   <decl>class func fooProtoClassFunc()</decl>
 }</decl>
 <decl>var FOO_MACRO_1: <ref:TypeAlias>CInt</ref> { get }</decl>

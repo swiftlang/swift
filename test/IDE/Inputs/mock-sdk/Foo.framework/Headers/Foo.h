@@ -11,10 +11,38 @@ enum FooEnum1 {
 enum FooEnum2 { FooEnum2X, FooEnum2Y };
 enum FooEnum3 { FooEnum3X = 10, FooEnum3Y = 20 };
 
+#define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define CF_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
+#define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
+#define NS_OPTIONS(_type, _name) CF_OPTIONS(_type, _name)
+
+/// Aaa.  FooComparisonResult.  Bbb.
+typedef NS_ENUM(long, FooComparisonResult) {
+  FooOrderedAscending = -1L,
+  FooOrderedSame,
+  FooOrderedDescending
+};
+
+/// Aaa.  FooRuncingOptions.  Bbb.
+typedef NS_OPTIONS(long, FooRuncingOptions) {
+  FooRuncingEnableMince = 1,
+  FooRuncingEnableQuince = 2,
+};
+
 struct FooStruct1 {
   int x;
   double y;
 };
+
+typedef struct FooStruct2 {
+  int x;
+  double y;
+} FooStructTypedef1;
+
+typedef struct {
+  int x;
+  double y;
+} FooStructTypedef2;
 
 /// Aaa.  FooTypedef1.  Bbb.
 typedef int FooTypedef1;
@@ -26,6 +54,7 @@ extern int fooIntVar;
 int fooFunc1(int a);
 int fooFunc1AnonymousParam(int);
 int fooFunc3(int a, float b, double c, int *d);
+void fooFuncWithBlock(int (^blk)(float x));
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -64,8 +93,8 @@ void fooFuncWithComment5(void);
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 int redeclaredInMultipleModulesFunc1(int a);
 
-/// Aaa.  FooProtocol.  Bbb.
-@protocol FooProtocol
+/// Aaa.  FooProtocolBase.  Bbb.
+@protocol FooProtocolBase
 
 /// Aaa.  fooProtoFunc.  Bbb.
 /// Ccc.
@@ -88,7 +117,17 @@ int redeclaredInMultipleModulesFunc1(int a);
 @property (readonly) int fooProperty3;
 @end
 
-@interface FooClass <FooProtocol> {
+@protocol FooProtocolDerived<FooProtocolBase>
+@end
+
+@interface FooClassBase
+- (void) fooBaseInstanceFunc0;
+
++ (void) fooBaseClassFunc0;
+@end
+
+/// Aaa.  FooClassDerived.  Bbb.
+@interface FooClassDerived : FooClassBase<FooProtocolDerived> {
   int fooIntIvar;
 }
 
