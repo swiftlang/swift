@@ -1312,6 +1312,10 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
       
       type = fnType->getResult();
     }
+
+    // Look through one level of optional on the result type.
+    if (auto valueType = type->getAnyOptionalObjectType())
+      type = valueType;
     
     if (isProtocolSelf(type) || type->is<DynamicSelfType>())
       return false;

@@ -3672,14 +3672,36 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // FIXME: This is a localized form of a much more general rule for
     // placement of open existential expressions. It only works for 
     // DynamicSelf.
-    if (auto archetypeTy = result->getType()->getAs<ArchetypeType>()) {
+    OptionalTypeKind optKind;
+    auto resultTy = result->getType();
+    if (auto optValueTy = resultTy->getAnyOptionalObjectType(optKind)) {
+      resultTy = optValueTy;
+    }
+    if (auto archetypeTy = resultTy->getAs<ArchetypeType>()) {
       auto opened = OpenedExistentials.find(archetypeTy);
       if (opened != OpenedExistentials.end()) {
-        // Erase the archetype to its corresponding existential.
-        result = coerceToType(result, archetypeTy->getOpenedExistentialType(),
-                              locator);
+        // Erase the archetype to its corresponding existential:
+        auto openedTy = archetypeTy->getOpenedExistentialType();
+
+        //   - Drill down to the optional value (if necessary).
+        if (optKind) {
+          result = new (tc.Context) BindOptionalExpr(result,
+                                                     result->getEndLoc(),
+                                                     0, archetypeTy);
+          result->setImplicit(true);
+        }
+
+        //   - Coerce to an existential value.
+        result = coerceToType(result, openedTy, locator);
         if (!result)
           return result;
+
+        //   - Bind up the result back up as an optional (if necessary).
+        if (optKind) {
+          Type optOpenedTy = OptionalType::get(optKind, openedTy);
+          result = new (tc.Context) InjectIntoOptionalExpr(result, optOpenedTy);
+          result = new (tc.Context) OptionalEvaluationExpr(result, optOpenedTy);
+        }
 
         // Create the expression that opens the existential.
         result = new (tc.Context) OpenExistentialExpr(
