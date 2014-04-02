@@ -32,6 +32,33 @@
   for pointers to ObjC pointers, such as 'NSError**', and for void pointers will
   be coming soon.
 
+* Objective-C pointer types now get imported by default as the '@unchecked T?'
+  optional type.  Swift class types no longer implicitly include 'nil'.
+
+  A value of '@unchecked T?' can be implicitly used as a value of 'T'.
+  Swift will implicitly cause a reliable failure if the value is 'nil',
+  rather than introducing undefined behavior (as in Objective-C ivar
+  accesses or everything in C/C++) or silently ignoring the operation
+  (as in Objective-C message sends).
+
+  A value of '@unchecked T?' can also be implicitly used as a value of 'T?',
+  allowing you explicitly handle the case of a 'nil' value.  For example,
+  if you would like to just silently ignore a message send a la Objective-C,
+  you can use the postfix '?' operator like so:
+
+    fieldsForKeys[kHeroFieldKey]?.setEditable(true)
+  
+  This design allows you to isolate and handle 'nil' values in Swift code
+  without requiring excessive "bookkeeping" boilerplate to use values that
+  you expect to be non-nil.
+
+  For now, we will continue to import C pointers as non-optional
+  UnsafePointer and C*Pointer types; that will be evaluated separately.
+
+  We intend to provide attributes for Clang to allow APIs to opt in to
+  importing specific parameters, return types, etc. as either the
+  explicit optional type 'T?' or the simple non-optional type 'T'.
+
 
 2014-03-26
 ----------
