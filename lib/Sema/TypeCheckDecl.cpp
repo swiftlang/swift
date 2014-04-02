@@ -3059,7 +3059,8 @@ public:
       }
 
       // Failing that, check for subtyping.
-      if (uncurriedDeclTy->canOverride(uncurriedParentDeclTy, &TC)) {
+      if (uncurriedDeclTy->canOverride(uncurriedParentDeclTy,
+                                       parentDecl->isObjC(), &TC)) {
         // If the Objective-C selectors match, always call it exact.
         matches.push_back({parentDecl, objCMatch, uncurriedParentDeclTy});
         hadExactMatch |= objCMatch;
@@ -3117,7 +3118,7 @@ public:
         auto parentPropertyTy = adjustSuperclassMemberDeclType(matchDecl,
                                                                superclass);
         
-        if (!propertyTy->canOverride(parentPropertyTy, &TC)) {
+        if (!propertyTy->canOverride(parentPropertyTy, false, &TC)) {
           TC.diagnose(property, diag::override_property_type_mismatch,
                       property->getName(), propertyTy, parentPropertyTy);
           TC.diagnose(matchDecl, diag::property_override_here);

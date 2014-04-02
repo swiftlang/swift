@@ -448,7 +448,8 @@ public:
   /// \brief Determines whether this type is a subtype of the \p other,
   /// guaranteed to have the same representation, and is permitted in an
   /// override.
-  bool canOverride(Type other, LazyResolver *resolver);
+  bool canOverride(Type other, bool allowUnsafeParameterOverride,
+                   LazyResolver *resolver);
 
   /// \brief Determines whether this type has a retainable pointer
   /// representation, i.e. whether it is representable as a single,

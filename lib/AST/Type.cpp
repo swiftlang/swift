@@ -1289,7 +1289,10 @@ bool TypeBase::hasRetainablePointerRepresentation() {
 
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
-static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {
+static bool canOverride(CanType t1, CanType t2,
+                        bool allowUnsafeParameterOverride,
+                        bool isParameter,
+                        LazyResolver *resolver) {
   if (t1 == t2) return true;
 
   // Scalar-to-tuple and tuple-to-tuple.
@@ -1299,14 +1302,15 @@ static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {
     auto tuple1 = dyn_cast<TupleType>(t1);
     if (!tuple1 || tuple1->getNumElements() != tuple2->getNumElements()) {
       if (tuple2->getNumElements() == 1)
-        return canOverride(t1, tuple2.getElementType(0), resolver);
+        return canOverride(t1, tuple2.getElementType(0),
+                           allowUnsafeParameterOverride, isParameter, resolver);
       return false;
     }
 
     for (auto i : indices(tuple1.getElementTypes())) {
       if (!canOverride(tuple1.getElementType(i),
-                              tuple2.getElementType(i),
-                              resolver))
+                       tuple2.getElementType(i),
+                       allowUnsafeParameterOverride, isParameter, resolver))
         return false;
     }
     return true;
@@ -1318,35 +1322,48 @@ static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {
     if (!fn1 || fn1->getExtInfo() != fn2->getExtInfo())
       return false;
     // Inputs are contravariant, results are covariant.
-    return (canOverride(fn2.getInput(), fn1.getInput(), resolver) &&
-            canOverride(fn1.getResult(), fn2.getResult(), resolver));
+    return (canOverride(fn2.getInput(), fn1.getInput(),
+                        allowUnsafeParameterOverride, true, resolver) &&
+            canOverride(fn1.getResult(), fn2.getResult(),
+                        allowUnsafeParameterOverride, false, resolver));
   }
 
   // Class-to-optional and class optional-to-optional.  Note that this
   // is not recursive: T? is not necessarily a trivial subtype of T??,
   // although it is a subtype.
-  if (auto bound2 = dyn_cast<BoundGenericType>(t2)) {
-    if (bound2->getDecl()->classifyAsOptionalType()) {
-      auto obj2 = bound2.getGenericArgs()[0];
+  if (auto obj2 = t2.getAnyOptionalObjectType()) {
+    // Value-to-optional.
+    // FIXME: this isn't trivial on non-class types!  But we have to
+    // allow it because we don't want the model to be specific to
+    // bridged types.  We should generalize to arbitrary subtypes
+    // and do the thunking necessary to make the model work.
+    if (obj2 == t1)
+      return true;
 
-      if (obj2->isEqual(t1))
-        return true;
+    // Optional-to-optional.
+    if (auto obj1 = t1.getAnyOptionalObjectType()) {
+      // Allow T? and @unchecked T? to freely override one another.
+      // We can assume that these types have the exact same
+      // representation as long as the underlying types have exact
+      // same representation constraints.  Unfortunately, subtyping
+      // might give us more information and invalidate this!
+      // Objective-C doesn't portably give more than a single level of
+      // optional type without side-data, so the only *guarantee* can
+      // take advantage of is a single level of class pointer.  So
+      // really we need thunking for the same reason as above.
+      return canOverride(obj1, obj2, allowUnsafeParameterOverride,
+                         isParameter, resolver);
+    }
 
-      // Optional-to-optional.
-      if (auto bound1 = dyn_cast<BoundGenericType>(t1)) {
-        if (bound1->getDecl()->classifyAsOptionalType()) {
-          auto obj1 = bound1.getGenericArgs()[0];
-          // Allow T? and @unchecked T? to freely override one another.
-          return canOverride(obj1, obj2, resolver);
-        } else if (!isa<BoundGenericClassType>(bound1)) {
-          return false;
-        }
-      }
+    // Class-to-optional.
+    return obj2->isSuperclassOf(t1, resolver);
+  }
 
-      // Class-to-optional.
-      return obj2->isSuperclassOf(t1, resolver);
-    } else if (!isa<BoundGenericClassType>(bound2)) {
-      return false;
+  // Allow T to override @unchecked T? in certain cases.
+  // FIXME: this should force a thunk that does the checking!
+  if (allowUnsafeParameterOverride && isParameter) {
+    if (auto obj1 = t1->getUncheckedOptionalObjectType()) {
+      t1 = obj1->getCanonicalType();
     }
   }
 
@@ -1354,8 +1371,10 @@ static bool canOverride(CanType t1, CanType t2, LazyResolver *resolver) {
   return t2->isSuperclassOf(t1, resolver);
 }
 
-bool TypeBase::canOverride(Type other, LazyResolver *resolver) {
-  return ::canOverride(getCanonicalType(), other->getCanonicalType(), resolver);
+bool TypeBase::canOverride(Type other, bool allowUnsafeParameterOverride,
+                           LazyResolver *resolver) {
+  return ::canOverride(getCanonicalType(), other->getCanonicalType(),
+                       allowUnsafeParameterOverride, false, resolver);
 }
 
 /// hasAnyDefaultValues - Return true if any of our elements has a default
