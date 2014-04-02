@@ -177,11 +177,24 @@ namespace swift {
     /// Retrieve the camelCase words in the given string.
     inline Words getWords(StringRef string) { return Words(string); }
 
-    /// Find the last preposition in the given camelCase string.
+    /// Lowercase the first word within the given camelCase string.
     ///
-    /// \returns a pair containing the starting index of the last
-    /// preposition as well as the kind of preposition found.
-    std::pair<unsigned, PrepositionKind> findLastPreposition(StringRef string);
+    /// \param string The string to lowercase.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string with the first word lowercased. When the
+    /// first word is an acronym, the string will be returned
+    /// unchanged.
+    StringRef toLowercaseWord(StringRef string, SmallVectorImpl<char> &scratch);
+
+    /// Sentence-case the given camelCase string by turning the first
+    /// letter into an uppercase letter.
+    ///
+    /// \param string The string to sentence-case.
+    /// \param scratch Scratch buffer used to form the resulting string.
+    ///
+    /// \returns the string in sentence case.
+    StringRef toSentencecase(StringRef string, SmallVectorImpl<char> &scratch);
   } // end namespace camel_case
 }
 

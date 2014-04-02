@@ -54,3 +54,22 @@ TEST(CamelCaseWordsTest, Iteration) {
   ++iter;
   EXPECT_EQ(iter, words.end());
 }
+
+TEST(ToLowercaseTest, Words) {
+  llvm::SmallString<64> scratch;
+
+  EXPECT_EQ(camel_case::toLowercaseWord("By", scratch), "by");
+  EXPECT_EQ(camel_case::toLowercaseWord("and", scratch), "and");
+  EXPECT_EQ(camel_case::toLowercaseWord("A", scratch), "a");
+  EXPECT_EQ(camel_case::toLowercaseWord("URL", scratch), "URL");
+  EXPECT_EQ(camel_case::toLowercaseWord("", scratch), "");
+}
+
+TEST(ToSentencecaseTest, Words) {
+  llvm::SmallString<64> scratch;
+
+  EXPECT_EQ(camel_case::toSentencecase("by", scratch), "By");
+  EXPECT_EQ(camel_case::toSentencecase("a", scratch), "A");
+  EXPECT_EQ(camel_case::toSentencecase("URL", scratch), "URL");
+  EXPECT_EQ(camel_case::toSentencecase("", scratch), "");
+}

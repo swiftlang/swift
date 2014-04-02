@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 using namespace camel_case;
 
@@ -86,7 +87,6 @@ void WordIterator::computePrevPosition() const {
   PrevPositionValid = true;
 }
 
-
 StringRef camel_case::getFirstWord(StringRef string) {
   if (string.empty())
     return "";
@@ -101,3 +101,38 @@ StringRef camel_case::getLastWord(StringRef string) {
   return *--WordIterator(string, string.size());
 }
 
+StringRef camel_case::toLowercaseWord(StringRef string, 
+                                      SmallVectorImpl<char> &scratch) {
+  if (string.empty())
+    return string;
+
+  // Already lowercase.
+  if (!clang::isUppercase(string[0]))
+    return string;
+
+  // Acronym doesn't get lowercased.
+  if (string.size() > 1 && clang::isUppercase(string[1]))
+    return string;
+
+  // Lowercase the first letter, append the rest.
+  scratch.clear();
+  scratch.push_back(clang::toLowercase(string[0]));
+  scratch.append(string.begin() + 1, string.end());
+  return StringRef(scratch.data(), scratch.size());
+}
+
+StringRef camel_case::toSentencecase(StringRef string, 
+                                     SmallVectorImpl<char> &scratch) {
+  if (string.empty())
+    return string;
+
+  // Can't be uppercased.
+  if (!clang::isLowercase(string[0]))
+    return string;
+
+  // Uppercase the first letter, append the rest.
+  scratch.clear();
+  scratch.push_back(clang::toUppercase(string[0]));
+  scratch.append(string.begin() + 1, string.end());
+  return StringRef(scratch.data(), scratch.size());  
+}
