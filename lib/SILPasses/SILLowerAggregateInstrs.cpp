@@ -103,7 +103,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     // If we are not taking and have a reference type:
     //   strong_retain %new : $*T
     // or if we have a non-trivial non-reference type.
-    //   copy_value %new : $*T
+    //   retain_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
       TL.emitLoweredRetainValue(Builder, CA->getLoc(), New,

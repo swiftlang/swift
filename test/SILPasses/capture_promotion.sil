@@ -58,10 +58,10 @@ bb0:
 // CHECK-NEXT: [[LOADFOO:%.*]] = load {{.*}} : $*Foo
 // CHECK-NEXT: strong_retain [[LOADFOO]] : $Foo
 
-// The Baz variable is loaded and copy_value'd, because it is a non-trivial
+// The Baz variable is loaded and retain_value'd, because it is a non-trivial
 // aggregate type
 // CHECK-NEXT: [[LOADBAZ:%.*]] = load {{.*}} : $*Baz
-// CHECK-NEXT: copy_value [[LOADBAZ:%.*]] : $Baz
+// CHECK-NEXT: retain_value [[LOADBAZ:%.*]] : $Baz
 
 // The Int variable is loaded only, because it is trivial
 // CHECK-NEXT: [[LOADINT:%.*]] = load {{.*}} : $*Int

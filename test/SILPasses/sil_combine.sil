@@ -369,15 +369,15 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @copy_value_test
+// CHECK-LABEL: sil @retain_value_test
 // CHECK: bb0([[TRIVIAL_TARGET:%[0-9]+]] : $Builtin.Int8, [[REFCOUNT_TARGET:%[0-9]+]] : $Builtin.ObjectPointer):
 // CHECK-NEXT: strong_retain [[REFCOUNT_TARGET]] : $Builtin.ObjectPointer
 // CHECK-NEXT: tuple ([[TRIVIAL_TARGET]] : $Builtin.Int8, [[REFCOUNT_TARGET]] : $Builtin.ObjectPointer)
 // CHECK-NEXT: return
-sil @copy_value_test : $@thin (Builtin.Int8, Builtin.ObjectPointer) -> (Builtin.Int8, Builtin.ObjectPointer) {
+sil @retain_value_test : $@thin (Builtin.Int8, Builtin.ObjectPointer) -> (Builtin.Int8, Builtin.ObjectPointer) {
 bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
-  copy_value %0 : $Builtin.Int8
-  copy_value %1 : $Builtin.ObjectPointer
+  retain_value %0 : $Builtin.Int8
+  retain_value %1 : $Builtin.ObjectPointer
   %4 = tuple(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer)
   return %4 : $(Builtin.Int8, Builtin.ObjectPointer)
 }
@@ -470,7 +470,7 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
 // CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
 // CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
-// CHECK-NEXT: copy_value [[INVALID_CASE]] : $U
+// CHECK-NEXT: retain_value [[INVALID_CASE]] : $U
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
 //
@@ -481,12 +481,12 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 sil @sil_copyvalue_of_enum : $@thin (@thin U.Type, C) -> (U, U, U) {
 bb0(%0 : $@thin U.Type, %1 : $C):
   %2 = enum $U, #U.X!enumelt
-  copy_value %2 : $U
+  retain_value %2 : $U
   %3 = integer_literal $Builtin.Int64, 32
   %4 = enum $U, #U.Y!enumelt.1, %3 : $Builtin.Int64
-  copy_value %4 : $U
+  retain_value %4 : $U
   %5 = enum $U, #U.Z!enumelt.1, %1 : $C
-  copy_value %5 : $U
+  retain_value %5 : $U
   %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
 }

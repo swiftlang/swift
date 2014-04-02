@@ -29,11 +29,11 @@ struct S {
 // CHECK-NEXT: return
 sil @simple_copyvalue_destroyvalue_pair : $@thin (S) -> S {
 bb0(%0 : $S):
-  copy_value %0 : $S
+  retain_value %0 : $S
   destroy_value %0 : $S
-  copy_value %0 : $S
+  retain_value %0 : $S
   destroy_value %0 : $S
-  copy_value %0 : $S
+  retain_value %0 : $S
   destroy_value %0 : $S
   return %0 : $S
 }
@@ -59,7 +59,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $Builtin.Int64):
 // CHECK-NEXT: return
 sil @delete_copyvalue_over_non_side_effect_instructions : $@thin (S, Builtin.Int64) -> (Builtin.Int1) {
 bb0(%0 : $S, %1 : $Builtin.Int64):
-  copy_value %0 : $S
+  retain_value %0 : $S
   %2 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
   %3 = apply %2(%1, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
   destroy_value %0 : $S
@@ -87,7 +87,7 @@ bb0(%0 : $Builtin.ObjectPointer, %1 : $Builtin.ObjectPointer):
 // CHECK-NEXT: return
 sil @delete_copyvalue_over_single_potential_decrement : $@thin (S, Builtin.ObjectPointer) -> () {
 bb0(%0 : $S, %1 : $Builtin.ObjectPointer):
-  copy_value %0 : $S
+  retain_value %0 : $S
   strong_release %1 : $Builtin.ObjectPointer
   destroy_value %0 : $S
   %2 = tuple()
@@ -119,7 +119,7 @@ sil @S_user : $@thin (S) -> ()
 
 // CHECK-LABEL: sil @dont_delete_copyvalue_over_decrement_use : $@thin (S) -> ()
 // CHECK: bb0
-// CHECK: copy_value
+// CHECK: retain_value
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: destroy_value
@@ -128,7 +128,7 @@ sil @S_user : $@thin (S) -> ()
 sil @dont_delete_copyvalue_over_decrement_use : $@thin (S) -> () {
 bb0(%0 : $S):
   %1 = function_ref @S_user : $@thin (S) -> ()
-  copy_value %0 : $S
+  retain_value %0 : $S
   apply %1 (%0) : $@thin (S) -> ()
   apply %1 (%0) : $@thin (S) -> ()
   destroy_value %0 : $S
@@ -163,7 +163,7 @@ bb0(%0 : $Builtin.ObjectPointer):
 
 // CHECK-LABEL: sil @delete_copyvalue_over_decrement_use_when_knownsafe : $@thin (S) -> ()
 // CHECK: bb0
-// CHECK: copy_value
+// CHECK: retain_value
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: apply
@@ -174,10 +174,10 @@ bb0(%0 : $Builtin.ObjectPointer):
 sil @delete_copyvalue_over_decrement_use_when_knownsafe : $@thin (S) -> () {
 bb0(%0 : $S):
   %1 = function_ref @S_user : $@thin (S) -> ()
-  copy_value %0 : $S
+  retain_value %0 : $S
   %2 = integer_literal $Builtin.Int32, 1
   %3 = integer_literal $Builtin.Int32, 2
-  copy_value %0 : $S
+  retain_value %0 : $S
   apply %1 (%0) : $@thin (S) -> ()
   apply %1 (%0) : $@thin (S) -> ()
   destroy_value %0 : $S

@@ -20,9 +20,9 @@ bb0:
   store %1 to %2 : $*SomeClass                    // id: %3
   inject_enum_addr %0#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // id: %4
   %5 = load %0#1 : $*Optional<SomeClass>          // users: %6, %8, %9, %14
-  %6 = copy_value %5 : $Optional<SomeClass>
+  %6 = retain_value %5 : $Optional<SomeClass>
   %7 = alloc_stack $Optional<SomeClass>           // users: %9, %10, %11, %13
-  %8 = copy_value %5 : $Optional<SomeClass>
+  %8 = retain_value %5 : $Optional<SomeClass>
   store %5 to %7#1 : $*Optional<SomeClass>        // id: %9
   switch_enum_addr %7#1 : $*Optional<SomeClass>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2 // id: %10
 

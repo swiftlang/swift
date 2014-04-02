@@ -794,7 +794,7 @@ public:
   }
   
   void visitRetainValueInst(RetainValueInst *I) {
-    OS << "copy_value " << getIDAndType(I->getOperand());
+    OS << "retain_value " << getIDAndType(I->getOperand());
   }
 
   void visitDestroyValueInst(DestroyValueInst *I) {

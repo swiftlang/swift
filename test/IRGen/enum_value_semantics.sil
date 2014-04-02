@@ -86,7 +86,7 @@ enum SinglePayloadNontrivial {
 
 sil @single_payload_nontrivial_copy_destroy : $(SinglePayloadNontrivial) -> () {
 bb0(%0 : $SinglePayloadNontrivial):
-  copy_value %0 : $SinglePayloadNontrivial
+  retain_value %0 : $SinglePayloadNontrivial
   destroy_value %0 : $SinglePayloadNontrivial
   %v = tuple ()
   return %v : $()

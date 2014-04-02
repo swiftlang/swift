@@ -654,7 +654,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *CI) {
   SILValue Operand = CI->getOperand();
   SILType OperandTy = Operand.getType();
 
-  // copy_value of an enum with a trivial payload or no-payload is a no-op +
+  // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
     if (!EI->hasOperand() ||

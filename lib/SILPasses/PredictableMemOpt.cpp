@@ -734,7 +734,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
 
 
 /// Explode a copy_addr instruction of a loadable type into lower level
-/// operations like loads, stores, retains, releases, copy_value, etc.
+/// operations like loads, stores, retains, releases, retain_value, etc.
 void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
   DEBUG(llvm::dbgs() << "  -- Exploding copy_addr: " << *CAI << "\n");
   

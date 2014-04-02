@@ -993,7 +993,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("cond_fail", ValueKind::CondFailInst)
     .Case("convert_function", ValueKind::ConvertFunctionInst)
     .Case("copy_addr", ValueKind::CopyAddrInst)
-    .Case("copy_value", ValueKind::RetainValueInst)
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)

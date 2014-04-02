@@ -295,14 +295,14 @@ public:
   virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
-  /// Emit a lowered 'copy_value' operation.
+  /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
   virtual void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                                     SILValue value,
                                     LoweringStyle style) const = 0;
 
-  /// Emit a lowered 'copy_value' operation.
+  /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
   void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
@@ -310,7 +310,7 @@ public:
     emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
   }
 
-  /// Emit a lowered 'copy_value' operation.
+  /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
   void emitLoweredRetainValueDeep(SILBuilder &B, SILLocation loc,
@@ -318,7 +318,7 @@ public:
     emitLoweredRetainValue(B, loc, value, LoweringStyle::Deep);
   }
 
-  /// Emit a lowered 'copy_value' operation.
+  /// Emit a lowered 'retain_value' operation.
   ///
   /// This type must be loadable.
   void emitLoweredRetainValueDeepNoEnum(SILBuilder &B, SILLocation loc,
