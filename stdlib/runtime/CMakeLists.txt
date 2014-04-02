@@ -21,7 +21,6 @@ add_swift_library(swift_runtime INSTALL
   Once.cpp
   Init.cpp
   Reflection.mm
-  NSSwiftString.mm
   Heap.cpp
   BlockShims.mm)
 
