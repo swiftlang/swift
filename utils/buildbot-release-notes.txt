@@ -59,6 +59,21 @@
   importing specific parameters, return types, etc. as either the
   explicit optional type 'T?' or the simple non-optional type 'T'.
 
+* The 'objc' attribute now optionally accepts a name, which can be
+  used to provide the name for an entity as seen in Objective-C. For
+  example:
+
+    class MyType {
+      var enabled: Bool {
+        @objc(isEnabled) get {
+          // ...
+        }
+      }
+    }
+
+  The @objc attribute can be used to name initializers, methods,
+  getters, setters, classes, and protocols.
+
 
 2014-03-26
 ----------
