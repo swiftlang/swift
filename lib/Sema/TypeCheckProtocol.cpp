@@ -401,6 +401,24 @@ namespace {
 
 } // end anonymous namespace
 
+static std::pair<Type,Type> getTypesToCompare(ValueDecl *reqt, Type reqtType,
+                                              Type witnessType) {
+  // Only do this hack when the protocol is @objc.
+  if (reqt->isObjC()) {
+    // If the requirement type is an UncheckedOptional type, pretend it isn't.
+    if (auto reqtValueType = reqtType->getUncheckedOptionalObjectType()) {
+      reqtType = reqtValueType;
+
+      // But be sure to allow the witness type to be explicitly optional.
+      if (auto witnessValueType = witnessType->getAnyOptionalObjectType()) {
+        witnessType = witnessValueType;
+      }
+    }
+  }
+
+  return {reqtType, witnessType};
+}
+
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -525,8 +543,9 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
+      auto typePair = getTypesToCompare(req, reqResultType, witnessResultType);
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       witnessResultType, reqResultType);
+                       typePair.first, typePair.second);
       // FIXME: Check whether this has already failed.
     }
 
@@ -561,17 +580,23 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
                                   witnessType);
       }
 
+      // Gross hack: strip a level of unchecked-optionality off both
+      // sides when matching against a protocol imported from Objective-C.
+      auto typePair = getTypesToCompare(req, reqParams[i].getType(),
+                                        witnessParams[i].getType());
+
       // Check whether the parameter types match.
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       witnessParams[i].getType(), reqParams[i].getType());
+                       typePair.first, typePair.second);
       // FIXME: Check whether this failed.
 
       // FIXME: Consider default arguments here?
     }
   } else {
     // Simple case: add the constraint.
+    auto typePair = getTypesToCompare(req, reqType, openWitnessType);
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     openWitnessType, reqType);
+                     typePair.first, typePair.second);
   }
 
   // Try to solve the system.
