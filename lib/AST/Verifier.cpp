@@ -947,14 +947,45 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
     
+    void verifyChecked(LValueConversionExpr *E) {
+      if (!E->getSubExpr()->getType()->is<LValueType>()) {
+        Out << "LValueConversion subexpression must be an lvalue\n";
+        abort();
+      }
+      
+      if (!E->getType()->is<LValueType>()) {
+        Out << "LValueConversion result type must be an lvalue\n";
+        abort();
+      }
+      
+      Type origType = E->getSubExpr()->getType()->getLValueOrInOutObjectType();
+      Type convertedType = E->getType()->getLValueOrInOutObjectType();
+      
+      Type fromFnType = FunctionType::get(origType, convertedType);
+      Type toFnType = FunctionType::get(convertedType, origType);
+      
+      if (!E->getFromConversionFn()->getType()->isEqual(fromFnType)) {
+        Out << "LValueConversion from-conversion function must be a function "
+               "from orig type to converted type\n";
+        abort();
+      }
+      if (!E->getToConversionFn()->getType()->isEqual(toFnType)) {
+        Out << "LValueConversion to-conversion function must be a function "
+               "from converted type to orig type\n";
+        abort();
+      }
+      
+      verifyCheckedBase(E);
+    }
+    
     void verifyChecked(LValueToPointerExpr *E) {
       if (!E->getSubExpr()->getType()->is<LValueType>()) {
-        Out << "LValueToPointerExpr subexpression must be an lvalue";
+        Out << "LValueToPointerExpr subexpression must be an lvalue\n";
         abort();
       }
       if (!E->getType()->isEqual(
                              E->getType()->getASTContext().TheRawPointerType)) {
-        Out << "LValueToPointerExpr result type must be RawPointer";
+        Out << "LValueToPointerExpr result type must be RawPointer\n";
         abort();
       }
       
@@ -963,7 +994,7 @@ struct ASTNodeBase {};
     
     void verifyChecked(InOutConversionExpr *E) {
       if (!E->getSubExpr()->getType()->isEqual(E->getType())) {
-        Out << "InOutConversionExpr must have the same type as its subexpression";
+        Out << "InOutConversionExpr must have the same type as its subexpression\n";
         abort();
       }
       verifyCheckedBase(E);

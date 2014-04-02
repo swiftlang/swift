@@ -23,6 +23,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
@@ -165,6 +166,7 @@ public:
   LValue visitMemberRefExpr(MemberRefExpr *e);
   LValue visitSubscriptExpr(SubscriptExpr *e);
   LValue visitTupleElementExpr(TupleElementExpr *e);
+  LValue visitLValueConversionExpr(LValueConversionExpr *e);
   
   // Expressions that wrap lvalues
   
@@ -643,6 +645,11 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e) {
 
   lv.add<TupleElementComponent>(index, typeData);
   return std::move(lv);
+}
+
+LValue SILGenLValue::visitLValueConversionExpr(LValueConversionExpr *e) {
+  gen.SGM.diagnose(e, diag::not_implemented, "lvalue writeback conversion");
+  exit(1);
 }
 
 LValue SILGenLValue::visitInOutExpr(InOutExpr *e) {

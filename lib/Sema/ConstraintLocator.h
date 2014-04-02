@@ -94,6 +94,12 @@ public:
     AddressOf,
     /// \brief Inout conversion subexpression.
     InOutConversion,
+    /// \brief Inout writeback conversion subexpression.
+    WritebackConversion,
+    /// \brief Inout writeback conversion getter.
+    WritebackConversionGet,
+    /// \brief Inout writeback conversion setter.
+    WritebackConversionSet,
     /// \brief Rvalue adjustment.
     RvalueAdjustment,
     /// \brief The result of a closure.
@@ -146,6 +152,9 @@ public:
     case ConstructorMember:
     case AddressOf:
     case InOutConversion:
+    case WritebackConversion:
+    case WritebackConversionGet:
+    case WritebackConversionSet:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -190,6 +199,9 @@ public:
   static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
     switch (kind) {
     case InOutConversion:
+    case WritebackConversion:
+    case WritebackConversionGet:
+    case WritebackConversionSet:
     case AddressOf:
     case ApplyArgument:
     case ApplyFunction:

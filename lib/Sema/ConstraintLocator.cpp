@@ -62,7 +62,19 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case InOutConversion:
       out << "inout conversion";
       break;
-
+        
+    case WritebackConversion:
+      out << "inout writeback conversion";
+      break;
+        
+    case WritebackConversionGet:
+      out << "inout writeback conversion getter";
+      break;
+        
+    case WritebackConversionSet:
+      out << "inout writeback conversion setter";
+      break;
+        
     case ArrayElementType:
       out << "array element";
       break;

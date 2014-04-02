@@ -1720,6 +1720,38 @@ public:
   }
 };
   
+/// Convert an lvalue to an lvalue of a different type using a pair of
+/// conversion functions.
+class LValueConversionExpr : public ImplicitConversionExpr {
+  // The conversion function that converts from the original type to the
+  // converted type.
+  Expr *FromConversionFn;
+  // The conversion function that converts back to the original type from the
+  // converted type.
+  Expr *ToConversionFn;
+  
+public:
+  LValueConversionExpr(Expr *SubExpr, Type Ty,
+                       Expr *FromConversionFn, Expr *ToConversionFn)
+    : ImplicitConversionExpr(ExprKind::LValueConversion, SubExpr, Ty),
+      FromConversionFn(FromConversionFn), ToConversionFn(ToConversionFn)
+  {}
+  
+  /// Get the expression that produces the function that converts from the
+  /// original lvalue type to the converted type.
+  Expr *getFromConversionFn() const { return FromConversionFn; }
+  void setFromConversionFn(Expr *e) { FromConversionFn = e; }
+  
+  /// Get the expression that produces the function that converts back to the
+  /// original lvalue type from the converted type.
+  Expr *getToConversionFn() const { return ToConversionFn; }
+  void setToConversionFn(Expr *e) { ToConversionFn = e; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LValueConversion;
+  }
+};
+  
 /// Convert the address of an lvalue to a raw pointer.
 class LValueToPointerExpr : public ImplicitConversionExpr {
   Type AbstractionPattern;

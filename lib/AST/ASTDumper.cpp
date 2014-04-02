@@ -1341,6 +1341,15 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitLValueConversionExpr(LValueConversionExpr *E) {
+    printCommon(E, "lvalue_conversion") << '\n';
+    printRec(E->getSubExpr());
+    OS << "\nfrom = ";
+    printRec(E->getFromConversionFn());
+    OS << "\nto = ";
+    printRec(E->getToConversionFn());
+    OS << ')';
+  }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
     printRec(E->getSubExpr());

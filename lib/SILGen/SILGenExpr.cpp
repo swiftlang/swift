@@ -212,6 +212,7 @@ namespace {
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
+    RValue visitLValueConversionExpr(LValueConversionExpr *E, SGFContext C);
     RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
@@ -3408,6 +3409,11 @@ RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
   SILValue block = SGF.B.createBridgeToBlock(E, func.forward(SGF),
                                     SGF.getLoweredLoadableType(E->getType()));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(block));
+}
+
+RValue RValueEmitter::visitLValueConversionExpr(LValueConversionExpr *E,
+                                                SGFContext C) {
+  llvm_unreachable("should only appear in lvalue contexts");
 }
 
 RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,

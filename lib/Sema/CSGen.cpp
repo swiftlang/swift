@@ -767,9 +767,40 @@ namespace {
       // Don't track failures on the conversion constraints, so that we don't
       // spend energy trying to diagnose them. Inout conversions should be
       // rare.
-      auto conversionLocator = CS.getConstraintLocator(expr,
+      auto addrConversionLocator = CS.getConstraintLocator(expr,
                                            ConstraintLocator::InOutConversion);
-      conversionLocator->setDiscardFailures(true);
+      addrConversionLocator->setDiscardFailures(true);
+      auto writebackConversionLocator = CS.getConstraintLocator(expr,
+                                       ConstraintLocator::WritebackConversion);
+      writebackConversionLocator->setDiscardFailures(true);
+      
+      // Create a type variable for the writeback type of writeback conversions.
+      auto writebackTy
+        = CS.createTypeVariable(writebackConversionLocator, /*options=*/0);
+      // The solver doesn't like unbound type variables so create a useless
+      // binding of writebackTy to Void for disjunction choices that don't need
+      // the variable.
+      auto voidWriteback = Constraint::create(CS, ConstraintKind::Bind,
+                                        writebackTy,
+                                        TupleType::getEmpty(CS.getASTContext()),
+                                        DeclName(),
+                                        writebackConversionLocator);
+      // Create a type variable to represent the argument type to the writeback
+      // setter, which may be a labeled tuple and thus needs to be convertible
+      // from the writeback type.
+      auto lvalueArgTy
+        = CS.createTypeVariable(writebackConversionLocator, /*options=*/0);
+      CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
+                                          lvalue, lvalueArgTy,
+                                          DeclName(),
+                                          writebackConversionLocator));
+      
+      auto writebackArgTy
+        = CS.createTypeVariable(writebackConversionLocator, /*options=*/0);
+      CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
+                                          writebackTy, writebackArgTy,
+                                          DeclName(),
+                                          writebackConversionLocator));
       
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
@@ -777,44 +808,96 @@ namespace {
       
       // The result can either directly be the 'inout T' type or be the result
       // of an inout conversion.
-      auto result = CS.createTypeVariable(conversionLocator, /*options=*/0);
+      auto result = CS.createTypeVariable(addrConversionLocator, /*options=*/0);
       
+      //
       // Form the constraints for the inout nonconversion case.
       // The result will be bound to the inout T type of the lvalue.
       auto inout = InOutType::get(lvalue);
       
       SmallVector<Constraint*, 3> disjunctions;
       
-      disjunctions.push_back(Constraint::create(CS, ConstraintKind::Bind,
-                                                inout, result, DeclName(),
-                                                conversionLocator));
+      Constraint *inoutConstraints[] = {
+        Constraint::create(CS, ConstraintKind::Bind,
+                           inout, result, DeclName(),
+                           addrConversionLocator),
+        voidWriteback,
+      };
       
+      disjunctions.push_back(Constraint::createConjunction(CS, inoutConstraints,
+                                                       addrConversionLocator));
+      
+      //
       // Form the constraints for the address conversion case.
       // The result will be of some type that has a static __inout_conversion
       // method taking the metatype and a RawPointer as a parameter:
       //
-      //   $Result.Type -> (Builtin.RawPointer, $LValue.Type) -> $Result
+      //   static func __inout_conversion(
+      //     Builtin.RawPointer,
+      //     $LValue.Type
+      //   ) -> $Result
+      //
       auto &C = CS.getASTContext();
       auto lvMeta = MetatypeType::get(lvalue);
-      TupleTypeElt args[] = {
-        C.TheRawPointerType,
-        lvMeta,
-      };
       auto resultMeta = MetatypeType::get(result);
-      auto argTuple = TupleType::get(args, C);
-      auto methodTy = FunctionType::get(argTuple, result);
       
-      auto member = Constraint::create(CS, ConstraintKind::ValueMember,
-                                       resultMeta, methodTy,
-                                       C.getIdentifier("__inout_conversion"),
-                                       conversionLocator);
+      auto createMethodConstraint = [&](std::initializer_list<TupleTypeElt> argTys,
+                                    Type resultTy,
+                                    StringRef name,
+                                    ConstraintLocator *locator) -> Constraint* {
+        auto argTuple = TupleType::get(llvm::makeArrayRef(argTys.begin(),
+                                                          argTys.end()), C);
+        auto methodTy = FunctionType::get(argTuple, resultTy);
+        
+        return Constraint::create(CS, ConstraintKind::ValueMember,
+                                  resultMeta, methodTy, C.getIdentifier(name),
+                                  locator);
+      };
       
-      disjunctions.push_back(member);
+      Constraint *addrConversionConstraints[] = {
+        createMethodConstraint({C.TheRawPointerType, lvMeta}, result,
+                               "__inout_conversion", addrConversionLocator),
+        voidWriteback,
+      };
       
-      // TODO: Writeback conversion.
+      disjunctions.push_back(
+                   Constraint::createConjunction(CS, addrConversionConstraints,
+                                                 addrConversionLocator));
       
+      //
+      // Form the constraints for the writeback conversion case.
+      // The result will be of some type that has the following static methods:
+      //
+      //   static func __writeback_conversion(
+      //     Builtin.RawPointer,
+      //     $LValue.Type
+      //   ) -> $Result
+      //   static func __writeback_conversion_get($LValue) -> $Writeback
+      //   static func __writeback_conversion_set($Writeback) -> $LValue
+      auto getLocator = CS.getConstraintLocator(expr,
+                                   ConstraintLocator::WritebackConversionGet);
+      auto setLocator = CS.getConstraintLocator(expr,
+                                   ConstraintLocator::WritebackConversionSet);
+      getLocator->setDiscardFailures(true);
+      setLocator->setDiscardFailures(true);
+      
+      Constraint *writebackConversionRequirements[] = {
+        createMethodConstraint({C.TheRawPointerType, lvMeta}, result,
+                               "__writeback_conversion",
+                               writebackConversionLocator),
+        createMethodConstraint({lvalueArgTy}, writebackTy,
+                               "__writeback_conversion_get", getLocator),
+        createMethodConstraint({writebackArgTy}, lvalue,
+                               "__writeback_conversion_set", setLocator),
+      };
+      
+      disjunctions.push_back(Constraint::createConjunction(CS,
+                 writebackConversionRequirements, writebackConversionLocator));
+      
+      //
+      // Build the final disjunction constraint.
       CS.addConstraint(Constraint::createDisjunction(CS, disjunctions,
-                                           conversionLocator, RememberChoice));
+                                       addrConversionLocator, RememberChoice));
       return result;
     }
 
