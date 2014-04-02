@@ -363,7 +363,7 @@ void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
   if (!name.isSimpleName())
     return;
   
-  getCache().lookupValue(name.getSimpleName(), lookupKind, *this, result);
+  getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
   
   #ifndef NDEBUG
   for (auto r : result) {

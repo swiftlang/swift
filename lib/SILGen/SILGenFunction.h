@@ -85,7 +85,6 @@ public:
   /// The name of the function currently being emitted, as presented to user
   /// code by __FUNCTION__.
   DeclName MagicFunctionName;
-  bool MagicFunctionSeparatedFirstParam;
   std::string MagicFunctionString;
 
   ASTContext &getASTContext() const { return SGM.M.getASTContext(); }

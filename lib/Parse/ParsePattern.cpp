@@ -496,7 +496,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
     
-    FullName = DeclName(Context, NamePieces);
+    FullName = DeclName(Context, NamePieces[0],
+                        llvm::makeArrayRef(NamePieces.begin() + 1,
+                                           NamePieces.end()));
     
     if (bodyPatterns.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking
@@ -533,7 +535,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       break;
     }
 
-    FullName = DeclName(Context, NamePieces);
+    FullName = DeclName(Context, NamePieces[0],
+                        llvm::makeArrayRef(NamePieces.begin() + 1, NamePieces.end()));
 
     argPatterns.push_back(TuplePattern::create(Context, LParenLoc, ArgElts, 
                                                RParenLoc));

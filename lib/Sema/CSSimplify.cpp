@@ -1358,7 +1358,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
     
-    StringRef nameStr = name.getSimpleName().str();
+    StringRef nameStr = name.getBaseName().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
@@ -1366,7 +1366,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         Value < baseTuple->getFields().size()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = baseTuple->getNamedElementId(name.getSimpleName());
+      fieldIdx = baseTuple->getNamedElementId(name.getBaseName());
     }
 
     if (fieldIdx == -1) {
@@ -1438,7 +1438,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       return SolutionKind::Error;
     }
     
-    auto lookup = TC.lookupMemberType(baseObjTy, name.getSimpleName(), DC);
+    auto lookup = TC.lookupMemberType(baseObjTy, name.getBaseName(), DC);
     if (!lookup) {
       // FIXME: Customize diagnostic to mention types.
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
@@ -1478,7 +1478,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // Check whether we actually performed a lookup with an integer value.
     unsigned index;
     if (name.isSimpleName()
-        && !name.getSimpleName().str().getAsInteger(10, index)) {
+        && !name.getBaseName().str().getAsInteger(10, index)) {
       // ".0" on a scalar just refers to the underlying scalar value.
       if (index == 0) {
         OverloadChoice identityChoice(baseTy, OverloadChoiceKind::BaseType);

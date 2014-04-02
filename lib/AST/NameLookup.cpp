@@ -520,7 +520,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   DebuggerClient *DebugClient = M.getDebugClient();
   // TODO: Does the debugger client care about compound names?
   if (Name.isSimpleName()
-      && DebugClient && DebugClient->lookupOverrides(Name.getSimpleName(), DC,
+      && DebugClient && DebugClient->lookupOverrides(Name.getBaseName(), DC,
                                                    Loc, IsTypeLookup, Results))
     return;
 
@@ -553,7 +553,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   });
 
   if (Name.isSimpleName() && DebugClient && !Results.size())
-    DebugClient->lookupFallbacks(Name.getSimpleName(), DC, Loc, IsTypeLookup,
+    DebugClient->lookupFallbacks(Name.getBaseName(), DC, Loc, IsTypeLookup,
                                  Results);
 }
 

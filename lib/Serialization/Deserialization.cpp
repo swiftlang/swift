@@ -1762,10 +1762,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (declOrOffset.isComplete())
       break;
 
+    DeclName name;
+    if (!names.empty()) {
+      name = DeclName(ctx, names[0],
+                      llvm::makeArrayRef(names.begin() + 1, names.end()));
+    }
     auto fn = FuncDecl::createDeserialized(
-        ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(),
-        DeclName(ctx, names), SourceLoc(),
-        genericParams, /*type=*/nullptr, numParamPatterns, DC);
+        ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(), name,
+        SourceLoc(), genericParams, /*type=*/nullptr, numParamPatterns, DC);
     declOrOffset = fn;
 
     if (Decl *associated = getDecl(associatedDeclID)) {

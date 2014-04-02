@@ -1064,21 +1064,20 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         if (IsSelector) {
           // Collect the selector pieces.
           SmallVector<UnresolvedSelectorExpr::ComponentLoc, 2> Locs;
-          SmallVector<Identifier, 2> Components;
+          SmallVector<Identifier, 2> ArgumentNames;
           
           Locs.push_back({NameLoc, consumeToken(tok::colon)});
-          Components.push_back(Name);
           while (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
             Identifier SelName = Context.getIdentifier(Tok.getText());
             SourceLoc SelLoc = consumeToken(tok::identifier);
             SourceLoc ColonLoc = consumeToken(tok::colon);
             Locs.push_back({SelLoc, ColonLoc});
-            Components.push_back(SelName);
+            ArgumentNames.push_back(SelName);
           }
-          auto Name = DeclName(Context, Components);
+          auto FullName = DeclName(Context, Name, ArgumentNames);
           Result = makeParserResult(
             UnresolvedSelectorExpr::create(Context, Result.get(), TokLoc,
-                                           Name, Locs));
+                                           FullName, Locs));
         } else {
           Result = makeParserResult(
             new (Context) UnresolvedDotExpr(Result.get(), TokLoc, Name, NameLoc,

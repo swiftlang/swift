@@ -410,7 +410,7 @@ UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
   : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
     SubExpr(subExpr), DotLoc(dotLoc), Name(name)
 {
-  assert(name.getComponents().size() == components.size()
+  assert(name.getArgumentNames().size() + 1 == components.size()
          && "number of component locs does not match number of name components");
   auto buf = getComponentsBuf();
   std::uninitialized_copy(components.begin(), components.end(),
@@ -421,11 +421,12 @@ UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
              Expr *subExpr, SourceLoc dotLoc,
              DeclName name,
              ArrayRef<ComponentLoc> components) {
-  assert(name.getComponents().size() == components.size()
+  assert(name.getArgumentNames().size() + 1 == components.size()
          && "number of component locs does not match number of name components");
   
   void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
-                           + name.getComponents().size() * sizeof(ComponentLoc),
+                           + (name.getArgumentNames().size() + 1)
+                               * sizeof(ComponentLoc),
                          alignof(UnresolvedSelectorExpr));
   return ::new (buf) UnresolvedSelectorExpr(subExpr, dotLoc, name, components);
 }

@@ -1565,8 +1565,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[FuncLayout::Code];
     SmallVector<IdentifierID, 4> nameComponents;
-    for (auto component : fn->getFullName().getComponents())
-      nameComponents.push_back(addIdentifierRef(component));
+    nameComponents.push_back(addIdentifierRef(fn->getFullName().getBaseName()));
+    for (auto argName : fn->getFullName().getArgumentNames())
+      nameComponents.push_back(addIdentifierRef(argName));
       
     FuncLayout::emitRecord(Out, ScratchRecord, abbrCode,
                            addDeclRef(DC),

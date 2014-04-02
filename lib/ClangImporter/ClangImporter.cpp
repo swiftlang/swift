@@ -531,7 +531,6 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     return importName(selector.getIdentifierInfoForSlot(0));
   
   SmallVector<Identifier, 2> components;
-  
   for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i) {
     if (i > 0 || SplitPrepositions == SelectorSplitKind::None) {
       components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
@@ -563,7 +562,8 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     }
   }
   
-  return DeclName(SwiftContext, components);
+  return DeclName(SwiftContext, components[0],
+                  llvm::makeArrayRef(components.begin() + 1, components.end()));
 }
 
 /// Split the given selector piece at the given index, updating
@@ -1012,7 +1012,7 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
   VectorDeclConsumer vectorWriter(results);
   FilteringVisibleDeclConsumer filteringConsumer(vectorWriter, this);
   
-  owner.lookupValue(name.getSimpleName(), filteringConsumer);
+  owner.lookupValue(name.getBaseName(), filteringConsumer);
 }
 
 void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
@@ -1106,12 +1106,15 @@ void ClangModuleUnit::getImportedModules(
 /// Returns true if the first selector piece matches the given identifier.
 static bool selectorMatchesName(clang::Selector sel, DeclName name) {
   if (name.isSimpleName())
-    return sel.getNameForSlot(0) == name.getSimpleName().str();
+    return sel.getNameForSlot(0) == name.getBaseName().str();
   
-  if (sel.getNumArgs() != name.getComponents().size())
+  if (sel.getNumArgs() != name.getArgumentNames().size() + 1)
     return false;
-  for (unsigned i = 0, e = sel.getNumArgs(); i < e; ++i)
-    if (sel.getNameForSlot(i) != name.getComponents()[i].str())
+  if (sel.getNameForSlot(0) != name.getBaseName().str())
+    return false;
+
+  for (unsigned i = 1, e = sel.getNumArgs(); i < e; ++i)
+    if (sel.getNameForSlot(i) != name.getArgumentNames()[i-1].str())
       return false;
   return true;
 }

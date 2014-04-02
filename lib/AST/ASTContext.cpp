@@ -2104,42 +2104,37 @@ CanGenericSignature GenericSignature::getCanonical(
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
-                                         ArrayRef<Identifier> components) {
-  id.AddInteger(components.size());
-  for (auto c : components)
-    id.AddPointer(c.get());
+                                         Identifier baseName,
+                                         ArrayRef<Identifier> argumentNames) {
+  id.AddPointer(baseName.get());
+  id.AddInteger(argumentNames.size());
+  for (auto arg : argumentNames)
+    id.AddPointer(arg.get());
 }
 
-DeclName::DeclName(ASTContext &C, ArrayRef<Identifier> components) {
-  switch (components.size()) {
-  case 0:
-    SimpleOrCompound = Identifier();
+DeclName::DeclName(ASTContext &C, Identifier baseName,
+                   ArrayRef<Identifier> argumentNames) {
+  if (argumentNames.size() == 0) {
+    SimpleOrCompound = baseName;
     return;
+  }
 
-  case 1:
-    SimpleOrCompound = components.front();
-    return;
+  llvm::FoldingSetNodeID id;
+  CompoundDeclName::Profile(id, baseName, argumentNames);
 
-  default: {
-    llvm::FoldingSetNodeID id;
-    CompoundDeclName::Profile(id, components);
-
-    void *insert = nullptr;
-    if (CompoundDeclName *compoundName
-          = C.Impl.CompoundNames.FindNodeOrInsertPos(id, insert)) {
-      SimpleOrCompound = compoundName;
-      return;
-    }
-
-    auto buf = C.Allocate(sizeof(CompoundDeclName)
-                            + components.size() * sizeof(Identifier),
-                          alignof(CompoundDeclName));
-    auto compoundName = new (buf) CompoundDeclName(components.size());
-    std::uninitialized_copy(components.begin(), components.end(),
-                            compoundName->getComponents().begin());
+  void *insert = nullptr;
+  if (CompoundDeclName *compoundName
+        = C.Impl.CompoundNames.FindNodeOrInsertPos(id, insert)) {
     SimpleOrCompound = compoundName;
-    C.Impl.CompoundNames.InsertNode(compoundName, insert);
     return;
   }
-  }
+
+  auto buf = C.Allocate(sizeof(CompoundDeclName)
+                          + argumentNames.size() * sizeof(Identifier),
+                        alignof(CompoundDeclName));
+  auto compoundName = new (buf) CompoundDeclName(baseName,argumentNames.size());
+  std::uninitialized_copy(argumentNames.begin(), argumentNames.end(),
+                          compoundName->getArgumentNames().begin());
+  SimpleOrCompound = compoundName;
+  C.Impl.CompoundNames.InsertNode(compoundName, insert);
 }

@@ -191,28 +191,31 @@ class DeclName {
   friend class ASTContext;
   
   struct alignas(Identifier*) CompoundDeclName : llvm::FoldingSetNode {
-    size_t Size;
+    Identifier BaseName;
+    size_t NumArgs;
     
-    explicit CompoundDeclName(size_t Size) : Size(Size) {}
+    explicit CompoundDeclName(Identifier BaseName, size_t NumArgs)
+      : BaseName(BaseName), NumArgs(NumArgs) {}
     
-    ArrayRef<Identifier> getComponents() const {
-      return {reinterpret_cast<const Identifier*>(this + 1), Size};
+    ArrayRef<Identifier> getArgumentNames() const {
+      return {reinterpret_cast<const Identifier*>(this + 1), NumArgs};
     }
-    MutableArrayRef<Identifier> getComponents() {
-      return {reinterpret_cast<Identifier*>(this + 1), Size};
+    MutableArrayRef<Identifier> getArgumentNames() {
+      return {reinterpret_cast<Identifier*>(this + 1), NumArgs};
     }
       
     /// Uniquing for the ASTContext.
     static void Profile(llvm::FoldingSetNodeID &id,
-                        ArrayRef<Identifier> components);
+                        Identifier baseName,
+                        ArrayRef<Identifier> argumentNames);
     
     void Profile(llvm::FoldingSetNodeID &id) {
-      Profile(id, getComponents());
+      Profile(id, BaseName, getArgumentNames());
     }
   };
   
   // Either a single identifier piece stored inline, or a reference to a
-  // run-length-encoded array of identifier pieces owned by the ASTContext.
+  // compound declaration name.
   llvm::PointerUnion<Identifier, CompoundDeclName*> SimpleOrCompound;
   
   DeclName(void *Opaque)
@@ -227,31 +230,28 @@ public:
   /*implicit*/ DeclName(Identifier simpleName)
     : SimpleOrCompound(simpleName) {}
   
-  /// Build a compound value name by copying a list of components.
-  DeclName(ASTContext &C, ArrayRef<Identifier> components);
+  /// Build a compound value name given a base name and a set of argument names.
+  DeclName(ASTContext &C, Identifier baseName,
+           ArrayRef<Identifier> argumentNames);
   
-  /// Get the first name component. This is the name that is looked up in
-  /// "C-style" property accesses, such as 'foo.bar' or 'foo.bar(1, 2)'.
-  ///
-  /// TODO: Eventually compound names should not return a name here.
-  Identifier getSimpleName() const {
+  /// Retrive the 'base' name, i.e., the name that follows the introducer,
+  /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
+  /// 'var bar: Int'.
+  Identifier getBaseName() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
-      return compound->getComponents()[0];
+      return compound->BaseName;
     
     return SimpleOrCompound.get<Identifier>();
   }
-  
-  /// Get the components array.
-  ArrayRef<Identifier> getComponents() const {
+
+  /// Retrieve the names of the arguments, if there are any.
+  ArrayRef<Identifier> getArgumentNames() const {
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
-      return compound->getComponents();
-    
-    auto identifier = SimpleOrCompound.get<Identifier>();
-    if (identifier.get())
-      return identifier;
-    return {};
+      return compound->getArgumentNames();
+
+    return { };
   }
-  
+
   explicit operator bool() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
@@ -266,18 +266,18 @@ public:
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(Identifier name) const {
-    return isSimpleName() && getSimpleName() == name;
+    return isSimpleName() && getBaseName() == name;
   }
   
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
-    return isSimpleName() && getSimpleName().str().equals(name);
+    return isSimpleName() && getBaseName().str().equals(name);
   }
   
   /// True if this name is an operator.
   bool isOperator() const {
-    return isSimpleName() && getSimpleName().isOperator();
+    return isSimpleName() && getBaseName().isOperator();
   }
   
   /// True if this name should be found by a decl ref or member ref under the
@@ -291,7 +291,7 @@ public:
       return true;
     // If the reference is a simple name, try simple name matching.
     if (refName.isSimpleName())
-      return refName.getSimpleName() == getSimpleName();
+      return refName.getBaseName() == getBaseName();
     // The names don't match.
     return false;
   }
@@ -302,12 +302,16 @@ public:
   void addToLookupTable(LookupTable &table, const Element &elt) {
     table[*this].push_back(elt);
     if (!isSimpleName()) {
-      table[getSimpleName()].push_back(elt);
+      table[getBaseName()].push_back(elt);
     }
   }
   
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
+
+  /// Dump this name to standard error.
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(),
+                            "only for use within the debugger");
 };
   
 } // end namespace swift

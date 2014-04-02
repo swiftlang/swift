@@ -1428,7 +1428,7 @@ private:
   
   MutableArrayRef<ComponentLoc> getComponentsBuf() {
     return {reinterpret_cast<ComponentLoc*>(this+1),
-            Name.getComponents().size()};
+            Name.getArgumentNames().size() + 1};
   }
   
   UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
@@ -1444,7 +1444,7 @@ public:
   
   ArrayRef<ComponentLoc> getComponentLocs() const {
     return {reinterpret_cast<const ComponentLoc*>(this+1),
-            Name.getComponents().size()};
+            Name.getArgumentNames().size() + 1};
   }
   
   SourceLoc getLoc() const {

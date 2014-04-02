@@ -1569,7 +1569,7 @@ public:
 
   bool hasName() const { return bool(Name); }
   /// TODO: Rename to getSimpleName?
-  Identifier getName() const { return Name.getSimpleName(); }
+  Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }

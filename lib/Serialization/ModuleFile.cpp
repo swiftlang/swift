@@ -815,7 +815,7 @@ void ModuleFile::lookupValue(DeclName name,
     // FIXME: As a bit of a hack, do lookup by the simple name, then filter
     // compound decls, to avoid having to completely redo how modules are
     // serialized.
-    auto iter = TopLevelDecls->find(name.getSimpleName());
+    auto iter = TopLevelDecls->find(name.getBaseName());
     if (iter != TopLevelDecls->end()) {
       if (name.isSimpleName()) {
         for (auto item : *iter) {
@@ -834,7 +834,7 @@ void ModuleFile::lookupValue(DeclName name,
 
   // If the name is an operator name, also look for operator methods.
   if (name.isOperator() && OperatorMethodDecls) {
-    auto iter = OperatorMethodDecls->find(name.getSimpleName());
+    auto iter = OperatorMethodDecls->find(name.getBaseName());
     if (iter != OperatorMethodDecls->end()) {
       for (auto item : *iter) {
         auto VD = cast<ValueDecl>(getDecl(item.second));
@@ -1002,7 +1002,7 @@ void ModuleFile::lookupClassMember(Module::AccessPathTy accessPath,
   if (!ClassMembersByName)
     return;
 
-  auto iter = ClassMembersByName->find(name.getSimpleName());
+  auto iter = ClassMembersByName->find(name.getBaseName());
   if (iter == ClassMembersByName->end())
     return;
 

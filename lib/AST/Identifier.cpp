@@ -21,16 +21,19 @@ using namespace swift;
 
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
-  if (I.get() == 0) return OS << "(null identifier)";
+  if (I.get() == 0) return OS << "_";
   return OS << I.get();
 }
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
   if (I.isSimpleName())
-    return OS << I.getSimpleName();
-  
-  for (auto c : I.getComponents())
-    OS << c.get() << ':';
+    return OS << I.getBaseName();
+
+  OS << I.getBaseName() << "(";
+  for (auto c : I.getArgumentNames()) {
+    OS << c << ':';
+  }
+  OS << ")";
   return OS;
 }
 
@@ -44,4 +47,8 @@ bool Identifier::isOperatorSlow() const {
   assert(res == conversionOK && "invalid UTF-8 in identifier?!");
   (void)res;
   return !empty() && isOperatorStartCodePoint(codePoint);
+}
+
+void DeclName::dump() {
+  llvm::errs() << *this;
 }
