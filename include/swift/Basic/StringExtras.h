@@ -145,6 +145,12 @@ namespace swift {
       friend bool operator!=(const WordIterator &x, const WordIterator &y) {
         return !(x == y);
       }
+
+      /// Retrieve the position of this iterator within the underlying
+      /// string.
+      unsigned getPosition() const {
+        return Position;
+      }
     };
 
     /// Find the first camelCase word in the given string.

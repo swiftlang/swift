@@ -584,64 +584,39 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
     return { selector, "" };
   }
 
-  // If there are at least two characters in the parameter name, and the second
-  // one is not a lowercase character (uppercase or digit), we have an acronym.
-  // Don't lowercase anything.
-  if (selector.size() > index + 1 && !clang::isLowercase(selector[index + 1])) {
-    return { selector.substr(0, index), selector.substr(index) };
-  }
-    
-  // Lowercase the first character of the parameter name.
-  buffer.clear();
-  buffer.reserve(selector.size() - index);
-  buffer.push_back(tolower(selector[index]));
-  buffer.append(selector.begin() + index + 1, selector.end());
-  return { selector.substr(0, index), StringRef(buffer.data(), buffer.size()) };
+  // Split at the index and lowercase the parameter name.
+  return { selector.substr(0, index),
+           camel_case::toLowercaseWord(selector.substr(index), buffer) };
 }
 
 std::pair<StringRef, StringRef> 
 ClangImporter::Implementation::splitFirstSelectorPiece(
                                  StringRef selector,
                                  SmallVectorImpl<char> &buffer) {
+  // Get the camelCase words in this selector.
+  auto words = camel_case::getWords(selector);
+  if (words.empty())
+    return { selector, "" };
+
   // If "init" is the first word, we have an initializer.
-  if (selector.startswith("init") &&
-      (selector.size() == 4 || !clang::isLowercase(selector[4]))) {
+  if (*words.begin() == "init") {
     return splitSelectorPieceAt(selector, 4, buffer);
   }
 
   // Scan words from the back of the selector looking for a
   // preposition.
-  unsigned wordStart = selector.size();
-  unsigned wordEnd = wordStart;
-  for (;;) {
-    // Skip over any lowercase letters.
-    bool anyLower = false;
-    while (wordStart > 0 && clang::isLowercase(selector[wordStart-1])) {
-      --wordStart;
-      anyLower = true;
+  auto lastPrep = std::find_if(words.rbegin(), words.rend(),
+                               [&](StringRef word) -> bool {
+    return getPrepositionKind(word) != PK_None;
+  });
+
+  // If we found a preposition, split here.
+  if (lastPrep != words.rend()) {
+    if (getPrepositionKind(*lastPrep)) {
+      return splitSelectorPieceAt(selector,
+                                  std::prev(lastPrep.base()).getPosition(),
+                                  buffer);
     }
-
-    // Skip over any non-lowercase letters.
-    while (wordStart > 0 && !clang::isLowercase(selector[wordStart-1])) {
-      --wordStart;
-
-      // If there were any lowercase letters, stop after the first
-      // uppercase letter we see.
-      if (anyLower)
-        break;
-    }
-
-    // [wordStart, wordEnd) is the current word.
-    if (wordStart == 0)
-      break;
-
-    // If this word is a preposition, split here.
-    if (getPrepositionKind(selector.substr(wordStart, wordEnd - wordStart))) {
-      return splitSelectorPieceAt(selector, wordStart, buffer);
-    }
-
-    // Look for the next word.
-    wordEnd = wordStart;
   }
 
   // Nothing to split.
