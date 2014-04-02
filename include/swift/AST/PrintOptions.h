@@ -33,7 +33,7 @@ struct PrintOptions {
   bool VarInitializers = false;
 
   /// \brief Whether to print a placeholder for default parameters.
-  bool PrintDefaultParameterPlaceholder = false;
+  bool PrintDefaultParameterPlaceholder = true;
 
   /// \brief Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -80,6 +80,7 @@ struct PrintOptions {
     result.FunctionDefinitions = true;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
+    result.PrintDefaultParameterPlaceholder = true;
     result.SkipImplicit = false;
     result.PrintDocumentationComments = true;
     return result;

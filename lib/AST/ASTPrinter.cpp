@@ -386,7 +386,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
       } else {
         printPattern(Elt.getPattern());
       }
-      if (Elt.getInit()) {
+      if (Elt.getDefaultArgKind() != DefaultArgumentKind::None) {
         if (Options.PrintDefaultParameterPlaceholder)
           Printer << " = default";
         else if (Options.VarInitializers) {

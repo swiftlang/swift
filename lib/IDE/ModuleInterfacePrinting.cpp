@@ -34,6 +34,8 @@ void swift::ide::printSubmoduleInterface(Module *M,
   AdjustedOptions.ExplodePatternBindingDecls = true;
   AdjustedOptions.VarInitializers = false;
 
+  AdjustedOptions.PrintDefaultParameterPlaceholder = true;
+
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 
