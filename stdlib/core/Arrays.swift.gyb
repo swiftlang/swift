@@ -1,0 +1,72 @@
+%# -*- mode: swift -*-
+//===--- Arrays.swift.gyb - NativeArray, Array, and Slice -----------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  Three generic, mutable array-like types with value semantics.
+//
+//  - NativeArray<T> is a fast, contiguous array of T with a known
+//    backing store.
+//
+//  - Slice<T> presents an arbitrary subsequence of some contiguous sequence
+//    of Ts.
+//
+//  - Array<T> is like NativeArray<T> when T is not an ObjC type.
+//    Otherwise, it may use an NSArray bridged from Cocoa for storage
+//
+//===----------------------------------------------------------------------===//
+
+% for Self in ['NativeArray', 'Slice', 'NewArray']:
+struct ${Self}<T> {
+  typealias Element = T
+  typealias Buffer = ${'Array' if Self.startswith('New') else Self}Buffer<T>
+
+  var buffer: Buffer
+}
+
+extension ${Self} : Collection {
+  var startIndex: Int {
+    return 0
+  }
+
+  var endIndex: Int {
+    return buffer.count
+  }
+
+  subscript(i: Int) -> Element {
+    get {
+      return buffer[i]
+    }
+  }
+
+  func generate() -> IndexingGenerator<${Self}> {
+    return IndexingGenerator(self)
+  }
+}
+
+extension ${Self} /*: _ArrayType*/ {
+  func toNativeBuffer(managedByCopyOnWrite: Bool)
+  -> NativeArrayBuffer<Element> {
+    return buffer.toNativeBuffer(managedByCopyOnWrite)
+  }
+  
+  var count: Int {
+    get {
+      return buffer.count
+    }
+  }
+}
+%end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
+
