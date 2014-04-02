@@ -2419,7 +2419,7 @@ namespace {
     auto traitTy = substitutions[0].Replacement->getCanonicalType();
     
     switch ((traitTy.getPointer()->*Trait)()) {
-    // If the type obvious has or lacks the trait, emit a constant result.
+    // If the type obviously has or lacks the trait, emit a constant result.
     case TypeTraitResult::IsNot:
       result = false;
       break;
@@ -2815,6 +2815,22 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, AbstractStorageDecl *decl,
                        accessType.getResult());
   // ()
   emission.apply();
+}
+
+ManagedValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
+                                                         Expr *funcExpr,
+                                                         Type resultType,
+                                                         RValue &&operand) {
+  // Walk the function expression, which should produce a reference to the
+  // callee, leaving the final curry level unapplied.
+  CallEmission emission = prepareApplyExpr(*this, funcExpr);
+  // Rewrite the operand type to the expected argument type, to handle tuple
+  // conversions etc.
+  operand.rewriteType(funcExpr->getType()->castTo<FunctionType>()->getInput()
+                        ->getCanonicalType());
+  // Add the operand as the final callsite.
+  emission.addCallSite(loc, RValueSource(loc, std::move(operand)), resultType);
+  return emission.apply();
 }
 
 RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,

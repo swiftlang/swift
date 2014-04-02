@@ -2011,9 +2011,6 @@ namespace {
         auto writebackTy = getMemberRef->getType()
           ->castTo<AnyFunctionType>()
           ->getResult();
-        // Convert away tuple labels.
-        getMemberRef = new (C) FunctionConversionExpr(getMemberRef,
-                         FunctionType::get(lvTy->getObjectType(), writebackTy));
         
         Expr *setMemberRef = buildMemberRef(resultMeta, setChoice.openedFullType,
                                            expr->getSubExpr()->getStartLoc(),
@@ -2023,8 +2020,7 @@ namespace {
                                            ConstraintLocatorBuilder(locator),
                                            /*implicit*/ true,
                                            /*directPropertyAccess*/ false);
-        setMemberRef = new (C) FunctionConversionExpr(setMemberRef,
-                         FunctionType::get(writebackTy, lvTy->getObjectType()));
+        
         auto lvConversion = new (C) LValueConversionExpr(expr->getSubExpr(),
                                                    LValueType::get(writebackTy),
                                                    getMemberRef,

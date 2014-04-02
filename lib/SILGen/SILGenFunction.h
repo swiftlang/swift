@@ -626,6 +626,10 @@ public:
                        RValueSource &&optionalSelfValue,
                        bool isSuper,
                        RValue &&optionalSubscripts, RValue &&value);
+  ManagedValue emitApplyConversionFunction(SILLocation loc,
+                                           Expr *funcExpr,
+                                           Type resultType,
+                                           RValue &&operand);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,

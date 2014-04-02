@@ -961,17 +961,53 @@ struct ASTNodeBase {};
       Type origType = E->getSubExpr()->getType()->getLValueOrInOutObjectType();
       Type convertedType = E->getType()->getLValueOrInOutObjectType();
       
-      Type fromFnType = FunctionType::get(origType, convertedType);
-      Type toFnType = FunctionType::get(convertedType, origType);
-      
-      if (!E->getFromConversionFn()->getType()->isEqual(fromFnType)) {
-        Out << "LValueConversion from-conversion function must be a function "
-               "from orig type to converted type\n";
+      auto fromFnType = E->getFromConversionFn()->getType()->getAs<FunctionType>();
+      if (!fromFnType) {
+        Out << "LValueConversion from-conversion function must be of function "
+               "type\n";
         abort();
       }
-      if (!E->getToConversionFn()->getType()->isEqual(toFnType)) {
-        Out << "LValueConversion to-conversion function must be a function "
-               "from converted type to orig type\n";
+      if (!fromFnType->getResult()->isEqual(convertedType)) {
+        Out << "LValueConversion from-conversion function must return the "
+               "converted type\n";
+        abort();
+      }
+      
+      auto inputTypeMatches = [&](Type input, Type expected) -> bool {
+        if (input->isEqual(expected))
+          return true;
+        
+        auto tup = input->getAs<TupleType>();
+        if (!tup)
+          return false;
+        if (tup->getNumElements() != 1)
+          return false;
+        if (tup->getFields()[0].isVararg())
+          return false;
+        return tup->getFields()[0].getType()->isEqual(expected);
+      };
+      
+      if (!inputTypeMatches(fromFnType->getInput(), origType)) {
+        Out << "LValueConversion from-conversion function must take the "
+               "original type as its parameter\n";
+        abort();
+      }
+      
+      auto toFnType = E->getToConversionFn()->getType()->getAs<FunctionType>();
+      if (!toFnType) {
+        Out << "LValueConversion to-conversion function must be of function "
+        "type\n";
+        abort();
+      }
+      if (!toFnType->getResult()->isEqual(origType)) {
+        Out << "LValueConversion to-conversion function must return the "
+               "orig type\n";
+        abort();
+      }
+      
+      if (!inputTypeMatches(toFnType->getInput(), convertedType)) {
+        Out << "LValueConversion to-conversion function must take the "
+               "converted type as its parameter\n";
         abort();
       }
       
