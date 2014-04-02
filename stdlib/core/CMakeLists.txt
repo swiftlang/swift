@@ -82,6 +82,7 @@ set(SWIFTLIB_SOURCES
   CollectionOfOne.swift
   InputStream.swift
   Process.swift
+  SliceBuffer.swift
   VarArgs.swift
   Zip.swift
   )
