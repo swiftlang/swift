@@ -1927,6 +1927,7 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
     return SourceRange();
 
   case BodyKind::Parsed:
+  case BodyKind::Synthesize:
     if (auto body = getBody())
       return body->getSourceRange();
 
@@ -2238,7 +2239,8 @@ SourceRange ConstructorDecl::getSourceRange() const {
       getBodyKind() == BodyKind::Skipped)
     return { getConstructorLoc(), BodyRange.End };
 
-  if (!Body || !Body->getEndLoc().isValid()) {
+  auto body = getBody();
+  if (!body || !body->getEndLoc().isValid()) {
     const DeclContext *DC = getDeclContext();
     switch (DC->getContextKind()) {
     case DeclContextKind::ExtensionDecl:
@@ -2251,7 +2253,7 @@ SourceRange ConstructorDecl::getSourceRange() const {
       llvm_unreachable("Unhandled decl kind");
     }
   }
-  return { getConstructorLoc(), Body->getEndLoc() };
+  return { getConstructorLoc(), body->getEndLoc() };
 }
 
 Type ConstructorDecl::getArgumentType() const {
@@ -2449,5 +2451,5 @@ SourceRange DestructorDecl::getSourceRange() const {
   if (getBodyKind() == BodyKind::None)
     return getDestructorLoc();
 
-  return { getDestructorLoc(), Body->getEndLoc() };
+  return { getDestructorLoc(), getBody()->getEndLoc() };
 }

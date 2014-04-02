@@ -101,6 +101,45 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   return insertMemberDecl(enumDecl, rawTypeDecl);
 }
 
+static void deriveBodyRawRepresentable_toRaw(AbstractFunctionDecl *toRawDecl) {
+  auto enumDecl = cast<EnumDecl>(toRawDecl->getDeclContext());
+  Type enumType = enumDecl->getDeclaredTypeInContext();
+  ASTContext &C = enumDecl->getASTContext();
+
+  SmallVector<CaseStmt*, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
+                                          SourceLoc(), SourceLoc(),
+                                          Identifier(), elt, nullptr);
+    pat->setImplicit();
+
+    auto labelItem =
+      CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
+
+    auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
+
+    auto body = BraceStmt::create(C, SourceLoc(),
+                                  ASTNode(returnStmt), SourceLoc());
+
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
+                                     /*HasBoundDecls=*/false, SourceLoc(),
+                                     body));
+  }
+
+  Pattern *curriedArgs = toRawDecl->getBodyParamPatterns().front();
+  auto selfPattern =
+    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
+  auto selfDecl = selfPattern->getDecl();
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
+                                       SourceLoc(), cases, SourceLoc(), C);
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(switchStmt),
+                                SourceLoc());
+  toRawDecl->setBody(body);
+}
+
 static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                                               EnumDecl *enumDecl) {
   // enum SomeEnum : SomeType {
@@ -140,33 +179,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                        C.getIdentifier("toRaw"), SourceLoc(), nullptr, Type(),
                        params, params, TypeLoc::withoutLoc(rawType), enumDecl);
   toRawDecl->setImplicit();
-  
-  SmallVector<CaseStmt*, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                          SourceLoc(), SourceLoc(), Identifier(), elt, nullptr);
-    pat->setImplicit();
-    
-    auto labelItem =
-        CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
-    
-    auto returnExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
-    
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(returnStmt), SourceLoc());
-    
-    cases.push_back(
-        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
-                         SourceLoc(), body));
-  }
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(switchStmt),
-                                SourceLoc());
-  toRawDecl->setBody(body);
+  toRawDecl->setBodySynthesizer(&deriveBodyRawRepresentable_toRaw);
 
   // Compute the type of toRaw().
   GenericParamList *genericParams = nullptr;
@@ -194,6 +207,67 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   tc.implicitlyDefinedFunctions.push_back(toRawDecl);
 
   return insertMemberDecl(enumDecl, toRawDecl);
+}
+
+static void
+deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
+  auto enumDecl = cast<EnumDecl>(fromRawDecl->getDeclContext());
+  ASTContext &C = enumDecl->getASTContext();
+
+  Type enumType = enumDecl->getDeclaredTypeInContext();
+  Type enumMetaType = MetatypeType::get(enumType);
+
+  SmallVector<CaseStmt*, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
+    auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
+                                      nullptr, nullptr);
+    litPat->setImplicit();
+
+    auto labelItem =
+      CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
+
+    auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
+    auto metaTyRef = new (C) MetatypeExpr(nullptr, SourceLoc(), enumMetaType);
+    auto returnExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
+
+    auto body = BraceStmt::create(C, SourceLoc(),
+                                  ASTNode(returnStmt), SourceLoc());
+
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
+                                     /*HasBoundDecls=*/false, SourceLoc(),
+                                     body));
+  }
+
+  auto anyPat = new (C) AnyPattern(SourceLoc());
+  anyPat->setImplicit();
+  auto dfltLabelItem =
+    CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
+
+  auto optionalRef = new (C) DeclRefExpr(C.getOptionalDecl(),
+                                         SourceLoc(), /*implicit*/true);
+  auto emptyArgs = new (C) TupleExpr(SourceLoc(), SourceLoc(),
+                                     /*implicit*/ true);
+  auto dfltReturnExpr = new (C) CallExpr(optionalRef, emptyArgs,
+                                         /*implicit*/ true);
+  auto dfltReturnStmt = new (C) ReturnStmt(SourceLoc(), dfltReturnExpr);
+  auto dfltBody = BraceStmt::create(C, SourceLoc(),
+                                    ASTNode(dfltReturnStmt), SourceLoc());
+  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
+                                   /*HasBoundDecls=*/false, SourceLoc(),
+                                   dfltBody));
+
+  Pattern *args = fromRawDecl->getBodyParamPatterns().back();
+  auto rawArgPattern = cast<NamedPattern>(args->getSemanticsProvidingPattern());
+  auto rawDecl = rawArgPattern->getDecl();
+  auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
+  auto switchStmt = SwitchStmt::create(SourceLoc(), rawRef, SourceLoc(),
+                                       cases, SourceLoc(), C);
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(switchStmt),
+                                SourceLoc());
+  fromRawDecl->setBody(body);
 }
 
 static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
@@ -243,8 +317,8 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
   selfParam->setType(enumMetaType);
-  auto metaTy = MetatypeType::get(enumType);
-  selfParam = new (C) TypedPattern(selfParam, TypeLoc::withoutLoc(metaTy));
+  selfParam = new (C) TypedPattern(selfParam,
+                                   TypeLoc::withoutLoc(enumMetaType));
   selfParam->setType(enumMetaType);
   selfParam->setImplicit();
 
@@ -273,55 +347,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
       bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
-
-  SmallVector<CaseStmt*, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    auto litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
-    auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
-                                      nullptr, nullptr);
-    litPat->setImplicit();
-    
-    auto labelItem =
-        CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
-    
-    auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
-    auto metaTyRef = new (C) MetatypeExpr(nullptr, SourceLoc(), metaTy);
-    auto returnExpr = new (C) DotSyntaxCallExpr(eltRef,SourceLoc(),metaTyRef);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
-    
-    auto body = BraceStmt::create(C, SourceLoc(),
-                                  ASTNode(returnStmt), SourceLoc());
-    
-    cases.push_back(
-        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
-                         SourceLoc(), body));
-  }
-  
-  auto anyPat = new (C) AnyPattern(SourceLoc());
-  anyPat->setImplicit();
-  auto dfltLabelItem =
-      CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(), nullptr);
-  
-  auto optionalRef = new (C) DeclRefExpr(C.getOptionalDecl(),
-                                         SourceLoc(), /*implicit*/true);
-  auto emptyArgs = new (C) TupleExpr(SourceLoc(), SourceLoc(),
-                                     /*implicit*/ true);
-  auto dfltReturnExpr = new (C) CallExpr(optionalRef, emptyArgs,
-                                         /*implicit*/ true);
-  auto dfltReturnStmt = new (C) ReturnStmt(SourceLoc(), dfltReturnExpr);
-  auto dfltBody = BraceStmt::create(C, SourceLoc(),
-                                    ASTNode(dfltReturnStmt), SourceLoc());
-  cases.push_back(
-      CaseStmt::create(C, SourceLoc(), dfltLabelItem, /*HasBoundDecls=*/false,
-                       SourceLoc(), dfltBody));
-  
-  auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), rawRef, SourceLoc(),
-                                       cases, SourceLoc(), C);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                                ASTNode(switchStmt),
-                                SourceLoc());
-  fromRawDecl->setBody(body);
+  fromRawDecl->setBodySynthesizer(&deriveBodyRawRepresentable_frowRaw);
 
   // Compute the type of fromRaw().
   GenericParamList *genericParams = nullptr;

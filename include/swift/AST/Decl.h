@@ -234,7 +234,7 @@ class alignas(8) Decl {
     unsigned : NumValueDeclBits;
 
     /// \see AbstractFunctionDecl::BodyKind
-    unsigned BodyKind : 2;
+    unsigned BodyKind : 3;
 
     /// \brief Whether this function was declared with a selector-style
     /// signature.
@@ -243,7 +243,7 @@ class alignas(8) Decl {
     /// Number of curried parameter patterns (tuples).
     unsigned NumParamPatterns : 7;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 11 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -3158,12 +3158,17 @@ public:
     Parsed,
 
     /// Function body is not available, although it was written in the source.
-    Skipped
+    Skipped,
+
+    /// Function body will be synthesized on demand.
+    Synthesize
   };
 
   BodyKind getBodyKind() const {
     return BodyKind(AbstractFunctionDeclBits.BodyKind);
   }
+
+  using BodySynthesizer = void (*)(AbstractFunctionDecl *);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -3172,7 +3177,11 @@ protected:
     /// This enum member is active if getBodyKind() == BodyKind::Parsed.
     BraceStmt *Body;
 
+    /// This enum member is active if getBodyKind() == BodyKind::Synthesize.
+    BodySynthesizer Synthesizer;
+
     /// The location of the function body when the body is delayed or skipped.
+    ///
     /// This enum member is active if getBodyKind() is BodyKind::Unparsed or
     /// BodyKind::Skipped.
     SourceRange BodyRange;
@@ -3225,8 +3234,13 @@ public:
   ///
   /// \sa hasBody()
   BraceStmt *getBody() const {
-    if (getBodyKind() == BodyKind::Parsed)
+    if (getBodyKind() == BodyKind::Synthesize) {
+      const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
+      (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this));
+    }
+    if (getBodyKind() == BodyKind::Parsed) {
       return Body;
+    }
     return nullptr;
   }
   void setBody(BraceStmt *S) {
@@ -3250,6 +3264,13 @@ public:
     assert(getBodyKind() == BodyKind::None);
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);
+  }
+
+  /// Note that parsing for the body was delayed.
+  void setBodySynthesizer(BodySynthesizer synthesizer) {
+    assert(getBodyKind() == BodyKind::None);
+    Synthesizer = synthesizer;
+    setBodyKind(BodyKind::Synthesize);
   }
 
   /// Retrieve the source range of the function body.
