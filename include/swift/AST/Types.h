@@ -2474,6 +2474,16 @@ public:
   /// Return a uniqued optional type with the specified base type.
   static OptionalType *get(Type baseTy);
 
+  /// Build one of the optional type sugar kinds.
+  ///
+  /// It's a bit unnatural to have this on OptionalType, but we don't
+  /// have an abstract common class, and polluting TypeBase with it
+  /// would be unfortunate.  If we ever make an AnyOptionalType,
+  /// we can move it there.
+  ///
+  /// \param kind - can't be OTK_None
+  static Type get(OptionalTypeKind kind, Type baseTy);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;

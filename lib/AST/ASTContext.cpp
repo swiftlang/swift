@@ -1827,6 +1827,17 @@ ArraySliceType *ArraySliceType::get(Type base) {
   return entry = new (C, arena) ArraySliceType(C, base, properties);
 }
 
+Type OptionalType::get(OptionalTypeKind which, Type valueType) {
+  switch (which) {
+  // It wouldn't be unreasonable for this method to just ignore
+  // OTK_None if we made code more convenient to write.
+  case OTK_None: llvm_unreachable("building a non-optional type!");
+  case OTK_Optional: return OptionalType::get(valueType);
+  case OTK_UncheckedOptional: return UncheckedOptionalType::get(valueType);
+  }
+  llvm_unreachable("bad optional type kind");
+}
+
 OptionalType *OptionalType::get(Type base) {
   auto properties = base->getRecursiveProperties();
   auto arena = getArena(properties);
