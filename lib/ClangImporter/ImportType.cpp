@@ -34,6 +34,14 @@
 
 using namespace swift;
 
+/// Is the given type one of the kinds of type that we should import
+/// as an optional type?
+static bool shouldImportAsOptional(const clang::Type *type) {
+  // Modifying this function isn't enough: you need to modify the
+  // appropriate visitor case as well.
+  return type->isObjCObjectPointerType();
+}
+
 namespace {
   class SwiftTypeConverter : public clang::TypeVisitor<SwiftTypeConverter, Type>
   {
@@ -329,13 +337,19 @@ namespace {
       if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         if (!decl)
           return nullptr;
+        Type mappedType;
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:
-          return decl->getDeclaredType();
+          mappedType = decl->getDeclaredType();
+          break;
         case MappedTypeNameKind::DefineOnly:
-          return cast<TypeAliasDecl>(decl)->getUnderlyingType();
+          mappedType = cast<TypeAliasDecl>(decl)->getUnderlyingType();
+          break;
         }
+        if (Impl.EnableOptional && shouldImportAsOptional(type))
+          mappedType = UncheckedOptionalType::get(mappedType);
+        return mappedType;
       }
       if (kind == ImportTypeKind::Normal)
         return decl ? decl->getDeclaredType() : nullptr;
