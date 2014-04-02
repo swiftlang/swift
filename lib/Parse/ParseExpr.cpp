@@ -595,10 +595,12 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
         // Parse the first selector name.
         Identifier firstSelectorPiece = Context.getIdentifier(Tok.getText());
+        SourceLoc firstSelectorPieceLoc = Tok.getLoc();
         consumeToken(tok::identifier);
 
         ParserResult<Expr> call = parseExprCallSuffix(makeParserResult(result), 
-                                                      firstSelectorPiece);
+                                                      firstSelectorPiece,
+                                                      firstSelectorPieceLoc);
         if (call.hasCodeCompletion() || call.isParseError())
           return call;
 
@@ -999,11 +1001,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
             // Parse the first selector name.
             Identifier firstSelectorPiece
               = Context.getIdentifier(Tok.getText());
+            SourceLoc firstSelectorPieceLoc = Tok.getLoc();
             consumeToken(tok::identifier);
             
             ParserResult<Expr> call = parseExprCallSuffix(
                                         makeParserResult(initRef),
-                                        firstSelectorPiece);
+                                        firstSelectorPiece,
+                                        firstSelectorPieceLoc);
             if (call.hasCodeCompletion() || call.isParseError())
               return call;
             
@@ -1791,7 +1795,8 @@ bool Parser::hasExprCallSuffix(bool isExprBasic) {
 ///   identifier expr-paren
 ///   identifier expr-closure
 ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
-                                              Identifier firstSelectorPiece) {
+                                               Identifier firstSelectorPiece,
+                                               SourceLoc firstSelectorPieceLoc) {
   assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) 
          && "Not a call suffix?");
 
@@ -1826,12 +1831,14 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   // Add the first argument.
   SmallVector<Expr *, 4> selectorArgs;
   SmallVector<Identifier, 4> selectorPieces;
+  SmallVector<SourceLoc, 4> selectorLocs;
   bool hadError = false;
   if (firstArg.isParseError()) {
     hadError = true;
   } else {
     selectorArgs.push_back(firstArg.get());
     selectorPieces.push_back(firstSelectorPiece);
+    selectorLocs.push_back(firstSelectorPieceLoc);
   }
 
   // Parse the remaining selector arguments.
@@ -1845,6 +1852,7 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
 
     // Consume the selector piece.
     Identifier selectorPiece = Context.getIdentifier(Tok.getText());
+    selectorLocs.push_back(Tok.getLoc());
     consumeToken(tok::identifier);
 
     // Look for the following '(' or '{' that provides arguments.
@@ -1871,6 +1879,44 @@ ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
 
   if (hadError)
     return makeParserError();
+
+  // Complain that the selector syntax is going away.
+  auto diag = diagnose(fn.get()->getLoc(), diag::selector_call_args_removed);
+  for (unsigned i = 0, n = selectorArgs.size(); i != n-1; ++i) {
+    // If the next expression is a trailing closure, remove following the ')' of
+    // this argument to the end of the next keyword. There's no way to express
+    // keywords with trailing closures.
+    if (isa<ClosureExpr>(selectorArgs[i+1])) {
+      auto afterThisArg
+        = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                     selectorArgs[i]->getEndLoc());
+      auto afterNextSelector = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                          selectorLocs[i+1]);
+      diag.fixItReplaceChars(afterThisArg, afterNextSelector, "");
+      continue;
+    }
+
+    // However, when we have something like 'super.init withFoo' or
+    // 'X.init withFoo' as our function, and this is the first argument, then
+    // replace the '.init ' part with '(' and replace the first '(' with a ':';.
+    if (i == 0) {
+      if (auto ctor = dyn_cast<UnresolvedConstructorExpr>(fn.get())) {
+        auto endOfSubLoc
+          = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                       ctor->getSubExpr()->getEndLoc());
+        diag.fixItReplaceChars(endOfSubLoc, selectorLocs[0], "(");
+
+        diag.fixItReplace(selectorArgs[i]->getStartLoc(), ": ");
+      }
+    }
+
+    // Replace from the end of this argument to the start of the name of the
+    // next argument with ", ".
+    diag.fixItReplaceChars(selectorArgs[i]->getEndLoc(),selectorLocs[i+1],", ");
+
+    // Replace the opening '(' of subsequent selector args with ": ".
+    diag.fixItReplace(selectorArgs[i+1]->getStartLoc(), ": ");
+  }
 
   // FIXME: Improve AST here to represent individual selector pieces
   // and their arguments cleanly.

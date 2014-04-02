@@ -931,7 +931,9 @@ public:
   bool hasExprCallSuffix(bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
-                                           = Identifier());
+                                           = Identifier(),
+                                         SourceLoc firstSelectorPieceLoc
+                                           = SourceLoc());
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprArray(SourceLoc LSquareLoc, Expr *FirstExpr);
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc, Expr *FirstKey);

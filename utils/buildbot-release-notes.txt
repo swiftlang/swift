@@ -59,6 +59,17 @@
   importing specific parameters, return types, etc. as either the
   explicit optional type 'T?' or the simple non-optional type 'T'.
 
+* The "separated" call syntax, i.e.,
+
+    NSColor.colorWithRed(r) green(g) blue(b) alpha(a)
+    UIColor.init withRed(r) green(g) blue(b) alpha(a)
+
+  is being removed. The compiler will now produce an error and provide
+  Fix-Its to rewrite calls to the "keyword-argument" syntax:
+
+    NSColor.colorWithRed(r, green: g, blue: b, alpha: a)
+    UIColor(withRed: r, green:g, blue:b, alpha: a)
+
 * The 'objc' attribute now optionally accepts a name, which can be
   used to provide the name for an entity as seen in Objective-C. For
   example:
