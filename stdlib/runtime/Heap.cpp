@@ -494,7 +494,6 @@ SwiftZone::threadExitCleanup(void *arg) {
     globalCache[i] = threadCache[i];
   }
   writeUnlock();
-  abort();
 }
 
 kern_return_t _swift_memory_reader(task_t task,
