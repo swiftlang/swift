@@ -458,13 +458,13 @@ namespace {
       // Trivial
     }
 
-    void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
                               LoweringStyle style) const override {
       // Trivial
     }
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
       // Trivial
     }
@@ -483,7 +483,7 @@ namespace {
     SILValue emitLoadOfCopy(SILBuilder &B, SILLocation loc,
                             SILValue addr, IsTake_t isTake) const override {
       SILValue value = B.createLoad(loc, addr);
-      if (!isTake) emitCopyValue(B, loc, value);
+      if (!isTake) emitRetainValue(B, loc, value);
       return value;
     }
 
@@ -577,12 +577,12 @@ namespace {
         });
     }
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue aggValue) const override {
-      B.createCopyValue(loc, aggValue);
+      B.createRetainValue(loc, aggValue);
     }
 
-    void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue aggValue,
                               LoweringStyle style) const override {
       for (auto &child : getChildren()) {
@@ -752,17 +752,17 @@ namespace {
       return ArrayRef<NonTrivialElement>(buffer, numNonTrivial);
     }
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
-      B.createCopyValue(loc, value);
+      B.createRetainValue(loc, value);
     }
 
-    void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
                               LoweringStyle style) const override {
       if (style == LoweringStyle::Shallow ||
           style == LoweringStyle::DeepNoEnum) {
-        B.createCopyValue(loc, value);
+        B.createRetainValue(loc, value);
       } else {
         ifNonTrivialElement(B, loc, value,
           [&](SILBuilder &B, SILLocation loc, SILValue child,
@@ -801,10 +801,10 @@ namespace {
     LeafLoadableTypeLowering(SILType type)
       : NonTrivialLoadableTypeLowering(type) {}
 
-    void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
                               LoweringStyle style) const override {
-      emitCopyValue(B, loc, value);
+      emitRetainValue(B, loc, value);
     }
 
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
@@ -820,7 +820,7 @@ namespace {
   public:
     ReferenceTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
       if (!isa<FunctionRefInst>(value))
         B.createStrongRetain(loc, value);
@@ -837,7 +837,7 @@ namespace {
   public:
     UnownedTypeLowering(SILType type) : LeafLoadableTypeLowering(type) {}
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
       B.createUnownedRetain(loc, value);
     }
@@ -882,12 +882,12 @@ namespace {
       B.emitDestroyAddr(loc, value);
     }
 
-    void emitCopyValue(SILBuilder &B, SILLocation loc,
+    void emitRetainValue(SILBuilder &B, SILLocation loc,
                        SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                               SILValue value,
                               LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");

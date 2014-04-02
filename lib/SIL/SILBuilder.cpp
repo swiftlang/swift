@@ -175,7 +175,7 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
 
     // Scan past simple memory accesses.  These cannot reduce refcounts.
     if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
-        isa<CopyValueInst>(Inst))
+        isa<RetainValueInst>(Inst))
       continue;
 
     // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'

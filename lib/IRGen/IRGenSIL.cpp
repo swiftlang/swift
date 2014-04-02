@@ -572,7 +572,7 @@ public:
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
-  void visitCopyValueInst(CopyValueInst *i);
+  void visitRetainValueInst(RetainValueInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
@@ -2088,7 +2088,7 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   Builder.CreateCondBr(condValue, trueBB.bb, falseBB.bb);
 }
 
-void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
+void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out(in.getKind());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))

@@ -1321,12 +1321,12 @@ public:
   }
 };
 
-/// CopyValueInst - Copies a loadable value.
-class CopyValueInst : public UnaryInstructionBase<ValueKind::CopyValueInst,
+/// RetainValueInst - Copies a loadable value.
+class RetainValueInst : public UnaryInstructionBase<ValueKind::RetainValueInst,
                                                   SILInstruction,
                                                   /*HasValue*/ false> {
 public:
-  CopyValueInst(SILLocation loc, SILValue operand)
+  RetainValueInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand) {}
 };
 

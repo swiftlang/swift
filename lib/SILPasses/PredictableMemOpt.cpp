@@ -820,7 +820,7 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
       }
       continue;
       
-    case ValueKind::CopyValueInst:
+    case ValueKind::RetainValueInst:
     case ValueKind::StrongRetainInst:
     case ValueKind::StrongReleaseInst:
     case ValueKind::UnownedRetainInst:

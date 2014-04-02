@@ -2485,16 +2485,16 @@ Aggregate Types
 These instructions construct and project elements from structs, tuples, and
 class instances.
 
-copy_value
-``````````
+retain_value
+````````````
 
 ::
 
-  sil-instruction ::= 'copy_value' sil-operand
+  sil-instruction ::= 'retain_value' sil-operand
 
-  copy_value %0 : $A
+  retain_value %0 : $A
 
-Copies a loadable value, retaining any references it holds.
+Retains a loadable value, which simply retains any references it holds.
 
 For trivial types, this is a no-op.  For reference types, this is equivalent to
 a ``strong_retain``.  For ``@unowned`` types, this is equivalent to an
@@ -3486,9 +3486,9 @@ On a path dominated by a destination block of ``switch_enum``, copying or
 destroying the basic block argument has equivalent reference counting semantics
 to copying or destroying the ``switch_enum`` operand::
 
-    // This copy_value...
-    %e2 = copy_value %e1 : $Enum
-    switch_enum %e2, case #Enum.A: a, case #Enum.B: b
+    // This retain_value...
+    retain_value %e1 : $Enum
+    switch_enum %e1, case #Enum.A: a, case #Enum.B: b
   a(%a : $A):
     // ...is balanced by this destroy_value
     destroy_value %a

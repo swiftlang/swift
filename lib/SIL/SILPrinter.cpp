@@ -793,7 +793,7 @@ public:
     OS << "is_nonnull " << getIDAndType(I->getOperand());
   }
   
-  void visitCopyValueInst(CopyValueInst *I) {
+  void visitRetainValueInst(RetainValueInst *I) {
     OS << "copy_value " << getIDAndType(I->getOperand());
   }
 

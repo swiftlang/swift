@@ -43,13 +43,13 @@ STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
 /// strong_release) pair or a (copy_value, destroy_value) pair.
 static bool matchingRefCountPairType(SILInstruction *Inc, SILInstruction *Dec) {
   return (isa<StrongRetainInst>(Inc) && isa<StrongReleaseInst>(Dec)) ||
-    (isa<CopyValueInst>(Inc) && isa<DestroyValueInst>(Dec));
+    (isa<RetainValueInst>(Inc) && isa<DestroyValueInst>(Dec));
 }
 
 /// Is I an instruction that we recognize as a "reference count increment"
 /// instruction?
 static bool isRefCountIncrement(SILInstruction &I) {
-  return isa<StrongRetainInst>(I) || isa<CopyValueInst>(I);
+  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
 }
 
 /// Is I an instruction that we recognize as a "reference count decrement"
@@ -285,7 +285,7 @@ static bool isInterestingInstruction(ValueKind Kind) {
   switch (Kind) {
    default:
      return false;
-   case ValueKind::CopyValueInst:
+   case ValueKind::RetainValueInst:
    case ValueKind::DestroyValueInst:
    case ValueKind::StrongRetainInst:
    case ValueKind::StrongReleaseInst:

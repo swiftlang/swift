@@ -298,32 +298,32 @@ public:
   /// Emit a lowered 'copy_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredCopyValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredRetainValue(SILBuilder &B, SILLocation loc,
                                     SILValue value,
                                     LoweringStyle style) const = 0;
 
   /// Emit a lowered 'copy_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredCopyValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredRetainValueShallow(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredCopyValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredRetainValue(B, loc, value, LoweringStyle::Shallow);
   }
 
   /// Emit a lowered 'copy_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredCopyValueDeep(SILBuilder &B, SILLocation loc,
+  void emitLoweredRetainValueDeep(SILBuilder &B, SILLocation loc,
                                 SILValue value) const {
-    emitLoweredCopyValue(B, loc, value, LoweringStyle::Deep);
+    emitLoweredRetainValue(B, loc, value, LoweringStyle::Deep);
   }
 
   /// Emit a lowered 'copy_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredCopyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
+  void emitLoweredRetainValueDeepNoEnum(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredCopyValue(B, loc, value, LoweringStyle::DeepNoEnum);
+    emitLoweredRetainValue(B, loc, value, LoweringStyle::DeepNoEnum);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -333,16 +333,16 @@ public:
   /// with exactly the same semantics.  For example, it performs an
   /// unowned_retain on a value of [unknown] type.  It is therefore
   /// not necessarily the right thing to do on a semantic load.
-  virtual void emitCopyValue(SILBuilder &B, SILLocation loc,
+  virtual void emitRetainValue(SILBuilder &B, SILLocation loc,
                              SILValue value) const = 0;
 
   void emitLoweredCopyChildValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle style) const {
     if (style != LoweringStyle::Shallow) {
-      emitLoweredCopyValue(B, loc, value, style);
+      emitLoweredRetainValue(B, loc, value, style);
     } else {
-      emitCopyValue(B, loc, value);
+      emitRetainValue(B, loc, value);
     }
   }
 

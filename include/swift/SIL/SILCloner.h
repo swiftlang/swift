@@ -568,9 +568,9 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
+SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
   doPostProcess(Inst,
-    Builder.createCopyValue(getOpLocation(Inst->getLoc()),
+    Builder.createRetainValue(getOpLocation(Inst->getLoc()),
                             getOpValue(Inst->getOperand())));
 }
 

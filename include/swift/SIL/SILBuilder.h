@@ -406,8 +406,8 @@ public:
                     UnconditionalCheckedCastInst(loc, kind, op, destTy));
   }
   
-  CopyValueInst *createCopyValue(SILLocation loc, SILValue operand) {
-    return insert(new (F.getModule()) CopyValueInst(loc, operand));
+  RetainValueInst *createRetainValue(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) RetainValueInst(loc, operand));
   }
 
   DestroyValueInst *createDestroyValue(SILLocation loc, SILValue operand) {
@@ -859,10 +859,10 @@ public:
 
   /// Convenience function for calling emitRetain on the type lowering
   /// for the non-address value.
-  void emitCopyValueOperation(SILLocation loc, SILValue v) {
+  void emitRetainValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
     auto &lowering = F.getModule().getTypeLowering(v.getType());
-    return lowering.emitCopyValue(*this, loc, v);
+    return lowering.emitRetainValue(*this, loc, v);
   }
 
   /// Convenience function for calling emitRelease on the type

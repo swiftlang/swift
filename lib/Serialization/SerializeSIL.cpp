@@ -617,7 +617,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::CondFailInst:
-  case ValueKind::CopyValueInst:
+  case ValueKind::RetainValueInst:
   case ValueKind::DestroyValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocRefInst:

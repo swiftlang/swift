@@ -558,7 +558,7 @@ public:
             "Store operand type and dest type mismatch");
   }
 
-  void checkCopyValueInst(CopyValueInst *I) {
+  void checkRetainValueInst(RetainValueInst *I) {
     require(I->getOperand().getType().isObject(),
             "Source value should be an object value");
   }

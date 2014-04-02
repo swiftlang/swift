@@ -106,7 +106,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     //   copy_value %new : $*T
     IsTake_t IsTake = CA->isTakeOfSrc();
     if (IsTake_t::IsNotTake == IsTake) {
-      TL.emitLoweredCopyValue(Builder, CA->getLoc(), New,
+      TL.emitLoweredRetainValue(Builder, CA->getLoc(), New,
                               TypeLowering::LoweringStyle::DeepNoEnum);
     }
 
@@ -176,7 +176,7 @@ static bool expandDestroyValue(DestroyValueInst *DV) {
   return true;
 }
 
-static bool expandCopyValue(CopyValueInst *CV) {
+static bool expandRetainValue(RetainValueInst *CV) {
   SILModule &Module = CV->getModule();
   SILBuilder Builder(CV);
 
@@ -190,7 +190,7 @@ static bool expandCopyValue(CopyValueInst *CV) {
          "types.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredCopyValue(Builder, CV->getLoc(), Value,
+  TL.emitLoweredRetainValue(Builder, CV->getLoc(), Value,
                           TypeLowering::LoweringStyle::DeepNoEnum);
   
   DEBUG(llvm::dbgs() << "    Expanding Copy Value: " << *CV);
@@ -228,8 +228,8 @@ static bool processFunction(SILFunction &Fn) {
           continue;
         }
 
-      if (auto *CV = dyn_cast<CopyValueInst>(Inst))
-        if (expandCopyValue(CV)) {
+      if (auto *CV = dyn_cast<RetainValueInst>(Inst))
+        if (expandRetainValue(CV)) {
           ++II;
           CV->eraseFromParent();
           Changed = true;

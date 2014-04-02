@@ -257,7 +257,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
   SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
-  SILInstruction *visitCopyValueInst(CopyValueInst *CI);
+  SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
@@ -650,7 +650,7 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
+SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *CI) {
   SILValue Operand = CI->getOperand();
   SILType OperandTy = Operand.getType();
 
@@ -662,13 +662,13 @@ SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *CI) {
       return eraseInstFromFunction(*CI);
     }
 
-  // CopyValueInst of a reference type is a strong_release.
+  // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics()) {
     Builder->createStrongRetain(CI->getLoc(), Operand);
     return eraseInstFromFunction(*CI);
   }
 
-  // CopyValueInst of a trivial type is a no-op + use propogation.
+  // RetainValueInst of a trivial type is a no-op + use propogation.
   if (OperandTy.isTrivial(CI->getModule())) {
     return eraseInstFromFunction(*CI);
   }
@@ -756,7 +756,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // arguments.
     for (auto Arg : PAI->getArguments())
       if (!Arg.getType().isAddress())
-        Builder->emitCopyValueOperation(PAI->getLoc(), Arg);
+        Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
 
     ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, Args,
                                           AI->isTransparent());

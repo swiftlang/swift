@@ -73,7 +73,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
-  lowering.emitCopyValue(B, loc, v);
+  lowering.emitRetainValue(B, loc, v);
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -633,7 +633,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
     } else if (hasAbstractionChange || !C.isPlusZeroOk()) {
       // If we have an abstraction change or if we have to produce a result at
-      // +1, then emit a copyvalue.
+      // +1, then emit a RetainValue.
       Result = Result.copyUnmanaged(*this, loc);
     }
   } else {
@@ -1825,7 +1825,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
           assert(!Entry.getConstant().getType().isAddress());
           
           Val = Entry.getConstant();
-          B.emitCopyValueOperation(loc, Val);
+          B.emitRetainValueOperation(loc, Val);
         } else {
           // If we have a mutable binding for a 'let', such as 'self' in an
           // 'init' method, load it.
@@ -2445,7 +2445,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILValue selfValue = B.createLoad(cleanupLoc, selfLV);
 
   // We have to do a retain because someone else may be using the box.
-  lowering.emitCopyValue(B, cleanupLoc, selfValue);
+  lowering.emitRetainValue(B, cleanupLoc, selfValue);
 
   // Release the box.
   B.emitStrongRelease(cleanupLoc, selfBox);
@@ -2889,7 +2889,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     assert(selfBox);
 
     // We have to do a retain because someone else may be using the box.
-    B.emitCopyValueOperation(cleanupLoc, selfArg);
+    B.emitRetainValueOperation(cleanupLoc, selfArg);
     B.emitStrongRelease(cleanupLoc, selfBox);
   }
 
