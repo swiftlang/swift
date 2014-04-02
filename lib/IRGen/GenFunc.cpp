@@ -2320,11 +2320,19 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   assert(!toTy->isVoidTy()
          && "Unexpected void destination type in type coercion!");
 
-  // If both are pointers, we can simply insert a bitcast, otherwise
-  // we need to store, bitcast, and load.
-  if (toTy->isPointerTy() && fromTy->isPointerTy())
-    return Builder.CreateBitCast(value, toTy);
+  // Use the pointer/pointer and pointer/int casts if we can.
+  if (toTy->isPointerTy()) {
+    if (fromTy->isPointerTy())
+      return Builder.CreateBitCast(value, toTy);
+    if (fromTy == IGM.IntPtrTy)
+      return Builder.CreateIntToPtr(value, toTy);
+  } else if (fromTy->isPointerTy()) {
+    if (toTy == IGM.IntPtrTy) {
+      return Builder.CreatePtrToInt(value, toTy);
+    }
+  }
 
+  // Otherwise we need to store, bitcast, and load.
   assert(DL.getTypeSizeInBits(fromTy) == DL.getTypeSizeInBits(toTy)
          && "Coerced types should not differ in size!");
 
