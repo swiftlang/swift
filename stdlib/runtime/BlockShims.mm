@@ -67,7 +67,7 @@ namespace {
 #define VOID dT_
 #define NONE
 
-#define OBJCPTR(_type_) _type_
+#define OBJCPTR(_type_) CAT3(GSQ,_type_,_)
 
 /// () -> Void
 MAKE_BLOCK_SHIM(FUNC(NONE,
