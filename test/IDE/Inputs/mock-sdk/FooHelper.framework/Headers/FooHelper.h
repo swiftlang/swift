@@ -1,5 +1,10 @@
 #import <FooHelper/FooHelperExplicit.h>
 #import <FooHelperSub/FooHelperSub.h>
 
-int fooHelperFrameworkFunc1(int a);
+int fooHelperFunc1(int a);
+
+enum {
+  FooHelperUnnamedEnumeratorA1,
+  FooHelperUnnamedEnumeratorA2,
+};
 

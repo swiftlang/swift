@@ -1,4 +1,4 @@
-int fooHelperSubFrameworkFunc1(int a);
+int fooHelperSubFunc1(int a);
 
 enum FooHelperSubEnum1 {
   FooHelperSubEnum1X,

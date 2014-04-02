@@ -1,4 +1,5 @@
-<decl>import FooClangDepModule</decl>
+<decl>@exported import Foo.FooSub</decl>
+<decl>@exported import FooHelper</decl>
 
 <decl>/// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
@@ -20,6 +21,10 @@ var FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
 }</decl>
 <decl>var FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
 <decl>var FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
+<decl>struct FooStruct1 {
+  <decl>var x: <ref:TypeAlias>CInt</ref></decl>
+  <decl>var y: <ref:TypeAlias>CDouble</ref></decl>
+}</decl>
 
 <decl>/// Aaa.  FooTypedef1.  Bbb.
 typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
@@ -137,4 +142,12 @@ func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:Type
 <decl>var FOO_MACRO_5: <ref:TypeAlias>CUnsignedLongLong</ref> { get }</decl>
 <decl>var FOO_MACRO_REDEF_1: <ref:TypeAlias>CInt</ref> { get }</decl>
 <decl>var FOO_MACRO_REDEF_2: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl>func theLastDeclInFooClangModule()</decl>
+<decl>func theLastDeclInFoo()</decl>
+<decl>func fooSubFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>struct FooSubEnum1 {
+  <decl>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+}</decl>
+<decl>var FooSubEnum1X: <ref:Struct>FooSubEnum1</ref> { get }</decl>
+<decl>var FooSubEnum1Y: <ref:Struct>FooSubEnum1</ref> { get }</decl>
+<decl>var FooSubUnnamedEnumeratorA1: <ref:Struct>Int</ref> { get }</decl>

@@ -1,0 +1,10 @@
+@exported import Foo.FooSub
+@exported import FooHelper
+func fooSubFunc1(a: CInt) -> CInt
+struct FooSubEnum1 {
+  init(value: CUnsignedInt)
+  var value: CUnsignedInt
+}
+var FooSubEnum1X: FooSubEnum1 { get }
+var FooSubEnum1Y: FooSubEnum1 { get }
+var FooSubUnnamedEnumeratorA1: Int { get }
