@@ -82,18 +82,22 @@ public:
   static void writeLock() {
     int r = pthread_rwlock_wrlock(&lock);
     assert(r == 0);
+    (void)r;
   }
   static void writeUnlock() {
     int r = pthread_rwlock_unlock(&lock);
     assert(r == 0);
+    (void)r;
   }
   static void readLock() {
     int r = pthread_rwlock_rdlock(&lock);
     assert(r == 0);
+    (void)r;
   }
   static void readUnlock() {
     int r = pthread_rwlock_unlock(&lock);
     assert(r == 0);
+    (void)r;
   }
   void debug() {
     malloc_zone_print(&zoneShims, true);
