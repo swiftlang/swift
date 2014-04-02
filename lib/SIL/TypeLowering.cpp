@@ -414,12 +414,12 @@ namespace {
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       SILValue value = B.createLoad(loc, addr);
-      emitDestroyValue(B, loc, value);
+      emitReleaseValue(B, loc, value);
     }
 
     void emitDestroyRValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      emitDestroyValue(B, loc, value);
+      emitReleaseValue(B, loc, value);
     }
 
     void emitCopyInto(SILBuilder &B, SILLocation loc,
@@ -452,7 +452,7 @@ namespace {
       // Trivial
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle loweringStyle) const override {
       // Trivial
@@ -469,7 +469,7 @@ namespace {
       // Trivial
     }
 
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       // Trivial
     }
@@ -493,7 +493,7 @@ namespace {
       SILValue oldValue;
       if (!isInit) oldValue = B.createLoad(loc, addr);
       B.createStore(loc, newValue, addr);
-      if (!isInit) emitDestroyValue(B, loc, oldValue);
+      if (!isInit) emitReleaseValue(B, loc, oldValue);
     }
   };
 
@@ -596,25 +596,25 @@ namespace {
       }
     }
 
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue aggValue) const override {
-      B.createDestroyValue(loc, aggValue);
+      B.createReleaseValue(loc, aggValue);
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                  SILValue aggValue,
                                  LoweringStyle loweringStyle) const override {
       SimpleOperationTy Fn;
 
       switch(loweringStyle) {
       case LoweringStyle::Shallow:
-        Fn = &TypeLowering::emitDestroyValue;
+        Fn = &TypeLowering::emitReleaseValue;
         break;
       case LoweringStyle::Deep:
-        Fn = &TypeLowering::emitLoweredDestroyValueDeep;
+        Fn = &TypeLowering::emitLoweredReleaseValueDeep;
         break;
       case LoweringStyle::DeepNoEnum:
-        Fn = &TypeLowering::emitLoweredDestroyValueDeepNoEnum;
+        Fn = &TypeLowering::emitLoweredReleaseValueDeepNoEnum;
         break;
       }
 
@@ -773,19 +773,19 @@ namespace {
       }
     }
     
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
-      B.createDestroyValue(loc, value);
+      B.createReleaseValue(loc, value);
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle style) const override {
       assert(style != LoweringStyle::Shallow &&
              "This method should never be called when performing a shallow "
              "destroy value.");
       if (style == LoweringStyle::DeepNoEnum)
-        B.createDestroyValue(loc, value);
+        B.createReleaseValue(loc, value);
       else
         ifNonTrivialElement(B, loc, value,
           [&](SILBuilder &B, SILLocation loc, SILValue child,
@@ -807,10 +807,10 @@ namespace {
       emitRetainValue(B, loc, value);
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle style) const override {
-      emitDestroyValue(B, loc, value);
+      emitReleaseValue(B, loc, value);
     }
   };
 
@@ -826,7 +826,7 @@ namespace {
         B.createStrongRetain(loc, value);
     }
 
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.emitStrongRelease(loc, value);
     }
@@ -842,7 +842,7 @@ namespace {
       B.createUnownedRetain(loc, value);
     }
 
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       B.createUnownedRelease(loc, value);
     }
@@ -893,12 +893,12 @@ namespace {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitReleaseValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       llvm_unreachable("type is not loadable!");
     }
 
-    void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+    void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                  SILValue value,
                                  LoweringStyle style) const override {
       llvm_unreachable("type is not loadable!");

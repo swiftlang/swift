@@ -563,7 +563,7 @@ public:
             "Source value should be an object value");
   }
 
-  void checkDestroyValueInst(DestroyValueInst *I) {
+  void checkReleaseValueInst(ReleaseValueInst *I) {
     require(I->getOperand().getType().isObject(),
             "Source value should be an object value");
   }

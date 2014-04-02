@@ -1996,7 +1996,7 @@ fix_lifetime
 
 Acts as a use of a value operand, or of the value in memory referenced by an
 address operand. Optimizations may not move operations that would destroy the
-value, such as ``destroy_value``, ``strong_release``, ``copy_addr [take]``, or
+value, such as ``release_value``, ``strong_release``, ``copy_addr [take]``, or
 ``destroy_addr``, past this instruction.
 
 Literals
@@ -2504,16 +2504,16 @@ For aggregate types, especially enums, it is typically both easier
 and more efficient to reason about aggregate copies than it is to
 reason about copies of the subobjects.
 
-destroy_value
+release_value
 `````````````
 
 ::
 
-  sil-instruction ::= 'destroy_value' sil-operand
+  sil-instruction ::= 'release_value' sil-operand
 
-  destroy_value %0 : $A
+  release_value %0 : $A
 
-Destroys a loadable value.
+Destroys a loadable value, by releasing any retainable pointers within it.
 
 This is defined to be equivalent to storing the operand into a stack
 allocation and using 'destroy_addr' to destroy the object there.
@@ -3490,11 +3490,11 @@ to copying or destroying the ``switch_enum`` operand::
     retain_value %e1 : $Enum
     switch_enum %e1, case #Enum.A: a, case #Enum.B: b
   a(%a : $A):
-    // ...is balanced by this destroy_value
-    destroy_value %a
+    // ...is balanced by this release_value
+    release_value %a
   b(%b : $B):
     // ...and this one
-    destroy_value %b
+    release_value %b
 
 switch_enum_addr
 ````````````````

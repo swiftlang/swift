@@ -369,7 +369,7 @@ ClosureCloner::populateCloned() {
 
 /// \brief Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced wit
-/// a destroyValue of the new object type argument, otherwise it is handled
+/// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
@@ -378,11 +378,11 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
     assert(Operand.getResultNumber() == 0);
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
-      // Releases of the box arguments get replaced with destroyValue of the new
+      // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
       SILFunction &F = getBuilder().getFunction();
       auto &typeLowering = F.getModule().getTypeLowering(I->second.getType());
-      typeLowering.emitDestroyValue(getBuilder(), Inst->getLoc(), I->second);
+      typeLowering.emitReleaseValue(getBuilder(), Inst->getLoc(), I->second);
       return;
     }
   }

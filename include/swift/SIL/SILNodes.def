@@ -138,7 +138,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Aggregate Types
   INST(RetainValueInst, SILInstruction, MayHaveSideEffects)
-  INST(DestroyValueInst, SILInstruction, MayHaveSideEffects)
+  INST(ReleaseValueInst, SILInstruction, MayHaveSideEffects)
   INST(TupleInst, SILInstruction, None)
   INST(TupleExtractInst, SILInstruction, None)
   INST(TupleElementAddrInst, SILInstruction, None)

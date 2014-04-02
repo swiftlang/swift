@@ -113,9 +113,9 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
     // If we are not initializing:
     // strong_release %old : $*T
     //   *or*
-    // destroy_value %new : $*T
+    // release_value %new : $*T
     if (Old) {
-      TL.emitLoweredDestroyValue(Builder, CA->getLoc(), Old,
+      TL.emitLoweredReleaseValue(Builder, CA->getLoc(), Old,
                                  TypeLowering::LoweringStyle::DeepNoEnum);
     }
   }
@@ -145,7 +145,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
     // If we have a type with reference semantics, emit a load/strong release.
     LoadInst *LI = Builder.createLoad(DA->getLoc(), Addr);
     auto &TL = Module.getTypeLowering(Type);
-    TL.emitLoweredDestroyValue(Builder, DA->getLoc(), LI,
+    TL.emitLoweredReleaseValue(Builder, DA->getLoc(), LI,
                                TypeLowering::LoweringStyle::DeepNoEnum);
   }
 
@@ -153,7 +153,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
   return true;
 }
 
-static bool expandDestroyValue(DestroyValueInst *DV) {
+static bool expandReleaseValue(ReleaseValueInst *DV) {
   SILModule &Module = DV->getModule();
   SILBuilder Builder(DV);
 
@@ -164,10 +164,10 @@ static bool expandDestroyValue(DestroyValueInst *DV) {
   // If we have an address only type, do nothing.
   SILType Type = Value.getType();
   assert(Type.isLoadable(Module) &&
-         "destroy_value should never be called on a non-loadable type.");
+         "release_value should never be called on a non-loadable type.");
 
   auto &TL = Module.getTypeLowering(Type);
-  TL.emitLoweredDestroyValue(Builder, DV->getLoc(), Value,
+  TL.emitLoweredReleaseValue(Builder, DV->getLoc(), Value,
                              TypeLowering::LoweringStyle::DeepNoEnum);
 
   DEBUG(llvm::dbgs() << "    Expanding Destroy Value: " << *DV);
@@ -236,8 +236,8 @@ static bool processFunction(SILFunction &Fn) {
           continue;
         }
 
-      if (auto *DV = dyn_cast<DestroyValueInst>(Inst))
-        if (expandDestroyValue(DV)) {
+      if (auto *DV = dyn_cast<ReleaseValueInst>(Inst))
+        if (expandReleaseValue(DV)) {
           ++II;
           DV->eraseFromParent();
           Changed = true;

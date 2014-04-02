@@ -30,11 +30,11 @@ bb1:                                              // Preds: bb0
   %11 = take_enum_data_addr %7#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %12
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass> // id: %13
-  destroy_value %5 : $Optional<SomeClass>         // id: %14
+  release_value %5 : $Optional<SomeClass>         // id: %14
   %15 = class_method %12 : $SomeClass, #SomeClass.hash!1 : SomeClass -> () -> Int , $@cc(method) @thin (@owned SomeClass) -> Int // user: %16
   %16 = apply %15(%12) : $@cc(method) @thin (@owned SomeClass) -> Int // user: %20
   %17 = load %0#1 : $*Optional<SomeClass>         // user: %18
-  destroy_value %17 : $Optional<SomeClass>        // id: %18
+  release_value %17 : $Optional<SomeClass>        // id: %18
   dealloc_stack %0#0 : $*@local_storage Optional<SomeClass> // id: %19
   return %16 : $Int                               // id: %20
 

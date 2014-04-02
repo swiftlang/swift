@@ -726,7 +726,7 @@ bool AllocOptimize::promoteDestroyAddr(DestroyAddrInst *DAI) {
   DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *DAI << "\n");
   DEBUG(llvm::dbgs() << "      To value: " << *NewVal.getDef() << "\n");
   
-  SILBuilder(DAI).emitDestroyValueOperation(DAI->getLoc(), NewVal);
+  SILBuilder(DAI).emitReleaseValueOperation(DAI->getLoc(), NewVal);
   DAI->eraseFromParent();
   return true;
 }
@@ -825,7 +825,7 @@ void AllocOptimize::explodeCopyAddr(CopyAddrInst *CAI) {
     case ValueKind::StrongReleaseInst:
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedReleaseInst:
-    case ValueKind::DestroyValueInst:   // Destroy overwritten value
+    case ValueKind::ReleaseValueInst:   // Destroy overwritten value
       // These are ignored.
       continue;
     }

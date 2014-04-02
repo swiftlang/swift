@@ -148,7 +148,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
       SILBuilder B(SRI);
       for (auto &CaptureArg : CaptureArgs)
         if (!CaptureArg.getType().isAddress())
-          B.emitDestroyValueOperation(SRI->getLoc(), CaptureArg);
+          B.emitReleaseValueOperation(SRI->getLoc(), CaptureArg);
       SRI->eraseFromParent();
     }
 

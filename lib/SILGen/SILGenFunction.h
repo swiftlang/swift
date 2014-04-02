@@ -921,7 +921,7 @@ public:
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
   
-  /// Enter a cleanup to emit a destroyValue/destroyAddr of the specified value.
+  /// Enter a cleanup to emit a ReleaseValue/destroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
 
   /// Evaluate an Expr as an lvalue.

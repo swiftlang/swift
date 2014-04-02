@@ -573,7 +573,7 @@ public:
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
-  void visitDestroyValueInst(DestroyValueInst *i);
+  void visitReleaseValueInst(ReleaseValueInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
@@ -2096,7 +2096,7 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   out.claimAll();
 }
 
-void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
+void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
     .consume(*this, in);

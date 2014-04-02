@@ -797,8 +797,8 @@ public:
     OS << "retain_value " << getIDAndType(I->getOperand());
   }
 
-  void visitDestroyValueInst(DestroyValueInst *I) {
-    OS << "destroy_value " << getIDAndType(I->getOperand());
+  void visitReleaseValueInst(ReleaseValueInst *I) {
+    OS << "release_value " << getIDAndType(I->getOperand());
   }
 
   void visitStructInst(StructInst *SI) {

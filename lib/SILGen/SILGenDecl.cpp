@@ -186,16 +186,16 @@ public:
   }
 };
 
-class DestroyValueCleanup : public Cleanup {
+class ReleaseValueCleanup : public Cleanup {
   SILValue v;
 public:
-  DestroyValueCleanup(SILValue v) : v(v) {}
+  ReleaseValueCleanup(SILValue v) : v(v) {}
   
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     if (v.getType().isAddress())
       gen.B.emitDestroyAddr(l, v);
     else
-      gen.B.emitDestroyValueOperation(l, v);
+      gen.B.emitReleaseValueOperation(l, v);
   }
 };
 
@@ -646,7 +646,7 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
 }
 
 CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
-  Cleanups.pushCleanup<DestroyValueCleanup>(valueOrAddr);
+  Cleanups.pushCleanup<ReleaseValueCleanup>(valueOrAddr);
   return Cleanups.getTopCleanup();
 }
 
@@ -1372,7 +1372,7 @@ SILGenFunction::enterDormantTemporaryCleanup(SILValue addr,
   if (tempTL.isTrivial())
     return CleanupHandle::invalid();
 
-  Cleanups.pushCleanupInState<DestroyValueCleanup>(CleanupState::Dormant, addr);
+  Cleanups.pushCleanupInState<ReleaseValueCleanup>(CleanupState::Dormant, addr);
   return Cleanups.getCleanupsDepth();
 }
 
@@ -1385,13 +1385,13 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   
   auto loc = VarLocs[vd];
   
-  // For 'let' bindings, we emit a destroy_value or destroy_addr, depending on
+  // For 'let' bindings, we emit a release_value or destroy_addr, depending on
   // whether we have an address or not.
   if (loc.isConstant()) {
     assert(vd->isLet() && "Mutable vardecl assigned a constant value?");
     SILValue Val = loc.getConstant();
     if (!Val.getType().isAddress())
-      B.emitDestroyValueOperation(silLoc, Val);
+      B.emitReleaseValueOperation(silLoc, Val);
     else
       B.emitDestroyAddr(silLoc, Val);
     return;
@@ -1457,7 +1457,7 @@ static void emitObjCReturnValue(SILGenFunction &gen,
     gen.B.createAutoreleaseReturn(loc, result);
     return;
   case ResultConvention::Unowned:
-    gen.B.emitDestroyValueOperation(loc, result);
+    gen.B.emitReleaseValueOperation(loc, result);
     SWIFT_FALLTHROUGH;
   case ResultConvention::Owned:
     gen.B.createReturn(loc, result);

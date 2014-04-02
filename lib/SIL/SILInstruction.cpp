@@ -154,8 +154,8 @@ namespace {
       return X->getOperand() == RHS->getOperand();
     }
 
-    bool visitDestroyValueInst(const DestroyValueInst *RHS) {
-      auto *X = cast<DestroyValueInst>(LHS);
+    bool visitReleaseValueInst(const ReleaseValueInst *RHS) {
+      auto *X = cast<ReleaseValueInst>(LHS);
       return X->getOperand() == RHS->getOperand();
     }
 

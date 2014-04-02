@@ -136,7 +136,7 @@ bb0(%0 : $*C1):
 // CHECK-LABEL: sil @expand_destroy_addr_enum
 // CHECK: bb0
 // CHECK-NEXT: load
-// CHECK-NEXT: destroy_value
+// CHECK-NEXT: release_value
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @expand_destroy_addr_enum : $@thin (@inout E) -> () {
@@ -292,7 +292,7 @@ bb0(%0 : $*S, %1 : $*S):
 // CHECK-NEXT: [[IN2ELT2:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 2
 // CHECK-NEXT: strong_release [[IN2ELT2]]
 // CHECK-NEXT: [[IN2ELT3:%[0-9]+]] = tuple_extract [[IN2]] : $(S, S2, C1, E), 3
-// CHECK-NEXT: destroy_value [[IN2ELT3]] : $E
+// CHECK-NEXT: release_value [[IN2ELT3]] : $E
 // CHECK-NEXT: store [[IN1]] to [[IN2PTR]] : $*(S, S2, C1, E)
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
@@ -337,7 +337,7 @@ bb0(%0 : $*C1, %1 : $*C1):
 // CHECK-NEXT: [[LOAD1:%[0-9]+]] = load [[IN1]] : $*E
 // CHECK-NEXT: [[LOAD2:%[0-9]+]] = load [[IN2]] : $*E
 // CHECK-NEXT: retain_value [[LOAD1]]
-// CHECK-NEXT: destroy_value [[LOAD2]]
+// CHECK-NEXT: release_value [[LOAD2]]
 // CHECK-NEXT: store [[LOAD1]] to [[IN2]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -355,18 +355,18 @@ bb0(%0 : $*E, %1 : $*E):
 // Test expansions for various types (these will become more
 // interesting when I introduce the actual chopping work).
 
-// CHECK-LABEL: sil @expand_destroy_value_trivial
+// CHECK-LABEL: sil @expand_release_value_trivial
 // CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_destroy_value_trivial : $@thin (Builtin.Int64) -> () {
+sil @expand_release_value_trivial : $@thin (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
-  destroy_value %0 : $Builtin.Int64
+  release_value %0 : $Builtin.Int64
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @expand_destroy_value_aggstructnontrivial
+// CHECK-LABEL: sil @expand_release_value_aggstructnontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $S):
 // CHECK-NEXT: [[cls:%[0-9]+]] = struct_extract [[IN]] : $S, #S.cls
 // CHECK-NEXT: strong_release [[cls]] : $C3
@@ -375,14 +375,14 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: strong_release [[innerstructcls1]] : $C1
 // CHECK-NEXT: [[innerstructcls2:%[0-9]+]] = struct_extract [[innerstruct]] : $S2, #S2.cls2
 // CHECK-NEXT: strong_release [[innerstructcls2]]
-sil @expand_destroy_value_aggstructnontrivial : $@thin (S) -> () {
+sil @expand_release_value_aggstructnontrivial : $@thin (S) -> () {
 bb0(%0 : $S):
-  destroy_value %0 : $S
+  release_value %0 : $S
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @expand_destroy_value_aggtuplenontrivial
+// CHECK-LABEL: sil @expand_release_value_aggtuplenontrivial
 // CHECK: bb0([[IN:%[0-9]+]] : $(S, S2, C1, E)):
 // CHECK-NEXT: [[ELT0:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 0
 // CHECK-NEXT: [[ELT0cls:%[0-9]+]] = struct_extract [[ELT0]] : $S, #S.cls
@@ -400,37 +400,37 @@ bb0(%0 : $S):
 // CHECK-NEXT: [[ELT2:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 2
 // CHECK-NEXT: strong_release [[ELT2]]
 // CHECK-NEXT: [[ELT3:%[0-9]+]] = tuple_extract [[IN]] : $(S, S2, C1, E), 3
-// CHECK-NEXT: destroy_value [[ELT3]] : $E
+// CHECK-NEXT: release_value [[ELT3]] : $E
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_destroy_value_aggtuplenontrivial : $@thin ((S, S2, C1, E)) -> () {
+sil @expand_release_value_aggtuplenontrivial : $@thin ((S, S2, C1, E)) -> () {
 bb0(%0 : $(S, S2, C1, E)):
-  destroy_value %0 : $(S, S2, C1, E)
+  release_value %0 : $(S, S2, C1, E)
   %1 = tuple()
   return %1 : $()
 }
 
 // Just turn into a load + strong_release.
-// CHECK-LABEL: sil @expand_destroy_value_reference
+// CHECK-LABEL: sil @expand_release_value_reference
 // CHECK: bb0([[IN:%[0-9]+]] : $C1):
 // CHECK-NEXT: strong_release [[IN]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @expand_destroy_value_reference : $@thin (C1) -> () {
+sil @expand_release_value_reference : $@thin (C1) -> () {
 bb0(%0 : $C1):
-  destroy_value %0 : $C1
+  release_value %0 : $C1
   %1 = tuple()
   return %1 : $()
 }
 
-// CHECK-LABEL: sil @expand_destroy_value_enum
+// CHECK-LABEL: sil @expand_release_value_enum
 // CHECK: bb0([[IN1:%[0-9]+]] : $E):
-// CHECK-NEXT: destroy_value
+// CHECK-NEXT: release_value
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @expand_destroy_value_enum : $@thin (E) -> () {
+sil @expand_release_value_enum : $@thin (E) -> () {
 bb0(%0 : $E):
-  destroy_value %0 : $E
+  release_value %0 : $E
   %1 = tuple()
   return %1 : $()
 }

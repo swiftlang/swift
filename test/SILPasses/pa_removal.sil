@@ -20,7 +20,7 @@ class K {
 }
 
 //CHECK: sil @a_function2
-// The destroy_value of $K is optimized to a strong_release.
+// The release_value of $K is optimized to a strong_release.
 sil @a_function2 : $@thin (@owned K) -> () {
 bb0(%0 : $K):
   %1 = alloc_ref $K

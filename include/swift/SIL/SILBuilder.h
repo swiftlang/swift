@@ -410,8 +410,8 @@ public:
     return insert(new (F.getModule()) RetainValueInst(loc, operand));
   }
 
-  DestroyValueInst *createDestroyValue(SILLocation loc, SILValue operand) {
-    return insert(new (F.getModule()) DestroyValueInst(loc, operand));
+  ReleaseValueInst *createReleaseValue(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) ReleaseValueInst(loc, operand));
   }
 
   StructInst *createStruct(SILLocation Loc, SILType Ty,
@@ -867,10 +867,10 @@ public:
 
   /// Convenience function for calling emitRelease on the type
   /// lowering for the non-address value.
-  void emitDestroyValueOperation(SILLocation loc, SILValue v) {
+  void emitReleaseValueOperation(SILLocation loc, SILValue v) {
     assert(!v.getType().isAddress());
     auto &lowering = F.getModule().getTypeLowering(v.getType());
-    lowering.emitDestroyValue(*this, loc, v);
+    lowering.emitReleaseValue(*this, loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand,

@@ -576,9 +576,9 @@ SILCloner<ImplClass>::visitRetainValueInst(RetainValueInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
+SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
   doPostProcess(Inst,
-    Builder.createDestroyValue(getOpLocation(Inst->getLoc()),
+    Builder.createReleaseValue(getOpLocation(Inst->getLoc()),
                                getOpValue(Inst->getOperand())));
 }
 

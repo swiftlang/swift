@@ -66,7 +66,7 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     SILValue IncomingVal = B.createLoad(Inst->getLoc(), Inst->getDest());
     B.createStore(Inst->getLoc(), Src, Inst->getDest());
 
-    B.emitDestroyValueOperation(Inst->getLoc(), IncomingVal);
+    B.emitReleaseValueOperation(Inst->getLoc(), IncomingVal);
   }
 
   Inst->eraseFromParent();

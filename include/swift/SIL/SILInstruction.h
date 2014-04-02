@@ -1330,12 +1330,12 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
-/// DestroyValueInst - Destroys a loadable value.
-class DestroyValueInst : public UnaryInstructionBase<ValueKind::DestroyValueInst,
+/// ReleaseValueInst - Destroys a loadable value.
+class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst,
                                                      SILInstruction,
                                                      /*HasValue*/ false> {
 public:
-  DestroyValueInst(SILLocation loc, SILValue operand)
+  ReleaseValueInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand) {}
 };
 

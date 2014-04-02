@@ -928,7 +928,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
   null = gen.B.createApply(loc, bfr, null);
 
   null = gen.B.createRawPointerToRef(loc, null, refType);
-  optTL.emitDestroyValue(gen.B, loc, opt); // destroy the nothing value
+  optTL.emitReleaseValue(gen.B, loc, opt); // destroy the nothing value
   gen.B.createBranch(loc, contBB, null);
 
   // Continue.

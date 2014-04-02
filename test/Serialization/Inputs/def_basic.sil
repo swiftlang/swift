@@ -859,14 +859,14 @@ sil @test_mark_fn_escape : $@thin () -> () {
   return %28 : $()
 }
 
-// CHECK-LABEL: sil public_external @test_copy_destroy_value
-sil @test_copy_destroy_value : $@thin (Val) -> (Val) {
+// CHECK-LABEL: sil public_external @test_copy_release_value
+sil @test_copy_release_value : $@thin (Val) -> (Val) {
 bb0(%0 : $Val):
   retain_value %0 : $Val
-  destroy_value %0 : $Val
+  release_value %0 : $Val
   return %0 : $Val
   // CHECK:      retain_value [[T0:%.*]] : $Val
-  // CHECK-NEXT: destroy_value [[T0]] : $Val
+  // CHECK-NEXT: release_value [[T0]] : $Val
   // CHECK-NEXT: return [[T0]] : $Val
 }
 
@@ -1119,7 +1119,7 @@ bb0:
   %111 = function_ref @test_partial_apply : $@thin Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@thin () -> ()
-  %117 = function_ref @test_copy_destroy_value : $@thin (Val) -> (Val)
+  %117 = function_ref @test_copy_release_value : $@thin (Val) -> (Val)
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8

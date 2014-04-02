@@ -40,10 +40,10 @@ STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
 /// Returns true if Inc and Dec are compatible reference count instructions.
 ///
 /// In more specific terms this means that means a (strong_retain,
-/// strong_release) pair or a (retain_value, destroy_value) pair.
+/// strong_release) pair or a (retain_value, release_value) pair.
 static bool matchingRefCountPairType(SILInstruction *Inc, SILInstruction *Dec) {
   return (isa<StrongRetainInst>(Inc) && isa<StrongReleaseInst>(Dec)) ||
-    (isa<RetainValueInst>(Inc) && isa<DestroyValueInst>(Dec));
+    (isa<RetainValueInst>(Inc) && isa<ReleaseValueInst>(Dec));
 }
 
 /// Is I an instruction that we recognize as a "reference count increment"
@@ -55,7 +55,7 @@ static bool isRefCountIncrement(SILInstruction &I) {
 /// Is I an instruction that we recognize as a "reference count decrement"
 /// instruction?
 static bool isRefCountDecrement(SILInstruction &I) {
-  return isa<StrongReleaseInst>(I) || isa<DestroyValueInst>(I);
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
 }
 
 //===----------------------------------------------------------------------===//
@@ -286,7 +286,7 @@ static bool isInterestingInstruction(ValueKind Kind) {
    default:
      return false;
    case ValueKind::RetainValueInst:
-   case ValueKind::DestroyValueInst:
+   case ValueKind::ReleaseValueInst:
    case ValueKind::StrongRetainInst:
    case ValueKind::StrongReleaseInst:
      return true;
@@ -369,7 +369,7 @@ processBBTopDown(SILBasicBlock &BB,
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
 
       // If the state is already initialized to contain a reference count
-      // increment of the same type (i.e. retain_value, destroy_value or
+      // increment of the same type (i.e. retain_value, release_value or
       // strong_retain, strong_release), then remove the state from the map
       // and add the retain/release pair to the delete list and continue.
       if (RefCountState.doesDecrementMatchInstruction(&I)) {

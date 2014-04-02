@@ -256,7 +256,7 @@ public:
 
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
-  SILInstruction *visitDestroyValueInst(DestroyValueInst *DI);
+  SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
@@ -628,7 +628,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   return eraseInstFromFunction(*LI);
 }
 
-SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
+SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *DI) {
   SILValue Operand = DI->getOperand();
   SILType OperandTy = Operand.getType();
 
@@ -638,11 +638,11 @@ SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *DI) {
         EI->getOperand().getType().isTrivial(EI->getModule()))
       return eraseInstFromFunction(*DI);
 
-  // DestroyValueInst of a reference type is a strong_release.
+  // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics())
     return new (DI->getModule()) StrongReleaseInst(DI->getLoc(), Operand);
 
-  // DestroyValueInst of a trivial type is a no-op.
+  // ReleaseValueInst of a trivial type is a no-op.
   if (OperandTy.isTrivial(DI->getModule()))
     return eraseInstFromFunction(*DI);
 
@@ -703,7 +703,7 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     assert(Delta <= Params.size() && "Error, more Args to partial apply than "
            "params in its interface.");
 
-    // Set the insertion point of the destroy_value to be that of the release,
+    // Set the insertion point of the release_value to be that of the release,
     // which is the end of the lifetime of the partial_apply.
     auto OrigInsertPoint = Builder->getInsertionPoint();
     SILInstruction *SingleUser = PAI->use_begin()->getUser();
@@ -715,7 +715,7 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
       if (!Param.isIndirect() && Param.isConsumed())
         if (!Arg.getType().isAddress())
-          Builder->createDestroyValue(Loc, Arg);
+          Builder->createReleaseValue(Loc, Arg);
     }
 
     Builder->setInsertionPoint(OrigInsertPoint);

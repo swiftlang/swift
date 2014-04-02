@@ -153,7 +153,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::DebugValueAddrInst:
   case ValueKind::DebugValueInst:
   case ValueKind::DestroyAddrInst:
-  case ValueKind::DestroyValueInst:
+  case ValueKind::ReleaseValueInst:
   case ValueKind::FloatLiteralInst:
   case ValueKind::FunctionRefInst:
   case ValueKind::GlobalAddrInst:

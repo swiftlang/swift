@@ -97,9 +97,9 @@ bb0:
 
 // The release of %4 is removed because the Int type is trivial
 
-// The release of %2 is replaced by a destroy_value of the Baz argument, since
+// The release of %2 is replaced by a release_value of the Baz argument, since
 // it is a non-trivial aggregate
-// CHECK-NEXT: destroy_value {{.*}} : $Baz
+// CHECK-NEXT: release_value {{.*}} : $Baz
 
 // The release of %0 is replaced by a strong_release of the Foo argument, since
 // is is a reference type

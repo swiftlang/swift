@@ -243,10 +243,10 @@ public:
     DeepNoEnum
   };
 
-  /// Emit a lowered 'destroy_value' operation.
+  /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  virtual void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc,
+  virtual void emitLoweredReleaseValue(SILBuilder &B, SILLocation loc,
                                        SILValue value,
                                        LoweringStyle loweringStyle) const = 0;
 
@@ -254,34 +254,34 @@ public:
                                     SILValue value,
                                     LoweringStyle loweringStyle) const {
     if (loweringStyle != LoweringStyle::Shallow) {
-      return emitLoweredDestroyValue(B, loc, value, loweringStyle);
+      return emitLoweredReleaseValue(B, loc, value, loweringStyle);
     } else {
-      return emitDestroyValue(B, loc, value);
+      return emitReleaseValue(B, loc, value);
     }
   }
 
-  /// Emit a lowered 'destroy_value' operation.
+  /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueShallow(SILBuilder &B, SILLocation loc,
+  void emitLoweredReleaseValueShallow(SILBuilder &B, SILLocation loc,
                                       SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Shallow);
+    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Shallow);
   }
 
-  /// Emit a lowered 'destroy_value' operation.
+  /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueDeep(SILBuilder &B, SILLocation loc,
+  void emitLoweredReleaseValueDeep(SILBuilder &B, SILLocation loc,
                                    SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, LoweringStyle::Deep);
+    emitLoweredReleaseValue(B, loc, value, LoweringStyle::Deep);
   }
 
-  /// Emit a lowered 'destroy_value' operation.
+  /// Emit a lowered 'release_value' operation.
   ///
   /// This type must be loadable.
-  void emitLoweredDestroyValueDeepNoEnum(SILBuilder &B, SILLocation loc,
+  void emitLoweredReleaseValueDeepNoEnum(SILBuilder &B, SILLocation loc,
                                          SILValue value) const {
-    emitLoweredDestroyValue(B, loc, value, LoweringStyle::DeepNoEnum);
+    emitLoweredReleaseValue(B, loc, value, LoweringStyle::DeepNoEnum);
   }
 
   /// Given a primitively loaded value of this type (which must be
@@ -292,7 +292,7 @@ public:
   /// example, it performs an unowned_release on a value of [unknown]
   /// type.  It is therefore not necessarily the right thing to do on
   /// a semantic load.
-  virtual void emitDestroyValue(SILBuilder &B, SILLocation loc,
+  virtual void emitReleaseValue(SILBuilder &B, SILLocation loc,
                                 SILValue value) const = 0;
 
   /// Emit a lowered 'retain_value' operation.

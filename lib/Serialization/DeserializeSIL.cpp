@@ -1007,7 +1007,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   UNARY_INSTRUCTION(CondFail)
   UNARY_INSTRUCTION(RetainValue)
-  UNARY_INSTRUCTION(DestroyValue)
+  UNARY_INSTRUCTION(ReleaseValue)
   UNARY_INSTRUCTION(DeinitExistential)
   UNARY_INSTRUCTION(DestroyAddr)
   UNARY_INSTRUCTION(IsNonnull)

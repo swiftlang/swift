@@ -1000,7 +1000,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("debug_value_addr", ValueKind::DebugValueAddrInst)
     .Case("deinit_existential", ValueKind::DeinitExistentialInst)
     .Case("destroy_addr", ValueKind::DestroyAddrInst)
-    .Case("destroy_value", ValueKind::DestroyValueInst)
+    .Case("release_value", ValueKind::ReleaseValueInst)
     .Case("switch_enum_addr",
           ValueKind::SwitchEnumAddrInst)
     .Case("dynamic_method", ValueKind::DynamicMethodInst)
@@ -1419,7 +1419,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   UNARY_INSTRUCTION(UnownedRetain)
   UNARY_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(DestroyAddr)
-  UNARY_INSTRUCTION(DestroyValue)
+  UNARY_INSTRUCTION(ReleaseValue)
   UNARY_INSTRUCTION(RetainValue)
   UNARY_INSTRUCTION(Load)
   UNARY_INSTRUCTION(CondFail)

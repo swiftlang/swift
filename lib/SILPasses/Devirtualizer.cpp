@@ -1093,7 +1093,7 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
     case ValueKind::DeallocStackInst:
     case ValueKind::StrongReleaseInst:
     case ValueKind::DestroyAddrInst:
-    case ValueKind::DestroyValueInst:
+    case ValueKind::ReleaseValueInst:
       continue;
 
     default: {
