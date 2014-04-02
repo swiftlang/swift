@@ -57,6 +57,88 @@ static Expr *getFalseExpr(ASTContext &C) {
                              /*direct access*/false, decl->getType());
 }
 
+static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
+  auto args = cast<TuplePattern>(eqDecl->getBodyParamPatterns().back());
+  auto aPattern = args->getFields()[0].getPattern();
+  auto aParamPattern =
+    cast<NamedPattern>(aPattern->getSemanticsProvidingPattern());
+  auto aParam = aParamPattern->getDecl();
+  auto bPattern = args->getFields()[1].getPattern();
+  auto bParamPattern =
+    cast<NamedPattern>(bPattern->getSemanticsProvidingPattern());
+  auto bParam = bParamPattern->getDecl();
+
+  auto enumDecl = cast<EnumDecl>(aParam->getType()->getAnyNominal());
+  ASTContext &C = enumDecl->getASTContext();
+  auto enumTy = enumDecl->getDeclaredTypeInContext();
+
+  SmallVector<CaseStmt*, 4> cases;
+  SmallVector<CaseLabelItem, 4> caseLabelItems;
+  
+  for (auto elt : enumDecl->getAllElements()) {
+    assert(!elt->hasArgumentType()
+           && "enums with payloads not supported yet");
+    auto aPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumTy),
+                                           SourceLoc(), SourceLoc(),
+                                           Identifier(), elt,
+                                           nullptr);
+    aPat->setImplicit();
+    auto bPat = aPat->clone(C, Pattern::Implicit);
+    
+    TuplePatternElt tupleElts[] = {
+      TuplePatternElt(aPat),
+      TuplePatternElt(bPat)
+    };
+    auto tuplePat = TuplePattern::create(C, SourceLoc(), tupleElts,
+                                         SourceLoc());
+    tuplePat->setImplicit();
+
+    caseLabelItems.push_back(
+        CaseLabelItem(/*IsDefault=*/false, tuplePat, SourceLoc(), nullptr));
+  }
+  {
+    Expr *trueExpr = getTrueExpr(C);
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
+    BraceStmt* body = BraceStmt::create(C, SourceLoc(),
+                                        ASTNode(returnStmt), SourceLoc());
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), caseLabelItems,
+                         /*HasBoundDecls=*/false, SourceLoc(), body));
+  }
+  {
+    auto any = new (C) AnyPattern(SourceLoc());
+    any->setImplicit();
+
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/true, any, SourceLoc(), nullptr);
+
+    Expr *falseExpr = getFalseExpr(C);
+    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
+    BraceStmt* body = BraceStmt::create(C, SourceLoc(),
+                                        ASTNode(returnStmt), SourceLoc());
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
+  }
+  
+  auto aRef = new (C) DeclRefExpr(aParam, SourceLoc(), /*implicit*/ true);
+  auto bRef = new (C) DeclRefExpr(bParam, SourceLoc(), /*implicit*/ true);
+  
+  Expr *ab[] = {aRef, bRef};
+  
+  TupleExpr *abTuple = new (C) TupleExpr(SourceLoc(),
+                                         C.AllocateCopy(ab), nullptr,
+                                         SourceLoc(),
+                                         /*trailingClosure*/ false,
+                                         /*implicit*/ true);
+  
+  auto switchStmt = SwitchStmt::create(SourceLoc(), abTuple, SourceLoc(),
+                                       cases, SourceLoc(), C);
+  BraceStmt *body
+    = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
+  eqDecl->setBody(body);
+}
+
 /// Derive an '==' operator implementation for an enum.
 static ValueDecl *
 deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
@@ -136,72 +218,8 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   }
   eqDecl->setOperatorDecl(op);
   eqDecl->setDerivedForTypeDecl(enumDecl);
-  
-  SmallVector<CaseStmt*, 4> cases;
-  SmallVector<CaseLabelItem, 4> caseLabelItems;
-  
-  for (auto elt : enumDecl->getAllElements()) {
-    assert(!elt->hasArgumentType()
-           && "enums with payloads not supported yet");
-    auto aPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumTy),
-                                           SourceLoc(), SourceLoc(),
-                                           Identifier(), elt,
-                                           nullptr);
-    aPat->setImplicit();
-    auto bPat = aPat->clone(C, Pattern::Implicit);
-    
-    TuplePatternElt tupleElts[] = {
-      TuplePatternElt(aPat),
-      TuplePatternElt(bPat)
-    };
-    auto tuplePat = TuplePattern::create(C, SourceLoc(), tupleElts, SourceLoc());
-    tuplePat->setImplicit();
+  eqDecl->setBodySynthesizer(&deriveBodyEquatable_enum_eq);
 
-    caseLabelItems.push_back(
-        CaseLabelItem(/*IsDefault=*/false, tuplePat, SourceLoc(), nullptr));
-  }
-  {
-    Expr *trueExpr = getTrueExpr(C);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), trueExpr);
-    BraceStmt* body = BraceStmt::create(C, SourceLoc(),
-                                        ASTNode(returnStmt), SourceLoc());
-    cases.push_back(
-        CaseStmt::create(C, SourceLoc(), caseLabelItems,
-                         /*HasBoundDecls=*/false, SourceLoc(), body));
-  }
-  {
-    auto any = new (C) AnyPattern(SourceLoc());
-    any->setImplicit();
-
-    auto labelItem =
-        CaseLabelItem(/*IsDefault=*/true, any, SourceLoc(), nullptr);
-
-    Expr *falseExpr = getFalseExpr(C);
-    auto returnStmt = new (C) ReturnStmt(SourceLoc(), falseExpr);
-    BraceStmt* body = BraceStmt::create(C, SourceLoc(),
-                                        ASTNode(returnStmt), SourceLoc());
-    cases.push_back(
-        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
-                         SourceLoc(), body));
-  }
-  
-  auto aRef = new (C) DeclRefExpr(aParam.first, SourceLoc(), /*implicit*/ true);
-  auto bRef = new (C) DeclRefExpr(bParam.first, SourceLoc(), /*implicit*/ true);
-  
-  Expr *ab[] = {aRef, bRef};
-  
-  TupleExpr *abTuple = new (C) TupleExpr(SourceLoc(),
-                                         C.AllocateCopy(ab), nullptr,
-                                         SourceLoc(),
-                                         /*trailingClosure*/ false,
-                                         /*implicit*/ true);
-  
-  auto switchStmt = SwitchStmt::create(SourceLoc(), abTuple, SourceLoc(),
-                                       cases, SourceLoc(), C);
-  BraceStmt *body
-    = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
-  eqDecl->setBody(body);
-  
   // Compute the type and interface type.
   Type fnTy, interfaceTy;
   if (genericParams) {
@@ -246,6 +264,84 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
   tc.diagnose(requirement->getLoc(),
               diag::broken_equatable_requirement);
   return nullptr;
+}
+
+static void
+deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
+  auto enumDecl = cast<EnumDecl>(hashValueDecl->getDeclContext());
+  ASTContext &C = enumDecl->getASTContext();
+  auto enumType = enumDecl->getDeclaredTypeInContext();
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
+                                  SourceLoc(),
+                                  C.getIdentifier("index"),
+                                  intType, hashValueDecl);
+  indexVar->setImplicit();
+  
+  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  indexPat = new (C) TypedPattern(indexPat, TypeLoc::withoutLoc(intType));
+  auto indexBind = new (C) PatternBindingDecl(SourceLoc(),
+                                              StaticSpellingKind::None,
+                                              SourceLoc(),
+                                              indexPat, nullptr,
+                                              /*conditional*/ false,
+                                              enumDecl);
+  
+  unsigned index = 0;
+  SmallVector<CaseStmt*, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
+                                          SourceLoc(), SourceLoc(),
+                                          Identifier(), elt, nullptr);
+    pat->setImplicit();
+    
+    auto labelItem =
+        CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
+    
+    llvm::SmallString<8> indexVal;
+    APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
+    auto indexStr = C.AllocateCopy(indexVal);
+    
+    auto indexExpr = new (C) IntegerLiteralExpr(
+                     StringRef(indexStr.data(), indexStr.size()), SourceLoc(),
+                     /*implicit*/ true);
+    auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
+                                        /*implicit*/true);
+    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
+                                         indexExpr, /*implicit*/ true);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
+                                  SourceLoc());
+    cases.push_back(
+        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
+                         SourceLoc(), body));
+  }
+
+  Pattern *curriedArgs = hashValueDecl->getBodyParamPatterns().front();
+  auto selfPattern =
+    cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
+  auto selfDecl = selfPattern->getDecl();
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
+  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
+                                       SourceLoc(), cases, SourceLoc(), C);
+  
+  auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
+                                      /*implicit*/ true);
+  auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
+                                             hashValueDecl->getName(),
+                                             SourceLoc(), /*implicit*/ true);
+  auto args = new (C) TupleExpr(SourceLoc(), SourceLoc(), /*implicit*/ true);
+  auto call = new (C) CallExpr(memberRef, args, /*implicit*/true);
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
+  
+  ASTNode bodyStmts[] = {
+    indexBind,
+    switchStmt,
+    returnStmt,
+  };
+  
+  auto body = BraceStmt::create(C, SourceLoc(), bodyStmts, SourceLoc());
+  hashValueDecl->setBody(body);
 }
 
 /// Derive a 'hashValue' implementation for an enum.
@@ -307,70 +403,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
                      id_hashValue, SourceLoc(), nullptr, Type(),
                      params, params, TypeLoc::withoutLoc(intType), enumDecl);
   hashValueDecl->setImplicit();
-  
-  auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
-                                  SourceLoc(),
-                                  C.getIdentifier("index"),
-                                  intType, hashValueDecl);
-  indexVar->setImplicit();
-  
-  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
-  indexPat = new (C) TypedPattern(indexPat, TypeLoc::withoutLoc(intType));
-  auto indexBind = new (C) PatternBindingDecl(SourceLoc(),
-                                              StaticSpellingKind::None,
-                                              SourceLoc(),
-                                              indexPat, nullptr,
-                                              /*conditional*/ false,
-                                              enumDecl);
-  
-  unsigned index = 0;
-  SmallVector<CaseStmt*, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(), Identifier(), elt, nullptr);
-    pat->setImplicit();
-    
-    auto labelItem =
-        CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(), nullptr);
-    
-    llvm::SmallString<8> indexVal;
-    APInt(32, index++).toString(indexVal, 10, /*signed*/ false);
-    auto indexStr = C.AllocateCopy(indexVal);
-    
-    auto indexExpr = new (C) IntegerLiteralExpr(
-                     StringRef(indexStr.data(), indexStr.size()), SourceLoc(),
-                     /*implicit*/ true);
-    auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
-                                        /*implicit*/true);
-    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
-                                         indexExpr, /*implicit*/ true);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
-                                  SourceLoc());
-    cases.push_back(
-        CaseStmt::create(C, SourceLoc(), labelItem, /*HasBoundDecls=*/false,
-                         SourceLoc(), body));
-  }
-  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
-  
-  auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
-                                      /*implicit*/ true);
-  auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(), id_hashValue,
-                                             SourceLoc(), /*implicit*/ true);
-  auto args = new (C) TupleExpr(SourceLoc(), SourceLoc(), /*implicit*/ true);
-  auto call = new (C) CallExpr(memberRef, args, /*implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
-  
-  ASTNode bodyStmts[] = {
-    indexBind,
-    switchStmt,
-    returnStmt,
-  };
-  
-  auto body = BraceStmt::create(C, SourceLoc(), bodyStmts, SourceLoc());
-  hashValueDecl->setBody(body);
-  
+  hashValueDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
+
   // Compute the type of hashValue().
   GenericParamList *genericParams = nullptr;
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
