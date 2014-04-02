@@ -567,7 +567,7 @@ namespace {
           Indent -= 2;
         }
       }
-      if (auto Body = D->getBody()) {
+      if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
         printRec(Body);
       }

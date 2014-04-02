@@ -1364,7 +1364,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
 static void synthesizeObservingAccessors(VarDecl *VD) {
   assert(VD->getStorageKind() == VarDecl::Observing);
   assert(VD->getGetter() && VD->getSetter() &&
-         !VD->getGetter()->getBody() && !VD->getSetter()->getBody() &&
+         !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
          "willSet/didSet var already has a getter or setter");
   
   auto &Ctx = VD->getASTContext();

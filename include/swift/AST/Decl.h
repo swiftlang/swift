@@ -3233,8 +3233,8 @@ public:
   /// have a body for this function.
   ///
   /// \sa hasBody()
-  BraceStmt *getBody() const {
-    if (getBodyKind() == BodyKind::Synthesize) {
+  BraceStmt *getBody(bool canSynthesize = true) const {
+    if (canSynthesize && getBodyKind() == BodyKind::Synthesize) {
       const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
       (*Synthesizer)(const_cast<AbstractFunctionDecl *>(this));
     }

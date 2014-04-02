@@ -650,7 +650,7 @@ public:
           if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
             return true;
 
-      if (AFD->getBody()) {
+      if (AFD->getBody(/*canSynthesize=*/false)) {
         if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
           AFD->setBody(S);
         else
