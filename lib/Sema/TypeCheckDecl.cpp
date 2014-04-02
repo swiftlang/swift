@@ -605,18 +605,6 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   });
 }
 
-static CanType getExtendedType(ExtensionDecl *ED) {
-  CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
-
-  // FIXME: we should require generic parameter clauses here
-  if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
-    auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
-    ED->getExtendedTypeLoc().setType(boundType, true);
-    ExtendedTy = boundType->getCanonicalType();
-  }
-  return ExtendedTy;
-}
-
 /// Create a fresh archetype builder.
 /// FIXME: Duplicated with TypeCheckGeneric.cpp; this one should go away.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
@@ -3359,7 +3347,7 @@ public:
     }
 
     if (!IsSecondPass) {
-      CanType ExtendedTy = getExtendedType(ED);
+      CanType ExtendedTy = DeclContext::getExtendedType(ED);
 
       if (!isa<EnumType>(ExtendedTy) &&
           !isa<StructType>(ExtendedTy) &&
@@ -5003,7 +4991,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     // Only Struct and Enum extensions can be transparent.
     } else if (ED) {
-      CanType ExtendedTy = getExtendedType(ED);
+      CanType ExtendedTy = DeclContext::getExtendedType(ED);
       if (!isa<StructType>(ExtendedTy) && !isa<EnumType>(ExtendedTy)) {
         TC.diagnose(Attrs.getLoc(AK_transparent),
                     diag::transparent_on_invalid_extension);

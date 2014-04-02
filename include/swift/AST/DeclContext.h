@@ -28,7 +28,9 @@ namespace swift {
   class AbstractFunctionDecl;
   class ASTContext;
   class ASTWalker;
+  class CanType;
   class DeclContext;
+  class ExtensionDecl;
   class GenericParamList;
   class LazyResolver;
   class GenericSignature;
@@ -115,6 +117,10 @@ public:
   DeclContextKind getContextKind() const {
     return ParentAndKind.getInt();
   }
+  
+  /// \brief Obtain the canonical type from a type extension declaration,
+  /// binding any unbound generic types if necessary.
+  static CanType getExtendedType(ExtensionDecl *ED);
 
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a

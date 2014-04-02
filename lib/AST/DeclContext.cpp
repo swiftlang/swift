@@ -10,13 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/DeclContext.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
+
+CanType DeclContext::getExtendedType(ExtensionDecl *ED) {
+  CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
+  
+  // FIXME: we should require generic parameter clauses here
+  if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
+    auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
+    ED->getExtendedTypeLoc().setType(boundType, true);
+    ExtendedTy = boundType->getCanonicalType();
+  }
+  return ExtendedTy;
+}
 
 // Only allow allocation of DeclContext using the allocator in ASTContext.
 void *DeclContext::operator new(size_t Bytes, ASTContext &C,
@@ -39,9 +52,15 @@ Type DeclContext::getDeclaredTypeOfContext() const {
     return Type();
 
   case DeclContextKind::ExtensionDecl: {
-    auto type = cast<ExtensionDecl>(this)->getExtendedType();
+    auto ED = cast<ExtensionDecl>(this);
+    auto type = ED->getExtendedType();
+    
     if (auto ND = type->getNominalOrBoundGenericNominal())
       return ND->getDeclaredType();
+    
+    if (dyn_cast<UnboundGenericType>(type.getPointer())) {
+      return getExtendedType(const_cast<ExtensionDecl*>(ED));
+    }
     return Type();
   }
 
@@ -61,7 +80,7 @@ Type DeclContext::getDeclaredTypeInContext() {
     return Type();
 
   case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(this)->getExtendedType();
+    return getExtendedType(cast<ExtensionDecl>(this));
 
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();
