@@ -386,7 +386,7 @@ namespace {
         // need to include everything else in the world?
         auto outputTy
           = CS.createTypeVariable(
-              CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+              CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction),
               /*options=*/0);
         CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
@@ -997,7 +997,7 @@ namespace {
       // variables T1 and T2.
       auto outputTy
         = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
+            CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction),
             /*options=*/0);
 
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);

@@ -475,11 +475,11 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                            ConstraintLocator::ConversionMember));
   auto inputTV = cs.createTypeVariable(
                    cs.getConstraintLocator(memberLocator,
-                                           ConstraintLocator::FunctionArgument),
+                                           ConstraintLocator::ApplyArgument),
                    /*options=*/0);
   auto outputTV = cs.createTypeVariable(
                     cs.getConstraintLocator(memberLocator,
-                                            ConstraintLocator::FunctionResult),
+                                            ConstraintLocator::ApplyFunction),
                     /*options=*/0);
 
   auto &ctx = cs.getASTContext();
@@ -964,14 +964,6 @@ commit_to_conversions:
     }
 
     return SolutionKind::Error;
-  }
-
-  // Okay, we need to perform one or more conversions.  If this
-  // conversion will cause a function conversion, score it as worse.
-  // This induces conversions to occur within closures instead of
-  // outside of them wherever possible.
-  if (locator.isFunctionConversion()) {
-    increaseScore(SK_FunctionConversion);
   }
 
   // Where there is more than one potential conversion, create a disjunction
@@ -1812,7 +1804,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     if (matchTypes(func1->getResult(), instanceTy2,
                    TypeMatchKind::BindType,
                    flags,
-                   locator.withPathElement(ConstraintLocator::FunctionResult))
+                   locator.withPathElement(ConstraintLocator::ApplyFunction))
         == SolutionKind::Error)
       return SolutionKind::Error;
 
@@ -1888,6 +1880,17 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                                                TypeMatchKind matchKind,
                                                unsigned flags,
                                                ConstraintLocatorBuilder locator) {
+  // Add to the score based on context.
+  auto addContextualScore = [&] {
+    // Okay, we need to perform one or more conversions.  If this
+    // conversion will cause a function conversion, score it as worse.
+    // This induces conversions to occur within closures instead of
+    // outside of them wherever possible.
+    if (locator.isFunctionConversion()) {
+      increaseScore(SK_FunctionConversion);
+    }
+  };
+
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
@@ -1913,6 +1916,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
+    addContextualScore();
     return matchSuperclassTypes(type1, type2, matchKind, flags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
@@ -1922,12 +1926,14 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
   case ConversionRestrictionKind::Existential:
+    addContextualScore();
     return matchExistentialTypes(type1, type2,
                                  matchKind, flags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
   case ConversionRestrictionKind::ValueToOptional: {
+    addContextualScore();
     assert(matchKind >= TypeMatchKind::Subtype);
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
@@ -1944,6 +1950,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::OptionalToUncheckedOptional:
   case ConversionRestrictionKind::UncheckedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
+    addContextualScore();
     assert(matchKind >= TypeMatchKind::Subtype);
     auto generic1 = type1->castTo<BoundGenericType>();
     auto generic2 = type2->castTo<BoundGenericType>();
@@ -1963,6 +1970,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   // Fortunately, user-defined conversions only allow subtype
   // conversions on their results.
   case ConversionRestrictionKind::ForceUnchecked: {
+    addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
     auto boundGenericType1 = type1->castTo<BoundGenericType>();
     assert(boundGenericType1->getDecl()->classifyAsOptionalType()
@@ -1976,6 +1984,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
   case ConversionRestrictionKind::User:
+    addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
     return tryUserConversion(*this, type1,
                              ConstraintKind::Subtype,
