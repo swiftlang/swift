@@ -187,6 +187,9 @@ set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
 
+option(SWIFT_SPLIT_OBJC_SELECTORS 
+       "Split Objective-C selectors when building the standard library" NO)
+
 option(SWIFT_BUILD_TOOLS "Build Swift tools" YES)
 option(SWIFT_BUILD_STDLIB "Build Swift stdlib" YES)
 set(SWIFT_RUN_LONG_TESTS OFF CACHE BOOL "Run tests that can take a long time to finish")
@@ -314,6 +317,10 @@ function(compile_swift_files)
     list(APPEND swift_flags "-O2")
   else()
     list(APPEND swift_flags "-O0")
+  endif()
+
+  if (SWIFT_SPLIT_OBJC_SELECTORS)
+    list(APPEND swift_flags "-split-objc-selectors")
   endif()
 
   # FIXME: We shouldn't /have/ to build things in a single process.
