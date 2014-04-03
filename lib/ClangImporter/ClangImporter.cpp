@@ -518,6 +518,8 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   return SwiftContext.getIdentifier(nameBuf);
 }
 
+/// Import the given string directly as an identifier, where the empty
+/// string maps to a null identifier.
 static Identifier importNameOrNull(ASTContext &ctx, StringRef name) {
   if (name.empty())
     return Identifier();
@@ -531,18 +533,36 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   assert(!selector.isNull() && "Null selector?");
 
   // Zero-argument selectors.
-  if (selector.isUnarySelector())
-    return importName(selector.getIdentifierInfoForSlot(0));
+  if (selector.isUnarySelector()) {
+    auto name = selector.getNameForSlot(0);
+
+    // Simple case.
+    if (!isInitializer || name.size() == 4)
+      return importNameOrNull(SwiftContext, name);
+
+    // We have an initializer with no parameters but a name that
+    // contains more than 'init', we synthesize an argument to capture
+    // what follows 'init'.
+    assert(camel_case::getFirstWord(name).equals("init"));
+    llvm::SmallString<16> scratch;
+    auto baseName = SwiftContext.Id_init;
+    auto argName
+      = importNameOrNull(SwiftContext,
+                         camel_case::toLowercaseWord(name.substr(4), scratch));
+    return DeclName(SwiftContext, baseName, argName);
+  }
 
   // Determine the base name and first argument name.
   Identifier baseName;
   SmallVector<Identifier, 2> argumentNames;
   StringRef firstPiece = selector.getNameForSlot(0);
   if (isInitializer) {
+    llvm::SmallString<16> scratch;
     assert(camel_case::getFirstWord(firstPiece).equals("init"));
     baseName = SwiftContext.Id_init;
-    argumentNames.push_back(importNameOrNull(SwiftContext,
-                                             firstPiece.substr(4)));
+    auto firstArgName = camel_case::toLowercaseWord(firstPiece.substr(4),
+                                                    scratch);
+    argumentNames.push_back(importNameOrNull(SwiftContext, firstArgName));
   } else if (SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;

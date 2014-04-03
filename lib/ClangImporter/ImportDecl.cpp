@@ -1985,7 +1985,8 @@ namespace {
 
 
       auto loc = decl->getLoc();
-      auto name = Impl.SwiftContext.Id_init;
+      auto name = Impl.importName(objcMethod->getSelector(), 
+                                  /*isInitializer=*/true);
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;
@@ -1998,15 +1999,15 @@ namespace {
       bool hasSelectorStyleSignature;
 
       // Import the type that this method will have.
-      auto type = Impl.importFunctionType(objcMethod->getReturnType(),
-                                          { objcMethod->param_begin(),
-                                            objcMethod->param_size() },
-                                          objcMethod->isVariadic(),
+      auto type = Impl.importMethodType(objcMethod->getReturnType(),
+                                        { objcMethod->param_begin(),
+                                          objcMethod->param_size() },
+                                        objcMethod->isVariadic(),
                                   objcMethod->hasAttr<clang::NoReturnAttr>(),
                                           argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
-                                          objcMethod->getSelector(),
+                                          name,
                                           SpecialMethodKind::Constructor);
       assert(type && "Type has already been successfully converted?");
 
@@ -2029,9 +2030,11 @@ namespace {
       VarDecl *selfVar = createSelfDecl(dc, false);
       selfPat = createTypedNamedPattern(selfVar);
 
+      // FIXME: Temporary hack because initializers don't yet use full
+      // names.
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext)
-         ConstructorDecl(name, loc, selfPat, argPatterns.back(),
+          ConstructorDecl(name.getBaseName(), loc, selfPat, argPatterns.back(),
                          selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
       result->setIsObjC(true);
       result->setClangNode(objcMethod);

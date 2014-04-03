@@ -874,6 +874,28 @@ Type ClangImporter::Implementation::importMethodType(
     ++index;
   }
 
+  // If we have a constructor with no parameters and a name with an
+  // argument name, synthesize a Void parameter with that name.
+  if (kind == SpecialMethodKind::Constructor && params.empty() && 
+      argNames.size() == 1) {
+    auto argName = argNames[0];
+    auto type = TupleType::getEmpty(SwiftContext);
+    auto var = new (SwiftContext) VarDecl(/*static*/ false,
+                                          /*IsLet*/ true,
+                                          SourceLoc(), argName, type,
+                                          firstClangModule);
+    Pattern *pattern = new (SwiftContext) NamedPattern(var);
+    pattern->setType(type);
+    pattern = new (SwiftContext) TypedPattern(pattern,
+                                              TypeLoc::withoutLoc(type));
+    pattern->setType(type);
+    
+    argPatternElts.push_back(TuplePatternElt(pattern));
+    bodyPatternElts.push_back(TuplePatternElt(pattern));
+    swiftArgParams.push_back(TupleTypeElt(type, argName));
+    swiftBodyParams.push_back(TupleTypeElt(type, argName));
+  }
+
   // Form the parameter tuples.
   auto argParamsTy = TupleType::get(swiftArgParams, SwiftContext);
   auto bodyParamsTy = TupleType::get(swiftBodyParams, SwiftContext);
