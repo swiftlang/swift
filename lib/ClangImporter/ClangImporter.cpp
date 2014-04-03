@@ -583,13 +583,28 @@ splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
   return { selector, "" };
 }
 
-/// Import the given string directly as an identifier, where the empty
-/// string maps to a null identifier.
-static Identifier importNameOrNull(ASTContext &ctx, StringRef name) {
+/// Import an argument name.
+static Identifier importArgName(ASTContext &ctx, StringRef name) {
+  // Simple case: empty name.
   if (name.empty())
     return Identifier();
 
-  return ctx.getIdentifier(name);
+  // If the first word isn't a non-directional preposition, lowercase
+  // it to form the argument name.
+  llvm::SmallString<16> scratch;
+  auto firstWord = camel_case::getFirstWord(name);
+  if (!ctx.LangOpts.SplitPrepositions ||
+      getPrepositionKind(firstWord) != PK_Nondirectional)
+    return ctx.getIdentifier(camel_case::toLowercaseWord(name, scratch));
+
+  // The first word is a non-directional preposition.
+
+  // If there's only one word, we're left with no argument name.
+  if (firstWord.size() == name.size())
+    return Identifier();
+  
+  return ctx.getIdentifier(
+           camel_case::toLowercaseWord(name.substr(firstWord.size()), scratch));
 }
 
 DeclName
@@ -603,17 +618,14 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 
     // Simple case.
     if (!isInitializer || name.size() == 4)
-      return importNameOrNull(SwiftContext, name);
+      return SwiftContext.getIdentifier(name);
 
     // This is an initializer with no parameters but a name that
     // contains more than 'init', so synthesize an argument to capture
     // what follows 'init'.
     assert(camel_case::getFirstWord(name).equals("init"));
-    llvm::SmallString<16> scratch;
     auto baseName = SwiftContext.Id_init;
-    auto argName
-      = importNameOrNull(SwiftContext,
-                         camel_case::toLowercaseWord(name.substr(4), scratch));
+    auto argName = importArgName(SwiftContext, name.substr(4));
     return DeclName(SwiftContext, baseName, argName);
   }
 
@@ -622,19 +634,16 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   SmallVector<Identifier, 2> argumentNames;
   StringRef firstPiece = selector.getNameForSlot(0);
   if (isInitializer) {
-    llvm::SmallString<16> scratch;
     assert(camel_case::getFirstWord(firstPiece).equals("init"));
     baseName = SwiftContext.Id_init;
-    auto firstArgName = camel_case::toLowercaseWord(firstPiece.substr(4),
-                                                    scratch);
-    argumentNames.push_back(importNameOrNull(SwiftContext, firstArgName));
+    argumentNames.push_back(importArgName(SwiftContext, firstPiece.substr(4)));
   } else if (SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
     std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
                                                                scratch);
-    baseName = importNameOrNull(SwiftContext, funcName);
-    argumentNames.push_back(importNameOrNull(SwiftContext, firstArgName));
+    baseName = SwiftContext.getIdentifier(funcName);
+    argumentNames.push_back(importArgName(SwiftContext, firstArgName));
   } else {
     baseName = SwiftContext.getIdentifier(firstPiece);
     argumentNames.push_back(Identifier());
@@ -642,8 +651,8 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 
   // Determine the remaining argument names.
   for (unsigned i = 1, e = selector.getNumArgs(); i < e; ++i) {
-    argumentNames.push_back(importNameOrNull(SwiftContext,
-                                             selector.getNameForSlot(i)));
+    argumentNames.push_back(importArgName(SwiftContext,
+                                          selector.getNameForSlot(i)));
   }
   
   return DeclName(SwiftContext, baseName, argumentNames);

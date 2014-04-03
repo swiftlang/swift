@@ -4155,8 +4155,18 @@ createSubobjectInitOverride(TypeChecker &tc,
   // Set the type of the initializer.
   configureConstructorType(ctor, outerGenericParams, selfType, 
                            argParamPatterns->getType());
-  if (superclassCtor->isObjC())
+  if (superclassCtor->isObjC()) {
     ctor->setIsObjC(true);
+
+    // Inherit the @objc name from the superclass initializer, if it
+    // has one.
+    // FIXME: Generalize inheritance of attributes here?
+    if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
+      if (objcAttr->hasName())
+        ctor->getMutableAttrs().add(objcAttr->clone(ctx));
+    }
+
+  }
 
   // Wire up the overides.
   DeclChecker(tc, false, false).checkOverrides(ctor);
