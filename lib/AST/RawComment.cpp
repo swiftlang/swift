@@ -160,8 +160,9 @@ static unsigned measureASCIIArt(StringRef S) {
 }
 
 static llvm::rest::LineList
-toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
-  llvm::rest::LineList Result;
+toLineList(llvm::rest::ReSTContext &TheReSTContext,
+           llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
+  llvm::rest::LineListBuilder Result;
   for (const auto &C : RC.Comments) {
     if (C.isLine()) {
       // Skip comment marker.
@@ -216,15 +217,16 @@ toLineList(llvm::rest::SourceManager<SourceLoc> &RSM, RawComment RC) {
       }
     }
   }
-  return std::move(Result);
+  return Result.takeLineList(TheReSTContext);
 }
 
 static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
                                      const Decl *D) {
   PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
 
+  llvm::rest::ReSTContext TheReSTContext;
   llvm::rest::SourceManager<SourceLoc> RSM;
-  llvm::rest::LineList LL = toLineList(RSM, RC);
+  llvm::rest::LineList LL = toLineList(TheReSTContext, RSM, RC);
   llvm::SmallString<256> Result;
   llvm::rest::extractBrief(LL, Result);
 

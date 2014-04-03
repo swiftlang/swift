@@ -12,6 +12,7 @@
 
 #include "swift/ReST/LineList.h"
 #include "swift/ReST/Parser.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Unicode.h"
 #include "llvm/Support/ConvertUTF.h"
 #include <utility>
@@ -40,7 +41,7 @@ static std::pair<ColumnNum, unsigned> measureIndentation(StringRef Text) {
   return { Col, Text.size() };
 }
 
-void LineList::addLine(StringRef Text, SourceRange Range) {
+void LineListBuilder::addLine(StringRef Text, SourceRange Range) {
   Line L;
   L.Text = Text;
   L.Range = Range;
@@ -49,6 +50,9 @@ void LineList::addLine(StringRef Text, SourceRange Range) {
   L.FirstTextByte = FirstTextByte;
   Lines.push_back(L);
 }
+
+LineList LineListBuilder::takeLineList(ReSTContext &Context) {
+  return LineList(Context.allocateCopy(ArrayRef<Line>(Lines)));}
 
 // FIXME: this could work a little faster if we could call LLVM's
 // charWidth().

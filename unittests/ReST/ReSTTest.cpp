@@ -25,18 +25,18 @@ using namespace llvm::rest::detail;
 struct ReSTTest : public ::testing::Test {
   SourceManager<unsigned> SM;
 
-  LineList toLineList(StringRef Text) {
-    LineList Result;
+  LineList toLineList(ReSTContext &Context, StringRef Text) {
+    LineListBuilder Result;
     Result.addLine(Text, SM.registerLine(Text, 0));
-    return Result;
+    return Result.takeLineList(Context);
   }
 
-  LineList toLineList(std::vector<const char *> Lines) {
-    LineList Result;
+  LineList toLineList(ReSTContext &Context, std::vector<const char *> Lines) {
+    LineListBuilder Result;
     for (auto S : Lines) {
       Result.addLine(S, SM.registerLine(S, 0));
     }
-    return Result;
+    return Result.takeLineList(Context);
   }
 };
 
@@ -52,7 +52,8 @@ struct LineListIndentationTest
 
 TEST_P(LineListIndentationTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   EXPECT_EQ(1u, LL.size());
   EXPECT_EQ(Test.FirstTextCol, LL[0].FirstTextCol.Value);
   EXPECT_EQ(Test.FirstTextByte, LL[0].FirstTextByte);
@@ -97,7 +98,8 @@ struct ClassifyLineBlankTest
 
 TEST_P(ClassifyLineBlankTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   auto Result = classifyLine(LL[0]);
   EXPECT_EQ(LineKind::Blank, Result.Kind);
 }
@@ -127,7 +129,8 @@ struct ClassifyLineBulletListTest
 
 TEST_P(ClassifyLineBulletListTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   auto Result = classifyLine(LL[0]);
   EXPECT_EQ(Test.Kind, Result.Kind);
   if (isBullet(Test.Kind)) {
@@ -198,7 +201,8 @@ struct ClassifyLineEnumeratedListTest
 
 TEST_P(ClassifyLineEnumeratedListTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   auto Result = classifyLine(LL[0]);
   EXPECT_EQ(Test.Kind, Result.Kind);
   if (isEnumerated(Test.Kind)) {
@@ -321,7 +325,8 @@ struct ClassifyLineFieldListTest
 
 TEST_P(ClassifyLineFieldListTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   auto Result = classifyLine(LL[0]);
   EXPECT_EQ(Test.Kind, Result.Kind);
   if (Test.Kind == LineKind::FieldList) {
@@ -412,14 +417,14 @@ struct ExtractBriefTest
 
 TEST_P(ExtractBriefTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   llvm::SmallString<64> Str;
 
   extractBrief(LL, Str);
   EXPECT_EQ(Test.Brief, Str.str().str());
   Str.clear();
 
-  ReSTContext Context;
   auto *TheDocument = parseDocument(Context, LL);
   {
     llvm::raw_svector_ostream OS(Str);
@@ -1483,7 +1488,8 @@ struct ParseReSTTest
 
 TEST_P(ParseReSTTest, Test) {
   const auto &Test = GetParam();
-  auto LL = toLineList(Test.InText);
+  ReSTContext Context;
+  auto LL = toLineList(Context, Test.InText);
   llvm::SmallString<64> Str;
   extractBrief(LL, Str);
   EXPECT_EQ(Test.Brief, Str.str());

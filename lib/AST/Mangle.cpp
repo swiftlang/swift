@@ -85,6 +85,7 @@ static bool isNonAscii(StringRef str) {
 void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   StringRef str = ident.str();
   if (str.empty()) {
+    assert(false);
     Buffer << "0";
     return;
   }

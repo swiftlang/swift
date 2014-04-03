@@ -13,11 +13,14 @@
 #ifndef LLVM_REST_LINELIST_H
 #define LLVM_REST_LINELIST_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/ReST/SourceLoc.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 
 namespace llvm {
 namespace rest {
+class ReSTContext;
 
 /// A 0-based column number.
 struct ColumnNum {
@@ -278,9 +281,11 @@ struct LinePart {
 class LineListRef;
 
 class LineList {
-  std::vector<Line> Lines;
+  MutableArrayRef<Line> Lines;
 
 public:
+  LineList(MutableArrayRef<Line> Lines) : Lines(Lines) {}
+
   Line &operator[](unsigned i) {
     assert(i < Lines.size());
     return Lines[i];
@@ -318,8 +323,6 @@ public:
     assert(i < size());
     return (*this)[i + 1].getClassification().Kind == detail::LineKind::Blank;
   }
-
-  void addLine(StringRef Text, SourceRange Range);
 };
 
 /// A lightweight view into a \c LineList.
@@ -395,6 +398,15 @@ inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) {
   Result.Size = Size;
   return Result;
 }
+
+class LineListBuilder {
+  std::vector<Line> Lines;
+
+public:
+  void addLine(StringRef Text, SourceRange Range);
+
+  LineList takeLineList(ReSTContext &Context);
+};
 
 } // namespace rest
 } // namespace llvm

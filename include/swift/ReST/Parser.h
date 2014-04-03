@@ -29,7 +29,7 @@ LineClassification classifyLine(const Line &L);
 
 void extractBrief(LineListRef LL, llvm::SmallVectorImpl<char> &Str);
 
-struct LangOptions {
+struct LangOptions final {
   /// If set to true, then if all input lines are uniformly indented by the
   /// same amount, ignore that amount of indentation everywhere.
   ///
@@ -44,7 +44,7 @@ struct LangOptions {
   bool IgnoreUniformIndentation = false;
 };
 
-class ReSTContext {
+class ReSTContext final {
 public:
   LangOptions LangOpts;
   llvm::BumpPtrAllocator Allocator;
@@ -54,7 +54,7 @@ public:
   }
 
   template <typename T, typename It>
-  T *allocateCopy(It Begin, It End) const {
+  T *allocateCopy(It Begin, It End) {
     T *Res =
         static_cast<T *>(allocate(sizeof(T) * (End - Begin), alignof(T)));
     for (unsigned i = 0; Begin != End; ++Begin, ++i)
@@ -63,7 +63,7 @@ public:
   }
 
   template <typename T>
-  MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) const {
+  MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) {
     return MutableArrayRef<T>(allocateCopy<T>(Array.begin(), Array.end()),
                               Array.size());
   }
