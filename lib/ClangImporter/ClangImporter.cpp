@@ -518,6 +518,71 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   return SwiftContext.getIdentifier(nameBuf);
 }
 
+/// Split the given selector piece at the given index, updating
+/// capitalization as required.
+///
+/// \param selector The selector piece.
+/// \param index The index at which to split.
+/// \param buffer Buffer used for scratch space.
+///
+/// \returns a pair of strings \c (before,after), where \c after has
+/// has its capitalization adjusted if necessary.
+static std::pair<StringRef, StringRef>
+splitSelectorPieceAt(StringRef selector, unsigned index,
+                     SmallVectorImpl<char> &buffer) {
+  // If the split point is at the end of the selector, the solution is
+  // trivial.
+  if (selector.str().size() == index) {
+    return { selector, "" };
+  }
+
+  // Split at the index and lowercase the parameter name.
+  return { selector.substr(0, index),
+           camel_case::toLowercaseWord(selector.substr(index), buffer) };
+}
+
+  
+/// Split the first selector piece into a function name and first
+/// parameter name, if possible.
+///
+/// \param selector The selector piece to split.
+/// \param scratch Scratch space to use when forming strings.
+///
+/// \returns a (function name, first parameter name) pair describing
+/// the split. If no split is possible, the function name will be \c
+/// selector and the parameter name will be empty.
+static std::pair<StringRef, StringRef> 
+splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
+  // Get the camelCase words in this selector.
+  auto words = camel_case::getWords(selector);
+  if (words.empty())
+    return { selector, "" };
+
+  // If "init" is the first word, we have an initializer.
+  if (*words.begin() == "init") {
+    return splitSelectorPieceAt(selector, 4, scratch);
+  }
+
+  // Scan words from the back of the selector looking for a
+  // preposition.
+  auto lastPrep = std::find_if(words.rbegin(), words.rend(),
+                               [&](StringRef word) -> bool {
+    return getPrepositionKind(word) != PK_None;
+  });
+
+  // If we found a preposition, split here.
+  if (lastPrep != words.rend()) {
+    if (getPrepositionKind(*lastPrep)) {
+      return splitSelectorPieceAt(selector,
+                                  std::prev(lastPrep.base()).getPosition(),
+                                  scratch);
+    }
+  }
+
+  // Nothing to split.
+  return { selector, "" };
+}
+
 /// Import the given string directly as an identifier, where the empty
 /// string maps to a null identifier.
 static Identifier importNameOrNull(ASTContext &ctx, StringRef name) {
@@ -540,8 +605,8 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     if (!isInitializer || name.size() == 4)
       return importNameOrNull(SwiftContext, name);
 
-    // We have an initializer with no parameters but a name that
-    // contains more than 'init', we synthesize an argument to capture
+    // This is an initializer with no parameters but a name that
+    // contains more than 'init', so synthesize an argument to capture
     // what follows 'init'.
     assert(camel_case::getFirstWord(name).equals("init"));
     llvm::SmallString<16> scratch;
@@ -583,64 +648,6 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   
   return DeclName(SwiftContext, baseName, argumentNames);
 }
-
-/// Split the given selector piece at the given index, updating
-/// capitalization as required.
-///
-/// \param selector The selector piece.
-/// \param index The index at which to split.
-/// \param buffer Buffer used for scratch space.
-///
-/// \returns a pair of strings \c (before,after), where \c after has
-/// has its capitalization adjusted if necessary.
-static std::pair<StringRef, StringRef>
-splitSelectorPieceAt(StringRef selector, unsigned index,
-                     SmallVectorImpl<char> &buffer) {
-  // If the split point is at the end of the selector, the solution is
-  // trivial.
-  if (selector.str().size() == index) {
-    return { selector, "" };
-  }
-
-  // Split at the index and lowercase the parameter name.
-  return { selector.substr(0, index),
-           camel_case::toLowercaseWord(selector.substr(index), buffer) };
-}
-
-std::pair<StringRef, StringRef> 
-ClangImporter::Implementation::splitFirstSelectorPiece(
-                                 StringRef selector,
-                                 SmallVectorImpl<char> &buffer) {
-  // Get the camelCase words in this selector.
-  auto words = camel_case::getWords(selector);
-  if (words.empty())
-    return { selector, "" };
-
-  // If "init" is the first word, we have an initializer.
-  if (*words.begin() == "init") {
-    return splitSelectorPieceAt(selector, 4, buffer);
-  }
-
-  // Scan words from the back of the selector looking for a
-  // preposition.
-  auto lastPrep = std::find_if(words.rbegin(), words.rend(),
-                               [&](StringRef word) -> bool {
-    return getPrepositionKind(word) != PK_None;
-  });
-
-  // If we found a preposition, split here.
-  if (lastPrep != words.rend()) {
-    if (getPrepositionKind(*lastPrep)) {
-      return splitSelectorPieceAt(selector,
-                                  std::prev(lastPrep.base()).getPosition(),
-                                  buffer);
-    }
-  }
-
-  // Nothing to split.
-  return { selector, "" };
-}
-
 
 #pragma mark Name lookup
 void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){

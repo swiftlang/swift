@@ -409,18 +409,6 @@ public:
   /// \param isInitializer Whether this name should be imported as an
   /// initializer.
   DeclName importName(clang::Selector selector, bool isInitializer);
-  
-  /// Split the first selector piece into a function name and first
-  /// parameter name, if possible.
-  ///
-  /// \param selector The selector piece to split.
-  ///
-  /// \returns a (function name, first parameter name) pair describing
-  /// the split. If no split is possible, the function name will be \c
-  /// selector and the parameter name will be empty.
-  std::pair<StringRef, StringRef> splitFirstSelectorPiece(
-                                    StringRef selector,
-                                    SmallVectorImpl<char> &buffer);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
