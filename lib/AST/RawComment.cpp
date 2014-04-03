@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/RawComment.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -251,5 +252,67 @@ StringRef Decl::getBriefComment() const {
 
   Context.setBriefComment(this, Result);
   return Result;
+}
+
+CommentContext::CommentContext() {
+  TheReSTContext.LangOpts.IgnoreUniformIndentation = true;
+}
+
+CommentContext::~CommentContext() {
+  for (auto *FC : FullComments) {
+    FC->~FullComment();
+  }
+}
+
+static bool isFieldNamed(const llvm::rest::Field *F, StringRef Name) {
+  const llvm::rest::TextAndInline *ActualName = F->getName();
+  if (ActualName->isLinePart()) {
+    return ActualName->getLinePart().Text == Name;
+  } else {
+    llvm::rest::LineListRef LL = ActualName->getLines();
+    if (LL.size() != 1)
+      return false;
+    return LL[0].Text.drop_front(LL[0].FirstTextByte) == Name;
+  }
+}
+
+const FullComment::CommentParts &FullComment::getParts() const {
+  if (Parts.hasValue())
+    return Parts.getValue();
+
+  Parts = CommentParts();
+  for (const auto *N : Doc->getChildren()) {
+    if (const auto *FL = dyn_cast<llvm::rest::FieldList>(N)) {
+      for (const auto *F : FL->getChildren()) {
+        if (isFieldNamed(F, "param"))
+          Parts->Params.push_back(F);
+        else if (isFieldNamed(F, "returns"))
+          Parts->Returns.push_back(F);
+        else
+          Parts->MiscTopLevelNodes.push_back(F);
+      }
+    } else {
+      Parts->MiscTopLevelNodes.push_back(N);
+    }
+  }
+  return Parts.getValue();
+}
+
+void *FullComment::operator new(size_t Bytes, llvm::rest::ReSTContext &C,
+                                unsigned Alignment) {
+  return C.Allocator.Allocate(Bytes, Alignment);
+}
+
+FullComment *swift::getFullComment(CommentContext &Context, const Decl *D) {
+  auto RC = D->getRawComment();
+  if (RC.isEmpty())
+    return nullptr;
+
+  PrettyStackTraceDecl StackTrace("parsing comment for", D);
+
+  llvm::rest::SourceManager<SourceLoc> RSM;
+  llvm::rest::LineList LL = toLineList(Context.TheReSTContext, RSM, RC);
+  auto *Doc = llvm::rest::parseDocument(Context.TheReSTContext, LL);
+  return new (Context.TheReSTContext) FullComment(D, Doc);
 }
 
