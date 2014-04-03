@@ -421,19 +421,28 @@ public:
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
   }
-
-  // "Constructors" for attributes that don't have their own base class, since
-  // they are trivial.
-  static DeclAttribute *createFinal(SourceLoc AtLoc, SourceLoc FinalLoc,
-                                    bool isImplicit, ASTContext &C) {
-    return new (C) DeclAttribute(DAK_final, AtLoc, FinalLoc, isImplicit);
-  }
-  static DeclAttribute *createFinal(ASTContext &C) {
-    return createFinal(SourceLoc(), SourceLoc(), true, C);
-  }
-
 };
 
+/// Describes a "simple" declaration attribute that carries no data.
+template<DeclAttrKind Kind>
+class SimpleDeclAttr : public DeclAttribute {
+public:
+  SimpleDeclAttr()
+    : DeclAttribute(Kind, SourceLoc(), SourceLoc(), /*isImplicit=*/true) { }
+
+  SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
+    : DeclAttribute(Kind, AtLoc, NameLoc, /*isImplicit=*/false) { }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == Kind;
+  }
+};
+
+// Declare typedefs for all of the simple declaration attributes.
+#define SIMPLE_DECL_ATTR(NAME, CLASS, OPTIONS) \
+ typedef SimpleDeclAttr<DAK_##NAME> CLASS##Attr;
+#include "swift/AST/Attr.def"
+  
 /// Defines the @asmname attribute.
 class AsmnameAttr : public DeclAttribute {
 public:

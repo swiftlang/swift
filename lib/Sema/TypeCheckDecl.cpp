@@ -1283,7 +1283,7 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
 
   // If the var is marked @final, then so is the getter.
   if (VD->isFinal())
-    Get->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
+    Get->getMutableAttrs().add(new (Ctx) FinalAttr());
 }
 
 
@@ -1316,7 +1316,7 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
     Set->getMutableAttrs().setAttr(AK_transparent, Loc);
 
     if (VD->isFinal())
-      Set->getMutableAttrs().add(DeclAttribute::createFinal(Context));
+      Set->getMutableAttrs().add(new (Context) FinalAttr());
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -1437,7 +1437,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
 
     // Make sure the didSet/willSet accessors are marked @final.
     if (!willSet->isFinal())
-      willSet->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
+      willSet->getMutableAttrs().add(new (Ctx) FinalAttr());
   }
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1464,7 +1464,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
 
     // Make sure the didSet/willSet accessors are marked @final.
     if (!didSet->isFinal())
-      didSet->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
+      didSet->getMutableAttrs().add(new (Ctx) FinalAttr());
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
@@ -1702,11 +1702,9 @@ public:
     // getter and setter as final as well.
     if (VD->isFinal()) {
       if (VD->getGetter() && !VD->getGetter()->isFinal())
-        VD->getGetter()->getMutableAttrs().add(
-                                        DeclAttribute::createFinal(TC.Context));
+        VD->getGetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
       if (VD->getSetter() && !VD->getSetter()->isFinal())
-        VD->getSetter()->getMutableAttrs().add(
-                                               DeclAttribute::createFinal(TC.Context));
+        VD->getSetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
     }
 
   }

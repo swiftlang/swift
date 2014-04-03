@@ -340,8 +340,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_final:
     if (!DiscardAttribute)
-      Attributes.add(DeclAttribute::createFinal(AtLoc, Loc, /*Implicit=*/false,
-                                                Context));
+      Attributes.add(new (Context) FinalAttr(AtLoc, Loc));
     break;
   case DAK_objc: {
     // Unnamed @objc attribute.
