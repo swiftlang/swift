@@ -298,7 +298,7 @@ public:
 
   unsigned size() const { return Lines.size(); }
 
-  LineListRef subList(unsigned StartIndex, unsigned Size);
+  LineListRef subList(unsigned StartIndex, unsigned Size) const;
 
   bool isPreviousLineBlank(unsigned i) const {
     // [ReST/Syntax Details/Whitespace/Blank Lines]
@@ -329,13 +329,13 @@ public:
 class LineListRef {
   friend class LineList;
 
-  LineList &LL;
+  LineList LL;
   unsigned StartIdx;
   unsigned Size;
   Optional<Line> FirstLine;
 
 public:
-  LineListRef(LineList &LL) : LL(LL), StartIdx(0), Size(LL.size()) {}
+  LineListRef(LineList LL) : LL(LL), StartIdx(0), Size(LL.size()) {}
   LineListRef(const LineListRef &LL) = default;
 
   Line &operator[](unsigned i) {
@@ -390,7 +390,7 @@ public:
   bool isFirstLineTruncated() const { return FirstLine.hasValue(); }
 };
 
-inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) {
+inline LineListRef LineList::subList(unsigned StartIndex, unsigned Size) const {
   assert(StartIndex <= Lines.size());
   assert(StartIndex + Size <= Lines.size());
   LineListRef Result(*this);
