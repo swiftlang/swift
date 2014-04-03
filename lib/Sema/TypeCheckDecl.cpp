@@ -3204,7 +3204,9 @@ public:
     }
 
     bool visitFinalAttr(FinalAttr *attr) {
-      // FALSE: Should diagnose this.
+      // FIXME: Customize message to the kind of thing.
+      TC.diagnose(Override, diag::override_final);
+      TC.diagnose(Base, diag::overridden_here);
       return false;
     }
 

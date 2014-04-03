@@ -507,6 +507,8 @@ ERROR(override_mutable_covariant_property,sema_tcd,none,
 ERROR(override_mutable_covariant_subscript,sema_tcd,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
+ERROR(override_final,sema_tcd,none,
+      "declaration overrides a 'final' declaration", ())
 
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
