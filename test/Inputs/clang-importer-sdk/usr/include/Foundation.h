@@ -15,6 +15,8 @@ typedef signed char BOOL;
 @property NSString *nsstringProperty;
 @property BOOL boolProperty;
 
++ (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)count;
+
 @end
 
 @protocol NSCoding
@@ -23,8 +25,12 @@ typedef signed char BOOL;
 @protocol NSSecureCoding <NSCoding>
 @end
 
+@interface NSError : NSObject
+@end
+
 @interface NSString : NSObject <NSSecureCoding>
 - (void)onlyOnNSString;
++ (instancetype)stringWithContentsOfFile:(NSString*)path error:(NSError**)error;
 @end
 
 NSString *NSStringToNSString(NSString *str);

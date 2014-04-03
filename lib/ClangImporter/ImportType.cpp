@@ -137,10 +137,9 @@ namespace {
                                         "CMutableVoidPointer");
       }
       
-      // TODO: Add a new ImportTypeKind for PointerParameter for special
-      // importing behavior of ObjC class pointers.
+      // Import the pointee type as a pointer parameter.
       auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Normal);
+                                         ImportTypeKind::Pointee);
       
       // If we can't represent the pointee in Swift, don't try to use a bridged
       // pointer type.
@@ -151,19 +150,18 @@ namespace {
         // Const pointers map to CConstPointer.
         return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                   "CConstPointer", pointeeType);
-      } else if (!pointeeQualType->isObjCObjectPointerType()) {
+      } else if (pointeeQualType->isObjCObjectPointerType()) {
+        // Mutable pointers to ObjC pointers map to ObjCMutablePointer.
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                             "ObjCMutablePointer", pointeeType);
+      } else {
         // Mutable non-ObjC pointers map to CMutablePointer.
         return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
                                                 "CMutablePointer", pointeeType);
       }
-      // TODO: Import ObjC mutable pointers as ObjCMutablePointer.
-      
-      // We don't know how to import this type specially as a parameter pointer,
-      // so fall back to normal pointer import.
-      return Type();
     }
     
-    Type VisitPointerType(const clang::PointerType *type) {
+    Type VisitPointerType(const clang::PointerType *type) {      
       // FIXME: Function pointer types can be mapped to Swift function types
       // once we have the notion of a "thin" function that does not capture
       // anything.
@@ -199,10 +197,10 @@ namespace {
       // We don't bridge volatile or nontrivial lifetime pointer parameters.
       if (kind == ImportTypeKind::Parameter
           && !pointeeQualType.isVolatileQualified()
-          && !pointeeQualType.hasNonTrivialObjCLifetime())
+          && !pointeeQualType.hasStrongOrWeakObjCLifetime())
         if (Type paramType = importParameterPointerType(type))
           return paramType;
-        
+      
       // Import void* as COpaquePointer.
       // TODO: Map argument pointers to CConstVoidPointer/CMutableVoidPointer
       // based on qualifiers.
@@ -211,7 +209,7 @@ namespace {
       }
       
       auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Normal);
+                                         ImportTypeKind::Pointee);
       
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.
@@ -343,6 +341,15 @@ namespace {
 
       return ParenType::get(Impl.SwiftContext, inner);
     }
+    
+    /// Wrap a type in the Optional type appropriate to the import kind.
+    Type getOptionalType(Type payloadType, ImportTypeKind kind) {
+      // Import pointee types as true Optional.
+      if (kind == ImportTypeKind::Pointee)
+        return OptionalType::get(payloadType);
+      // Otherwise, import as UncheckedOptional.
+      return UncheckedOptionalType::get(payloadType);
+    }
 
     Type VisitTypedefType(const clang::TypedefType *type) {
       // When BOOL is the type of a function parameter or a function
@@ -377,7 +384,7 @@ namespace {
           break;
         }
         if (shouldImportAsOptional(type))
-          mappedType = UncheckedOptionalType::get(mappedType);
+          mappedType = getOptionalType(mappedType, kind);
         return mappedType;
       }
       if (kind == ImportTypeKind::Normal)
@@ -565,7 +572,7 @@ namespace {
       Type result = VisitObjCObjectPointerTypeImpl(type);
       if (!result)
         return result;
-      return UncheckedOptionalType::get(result);
+      return getOptionalType(result, kind);
     }
   };
 }

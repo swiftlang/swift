@@ -88,6 +88,13 @@ enum class ImportTypeKind {
   /// [inout] parameters) and C pointers (which become magic [inout]-able types),
   /// among other things, and enables the conversion of bridged types.
   Parameter,
+  
+  /// \brief Import the type pointed to by a pointer.
+  ///
+  /// This provides special treatment for pointer-to-ObjC-pointer
+  /// types, which get imported as pointers to *checked* optional,
+  /// *Pointer<NSFoo?>, instead of unchecked optional as usual.
+  Pointee,
 
   /// \brief Import the type of an ObjC property.
   ///
