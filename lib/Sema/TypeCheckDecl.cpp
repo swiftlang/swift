@@ -3173,6 +3173,75 @@ public:
     return true;
   }
 
+  /// Attribute visitor that checks how the given attribute should be
+  /// considered when overriding a declaration.
+  class AttributeOverrideChecker
+          : public AttributeVisitor<AttributeOverrideChecker, bool> {
+    TypeChecker &TC;
+    ValueDecl *Base;
+    ValueDecl *Override;
+
+  public:
+    AttributeOverrideChecker(TypeChecker &tc, ValueDecl *base,
+                             ValueDecl *override)
+      : TC(tc), Base(base), Override(override) { }
+
+    /// Deleting this ensures that all attributes are covered by the visitor
+    /// below.
+    bool visitDeclAttribute(DeclAttribute *A) = delete;
+
+#define UNINTERESTING_ATTR(CLASS)                               \
+    bool visit##CLASS##Attr(CLASS##Attr *attr) { return false; }
+
+    UNINTERESTING_ATTR(Asmname)
+
+#undef UNINTERESTING_ATTR
+
+    bool visitAvailabilityAttr(AvailabilityAttr *attr) {
+      // FIXME: Check that this declaration is at least as available as the
+      // one it overrides.
+      return false;
+    }
+
+    bool visitFinalAttr(FinalAttr *attr) {
+      // FALSE: Should diagnose this.
+      return false;
+    }
+
+    bool visitObjCAttr(ObjCAttr *attr) {
+      // If the attribute on the base does not have a name, there's nothing
+      // to check.
+      if (!attr->hasName())
+        return false;
+
+      // If the overriding declaration already has an @objc attribute, check
+      // whether the names are consistent.
+      if (auto overrideAttr = Override->getAttrs().getAttribute<ObjCAttr>()) {
+        if (overrideAttr->hasName()) {
+          // If the names (and kind) match, we're done.
+          if (overrideAttr->getKind() == attr->getKind() &&
+              overrideAttr->getNames() == attr->getNames()) {
+            return false;
+          }
+
+          // The names don't match, which indicates that this is a Swift
+          // override that is not going to be reflected in Objective-C.
+          llvm::SmallString<64> baseScratch, overrideScratch;
+          TC.diagnose(overrideAttr->AtLoc, diag::objc_override_name_mismatch,
+                      overrideAttr->getName(baseScratch),
+                      attr->getName(overrideScratch));
+          TC.diagnose(Base, diag::overridden_here);
+        }
+
+        // Drop the attribute. We'll paste a new one in its place.
+        Override->getMutableAttrs().removeAttribute(overrideAttr);
+      }
+
+      Override->getMutableAttrs().add(attr->clone(TC.Context));
+      return false;
+    }
+  };
+
   /// Record that the \c overriding declarations overrides the \c
   /// overridden declaration.
   ///
@@ -3244,7 +3313,14 @@ public:
     if (base->getAttrs().isUnavailable()) {
       TC.diagnose(override, diag::override_unavailable, override->getName());
     }
-    
+
+    /// Check attributes associated with the base; some may need to merged with
+    /// or checked against attributes in the overriding declaration.
+    AttributeOverrideChecker attrChecker(TC, base, override);
+    for (auto attr : base->getMutableAttrs()) {
+      attrChecker.visit(attr);
+    }
+
     if (auto overridingFunc = dyn_cast<FuncDecl>(override)) {
       overridingFunc->setOverriddenDecl(cast<FuncDecl>(base));
     } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(override)) {
