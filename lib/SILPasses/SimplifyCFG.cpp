@@ -498,7 +498,11 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
         Dests.push_back(S);
     }
     
-    SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
+    if (EI->hasOperand())
+      SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock,
+                                   EI->getOperand());
+    else
+      SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
     SEI->eraseFromParent();
     if (EI->use_empty()) EI->eraseFromParent();
     
