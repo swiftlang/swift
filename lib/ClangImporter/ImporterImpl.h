@@ -609,11 +609,6 @@ public:
   /// \param isNoReturn Whether the function is noreturn.
   /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
-  /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
-  ///   whether the created arg/body patterns are different (selector-style).
-  /// \param selector The Objective-C method selector to use for the names.
-  /// \param kind Controls whether we're building a type for a method that
-  ///        needs special handling.
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
@@ -621,10 +616,7 @@ public:
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
                           SmallVectorImpl<Pattern*> &argPatterns,
-                          SmallVectorImpl<Pattern*> &bodyPatterns,
-                          bool *pHasSelectorStyleSignature = nullptr,
-                          clang::Selector selector = clang::Selector(),
-                          SpecialMethodKind kind = SpecialMethodKind::Regular);
+                          SmallVectorImpl<Pattern*> &bodyPatterns);
 
   /// \brief Import the type of an Objective-C method.
   ///

@@ -583,13 +583,7 @@ Type ClangImporter::Implementation::importFunctionType(
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
        SmallVectorImpl<Pattern*> &argPatterns,
-       SmallVectorImpl<Pattern*> &bodyPatterns,
-       bool *pHasSelectorStyleSignature,
-       clang::Selector selector,
-       SpecialMethodKind kind) {
-
-  if (pHasSelectorStyleSignature)
-    *pHasSelectorStyleSignature = false;
+       SmallVectorImpl<Pattern*> &bodyPatterns) {
 
   // Cannot import variadic types.
   if (isVariadic)
@@ -614,49 +608,13 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Import the parameter type into Swift.
-    Type swiftParamTy;
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
-        paramTy->isObjCIdType()) {
-      swiftParamTy = getNSCopyingType();
-    }
-    if (!swiftParamTy)
-      swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+    Type swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
     if (!swiftParamTy)
       return Type();
 
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
     Identifier name = bodyName;
-    if (index < selector.getNumArgs() &&
-        (index > 0 || 
-         kind == SpecialMethodKind::Constructor || 
-         SplitPrepositions)) {
-      // For parameters after the first, or all parameters in a constructor,
-      // the name comes from the selector.
-      name = importName(selector.getIdentifierInfoForSlot(index));
-
-      // For the first selector piece either in a constructor or when 
-      // For the first selector piece in a constructor, strip off the 'init'
-      // prefer and lowercase the first letter of the remainder (unless the
-      // second letter is also uppercase, in which case we probably have an
-      // acronym anyway).
-      if (index == 0 && !name.empty() &&
-          (kind == SpecialMethodKind::Constructor || 
-           SplitPrepositions)) {
-        StringRef newFuncName, newName;
-        llvm::SmallString<16> buffer;
-        std::tie(newFuncName, newName)
-          = splitFirstSelectorPiece(name.str(), buffer);
-
-        if (kind == SpecialMethodKind::Constructor ||
-            !newFuncName.equals("init")) {
-          if (newName.empty())
-            name = Identifier();
-          else
-            name = SwiftContext.getIdentifier(newName);
-        }
-      }
-    }
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
@@ -704,41 +662,10 @@ Type ClangImporter::Implementation::importFunctionType(
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
     
-    if (argPattern != bodyPattern && pHasSelectorStyleSignature)
-      *pHasSelectorStyleSignature = true;
-
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
     ++index;
-  }
-
-  // If we have a constructor with no parameters and a unary selector that is
-  // not 'init', synthesize a Void parameter with the name following 'init',
-  // suitably modified for a parameter name.
-  if (kind == SpecialMethodKind::Constructor && selector.isUnarySelector() &&
-      params.empty()) {
-    llvm::SmallString<16> buffer;
-    auto name = selector.getIdentifierInfoForSlot(0)->getName();
-    StringRef newName = splitFirstSelectorPiece(name, buffer).second;
-    if (!newName.empty()) {
-      auto name = SwiftContext.getIdentifier(newName);
-      auto type = TupleType::getEmpty(SwiftContext);
-      auto var = new (SwiftContext) VarDecl(/*static*/ false,
-                                            /*IsLet*/ true,
-                                            SourceLoc(), name, type,
-                                            firstClangModule);
-      Pattern *pattern = new (SwiftContext) NamedPattern(var);
-      pattern->setType(type);
-      pattern = new (SwiftContext) TypedPattern(pattern,
-                                                TypeLoc::withoutLoc(type));
-      pattern->setType(type);
-
-      argPatternElts.push_back(TuplePatternElt(pattern));
-      bodyPatternElts.push_back(TuplePatternElt(pattern));
-      swiftArgParams.push_back(TupleTypeElt(type, name));
-      swiftBodyParams.push_back(TupleTypeElt(type, name));
-    }
   }
 
   // Form the parameter tuples.
