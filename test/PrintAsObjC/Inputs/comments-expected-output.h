@@ -4,9 +4,9 @@
 
 
 
-/// Aaa.  A1.  Bbb.
+/// Aaa.  A10.  Bbb.
 SWIFT_CLASS
-@interface A1
+@interface A010
 
 - (void)f0;
 
@@ -52,6 +52,68 @@ SWIFT_CLASS
 
 /// Aaa.  v1.
 @property (nonatomic) NSInteger v1;
+@end
+
+
+SWIFT_CLASS
+@interface A020_BulletList
+
+/// <ul><li><p>Aaa.</p></li><li><p>Bbb.
+/// Ccc.</p></li></ul>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS
+@interface A030_EnumeratedList
+
+/// <ol><li><p>Aaa.</p></li><li><p>Bbb.
+/// Ccc.</p></li></ol>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS
+@interface A040_DefinitionList
+
+/// <dl><dt>Aaa</dt><dd><p>Bbb.</p></dd><dt>Ccc</dt><dd><p>Ddd.</p></dd><dt>Eee : Fff</dt><dd><p>Ggg.</p></dd><dt>``Hhh``</dt><dd><p>Jjj.</p></dd></dl>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS
+@interface A050_FieldList
+
+/// <dl><dt>unknown</dt><dd><p>Aaa.
+/// Bbb.</p></dd></dl>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS
+@interface A060_OptionList
+
+/// -a   Aaa.
+/// -b   Bbb.
+///
+/// <blockquote><p>Ccc.</p></blockquote>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS
+@interface A070_BlockQuote
+
+/// Aaa.
+///
+/// <blockquote><p>Bbb.</p><p>Ccc.</p></blockquote>
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
