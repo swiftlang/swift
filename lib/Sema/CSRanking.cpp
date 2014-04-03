@@ -30,6 +30,31 @@ STATISTIC(NumDiscardedSolutions, "# of solutions discarded");
 void ConstraintSystem::increaseScore(ScoreKind kind) {
   unsigned index = static_cast<unsigned>(kind);
   ++CurrentScore.Data[index];
+
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = getASTContext().TypeCheckerDebug->getStream();
+    if (solverState)
+      log.indent(solverState->depth * 2);
+    log << "(increasing score due to ";
+    switch (kind) {
+    case SK_ForceUnchecked:
+      log << "force of an unchecked optional";
+      break;
+
+    case SK_UserConversion:
+      log << "user conversion";
+      break;
+
+    case SK_FunctionConversion:
+      log << "function conversion";
+      break;
+
+    case SK_NonDefaultLiteral:
+      log << "non-default literal";
+      break;
+    }
+    log << ")\n";
+  }
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
