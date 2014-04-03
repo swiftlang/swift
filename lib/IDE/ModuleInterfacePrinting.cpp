@@ -44,15 +44,19 @@ static const clang::Module *findTopLevelClangModule(const Module *M) {
   return CMU->getClangModule();
 }
 
-void swift::ide::printModuleInterface(Module *M, ASTPrinter &Printer,
+void swift::ide::printModuleInterface(Module *M,
+                                      ModuleTraversalOptions TraversalOptions,
+                                      ASTPrinter &Printer,
                                       const PrintOptions &Options) {
-  printSubmoduleInterface(M, M->Name.str(), Printer, Options);
+  printSubmoduleInterface(M, M->Name.str(), TraversalOptions, Printer, Options);
 }
 
-void swift::ide::printSubmoduleInterface(Module *M,
-                                         ArrayRef<StringRef> FullModuleName,
-                                         ASTPrinter &Printer,
-                                         const PrintOptions &Options) {
+void swift::ide::printSubmoduleInterface(
+       Module *M,
+       ArrayRef<StringRef> FullModuleName,
+       ModuleTraversalOptions TraversalOptions,
+       ASTPrinter &Printer,
+       const PrintOptions &Options) {
   auto AdjustedOptions = Options;
 
   // Don't print empty curly braces while printing the module interface.
@@ -77,7 +81,9 @@ void swift::ide::printSubmoduleInterface(Module *M,
 
   SmallVector<ImportDecl *, 1> ImportDecls;
   SmallVector<Decl *, 1> SwiftDecls;
-  SmallVector<std::pair<Decl *, clang::SourceLocation>, 1> ClangDecls;
+  llvm::DenseMap<const clang::Module *,
+                 SmallVector<std::pair<Decl *, clang::SourceLocation>, 1>>
+    ClangDecls;
 
   // Drop top-level module name.
   FullModuleName = FullModuleName.slice(1);
@@ -91,6 +97,33 @@ void swift::ide::printSubmoduleInterface(Module *M,
     }
   } else {
     assert(FullModuleName.empty());
+  }
+
+  // If we're printing recursively, find all of the submodules to print.
+  if (TraversalOptions) {
+    SmallVector<const clang::Module *, 8> Worklist;
+    SmallPtrSet<const clang::Module *, 8> Visited;
+    Worklist.push_back(InterestingClangModule);
+    Visited.insert(InterestingClangModule);
+    while (!Worklist.empty()) {
+      const clang::Module *CM = Worklist.pop_back_val();
+      if (!(TraversalOptions & ModuleTraversal::VisitHidden) &&
+          !InterestingClangModule->isModuleVisible(CM))
+        continue;
+
+      ClangDecls.insert({ CM, {} });
+
+      // If we're supposed to visit submodules, add them now.
+      if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
+        for (auto Sub = CM->submodule_begin(), SubEnd = CM->submodule_end();
+             Sub != SubEnd; ++Sub) {
+          if (Visited.insert(*Sub))
+            Worklist.push_back(*Sub);
+        }
+      }
+    }
+  } else {
+    ClangDecls.insert({ InterestingClangModule, {} });
   }
 
   // Separate the declarations that we are going to print into different
@@ -107,8 +140,11 @@ void swift::ide::printSubmoduleInterface(Module *M,
       } else {
         Loc = CN.getAsMacro()->getDefinitionLoc();
       }
-      if (Importer.getClangOwningModule(CN) == InterestingClangModule)
-        ClangDecls.push_back({ D, Loc });
+
+      auto *OwningModule = Importer.getClangOwningModule(CN);
+      auto I = ClangDecls.find(OwningModule);
+      if (I != ClangDecls.end())
+        I->second.push_back({ D, Loc });
       continue;
     }
     SwiftDecls.push_back(D);
@@ -116,13 +152,16 @@ void swift::ide::printSubmoduleInterface(Module *M,
 
   auto &ClangSourceManager = Importer.getClangASTContext().getSourceManager();
 
-  // Sort imported declarations in source order.
-  std::sort(ClangDecls.begin(), ClangDecls.end(),
-            [&](std::pair<Decl *, clang::SourceLocation> LHS,
-                std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
-    return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
-                                                        RHS.second);
-  });
+  // Sort imported declarations in source order *within a submodule*.
+  for (auto &P : ClangDecls) {
+    std::sort(P.second.begin(), P.second.end(),
+              [&](std::pair<Decl *, clang::SourceLocation> LHS,
+                  std::pair<Decl *, clang::SourceLocation> RHS)
+              -> bool {
+                return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
+                                                                    RHS.second);
+              });
+  }
 
   // Sort Swift declarations so that we print them in a consistent order.
   std::sort(ImportDecls.begin(), ImportDecls.end(),
@@ -171,8 +210,24 @@ void swift::ide::printSubmoduleInterface(Module *M,
   for (auto *D : ImportDecls)
     PrintDecl(D);
 
-  for (auto DeclAndLoc : ClangDecls)
-    PrintDecl(DeclAndLoc.first);
+  {
+    using ModuleAndName = std::pair<const clang::Module *, std::string>;
+    SmallVector<ModuleAndName, 8> ClangModules;
+    for (auto P : ClangDecls) {
+      ClangModules.push_back({ P.first, P.first->getFullModuleName() });
+    }
+    // Sort modules by name.
+    std::sort(ClangModules.begin(), ClangModules.end(),
+              [](const ModuleAndName &LHS, const ModuleAndName &RHS)
+                -> bool {
+                  return LHS.second < RHS.second;
+              });
+
+    for (auto CM : ClangModules) {
+      for (auto DeclAndLoc : ClangDecls[CM.first])
+        PrintDecl(DeclAndLoc.first);
+    }
+  }
 
   for (auto *D : SwiftDecls)
     PrintDecl(D);

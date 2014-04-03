@@ -14,6 +14,7 @@
 #define SWIFT_IDE_MODULE_INTERFACE_PRINTING_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 
 namespace swift {
 class ASTPrinter;
@@ -21,12 +22,26 @@ class Module;
 struct PrintOptions;
 
 namespace ide {
-void printModuleInterface(Module *M, ASTPrinter &Printer,
-                          const PrintOptions &Options);
+
+/// Flags used when traversing a module for printing.
+enum class ModuleTraversal : unsigned {
+  /// Visit modules even if their contents wouldn't be visible to name lookup.
+  VisitHidden     = 0x01,
+  /// Visit submodules.
+  VisitSubmodules = 0x02
+};
+
+/// Options used to describe the traversal of a module for printing.
+typedef OptionSet<ModuleTraversal> ModuleTraversalOptions;
+
+void printModuleInterface(Module *M,
+                          ModuleTraversalOptions TraversalOptions,
+                          ASTPrinter &Printer, const PrintOptions &Options);
 
 // FIXME: this API should go away when Swift can represent Clang submodules as
 // 'swift::Module *' objects.
 void printSubmoduleInterface(Module *M, ArrayRef<StringRef> FullModuleName,
+                             ModuleTraversalOptions TraversalOptions,
                              ASTPrinter &Printer, const PrintOptions &Options);
 
 } // namespace ide
