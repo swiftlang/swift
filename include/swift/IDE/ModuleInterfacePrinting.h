@@ -28,7 +28,9 @@ enum class ModuleTraversal : unsigned {
   /// Visit modules even if their contents wouldn't be visible to name lookup.
   VisitHidden     = 0x01,
   /// Visit submodules.
-  VisitSubmodules = 0x02
+  VisitSubmodules = 0x02,
+  /// Skip the declarations in a Swift overlay module.
+  SkipOverlay     = 0x04,
 };
 
 /// Options used to describe the traversal of a module for printing.

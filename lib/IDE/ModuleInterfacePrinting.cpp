@@ -229,7 +229,10 @@ void swift::ide::printSubmoduleInterface(
     }
   }
 
-  for (auto *D : SwiftDecls)
-    PrintDecl(D);
+  if (!(TraversalOptions & ModuleTraversal::SkipOverlay) ||
+      !InterestingClangModule) {
+    for (auto *D : SwiftDecls)
+      PrintDecl(D);
+  }
 }
 
