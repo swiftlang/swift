@@ -64,12 +64,13 @@ TYPE_ATTR(opened)
 // - Attribute name.
 // - Options for the attribute, including the declarations the
 //   attribute can appear, and whether duplicates are allowed.
-DECL_ATTR(asmname, OnFunc|OnConstructor|OnDestructor)
+DECL_ATTR(asmname, OnFunc | OnConstructor | OnDestructor)
 DECL_ATTR(availability, OnFunc | OnStruct | OnEnum |
                         OnClass | OnProtocol | OnVar |
                         OnConstructor | OnDestructor |
                         AllowMultipleAttributes)
-DECL_ATTR(objc, OnFunc |OnClass | OnProtocol | OnVar | OnSubscript |
+DECL_ATTR(final, OnFunc | OnVar | OnSubscript)
+DECL_ATTR(objc, OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
                 OnConstructor | OnDestructor)
 
 ATTR(assignment)

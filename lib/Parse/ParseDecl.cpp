@@ -338,6 +338,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DAK_final:
+    if (!DiscardAttribute)
+      Attributes.add(DeclAttribute::createFinal(AtLoc, Loc, /*Implicit=*/false,
+                                                Context));
+    break;
   case DAK_objc: {
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {

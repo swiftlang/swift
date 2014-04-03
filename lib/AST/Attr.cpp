@@ -125,7 +125,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
       Printer << ')';
       break;
     }
-    case DAK_objc: { 
+    case DAK_final:
+      Printer << "@final";
+      break;
+    case DAK_objc: {
       Printer << "@objc";
       
       auto printId = [&](Identifier name) {

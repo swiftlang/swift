@@ -843,15 +843,11 @@ public:
       bool isDynamicallyDispatched = false;
       bool requiresAllocRefDynamic = false;
 
-      // Non-extension class methods and Objective-C methods are dynamically
-      // dispatched.
-      // FIXME: Eventually, extension methods on classes will become
-      // dynamically dispatched as well.
       if (auto fd = dyn_cast<FuncDecl>(afd)) {
-        // FIXME: @final some day.
-        if ((fd->isObjC() || isa<ClassDecl>(fd->getDeclContext())) &&
-            // didSet and willSet methods should always be directly dispatched.
-            !fd->isObservingAccessor()) {
+        // If this declaration is in a class but not marked @final, then it is
+        // always dynamically dispatched.
+        if ((isa<ClassDecl>(fd->getDeclContext()) || fd->isObjC()) &&
+            !fd->isFinal()) {
           isDynamicallyDispatched = true;
           kind = SILDeclRef::Kind::Func;
         }
@@ -2654,24 +2650,28 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                substAccessorType, loc);
   }
 
-  // FIXME: Have a nicely-abstracted way to figure out which kind of
-  // dispatch we're doing.  This should handle @final, etc.
   bool isClassDispatch = false;
   if (auto ctx = decl->getDeclContext()->getDeclaredTypeOfContext())
     isClassDispatch = ctx->getClassOrBoundGenericClass();
-  if (isClassDispatch) {
-    auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
 
-    if (!isSuper)
-      return Callee::forClassMethod(gen, self, constant, substAccessorType,
-                                    loc);
+  // Dispatch in a struct/enum or to an @final method is always direct.
+  if (!isClassDispatch || decl->isFinal())
+    return Callee::forDirect(gen, constant, substAccessorType, loc);
 
-    while (auto *upcast = dyn_cast<UpcastInst>(self))
-      self = upcast->getOperand();
+  // Otherwise, if we have a non-final class dispatch to a normal method,
+  // perform a dynamic dispatch.
+  auto self = selfValue.forceAndPeekRValue(gen).peekScalarValue();
+  if (!isSuper)
+    return Callee::forClassMethod(gen, self, constant, substAccessorType,
+                                  loc);
 
-    if (constant.isForeign)
-      return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
-  }
+  // If this is a "super." dispatch, we either do a direct dispatch in the case
+  // of swift classes or an objc super call.
+  while (auto *upcast = dyn_cast<UpcastInst>(self))
+    self = upcast->getOperand();
+  
+  if (constant.isForeign)
+    return Callee::forSuperMethod(gen, self, constant, substAccessorType,loc);
 
   return Callee::forDirect(gen, constant, substAccessorType, loc);
 }

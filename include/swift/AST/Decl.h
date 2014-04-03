@@ -1644,6 +1644,9 @@ public:
   void setIsObjC(bool value) {
     AttrsAndIsObjC.setInt(value);
   }
+
+  /// Is this declaration marked with the @final attribute?
+  bool isFinal() const { return getAttrs().has(DAK_final); }
   
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;

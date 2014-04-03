@@ -325,6 +325,7 @@ protected:
   }
 
 public:
+
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
   }
@@ -418,8 +419,19 @@ public:
   /// Returns true if multiple instances of an attribute kind
   /// can appear on a delcaration.
   static bool allowMultipleAttributes(DeclAttrKind DK) {
-   return getOptions(DK) & AllowMultipleAttributes;
+    return getOptions(DK) & AllowMultipleAttributes;
   }
+
+  // "Constructors" for attributes that don't have their own base class, since
+  // they are trivial.
+  static DeclAttribute *createFinal(SourceLoc AtLoc, SourceLoc FinalLoc,
+                                    bool isImplicit, ASTContext &C) {
+    return new (C) DeclAttribute(DAK_final, AtLoc, FinalLoc, isImplicit);
+  }
+  static DeclAttribute *createFinal(ASTContext &C) {
+    return createFinal(SourceLoc(), SourceLoc(), true, C);
+  }
+
 };
 
 /// Defines the @asmname attribute.
@@ -657,6 +669,13 @@ public:
   
   bool has(AttrKind A) const {
     return HasAttr[A];
+  }
+
+  bool has(DeclAttrKind DK) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK)
+        return true;
+    return false;
   }
 
   SourceLoc getLoc(AttrKind A) const {

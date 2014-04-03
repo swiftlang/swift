@@ -1280,6 +1280,10 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
   Get->getMutableAttrs().setAttr(AK_transparent, Loc);
+
+  // If the var is marked @final, then so is the getter.
+  if (VD->isFinal())
+    Get->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
 }
 
 
@@ -1310,6 +1314,9 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
 
     // Mark it transparent, there is no user benefit to this actually existing.
     Set->getMutableAttrs().setAttr(AK_transparent, Loc);
+
+    if (VD->isFinal())
+      Set->getMutableAttrs().add(DeclAttribute::createFinal(Context));
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -1419,15 +1426,18 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   //              (declrefexpr(value)))
   // or:
   //   (call_expr (decl_ref_expr(willSet)), (declrefexpr(value)))
-  if (VD->getWillSetFunc()) {
-    Expr *Callee = new (Ctx) DeclRefExpr(VD->getWillSetFunc(),
-                                         SourceLoc(), /*imp*/true);
+  if (auto willSet = VD->getWillSetFunc()) {
+    Expr *Callee = new (Ctx) DeclRefExpr(willSet, SourceLoc(), /*imp*/true);
     auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), /*imp*/true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
+
+    // Make sure the didSet/willSet accessors are marked @final.
+    if (!willSet->isFinal())
+      willSet->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
   }
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1442,18 +1452,21 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   //              (decl_ref_expr(tmp)))
   // or:
   //   (call_expr (decl_ref_expr(didSet)), (decl_ref_expr(tmp)))
-  if (VD->getDidSetFunc()) {
+  if (auto didSet = VD->getDidSetFunc()) {
     auto *OldValueExpr = new (Ctx) DeclRefExpr(OldValue, SourceLoc(),
                                                /*impl*/true);
-    Expr *Callee = new (Ctx) DeclRefExpr(VD->getDidSetFunc(),
-                                         SourceLoc(), /*imp*/true);
+    Expr *Callee = new (Ctx) DeclRefExpr(didSet, SourceLoc(), /*imp*/true);
     if (SelfDecl) {
       auto *SelfDRE = new (Ctx) DeclRefExpr(SelfDecl, SourceLoc(), /*imp*/true);
       Callee = new (Ctx) DotSyntaxCallExpr(Callee, SourceLoc(), SelfDRE);
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
+
+    // Make sure the didSet/willSet accessors are marked @final.
+    if (!didSet->isFinal())
+      didSet->getMutableAttrs().add(DeclAttribute::createFinal(Ctx));
   }
-  
+
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
 }
 
@@ -1684,6 +1697,18 @@ public:
       TC.typeCheckDecl(VD->getGetter(), true);
       TC.typeCheckDecl(VD->getSetter(), true);
     }
+
+    // If this variable is marked @final and has a getter or setter, mark the
+    // getter and setter as final as well.
+    if (VD->isFinal()) {
+      if (VD->getGetter() && !VD->getGetter()->isFinal())
+        VD->getGetter()->getMutableAttrs().add(
+                                        DeclAttribute::createFinal(TC.Context));
+      if (VD->getSetter() && !VD->getSetter()->isFinal())
+        VD->getSetter()->getMutableAttrs().add(
+                                               DeclAttribute::createFinal(TC.Context));
+    }
+
   }
 
 
