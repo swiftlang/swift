@@ -132,7 +132,12 @@ namespace {
       auto pointeeType = Impl.importType(pointeeQualType,
                                          ImportTypeKind::Normal);
       
-      if (!pointeeType || type->isVoidPointerType()) {
+      // If we can't represent the pointee in Swift, don't try to use a bridged
+      // pointer type.
+      if (!pointeeType)
+        return Type();
+      
+      if (type->isVoidPointerType()) {
         // Pointers to unmappable or void types map to C*VoidPointer.
         if (pointeeQualType.isConstQualified())
           return Impl.getNamedSwiftType(Impl.getStdlibModule(),
