@@ -482,9 +482,8 @@ class TypeConverter {
   getConstantContextGenericParams(SILDeclRef constant, bool addCaptures);
   
   // Types converted during foreign bridging.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
-  Optional<CanType> BridgedType##Ty; \
-  Optional<CanType> NativeType##Ty;
+#define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
+  Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
   Optional<NominalTypeDecl*> UnsafePointerDecl;
   Optional<NominalTypeDecl*> CConstPointerDecl;
@@ -699,9 +698,8 @@ public:
                                     GenericParamList *contextParams) const;
 
   /// Known types for bridging.
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
-  CanType get##BridgedType##Type(); \
-  CanType get##NativeType##Type();
+#define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
+  CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
   NominalTypeDecl *getCMutablePointerDecl();
   NominalTypeDecl *getObjCMutablePointerDecl();

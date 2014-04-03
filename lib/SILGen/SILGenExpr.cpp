@@ -3709,9 +3709,28 @@ static bool isUnsafePointerType(SILGenFunction &gen,
     == gen.SGM.Types.getUnsafePointerDecl();
 }
 
+namespace {
+  // A cleanup that emits a fix_lifetime instruction on a value.
+  class FixLifetimeCleanup : public Cleanup {
+    SILValue value;
+  public:
+    FixLifetimeCleanup(SILValue value) : value(value) {}
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.B.emitFixLifetime(l, value);
+    }
+  };
+}
+
 static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
                                                       SILLocation loc,
                                                       ManagedValue v) {
+  // C*Pointer types in Swift contain a strong reference field we need to
+  // lifetime-extend for the duration of the bridge call.
+  {
+    auto copy = v.copyUnmanaged(gen, loc);
+    gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
+  }
+  
   // func convertC*PointerToUnsafePointer<T>(C*Pointer<T>) -> UnsafePointer<T>
   SILValue cToUnsafePointer;
   auto nativeNom = v.getType().getNominalOrBoundGenericNominal();
@@ -3756,6 +3775,79 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
                                /*transparent*/ true);
   
   return ManagedValue::forUnmanaged(ptr);
+}
+
+static ManagedValue
+emitBridgeCVoidPointerToCOpaquePointer(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       ManagedValue v,
+                                       SILDeclRef conversionFn) {
+  // C*Pointer types in Swift contain a strong reference field we need to
+  // lifetime-extend for the duration of the bridge call.
+  {
+    auto copy = v.copyUnmanaged(gen, loc);
+    gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
+  }
+  SILValue conversionFnRef
+    = gen.emitGlobalFunctionRef(loc, conversionFn);
+  
+  SILType resultTy =gen.getLoweredLoadableType(
+                                         gen.SGM.Types.getCOpaquePointerType());
+  
+  SILValue result = gen.B.createApply(loc, conversionFnRef,
+                                      conversionFnRef.getType(),
+                                      resultTy, {}, v.forward(gen));
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+static ManagedValue
+emitBridgeCMutableVoidPointerToCOpaquePointer(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue v) {
+  return emitBridgeCVoidPointerToCOpaquePointer(gen, loc, v,
+                            gen.SGM.getCMutableVoidPointerToCOpaquePointerFn());
+}
+
+static ManagedValue
+emitBridgeCConstVoidPointerToCOpaquePointer(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ManagedValue v) {
+  return emitBridgeCVoidPointerToCOpaquePointer(gen, loc, v,
+                              gen.SGM.getCConstVoidPointerToCOpaquePointerFn());
+}
+
+static ManagedValue
+emitBridgeCOpaquePointerToCVoidPointer(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       ManagedValue v,
+                                       SILDeclRef conversionFn,
+                                       CanType resultTy) {
+  SILValue conversionFnRef
+    = gen.emitGlobalFunctionRef(loc, conversionFn);
+  
+  SILValue result = gen.B.createApply(loc, conversionFnRef,
+                                      conversionFnRef.getType(),
+                                      SILType::getPrimitiveObjectType(resultTy),
+                                      {}, v.forward(gen));
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+static ManagedValue
+emitBridgeCOpaquePointerToCMutableVoidPointer(SILGenFunction &gen,
+                                              SILLocation loc,
+                                              ManagedValue v) {
+  return emitBridgeCOpaquePointerToCVoidPointer(gen, loc, v,
+                            gen.SGM.getCOpaquePointerToCMutableVoidPointerFn(),
+                            gen.SGM.Types.getCMutableVoidPointerType());
+}
+
+static ManagedValue
+emitBridgeCOpaquePointerToCConstVoidPointer(SILGenFunction &gen,
+                                            SILLocation loc,
+                                            ManagedValue v) {
+  return emitBridgeCOpaquePointerToCVoidPointer(gen, loc, v,
+                            gen.SGM.getCOpaquePointerToCConstVoidPointerFn(),
+                            gen.SGM.Types.getCConstVoidPointerType());
 }
 
 static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
@@ -3803,18 +3895,6 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(ptr);
 }
 
-namespace {
-  // A cleanup that emits a fix_lifetime instruction on a value.
-  class FixLifetimeCleanup : public Cleanup {
-    SILValue value;
-  public:
-    FixLifetimeCleanup(SILValue value) : value(value) {}
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.emitFixLifetime(l, value);
-    }
-  };
-}
-
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
                                               SILLocation loc,
                                               ManagedValue v,
@@ -3849,11 +3929,6 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
   // Bridge C*Pointer types to UnsafePointer.
   if (isUnsafePointerType(gen, loweredBridgedTy)
       && isCPointerType(gen, loweredNativeTy)) {
-    // C*Pointer types in Swift contain a strong reference field we need to
-    // lifetime-extend for the duration of the bridge call.
-    auto copy = v.copyUnmanaged(gen, loc);
-    gen.Cleanups.pushCleanup<FixLifetimeCleanup>(copy.getValue());
-    
     return emitBridgeCPointerToUnsafePointer(gen, loc, v);
   }
       

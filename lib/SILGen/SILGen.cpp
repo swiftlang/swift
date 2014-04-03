@@ -146,14 +146,6 @@ static SILType getNSStringTy(SILGenModule &SGM) {
   return SGM.getLoweredType(SGM.Types.getNSStringType());
 }
 
-static SILType getBoolTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getBoolType());
-}
-
-static SILType getObjCBoolTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getObjCBoolType());
-}
-
 SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
                        FOUNDATION_MODULE_NAME, "convertNSStringToString",
@@ -197,19 +189,22 @@ SILDeclRef SILGenModule::getStringToNSStringFn() {
                        getNSStringTy(*this));
 }
 
-SILDeclRef SILGenModule::getBoolToObjCBoolFn() {
-  return getBridgingFn(BoolToObjCBoolFn, *this,
-                       OBJC_MODULE_NAME, "convertBoolToObjCBool",
-                       {getBoolTy(*this)},
-                       getObjCBoolTy(*this));
-}
+#define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
+  SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
+    return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
+                         Module, "convert" #FromTy "To" #ToTy, \
+                         {getLoweredType(Types.get##FromTy##Type())}, \
+                         getLoweredType(Types.get##ToTy##Type())); \
+  }
 
-SILDeclRef SILGenModule::getObjCBoolToBoolFn() {
-  return getBridgingFn(ObjCBoolToBoolFn, *this,
-                       OBJC_MODULE_NAME, "convertObjCBoolToBool",
-                       {getObjCBoolTy(*this)},
-                       getBoolTy(*this));
-}
+STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, Bool, ObjCBool)
+STANDARD_GET_BRIDGING_FN(OBJC_MODULE_NAME, ObjCBool, Bool)
+STANDARD_GET_BRIDGING_FN(STDLIB_NAME, CMutableVoidPointer, COpaquePointer)
+STANDARD_GET_BRIDGING_FN(STDLIB_NAME, CConstVoidPointer, COpaquePointer)
+STANDARD_GET_BRIDGING_FN(STDLIB_NAME, COpaquePointer, CMutableVoidPointer)
+STANDARD_GET_BRIDGING_FN(STDLIB_NAME, COpaquePointer, CConstVoidPointer)
+
+#undef STANDARD_GET_BRIDGING_FN
 
 static SILType getPointerInterfaceType(NominalTypeDecl *pointerDecl) {
   return SILType::getPrimitiveObjectType(pointerDecl->getDeclaredInterfaceType()

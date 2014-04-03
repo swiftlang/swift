@@ -109,14 +109,10 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   return t;
 }
 
-#define BRIDGE_TYPE(BridgedModule,BridgedType, NativeModule,NativeType,Opt) \
+#define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType TypeConverter::get##BridgedType##Type() {         \
     return getKnownType(BridgedType##Ty, M.getASTContext(), \
                         #BridgedModule, #BridgedType);      \
-  }                                                         \
-  CanType TypeConverter::get##NativeType##Type() {          \
-    return getKnownType(NativeType##Ty, M.getASTContext(),  \
-                        #NativeModule, #NativeType);        \
   }
 #include "swift/SIL/BridgedTypes.def"
 

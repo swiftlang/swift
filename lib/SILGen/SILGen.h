@@ -83,6 +83,10 @@ public:
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
+  Optional<SILDeclRef> CMutableVoidPointerToCOpaquePointerFn;
+  Optional<SILDeclRef> CConstVoidPointerToCOpaquePointerFn;
+  Optional<SILDeclRef> COpaquePointerToCMutableVoidPointerFn;
+  Optional<SILDeclRef> COpaquePointerToCConstVoidPointerFn;
   Optional<SILDeclRef> StringDefaultInitFn;
   Optional<SILDeclRef> CConstPointerToUnsafePointerFn;
   Optional<SILDeclRef> CMutablePointerToUnsafePointerFn;
@@ -257,9 +261,13 @@ public:
   SILDeclRef getObjCMutablePointerToUnsafePointerFn();
   SILDeclRef getCMutablePointerToUnsafePointerFn();
   SILDeclRef getCConstPointerToUnsafePointerFn();
+  SILDeclRef getCMutableVoidPointerToCOpaquePointerFn();
+  SILDeclRef getCConstVoidPointerToCOpaquePointerFn();
   SILDeclRef getUnsafePointerToObjCMutablePointerFn();
   SILDeclRef getUnsafePointerToCMutablePointerFn();
   SILDeclRef getUnsafePointerToCConstPointerFn();
+  SILDeclRef getCOpaquePointerToCMutableVoidPointerFn();
+  SILDeclRef getCOpaquePointerToCConstVoidPointerFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

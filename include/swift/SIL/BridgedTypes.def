@@ -13,6 +13,10 @@
 // This file defines the database of C and Objective-C types that require
 // implicit conversions to bridge to native Swift types.
 //
+// BRIDGING_KNOWN_TYPE(MODULE, TYPE)
+//  - MODULE is the name of the module into which the type is imported.
+//  - TYPE is the name of the type.
+//
 // BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,
 //             NATIVE_MODULE, NATIVE_TYPE,
 //             OPTIONAL_IS_BRIDGED)
@@ -26,8 +30,27 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef BRIDGING_KNOWN_TYPE
+#define BRIDGING_KNOWN_TYPE(module, type)
+#endif
+
+#ifndef BRIDGE_TYPE
+#define BRIDGE_TYPE(bmodule, btype, nmodule, ntype, opt)
+#endif
+
+BRIDGING_KNOWN_TYPE(Swift, CMutableVoidPointer)
+BRIDGING_KNOWN_TYPE(Swift, CConstVoidPointer)
+BRIDGING_KNOWN_TYPE(Swift, COpaquePointer)
+BRIDGING_KNOWN_TYPE(Foundation, NSString)
+BRIDGING_KNOWN_TYPE(Swift, String)
+BRIDGING_KNOWN_TYPE(ObjectiveC, ObjCBool)
+BRIDGING_KNOWN_TYPE(Swift, Bool)
+
+BRIDGE_TYPE(Swift,COpaquePointer, Swift,CMutableVoidPointer, false)
+BRIDGE_TYPE(Swift,COpaquePointer, Swift,CConstVoidPointer, false)
 BRIDGE_TYPE(Foundation,NSString, Swift,String,  true)
 BRIDGE_TYPE(ObjectiveC,ObjCBool, Swift,Bool,    false)
 
+#undef BRIDGING_KNOWN_TYPE
 #undef BRIDGE_TYPE
 
