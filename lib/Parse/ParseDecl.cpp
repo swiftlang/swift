@@ -200,11 +200,110 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   SourceRange AttrRange;
 
   switch (DK) {
-    case DAK_Count:
-      llvm_unreachable("DAK_Count should not appear in parsing switch");
-    case DAK_asmname: {
-      if (!consumeIf(tok::l_paren)) {
-        diagnose(Loc, diag::attr_expected_lparen, AttrName);
+  case DAK_Count:
+    llvm_unreachable("DAK_Count should not appear in parsing switch");
+  case DAK_asmname: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+
+    StringRef AsmName =
+      getStringLiteralIfNotInterpolated(*this, Loc, Tok, "asmname");
+
+    if (!AsmName.empty())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+
+    consumeToken(tok::string_literal);
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName);
+      return false;
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange,
+                                               /*Implicit=*/false));
+
+    break;
+  }
+  case DAK_availability: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName);
+      return false;
+    }
+
+    // platform:
+    //   *
+    //   identifier
+
+    StringRef Platform;
+
+    if (Tok.is(tok::identifier)) {
+      // FIXME: This is a hard coded list probably doesn't belong
+      // here.  Putting here now for bringup.
+      bool IsValid =
+        llvm::StringSwitch<bool>(Tok.getText())
+          .Case("ios", true)
+          .Case("macosx", true)
+          .Case("ios_app_extension", true)
+          .Case("macosx_app_extension", true)
+          .Default(false);
+      if (!IsValid) {
+        diagnose(Loc, diag::attr_availability_unknown_platform,
+                 Tok.getText(), AttrName)
+          .highlight(SourceRange(Tok.getLoc()));
+        return false;
+      }
+      Platform = Tok.getText();
+    }
+    else if (!(Tok.isAnyOperator() && Tok.getText() == "*")) {
+      diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
+        .highlight(SourceRange(Tok.getLoc()));
+      return false;
+    }
+
+    consumeToken();
+
+    // Parse the kind, looking for 'unavailable'.  This needs to be
+    // relaxed later, but this is strict now for bringup.
+
+    if (!consumeIf(tok::comma)) {
+      diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName);
+      return false;
+    }
+
+    if (!Tok.is(tok::identifier) || Tok.getText() != "unavailable") {
+      diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
+               AttrName)
+        .highlight(SourceRange(Tok.getLoc()));
+      return false;
+    }
+
+    consumeToken();
+
+    StringRef Message;
+
+    if (consumeIf(tok::comma)) {
+      if (!Tok.is(tok::identifier) || Tok.getText() != "message") {
+        diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
+                 AttrName)
+        .highlight(SourceRange(Tok.getLoc()));
+        return false;
+      }
+
+      consumeToken();
+
+      if (!consumeIf(tok::equal)) {
+        diagnose(Tok.getLoc(), diag::attr_availability_expected_equal,
+                 AttrName, "message");
         return false;
       }
 
@@ -213,230 +312,131 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         return false;
       }
 
-      StringRef AsmName =
-        getStringLiteralIfNotInterpolated(*this, Loc, Tok, "asmname");
+      Message =
+        getStringLiteralIfNotInterpolated(*this, Loc, Tok, "message");
 
-      if (!AsmName.empty())
-        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-      else
-        DiscardAttribute = true;
+      // FIXME: an empty message is still possible if parsing was valid.
+      // We need to updategetStringLiteralIfNotInterpolated().
+      if (Message.empty())
+        return false;
 
       consumeToken(tok::string_literal);
 
-      if (!consumeIf(tok::r_paren)) {
-        diagnose(Loc, diag::attr_expected_rparen, AttrName);
-        return false;
-      }
+    }
 
-      if (!DiscardAttribute)
-        Attributes.add(new (Context) AsmnameAttr(AsmName, AtLoc, AttrRange,
-                                                 /*Implicit=*/false));
+    SourceRange R(Loc, Tok.getLoc());
 
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName);
+      return false;
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context)
+                     AvailabilityAttr(AtLoc, R, Platform, Message, true,
+                                      /*Implicit=*/false));
+    break;
+  }
+
+  case DAK_objc: {
+    // Unnamed @objc attribute.
+    if (Tok.isNot(tok::l_paren)) {
+      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
       break;
     }
-    case DAK_availability: {
-      if (!consumeIf(tok::l_paren)) {
-        diagnose(Loc, diag::attr_expected_lparen, AttrName);
-        return false;
+
+    // Parse the leading '('.
+    SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+    // Parse the names, with trailing colons (if there are present).
+    SmallVector<Identifier, 4> Names;
+    SmallVector<SourceLoc, 4> NameLocs;
+    bool sawColon = false;
+    while (true) {
+      // Empty selector piece.
+      if (Tok.is(tok::colon)) {
+        Names.push_back(Identifier());
+        NameLocs.push_back(Tok.getLoc());
+        sawColon = true;
+        consumeToken();
+        continue;
       }
 
-      // platform:
-      //   *
-      //   identifier
-
-      StringRef Platform;
-
-      if (Tok.is(tok::identifier)) {
-        // FIXME: This is a hard coded list probably doesn't belong
-        // here.  Putting here now for bringup.
-        bool IsValid =
-          llvm::StringSwitch<bool>(Tok.getText())
-            .Case("ios", true)
-            .Case("macosx", true)
-            .Case("ios_app_extension", true)
-            .Case("macosx_app_extension", true)
-            .Default(false);
-        if (!IsValid) {
-          diagnose(Loc, diag::attr_availability_unknown_platform,
-                   Tok.getText(), AttrName)
-            .highlight(SourceRange(Tok.getLoc()));
-          return false;
-        }
-        Platform = Tok.getText();
-      }
-      else if (!(Tok.isAnyOperator() && Tok.getText() == "*")) {
-        diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
-          .highlight(SourceRange(Tok.getLoc()));
-        return false;
-      }
-
-      consumeToken();
-
-      // Parse the kind, looking for 'unavailable'.  This needs to be
-      // relaxed later, but this is strict now for bringup.
-
-      if (!consumeIf(tok::comma)) {
-        diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName);
-        return false;
-      }
-
-      if (!Tok.is(tok::identifier) || Tok.getText() != "unavailable") {
-        diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
-                 AttrName)
-          .highlight(SourceRange(Tok.getLoc()));
-        return false;
-      }
-
-      consumeToken();
-
-      StringRef Message;
-
-      if (consumeIf(tok::comma)) {
-        if (!Tok.is(tok::identifier) || Tok.getText() != "message") {
-          diagnose(Tok.getLoc(), diag::attr_availability_expected_option,
-                   AttrName)
-          .highlight(SourceRange(Tok.getLoc()));
-          return false;
-        }
-
+      // Name.
+      if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+        Names.push_back(Context.getIdentifier(Tok.getText()));
+        NameLocs.push_back(Tok.getLoc());
         consumeToken();
 
-        if (!consumeIf(tok::equal)) {
-          diagnose(Tok.getLoc(), diag::attr_availability_expected_equal,
-                   AttrName, "message");
-          return false;
-        }
-
-        if (Tok.isNot(tok::string_literal)) {
-          diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-          return false;
-        }
-
-        Message =
-          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "message");
-
-        // FIXME: an empty message is still possible if parsing was valid.
-        // We need to updategetStringLiteralIfNotInterpolated().
-        if (Message.empty())
-          return false;
-
-        consumeToken(tok::string_literal);
-
-      }
-
-      SourceRange R(Loc, Tok.getLoc());
-
-      if (!consumeIf(tok::r_paren)) {
-        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName);
-        return false;
-      }
-
-      if (!DiscardAttribute)
-        Attributes.add(new (Context)
-                       AvailabilityAttr(AtLoc, R, Platform, Message, true,
-                                        /*Implicit=*/false));
-      break;
-    }
-
-    case DAK_objc: {
-      // Unnamed @objc attribute.
-      if (Tok.isNot(tok::l_paren)) {
-        Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
-        break;
-      }
-
-      // Parse the leading '('.
-      SourceLoc LParenLoc = consumeToken(tok::l_paren);
-
-      // Parse the names, with trailing colons (if there are present).
-      SmallVector<Identifier, 4> Names;
-      SmallVector<SourceLoc, 4> NameLocs;
-      bool sawColon = false;
-      while (true) {
-        // Empty selector piece.
+        // If we have a colon, consume it.
         if (Tok.is(tok::colon)) {
-          Names.push_back(Identifier());
-          NameLocs.push_back(Tok.getLoc());
+          consumeToken();
           sawColon = true;
-          consumeToken();
           continue;
-        }
-
-        // Name.
-        if (Tok.is(tok::identifier) || Tok.isKeyword()) {
-          Names.push_back(Context.getIdentifier(Tok.getText()));
-          NameLocs.push_back(Tok.getLoc());
-          consumeToken();
-
-          // If we have a colon, consume it.
-          if (Tok.is(tok::colon)) {
-            consumeToken();
-            sawColon = true;
-            continue;
-          } 
-          
-          // If we see a closing parentheses, we're done.
-          if (Tok.is(tok::r_paren)) {
-            // If we saw more than one identifier, there's a ':'
-            // missing here. Complain and pretend we saw it.
-            if (Names.size() > 1) {
-              SourceLoc afterLast
-                = Lexer::getLocForEndOfToken(Context.SourceMgr, 
-                                             NameLocs.back());
-              diagnose(Tok, diag::attr_objc_missing_colon)
-                .fixItInsert(afterLast, ":");
-              sawColon = true;
-            }
-
-            break;
-          }
-
-          // If we see another identifier or keyword, complain about
-          // the missing colon and keep going.
-          if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+        } 
+        
+        // If we see a closing parentheses, we're done.
+        if (Tok.is(tok::r_paren)) {
+          // If we saw more than one identifier, there's a ':'
+          // missing here. Complain and pretend we saw it.
+          if (Names.size() > 1) {
             SourceLoc afterLast
-              = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
+              = Lexer::getLocForEndOfToken(Context.SourceMgr, 
+                                           NameLocs.back());
             diagnose(Tok, diag::attr_objc_missing_colon)
               .fixItInsert(afterLast, ":");
             sawColon = true;
-            continue;
           }
 
-          // We don't know what happened. Break out.
           break;
         }
 
+        // If we see another identifier or keyword, complain about
+        // the missing colon and keep going.
+        if (Tok.is(tok::identifier) || Tok.isKeyword()) {
+          SourceLoc afterLast
+            = Lexer::getLocForEndOfToken(Context.SourceMgr, NameLocs.back());
+          diagnose(Tok, diag::attr_objc_missing_colon)
+            .fixItInsert(afterLast, ":");
+          sawColon = true;
+          continue;
+        }
+
+        // We don't know what happened. Break out.
         break;
       }
-      
-      // Parse the matching ')'.
-      SourceLoc RParenLoc;
-      bool Invalid = false;
-      if (parseMatchingToken(tok::r_paren, RParenLoc, 
-                             diag::attr_objc_expected_rparen, LParenLoc)) {
-        RParenLoc = Tok.getLoc();
-        Invalid = true;
-      }
 
-      if (Names.empty()) {
-        // When there are no names, recover as if there were no parentheses.
-        if (!Invalid)
-          diagnose(LParenLoc, diag::attr_objc_empty_name);
-        Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
-      } else if (!sawColon) {
-        // When we didn't see a colon, this is a nullary name.
-        assert(Names.size() == 1 && "Forgot to set sawColon?");
-        Attributes.add(ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
-                                               NameLocs.front(), Names.front(),
-                                               RParenLoc));
-      } else {
-        // When we did see a colon, this is a selector.
-        Attributes.add(ObjCAttr::createSelector(Context, AtLoc, Loc,
-                                                LParenLoc, NameLocs, Names,
-                                                RParenLoc));
-      }
       break;
     }
+    
+    // Parse the matching ')'.
+    SourceLoc RParenLoc;
+    bool Invalid = false;
+    if (parseMatchingToken(tok::r_paren, RParenLoc, 
+                           diag::attr_objc_expected_rparen, LParenLoc)) {
+      RParenLoc = Tok.getLoc();
+      Invalid = true;
+    }
+
+    if (Names.empty()) {
+      // When there are no names, recover as if there were no parentheses.
+      if (!Invalid)
+        diagnose(LParenLoc, diag::attr_objc_empty_name);
+      Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+    } else if (!sawColon) {
+      // When we didn't see a colon, this is a nullary name.
+      assert(Names.size() == 1 && "Forgot to set sawColon?");
+      Attributes.add(ObjCAttr::createNullary(Context, AtLoc, Loc, LParenLoc,
+                                             NameLocs.front(), Names.front(),
+                                             RParenLoc));
+    } else {
+      // When we did see a colon, this is a selector.
+      Attributes.add(ObjCAttr::createSelector(Context, AtLoc, Loc,
+                                              LParenLoc, NameLocs, Names,
+                                              RParenLoc));
+    }
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
