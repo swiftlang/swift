@@ -255,7 +255,7 @@ struct Line {
   SourceRange Range;
   ColumnNum FirstTextCol;
   unsigned FirstTextByte : 10;
-  unsigned ClassificationComputed : 1;
+  mutable unsigned ClassificationComputed : 1;
 
 private:
   mutable detail::LineClassification Classification;
@@ -267,6 +267,7 @@ public:
     if (ClassificationComputed)
       return Classification;
     computeClassification();
+    ClassificationComputed = true;
     return Classification;
   }
 
