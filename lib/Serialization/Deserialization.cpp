@@ -1683,7 +1683,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      var->getMutableAttrs().add(DeclAttribute::createFinal(ctx));
+      var->getMutableAttrs().add(new (ctx) FinalAttr());
 
     if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
       var->setOverriddenDecl(overridden);
@@ -1842,7 +1842,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      fn->getMutableAttrs().add(DeclAttribute::createFinal(ctx));
+      fn->getMutableAttrs().add(new (ctx) FinalAttr());
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);
@@ -2199,7 +2199,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      subscript->getMutableAttrs().add(DeclAttribute::createFinal(ctx));
+      subscript->getMutableAttrs().add(new (ctx) FinalAttr());
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
       subscript->setOverriddenDecl(overridden);
       subscript->getMutableAttrs().setAttr(AK_override, SourceLoc());
