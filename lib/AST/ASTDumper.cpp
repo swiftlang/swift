@@ -396,6 +396,9 @@ namespace {
         OS << " override=";
         Overridden->dumpRef(OS);
       }
+
+      if (VD->isFinal())
+        OS << " final";
     }
 
     void visitSourceFile(const SourceFile &SF) {

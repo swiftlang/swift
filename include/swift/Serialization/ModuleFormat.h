@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 41;
+const uint16_t VERSION_MINOR = 42;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -659,7 +659,8 @@ namespace decls_block {
     BCFixed<1>,   // IBOutlet?
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
-    BCFixed<1>,   // isVal?
+    BCFixed<1>,   // isLet?
+    BCFixed<1>,   // isFinal?
     VarDeclStorageKindField,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type
@@ -684,6 +685,7 @@ namespace decls_block {
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // optional?
+    BCFixed<1>,   // final?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type
@@ -745,6 +747,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // optional?
+    BCFixed<1>,  // final?
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
     TypeIDField, // interface type
