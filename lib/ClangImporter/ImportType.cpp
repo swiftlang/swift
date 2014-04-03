@@ -127,16 +127,6 @@ namespace {
     
     Type importParameterPointerType(const clang::PointerType *type) {
       auto pointeeQualType = type->getPointeeType();
-      // TODO: Add a new ImportTypeKind for PointerParameter for special
-      // importing behavior of ObjC class pointers.
-      auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Normal);
-      
-      // If we can't represent the pointee in Swift, don't try to use a bridged
-      // pointer type.
-      if (!pointeeType)
-        return Type();
-      
       if (type->isVoidPointerType()) {
         // Pointers to unmappable or void types map to C*VoidPointer.
         if (pointeeQualType.isConstQualified())
@@ -146,6 +136,16 @@ namespace {
           return Impl.getNamedSwiftType(Impl.getStdlibModule(),
                                         "CMutableVoidPointer");
       }
+      
+      // TODO: Add a new ImportTypeKind for PointerParameter for special
+      // importing behavior of ObjC class pointers.
+      auto pointeeType = Impl.importType(pointeeQualType,
+                                         ImportTypeKind::Normal);
+      
+      // If we can't represent the pointee in Swift, don't try to use a bridged
+      // pointer type.
+      if (!pointeeType)
+        return Type();
       
       if (pointeeQualType.isConstQualified()) {
         // Const pointers map to CConstPointer.
