@@ -173,11 +173,11 @@ void DeclAttribute::print(llvm::raw_ostream &OS) const {
 
 unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
-    case DAK_Count:
-      llvm_unreachable("getOptions needs a valid attribute");
-      break;
-#define DECL_ATTR(NAME, OPTIONS)\
-case DAK_##NAME: return OPTIONS;
+  case DAK_Count:
+    llvm_unreachable("getOptions needs a valid attribute");
+    break;
+#define DECL_ATTR(NAME, CLASS, OPTIONS)\
+  case DAK_##NAME: return OPTIONS;
 #include "swift/AST/Attr.def"
   }
   return 0;

@@ -135,7 +135,7 @@ enum AttrKind {
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
 enum DeclAttrKind : unsigned {
-#define DECL_ATTR(X, Y) DAK_##X,
+#define DECL_ATTR(NAME, CLASS, OPTIONS) DAK_##NAME,
 #include "swift/AST/Attr.def"
   DAK_Count
 };

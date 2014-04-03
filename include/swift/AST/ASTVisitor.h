@@ -34,6 +34,7 @@ template<typename ImplClass,
          typename DeclRetTy = void,
          typename PatternRetTy = void,
          typename TypeReprRetTy = void,
+         typename AttributeRetTy = void,
          typename... Args>
 class ASTVisitor {
 public:
@@ -137,29 +138,58 @@ public:
   }
 #define ABSTRACT_TYPEREPR(CLASS, PARENT) TYPEREPR(CLASS, PARENT)
 #include "swift/AST/TypeReprNodes.def"
+
+  AttributeRetTy visit(DeclAttribute *A, Args... AA) {
+    switch (A->getKind()) {
+#define DECL_ATTR(NAME, CLASS, OPTIONS)                           \
+    case DAK_##NAME:                                              \
+      return static_cast<ImplClass*>(this)                        \
+               ->visit##CLASS##Attr(static_cast<CLASS##Attr*>(A), \
+                                    ::std::forward<Args>(AA)...);
+#include "swift/AST/Attr.def"
+
+    case DAK_Count:
+      llvm_unreachable("Not an attribute kind");
+    }
+  }
+
+  AttributeRetTy visitDeclAttribute(DeclAttribute *A, Args... AA) {
+    return AttributeRetTy();
+  }
+
+#define DECL_ATTR(NAME,CLASS,OPTIONS) \
+  AttributeRetTy visit##CLASS##Attr(CLASS##Attr *A, Args... AA) { \
+    return static_cast<ImplClass*>(this)->visitDeclAttribute(       \
+             A, ::std::forward<Args>(AA)...);                       \
+  }
+#include "swift/AST/Attr.def"
 };
   
   
 template<typename ImplClass, typename ExprRetTy = void, typename... Args>
 using ExprVisitor = ASTVisitor<ImplClass, ExprRetTy, void, void, void, void,
-                               Args...>;
+                               void, Args...>;
 
 template<typename ImplClass, typename StmtRetTy = void, typename... Args>
 using StmtVisitor = ASTVisitor<ImplClass, void, StmtRetTy, void, void, void,
-                               Args...>;
+                               void, Args...>;
 
 template<typename ImplClass, typename DeclRetTy = void, typename... Args>
 using DeclVisitor = ASTVisitor<ImplClass, void, void, DeclRetTy, void, void,
-                               Args...>;
+                               void, Args...>;
 
 template<typename ImplClass, typename PatternRetTy = void, typename... Args>
 using PatternVisitor = ASTVisitor<ImplClass, void,void,void, PatternRetTy, void,
-                                  Args...>;
+                                  void, Args...>;
 
 template<typename ImplClass, typename TypeReprRetTy = void, typename... Args>
 using TypeReprVisitor = ASTVisitor<ImplClass, void,void,void,void,TypeReprRetTy,
-                                  Args...>;
+                                   void, Args...>;
+
+template<typename ImplClass, typename AttributeRetTy = void, typename... Args>
+using AttributeVisitor = ASTVisitor<ImplClass, void,void,void,void,void,
+                                    AttributeRetTy, Args...>;
 
 } // end namespace swift
-  
+
 #endif
