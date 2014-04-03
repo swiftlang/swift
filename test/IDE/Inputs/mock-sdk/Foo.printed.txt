@@ -62,10 +62,10 @@ typealias FooTypedef1 = CInt
 var fooIntVar: CInt
 
 /// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(a: CInt) -> CInt
+func fooFunc1(_: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
-func fooFunc3(a: CInt, b: CFloat, c: CDouble, d: CMutablePointer<CInt>) -> CInt
-func fooFuncWithBlock(blk: @objc_block (CFloat) -> CInt)
+func fooFunc3(_: CInt, _: CFloat, _: CDouble, _: CMutablePointer<CInt>) -> CInt
+func fooFuncWithBlock(_: @objc_block (CFloat) -> CInt)
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -101,7 +101,7 @@ func fooFuncWithComment4()
 func fooFuncWithComment5()
 
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(a: CInt) -> CInt
+func redeclaredInMultipleModulesFunc1(_: CInt) -> CInt
 
 /// Aaa.  FooProtocolBase.  Bbb.
 @objc protocol FooProtocolBase {

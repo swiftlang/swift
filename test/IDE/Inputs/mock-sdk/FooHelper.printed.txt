@@ -1,5 +1,5 @@
 import FooHelper.FooHelperExplicit
 @exported import FooHelper.FooHelperSub
-func fooHelperFunc1(a: CInt) -> CInt
+func fooHelperFunc1(_: CInt) -> CInt
 var FooHelperUnnamedEnumeratorA1: Int { get }
 var FooHelperUnnamedEnumeratorA2: Int { get }

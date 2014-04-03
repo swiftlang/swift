@@ -10,7 +10,7 @@ float cfunc4();
 
 void exit(int);
 
-double pow(double, double);
+double pow(double x, double y);
 
 int puts(const char *);
 

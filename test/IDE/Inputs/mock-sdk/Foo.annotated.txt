@@ -62,10 +62,10 @@ typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
 var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
 
 <decl>/// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func fooFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl>func fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl>func fooFuncWithBlock(blk: @objc_block (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
+<decl>func fooFunc3(_: <ref:TypeAlias>CInt</ref>, _: <ref:TypeAlias>CFloat</ref>, _: <ref:TypeAlias>CDouble</ref>, _: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl>func fooFuncWithBlock(_: @objc_block (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
 
 <decl>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -101,7 +101,7 @@ func fooFuncWithComment4()</decl>
 func fooFuncWithComment5()</decl>
 
 <decl>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 
 <decl>/// Aaa.  FooProtocolBase.  Bbb.
 @objc protocol FooProtocolBase {

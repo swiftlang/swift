@@ -614,7 +614,9 @@ Type ClangImporter::Implementation::importFunctionType(
 
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param->getDeclName());
-    Identifier name = bodyName;
+
+    // Note: C functions never have argument names.
+    Identifier name;
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
