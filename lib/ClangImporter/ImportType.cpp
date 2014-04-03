@@ -124,7 +124,40 @@ namespace {
       // FIXME: Implement once Complex is in the library.
       return Type();
     }
-
+    
+    Type importParameterPointerType(const clang::PointerType *type) {
+      auto pointeeQualType = type->getPointeeType();
+      // TODO: Add a new ImportTypeKind for PointerParameter for special
+      // importing behavior of ObjC class pointers.
+      auto pointeeType = Impl.importType(pointeeQualType,
+                                         ImportTypeKind::Normal);
+      
+      if (!pointeeType || type->isVoidPointerType()) {
+        // Pointers to unmappable or void types map to C*VoidPointer.
+        if (pointeeQualType.isConstQualified())
+          return Impl.getNamedSwiftType(Impl.getStdlibModule(),
+                                        "CConstVoidPointer");
+        else
+          return Impl.getNamedSwiftType(Impl.getStdlibModule(),
+                                        "CMutableVoidPointer");
+      }
+      
+      if (pointeeQualType.isConstQualified()) {
+        // Const pointers map to CConstPointer.
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                  "CConstPointer", pointeeType);
+      } else if (!pointeeQualType->isObjCObjectPointerType()) {
+        // Mutable non-ObjC pointers map to CMutablePointer.
+        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                                "CMutablePointer", pointeeType);
+      }
+      // TODO: Import ObjC mutable pointers as ObjCMutablePointer.
+      
+      // We don't know how to import this type specially as a parameter pointer,
+      // so fall back to normal pointer import.
+      return Type();
+    }
+    
     Type VisitPointerType(const clang::PointerType *type) {
       // FIXME: Function pointer types can be mapped to Swift function types
       // once we have the notion of a "thin" function that does not capture
@@ -140,13 +173,6 @@ namespace {
         return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CString");
       }
       
-      // Import void* as COpaquePointer.
-      // TODO: Map argument pointers to CConstVoidPointer/CMutableVoidPointer
-      // based on qualifiers.
-      if (type->isVoidPointerType()) {
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
-      }
-
       // Special case for NSZone*, which has its own Swift wrapper.
       if (auto pointee = type->getPointeeType()->getAs<clang::TypedefType>()) {
         const clang::RecordType *pointeeStruct = pointee->getAsStructureType();
@@ -163,31 +189,29 @@ namespace {
       // All other C pointers to concrete types map to UnsafePointer<T> or, if
       // in parameter position, to bridged pointer types.
       auto pointeeQualType = type->getPointeeType();
-      auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Normal);
-      // If the pointed-to type is unrepresentable in Swift, import as
-      // COpaquePointer.
-      // FIXME: Should use something with a stronger type.
-      // FIXME: Should use the bridged C*VoidPointer types in argument position.
-      if (!pointeeType)
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
       
       // Pointer parameters map to the bridged argument pointer types.
       // We don't bridge volatile or nontrivial lifetime pointer parameters.
       if (kind == ImportTypeKind::Parameter
           && !pointeeQualType.isVolatileQualified()
-          && !pointeeQualType.hasNonTrivialObjCLifetime()) {
-        if (pointeeQualType.isConstQualified()) {
-          // Const pointers map to CConstPointer.
-          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                "CConstPointer", pointeeType);
-        } else if (!type->getPointeeType()->isObjCObjectPointerType()) {
-          // Mutable non-ObjC pointers map to CMutablePointer.
-          return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                "CMutablePointer", pointeeType);
-        }
-        // TODO: Map pointer-to-ObjC-pointer parameters to ObjCMutablePointer.
+          && !pointeeQualType.hasNonTrivialObjCLifetime())
+        if (Type paramType = importParameterPointerType(type))
+          return paramType;
+        
+      // Import void* as COpaquePointer.
+      // TODO: Map argument pointers to CConstVoidPointer/CMutableVoidPointer
+      // based on qualifiers.
+      if (type->isVoidPointerType()) {
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
       }
+      
+      auto pointeeType = Impl.importType(pointeeQualType,
+                                         ImportTypeKind::Normal);
+      
+      // If the pointed-to type is unrepresentable in Swift, import as
+      // COpaquePointer.
+      if (!pointeeType)
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
       
       // Non-parameter pointers map to UnsafePointer.
       return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),

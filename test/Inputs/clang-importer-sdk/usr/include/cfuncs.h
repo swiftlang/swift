@@ -27,6 +27,9 @@ int renamed(int) __asm("_something_else");
 void param_pointer(int *p);
 void param_const_pointer(const int *p);
 
+void param_void_pointer(void *p);
+void param_const_void_pointer(const void *p);
+
 void decay_param_array(int p[]);
 void decay_param_const_array(const int p[]);
 
