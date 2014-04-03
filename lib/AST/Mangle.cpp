@@ -84,11 +84,7 @@ static bool isNonAscii(StringRef str) {
 /// Mangle an identifier into the buffer.
 void Mangler::mangleIdentifier(Identifier ident, OperatorFixity fixity) {
   StringRef str = ident.str();
-  if (str.empty()) {
-    assert(false);
-    Buffer << "0";
-    return;
-  }
+  assert(!str.empty() && "mangling an empty identifier!");
 
   // If the identifier contains non-ASCII character, we mangle with an initial
   // X and Punycode the identifier string.
