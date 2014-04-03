@@ -57,6 +57,8 @@ STATISTIC(NumMultiMethodNames,
           "multi-part Objective-C method names imported");
 STATISTIC(NumPrepositionSplitMethodNames,
           "Objective-C method names where the first selector piece was split");
+STATISTIC(NumPrepositionTrailingFirstPiece,
+  "Objective-C method names where the first piece ends in a preposition");
 STATISTIC(NumMethodsMissingFirstArgName,
           "Objective-C method names where the first argument name is missing");
 
@@ -592,6 +594,8 @@ splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
   if (lastPrep != words.rend()) {
     if (getPrepositionKind(*lastPrep)) {
       ++NumPrepositionSplitMethodNames;
+      if (lastPrep == words.rbegin())
+        ++NumPrepositionTrailingFirstPiece;
       return splitSelectorPieceAt(selector,
                                   std::prev(lastPrep.base()).getPosition(),
                                   scratch);
