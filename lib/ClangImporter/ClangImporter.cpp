@@ -35,12 +35,30 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
 #include <memory>
 
 using namespace swift;
+
+//===--------------------------------------------------------------------===//
+// Importer statistics
+//===--------------------------------------------------------------------===//
+#define DEBUG_TYPE "Clang module importer"
+STATISTIC(NumNullaryMethodNames,
+          "nullary Objective-C method names imported");
+STATISTIC(NumUnaryMethodNames,
+          "unary Objective-C method names imported");
+STATISTIC(NumNullaryInitMethodsMadeUnary,
+          "nullary Objective-C init methods turned into unary initializers");
+STATISTIC(NumMultiMethodNames,
+          "multi-part Objective-C method names imported");
+STATISTIC(NumPrepositionSplitMethodNames,
+          "Objective-C method names where the first selector piece was split");
+STATISTIC(NumMethodsMissingFirstArgName,
+          "Objective-C method names where the first argument name is missing");
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -573,6 +591,7 @@ splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
   // If we found a preposition, split here.
   if (lastPrep != words.rend()) {
     if (getPrepositionKind(*lastPrep)) {
+      ++NumPrepositionSplitMethodNames;
       return splitSelectorPieceAt(selector,
                                   std::prev(lastPrep.base()).getPosition(),
                                   scratch);
@@ -614,6 +633,8 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 
   // Zero-argument selectors.
   if (selector.isUnarySelector()) {
+    ++NumNullaryMethodNames;
+
     auto name = selector.getNameForSlot(0);
 
     // Simple case.
@@ -623,6 +644,7 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     // This is an initializer with no parameters but a name that
     // contains more than 'init', so synthesize an argument to capture
     // what follows 'init'.
+    ++NumNullaryInitMethodsMadeUnary;
     assert(camel_case::getFirstWord(name).equals("init"));
     auto baseName = SwiftContext.Id_init;
     auto argName = importArgName(SwiftContext, name.substr(4));
@@ -649,8 +671,17 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     argumentNames.push_back(Identifier());
   }
 
+  if (argumentNames[0].empty())
+    ++NumMethodsMissingFirstArgName;
+
   // Determine the remaining argument names.
-  for (unsigned i = 1, e = selector.getNumArgs(); i < e; ++i) {
+  unsigned n = selector.getNumArgs();
+  if (n == 1)
+    ++NumUnaryMethodNames;
+  else
+    ++NumMultiMethodNames;
+  
+  for (unsigned i = 1; i != n; ++i) {
     argumentNames.push_back(importArgName(SwiftContext,
                                           selector.getNameForSlot(i)));
   }
