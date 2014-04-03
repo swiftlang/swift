@@ -57,6 +57,10 @@ public:
     return false; // FIXME
   }
 
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+
   // Only allow allocation using the allocator in ReSTContext or by placement
   // new.
   void *operator new(size_t Bytes, ReSTContext &C,

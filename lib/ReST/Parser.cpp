@@ -967,3 +967,8 @@ void llvm::rest::convertToDocutilsXML(const Document *D, raw_ostream &OS) {
   Converter.printASTNode(D);
 }
 
+void ReSTASTNode::dump() const {
+  CommentToDocutilsXMLConverter Converter(llvm::errs());
+  Converter.printASTNode(this);
+  llvm::errs() << '\n';
+}
