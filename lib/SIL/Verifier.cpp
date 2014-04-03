@@ -231,6 +231,15 @@ public:
         require(Dominance->properlyDominates(valueI, I),
                 "instruction isn't dominated by its operand");
       }
+      
+      if (auto *valueBBA = dyn_cast<SILArgument>(operand.get())) {
+        require(valueBBA->getParent(),
+                "instruction uses value of unparented instruction");
+        require(valueBBA->getParent()->getParent() == &F,
+                "bb argument value from another function");
+        require(Dominance->dominates(valueBBA->getParent(), I->getParent()),
+                "instruction isn't dominated by its bb argument operand");
+      }
 
       require(operand.getUser() == I,
               "instruction's operand's owner isn't the instruction");
