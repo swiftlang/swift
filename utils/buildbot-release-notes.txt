@@ -24,12 +24,26 @@
     // void sincos(double, double*, double*);
     sincos(M_PI/2, &s, &c)
 
+  Void pointer parameters can be passed an array or inout of any type:
+
+    // + (NSData*)dataWithBytes:(const void*)bytes length:(NSUInteger)length;
+    let data = NSData.dataWithBytes([1.5, 2.25, 3.125],
+                                    length: sizeof(Double.self) * 3)
+    var fromData = [0.0, 0.0, 0.0]
+    // - (void)getBytes:(void*)bytes length:(NSUInteger)length;
+    data.getBytes(&fromData, length: sizeof(Double.self) * 3)
+
   Note that we don't know whether an API reads or writes the C pointer, so
   you need to explicitly initialize values (like "s" and "c" above) even if
   you know that the API overwrites them.
 
-  This support is currently limited to non-void, non-ObjC pointer types; support 
-  for pointers to ObjC pointers, such as 'NSError**', and for void pointers will
+  This pointer bridging only applies to arguments, and only works with well-
+  behaved C and ObjC APIs that don't keep the pointers they receive as
+  arguments around or do other dirty pointer tricks. Nonstandard use of pointer
+  arguments still requires UnsafePointer.
+
+  This support is currently limited to non-ObjC pointer types; support 
+  for pointers to ObjC pointers, such as 'NSError**', will
   be coming soon.
 
 * Objective-C pointer types now get imported by default as the '@unchecked T?'
