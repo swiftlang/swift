@@ -381,7 +381,8 @@ public:
   LinePart getLinePart(unsigned LineIndex, unsigned StartByte,
                        unsigned NumBytes) const {
     LinePart Result;
-    const Line &FirstLine = (*this)[0];
+    const Line &FirstLine = (*this)[LineIndex];
+    assert(NumBytes <= FirstLine.Text.size() - StartByte);
     Result.Text = FirstLine.Text.substr(StartByte, NumBytes);
     SourceLoc StartLoc = FirstLine.Range.Start.getAdvancedLoc(StartByte);
     Result.Range = SourceRange(StartLoc, StartLoc.getAdvancedLoc(NumBytes));

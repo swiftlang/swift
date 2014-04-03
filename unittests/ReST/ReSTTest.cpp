@@ -40,6 +40,51 @@ struct ReSTTest : public ::testing::Test {
   }
 };
 
+TEST_F(ReSTTest, LineList_getLinePart1) {
+  ReSTContext Context;
+  std::vector<const char *> Text = { "abcd", "efg", "hi" };
+  LineListRef LL = toLineList(Context, Text);
+
+  EXPECT_EQ("",     LL.getLinePart(0, 0, 0).Text);
+  EXPECT_EQ("a",    LL.getLinePart(0, 0, 1).Text);
+  EXPECT_EQ("ab",   LL.getLinePart(0, 0, 2).Text);
+  EXPECT_EQ("abc",  LL.getLinePart(0, 0, 3).Text);
+  EXPECT_EQ("abcd", LL.getLinePart(0, 0, 4).Text);
+  EXPECT_EQ("",     LL.getLinePart(0, 1, 0).Text);
+  EXPECT_EQ("b",    LL.getLinePart(0, 1, 1).Text);
+  EXPECT_EQ("bc",   LL.getLinePart(0, 1, 2).Text);
+  EXPECT_EQ("bcd",  LL.getLinePart(0, 1, 3).Text);
+  EXPECT_EQ("cd",   LL.getLinePart(0, 2, 2).Text);
+  EXPECT_EQ("d",    LL.getLinePart(0, 3, 1).Text);
+  EXPECT_EQ("",     LL.getLinePart(0, 4, 0).Text);
+
+  EXPECT_EQ("",     LL.getLinePart(1, 0, 0).Text);
+  EXPECT_EQ("e",    LL.getLinePart(1, 0, 1).Text);
+  EXPECT_EQ("ef",   LL.getLinePart(1, 0, 2).Text);
+  EXPECT_EQ("efg",  LL.getLinePart(1, 0, 3).Text);
+  EXPECT_EQ("f",    LL.getLinePart(1, 1, 1).Text);
+  EXPECT_EQ("fg",   LL.getLinePart(1, 1, 2).Text);
+
+  EXPECT_EQ("",     LL.getLinePart(2, 0, 0).Text);
+  EXPECT_EQ("h",    LL.getLinePart(2, 0, 1).Text);
+  EXPECT_EQ("hi",   LL.getLinePart(2, 0, 2).Text);
+}
+
+TEST_F(ReSTTest, LineList_getLinePart2) {
+  ReSTContext Context;
+  std::vector<const char *> Text = { "zzz", "zabcd", "efg", "hi", "zzz" };
+  LineListRef LL = toLineList(Context, Text);
+  LL = LL.dropFrontLines(1);
+  LL = LL.subList(0, 3);
+  LL.fromFirstLineDropFront(1);
+
+  ASSERT_EQ(3u, LL.size());
+
+  EXPECT_EQ("zabcd", LL.getLinePart(0, 0, 5).Text);
+  EXPECT_EQ("efg",   LL.getLinePart(1, 0, 3).Text);
+  EXPECT_EQ("hi",    LL.getLinePart(2, 0, 2).Text);
+}
+
 struct LineListIndentationTestData {
   StringRef InText;
   unsigned FirstTextCol;
@@ -1069,6 +1114,36 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "<field>"
         "<field_name>aaa</field_name>"
         "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "  ccc",
+      ":ddd: eee",
+      "  fff"
+    }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+      "<field>"
+        "<field_name>ddd</field_name>"
+        "<field_body><paragraph>eee\nfff</paragraph></field_body>"
+      "</field>"
+    "</field_list>" }, // Correct.
+  { { ":aaa: bbb",
+      "  ccc",
+      ":ddddd: eee",
+      "  fff"
+    }, "",
+    "<field_list>"
+      "<field>"
+        "<field_name>aaa</field_name>"
+        "<field_body><paragraph>bbb\nccc</paragraph></field_body>"
+      "</field>"
+      "<field>"
+        "<field_name>ddddd</field_name>"
+        "<field_body><paragraph>eee\nfff</paragraph></field_body>"
       "</field>"
     "</field_list>" }, // Correct.
   { { ":aaa: bbb",
