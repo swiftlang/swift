@@ -1057,12 +1057,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         
         // If this is a selector reference, collect the selector pieces.
         bool IsSelector = false;
-        if (Tok.is(tok::colon) && peekToken().is(tok::identifier)) {
+        if (Tok.is(tok::colon) &&
+            (peekToken().is(tok::identifier) || peekToken().is(tok::kw__))) {
           BacktrackingScope BS(*this);
-          
-          IsSelector = consumeIf(tok::colon)
-            && consumeIf(tok::identifier)
-            && consumeIf(tok::colon);
+
+          consumeToken(); // ':'
+          consumeToken(); // identifier or '_'
+          IsSelector = consumeIf(tok::colon);
         }
         
         if (IsSelector) {
@@ -1071,9 +1072,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           SmallVector<Identifier, 2> ArgumentNames;
           
           Locs.push_back({NameLoc, consumeToken(tok::colon)});
-          while (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-            Identifier SelName = Context.getIdentifier(Tok.getText());
-            SourceLoc SelLoc = consumeToken(tok::identifier);
+          while ((Tok.is(tok::identifier) || Tok.is(tok::kw__)) &&
+                 peekToken().is(tok::colon)) {
+            Identifier SelName;
+            if (Tok.is(tok::identifier))
+              SelName = Context.getIdentifier(Tok.getText());
+            SourceLoc SelLoc = consumeToken();
             SourceLoc ColonLoc = consumeToken(tok::colon);
             Locs.push_back({SelLoc, ColonLoc});
             ArgumentNames.push_back(SelName);

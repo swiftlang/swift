@@ -518,45 +518,50 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   return SwiftContext.getIdentifier(nameBuf);
 }
 
+static Identifier importNameOrNull(ASTContext &ctx, StringRef name) {
+  if (name.empty())
+    return Identifier();
+
+  return ctx.getIdentifier(name);
+}
+
 DeclName
-ClangImporter::Implementation::importName(clang::Selector selector) {
-  if (selector.isNull())
-    return DeclName();
-  
+ClangImporter::Implementation::importName(clang::Selector selector,
+                                          bool isInitializer) {
+  assert(!selector.isNull() && "Null selector?");
+
+  // Zero-argument selectors.
   if (selector.isUnarySelector())
     return importName(selector.getIdentifierInfoForSlot(0));
-  
-  SmallVector<Identifier, 2> components;
-  for (unsigned i = 0, e = selector.getNumArgs(); i < e; ++i) {
-    if (i > 0 || !SplitPrepositions) {
-      components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
-      continue;
-    }
 
-    // Split the first selector into a function name and a first
-    // parameter name.
-    // FIXME: Eventually handle init method selectors, too.
-    StringRef funcName, paramName;
-    llvm::SmallString<16> buffer;
-    auto piece = selector.getIdentifierInfoForSlot(i);
-    std::tie(funcName, paramName) = splitFirstSelectorPiece(piece->getName(),
-                                                            buffer);
+  // Determine the base name and first argument name.
+  Identifier baseName;
+  SmallVector<Identifier, 2> argumentNames;
+  StringRef firstPiece = selector.getNameForSlot(0);
+  if (isInitializer) {
+    assert(camel_case::getFirstWord(firstPiece).equals("init"));
+    baseName = SwiftContext.Id_init;
+    argumentNames.push_back(importNameOrNull(SwiftContext,
+                                             firstPiece.substr(4)));
+  } else if (SplitPrepositions) {
+    llvm::SmallString<16> scratch;
+    StringRef funcName, firstArgName;
+    std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
+                                                               scratch);
+    baseName = importNameOrNull(SwiftContext, funcName);
+    argumentNames.push_back(importNameOrNull(SwiftContext, firstArgName));
+  } else {
+    baseName = SwiftContext.getIdentifier(firstPiece);
+    argumentNames.push_back(Identifier());
+  }
 
-    // FIXME: Don't allow splitting out 'init'. That's currently
-    // handled elsewhere.
-    if (funcName.equals("init")) {
-      components.push_back(importName(selector.getIdentifierInfoForSlot(i)));
-      continue;
-    }
-
-    components.push_back(SwiftContext.getIdentifier(funcName));
-    if (!paramName.empty()) {
-      components.push_back(SwiftContext.getIdentifier(paramName));
-    }
+  // Determine the remaining argument names.
+  for (unsigned i = 1, e = selector.getNumArgs(); i < e; ++i) {
+    argumentNames.push_back(importNameOrNull(SwiftContext,
+                                             selector.getNameForSlot(i)));
   }
   
-  return DeclName(SwiftContext, components[0],
-                  llvm::makeArrayRef(components.begin() + 1, components.end()));
+  return DeclName(SwiftContext, baseName, argumentNames);
 }
 
 /// Split the given selector piece at the given index, updating

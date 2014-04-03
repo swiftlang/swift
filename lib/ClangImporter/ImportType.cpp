@@ -763,6 +763,139 @@ Type ClangImporter::Implementation::importFunctionType(
   return FunctionType::get(argParamsTy, swiftResultTy, extInfo);
 }
 
+Type ClangImporter::Implementation::importMethodType(
+       clang::QualType resultType,
+       ArrayRef<const clang::ParmVarDecl *> params,
+       bool isVariadic, bool isNoReturn,
+       SmallVectorImpl<Pattern*> &argPatterns,
+       SmallVectorImpl<Pattern*> &bodyPatterns,
+       bool *pHasSelectorStyleSignature,
+       DeclName methodName,
+       SpecialMethodKind kind) {
+
+  if (pHasSelectorStyleSignature)
+    *pHasSelectorStyleSignature = false;
+
+  // Cannot import variadic types.
+  if (isVariadic)
+    return Type();
+
+  // Import the result type.
+  auto swiftResultTy = importType(resultType, ImportTypeKind::Result);
+  if (!swiftResultTy)
+    return Type();
+
+  // Import the parameters.
+  SmallVector<TupleTypeElt, 4> swiftArgParams;
+  SmallVector<TupleTypeElt, 4> swiftBodyParams;
+  SmallVector<TuplePatternElt, 4> argPatternElts;
+  SmallVector<TuplePatternElt, 4> bodyPatternElts;
+  auto argNames = methodName.getArgumentNames();
+  unsigned index = 0;
+  for (auto param : params) {
+    auto paramTy = param->getType();
+    if (paramTy->isVoidType()) {
+      ++index;
+      continue;
+    }
+
+    // Import the parameter type into Swift.
+    Type swiftParamTy;
+    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
+        paramTy->isObjCIdType()) {
+      swiftParamTy = getNSCopyingType();
+    }
+    if (!swiftParamTy)
+      swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+    if (!swiftParamTy)
+      return Type();
+
+    // Figure out the name for this parameter.
+    Identifier bodyName = importName(param->getDeclName());
+
+    // Figure out the name for this argument, which comes from the method name.
+    Identifier name;
+    if (index < argNames.size()) {
+      name = argNames[index];
+    }
+
+    // Compute the pattern to put into the body.
+    Pattern *bodyPattern;
+    if (bodyName.empty()) {
+      bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
+    } else {
+      auto bodyVar
+        = new (SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
+                                     importSourceLoc(param->getLocation()),
+                                     bodyName, swiftParamTy, firstClangModule);
+      bodyVar->setClangNode(param);
+      bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
+    }
+    bodyPattern->setType(swiftParamTy);
+    bodyPattern
+      = new (SwiftContext) TypedPattern(bodyPattern,
+                                        TypeLoc::withoutLoc(swiftParamTy));
+    bodyPattern->setType(swiftParamTy);
+    bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
+
+    // Compute the pattern to put into the argument list, which may be
+    // different (when there is a selector involved).
+    Pattern *argPattern = bodyPattern;
+    if (bodyName != name) {
+      if (name.empty()) {
+        argPattern = new (SwiftContext) AnyPattern(SourceLoc(),
+                                                   /*Implicit=*/true);
+      } else {
+        auto argVar = new (SwiftContext) VarDecl(/*static*/ false,
+                                                 /*IsLet*/ false,
+                                                 SourceLoc(), name,
+                                                 swiftParamTy,
+                                                 firstClangModule);
+        argVar->setImplicit();
+        argVar->setClangNode(param);
+        argPattern = new (SwiftContext) NamedPattern(argVar);
+      }
+      argPattern->setType(swiftParamTy);
+
+      argPattern
+        = new (SwiftContext) TypedPattern(argPattern,
+                                          TypeLoc::withoutLoc(swiftParamTy),
+                                          /*Implicit=*/true);
+      argPattern->setType(swiftParamTy);
+    }
+    argPatternElts.push_back(TuplePatternElt(argPattern));
+    
+    if (argPattern != bodyPattern && pHasSelectorStyleSignature)
+      *pHasSelectorStyleSignature = true;
+
+    // Add the tuple elements for the function types.
+    swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
+    swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
+    ++index;
+  }
+
+  // Form the parameter tuples.
+  auto argParamsTy = TupleType::get(swiftArgParams, SwiftContext);
+  auto bodyParamsTy = TupleType::get(swiftBodyParams, SwiftContext);
+
+  // Form the body and argument patterns.
+  bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
+                                              bodyPatternElts, SourceLoc()));
+  bodyPatterns.back()->setType(bodyParamsTy);
+  argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
+                                             argPatternElts, SourceLoc(),
+                                             false, SourceLoc(),
+                                             /*Implicit=*/true));
+  argPatterns.back()->setType(argParamsTy);
+  
+  
+  FunctionType::ExtInfo extInfo;
+  extInfo = extInfo.withIsNoReturn(isNoReturn);
+  
+  // Form the function type.
+  return FunctionType::get(argParamsTy, swiftResultTy, extInfo);
+}
+
 Module *ClangImporter::Implementation::getStdlibModule() {
   return SwiftContext.getStdlibModule();
 }

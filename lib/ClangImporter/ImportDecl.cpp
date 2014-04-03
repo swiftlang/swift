@@ -1663,7 +1663,8 @@ namespace {
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc, bool forceClassMethod = false) {
-      DeclName name = Impl.importName(decl->getSelector());
+      DeclName name = Impl.importName(decl->getSelector(),
+                                      /*isInitializer=*/false);
       if (!name)
         return nullptr;
 
@@ -1692,7 +1693,7 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      auto type = Impl.importFunctionType(decl->getReturnType(),
+      auto type = Impl.importMethodType(decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -1700,7 +1701,7 @@ namespace {
                                           argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
-                                          decl->getSelector(),
+                                          name,
                                           kind);
       if (!type)
         return nullptr;
@@ -1712,6 +1713,14 @@ namespace {
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
         if (known != Impl.ImportedDecls.end())
           return known->second;
+      }
+
+      // If we're not splitting prepositions, the method-name-as-written
+      // has an entry for the first parameter, but shouldn't.
+      // FIXME: This is a hack to keep "x.foo:bar:wibble:" working.
+      if (!Impl.SplitPrepositions && !name.getArgumentNames().empty()) {
+        name = DeclName(Impl.SwiftContext, name.getBaseName(),
+                        name.getArgumentNames().slice(1));
       }
 
       auto result = FuncDecl::create(

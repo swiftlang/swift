@@ -50,5 +50,5 @@ bool Identifier::isOperatorSlow() const {
 }
 
 void DeclName::dump() {
-  llvm::errs() << *this;
+  llvm::errs() << *this << "\n";
 }

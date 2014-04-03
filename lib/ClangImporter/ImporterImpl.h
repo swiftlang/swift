@@ -403,7 +403,12 @@ public:
                         StringRef removePrefix = "");
   
   /// Import the given selector name into Swift.
-  DeclName importName(clang::Selector selector);
+  ///
+  /// \param selector The selector to import.
+  ///
+  /// \param isInitializer Whether this name should be imported as an
+  /// initializer.
+  DeclName importName(clang::Selector selector, bool isInitializer);
   
   /// Split the first selector piece into a function name and first
   /// parameter name, if possible.
@@ -620,6 +625,36 @@ public:
                           bool *pHasSelectorStyleSignature = nullptr,
                           clang::Selector selector = clang::Selector(),
                           SpecialMethodKind kind = SpecialMethodKind::Regular);
+
+  /// \brief Import the type of an Objective-C method.
+  ///
+  /// This routine should be preferred when importing function types for
+  /// which we have actual function parameters, e.g., when dealing with a
+  /// function declaration, because it produces a function type whose input
+  /// tuple has argument names.
+  ///
+  /// \param resultType The result type of the function.
+  /// \param params The parameter types to the function.
+  /// \param isVariadic Whether the function is variadic.
+  /// \param isNoReturn Whether the function is noreturn.
+  /// \param argPatterns The externally-visible patterns for the parameters.
+  /// \param bodyPatterns The patterns visible inside the function body.
+  /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
+  ///   whether the created arg/body patterns are different (selector-style).
+  /// \param methodName The name of the imported method.
+  /// \param kind Controls whether we're building a type for a method that
+  ///        needs special handling.
+  ///
+  /// \returns the imported function type, or null if the type cannot be
+  /// imported.
+  Type importMethodType(clang::QualType resultType,
+                        ArrayRef<const clang::ParmVarDecl *> params,
+                        bool isVariadic, bool isNoReturn,
+                        SmallVectorImpl<Pattern*> &argPatterns,
+                        SmallVectorImpl<Pattern*> &bodyPatterns,
+                        bool *pHasSelectorStyleSignature,
+                        DeclName methodName,
+                        SpecialMethodKind kind);
 
   /// \brief Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
