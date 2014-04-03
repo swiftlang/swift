@@ -24,6 +24,15 @@
     // void sincos(double, double*, double*);
     sincos(M_PI/2, &s, &c)
 
+  Pointers to pointers to ObjC classes, such as 'NSError**', get imported as
+  'ObjCMutablePointer<NSError?>'. This type doesn't work with arrays, but
+  accepts inouts or 'nil':
+
+    var error: NSError? = nil
+    let words = NSString.stringWithContentsOfFile("/usr/share/dict/words",
+      encoding: .UTF8StringEncoding,
+      error: &error)
+
   Void pointer parameters can be passed an array or inout of any type:
 
     // + (NSData*)dataWithBytes:(const void*)bytes length:(NSUInteger)length;
@@ -41,10 +50,6 @@
   behaved C and ObjC APIs that don't keep the pointers they receive as
   arguments around or do other dirty pointer tricks. Nonstandard use of pointer
   arguments still requires UnsafePointer.
-
-  This support is currently limited to non-ObjC pointer types; support 
-  for pointers to ObjC pointers, such as 'NSError**', will
-  be coming soon.
 
 * Objective-C pointer types now get imported by default as the '@unchecked T?'
   optional type.  Swift class types no longer implicitly include 'nil'.
