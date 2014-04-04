@@ -1617,6 +1617,8 @@ public:
 
   void visitImportDecl(ImportDecl *ID) {
     // Nothing to do.
+    
+    TC.checkDeclAttributes(ID);
   }
 
   void visitBoundVariable(VarDecl *VD) {
@@ -1706,7 +1708,7 @@ public:
       if (VD->getSetter() && !VD->getSetter()->isFinal())
         VD->getSetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
     }
-
+    TC.checkDeclAttributes(VD);
   }
 
 
@@ -1792,6 +1794,7 @@ public:
 
     if (!IsSecondPass)
       visitBoundVars(PBD->getPattern());
+    TC.checkDeclAttributes(PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -1860,6 +1863,8 @@ public:
         SD->getMutableAttrs().clearAttribute(AK_override);
       }
     }
+
+    TC.checkDeclAttributes(SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -1883,6 +1888,7 @@ public:
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         TC.checkInheritanceClause(TAD);
     }
+    TC.checkDeclAttributes(TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -1892,6 +1898,7 @@ public:
         TC.validateType(defaultDefinition, assocType->getDeclContext())) {
       defaultDefinition.setInvalidType(TC.Context);
     }
+    TC.checkDeclAttributes(assocType);
   }
 
   // Given the raw value literal expression for an enum case, produces the
@@ -1941,10 +1948,9 @@ public:
   void visitEnumDecl(EnumDecl *ED) {
     // This enum declaration is technically a parse error, so do not type
     // check.
-    if (dyn_cast<ProtocolDecl>(ED->getParent())) {
+    if (isa<ProtocolDecl>(ED->getParent()))
       return;
-    }
-        
+    
     if (!IsSecondPass) {
       TC.validateDecl(ED);
 
@@ -2095,25 +2101,24 @@ public:
         }
       }
     }
+    TC.checkDeclAttributes(ED);
   }
 
   void visitStructDecl(StructDecl *SD) {
     
     // This struct declaration is technically a parse error, so do not type
     // check.
-    if (dyn_cast<ProtocolDecl>(SD->getParent())) {
+    if (isa<ProtocolDecl>(SD->getParent()))
       return;
-    }
-        
+    
     if (!IsSecondPass) {
       TC.validateDecl(SD);
       if (!TC.ValidatedTypes.empty() && SD == TC.ValidatedTypes.back())
         TC.ValidatedTypes.pop_back();
     }
 
-    if (!IsSecondPass) {
+    if (!IsSecondPass)
       TC.addImplicitConstructors(SD);
-    }
 
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
@@ -2124,6 +2129,7 @@ public:
     if (!IsFirstPass) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
     }
+    TC.checkDeclAttributes(SD);
   }
 
   void checkObjCConformance(ProtocolDecl *protocol,
@@ -2228,9 +2234,8 @@ public:
     
     // This class declaration is technically a parse error, so do not type
     // check.
-    if (dyn_cast<ProtocolDecl>(CD->getParent())) {
+    if (isa<ProtocolDecl>(CD->getParent()))
       return;
-    }
     
     if (!IsSecondPass) {
       TC.validateDecl(CD);
@@ -2352,15 +2357,16 @@ public:
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
     }
+    
+    TC.checkDeclAttributes(CD);
   }
   
   void visitProtocolDecl(ProtocolDecl *PD) {
     // This protocol declaration is technically a parse error, so do not type
     // check.
-    if (dyn_cast<ProtocolDecl>(PD->getParent())) {
+    if (isa<ProtocolDecl>(PD->getParent()))
       return;
-    }
-        
+    
     if (IsSecondPass) {
       return;
     }
@@ -2377,6 +2383,8 @@ public:
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
+
+    TC.checkDeclAttributes(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -2902,6 +2910,8 @@ public:
         FD->getMutableAttrs().clearAttribute(AK_override);
       }
     }
+    
+    TC.checkDeclAttributes(FD);
   }
 
   /// Adjust the type of the given declaration to appear as if it were
@@ -3176,7 +3186,7 @@ public:
   /// Attribute visitor that checks how the given attribute should be
   /// considered when overriding a declaration.
   class AttributeOverrideChecker
-          : public AttributeVisitor<AttributeOverrideChecker, bool> {
+          : public AttributeVisitor<AttributeOverrideChecker> {
     TypeChecker &TC;
     ValueDecl *Base;
     ValueDecl *Override;
@@ -3188,33 +3198,31 @@ public:
 
     /// Deleting this ensures that all attributes are covered by the visitor
     /// below.
-    bool visitDeclAttribute(DeclAttribute *A) = delete;
+    void visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define UNINTERESTING_ATTR(CLASS)                               \
-    bool visit##CLASS##Attr(CLASS##Attr *attr) { return false; }
+    void visit##CLASS##Attr(CLASS##Attr *attr) { }
 
     UNINTERESTING_ATTR(Asmname)
 
 #undef UNINTERESTING_ATTR
 
-    bool visitAvailabilityAttr(AvailabilityAttr *attr) {
+    void visitAvailabilityAttr(AvailabilityAttr *attr) {
       // FIXME: Check that this declaration is at least as available as the
       // one it overrides.
-      return false;
     }
 
-    bool visitFinalAttr(FinalAttr *attr) {
+    void visitFinalAttr(FinalAttr *attr) {
       // FIXME: Customize message to the kind of thing.
       TC.diagnose(Override, diag::override_final);
       TC.diagnose(Base, diag::overridden_here);
-      return false;
     }
 
-    bool visitObjCAttr(ObjCAttr *attr) {
+    void visitObjCAttr(ObjCAttr *attr) {
       // If the attribute on the base does not have a name, there's nothing
       // to check.
       if (!attr->hasName())
-        return false;
+        return;
 
       // If the overriding declaration already has an @objc attribute, check
       // whether the names are consistent.
@@ -3223,7 +3231,7 @@ public:
           // If the names (and kind) match, we're done.
           if (overrideAttr->getKind() == attr->getKind() &&
               overrideAttr->getNames() == attr->getNames()) {
-            return false;
+            return;
           }
 
           // The names don't match, which indicates that this is a Swift
@@ -3240,7 +3248,7 @@ public:
       }
 
       Override->getMutableAttrs().add(attr->clone(TC.Context));
-      return false;
+      return;
     }
   };
 
@@ -3442,6 +3450,7 @@ public:
       EED->overwriteType(ErrorType::get(TC.Context));
       EED->setInvalid();
     }
+    TC.checkDeclAttributes(EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -3487,7 +3496,8 @@ public:
       checkExplicitConformance(ED, ED->getExtendedType());
       checkObjCConformances(ED->getProtocols(), ED->getConformances());
     }
-  }
+    TC.checkDeclAttributes(ED);
+ }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
     // See swift::performTypeChecking for TopLevelCodeDecl handling.
@@ -3497,6 +3507,7 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
+    TC.checkDeclAttributes(ICD);
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
@@ -3635,6 +3646,7 @@ public:
     bool isRequired = CD->getAttrs().isRequired() ||
       (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired());
     CD->setRequired(isRequired);
+    TC.checkDeclAttributes(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -3681,6 +3693,7 @@ public:
     DD->setIsObjC(true);
 
     validateAttributes(TC, DD);
+    TC.checkDeclAttributes(DD);
   }
 };
 }; // end anonymous namespace.
@@ -3890,7 +3903,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       // If the variable declaration is for a 'self' parameter, it may be
       // because the self variable was reverted whilst validating the function
       // signature.  In that case, reset the type.
-      if (dyn_cast<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
+      if (isa<NominalTypeDecl>(VD->getDeclContext()->getParent())) {
         if (auto funcDeclContext =
                 dyn_cast<AbstractFunctionDecl>(VD->getDeclContext())) {
           GenericParamList *outerGenericParams = nullptr;

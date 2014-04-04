@@ -507,8 +507,6 @@ ERROR(override_mutable_covariant_property,sema_tcd,none,
 ERROR(override_mutable_covariant_subscript,sema_tcd,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-ERROR(override_final,sema_tcd,none,
-      "declaration overrides a 'final' declaration", ())
 
 ERROR(decl_no_default_init,sema_tcd,none,
       "cannot default-initialize variable of type %0", (Type))
@@ -596,6 +594,16 @@ ERROR(dynamic_self_struct_enum,sema_tcd,none,
 // Duplicate declarations
 ERROR(duplicate_enum_element,sema_tcd,none,
       "duplicate definition of enum element",())
+
+//------------------------------------------------------------------------------
+// Type Check Attributes
+//------------------------------------------------------------------------------
+
+ERROR(override_final,sema_tcd,none,
+      "declaration overrides a 'final' declaration", ())
+
+ERROR(member_cannot_be_final,sema_tcd,none,
+      "only class member may be marked with the @final attribute", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

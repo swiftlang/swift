@@ -468,6 +468,9 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
   
+  
+  void checkDeclAttributes(Decl *D);
+  
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD, true);
   }

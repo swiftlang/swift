@@ -16,6 +16,7 @@ add_swift_library(swiftSema
   MiscDiagnostics.cpp
   PlaygroundTransform.cpp
   TypeChecker.cpp
+  TypeCheckAttr.cpp
   TypeCheckConstraints.cpp
   TypeCheckExpr.cpp
   TypeCheckDecl.cpp
