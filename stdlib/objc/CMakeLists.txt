@@ -30,3 +30,5 @@ if (SWIFT_DEPLOYMENT_OS MATCHES "^macosx")
 else()
   add_subdirectory(UIKit)
 endif()
+
+add_subdirectory(XCTest)
