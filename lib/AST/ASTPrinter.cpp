@@ -727,6 +727,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       isMutable = false;
   });
 
+  printAttributes(decl->getAttrs());
   Printer << (isMutable ? "var " : "let ");
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {

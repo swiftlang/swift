@@ -671,7 +671,6 @@ namespace decls_block {
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
-    BCFixed<1>,   // isFinal?
     VarDeclStorageKindField,   // StorageKind
     TypeIDField,  // type
     TypeIDField,  // interface type
@@ -696,7 +695,6 @@ namespace decls_block {
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // optional?
-    BCFixed<1>,   // final?
     BCVBR<5>,     // number of parameter patterns
     TypeIDField,  // type (signature)
     TypeIDField,  // interface type
@@ -753,7 +751,6 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // optional?
-    BCFixed<1>,  // final?
     TypeIDField, // subscript dummy type
     TypeIDField, // element type
     TypeIDField, // interface type

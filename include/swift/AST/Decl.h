@@ -1701,8 +1701,10 @@ public:
   }
 
   /// Is this declaration marked with the @final attribute?
-  bool isFinal() const { return getAttrs().has(DAK_final); }
-  
+  bool isFinal() const {
+    return getAttrs().hasValidAttribute<FinalAttr>();
+  }
+
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
 

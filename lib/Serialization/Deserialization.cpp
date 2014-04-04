@@ -1730,7 +1730,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet, isFinal;
+    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet;
     uint8_t StorageKind;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
@@ -1738,7 +1738,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
                                        isObjC, isIBOutlet, isOptional, isStatic,
-                                       isLet, isFinal, StorageKind, typeID,
+                                       isLet, StorageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        willSetID, didSetID, overriddenID);
 
@@ -1788,8 +1788,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       var->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    if (isFinal)
-      var->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
 
     if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
       var->setOverriddenDecl(overridden);
@@ -1807,7 +1805,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     uint8_t RawStaticSpelling;
     bool isAssignmentOrConversion;
     bool isObjC, isIBAction, isTransparent, isMutating, hasDynamicSelf;
-    bool isOptional, isFinal;
+    bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
     TypeID interfaceTypeID;
@@ -1822,7 +1820,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                         isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
                                         isMutating, hasDynamicSelf, isOptional,
-                                        isFinal,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
@@ -1926,8 +1923,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     fn->setDynamicSelf(hasDynamicSelf);
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    if (isFinal)
-      fn->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);
@@ -2255,13 +2250,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   case decls_block::SUBSCRIPT_DECL: {
     DeclID contextID;
-    bool isImplicit, isObjC, isOptional, isFinal;
+    bool isImplicit, isObjC, isOptional;
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
-                                             isObjC, isOptional, isFinal,
+                                             isObjC, isOptional,
                                              declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
@@ -2293,9 +2288,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     subscript->setIsObjC(isObjC);
     if (isOptional)
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
-    if (isFinal)
-      subscript->getMutableAttrs().add(
-          new (ctx) FinalAttr(/*IsImplicit=*/true));
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
       subscript->setOverriddenDecl(overridden);
       subscript->getMutableAttrs().setAttr(AK_override, SourceLoc());
