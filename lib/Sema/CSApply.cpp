@@ -260,17 +260,19 @@ static bool isImplicitDirectMemberReference(Expr *base, VarDecl *member,
   // accessors.  However, in the init and destructor methods for the type
   // immediately containing the property, accesses are done direct.
   if (auto *AFD_DC = dyn_cast<AbstractFunctionDecl>(DC))
-    if (member->hasStorage() && member->hasAccessorFunctions() &&
+    if (member->hasStorage() &&
         // In a ctor or dtor.
         (isa<ConstructorDecl>(AFD_DC) || isa<DestructorDecl>(AFD_DC)) &&
 
         // Ctor or dtor are for immediate class, not a derived class.
-        AFD_DC->getParent() == member->getDeclContext() &&
+        AFD_DC->getParent()->getDeclaredTypeOfContext()->getCanonicalType() ==
+          member->getDeclContext()->getDeclaredTypeOfContext()->getCanonicalType() &&
 
         // Is a "self.property" reference.
         isa<DeclRefExpr>(base) &&
         AFD_DC->getImplicitSelfDecl() == cast<DeclRefExpr>(base)->getDecl()) {
-      // Access this directly instead of going through (e.g.) observing accessors.
+      // Access this directly instead of going through (e.g.) observing or
+      // trivial accessors.
       return true;
     }
 
