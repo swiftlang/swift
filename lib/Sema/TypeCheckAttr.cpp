@@ -68,8 +68,11 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   }
   
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
-    if (FD->isObservingAccessor() && !attr->isImplicit()) {
-      TC.diagnose(attr->getLocation(), diag::final_not_on_accessors);
+    if (FD->isAccessor() && !attr->isImplicit()) {
+      unsigned Kind = 2;
+      if (auto *VD = dyn_cast<VarDecl>(FD->getAccessorStorageDecl()))
+        Kind = VD->isLet() ? 1 : 0;
+      TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind);
       return;
     }
   }
