@@ -23,6 +23,7 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
@@ -55,7 +56,6 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
-  class LazyMemberLoader;
   class LiteralExpr;
   class FuncDecl;
   class BraceStmt;
@@ -1221,7 +1221,7 @@ class ExtensionDecl : public Decl, public DeclContext {
   /// ExtendedType - The type being extended.
   TypeLoc ExtendedType;
   MutableArrayRef<TypeLoc> Inherited;
-  ArrayRef<Decl*> Members;
+  LazyLoaderArray<Decl*> Members;
 
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
@@ -1236,9 +1236,6 @@ class ExtensionDecl : public Decl, public DeclContext {
   /// a known nominal type.
   llvm::PointerIntPair<ExtensionDecl *, 1, bool> NextExtension
     = {nullptr, false};
-
-  LazyMemberLoader *Resolver = nullptr;
-  uint64_t ResolverContextData;
 
   friend class ExtensionIterator;
   friend class NominalTypeDecl;
@@ -1307,7 +1304,7 @@ public:
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
-    return Resolver;
+    return Members.isLazy();
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -2236,7 +2233,7 @@ typedef std::function<ProtocolDecl *()> DelayedProtocolDecl;
 /// decl is always a DeclContext.
 class NominalTypeDecl : public TypeDecl, public DeclContext {
   SourceRange Braces;
-  ArrayRef<Decl*> Members;
+  LazyLoaderArray<Decl*> Members;
   
   /// \brief The sets of implicit members and protocols added to imported enum
   /// types.  These members and protocols are added to the NominalDecl only if
@@ -2282,9 +2279,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// called.
   MemberLookupTable *LookupTable = nullptr;
 
-  LazyMemberLoader *Resolver = nullptr;
-  uint64_t ResolverContextData;
-
   friend class MemberLookupTable;
   friend class ExtensionDecl;
 
@@ -2318,7 +2312,7 @@ public:
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
-    return Resolver;
+    return Members.isLazy();
   }
   
   /// \brief Returns true if this this decl contains delayed value or protocol
