@@ -1527,12 +1527,6 @@ getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
     }
   }
 
-  // If we override a property, use its getter selector.
-  // FIXME: We shouldn't need this, because we should be inheriting @objc(name)
-  // when needed.
-  if (auto overridden = getOverriddenDecl())
-    return overridden->getObjCGetterSelector(buffer);
-
   llvm::raw_svector_ostream out(buffer);
 
   // Subscripts use a specific selector.
@@ -1563,12 +1557,6 @@ StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buff
         return objcAttr->getName(buffer);
     }
   }
-
-  // If we override a property, use its setter selector.
-  // FIXME: We shouldn't need this, because we should be inheriting @objc(name)
-  // when needed.
-  if (auto overridden = getOverriddenDecl())
-    return overridden->getObjCSetterSelector(buffer);
 
   llvm::raw_svector_ostream out(buffer);
 

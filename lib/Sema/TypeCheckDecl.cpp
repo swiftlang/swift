@@ -1827,6 +1827,15 @@ public:
 
     validateAttributes(TC, SD);
 
+    // If this variable is marked @final and has a getter or setter, mark the
+    // getter and setter as final as well.
+    if (SD->isFinal()) {
+      if (SD->getGetter() && !SD->getGetter()->isFinal())
+        SD->getGetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+      if (SD->getSetter() && !SD->getSetter()->isFinal())
+        SD->getSetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+    }
+
     // A subscript is ObjC-compatible if it's explicitly @objc, or a
     // member of an ObjC-compatible class or protocol.
     if (dc->getDeclaredTypeInContext()) {
@@ -3213,6 +3222,16 @@ public:
     }
 
     void visitFinalAttr(FinalAttr *attr) {
+      // If this is an accessor, don't complain if we would have
+      // complained about the storage declaration.
+      if (auto func = dyn_cast<FuncDecl>(Override)) {
+        if (auto storageDecl = func->getAccessorStorageDecl()) {
+          if (storageDecl->getOverriddenDecl() &&
+              storageDecl->getOverriddenDecl()->isFinal())
+            return;
+        }
+      }
+
       // FIXME: Customize message to the kind of thing.
       TC.diagnose(Override, diag::override_final);
       TC.diagnose(Base, diag::overridden_here);
@@ -3247,6 +3266,8 @@ public:
         Override->getMutableAttrs().removeAttribute(overrideAttr);
       }
 
+      // Copy the name from the base declaration to the overriding
+      // declaration.
       Override->getMutableAttrs().add(attr->clone(TC.Context));
       return;
     }
@@ -3342,10 +3363,31 @@ public:
       // If there is a getter and/or setter, set their overrides as well.  This
       // is not done for observing accessors, since they are never dynamicly
       // dispatched (they are a local implementation detail of a property).
-      if (baseASD->getGetter() && overridingASD->getGetter())
-        overridingASD->getGetter()->setOverriddenDecl(baseASD->getGetter());
-      if (baseASD->getSetter() && overridingASD->getSetter())
-        overridingASD->getSetter()->setOverriddenDecl(baseASD->getSetter());
+      if (baseASD->getGetter() && overridingASD->getGetter()) {
+        auto overridingGetter = overridingASD->getGetter();
+        if (!overridingGetter->getAttrs().isOverride()) {
+          // FIXME: Egregious hack to set @override.
+          auto loc = overridingASD->getAttrs().getLoc(AK_override);
+          if (loc.isInvalid())
+            loc = overridingASD->getLoc();
+
+          overridingGetter->getMutableAttrs().setAttr(AK_override, loc);
+        }
+          
+        recordOverride(overridingGetter, baseASD->getGetter());
+      }
+      if (baseASD->getSetter() && overridingASD->getSetter()) {
+        auto overridingSetter = overridingASD->getSetter();
+        if (!overridingSetter->getAttrs().isOverride()) {
+          // FIXME: Egregious hack to set @override.
+          auto loc = overridingASD->getAttrs().getLoc(AK_override);
+          if (loc.isInvalid())
+            loc = overridingASD->getLoc();
+
+          overridingSetter->getMutableAttrs().setAttr(AK_override, loc);
+        }
+        recordOverride(overridingASD->getSetter(), baseASD->getSetter());
+      }
       
     } else {
       llvm_unreachable("Unexpected decl");
@@ -4274,7 +4316,6 @@ createSubobjectInitOverride(TypeChecker &tc,
 
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
-    // FIXME: Generalize inheritance of attributes here?
     if (auto objcAttr = superclassCtor->getAttrs().getAttribute<ObjCAttr>()) {
       if (objcAttr->hasName())
         ctor->getMutableAttrs().add(objcAttr->clone(ctx));
