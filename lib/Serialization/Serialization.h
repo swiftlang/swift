@@ -185,8 +185,10 @@ private:
   /// Writes a set of generic requirements.
   void writeRequirements(ArrayRef<Requirement> requirements);
 
-  /// Encode the underlying conformance of a generic or specialized
-  /// conformance.
+  /// Encode a reference to another conformance.
+  ///
+  /// This is used for the conformances of substitutions and for the
+  /// underlying conformances of specialized and inherited conformances.
   ///
   /// \param conformance The conformance we're encoding.
   ///
@@ -196,17 +198,21 @@ private:
   /// \param moduleID Will be set to the "module ID" value to
   /// be stored in the parent record.
   ///
+  /// \param allowReferencingCurrentModule If false, conformances in the current
+  /// module will always be appended rather than referenced.
+  ///
   /// \returns true if the underlying conformance will need to be written
   /// out as its own record following the parent record.
-  bool encodeUnderlyingConformance(const ProtocolConformance *conformance,
-                                   DeclID &typeID,
-                                   IdentifierID &moduleID);
+  bool encodeReferencedConformance(const ProtocolConformance *conformance,
+                                   DeclID &typeID, ModuleID &moduleID,
+                                   bool allowReferencingCurrentModule);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolDecl *> protocols,
                          ArrayRef<ProtocolConformance *> conformances,
                          const Decl *associatedDecl,
-                         const std::array<unsigned, 256> &abbrCodes);
+                         const std::array<unsigned, 256> &abbrCodes,
+                         bool writeIncomplete = false);
 
   /// Writes an array of members for a decl context.
   ///
@@ -313,7 +319,8 @@ public:
   void writeConformance(const ProtocolDecl *protocol,
                         const ProtocolConformance *conformance,
                         const Decl *associatedDecl,
-                        const std::array<unsigned, 256> &abbrCodes);
+                        const std::array<unsigned, 256> &abbrCodes,
+                        bool writeIncomplete = false);
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams,

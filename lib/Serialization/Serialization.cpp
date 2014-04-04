@@ -697,10 +697,13 @@ bool Serializer::writeGenericParams(const GenericParamList *genericParams,
 }
 
 bool
-Serializer::encodeUnderlyingConformance(const ProtocolConformance *conformance,
+Serializer::encodeReferencedConformance(const ProtocolConformance *conformance,
                                         DeclID &typeID,
-                                        IdentifierID &moduleID) {
+                                        ModuleID &moduleID,
+                                        bool allowReferencingCurrentModule) {
   bool append = !isa<NormalProtocolConformance>(conformance);
+  if (!allowReferencingCurrentModule)
+    append |= conformance->getDeclContext()->getParentModule() == M;
   if (append) {
     // Encode the type in typeID. Set moduleID to BUILTIN_MODULE_ID to indicate
     // that the underlying conformance will follow. This is safe because there
@@ -724,7 +727,8 @@ void
 Serializer::writeConformance(const ProtocolDecl *protocol,
                              const ProtocolConformance *conformance,
                              const Decl *associatedDecl,
-                             const std::array<unsigned, 256> &abbrCodes) {
+                             const std::array<unsigned, 256> &abbrCodes,
+                             bool writeIncomplete) {
   using namespace decls_block;
 
   if (!conformance) {
@@ -773,6 +777,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       ++numDefaultedDefinitions;
     }
 
+    if (writeIncomplete)
+      data.clear();
+
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
@@ -782,6 +789,7 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
                                                 numTypeWitnesses,
                                                 numInheritedConformances,
                                                 numDefaultedDefinitions,
+                                                writeIncomplete,
                                                 data);
 
     // FIXME: Unfortunate to have to copy these.
@@ -792,7 +800,10 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
       inheritedConformance.push_back(inheritedMapping.second);
     }
     writeConformances(inheritedProtos, inheritedConformance, associatedDecl,
-                      abbrCodes);
+                      abbrCodes, writeIncomplete);
+    if (writeIncomplete)
+      break;
+      
     conformance->forEachValueWitness(nullptr,
                                      [&](ValueDecl *req,
                                          ConcreteDeclRef witness) {
@@ -814,11 +825,11 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned abbrCode
       = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     DeclID typeID;
-    IdentifierID moduleID;
+    ModuleID moduleID;
 
     bool appendGenericConformance
-      = encodeUnderlyingConformance(conf->getGenericConformance(),
-                                    typeID, moduleID);
+      = encodeReferencedConformance(conf->getGenericConformance(),
+                                    typeID, moduleID, true);
 
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
@@ -840,11 +851,11 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned abbrCode
       = abbrCodes[InheritedProtocolConformanceLayout::Code];
     DeclID typeID;
-    IdentifierID moduleID;
+    ModuleID moduleID;
 
     bool appendInheritedConformance
-      = encodeUnderlyingConformance(conf->getInheritedConformance(),
-                                    typeID, moduleID);
+      = encodeReferencedConformance(conf->getInheritedConformance(),
+                                    typeID, moduleID, true);
 
     InheritedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                    abbrCode,
@@ -864,41 +875,48 @@ void
 Serializer::writeConformances(ArrayRef<ProtocolDecl *> protocols,
                               ArrayRef<ProtocolConformance *> conformances,
                               const Decl *associatedDecl,
-                              const std::array<unsigned, 256> &abbrCodes) {
+                              const std::array<unsigned, 256> &abbrCodes,
+                              bool writeIncomplete) {
   using namespace decls_block;
 
   for_each(protocols, conformances,
            [&](const ProtocolDecl *proto, const ProtocolConformance *conf) {
-    writeConformance(proto, conf, associatedDecl, abbrCodes);
+    writeConformance(proto, conf, associatedDecl, abbrCodes, writeIncomplete);
   });
 }
 
-/// Writes a list of generic substitutions.
-void Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
-                     const std::array<unsigned, 256> &abbrCodes) {
+void
+Serializer::writeSubstitutions(ArrayRef<Substitution> substitutions,
+                               const std::array<unsigned, 256> &abbrCodes) {
   using namespace decls_block;
   auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
   for (auto &sub : substitutions) {
-    BoundGenericSubstitutionLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
-      addTypeRef(sub.Archetype),
-      addTypeRef(sub.Replacement),
-      sub.Archetype->getConformsTo().size());
-    ArrayRef<ProtocolConformance*> conformances = sub.Conformance;
+    SmallVector<DeclID, 16> conformanceData;
+    SmallVector<const ProtocolConformance *, 8> conformancesToWrite;
 
-    // For archetypes the conformance information is context dependent,
-    // the conformance array is either empty or full of nulls and can be
-    // ignored. We use an array of null pointers for conformances to satisfy
-    // the requirement in writeConformances: the first and second arguments
-    // have the same size.
-    SmallVector<ProtocolConformance *, 4> conformancesBuf;
-    if (sub.Conformance.empty() && !sub.Archetype->getConformsTo().empty()) {
-      conformancesBuf.resize(sub.Archetype->getConformsTo().size(),
-                             nullptr);
-      conformances = conformancesBuf;
+    for (const ProtocolConformance *conformance : sub.Conformance) {
+      DeclID typeID;
+      ModuleID moduleID;
+      if (!conformance) {
+        typeID = addDeclRef(nullptr);
+        moduleID = BUILTIN_MODULE_ID;
+      } else if (encodeReferencedConformance(conformance, typeID, moduleID,
+                                             false)) {
+        conformancesToWrite.push_back(conformance);
+      }
+      conformanceData.push_back(typeID);
+      conformanceData.push_back(moduleID);
     }
-    writeConformances(sub.Archetype->getConformsTo(), conformances, nullptr,
-                      abbrCodes);
+
+    BoundGenericSubstitutionLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                               addTypeRef(sub.Archetype),
+                                               addTypeRef(sub.Replacement),
+                                               conformanceData);
+
+    for (const ProtocolConformance *conformance : conformancesToWrite) {
+      writeConformance(conformance->getProtocol(), conformance, nullptr,
+                       abbrCodes, /*writeIncomplete=*/true);
+    }
   }
 }
 

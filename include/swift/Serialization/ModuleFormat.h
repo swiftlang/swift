@@ -49,8 +49,9 @@ using DeclIDField = BCFixed<31>;
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
-using IdentifierID = Fixnum<31>;
-using IdentifierIDField = BCFixed<31>;
+// IdentifierID must be the same as DeclID because it is stored in the same way.
+using IdentifierID = DeclID;
+using IdentifierIDField = DeclIDField;
 
 // ModuleID must be the same as IdentifierID because it is stored the same way.
 using ModuleID = IdentifierID;
@@ -486,8 +487,10 @@ namespace decls_block {
     BOUND_GENERIC_SUBSTITUTION,
     TypeIDField, // archetype
     TypeIDField, // replacement
-    BCVBR<6>     // # of conformances
-    // Trailed by the protocol conformance info (if any)
+    BCArray<DeclIDField> // alternating conforming type and conformance module
+                         // using the same format as the decl/module fields in
+                         // SpecializedProtocolConformanceLayout.
+    // Trailed by inline protocol conformance info (if any)
   >;
 
   using PolymorphicFunctionTypeLayout = BCRecordLayout<
@@ -886,6 +889,9 @@ namespace decls_block {
     BCVBR<5>, // type mapping count
     BCVBR<5>, // inherited conformances count
     BCVBR<5>, // defaulted definitions count
+    BCFixed<1>, // incomplete?
+                // If set, the data array is empty and only inherited
+                // conformances trail the record.
     BCArray<DeclIDField>
     // The array contains value-value-substitutionCount triplets,
     // then type declarations, then defaulted definitions.

@@ -402,7 +402,7 @@ static ProtocolConformance *findConformance(ProtocolDecl *proto,
 
 
 ProtocolConformance *
-ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
+ModuleFile::readReferencedConformance(ProtocolDecl *proto,
                                       DeclID typeID,
                                       IdentifierID moduleID,
                                       llvm::BitstreamCursor &Cursor) {
@@ -457,7 +457,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     DeclID typeID;
-    IdentifierID moduleID;
+    ModuleID moduleID;
     unsigned numSubstitutions;
     SpecializedProtocolConformanceLayout::readRecord(scratch, protoID,
                                                      typeID,
@@ -477,7 +477,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
     }
 
     ProtocolConformance *genericConformance
-      = readUnderlyingConformance(proto, typeID, moduleID, Cursor);
+      = readReferencedConformance(proto, typeID, moduleID, Cursor);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
@@ -490,7 +490,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
   case INHERITED_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     DeclID typeID;
-    IdentifierID moduleID;
+    ModuleID moduleID;
     InheritedProtocolConformanceLayout::readRecord(scratch, protoID,
                                                    typeID,
                                                    moduleID);
@@ -500,7 +500,7 @@ ModuleFile::maybeReadConformance(Type conformingType,
     auto proto = cast<ProtocolDecl>(getDecl(protoID));
 
     ProtocolConformance *inheritedConformance
-      = readUnderlyingConformance(proto, typeID, moduleID, Cursor);
+      = readReferencedConformance(proto, typeID, moduleID, Cursor);
 
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
@@ -517,12 +517,19 @@ ModuleFile::maybeReadConformance(Type conformingType,
 
   DeclID protoID;
   unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  bool isIncomplete;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               valueCount, typeCount,
                                               inheritedCount, defaultedCount,
-                                              rawIDs);
+                                              isIncomplete, rawIDs);
+
+  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  ASTContext &ctx = getContext();
+  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
+                                        FileContext,
+                                        ProtocolConformanceState::Incomplete);
 
   InheritedConformanceMap inheritedConformances;
 
@@ -533,9 +540,16 @@ ModuleFile::maybeReadConformance(Type conformingType,
     inheritedConformances[(*inherited)->getProtocol()] = *inherited;
   }
 
-  ASTContext &ctx = getContext();
+  // Reset the offset RAII to the end of the trailing records.
+  lastRecordOffset.reset();
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  if (conformance->getState() == ProtocolConformanceState::Incomplete)
+    if (conformance->getInheritedConformances().empty())
+      for (auto inherited : inheritedConformances)
+        conformance->setInheritedConformance(inherited.first, inherited.second);
+
+  if (isIncomplete)
+    return conformance;
 
   WitnessMap witnesses;
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
@@ -586,18 +600,10 @@ ModuleFile::maybeReadConformance(Type conformingType,
   // Reset the offset RAII to the end of the trailing records.
   lastRecordOffset.reset();
 
-  auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(),
-                                        FileContext,
-                                        ProtocolConformanceState::Incomplete);
   // If we have a complete protocol conformance do not attempt to initialize
-  // it. Just return the proto, conformance pair.
+  // it. Just return the conformance.
   if (conformance->getState() == ProtocolConformanceState::Complete)
     return conformance;
-
-  // Set inherited conformances.
-  for (auto inherited : inheritedConformances) {
-    conformance->setInheritedConformance(inherited.first, inherited.second);
-  }
 
   // Set type witnesses.
   for (auto typeWitness : typeWitnesses) {
@@ -618,44 +624,53 @@ ModuleFile::maybeReadConformance(Type conformingType,
   return conformance;
 }
 
-Optional<Substitution> ModuleFile::maybeReadSubstitution(
-                           llvm::BitstreamCursor &Cursor) {
-  BCOffsetRAII lastRecordOffset(Cursor);
+Optional<Substitution>
+ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor) {
+  BCOffsetRAII lastRecordOffset(cursor);
 
-  auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+  auto entry = cursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record)
     return Nothing;
 
   StringRef blobData;
   SmallVector<uint64_t, 2> scratch;
-  unsigned recordID = Cursor.readRecord(entry.ID, scratch,
-                                        &blobData);
+  unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
   if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
     return Nothing;
 
 
   TypeID archetypeID, replacementID;
-  unsigned numConformances;
+  ArrayRef<uint64_t> rawConformanceData;
   decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
                                                           archetypeID,
                                                           replacementID,
-                                                          numConformances);
+                                                          rawConformanceData);
 
   auto archetypeTy = getType(archetypeID)->castTo<ArchetypeType>();
   auto replacementTy = getType(replacementID);
 
-  ASTContext &ctx = getContext();
-
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
-  while (numConformances--) {
-    auto conformance = maybeReadConformance(replacementTy, Cursor);
-    assert(conformance.hasValue() && "Missing conformance");
-    conformanceBuf.push_back(conformance.getValue());
+  ArrayRef<ProtocolDecl *> protos = archetypeTy->getConformsTo();
+  assert(rawConformanceData.size() % 2 == 0);
+  while (!rawConformanceData.empty()) {
+    ProtocolConformance *conformance = nullptr;
+    // A null associated type means there is no conformance.
+    if (DeclID(rawConformanceData[0])) {
+      conformance = readReferencedConformance(protos.front(),
+                                              rawConformanceData[0],
+                                              rawConformanceData[1],
+                                              cursor);
+      assert(conformance && "Missing conformance");
+    }
+    conformanceBuf.push_back(conformance);
+
+    protos = protos.slice(1);
+    rawConformanceData = rawConformanceData.slice(2);
   }
 
   lastRecordOffset.reset();
   return Substitution{archetypeTy, replacementTy,
-                      ctx.AllocateCopy(conformanceBuf)};
+                      getContext().AllocateCopy(conformanceBuf)};
 }
 
 GenericParamList *

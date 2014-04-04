@@ -307,12 +307,12 @@ private:
   /// If the record at the cursor is not a pattern, returns null.
   Pattern *maybeReadPattern();
 
-  /// Read the underlying conformance for a specialized or inherited
-  /// protocol conformance.
+  /// Read a referenced conformance, such as the underlying conformance for a
+  /// specialized or inherited protocol conformance.
   ProtocolConformance *
-  readUnderlyingConformance(ProtocolDecl *proto,
+  readReferencedConformance(ProtocolDecl *proto,
                             serialization::DeclID typeID,
-                            serialization::IdentifierID moduleID,
+                            serialization::ModuleID moduleID,
                             llvm::BitstreamCursor &Cursor);
 
   GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
