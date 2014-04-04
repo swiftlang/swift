@@ -104,6 +104,11 @@
   The @objc attribute can be used to name initializers, methods,
   getters, setters, classes, and protocols.
 
+* Methods, properties and subscripts in classes can now be marked with the
+  @final attribute.  This attribute prevents overriding the declaration in any
+  subclass, and provides better performance (since dynamic dispatch is avoided
+  in many cases).
+
 
 2014-03-26
 ----------
