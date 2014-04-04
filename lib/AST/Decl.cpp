@@ -29,6 +29,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/StringExtras.h"
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/DeclObjC.h"
@@ -2209,6 +2210,17 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
     return out.str();
 
   // Otherwise, it's at least a unary selector.
+
+  // If the first tuple element has a name, uppercase and emit it.
+  if (tuple && getASTContext().LangOpts.SplitPrepositions) {
+    llvm::SmallString<16> scratch;
+    if (auto named = dyn_cast<NamedPattern>(
+                       tuple->getFields()[0].getPattern()
+                         ->getSemanticsProvidingPattern())) {
+      out << camel_case::toSentencecase(named->getBoundName().str(), scratch);
+    }
+  }
+
   out << ':';
 
   // If it's a unary selector, we're done.
