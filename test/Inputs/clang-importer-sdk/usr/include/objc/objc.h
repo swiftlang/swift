@@ -17,6 +17,7 @@ typedef signed char BOOL;
 - (Class)myClass;
 + description;
 - (BOOL)allowsWeakReference __attribute__((unavailable));
+- (BOOL)isEqual:(NSObject *)other;
 @end
 
 @interface A : NSObject

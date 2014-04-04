@@ -603,6 +603,12 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
           ++score1;
       }
 
+      // A class member is always better than a curried instance member.
+      if (decl1->isInstanceMember() && !decl2->isInstanceMember())
+        ++score2;
+      else if (decl2->isInstanceMember() && !decl1->isInstanceMember())
+        ++score1;
+
       break;
     }
   }
