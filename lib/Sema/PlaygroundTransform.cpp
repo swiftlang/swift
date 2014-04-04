@@ -56,6 +56,8 @@ public:
       return transformDoWhileStmt(llvm::cast<DoWhileStmt>(S));
     case StmtKind::For:
       return transformForStmt(llvm::cast<ForStmt>(S));
+    case StmtKind::ForEach:
+      return transformForEachStmt(llvm::cast<ForEachStmt>(S));
     }
   }
     
@@ -212,10 +214,39 @@ public:
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
-        Stmt *NS = transformStmt(S);
-        if (NS != S) {
-          Modified = true;
-          Elements[EI] = NS;
+        if (ReturnStmt *RS = llvm::dyn_cast<ReturnStmt>(S)) {
+          if (RS->hasResult()) {
+            std::pair<PatternBindingDecl *, VarDecl *> PV =
+              buildPatternAndVariable(RS->getResult());
+            DeclRefExpr *DRE =
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        RS->getResult()->getType());
+            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(),
+                                                       DRE,
+                                                       true); // implicit
+            Expr *Log = buildLoggerCall(
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        RS->getResult()->getType()),
+              RS->getResult()->getSourceRange());
+            Modified = true;
+            Elements[EI] = PV.first;
+            Elements.insert(Elements.begin() + (EI + 1), PV.second);
+            Elements.insert(Elements.begin() + (EI + 2), Log);
+            Elements.insert(Elements.begin() + (EI + 3), NRS);
+            EI += 3;
+          }
+        } else {
+          Stmt *NS = transformStmt(S);
+          if (NS != S) {
+            Modified = true;
+            Elements[EI] = NS;
+          }
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
         if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
@@ -224,6 +255,14 @@ public:
             Modified = true;
             Elements.insert(Elements.begin() + (EI + 1), Log);
             ++EI;
+          }
+        }
+        else if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
+          if (BraceStmt *B = FD->getBody()) {
+            BraceStmt *NB = transformBraceStmt(B);
+            if (NB != B) {
+              FD->setBody(NB);
+            }
           }
         }
       }
