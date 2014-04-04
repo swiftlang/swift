@@ -181,7 +181,24 @@ namespace irgen {
   /// startup.
   llvm::Value *emitProtocolDescriptorRef(IRGenFunction &IGF,
                                          ProtocolDecl *protocol);
-
+  
+  /// Adjustment indices for the address points of various metadata.
+  /// Size is in words.
+  namespace MetadataAdjustmentIndex {
+    enum : unsigned {
+      // Class metadata has two words of head-allocated data: the destructor
+      // and the value witness table.
+      Class = 2,
+      
+      // Struct and enum metadata have one word of head-allocated data:
+      // the value witness table.
+      ValueType = 1,
+      
+      // Other metadata objects have no head allocation.
+      None = 0,
+    };
+  }
+  
 } // end namespace irgen
 } // end namespace swift
 

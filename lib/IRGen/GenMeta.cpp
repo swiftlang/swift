@@ -28,6 +28,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/Module.h"
 #include "llvm/ADT/SmallString.h"
 
 #include "Address.h"
@@ -2007,6 +2008,35 @@ namespace {
   };
 }
 
+/// Emit the ObjC-compatible class symbol for a class.
+/// Since LLVM and many system linkers do not have a notion of relative symbol
+/// references, we emit the symbol as a global asm block.
+static void emitObjCClassSymbol(IRGenModule &IGM,
+                                ClassDecl *classDecl,
+                                llvm::GlobalVariable *fullMetadata) {
+  llvm::SmallString<128> asmString;
+  llvm::raw_svector_ostream os(asmString);
+  
+  llvm::SmallString<32> classSymbol;
+  LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
+  
+  // Get the address point offset into the full metadata.
+  auto addrPointOffset
+    = llvm::ConstantInt::get(IGM.Int32Ty, MetadataAdjustmentIndex::Class);
+  llvm::Constant *gepIndexes[] = {
+    llvm::ConstantInt::get(IGM.Int32Ty, 0),
+    addrPointOffset,
+  };
+  auto addressPoint
+    = llvm::ConstantExpr::getGetElementPtr(fullMetadata, gepIndexes);
+  
+  // Create the alias.
+  new llvm::GlobalAlias(addressPoint->getType(),
+                        fullMetadata->getLinkage(),
+                        classSymbol.str(), addressPoint,
+                        IGM.getModule());
+}
+
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const StructLayout &layout) {
@@ -2043,11 +2073,22 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   // Add non-generic classes to the ObjC class list.
   if (IGM.ObjCInterop && !isPattern && !isIndirect) {
+    
     // We can't just use 'var' here because it's unadjusted.  Instead
     // of re-implementing the adjustment logic, just pull the metadata
     // pointer again.
     auto metadata =
       IGM.getAddrOfTypeMetadata(declaredType, isIndirect, isPattern);
+    
+    // Emit the ObjC class symbol to make the class visible to ObjC.
+    if (classDecl->isObjC()) {
+      // FIXME: Put the variable in a no_dead_strip section, as a workaround to
+      // avoid linker transformations that may break up the symbol.
+      var->setSection("__DATA,__objc_data, regular, no_dead_strip");
+      
+      emitObjCClassSymbol(IGM, classDecl, var);
+    }
+    
     IGM.addObjCClass(metadata);
   }
 }
