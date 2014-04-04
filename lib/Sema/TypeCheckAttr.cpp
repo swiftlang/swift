@@ -49,11 +49,6 @@ namespace {
 
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
-  // FIXME: Customize message to the kind of thing.
-  //      TC.diagnose(Override, diag::override_final);
-  //      TC.diagnose(Base, diag::overridden_here);
-  
-  
   // The @final attribute only makes sense in the context of a class
   // declaration.  Reject it on global functions, structs, enums, etc.
   auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();

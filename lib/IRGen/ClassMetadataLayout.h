@@ -116,6 +116,11 @@ private:
     
     // Add entries for the methods.
     for (auto member : theClass->getMembers()) {
+      // If this is a non-overriding @final member, we don't need table entries.
+      if (auto *VD = dyn_cast<ValueDecl>(member))
+        if (VD->isFinal() && VD->getOverriddenDecl() == nullptr)
+          continue;
+      
       // Add entries for methods.
       if (auto fn = dyn_cast<FuncDecl>(member)) {
         // Ignore accessors.  These get added when their AbstractStorageDecl is
@@ -128,7 +133,6 @@ private:
         addMethodEntries(ctor);
       } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
         // FIXME: Stored properties shouldn't be represented this way.
-        // FIXME: Handle @final.
         if (!asd->hasAccessorFunctions()) continue;
 
         addMethodEntries(asd->getGetter());

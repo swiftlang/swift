@@ -1033,6 +1033,11 @@ public:
     }
     
   not_overridden:
+    // If this is a @final member and isn't overriding something, we don't need
+    // to add it to the vtable.
+    if (member.getDecl()->isFinal())
+      return;
+    
     // Otherwise, introduce a new vtable entry.
     vtableEntries.emplace_back(member, SGM.getFunction(member, NotForDefinition));
   }
@@ -1041,8 +1046,8 @@ public:
   void visitDecl(Decl*) {}
   
   void visitFuncDecl(FuncDecl *fd) {
-    // ObjC decls and observing accessors don't go in vtables.
-    if (fd->hasClangNode() || fd->isObservingAccessor())
+    // ObjC declsdon't go in vtables.
+    if (fd->hasClangNode())
       return;
     
     addEntry(SILDeclRef(fd));
