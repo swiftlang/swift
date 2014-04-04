@@ -53,12 +53,19 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   //      TC.diagnose(Override, diag::override_final);
   //      TC.diagnose(Base, diag::overridden_here);
   
+  
+  // The @final attribute only makes sense in the context of a
   auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
   auto contextTypeDecl =
     typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
-  if (!isa<ClassDecl>(contextTypeDecl))
+  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
     TC.diagnose(D, diag::member_cannot_be_final);
+    return;
+  }
  
+  
+  
+  
 }
 
 
