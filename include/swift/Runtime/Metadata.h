@@ -1227,6 +1227,23 @@ struct ExistentialTypeMetadata : public Metadata {
   constexpr ExistentialTypeMetadata()
     : Metadata{MetadataKind::Existential},
       Flags(ExistentialTypeFlags()), Protocols() {}
+  
+  /// Project the value pointer from an existential container of the type
+  /// described by this metadata.
+  const OpaqueValue *projectValue(const OpaqueValue *container) const;
+  
+  OpaqueValue *projectValue(OpaqueValue *container) const {
+    return const_cast<OpaqueValue *>(container);
+  }
+  
+  /// Get the dynamic type from an existential container of the type described
+  /// by this metadata.
+  const Metadata *getDynamicType(const OpaqueValue *container) const;
+  
+  /// Get a witness table from an existential container of the type described
+  /// by this metadata.
+  const void * const *getWitnessTable(const OpaqueValue *container,
+                                      unsigned i) const;
 };
 
 /// \brief The header in front of a generic metadata template.

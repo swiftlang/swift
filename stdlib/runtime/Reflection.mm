@@ -177,7 +177,7 @@ public:
   
   /// Build a new MagicMirror for type T by taking ownership of the referenced
   /// value.
-  MagicMirror(OpaqueValue *value, const Metadata *T);
+  MagicMirror(OpaqueValue *value, const Metadata *T, bool take);
   
   /// Build a new MagicMirror for type T, sharing ownership with an existing
   /// heap object, which is retained.
@@ -761,14 +761,18 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
 }
   
 /// MagicMirror ownership-taking whole-value constructor.
-MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T) {
+MagicMirror::MagicMirror(OpaqueValue *value, const Metadata *T,
+                         bool take) {
   // Put value types into a box so we can take stable interior pointers.
   // TODO: Specialize behavior here. If the value is a swift-refcounted class
   // we don't need to put it in a box to point into it.
   BoxPair box = swift_allocBox(T);
   
-  T->vw_initializeWithTake(box.value, value);
-  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, value);
+  if (take)
+    T->vw_initializeWithTake(box.value, value);
+  else
+    T->vw_initializeWithCopy(box.value, value);
+  std::tie(T, Self, MirrorWitness) = getImplementationForType(T, box.value);
   
   Data = {box.heapObject, box.value, T};
 }
@@ -780,10 +784,67 @@ MagicMirror::MagicMirror(HeapObject *owner,
   Data = {owner, value, T};
 }
   
-static const ReflectableWitnessTable *
-getReflectableConformance(const Metadata *T) {
-  return reinterpret_cast<const ReflectableWitnessTable*>(
-    swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr));
+static std::tuple<const ReflectableWitnessTable *, const Metadata *,
+                  const OpaqueValue *>
+getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
+  // If the value is an existential container, look through it to reflect the
+  // contained value.
+  switch (T->getKind()) {
+  case MetadataKind::Tuple:
+  case MetadataKind::Struct:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::Class:
+  case MetadataKind::Opaque:
+  case MetadataKind::Enum:
+  case MetadataKind::Function:
+  case MetadataKind::Metatype:
+    break;
+      
+  case MetadataKind::Existential: {
+    auto existential
+      = static_cast<const ExistentialTypeMetadata *>(T);
+    
+    // If the existential happens to include the Reflectable protocol, use
+    // the witness table from the container.
+    unsigned wtOffset = 0;
+    for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
+      if (existential->Protocols[i] == &_TMpSs11Reflectable) {
+        return {
+          reinterpret_cast<const ReflectableWitnessTable*>(
+            existential->getWitnessTable(Value, wtOffset)),
+          existential->getDynamicType(Value),
+          existential->projectValue(Value)
+        };
+      }
+      if (existential->Protocols[i]->Flags.needsWitnessTable())
+        ++wtOffset;
+    }
+    
+    // Otherwise, unwrap the existential container and do a runtime lookup on
+    // its contained value as usual.
+    T = existential->getDynamicType(Value);
+    Value = existential->projectValue(Value);
+    break;
+  }
+  case MetadataKind::ExistentialMetatype:
+    // TODO: Should look through existential metatypes too, but it doesn't
+    // really matter yet since we don't have any special mirror behavior for
+    // concrete metatypes yet.
+    break;
+      
+  // Types can't have these kinds.
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapArray:
+    abort();
+  }
+  
+  return {
+    reinterpret_cast<const ReflectableWitnessTable*>(
+      swift_conformsToProtocol(T, &_TMpSs11Reflectable, nullptr)),
+    T,
+    Value
+  };
 }
   
 } // end anonymous namespace
@@ -797,11 +858,17 @@ getReflectableConformance(const Metadata *T) {
 /// This function consumes 'value', following Swift's +1 convention for in
 /// arguments.
 Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
-  auto witness = getReflectableConformance(T);
-                                                                  
+  const ReflectableWitnessTable *witness;
+  const Metadata *mirrorType;
+  const OpaqueValue *cMirrorValue;
+  std::tie(witness, mirrorType, cMirrorValue)
+    = getReflectableConformance(T, value);
+  
+  OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
+  
   // Use the Reflectable conformance if the object has one.
   if (witness) {
-    auto result = witness->getMirror(value, T);
+    auto result = witness->getMirror(mirrorValue, mirrorType);
     // 'self' of witnesses is passed at +0, so we still need to consume the
     // value.
     T->vw_destroy(value);
@@ -809,11 +876,15 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   }
   
   // Otherwise, fall back to MagicMirror.
-  {
-    Mirror result;
-    ::new (&result) MagicMirror(value, T);
-    return result;
-  }
+  Mirror result;
+  // Take the value, unless we projected a subvalue from it. We don't want to
+  // deal with partial value deinitialization.
+  bool take = mirrorValue == value;
+  ::new (&result) MagicMirror(mirrorValue, mirrorType, take);
+  // Destroy the whole original value if we couldn't take it.
+  if (!take)
+    T->vw_destroy(value);
+  return result;
 }
 
 /// Produce a mirror for any value, like swift_reflectAny, but do not consume
@@ -822,13 +893,18 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
                                      const OpaqueValue *value,
                                      const Metadata *T) {
-  auto witness = getReflectableConformance(T);
+  const ReflectableWitnessTable *witness;
+  const Metadata *mirrorType;
+  const OpaqueValue *mirrorValue;
+  std::tie(witness, mirrorType, mirrorValue)
+    = getReflectableConformance(T, value);
+  
   // Use the Reflectable conformance if the object has one.
   if (witness) {
-    return witness->getMirror(const_cast<OpaqueValue*>(value), T);
+    return witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
   }
   // Otherwise, fall back to MagicMirror.
   Mirror result;
-  ::new (&result) MagicMirror(owner, value, T);
+  ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;
 }

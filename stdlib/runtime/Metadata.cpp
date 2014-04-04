@@ -1932,6 +1932,55 @@ existential_getValueWitnesses(ProtocolClassConstraint classConstraint,
   
 } // end anonymous namespace
 
+const OpaqueValue *
+ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
+  auto words = reinterpret_cast<const void * const *>(container);
+  
+  // The layout of the container depends on whether it's class-constrained.
+  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+    // The value is a single class reference positioned after the witness table
+    // vector.
+    return reinterpret_cast<const OpaqueValue *>(
+                                           words + Flags.getNumWitnessTables());
+  }
+  
+  // The value is placed in a fixed-size buffer positioned after the metadata
+  // and witness tables. We need to project it using the projectBuffer value
+  // witness for the type.
+  auto metadata = *reinterpret_cast<const Metadata * const *>(container);
+  auto buffer = reinterpret_cast<const ValueBuffer *>(
+                                    // 1 word for metadata, N for witness tables
+                                    words + 1 + Flags.getNumWitnessTables());
+  return metadata->vw_projectBuffer(const_cast<ValueBuffer*>(buffer));
+}
+
+const Metadata *
+ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
+  // The layout of the container depends on whether it's class-constrained.
+  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+    // The metadata can be gotten from the class reference in class existentials.
+    auto obj
+      = *reinterpret_cast<HeapObject * const *>(projectValue(container));
+    return swift_unknownTypeOf(obj);
+  }
+  
+  // The metadata is stored in the first word of opaque existentials.
+  return *reinterpret_cast<const Metadata * const *>(container);
+}
+
+const void * const *
+ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
+                                         unsigned i) const {
+  auto words = reinterpret_cast<const void * const *>(container);
+  
+  // The layout of the container depends on whether it's class-constrained.
+  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class)
+    // The witness tables come first in a class existential.
+    return *reinterpret_cast<const void * const * const *>(words + i);
+  // The witness tables come after the metadata pointer in an opaque existential.
+  return *reinterpret_cast<const void * const * const *>(words + 1 + i);
+}
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
