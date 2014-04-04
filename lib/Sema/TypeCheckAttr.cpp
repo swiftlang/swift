@@ -54,16 +54,33 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   //      TC.diagnose(Base, diag::overridden_here);
   
   
-  // The @final attribute only makes sense in the context of a
+  // The @final attribute only makes sense in the context of a class
+  // declaration.  Reject it on global functions, structs, enums, etc.
   auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
   auto contextTypeDecl =
     typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
   if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
-    TC.diagnose(D, diag::member_cannot_be_final);
+    TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }
  
+  // We currently only support @final on var/let, func and subscript
+  // declarations.
+  // TODO: Support it on classes, which mark all members @final.
+  if (!isa<VarDecl>(D) && !isa<FuncDecl>(D) && !isa<SubscriptDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::final_not_allowed_here);
+    return;
+  }
   
+  if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (FD->isAccessor() && !attr->isImplicit()) {
+      unsigned Kind = 2;
+      if (auto *VD = dyn_cast<VarDecl>(FD->getAccessorStorageDecl()))
+        Kind = VD->isLet() ? 1 : 0;
+      TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind);
+      return;
+    }
+  }
   
   
 }

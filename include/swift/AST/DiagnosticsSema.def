@@ -605,6 +605,13 @@ ERROR(override_final,sema_tcd,none,
 ERROR(member_cannot_be_final,sema_tcd,none,
       "only class member may be marked with the @final attribute", ())
 
+ERROR(final_not_allowed_here,sema_tcd,none,
+      "@final may only be applied to var/let, func, and subscript", ())
+
+ERROR(final_not_on_accessors,sema_tcd,none,
+      "@final cannot be applied to accessors, it must be put on the "
+      "%select{var|let|subscript}0", (unsigned))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
