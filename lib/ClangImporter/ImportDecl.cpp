@@ -1021,7 +1021,7 @@ namespace {
       ASTContext &cxt = Impl.SwiftContext;
       
       // Create the enum declaration and record it.
-      Decl *result;
+      NominalTypeDecl *result;
       auto enumKind = Impl.classifyEnum(decl);
       switch (enumKind) {
       case EnumKind::Constants: {
@@ -1196,6 +1196,9 @@ namespace {
       case EnumKind::Options:
       case EnumKind::Enum:
         addEnumeratorsAsMembers = true;
+        // Do not force the creation of the implicit members just yet.
+        enumeratorDecls.append(result->getMembers(false).begin(),
+                               result->getMembers(false).end());
         break;
       }
       
@@ -1224,14 +1227,9 @@ namespace {
       // FIXME: Source range isn't totally accurate because Clang lacks the
       // location of the '{'.
       if (addEnumeratorsAsMembers) {
-        auto nomResult = cast<NominalTypeDecl>(result);
-        // Do not force the creation of the implicit members just yet.
-        enumeratorDecls.append(nomResult->getMembers(false).begin(),
-                               nomResult->getMembers(false).end());
-        nomResult->setMembers(Impl.SwiftContext.AllocateCopy(enumeratorDecls),
-                                Impl.importSourceRange(clang::SourceRange(
-                                                       decl->getLocation(),
-                                                       decl->getRBraceLoc())));
+        result->setMembers(Impl.SwiftContext.AllocateCopy(enumeratorDecls),
+                           Impl.importSourceRange({ decl->getLocation(),
+                                                    decl->getRBraceLoc() }));
       }
       
       // Add the type decl to ExternalDefinitions so that we can type-check

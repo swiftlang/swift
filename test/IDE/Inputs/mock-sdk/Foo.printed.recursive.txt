@@ -31,11 +31,11 @@ enum FooComparisonResult : CLong {
 
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions {
-  static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get }
   init()
   init(value: CLong)
   var value: CLong
+  static var EnableMince: FooRuncingOptions { get }
+  static var EnableQuince: FooRuncingOptions { get }
   static func fromMask(raw: CLong) -> FooRuncingOptions
   static func fromRaw(raw: CLong) -> FooRuncingOptions?
   func toRaw() -> CLong

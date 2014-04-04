@@ -31,11 +31,11 @@ enum FooComparisonResult : <ref:TypeAlias>CLong</ref> {
 
 <decl>/// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions {
-  <decl>static var EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl>static var EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl>init()</decl>
   <decl>init(value: <ref:TypeAlias>CLong</ref>)</decl>
   <decl>var value: <ref:TypeAlias>CLong</ref></decl>
+  <decl>static var EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl>static var EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl>static func fromMask(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
   <decl>static func fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
   <decl>func toRaw() -> <ref:TypeAlias>CLong</ref></decl>
