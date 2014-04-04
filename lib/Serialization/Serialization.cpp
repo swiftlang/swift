@@ -1229,33 +1229,53 @@ static bool isForced(const Decl *D,
   return false;
 }
 
+static uint8_t getRawStableObjCDeclAttrKind(swift::ObjCAttr::Kind kind) {
+  switch (kind) {
+  case swift::ObjCAttr::Kind::Unnamed:
+    return serialization::ObjCDeclAttrKind::Unnamed;
+  case swift::ObjCAttr::Kind::Nullary:
+    return serialization::ObjCDeclAttrKind::Nullary;
+  case swift::ObjCAttr::Kind::Selector:
+    return serialization::ObjCDeclAttrKind::Selector;
+  }
+}
+
 void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   using namespace decls_block;
 
   switch (DA->getKind()) {
-    case DAK_Count:
-      llvm_unreachable("cannot serialize DAK_Count");
-      return;
+  case DAK_Count:
+    llvm_unreachable("cannot serialize DAK_Count");
+    return;
 
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
-    case DAK_##NAME: {\
-      auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];\
-      CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode);\
-      return;\
-    }
+  case DAK_##NAME: {\
+    auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];\
+    CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode);\
+    return;\
+  }
 #include "swift/AST/Attr.def"
 
-    case DAK_asmname: {
-      auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
-      AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                        cast<AsmnameAttr>(DA)->Name);
-      return;
+  case DAK_asmname: {
+    auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
+    AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      cast<AsmnameAttr>(DA)->Name);
+    return;
+  }
+  case DAK_objc: {
+    auto *theAttr = cast<ObjCAttr>(DA);
+    SmallVector<IdentifierID, 4> names;
+    for (auto name : theAttr->getNames()) {
+      names.push_back(addIdentifierRef(name));
     }
-    case DAK_objc:
-      // FIXME: migrate serialization.
-      return;
-    case DAK_availability:
-      llvm_unreachable("not yet serialized");
+    auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
+    ObjCDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        getRawStableObjCDeclAttrKind(theAttr->getKind()), names);
+    return;
+  }
+  case DAK_availability:
+    llvm_unreachable("not yet serialized");
   }
 }
 
@@ -2364,6 +2384,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<XRefLayout>();
 
     registerDeclTypeAbbr<AsmnameDeclAttrLayout>();
+    registerDeclTypeAbbr<ObjCDeclAttrLayout>();
 #define SIMPLE_DECL_ATTR(X, NAME, ...)\
 registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/Attr.def"

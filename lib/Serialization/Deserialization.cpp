@@ -1386,18 +1386,48 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       switch (recordID) {
-        case decls_block::Asmname_DECL_ATTR:
-          Attr = new (ctx) AsmnameAttr(blobData);
+      case decls_block::Asmname_DECL_ATTR:
+        Attr = new (ctx) AsmnameAttr(blobData);
+        break;
+
+      case decls_block::ObjC_DECL_ATTR: {
+        uint8_t kind;
+        ArrayRef<uint64_t> rawNameIDs;
+        serialization::decls_block::ObjCDeclAttrLayout::readRecord(
+            scratch, kind, rawNameIDs);
+
+        SmallVector<Identifier, 4> names;
+        for (auto nameID : rawNameIDs)
+          names.push_back(getIdentifier(nameID));
+
+        switch (kind) {
+        case serialization::ObjCDeclAttrKind::Unnamed:
+          Attr = ObjCAttr::createUnnamed(ctx, SourceLoc(), SourceLoc());
           break;
-#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
-         case decls_block::CLASS##_DECL_ATTR:\
-          Attr = new (ctx) CLASS##Attr();\
+        case serialization::ObjCDeclAttrKind::Nullary:
+          Attr = ObjCAttr::createNullary(ctx, names[0]);
           break;
-#include "swift/AST/Attr.def"
+        case serialization::ObjCDeclAttrKind::Selector:
+          Attr = ObjCAttr::createSelector(ctx, names);
+          break;
         default:
-          // We don't know how to deserialize this kind of attribute.
+          // Unknown kind.  Drop the attribute and continue, but log an error.
           error();
-          return nullptr;
+          break;
+        }
+        break;
+      }
+
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
+       case decls_block::CLASS##_DECL_ATTR:\
+        Attr = new (ctx) CLASS##Attr();\
+        break;
+#include "swift/AST/Attr.def"
+
+      default:
+        // We don't know how to deserialize this kind of attribute.
+        error();
+        return nullptr;
       }
 
       if (!Attr)
@@ -1409,6 +1439,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
       // Advance bitstream cursor to the next record.
       entry = DeclTypeCursor.advance();
+
+      // Prepare to read the next record.
+      scratch.clear();
       continue;
     }
 
@@ -2350,12 +2383,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     return nullptr;
   }
 
-  if (DidRecord)
-    DidRecord(declOrOffset);
-
   // Record the attributes.
   if (DAttrs)
     declOrOffset.get()->getMutableAttrs().setRawAttributeChain(DAttrs);
+
+  if (DidRecord)
+    DidRecord(declOrOffset);
 
   return declOrOffset;
 }

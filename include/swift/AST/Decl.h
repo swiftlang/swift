@@ -1693,9 +1693,12 @@ public:
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
 
-  /// isObjC - Returns true if the decl requires Objective-C interop.
+  /// Returns true if the decl requires Objective-C interop.
+  ///
+  /// This can be true even if there is no 'objc' attribute on the declaration.
+  /// In that case it was inferred by the type checker.
   bool isObjC() const { return AttrsAndIsObjC.getInt(); }
-  
+
   void setIsObjC(bool value) {
     AttrsAndIsObjC.setInt(value);
   }
