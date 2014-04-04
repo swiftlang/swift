@@ -1393,6 +1393,8 @@ static bool protocolExtensionRequiresCategory(ProtocolDecl *protocol,
 
 /// Emit a type extension.
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
+  ClassDecl *origClass = ext->getExtendedType()->getClassOrBoundGenericClass();
+
   for (Decl *member : ext->getMembers()) {
     switch (member->getKind()) {
     case DeclKind::Import:
@@ -1433,11 +1435,15 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::Class:
       emitClassDecl(cast<ClassDecl>(member));
       continue;
-    case DeclKind::Var:
-      if (!cast<VarDecl>(member)->hasStorage())
+    case DeclKind::Var: {
+      auto var = cast<VarDecl>(member);
+      if (!var->hasStorage())
         // Getter/setter will be handled separately.
         continue;
+      if (var->isStatic() && !origClass)
+        continue;
       llvm_unreachable("decl not allowed in extension!");
+    }
     case DeclKind::Func:
       emitLocalDecls(cast<FuncDecl>(member));
       continue;
@@ -1451,8 +1457,6 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   // If the original class is ObjC, or the extension either introduces a
   // conformance to an ObjC protocol or introduces a method that requires an
   // Objective-C entry point, generate a category.
-  ClassDecl *origClass = ext->getDeclaredTypeInContext()
-    ->getClassOrBoundGenericClass();
   if (!origClass)
     return;
   bool needsCategory = origClass->isObjC();

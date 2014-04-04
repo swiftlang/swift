@@ -1075,6 +1075,18 @@ public:
   }
 };
 
+static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
+                                         GenericParamList *generics,
+                                         NominalTypeDecl *theType,
+                                         VarDecl *var) {
+  assert(!generics && "generic static properties not implemented");
+  assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
+         && "only value type static properties are implemented");
+
+  SGM.addGlobalVariable(var);
+}
+
+
 /// An ASTVisitor for generating SIL from method declarations
 /// inside nominal types.
 class SILGenType : public Lowering::ASTVisitor<SILGenType> {
@@ -1153,13 +1165,8 @@ public:
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
-      assert(!theType->getGenericParams()
-             && "generic static properties not implemented");
-      assert((isa<StructDecl>(theType) || isa<EnumDecl>(theType))
-             && "only value type static properties are implemented");
-      
-      SGM.addGlobalVariable(vd);
-      return;
+      return emitTypeMemberGlobalVariable(SGM, theType->getGenericParams(),
+                                          theType, vd);
     }
     
     visitAbstractStorageDecl(vd);
@@ -1324,8 +1331,21 @@ public:
     llvm_unreachable("destructor in extension?!");
   }
   
-  // no-ops. We don't deal with the layout of types here.
-  void visitPatternBindingDecl(PatternBindingDecl *) {}
+  void visitPatternBindingDecl(PatternBindingDecl *pd) {
+    if (pd->isStatic() && pd->hasInit()) {
+      SGM.emitGlobalInitialization(pd);
+    }
+  }
+
+  void visitVarDecl(VarDecl *vd) {
+    if (vd->isStatic() && vd->hasStorage()) {
+      ExtensionDecl *ext = cast<ExtensionDecl>(vd->getDeclContext());
+      NominalTypeDecl *theType = ext->getExtendedType()->getAnyNominal();
+      return emitTypeMemberGlobalVariable(SGM, ext->getGenericParams(),
+                                          theType, vd);
+    }
+    visitAbstractStorageDecl(vd);
+  }
   
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
     if (vd->usesObjCGetterAndSetter())
