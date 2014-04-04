@@ -46,7 +46,7 @@ module CoreData {
   export *
 }
 
-module AnotherBase {
-  header "AnotherBase.h"
+module ObjCParseExtras {
+  header "ObjCParseExtras.h"
   export *
 }

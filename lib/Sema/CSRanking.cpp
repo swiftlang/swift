@@ -604,10 +604,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
 
       // A class member is always better than a curried instance member.
-      if (decl1->isInstanceMember() && !decl2->isInstanceMember())
-        ++score2;
-      else if (decl2->isInstanceMember() && !decl1->isInstanceMember())
+      // If the members agree on instance-ness, a property is better than a
+      // method (because a method is usually immediately invoked).
+      if (!decl1->isInstanceMember() && decl2->isInstanceMember())
         ++score1;
+      else if (!decl2->isInstanceMember() && decl1->isInstanceMember())
+        ++score2;
+      else if (isa<VarDecl>(decl1) && isa<FuncDecl>(decl2))
+        ++score1;
+      else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
+        ++score2;
 
       break;
     }

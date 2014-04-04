@@ -3197,7 +3197,8 @@ namespace {
       dc->lookupQualified(containerTy, name, NL_QualifiedDefault,
                           Impl.getTypeResolver(), lookup);
       for (auto result : lookup) {
-        if (isa<FuncDecl>(result))
+        if (isa<FuncDecl>(result) && result->isInstanceMember() &&
+            result->getFullName().getArgumentNames().empty())
           return nullptr;
 
         if (auto var = dyn_cast<VarDecl>(result))
