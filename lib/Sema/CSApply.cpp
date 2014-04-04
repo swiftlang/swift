@@ -3774,10 +3774,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     auto ctor = cast<ConstructorDecl>(decl);
     // FIXME: Better description of the initializer than just it's type.
     if (ctor->isImplicit())
-      tc.diagnose(decl, diag::note_nonabstract_implicit_initializer,
+      tc.diagnose(decl, diag::note_nonrequired_implicit_initializer,
                   ctor->getArgumentType());
     else
-      tc.diagnose(decl, diag::note_nonabstract_initializer);
+      tc.diagnose(decl, diag::note_nonrequired_initializer);
   } else if (isa<ConstructorDecl>(decl) && ty->isExistentialType() &&
              fn->isStaticallyDerivedMetatype()) {
     tc.diagnose(apply->getLoc(), diag::static_construct_existential, ty)

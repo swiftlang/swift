@@ -67,6 +67,8 @@ struct PrintOptions {
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
+  bool PrintImplicitAttrs = true;
+
   /// \brief Whether to print documentation comments attached to declarations.
   bool PrintDocumentationComments = false;
 
@@ -82,6 +84,7 @@ struct PrintOptions {
     result.VarInitializers = true;
     result.PrintDefaultParameterPlaceholder = true;
     result.SkipImplicit = false;
+    result.PrintImplicitAttrs = true;
     result.PrintDocumentationComments = true;
     return result;
   }

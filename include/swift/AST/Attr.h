@@ -265,6 +265,8 @@ protected:
 
     // Whether this attribute was implicitly added.
     unsigned Implicit : 1;
+
+    unsigned Invalid : 1;
   };
   enum { NumDeclAttrBits = 9 };
   static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
@@ -298,6 +300,7 @@ protected:
   {
     DeclAttrBits.Kind = static_cast<unsigned>(DK);
     DeclAttrBits.Implicit = Implicit;
+    DeclAttrBits.Invalid = 0;
   }
 
   enum DeclAttrOptions {
@@ -337,6 +340,14 @@ public:
   void setImplicit(bool Implicit) {
     DeclAttrBits.Implicit = Implicit;
   }
+
+  /// Returns true if this attribute was find to be invalid in some way by
+  /// semantic analysis.  In that case, the attribute should not be considered,
+  /// the attribute node should be only used to retrieve source information.
+  bool isInvalid() const { return DeclAttrBits.Invalid; }
+  void setInvalid() { DeclAttrBits.Invalid = true; }
+
+  bool isValid() const { return !isInvalid(); }
 
   /// Returns the address of the next pointer field.
   /// Used for object deserialization.
@@ -433,8 +444,8 @@ public:
 template<DeclAttrKind Kind>
 class SimpleDeclAttr : public DeclAttribute {
 public:
-  SimpleDeclAttr()
-    : DeclAttribute(Kind, SourceLoc(), SourceLoc(), /*isImplicit=*/true) { }
+  SimpleDeclAttr(bool IsImplicit)
+    : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) { }
 
   SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
     : DeclAttribute(Kind, AtLoc, NameLoc, /*isImplicit=*/false) { }
@@ -762,7 +773,6 @@ public:
   bool requiresStoredPropertyInits() const {
     return has(AK_requires_stored_property_inits);
   }
-  bool isRequired() const { return has(AK_required); }
 
   bool hasMutating() const { return has(AK_mutating); }
   Optional<bool> getMutating() const {
@@ -836,6 +846,13 @@ public:
   /// Determine whether there is an attribute with the given attribute class.
   template <typename ATTR>
   bool hasAttribute() const { return getAttribute<ATTR>() != nullptr; }
+
+  /// Determine whether there is an attribute with the given attribute class.
+  template <typename ATTR>
+  bool hasValidAttribute() const {
+    auto TheAttribute = getAttribute<ATTR>();
+    return TheAttribute && TheAttribute->isValid();
+  }
 
   /// Retrieve the first attribute with the given kind.
   const DeclAttribute *getAttribute(DeclAttrKind DK) const {

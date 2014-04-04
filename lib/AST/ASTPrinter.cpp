@@ -296,10 +296,7 @@ private:
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
-  // Always skip implicit attributes.
-  PrintOptions AttrOptions = Options;
-  AttrOptions.SkipImplicit = true;
-  Attrs.print(Printer, AttrOptions);
+  Attrs.print(Printer, Options);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,
@@ -1052,10 +1049,6 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
-  if (!Options.SkipImplicit && decl->isRequired() &&
-      !decl->getAttrs().isRequired()) {
-    Printer << "/* @required(inferred) */ ";
-  }
 
   Printer << "init";
   if (decl->isGeneric()) {

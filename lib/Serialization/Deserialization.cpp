@@ -1418,10 +1418,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
         break;
       }
 
-#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
-       case decls_block::CLASS##_DECL_ATTR:\
-        Attr = new (ctx) CLASS##Attr();\
-        break;
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
+      case decls_block::CLASS##_DECL_ATTR: { \
+        bool isImplicit; \
+        serialization::decls_block::CLASS##DeclAttrLayout::readRecord( \
+            scratch, isImplicit); \
+        Attr = new (ctx) CLASS##Attr(isImplicit); \
+        break; \
+      }
 #include "swift/AST/Attr.def"
 
       default:
@@ -1633,7 +1637,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit, hasSelectorStyleSignature, isObjC, isTransparent;
-    bool isRequired;
     bool isCompleteObjectInit;
     TypeID signatureID;
     TypeID interfaceID;
@@ -1642,7 +1645,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
                                                isObjC, isTransparent,
-                                               isRequired, isCompleteObjectInit,
+                                               isCompleteObjectInit,
                                                signatureID, interfaceID,
                                                overriddenID);
     auto parent = getDeclContext(parentID);
@@ -1716,8 +1719,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     ctor->setIsObjC(isObjC);
     if (isTransparent)
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
-    if (isRequired)
-      ctor->setRequired(true);
     if (isCompleteObjectInit)
       ctor->setCompleteObjectInit(true);
     if (auto overridden
@@ -1788,7 +1789,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      var->getMutableAttrs().add(new (ctx) FinalAttr());
+      var->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
 
     if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
       var->setOverriddenDecl(overridden);
@@ -1926,7 +1927,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       fn->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      fn->getMutableAttrs().add(new (ctx) FinalAttr());
+      fn->getMutableAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
     // If we are an accessor on a var or subscript, make sure it is deserialized
     // too.
     getDecl(accessorStorageDeclID);
@@ -2293,7 +2294,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isOptional)
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (isFinal)
-      subscript->getMutableAttrs().add(new (ctx) FinalAttr());
+      subscript->getMutableAttrs().add(
+          new (ctx) FinalAttr(/*IsImplicit=*/true));
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
       subscript->setOverriddenDecl(overridden);
       subscript->getMutableAttrs().setAttr(AK_override, SourceLoc());

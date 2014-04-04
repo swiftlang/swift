@@ -653,7 +653,6 @@ namespace decls_block {
     BCFixed<1>,  // has selector-style signature?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // transparent?
-    BCFixed<1>,  // required?
     BCFixed<1>,  // complete object init?
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
@@ -978,8 +977,11 @@ namespace decls_block {
     BCArray<IdentifierIDField>
   >;
 
-#define SIMPLE_DECL_ATTR(X, CLASS, ...)\
-using CLASS##DeclAttrLayout = BCRecordLayout<CLASS##_DECL_ATTR>;
+#define SIMPLE_DECL_ATTR(X, CLASS, ...) \
+  using CLASS##DeclAttrLayout = BCRecordLayout< \
+    CLASS##_DECL_ATTR, \
+    BCFixed<1> /* implicit flag */ \
+  >;
 #include "swift/AST/Attr.def"
 
 }

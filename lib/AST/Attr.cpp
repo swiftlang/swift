@@ -65,7 +65,7 @@ void DeclAttributes::print(ASTPrinter &Printer,
     return;
 
   for (auto DA : *this) {
-    if (Options.SkipImplicit && DA->isImplicit())
+    if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
 
     DA->print(Printer);
@@ -100,68 +100,72 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@mutating ";
   if (MutatingAttr && !MutatingAttr.getValue())
     Printer << "@!mutating ";
-  if (isRequired())
-    Printer << "@required ";
   if (isOverride())
     Printer << "@override ";
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
   switch (getKind()) {
-    case DAK_asmname:
-      Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
-      break;
-    case DAK_availability: {
-      Printer << "@availability(";
-      auto Attr = cast<AvailabilityAttr>(this);
-      if (!Attr->hasPlatform())
-        Printer << '*';
-      else
-        Printer << Attr->Platform;
+  case DAK_asmname:
+    Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
+    break;
+  case DAK_availability: {
+    Printer << "@availability(";
+    auto Attr = cast<AvailabilityAttr>(this);
+    if (!Attr->hasPlatform())
+      Printer << '*';
+    else
+      Printer << Attr->Platform;
 
-      if (!Attr->Message.empty()) {
-        Printer << ", message=\""<< Attr->Message << "\"";
+    if (!Attr->Message.empty()) {
+      Printer << ", message=\""<< Attr->Message << "\"";
+    }
+    Printer << ')';
+    break;
+  }
+  case DAK_final:
+    Printer << "@final";
+    break;
+  case DAK_objc: {
+    Printer << "@objc";
+
+    auto printId = [&](Identifier name) {
+      if (name.empty())
+        return;
+
+      Printer << name.str();
+    };
+
+    auto Attr = cast<ObjCAttr>(this);
+    switch (Attr->getKind()) {
+    case ObjCAttr::Unnamed:
+      break;
+
+    case ObjCAttr::Nullary:
+      Printer << "(";
+      printId(Attr->getNames().front());
+      Printer << ")";
+      break;
+
+    case ObjCAttr::Selector:
+      Printer << "(";
+      for (auto name : Attr->getNames()) {
+        printId(name);
+        Printer << ":";
       }
-      Printer << ')';
+      Printer << ")";
       break;
     }
-    case DAK_final:
-      Printer << "@final";
-      break;
-    case DAK_objc: {
-      Printer << "@objc";
-      
-      auto printId = [&](Identifier name) {
-        if (name.empty())
-          return;
-        
-        Printer << name.str();
-      };
-
-      auto Attr = cast<ObjCAttr>(this);
-      switch (Attr->getKind()) {
-      case ObjCAttr::Unnamed:
-        break;
-
-      case ObjCAttr::Nullary:
-        Printer << "(";
-        printId(Attr->getNames().front());
-        Printer << ")";
-        break;
-
-      case ObjCAttr::Selector:
-        Printer << "(";
-        for (auto name : Attr->getNames()) {
-          printId(name);
-          Printer << ":";
-        }
-        Printer << ")";
-        break;
-      }
-      break;
-    }
-    case DAK_Count:
-      llvm_unreachable("exceed declaration attribute kinds");
+    break;
+  }
+  case DAK_required:
+    if (isImplicit())
+      Printer << "/* @required(inferred) */";
+    else
+      Printer << "@required";
+    break;
+  case DAK_Count:
+    llvm_unreachable("exceed declaration attribute kinds");
   }
   Printer << " ";
 }

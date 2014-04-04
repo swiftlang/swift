@@ -1249,10 +1249,11 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
 
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
-  case DAK_##NAME: {\
-    auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];\
-    CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode);\
-    return;\
+  case DAK_##NAME: { \
+    auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
+    CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, \
+                                      DA->isImplicit()); \
+    return; \
   }
 #include "swift/AST/Attr.def"
 
@@ -1746,7 +1747,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Constructor: {
     auto ctor = cast<ConstructorDecl>(D);
-    checkAllowedAttributes<AK_required, AK_transparent>(ctor);
+    checkAllowedAttributes<AK_transparent>(ctor);
     verifyAttrSerializable(ctor);
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
@@ -1758,7 +1759,6 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->hasSelectorStyleSignature(),
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
-                                  ctor->isRequired(),
                                   ctor->isCompleteObjectInit(),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),

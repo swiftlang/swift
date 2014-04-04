@@ -93,6 +93,8 @@ DECL_ATTR(objc, ObjC,
           OnConstructor | OnDestructor,
           3)
 
+SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
+
 ATTR(assignment)
 ATTR(class_protocol)
 ATTR(conversion)
@@ -104,7 +106,6 @@ ATTR(prefix)
 ATTR(postfix)
 ATTR(optional)
 ATTR(override)
-ATTR(required)
 ATTR(transparent)
 ATTR(unowned)
 ATTR(weak)

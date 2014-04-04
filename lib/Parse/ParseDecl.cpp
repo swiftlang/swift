@@ -441,6 +441,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     break;
   }
+  case DAK_required:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) RequiredAttr(AtLoc, Loc));
+    break;
   }
 
   if (DuplicateAttribute) {

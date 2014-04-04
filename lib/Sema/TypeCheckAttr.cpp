@@ -19,34 +19,31 @@
 using namespace swift;
 
 namespace {
-  class AttributeChecker : public AttributeVisitor<AttributeChecker> {
-    TypeChecker &TC;
-    Decl *D;
-  public:
-    AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
+class AttributeChecker : public AttributeVisitor<AttributeChecker> {
+  TypeChecker &TC;
+  Decl *D;
 
-    /// Deleting this ensures that all attributes are covered by the visitor
-    /// below.
-    void visitDeclAttribute(DeclAttribute *A) = delete;
+public:
+  AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
 
-    void visitAsmnameAttr(AsmnameAttr *attr) { }
+  /// Deleting this ensures that all attributes are covered by the visitor
+  /// below.
+  void visitDeclAttribute(DeclAttribute *A) = delete;
 
-    
-    void visitAvailabilityAttr(AvailabilityAttr *attr) {
-      // FIXME: Check that this declaration is at least as available as the
-      // one it overrides.
-    }
-    
-    void visitFinalAttr(FinalAttr *attr);
-    
-    void visitObjCAttr(ObjCAttr *attr) {
-    }
-    
-  };
+  void visitAsmnameAttr(AsmnameAttr *attr) { }
+
+  void visitAvailabilityAttr(AvailabilityAttr *attr) {
+    // FIXME: Check that this declaration is at least as available as the
+    // one it overrides.
+  }
+
+  void visitFinalAttr(FinalAttr *attr);
+
+  void visitObjCAttr(ObjCAttr *attr) {}
+
+  void visitRequiredAttr(RequiredAttr *attr);
+};
 } // end anonymous namespace
-
-
-
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   // The @final attribute only makes sense in the context of a class
@@ -58,7 +55,7 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }
- 
+
   // We currently only support @final on var/let, func and subscript
   // declarations.
   // TODO: Support it on classes, which mark all members @final.
@@ -66,7 +63,7 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::final_not_allowed_here);
     return;
   }
-  
+
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     if (FD->isAccessor() && !attr->isImplicit()) {
       unsigned Kind = 2;
@@ -76,21 +73,49 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
       return;
     }
   }
-  
-  
 }
 
-
-
-
+void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
+  // The required attribute only applies to constructors.
+  auto ctor = dyn_cast<ConstructorDecl>(D);
+  if (!ctor) {
+    TC.diagnose(attr->getLocation(), diag::required_non_initializer);
+    attr->setInvalid();
+    return;
+  }
+  auto parentTy = ctor->getExtensionType();
+  if (!parentTy) {
+    // Constructor outside of nominal type context; we've already complained
+    // elsewhere.
+    attr->setInvalid();
+    return;
+  }
+  // Only classes can have required constructors.
+  if (parentTy->getClassOrBoundGenericClass()) {
+    // The constructor must be declared within the class itself.
+    if (!isa<ClassDecl>(ctor->getDeclContext())) {
+      TC.diagnose(ctor, diag::required_initializer_in_extension, parentTy)
+        .highlight(attr->getLocation());
+      attr->setInvalid();
+      return;
+    }
+  } else {
+    if (!parentTy->is<ErrorType>()) {
+      TC.diagnose(ctor, diag::required_initializer_nonclass, parentTy)
+        .highlight(attr->getLocation());
+    }
+    attr->setInvalid();
+    return;
+  }
+}
 
 // FIXME: Merge validateAttributes into this.
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(*this, D);
-  
-  for (auto attr : D->getMutableAttrs()) {
-    Checker.visit(attr);
-  }
 
+  for (auto attr : D->getMutableAttrs()) {
+    if (attr->isValid())
+      Checker.visit(attr);
+  }
 }
 

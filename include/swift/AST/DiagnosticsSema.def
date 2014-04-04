@@ -678,9 +678,9 @@ ERROR(nonclass_complete_object_init,sema_tce,none,
 ERROR(dynamic_construct_class,sema_tce,none,
       "constructing an object of class type %0 with a metatype value requires "
       "an '@required' initializer", (Type))
-NOTE(note_nonabstract_initializer,sema_tce,none,
+NOTE(note_nonrequired_initializer,sema_tce,none,
       "selected non-required initializer declared here", ())
-NOTE(note_nonabstract_implicit_initializer,sema_tce,none,
+NOTE(note_nonrequired_implicit_initializer,sema_tce,none,
      "selected implicit initializer with type %0", (Type))
 ERROR(static_construct_existential,sema_tce,none,
       "constructing an object of protocol type %0 requires a metatype value",
@@ -950,16 +950,16 @@ ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
       "class", ())
 
 // required
-ERROR(abstract_non_initializer,attribute_parsing,none,
+ERROR(required_non_initializer,attribute_parsing,none,
       "'required' attribute can only be applied to an initializer", ())
-ERROR(abstract_initializer_nonclass,attribute_parsing,none,
+ERROR(required_initializer_nonclass,attribute_parsing,none,
       "'required' initializer in non-class type %0", (Type))
-ERROR(abstract_initializer_in_extension,attribute_parsing,none,
+ERROR(required_initializer_in_extension,attribute_parsing,none,
       "'required' initializer must be declared directly in class %0"
       " (not in an extension)", (Type))
-ERROR(abstract_incomplete_implementation,sema_tcd,none,
+ERROR(required_incomplete_implementation,sema_tcd,none,
       "class %0 does not implement its superclass's required members", (Type))
-NOTE(abstract_initializer_not_overridden,attribute_parsing,none,
+NOTE(required_initializer_not_overridden,attribute_parsing,none,
       "'required' initializer with type %0 not overridden", (Type))
 
 // Functions

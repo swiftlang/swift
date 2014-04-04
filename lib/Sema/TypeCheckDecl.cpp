@@ -1283,9 +1283,8 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
 
   // If the var is marked @final, then so is the getter.
   if (VD->isFinal())
-    Get->getMutableAttrs().add(new (Ctx) FinalAttr());
+    Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 }
-
 
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
@@ -1316,7 +1315,7 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
     Set->getMutableAttrs().setAttr(AK_transparent, Loc);
 
     if (VD->isFinal())
-      Set->getMutableAttrs().add(new (Context) FinalAttr());
+      Set->getMutableAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
@@ -1438,7 +1437,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     // Make sure the didSet/willSet accessors are marked @final.
     if (!willSet->isFinal() && willSet->getExtensionType() &&
         willSet->getExtensionType()->getClassOrBoundGenericClass())
-      willSet->getMutableAttrs().add(new (Ctx) FinalAttr());
+      willSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1466,7 +1465,7 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     // Make sure the didSet/willSet accessors are marked @final.
     if (!didSet->isFinal() && didSet->getExtensionType() &&
         didSet->getExtensionType()->getClassOrBoundGenericClass())
-      didSet->getMutableAttrs().add(new (Ctx) FinalAttr());
+      didSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
@@ -1706,9 +1705,11 @@ public:
     // getter and setter as final as well.
     if (VD->isFinal()) {
       if (VD->getGetter() && !VD->getGetter()->isFinal())
-        VD->getGetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+        VD->getGetter()->getMutableAttrs().add(
+            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
       if (VD->getSetter() && !VD->getSetter()->isFinal())
-        VD->getSetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+        VD->getSetter()->getMutableAttrs().add(
+            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
     TC.checkDeclAttributes(VD);
   }
@@ -1833,9 +1834,11 @@ public:
     // getter and setter as final as well.
     if (SD->isFinal()) {
       if (SD->getGetter() && !SD->getGetter()->isFinal())
-        SD->getGetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+        SD->getGetter()->getMutableAttrs().add(
+            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
       if (SD->getSetter() && !SD->getSetter()->isFinal())
-        SD->getSetter()->getMutableAttrs().add(new (TC.Context) FinalAttr());
+        SD->getSetter()->getMutableAttrs().add(
+            new (TC.Context) FinalAttr(/*IsImplicit=*/true));
     }
 
     // A subscript is ObjC-compatible if it's explicitly @objc, or a
@@ -2329,15 +2332,15 @@ public:
           if (superclassCtor->isRequired()) {
             // Complain that we don't have an overriding constructor.
             if (!diagnosed) {
-              TC.diagnose(CD, diag::abstract_incomplete_implementation,
+              TC.diagnose(CD, diag::required_incomplete_implementation,
                           CD->getDeclaredInterfaceType());
               diagnosed = true;
             }
 
             // FIXME: Using the type here is awful. We want to use the selector
             // name and provide a nice Fix-It with that declaration.
-            TC.diagnose(superclassCtor, 
-                        diag::abstract_initializer_not_overridden,
+            TC.diagnose(superclassCtor,
+                        diag::required_initializer_not_overridden,
                         superclassCtor->getArgumentType());
             continue;
           }
@@ -3274,6 +3277,8 @@ public:
       Override->getMutableAttrs().add(attr->clone(TC.Context));
       return;
     }
+
+    void visitRequiredAttr(RequiredAttr *attr) {}
   };
 
   /// Record that the \c overriding declarations overrides the \c
@@ -3684,13 +3689,16 @@ public:
     }
 
     // Check whether this constructor overrides a constructor in its base class.
-    // This only makes sense when the overridden constructor is abstract.
+    // This only makes sense when the overridden constructor is required.
     checkOverrides(CD);
 
-    // Determine whether this constructor is abstract.
-    bool isRequired = CD->getAttrs().isRequired() ||
-      (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired());
-    CD->setRequired(isRequired);
+    // Determine whether this constructor is required.
+    if (!CD->getAttrs().hasValidAttribute<RequiredAttr>()) {
+      if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
+        CD->getMutableAttrs().add(
+            new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
+    }
+
     TC.checkDeclAttributes(CD);
   }
 
@@ -5202,36 +5210,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
                 diag::requires_stored_property_inits_nonclass);
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
-  }
-
-  if (Attrs.isRequired()) {
-    // The abstract attribute only applies to constructors.
-    if (auto ctor = dyn_cast<ConstructorDecl>(D)) {
-      if (auto parentTy = ctor->getExtensionType()) {
-        // Only classes can have abstract constructors.
-        if (parentTy->getClassOrBoundGenericClass()) {
-          // The constructor must be declared within the class itself.
-          if (!isa<ClassDecl>(ctor->getDeclContext())) {
-            TC.diagnose(ctor, diag::abstract_initializer_in_extension, parentTy)
-              .highlight(Attrs.getLoc(AK_required));
-            D->getMutableAttrs().clearAttribute(AK_required);
-          }
-        } else {
-          if (!parentTy->is<ErrorType>()) {
-            TC.diagnose(ctor, diag::abstract_initializer_nonclass, parentTy)
-              .highlight(Attrs.getLoc(AK_required));
-          }
-          D->getMutableAttrs().clearAttribute(AK_required);
-        }
-      } else {
-        // Constructor outside of nominal type context; just clear the
-        // attribute; we've already complained elsewhere.
-        D->getMutableAttrs().clearAttribute(AK_required);
-      }
-    } else {
-      TC.diagnose(Attrs.getLoc(AK_required), diag::abstract_non_initializer);
-      D->getMutableAttrs().clearAttribute(AK_required);
-    }
   }
 
   if (Attrs.isOverride()) {
