@@ -100,30 +100,32 @@ void swift::ide::printSubmoduleInterface(
   }
 
   // If we're printing recursively, find all of the submodules to print.
-  if (TraversalOptions) {
-    SmallVector<const clang::Module *, 8> Worklist;
-    SmallPtrSet<const clang::Module *, 8> Visited;
-    Worklist.push_back(InterestingClangModule);
-    Visited.insert(InterestingClangModule);
-    while (!Worklist.empty()) {
-      const clang::Module *CM = Worklist.pop_back_val();
-      if (!(TraversalOptions & ModuleTraversal::VisitHidden) &&
-          !InterestingClangModule->isModuleVisible(CM))
-        continue;
+  if (InterestingClangModule) {
+    if (TraversalOptions) {
+      SmallVector<const clang::Module *, 8> Worklist;
+      SmallPtrSet<const clang::Module *, 8> Visited;
+      Worklist.push_back(InterestingClangModule);
+      Visited.insert(InterestingClangModule);
+      while (!Worklist.empty()) {
+        const clang::Module *CM = Worklist.pop_back_val();
+        if (!(TraversalOptions & ModuleTraversal::VisitHidden) &&
+            !InterestingClangModule->isModuleVisible(CM))
+          continue;
 
-      ClangDecls.insert({ CM, {} });
+        ClangDecls.insert({ CM, {} });
 
-      // If we're supposed to visit submodules, add them now.
-      if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
-        for (auto Sub = CM->submodule_begin(), SubEnd = CM->submodule_end();
-             Sub != SubEnd; ++Sub) {
-          if (Visited.insert(*Sub))
-            Worklist.push_back(*Sub);
+        // If we're supposed to visit submodules, add them now.
+        if (TraversalOptions & ModuleTraversal::VisitSubmodules) {
+          for (auto Sub = CM->submodule_begin(), SubEnd = CM->submodule_end();
+               Sub != SubEnd; ++Sub) {
+            if (Visited.insert(*Sub))
+              Worklist.push_back(*Sub);
+          }
         }
       }
+    } else {
+      ClangDecls.insert({ InterestingClangModule, {} });
     }
-  } else {
-    ClangDecls.insert({ InterestingClangModule, {} });
   }
 
   // Separate the declarations that we are going to print into different
