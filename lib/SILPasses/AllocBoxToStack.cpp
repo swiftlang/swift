@@ -284,18 +284,11 @@ static size_t getParameterIndexForOperand(Operand *O) {
 
 /// Given an operand of a direct apply or partial_apply of a
 /// non-generic function, return the parameter used in the body of the
-/// function to represent this operand.
-static SILValue getParameterForOperand(Operand *O) {
-  auto *FRI = getDirectCallee(O->getUser());
-  if (!FRI)
-    return SILValue();
-
-  auto *F = FRI->getReferencedFunction();
-  assert(F && "Expected a referenced function!");
-
-  // TODO: Support generics at some point.
-  if (callIsPolymorphic(O->getUser()))
-    return SILValue();
+/// function to represent this operand. For non-direct calls and for
+/// functions that we cannot examine the body of, return an empty
+/// SILValue.
+static SILValue getParameterForOperand(SILFunction *F, Operand *O) {
+  assert(F && !F->empty() && "Expected a function with a body!");
 
   auto &Entry = F->front();
   size_t ParamIndex = getParameterIndexForOperand(O);
@@ -304,16 +297,34 @@ static SILValue getParameterForOperand(Operand *O) {
   return SILValue(Param);
 }
 
+/// Return a pointer to the SILFunction called by Call if we can
+/// determine which funciton that is, and we have a body for that
+/// function. Otherwise return nullptr.
+static SILFunction *getFunctionBody(SILInstruction *Call) {
+  // TODO: Support generics at some point.
+  if (callIsPolymorphic(Call))
+    return nullptr;
+
+  if (auto *FRI = getDirectCallee(Call))
+    if (auto *F = FRI->getReferencedFunction())
+      if (!F->empty())
+        return F;
+
+  return nullptr;
+}
 
 /// Could this operand to an apply escape that function by being
 /// stored or returned?
 static bool operandEscapesApply(Operand *O) {
+  SILFunction *F = getFunctionBody(O->getUser());
+  // If we cannot examine the function body, assume the worst.
+  if (!F)
+    return true;
+
   // Check the uses of the operand, but do not recurse down into other
   // apply instructions.
-  if (auto Param = getParameterForOperand(O))
-    return canValueEscape(Param, /* examineApply = */ false);
-
-  return true;
+  auto Param = getParameterForOperand(F, O);
+  return canValueEscape(Param, /* examineApply = */ false);
 }
 
 /// checkPartialApplyBody - Check the body of a partial apply to see
@@ -321,15 +332,18 @@ static bool operandEscapesApply(Operand *O) {
 /// disqualify it from being protmoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
+  SILFunction *F = getFunctionBody(O->getUser());
+  // If we cannot examine the function body, assume the worst.
+  if (!F)
+    return false;
+
   // We don't actually use these because we're not recursively
   // rewriting the partial applies we find.
   llvm::SmallVector<Operand *, 1> ElidedOperands;
-  if (auto Param = getParameterForOperand(O))
-    return !findUnexpectedBoxUse(Param, /* examinePartialApply = */ false,
-                                 /* inAppliedFunction = */ true,
-                                 ElidedOperands);
-
-  return false;
+  auto Param = getParameterForOperand(F, O);
+  return !findUnexpectedBoxUse(Param, /* examinePartialApply = */ false,
+                               /* inAppliedFunction = */ true,
+                               ElidedOperands);
 }
 
 
