@@ -636,14 +636,14 @@ namespace {
         Type selfTy;
         if (isArchetypeOrExistentialRef)
           selfTy = baseTy;
-        else {
-          // If the base is already an lvalue with the right base type, we can
-          // pass it as an inout qualified type.
+        else
           selfTy = containerTy;
-          if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-            if (base->getType()->is<LValueType>())
-              selfTy = InOutType::get(selfTy);
-        }
+        
+        // If the base is already an lvalue with the right base type, we can
+        // pass it as an inout qualified type.
+        if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
+          if (base->getType()->is<LValueType>())
+            selfTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
                  base,  selfTy, member, IsDirectPropertyAccess,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
