@@ -113,7 +113,7 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
 
 /// NSAnimationContext animation group
 /// (NSAnimationContext) -> Void
-MAKE_BLOCK_SHIM(FUNC(DIRECT(CSo18NSAnimationContext),
+MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo18NSAnimationContext)),
                      VOID),
                 void(id));
                 
@@ -304,7 +304,8 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo8NSObject)),
                 void(id));
 
 // Another custom XPC handler.
-MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(CSo7NSError)),
-                          DIRECT(OBJCPTR(CSo8NSString))),
+// (error : NSError?, invocationString : NSString) -> Void
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(GSqCSo7NSError_),
+                          DIRECT(CSo8NSString)),
                      VOID),
                 void(id, id));
