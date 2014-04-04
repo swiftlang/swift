@@ -19,11 +19,11 @@
 #endif
 
 #ifndef DECL_ATTR
-#define DECL_ATTR(SPELLING, CLASS, OPTIONS)
+#define DECL_ATTR(SPELLING, CLASS, OPTIONS, CODE)
 #endif
 
 #ifndef SIMPLE_DECL_ATTR
-#define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS) DECL_ATTR(X, CLASS, OPTIONS)
+#define SIMPLE_DECL_ATTR(X, CLASS, OPTIONS, CODE) DECL_ATTR(X, CLASS, OPTIONS, CODE)
 #endif
 
 #ifndef TYPE_ATTR
@@ -69,18 +69,29 @@ TYPE_ATTR(opened)
 // - Class name without the 'Attr' suffix (ignored for
 // - Options for the attribute, including the declarations the
 //   attribute can appear, and whether duplicates are allowed.
+// - Unique attribute identifier used for serialization.  This
+//   can never be changed.
 //
 // SIMPLE_DECL_ATTR is the same, but the class becomes
 // SimpleDeclAttr<DAK_##NAME>.
-DECL_ATTR(asmname, Asmname, OnFunc | OnConstructor | OnDestructor)
+DECL_ATTR(asmname, Asmname,
+          OnFunc | OnConstructor | OnDestructor,
+          0)
+
 DECL_ATTR(availability, Availability,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
           OnConstructor | OnDestructor |
-          AllowMultipleAttributes)
-SIMPLE_DECL_ATTR(final, Final, OnFunc | OnVar | OnSubscript)
+          AllowMultipleAttributes,
+          1)
+
+SIMPLE_DECL_ATTR(final, Final,
+                 OnFunc | OnVar | OnSubscript,
+                 2)
+
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
-          OnConstructor | OnDestructor)
+          OnConstructor | OnDestructor,
+          3)
 
 ATTR(assignment)
 ATTR(class_protocol)

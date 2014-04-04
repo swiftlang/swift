@@ -176,7 +176,7 @@ unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");
     break;
-#define DECL_ATTR(NAME, CLASS, OPTIONS)\
+#define DECL_ATTR(NAME, CLASS, OPTIONS, ...)\
   case DAK_##NAME: return OPTIONS;
 #include "swift/AST/Attr.def"
   }

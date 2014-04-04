@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 42;
+const uint16_t VERSION_MINOR = 43;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -701,11 +701,6 @@ namespace decls_block {
     // - its generic parameters, if any
     // - argument and body parameter patterns
   >;
-  
-  using FuncAsmNameLayout = BCRecordLayout<
-    FUNC_ASMNAME,
-    BCBlob        // asmname
-  >;
 
   using PatternBindingLayout = BCRecordLayout<
     PATTERN_BINDING_DECL,
@@ -962,6 +957,16 @@ namespace decls_block {
     XREF_GENERIC_PARAM_PATH_PIECE,
     BCVBR<5> // index
   >;
+
+  using AsmnameDeclAttrLayout = BCRecordLayout<
+    Asmname_DECL_ATTR,
+    BCBlob // asmname
+  >;
+
+#define SIMPLE_DECL_ATTR(X, CLASS, ...)\
+using CLASS##DeclAttrLayout = BCRecordLayout<CLASS##_DECL_ATTR>;
+#include "swift/AST/Attr.def"
+
 }
 
 /// Returns the encoding kind for the given decl.

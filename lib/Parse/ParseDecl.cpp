@@ -605,7 +605,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     bool isDeclAttribute = false
 #define ATTR(X) || Text == #X
 #define VIRTUAL_ATTR(X)
-#define DECL_ATTR(X, Class, Options) || Text == #X
+#define DECL_ATTR(X, ...) || Text == #X
 #include "swift/AST/Attr.def"
     ;
     

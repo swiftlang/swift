@@ -135,7 +135,7 @@ enum AttrKind {
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
 enum DeclAttrKind : unsigned {
-#define DECL_ATTR(NAME, CLASS, OPTIONS) DAK_##NAME,
+#define DECL_ATTR(NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"
   DAK_Count
 };
@@ -338,6 +338,12 @@ public:
     DeclAttrBits.Implicit = Implicit;
   }
 
+  /// Returns the address of the next pointer field.
+  /// Used for object deserialization.
+  DeclAttribute **getMutableNext() {
+    return &Next;
+  }
+
   /// Print the attribute to the provided ASTPrinter.
   void print(ASTPrinter &Printer) const;
 
@@ -439,7 +445,7 @@ public:
 };
 
 // Declare typedefs for all of the simple declaration attributes.
-#define SIMPLE_DECL_ATTR(NAME, CLASS, OPTIONS) \
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
  typedef SimpleDeclAttr<DAK_##NAME> CLASS##Attr;
 #include "swift/AST/Attr.def"
   
@@ -858,6 +864,10 @@ public:
     llvm_unreachable("Attribute not found for removal");
   }
 
+  /// Set the raw chain of attributes.  Used for deserialization.
+  void setRawAttributeChain(DeclAttribute *Chain) {
+    DeclAttrs = Chain;
+  }
 };
   
 } // end namespace swift

@@ -227,6 +227,10 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
+
+  /// Writes out a declaration attribute.
+  void writeDeclAttribute(const DeclAttribute *DA);
+
   /// Writes the given decl.
   ///
   /// Returns false if the decl cannot be serialized without losing

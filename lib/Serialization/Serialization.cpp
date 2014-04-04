@@ -1229,6 +1229,36 @@ static bool isForced(const Decl *D,
   return false;
 }
 
+void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
+  using namespace decls_block;
+
+  switch (DA->getKind()) {
+    case DAK_Count:
+      llvm_unreachable("cannot serialize DAK_Count");
+      return;
+
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
+    case DAK_##NAME: {\
+      auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code];\
+      CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode);\
+      return;\
+    }
+#include "swift/AST/Attr.def"
+
+    case DAK_asmname: {
+      auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
+      AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        cast<AsmnameAttr>(DA)->Name);
+      return;
+    }
+    case DAK_objc:
+      // FIXME: migrate serialization.
+      return;
+    case DAK_availability:
+      llvm_unreachable("not yet serialized");
+  }
+}
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -1241,6 +1271,13 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
+
+  // Emit attributes (if any).
+  auto &Attrs = D->getAttrs();
+  if (Attrs.begin() != Attrs.end()) {
+    for (auto Attr : Attrs)
+      writeDeclAttribute(Attr);
+  }
 
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -1631,12 +1668,6 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
                            nameComponents);
-    
-    if (auto AsmA = fn->getAttrs().getAttribute<AsmnameAttr>()) {
-      FuncAsmNameLayout::emitRecord(Out, ScratchRecord,
-                                    DeclTypeAbbrCodes[FuncAsmNameLayout::Code],
-                                    AsmA->Name);
-    }
 
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
@@ -2294,7 +2325,6 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
     registerDeclTypeAbbr<FuncLayout>();
-    registerDeclTypeAbbr<FuncAsmNameLayout>();
     registerDeclTypeAbbr<PatternBindingLayout>();
     registerDeclTypeAbbr<ProtocolLayout>();
     registerDeclTypeAbbr<PrefixOperatorLayout>();
@@ -2332,6 +2362,11 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
     registerDeclTypeAbbr<DeclContextLayout>();
     registerDeclTypeAbbr<XRefLayout>();
+
+    registerDeclTypeAbbr<AsmnameDeclAttrLayout>();
+#define SIMPLE_DECL_ATTR(X, NAME, ...)\
+registerDeclTypeAbbr<NAME##DeclAttrLayout>();
+#include "swift/AST/Attr.def"
   }
 
   while (!DeclsAndTypesToWrite.empty()) {

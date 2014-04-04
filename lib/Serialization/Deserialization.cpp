@@ -1331,6 +1331,16 @@ getActualStaticSpellingKind(uint8_t raw) {
   return Nothing;
 }
 
+static bool isDeclAttrRecord(unsigned ID) {
+  using namespace decls_block;
+  switch (ID) {
+#define DECL_ATTR(NAME, CLASS, ...)\
+  case CLASS##_DECL_ATTR: return true;
+#include "swift/Serialization/DeclTypeRecordNodes.def"
+  default: return false;
+  }
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                           std::function<void(Decl*)> DidRecord) {
   if (DID == 0)
@@ -1356,10 +1366,54 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   }
 
   ASTContext &ctx = getContext();
-
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+
+  // Read the attributes (if any).
+  DeclAttribute *DAttrs = nullptr;
+  DeclAttribute **AttrsNext = &DAttrs;
+  unsigned recordID;
+
+  while (true) {
+    if (entry.Kind != llvm::BitstreamEntry::Record) {
+      // We don't know how to serialize decls represented by sub-blocks.
+      error();
+      return nullptr;
+    }
+
+    recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+
+    if (isDeclAttrRecord(recordID)) {
+      DeclAttribute *Attr = nullptr;
+      switch (recordID) {
+        case decls_block::Asmname_DECL_ATTR:
+          Attr = new (ctx) AsmnameAttr(blobData);
+          break;
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
+         case decls_block::CLASS##_DECL_ATTR:\
+          Attr = new (ctx) CLASS##Attr();\
+          break;
+#include "swift/AST/Attr.def"
+        default:
+          // We don't know how to deserialize this kind of attribute.
+          error();
+          return nullptr;
+      }
+
+      if (!Attr)
+        return nullptr;
+
+      // Advance the linked list.
+      *AttrsNext = Attr;
+      AttrsNext = Attr->getMutableNext();
+
+      // Advance bitstream cursor to the next record.
+      entry = DeclTypeCursor.advance();
+      continue;
+    }
+
+    break;
+  }
 
   PrettyDeclDeserialization stackTraceEntry(
      declOrOffset, DID, static_cast<decls_block::RecordKind>(recordID));
@@ -1744,26 +1798,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     SmallVector<Identifier, 2> names;
     for (auto nameID : nameIDs)
       names.push_back(getIdentifier(nameID));
-    
-    // Read in the asmname blob, if present.
-    StringRef asmname;
-    {
-      BCOffsetRAII lastRecordOffset(DeclTypeCursor);
-      
-      auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-      if (next.Kind != llvm::BitstreamEntry::Record)
-        goto did_read_asmname;
-      unsigned kind = DeclTypeCursor.readRecord(next.ID, scratch, &asmname);
-      
-      if (kind != decls_block::FUNC_ASMNAME) {
-        asmname = "";
-        goto did_read_asmname;
-      }
-      
-      lastRecordOffset.reset();
-    }
-  did_read_asmname:
-    
+
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       break;
@@ -1842,8 +1877,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       fn->setImplicit();
     if (hasSelectorStyleSignature)
       fn->setHasSelectorStyleSignature();
-    if (!asmname.empty())
-      fn->getMutableAttrs().add(new (ctx) AsmnameAttr(asmname));
     if (isAssignmentOrConversion) {
       if (fn->isOperator())
         fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());
@@ -2319,6 +2352,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
   if (DidRecord)
     DidRecord(declOrOffset);
+
+  // Record the attributes.
+  if (DAttrs)
+    declOrOffset.get()->getMutableAttrs().setRawAttributeChain(DAttrs);
+
   return declOrOffset;
 }
 

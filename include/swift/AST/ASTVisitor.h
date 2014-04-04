@@ -141,7 +141,7 @@ public:
 
   AttributeRetTy visit(DeclAttribute *A, Args... AA) {
     switch (A->getKind()) {
-#define DECL_ATTR(NAME, CLASS, OPTIONS)                           \
+#define DECL_ATTR(NAME, CLASS, ...)                           \
     case DAK_##NAME:                                              \
       return static_cast<ImplClass*>(this)                        \
                ->visit##CLASS##Attr(static_cast<CLASS##Attr*>(A), \
@@ -157,7 +157,7 @@ public:
     return AttributeRetTy();
   }
 
-#define DECL_ATTR(NAME,CLASS,OPTIONS) \
+#define DECL_ATTR(NAME,CLASS,...) \
   AttributeRetTy visit##CLASS##Attr(CLASS##Attr *A, Args... AA) { \
     return static_cast<ImplClass*>(this)->visitDeclAttribute(       \
              A, ::std::forward<Args>(AA)...);                       \
