@@ -38,6 +38,7 @@ namespace swift {
   
   enum class PatternKind : uint8_t;
   enum class StaticSpellingKind : uint8_t;
+  enum class DescriptiveDeclKind : uint8_t;
 
   /// \brief Enumeration describing all of possible diagnostics.
   ///
@@ -80,6 +81,7 @@ namespace swift {
     TypeRepr,
     PatternKind,
     StaticSpellingKind,
+    DescriptiveDeclKind,
   };
 
   namespace diag {
@@ -101,6 +103,7 @@ namespace swift {
       TypeRepr *TyR;
       PatternKind PatternKindVal;
       StaticSpellingKind StaticSpellingKindVal;
+      DescriptiveDeclKind DescriptiveDeclKindVal;
     };
     
   public:
@@ -149,6 +152,10 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::StaticSpellingKind),
           StaticSpellingKindVal(SSK) {}
 
+    DiagnosticArgument(DescriptiveDeclKind DDK)
+        : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
+          DescriptiveDeclKindVal(DDK) {}
+
     DiagnosticArgument(diag::RequirementKind kind)
       : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
 
@@ -192,6 +199,11 @@ namespace swift {
     StaticSpellingKind getAsStaticSpellingKind() const {
       assert(Kind == DiagnosticArgumentKind::StaticSpellingKind);
       return StaticSpellingKindVal;
+    }
+
+    DescriptiveDeclKind getAsDescriptiveDeclKind() const {
+      assert(Kind == DiagnosticArgumentKind::DescriptiveDeclKind);
+      return DescriptiveDeclKindVal;
     }
   };
   

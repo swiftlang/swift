@@ -107,6 +107,56 @@ enum class DeclKind : uint8_t {
 #include "swift/AST/DeclNodes.def"
 };
 
+/// Fine-grained declaration kind that provides a description of the
+/// kind of entity a declaration represents, as it would be used in
+/// diagnostics.
+///
+/// For example, \c FuncDecl is a single declaration class, but it has
+/// several descriptive entries depending on whether it is an
+/// operator, global function, local function, method, (observing)
+/// accessor, etc.
+enum class DescriptiveDeclKind : uint8_t {
+  Import,
+  Extension,
+  EnumCase,
+  TopLevelCode,
+  IfConfig,
+  PatternBinding,
+  Var,
+  Let,
+  StaticVar,
+  StaticLet,
+  ClassVar,
+  ClassLet,
+  InfixOperator,
+  PrefixOperator,
+  PostfixOperator,
+  TypeAlias,
+  GenericTypeParam,
+  AssociatedType,  
+  Enum,
+  Struct,
+  Class,
+  Protocol,
+  GenericEnum,
+  GenericStruct,
+  GenericClass,
+  Subscript,
+  Constructor,
+  Destructor,
+  LocalFunction,
+  GlobalFunction,
+  OperatorFunction,
+  Method,
+  StaticMethod,
+  ClassMethod,
+  Getter,
+  Setter,
+  WillSet,
+  DidSet,
+  EnumElement,
+};
+
 /// Keeps track of stage of circularity checking for the given protocol.
 enum class CircularityCheck {
   /// Circularity has not yet been checked.
@@ -463,6 +513,13 @@ public:
   /// developer aids, and should never be part of a diagnostic or exposed
   /// to the user of the compiler in any way.
   static StringRef getKindName(DeclKind K);
+
+  /// Retrieve the descriptive kind for this declaration.
+  DescriptiveDeclKind getDescriptiveKind() const;
+
+  /// Produce a name for the given descriptive declaration kind, which
+  /// is suitable for use in diagnostics.
+  static StringRef getDescriptiveKindName(DescriptiveDeclKind K);
 
   DeclContext *getDeclContext() const { return Context; }
   void setDeclContext(DeclContext *DC) { Context = DC; }

@@ -242,6 +242,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << Arg.getAsStaticSpellingKind();
     }
     break;
+
+  case DiagnosticArgumentKind::DescriptiveDeclKind:
+    assert(Modifier.empty() &&
+           "Improper modifier for DescriptiveDeclKind argument");
+    Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
+    break;
   }
 }
 

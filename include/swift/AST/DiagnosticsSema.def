@@ -600,7 +600,7 @@ ERROR(duplicate_enum_element,sema_tcd,none,
 //------------------------------------------------------------------------------
 
 ERROR(override_final,sema_tcd,none,
-      "declaration overrides a 'final' declaration", ())
+      "%0 overrides a 'final' %0", (DescriptiveDeclKind))
 
 ERROR(member_cannot_be_final,sema_tcd,none,
       "only class member may be marked with the @final attribute", ())

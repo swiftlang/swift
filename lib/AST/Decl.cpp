@@ -64,6 +64,150 @@ StringRef Decl::getKindName(DeclKind K) {
   }
 }
 
+DescriptiveDeclKind Decl::getDescriptiveKind() const {
+#define TRIVIAL_KIND(Kind)                      \
+  case DeclKind::Kind:                          \
+    return DescriptiveDeclKind::Kind
+
+  switch (getKind()) {
+  TRIVIAL_KIND(Import);
+  TRIVIAL_KIND(Extension);
+  TRIVIAL_KIND(EnumCase);
+  TRIVIAL_KIND(TopLevelCode);
+  TRIVIAL_KIND(IfConfig);
+  TRIVIAL_KIND(PatternBinding);
+  TRIVIAL_KIND(InfixOperator);
+  TRIVIAL_KIND(PrefixOperator);
+  TRIVIAL_KIND(PostfixOperator);
+  TRIVIAL_KIND(TypeAlias);
+  TRIVIAL_KIND(GenericTypeParam);
+  TRIVIAL_KIND(AssociatedType);
+  TRIVIAL_KIND(Protocol);
+  TRIVIAL_KIND(Subscript);
+  TRIVIAL_KIND(Constructor);
+  TRIVIAL_KIND(Destructor);
+  TRIVIAL_KIND(EnumElement);
+
+   case DeclKind::Enum:
+     return cast<EnumDecl>(this)->getGenericParams()
+              ? DescriptiveDeclKind::GenericEnum
+              : DescriptiveDeclKind::Enum;
+
+   case DeclKind::Struct:
+     return cast<StructDecl>(this)->getGenericParams()
+              ? DescriptiveDeclKind::GenericStruct
+              : DescriptiveDeclKind::Struct;
+
+   case DeclKind::Class:
+     return cast<ClassDecl>(this)->getGenericParams()
+              ? DescriptiveDeclKind::GenericClass
+              : DescriptiveDeclKind::Class;
+
+   case DeclKind::Var: {
+     auto var = cast<VarDecl>(this);
+     switch (var->getCorrectStaticSpelling()) {
+     case StaticSpellingKind::None:
+       return var->isLet()? DescriptiveDeclKind::Let
+                          : DescriptiveDeclKind::Var;
+     case StaticSpellingKind::KeywordStatic:
+       return var->isLet()? DescriptiveDeclKind::StaticLet
+                          : DescriptiveDeclKind::StaticVar;
+     case StaticSpellingKind::KeywordClass:
+       return var->isLet()? DescriptiveDeclKind::ClassLet
+                          : DescriptiveDeclKind::ClassVar;
+     }
+   }
+
+   case DeclKind::Func: {
+     auto func = cast<FuncDecl>(this);
+
+     // First, check for an accessor.
+     switch (func->getAccessorKind()) {
+     case AccessorKind::NotAccessor:
+       // Other classifications below.
+       break;
+
+     case AccessorKind::IsGetter:
+       return DescriptiveDeclKind::Getter;
+
+     case AccessorKind::IsSetter:
+       return DescriptiveDeclKind::Setter;
+
+     case AccessorKind::IsWillSet:
+       return DescriptiveDeclKind::WillSet;
+
+     case AccessorKind::IsDidSet:
+       return DescriptiveDeclKind::DidSet;
+     }
+
+     if (!func->getName().empty() && func->getName().isOperator())
+       return DescriptiveDeclKind::OperatorFunction;
+
+     if (func->getDeclContext()->isLocalContext())
+       return DescriptiveDeclKind::LocalFunction;
+
+     if (func->getDeclContext()->isModuleContext())
+       return DescriptiveDeclKind::GlobalFunction;
+
+     // We have a method.
+     switch (func->getCorrectStaticSpelling()) {
+     case StaticSpellingKind::None:
+       return DescriptiveDeclKind::Method;
+     case StaticSpellingKind::KeywordStatic:
+       return DescriptiveDeclKind::StaticMethod;
+     case StaticSpellingKind::KeywordClass:
+       return DescriptiveDeclKind::ClassMethod;
+     }
+   }
+  }
+#undef TRIVIAL_KIND
+}
+
+StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
+#define ENTRY(Kind, String) case DescriptiveDeclKind::Kind: return String
+  switch (K) {
+  ENTRY(Import, "import");
+  ENTRY(Extension, "extension");
+  ENTRY(EnumCase, "case");
+  ENTRY(TopLevelCode, "top-level code");
+  ENTRY(IfConfig, "if configuration");
+  ENTRY(PatternBinding, "pattern binding");
+  ENTRY(Var, "var");
+  ENTRY(Let, "let");
+  ENTRY(StaticVar, "static var");
+  ENTRY(StaticLet, "static let");
+  ENTRY(ClassVar, "class var");
+  ENTRY(ClassLet, "class let");
+  ENTRY(InfixOperator, "infix operator");
+  ENTRY(PrefixOperator, "prefix operator");
+  ENTRY(PostfixOperator, "postfix operator");
+  ENTRY(TypeAlias, "type alias");
+  ENTRY(GenericTypeParam, "generic parameter");
+  ENTRY(AssociatedType, "associated type");
+  ENTRY(Enum, "enum");
+  ENTRY(Struct, "struct");
+  ENTRY(Class, "class");
+  ENTRY(Protocol, "protocol");
+  ENTRY(GenericEnum, "generic enum");
+  ENTRY(GenericStruct, "generic struct");
+  ENTRY(GenericClass, "generic class");
+  ENTRY(Subscript, "subscript");
+  ENTRY(Constructor, "initializer");
+  ENTRY(Destructor, "deinitializer");
+  ENTRY(LocalFunction, "local function");
+  ENTRY(GlobalFunction, "global function");
+  ENTRY(OperatorFunction, "operator function");
+  ENTRY(Method, "instance method");
+  ENTRY(StaticMethod, "static method");
+  ENTRY(ClassMethod, "class method");
+  ENTRY(Getter, "getter");
+  ENTRY(Setter, "setter");
+  ENTRY(WillSet, "willSet observer");
+  ENTRY(DidSet, "didSet observer");
+  ENTRY(EnumElement, "enum element");
+  }
+#undef ENTRY
+}
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
@@ -565,6 +709,9 @@ static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
 }
 
 StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
+  if (!isStatic())
+    return StaticSpellingKind::None;
+
   return getCorrectStaticSpellingForDecl(this);
 }
 
@@ -1667,6 +1814,9 @@ bool VarDecl::isAnonClosureParam() const {
 }
 
 StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
+  if (!isStatic())
+    return StaticSpellingKind::None;
+
   return getCorrectStaticSpellingForDecl(this);
 }
 
@@ -2027,6 +2177,9 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
 }
 
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
+  if (!isStatic())
+    return StaticSpellingKind::None;
+
   return getCorrectStaticSpellingForDecl(this);
 }
 

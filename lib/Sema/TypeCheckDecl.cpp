@@ -3233,7 +3233,8 @@ public:
       }
 
       // FIXME: Customize message to the kind of thing.
-      TC.diagnose(Override, diag::override_final);
+      TC.diagnose(Override, diag::override_final, 
+                  Override->getDescriptiveKind());
       TC.diagnose(Base, diag::overridden_here);
     }
 
