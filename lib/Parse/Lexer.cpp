@@ -622,7 +622,12 @@ void Lexer::lexOperatorIdentifier() {
     assert(didStart && "unexpected operator start");
     (void) didStart;
     
-    while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
+    do {
+      if (CurPtr != BufferEnd && InSILMode && *CurPtr == '!')
+        // In SIL mode, '!' is a special token and can't be in the middle of
+        // an operator.
+        break;
+    } while (advanceIfValidContinuationOfOperator(CurPtr, BufferEnd));
   }
 
   // Decide between the binary, prefix, and postfix cases.

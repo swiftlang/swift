@@ -245,6 +245,10 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::identifier:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
+  case tok::oper_binary:
+    // A binary operator can be part of a SILDeclRef.
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    break;
   case tok::kw_destructor:
     P.diagnose(P.Tok, diag::destructor_is_deinit)
       .fixItReplace(SourceLoc(P.Tok.getLoc()), "deinit");
@@ -2796,16 +2800,15 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
     return nullptr;
 
-  // Find the protocol decl.
-  SmallVector<ValueDecl*, 4> CurModuleResults;
-  P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), DeclName,
-                                    NLKind::UnqualifiedLookup,
-                                    CurModuleResults);
-  if (CurModuleResults.size() != 1) {
+  // Find the protocol decl. The protocol can be imported.
+  llvm::PointerUnion<ValueDecl*, Module *> Res = lookupTopDecl(P, DeclName);
+  assert(Res.is<ValueDecl*>() && "Protocol look-up should return a Decl");
+  ValueDecl *VD = Res.get<ValueDecl*>();
+  if (!VD) {
     P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
     return nullptr;
   }
-  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(CurModuleResults[0]);
+  ProtocolDecl *proto = dyn_cast<ProtocolDecl>(VD);
   if (!proto)
     P.diagnose(DeclLoc, diag::sil_witness_protocol_not_found, DeclName);
   return proto;
