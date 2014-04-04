@@ -114,6 +114,9 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
       return (RESULT);
 
   CHECK_CLANG_TYPE_MATCH(type, "COpaquePointer", clangCtx.VoidPtrTy);
+  CHECK_CLANG_TYPE_MATCH(type, "CConstVoidPointer",
+                     clangCtx.getCanonicalType(clangCtx.VoidPtrTy.withConst()));
+  CHECK_CLANG_TYPE_MATCH(type, "CMutableVoidPointer", clangCtx.VoidPtrTy);
   CHECK_CLANG_TYPE_MATCH(type, "ObjCBool", clangCtx.ObjCBuiltinBoolTy);
   // FIXME: This is sufficient for ABI type generation, but should
   //        probably be const char* for type encoding.
