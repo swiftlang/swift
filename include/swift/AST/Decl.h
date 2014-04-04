@@ -1228,7 +1228,7 @@ class ExtensionDecl : public Decl, public DeclContext {
   
   /// \brief The set of protocol conformance mappings. The element order
   /// corresponds to the order of Protocols.
-  ArrayRef<ProtocolConformance *> Conformances;
+  LazyLoaderArray<ProtocolConformance *> Conformances;
 
   /// \brief The next extension in the linked list of extensions.
   ///
@@ -1295,10 +1295,11 @@ public:
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
-  ArrayRef<ProtocolConformance *> getConformances() const {
-    return Conformances;
+  ArrayRef<ProtocolConformance *> getConformances() const;
+  void setConformances(ArrayRef<ProtocolConformance *> c) {
+    Conformances = c;
   }
-  void setConformances(ArrayRef<ProtocolConformance *> c);
+  void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   ArrayRef<Decl*> getMembers(bool forceDelayedMembers = true) const;
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
@@ -2250,7 +2251,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// \brief The set of protocol conformance mappings. The element order
   /// corresponds to the order of Protocols returned by getProtocols().
   // FIXME: We don't really need this correspondence any more.
-  ArrayRef<ProtocolConformance *> Conformances;
+  LazyLoaderArray<ProtocolConformance *> Conformances;
 
   /// \brief The generic signature of this type.
   ///
@@ -2362,7 +2363,7 @@ public:
   /// Compute the type (and declared type) of this nominal type.
   void computeType();
 
-  Type getDeclaredTypeInContext();
+  Type getDeclaredTypeInContext() const;
 
   /// Get the "interface" type of the given nominal type, which is the
   /// type used to refer to the nominal type externally.
@@ -2401,12 +2402,11 @@ public:
   /// \brief Retrieve the set of protocol conformance mappings for this type.
   ///
   /// Calculated during type-checking.
-  ArrayRef<ProtocolConformance *> getConformances() const {
-    return Conformances;
-  }
+  ArrayRef<ProtocolConformance *> getConformances() const;
   void setConformances(ArrayRef<ProtocolConformance *> c) {
     Conformances = c;
   }
+  void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   using TypeDecl::getDeclaredInterfaceType;
 

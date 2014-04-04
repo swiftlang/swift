@@ -19,13 +19,14 @@
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
 
-CanType DeclContext::getExtendedType(ExtensionDecl *ED) {
+CanType DeclContext::getExtendedType(const ExtensionDecl *ED) {
   CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
   
   // FIXME: we should require generic parameter clauses here
   if (auto unbound = dyn_cast<UnboundGenericType>(ExtendedTy)) {
     auto boundType = unbound->getDecl()->getDeclaredTypeInContext();
-    ED->getExtendedTypeLoc().setType(boundType, true);
+    auto mutableED = const_cast<ExtensionDecl *>(ED);
+    mutableED->getExtendedTypeLoc().setType(boundType, true);
     ExtendedTy = boundType->getCanonicalType();
   }
   return ExtendedTy;
@@ -69,7 +70,7 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   }
 }
 
-Type DeclContext::getDeclaredTypeInContext() {
+Type DeclContext::getDeclaredTypeInContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
@@ -87,7 +88,7 @@ Type DeclContext::getDeclaredTypeInContext() {
   }
 }
 
-Type DeclContext::getDeclaredInterfaceType() {
+Type DeclContext::getDeclaredInterfaceType() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:

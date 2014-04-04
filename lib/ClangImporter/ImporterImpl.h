@@ -664,10 +664,6 @@ public:
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t unused) override;
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override {
-    llvm_unreachable("importer does not use lazy associated type defaults");
-  }
 };
 
 }

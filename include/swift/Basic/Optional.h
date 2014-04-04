@@ -146,7 +146,17 @@ namespace swift {
       reset();
       return result;
     }
-    
+
+    template <typename U>
+    constexpr T getValueOr(U &&value) const & {
+      return hasValue() ? getValue() : value;
+    }
+
+    template <typename U>
+    T getValueOr(U &&value) && {
+      return hasValue() ? getValue() : value;
+    }
+
     bool hasValue() const { return HasValue; }
     explicit operator bool() const { return HasValue; }
     

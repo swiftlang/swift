@@ -208,6 +208,27 @@ namespace {
 } // end anonymous namespace
 
 
+/// Skips a single record in the bitstream.
+///
+/// Returns true if the next entry is a record of type \p recordKind.
+/// Destroys the stream position if the next entry is not a record.
+static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
+  auto next = cursor.advance(AF_DontPopBlockAtEnd);
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    return false;
+
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
+
+#if NDEBUG
+  cursor.skipRecord(next.ID);
+  return true;
+#else
+  unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+  return kind == recordKind;
+#endif
+}
+
 /// Translate from the serialization DefaultArgumentKind enumerators, which are
 /// guaranteed to be stable, to the AST ones.
 static Optional<swift::DefaultArgumentKind>
@@ -387,7 +408,7 @@ ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
                                       llvm::BitstreamCursor &Cursor) {
   if (moduleID == serialization::BUILTIN_MODULE_ID) {
     // The underlying conformance is in the following record.
-    return maybeReadConformance(getType(typeID), Cursor)->second;
+    return *maybeReadConformance(getType(typeID), Cursor);
   }
 
   // Dig out the protocol conformance within the nominal declaration.
@@ -408,8 +429,9 @@ ModuleFile::readUnderlyingConformance(ProtocolDecl *proto,
   llvm_unreachable("Unable to find underlying conformance");
 }
 
-Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
-                              llvm::BitstreamCursor &Cursor){
+Optional<ProtocolConformance *>
+ModuleFile::maybeReadConformance(Type conformingType,
+                                 llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(Cursor);
@@ -425,7 +447,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     lastRecordOffset.reset();
     DeclID protoID;
     NoConformanceLayout::readRecord(scratch, protoID);
-    return std::make_pair(cast<ProtocolDecl>(getDecl(protoID)), nullptr);
+    return nullptr;
   }
 
   case NORMAL_PROTOCOL_CONFORMANCE:
@@ -461,10 +483,8 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     lastRecordOffset.reset();
 
     assert(genericConformance && "Missing generic conformance?");
-    return { proto,
-             ctx.getSpecializedConformance(conformingType,
-                                           genericConformance,
-                                           ctx.AllocateCopy(substitutions)) };
+    return ctx.getSpecializedConformance(conformingType, genericConformance,
+                                         ctx.AllocateCopy(substitutions));
   }
 
   case INHERITED_PROTOCOL_CONFORMANCE: {
@@ -485,9 +505,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     // Reset the offset RAII to the end of the trailing records.
     lastRecordOffset.reset();
     assert(inheritedConformance && "Missing generic conformance?");
-    return { proto,
-             ctx.getInheritedConformance(conformingType,
-                                         inheritedConformance) };
+    return ctx.getInheritedConformance(conformingType, inheritedConformance);
   }
 
   // Not a protocol conformance.
@@ -512,7 +530,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
     auto inherited = maybeReadConformance(conformingType, Cursor);
     assert(inherited.hasValue());
 
-    inheritedConformances.insert(inherited.getValue());
+    inheritedConformances[(*inherited)->getProtocol()] = *inherited;
   }
 
   ASTContext &ctx = getContext();
@@ -574,7 +592,7 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   // If we have a complete protocol conformance do not attempt to initialize
   // it. Just return the proto, conformance pair.
   if (conformance->getState() == ProtocolConformanceState::Complete)
-    return { proto, conformance };
+    return conformance;
 
   // Set inherited conformances.
   for (auto inherited : inheritedConformances) {
@@ -597,27 +615,8 @@ Optional<ConformancePair> ModuleFile::maybeReadConformance(Type conformingType,
   }
 
   conformance->setState(ProtocolConformanceState::Complete);
-  return { proto, conformance };
+  return conformance;
 }
-
-/// Applies protocol conformances to a decl.
-template <typename T>
-void processConformances(ASTContext &ctx, T *decl,
-                         ArrayRef<ConformancePair> conformances) {
-  SmallVector<ProtocolDecl *, 16> protoBuf;
-  SmallVector<ProtocolConformance *, 16> conformanceBuf;
-  for (auto conformancePair : conformances) {
-    auto proto = conformancePair.first;
-    auto conformance = conformancePair.second;
-
-    protoBuf.push_back(proto);
-    conformanceBuf.push_back(conformance);
-  }
-
-  decl->setProtocols(ctx.AllocateCopy(protoBuf));
-  decl->setConformances(ctx.AllocateCopy(conformanceBuf));
-}
-
 
 Optional<Substitution> ModuleFile::maybeReadSubstitution(
                            llvm::BitstreamCursor &Cursor) {
@@ -649,9 +648,9 @@ Optional<Substitution> ModuleFile::maybeReadSubstitution(
 
   SmallVector<ProtocolConformance *, 16> conformanceBuf;
   while (numConformances--) {
-    auto conformancePair = maybeReadConformance(replacementTy, Cursor);
-    assert(conformancePair.hasValue() && "Missing conformance");
-    conformanceBuf.push_back(conformancePair->second);
+    auto conformance = maybeReadConformance(replacementTy, Cursor);
+    assert(conformance.hasValue() && "Missing conformance");
+    conformanceBuf.push_back(conformance.getValue());
   }
 
   lastRecordOffset.reset();
@@ -1474,9 +1473,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     IdentifierID nameID;
     DeclID contextID;
     bool isImplicit;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit);
+                                          isImplicit, rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -1513,14 +1513,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     theStruct->computeType();
 
-    CanType canTy = theStruct->getDeclaredTypeInContext()->getCanonicalType();
-
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, theStruct, conformances);
+    auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
+                                               uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    theStruct->setProtocols(protocols);
 
     theStruct->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    theStruct->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+
     theStruct->setCheckedInheritanceClause();
     break;
   }
@@ -2001,11 +2004,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     bool isImplicit, isObjC, isIBDesignable, attrRequiresStoredPropertyInits;
     bool requiresStoredPropertyInits;
     TypeID superclassID;
+    ArrayRef<uint64_t> rawProtocolIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC, isIBDesignable,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
-                                         superclassID);
+                                         superclassID, rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2052,14 +2056,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       theClass->getMutableAttrs().setAttr(AK_IBDesignable, SourceLoc());
     theClass->computeType();
 
-    CanType canTy = theClass->getDeclaredTypeInContext()->getCanonicalType();
-
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, theClass, conformances);
+    auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
+                                               uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    theClass->setProtocols(protocols);
 
     theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    theClass->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+
     theClass->setCheckedInheritanceClause();
     theClass->setCircularityCheck(CircularityCheck::Checked);
     break;
@@ -2070,9 +2077,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     DeclID contextID;
     bool isImplicit;
     TypeID rawTypeID;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
-                                        isImplicit, rawTypeID);
+                                        isImplicit, rawTypeID,
+                                        rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2110,14 +2119,18 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     }
 
     theEnum->computeType();
-    CanType canTy = theEnum->getDeclaredTypeInContext()->getCanonicalType();
 
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, theEnum, conformances);
+    auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
+                                               uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    theEnum->setProtocols(protocols);
 
     theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    theEnum->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
+
     theEnum->setCheckedInheritanceClause();
     break;
   }
@@ -2211,9 +2224,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     TypeID baseID;
     DeclID contextID;
     bool isImplicit;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit);
+                                             isImplicit, rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2229,14 +2243,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     if (isImplicit)
       extension->setImplicit();
 
-    CanType canBaseTy = baseTy.getType()->getCanonicalType();
-
-    SmallVector<ConformancePair, 16> conformances;
-    while (auto conformance = maybeReadConformance(canBaseTy, DeclTypeCursor))
-      conformances.push_back(*conformance);
-    processConformances(ctx, extension, conformances);
+    auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
+    for_each(protocols, rawProtocolIDs, [this](ProtocolDecl *&p,
+                                               uint64_t rawID) {
+      p = cast<ProtocolDecl>(getDecl(rawID));
+    });
+    extension->setProtocols(protocols);
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
+    extension->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 
     baseTy.getType()->getAnyNominal()->addExtension(extension);
     extension->setCheckedInheritanceClause();
@@ -3055,6 +3071,25 @@ ArrayRef<Decl *> ModuleFile::loadAllMembers(const Decl *D,
   auto result = readMembers();
   assert(result && "unable to read members");
   return result.getValue();
+}
+
+ArrayRef<ProtocolConformance *>
+ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData) {
+  // FIXME: Add PrettyStackTrace.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+
+  Type conformingTy;
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+    conformingTy = nominal->getDeclaredTypeInContext();
+  else
+    conformingTy = cast<ExtensionDecl>(D)->getDeclaredTypeInContext();
+  CanType canTy = conformingTy->getCanonicalType();
+
+  SmallVector<ProtocolConformance *, 16> conformances;
+  while (auto conformance = maybeReadConformance(canTy, DeclTypeCursor))
+    conformances.push_back(conformance.getValue());
+  return getContext().AllocateCopy(conformances);
 }
 
 TypeLoc

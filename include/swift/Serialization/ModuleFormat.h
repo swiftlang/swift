@@ -587,26 +587,25 @@ namespace decls_block {
     BCArray<DeclIDField> // protocols
   >;
 
-  template <unsigned Code>
-  using NominalLayout = BCRecordLayout<
-    Code,
+  using StructLayout = BCRecordLayout<
+    STRUCT_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
-    BCFixed<1>  // implicit flag
-    // Trailed by the generic parameters (if any), conformance info (if any),
-    // and finally the decl context record.
+    BCFixed<1>,  // implicit flag
+    BCArray<DeclIDField> // protocols
+    // Trailed by the generic parameters (if any), the decl context record, and
+    // finally conformance info (if any).
   >;
-
-  using StructLayout = NominalLayout<STRUCT_DECL>;
 
   using EnumLayout = BCRecordLayout<
     ENUM_DECL,
     IdentifierIDField, // name
     DeclIDField, // context decl
     BCFixed<1>,  // implicit flag
-    TypeIDField  // raw type
-    // Trailed by the generic parameters (if any), conformance info (if any),
-    // and finally the decl context record.
+    TypeIDField, // raw type
+    BCArray<DeclIDField> // protocols
+    // Trailed by the generic parameters (if any), the decl context record, and
+    // finally conformance info (if any).
   >;
 
   using ClassLayout = BCRecordLayout<
@@ -618,9 +617,10 @@ namespace decls_block {
     BCFixed<1>,        // IBDesignable?
     BCFixed<1>,        // requires stored property initial values (attribute)
     BCFixed<1>,        // requires stored property initial values
-    TypeIDField        // superclass
-    // Trailed by the generic parameters (if any), conformance info (if any),
-    // and finally the decl context record.
+    TypeIDField,       // superclass
+    BCArray<DeclIDField> // protocols
+    // Trailed by the generic parameters (if any), the decl context record, and
+    // finally conformance info (if any).
   >;
 
   using ProtocolLayout = BCRecordLayout<
@@ -761,8 +761,9 @@ namespace decls_block {
     EXTENSION_DECL,
     TypeIDField, // base type
     DeclIDField, // context decl
-    BCFixed<1>   // implicit flag
-    // Trailed by conformance info (if any), then the decl context record.
+    BCFixed<1>,  // implicit flag
+    BCArray<DeclIDField> // protocols
+    // Trailed by the decl context record and then conformance info (if any).
   >;
 
   using DestructorLayout = BCRecordLayout<

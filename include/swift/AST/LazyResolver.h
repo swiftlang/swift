@@ -107,11 +107,24 @@ public:
   ///
   /// The implementation should \em not call setMembers on \p D.
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
-                                          uint64_t contextData) = 0;
+                                          uint64_t contextData) {
+    llvm_unreachable("unimplemented");
+  }
+
+  /// Returns an ASTContext-allocated array containing all conformances for
+  /// \p D.
+  ///
+  /// The implementation should \em not call setConformances on \p D.
+  virtual ArrayRef<ProtocolConformance *>
+  loadAllConformances(const Decl *D, uint64_t contextData) {
+    llvm_unreachable("unimplemented");
+  }
 
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) = 0;
+                                            uint64_t contextData) {
+    llvm_unreachable("unimplemented");
+  }
 };
 
 /// A placeholder for either an array or a member loader.

@@ -493,9 +493,46 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
-void ExtensionDecl::setConformances(ArrayRef<ProtocolConformance *> c) {
-  Conformances = c;
+template <typename T>
+static void
+loadAllConformances(const T *container,
+                    const LazyLoaderArray<ProtocolConformance*> &loaderInfo) {
+  if (!loaderInfo.isLazy())
+    return;
+
+  // Don't try to load conformances re-entrant-ly.
+  auto resolver = loaderInfo.getLoader();
+  auto contextData = loaderInfo.getLoaderContextData();
+  const_cast<LazyLoaderArray<ProtocolConformance*> &>(loaderInfo) = {};
+
+  auto conformances = resolver->loadAllConformances(container, contextData);
+  const_cast<T *>(container)->setConformances(conformances);
 }
+
+ArrayRef<ProtocolConformance*> NominalTypeDecl::getConformances() const {
+  loadAllConformances(this, Conformances);
+  return Conformances.getArray();
+}
+
+ArrayRef<ProtocolConformance*> ExtensionDecl::getConformances() const {
+  loadAllConformances(this, Conformances);
+  return Conformances.getArray();
+}
+
+void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
+                                           uint64_t contextData) {
+  assert(!Conformances.isLazy() && "already have a resolver");
+  assert(Conformances.getArray().empty() && "already have conformances");
+  Conformances.setLoader(resolver, contextData);
+}
+
+void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
+                                         uint64_t contextData) {
+  assert(!Conformances.isLazy() && "already have a resolver");
+  assert(Conformances.getArray().empty() && "already have conformances");
+  Conformances.setLoader(resolver, contextData);
+}
+
 
 GenericParamList *ExtensionDecl::getGenericParams() const {
   auto extendedType = getExtendedType();
@@ -904,7 +941,7 @@ void NominalTypeDecl::computeType() {
   }
 }
 
-Type NominalTypeDecl::getDeclaredTypeInContext() {
+Type NominalTypeDecl::getDeclaredTypeInContext() const {
   if (DeclaredTyInContext)
     return DeclaredTyInContext;
   
@@ -919,7 +956,7 @@ Type NominalTypeDecl::getDeclaredTypeInContext() {
     Ty = BoundGenericType::get(D, getDeclContext()->getDeclaredTypeInContext(),
                                GenericArgs);
   }
-  DeclaredTyInContext = Ty;
+  const_cast<NominalTypeDecl *>(this)->DeclaredTyInContext = Ty;
   return DeclaredTyInContext;
 }
 

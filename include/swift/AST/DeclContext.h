@@ -120,7 +120,7 @@ public:
   
   /// \brief Obtain the canonical type from a type extension declaration,
   /// binding any unbound generic types if necessary.
-  static CanType getExtendedType(ExtensionDecl *ED);
+  static CanType getExtendedType(const ExtensionDecl *ED);
 
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
@@ -160,12 +160,12 @@ public:
   /// getDeclaredTypeInContext - For a type context, retrieves the declared
   /// type of the context as visible from within the context. Returns a null
   /// type for non-type contexts.
-  Type getDeclaredTypeInContext();
+  Type getDeclaredTypeInContext() const;
   
   /// getDeclaredInterfaceType - For a type context, retrieves the interface
   /// type of the context as seen from outside the context. Returns a null
   /// type for non-type contexts.
-  Type getDeclaredInterfaceType();
+  Type getDeclaredInterfaceType() const;
 
   /// \brief Retrieve the innermost generic parameters introduced by this
   /// context or one of its parent contexts, or null if this context is not

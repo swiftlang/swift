@@ -499,7 +499,7 @@ public:
   ///
   /// If the record at the cursor is not a protocol conformance, returns
   /// Nothing. Note that a null pointer is a valid conformance value.
-  Optional<std::pair<ProtocolDecl *, ProtocolConformance *>>
+  Optional<ProtocolConformance *>
   maybeReadConformance(Type conformingType, llvm::BitstreamCursor &Cursor);
 
   /// Reads a generic param list from \c DeclTypeCursor.
@@ -511,6 +511,9 @@ public:
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;
+
+  virtual ArrayRef<ProtocolConformance *>
+  loadAllConformances(const Decl *D, uint64_t contextData) override;
 
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;

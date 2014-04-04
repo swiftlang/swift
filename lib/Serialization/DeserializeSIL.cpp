@@ -724,13 +724,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     SmallVector<ProtocolConformance*, 2> conformances;
     for (unsigned i = 0; i < Attr; ++i) {
-      auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
-                                                      SILCursor);
-      assert(conformancePair && "did not read enough conformances");
-      ProtocolConformance *conformance
-        = conformancePair ? conformancePair->second : nullptr;
-
-      conformances.push_back(conformance);
+      auto conformance = MF->maybeReadConformance(Ty.getSwiftRValueType(),
+                                                  SILCursor);
+      assert(conformance && "did not read enough conformances");
+      conformances.push_back(conformance.getValueOr(nullptr));
     }
 
     auto ctxConformances = MF->getContext().AllocateCopy(conformances);
@@ -1335,14 +1332,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::WitnessMethodInst: {
-      auto conformancePair = MF->maybeReadConformance(Ty.getSwiftRValueType(),
-                                                      SILCursor);
-      ProtocolConformance *conformance
-        = conformancePair ? conformancePair->second : nullptr;
-
+      auto conformance = MF->maybeReadConformance(Ty.getSwiftRValueType(),
+                                                  SILCursor);
       ResultVal = Builder.createWitnessMethod(Loc, Ty,
-                                                conformance, DRef,
-                                                operandTy, IsVolatile);
+                                              conformance.getValueOr(nullptr),
+                                              DRef, operandTy, IsVolatile);
       break;
     }
     case ValueKind::ProtocolMethodInst:
@@ -1646,16 +1640,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     MF->error();
     return nullptr;
   }
-  
+
   // Deserialize Conformance.
-  auto conformancePair = MF->maybeReadConformance(MF->getType(TyID),
-                                                  SILCursor);
-  ProtocolConformance *conformance
-    = conformancePair ? conformancePair->second : nullptr;
-  assert((conformance && isa<NormalProtocolConformance>(conformance)) &&
+  auto maybeConformance = MF->maybeReadConformance(MF->getType(TyID),
+                                                   SILCursor);
+  assert((maybeConformance &&
+          isa<NormalProtocolConformance>(*maybeConformance)) &&
          "Protocol conformance in witness table should be normal.");
-  NormalProtocolConformance *theConformance =
-      cast<NormalProtocolConformance>(conformance);
+  auto theConformance = cast<NormalProtocolConformance>(*maybeConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance).first;
@@ -1704,12 +1696,9 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       TypeID tyId;
       WitnessBaseEntryLayout::readRecord(scratch, protoId, tyId);
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
-      auto conformancePair = MF->maybeReadConformance(MF->getType(tyId),
-                                                      SILCursor);
-      ProtocolConformance *conformance
-        = conformancePair ? conformancePair->second : nullptr;
+      auto conformance = MF->maybeReadConformance(MF->getType(tyId), SILCursor);
       witnessEntries.push_back(SILWitnessTable::BaseProtocolWitness{
-        proto, conformance
+        proto, conformance.getValueOr(nullptr)
       });
     } else if (kind == SIL_WITNESS_ASSOC_PROTOCOL) {
       DeclID assocId, protoId;
@@ -1718,9 +1707,9 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
       ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
       ProtocolConformance *conformance = nullptr;
       if (tyId) {
-        auto conformancePair = MF->maybeReadConformance(MF->getType(tyId),
-                                                        SILCursor);
-        conformance = conformancePair ? conformancePair->second : nullptr;
+        auto maybeConformance =
+          MF->maybeReadConformance(MF->getType(tyId), SILCursor);
+        conformance = maybeConformance.getValueOr(nullptr);
       }
       witnessEntries.push_back(SILWitnessTable::AssociatedTypeProtocolWitness{
         cast<AssociatedTypeDecl>(MF->getDecl(assocId)), proto, conformance
