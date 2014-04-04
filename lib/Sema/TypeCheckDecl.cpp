@@ -1436,7 +1436,8 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
 
     // Make sure the didSet/willSet accessors are marked @final.
-    if (!willSet->isFinal())
+    if (!willSet->isFinal() && willSet->getExtensionType() &&
+        willSet->getExtensionType()->getClassOrBoundGenericClass())
       willSet->getMutableAttrs().add(new (Ctx) FinalAttr());
   }
   
@@ -1463,7 +1464,8 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
 
     // Make sure the didSet/willSet accessors are marked @final.
-    if (!didSet->isFinal())
+    if (!didSet->isFinal() && didSet->getExtensionType() &&
+        didSet->getExtensionType()->getClassOrBoundGenericClass())
       didSet->getMutableAttrs().add(new (Ctx) FinalAttr());
   }
 
