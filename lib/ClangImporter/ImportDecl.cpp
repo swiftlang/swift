@@ -1779,7 +1779,9 @@ namespace {
 
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
-        result->setStatic();      
+        result->setStatic();
+      if (forceClassMethod)
+        result->setImplicit();
 
       // If this method overrides another method, mark it as such.
       recordObjCMethodOverride(result, decl);
@@ -3584,6 +3586,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
     assert(!result->getClangDecl() || result->getClangDecl() == canon);
     result->setClangNode(decl);
+    result->setImplicit();
 
     // Map the Clang attributes onto Swift attributes.
     importAttributes(SwiftContext, decl, result);
