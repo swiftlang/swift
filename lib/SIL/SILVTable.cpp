@@ -61,13 +61,13 @@ SILVTable::SILVTable(ClassDecl *c, ArrayRef<Pair> entries)
   
   // Bump the reference count of functions referenced by this table.
   for (auto entry : getEntries()) {
-    entry.second->RefCount++;
+    entry.second->incrementRefCount();
   }
 }
 
 SILVTable::~SILVTable() {
   // Drop the reference count of functions referenced by this table.
   for (auto entry : getEntries()) {
-    entry.second->RefCount--;
+    entry.second->decrementRefCount();
   }
 }

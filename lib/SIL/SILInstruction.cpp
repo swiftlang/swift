@@ -620,12 +620,11 @@ PartialApplyInst *PartialApplyInst::create(SILLocation Loc, SILValue Callee,
 FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
   : LiteralInst(ValueKind::FunctionRefInst, Loc, F->getLoweredType()),
     Function(F) {
-
-      F->RefCount++;
+  F->incrementRefCount();
 }
 
 FunctionRefInst::~FunctionRefInst() {
-  Function->RefCount--;
+  Function->decrementRefCount();
 }
 
 SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)

@@ -104,7 +104,7 @@ SILWitnessTable::~SILWitnessTable() {
   for (auto entry : getEntries()) {
     switch (entry.getKind()) {
     case Method:
-      entry.getMethodWitness().Witness->RefCount--;
+      entry.getMethodWitness().Witness->decrementRefCount();
       break;
     case AssociatedType:
     case AssociatedTypeProtocol:
@@ -127,7 +127,7 @@ void SILWitnessTable::convertToDefinition(ArrayRef<Entry> entries) {
   for (auto entry : getEntries()) {
     switch (entry.getKind()) {
     case Method:
-      entry.getMethodWitness().Witness->RefCount++;
+      entry.getMethodWitness().Witness->incrementRefCount();
       break;
     case AssociatedType:
     case AssociatedTypeProtocol:

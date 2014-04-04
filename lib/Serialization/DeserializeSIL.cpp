@@ -447,15 +447,22 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   // If the next entry is the end of the block, then this function has
   // no contents.
   entry = SILCursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind == llvm::BitstreamEntry::EndBlock) {
-    assert(!contextParams && "context params without body?!");
-    cacheEntry.set(fn, /*fully deserialized*/ true);
-    return fn;
-  }
+  bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
+  assert((!isEmptyFunction || !contextParams) &&
+         "context params without body?!");
 
-  // Stop here if we're just supposed to parse a declaration.
-  if (declarationOnly) {
-    cacheEntry.set(fn, /*fully deserialized*/ false);
+  // Remember this in our cache in case it's a recursive function.
+  // Increase the reference count to keep it alive.
+  bool isFullyDeserialized = (isEmptyFunction || !declarationOnly);
+  if (cacheEntry.isDeserialized()) {
+    assert(fn == cacheEntry.get() && "changing SIL function during deserialization!");
+  } else {
+    fn->incrementRefCount();
+  }
+  cacheEntry.set(fn, isFullyDeserialized);
+
+  // Stop here if we have nothing else to do.
+  if (isEmptyFunction || declarationOnly) {
     return fn;
   }
 
@@ -498,7 +505,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       if (readSILInstruction(fn, CurrentBB, kind, scratch)) {
         DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
-        cacheEntry.set(fn, /*fully deserialized*/ true);
         return fn;
       }
     }
@@ -520,8 +526,6 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   if (Callback)
     Callback->didDeserializeFunctionBody(MF->getAssociatedModule(), fn);
-
-  cacheEntry.set(fn, /*fully deserialized*/ true);
 
   return fn;
 }
@@ -1792,4 +1796,10 @@ SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
   return Wt;
 }
 
-SILDeserializer::~SILDeserializer() = default;
+SILDeserializer::~SILDeserializer() {
+  // Drop our references to anything we've deserialized.
+  for (auto &fnEntry : Funcs) {
+    if (fnEntry.isDeserialized())
+      fnEntry.get()->decrementRefCount();
+  }
+}

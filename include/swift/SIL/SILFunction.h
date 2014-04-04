@@ -82,10 +82,7 @@ private:
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
   
-  /// This is the number of function_ref instructions using this SILFunction.
-  friend class FunctionRefInst;
-  friend class SILVTable;
-  friend class SILWitnessTable;
+  /// This is the number of uses of this SILFunction.
   unsigned RefCount = 0;
 
   SILFunction(SILModule &module, SILLinkage linkage,
@@ -119,9 +116,13 @@ public:
     return LoweredType;
   }
     
-  /// Return the number of function_ref instructions that refer to this
-  /// function.
+  /// Return the number of entities referring to this function (other
+  /// than the SILModule).
   unsigned getRefCount() const { return RefCount; }
+
+  /// Increase the reference count.
+  void incrementRefCount() { RefCount++; }
+  void decrementRefCount() { RefCount--; }
   
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
