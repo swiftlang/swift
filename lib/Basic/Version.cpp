@@ -19,12 +19,12 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
-/// \brief Helper macro for SWIFT_VERSION_STRING.
-#define SWIFT_MAKE_VERSION_STRING2(X) #X
+#define TOSTR2(X) #X
+#define TOSTR(X) TOSTR2(X)
 
 #ifdef SWIFT_VERSION_PATCHLEVEL
 /// \brief Helper macro for SWIFT_VERSION_STRING.
-#define SWIFT_MAKE_VERSION_STRING(X,Y,Z) SWIFT_MAKE_VERSION_STRING2(X.Y.Z)
+#define SWIFT_MAKE_VERSION_STRING(X,Y,Z) TOSTR2(X.Y.Z)
 
 /// \brief A string that describes the Swift version number, e.g., "1.0".
 #define SWIFT_VERSION_STRING \
@@ -32,7 +32,7 @@ SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR,SWIFT_VERSION_MINOR, \
 SWIFT_VERSION_PATCHLEVEL)
 #else
 /// \brief Helper macro for SWIFT_VERSION_STRING.
-#define SWIFT_MAKE_VERSION_STRING(X,Y) SWIFT_MAKE_VERSION_STRING2(X.Y)
+#define SWIFT_MAKE_VERSION_STRING(X,Y) TOSTR2(X.Y)
 
 /// \brief A string that describes the Swift version number, e.g., "1.0".
 #define SWIFT_VERSION_STRING \
@@ -42,7 +42,6 @@ SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR,SWIFT_VERSION_MINOR)
 namespace swift {
 namespace version {
 
-#define TOSTR(X) #X
 
 std::string getSwiftFullVersion() {
   std::string buf;
