@@ -59,9 +59,8 @@ Type DeclContext::getDeclaredTypeOfContext() const {
     if (auto ND = type->getNominalOrBoundGenericNominal())
       return ND->getDeclaredType();
     
-    if (dyn_cast<UnboundGenericType>(type.getPointer())) {
+    if (isa<UnboundGenericType>(type.getPointer()))
       return getExtendedType(const_cast<ExtensionDecl*>(ED));
-    }
     return Type();
   }
 
