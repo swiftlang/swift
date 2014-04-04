@@ -424,7 +424,10 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                   SGFContext C) {
   assert(!ncRefType->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
-
+  
+  // Don't need to write back to decls loaded as rvalues.
+  DisableWritebackScope scope(*this);
+  
   // If this is an decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
   
@@ -551,7 +554,6 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
                           ArrayRef<Substitution> substitutions,
                           bool isDirectPropertyAccess,
                           Type propTy, SGFContext C) {
-
   // If this is a non-direct access to a computed property, call the getter.
   if (FieldDecl->hasAccessorFunctions() && !isDirectPropertyAccess) {
     // If the base is +0, and this is a non-protocol/archetype base, emit a
@@ -1365,6 +1367,9 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 }
 
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
+  // Don't need to write back to members loaded as rvalues.
+  DisableWritebackScope scope(SGF);
+  
   assert(!E->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
 
