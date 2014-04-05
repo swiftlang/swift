@@ -224,6 +224,9 @@ public:
   llvm::SmallDenseMap<const clang::TypedefNameDecl *, MappedTypeNameKind, 16>
     SpecialTypedefNames;
 
+  /// Mapping from Objective-C selectors to method names.
+  llvm::DenseMap<std::pair<clang::Selector, char>, DeclName> SelectorMappings;
+
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.
   llvm::DenseSet<const clang::Decl *> SuperfluousTypedefs;

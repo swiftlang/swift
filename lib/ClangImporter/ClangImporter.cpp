@@ -595,9 +595,10 @@ static Identifier importArgName(ASTContext &ctx, StringRef name) {
            camel_case::toLowercaseWord(name.substr(firstWord.size()), scratch));
 }
 
-DeclName
-ClangImporter::Implementation::importName(clang::Selector selector,
-                                          bool isInitializer) {
+/// Map an Objective-C selector name to a Swift method name.
+static DeclName mapSelectorName(ASTContext &ctx,
+                                clang::Selector selector,
+                                bool isInitializer) {
   assert(!selector.isNull() && "Null selector?");
 
   // Zero-argument selectors.
@@ -608,16 +609,16 @@ ClangImporter::Implementation::importName(clang::Selector selector,
 
     // Simple case.
     if (!isInitializer || name.size() == 4)
-      return SwiftContext.getIdentifier(name);
+      return ctx.getIdentifier(name);
 
     // This is an initializer with no parameters but a name that
     // contains more than 'init', so synthesize an argument to capture
     // what follows 'init'.
     ++NumNullaryInitMethodsMadeUnary;
     assert(camel_case::getFirstWord(name).equals("init"));
-    auto baseName = SwiftContext.Id_init;
-    auto argName = importArgName(SwiftContext, name.substr(4));
-    return DeclName(SwiftContext, baseName, argName);
+    auto baseName = ctx.Id_init;
+    auto argName = importArgName(ctx, name.substr(4));
+    return DeclName(ctx, baseName, argName);
   }
 
   // Determine the base name and first argument name.
@@ -626,17 +627,17 @@ ClangImporter::Implementation::importName(clang::Selector selector,
   StringRef firstPiece = selector.getNameForSlot(0);
   if (isInitializer) {
     assert(camel_case::getFirstWord(firstPiece).equals("init"));
-    baseName = SwiftContext.Id_init;
-    argumentNames.push_back(importArgName(SwiftContext, firstPiece.substr(4)));
-  } else if (SplitPrepositions) {
+    baseName = ctx.Id_init;
+    argumentNames.push_back(importArgName(ctx, firstPiece.substr(4)));
+  } else if (ctx.LangOpts.SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
     std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
                                                                scratch);
-    baseName = SwiftContext.getIdentifier(funcName);
-    argumentNames.push_back(importArgName(SwiftContext, firstArgName));
+    baseName = ctx.getIdentifier(funcName);
+    argumentNames.push_back(importArgName(ctx, firstArgName));
   } else {
-    baseName = SwiftContext.getIdentifier(firstPiece);
+    baseName = ctx.getIdentifier(firstPiece);
     argumentNames.push_back(Identifier());
   }
 
@@ -651,11 +652,25 @@ ClangImporter::Implementation::importName(clang::Selector selector,
     ++NumMultiMethodNames;
   
   for (unsigned i = 1; i != n; ++i) {
-    argumentNames.push_back(importArgName(SwiftContext,
-                                          selector.getNameForSlot(i)));
+    argumentNames.push_back(importArgName(ctx, selector.getNameForSlot(i)));
   }
   
-  return DeclName(SwiftContext, baseName, argumentNames);
+  return DeclName(ctx, baseName, argumentNames);
+}
+
+DeclName ClangImporter::Implementation::importName(clang::Selector selector,
+                                                   bool isInitializer) {
+  // Check whether we've already mapped this selector.
+  auto known = SelectorMappings.find({selector, isInitializer});
+  if (known != SelectorMappings.end())
+    return known->second;
+
+  // Map the selector.
+  auto result = mapSelectorName(SwiftContext, selector, isInitializer);
+
+  // Cache the result and return.
+  SelectorMappings[{selector, isInitializer}] = result;
+  return result;
 }
 
 #pragma mark Name lookup
