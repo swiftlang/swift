@@ -534,6 +534,8 @@ ERROR(circular_class_inheritance,sema_tcd,none,
       "circular class inheritance %0", (StringRef))
 NOTE(class_here,sema_tcd,none,
      "class %0 declared here", (Identifier))
+ERROR(inheritance_from_final_class,sema_tcd,none,
+"Inheritance from a final class %0", (Identifier))
 
 // Enum raw types
 ERROR(multiple_enum_raw_types,sema_tcd,none,

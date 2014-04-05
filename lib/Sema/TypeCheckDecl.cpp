@@ -2288,6 +2288,16 @@ public:
       checkRequiredInClassInits(CD);
 
     if (!IsFirstPass) {
+      // Check that we don't inherit from a final class.
+      if (auto superclassTy = CD->getSuperclass()) {
+        ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+        if (Super->isFinal()) {
+          TC.diagnose(CD, diag::inheritance_from_final_class,
+                      Super->getName());
+          return;
+        }
+      }
+
       // Check for inconsistencies between the initializers of our
       // superclass and our own initializers.
       if (auto superclassTy = CD->getSuperclass()) {
