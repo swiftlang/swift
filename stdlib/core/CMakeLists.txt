@@ -35,6 +35,7 @@ set(SWIFTLIB_ESSENTIAL
   CompilerProtocols.swift
   ContiguousString.swift
   Dictionary.swift
+  EmptyCollection.swift
   Existential.swift
   FixedPoint.swift.gyb
   FloatingPoint.swift.gyb
