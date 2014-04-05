@@ -584,6 +584,10 @@ public:
         Result.push_back('\0');
         Result.pop_back();
 
+        // Enter the line into the line history.
+        HistEventW ev;
+        history_w(h, &ev, H_ENTER, TotalLine);
+
         return REPLInputKind::REPLDirective;
       }
 
