@@ -1,0 +1,44 @@
+//===--- MappedNames.def - Mapped Name Database -----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of C function names and Objective-C
+// selectors that are remapped on import to a specific Swift name.
+// ===---------------------------------------------------------------------===//
+
+/// MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames)
+///
+///   Selector: The Objective-C selector that will be mapped into the
+///   given Swift method name, in the form of a comma-separated list of
+///   strings in parentheses.
+///
+///   ForMethod: Boolean flag indicating whether this split is valid
+///   for a method.
+///
+///   ForInitializer: Boolean flag indicating whether this split is valid
+///   for an initializer.
+
+///   BaseName: The base name of the Swift method name, as a string.
+///
+///   ArgNames: The argument names of the Swift method name, as a
+///   comma-separated list of strings in parentheses.
+///
+/// Note that the selector and method name must have the same number
+/// of arguments, i.e., the same number of colons.
+#ifndef MAP_SELECTOR
+#  define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames)
+#endif
+
+MAP_SELECTOR(("colorWithDeviceRed", "green", "blue", "alpha"), true, false,
+             "colorWithDevice",("red", "green", "blue", "alpha"))
+
+#undef MAP_SELECTOR
+

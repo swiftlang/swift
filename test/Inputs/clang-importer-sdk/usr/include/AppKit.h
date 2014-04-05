@@ -30,3 +30,7 @@
 
 @interface NSInterestingDesignatedSub : NSInterestingDesignated
 @end
+
+@interface NSColor : NSObject
++ (instancetype)colorWithDeviceRed:(double)red green:(double)green blue:(double)blue alpha:(double)alpha;
+@end

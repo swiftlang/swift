@@ -658,8 +658,72 @@ static DeclName mapSelectorName(ASTContext &ctx,
   return DeclName(ctx, baseName, argumentNames);
 }
 
+namespace {
+  /// Function object used to create Clang selectors from strings.
+  class CreateSelector {
+    clang::ASTContext &Ctx;
+    
+  public:
+    CreateSelector(clang::ASTContext &ctx) : Ctx(ctx){ }
+
+    template<typename ...Strings>
+    clang::Selector operator()(Strings ...strings) const {
+      clang::IdentifierInfo *pieces[sizeof...(Strings)] = {
+        (strings[0]? &Ctx.Idents.get(strings) : nullptr)...
+      };
+
+      return Ctx.Selectors.getSelector(sizeof...(Strings), pieces);
+    }
+  };
+
+  /// Function object used to create Swift method names from strings.
+  class CreateMethodName {
+    ASTContext &Ctx;
+    Identifier BaseName;
+
+  public:
+    CreateMethodName(ASTContext &ctx, StringRef baseName) 
+      : Ctx(ctx)
+    { 
+      BaseName = Ctx.getIdentifier(baseName);
+    }
+
+    template<typename ...Strings>
+    DeclName operator()(Strings ...strings) const {
+      Identifier pieces[sizeof...(Strings)] = {
+        (strings[0]? Ctx.getIdentifier(strings) : Identifier())...
+      };
+
+      return DeclName(Ctx, BaseName, pieces);
+    }
+  };
+}
+
 DeclName ClangImporter::Implementation::importName(clang::Selector selector,
                                                    bool isInitializer) {
+  // If we haven't computed any selector mappings before, load the
+  // default mappings.
+  if (SelectorMappings.empty() && SplitPrepositions) {
+    // Function object that 
+    CreateSelector createSelector(getClangASTContext());
+
+#define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames) \
+    {                                                                   \
+      auto selector = createSelector Selector;                          \
+      CreateMethodName createMethodName(SwiftContext, BaseName);        \
+      auto methodName = createMethodName ArgNames;                      \
+      assert((ForMethod || ForInitializer) &&                           \
+             "Must be for a method or initializer");                    \
+      if (ForMethod)                                                    \
+        SelectorMappings[{selector, false}] = methodName;               \
+      if (ForInitializer) {                                             \
+        assert(methodName.getBaseName() == SwiftContext.Id_init);       \
+        SelectorMappings[{selector, true}] = methodName;                \
+      }                                                                 \
+    }
+#include "MappedNames.def"
+  }
+
   // Check whether we've already mapped this selector.
   auto known = SelectorMappings.find({selector, isInitializer});
   if (known != SelectorMappings.end())
