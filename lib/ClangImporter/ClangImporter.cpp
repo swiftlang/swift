@@ -108,32 +108,6 @@ void ClangImporter::clearTypeResolver() {
   Impl.setTypeResolver(nullptr);
 }
 
-namespace {
-  namespace attr_fallback {}
-}
-namespace clang {
-  using namespace ::attr_fallback;
-}
-
-/// Hack: returns true if Clang has a particular attribute.
-#define MAKE_HAS_ATTR(NAME) \
-namespace { \
-  namespace attr_fallback { \
-    class NAME##Attr; \
-  } \
-} \
-static constexpr bool has##NAME##Attr() { \
-  return !std::is_same<clang::NAME##Attr, attr_fallback::NAME##Attr>::value; \
-}
-
-MAKE_HAS_ATTR(ObjCRootClass)
-MAKE_HAS_ATTR(NotAnAttributeClangWillEverImplement)
-static_assert(hasObjCRootClassAttr(), "MAKE_HAS_ATTR is broken");
-static_assert(!hasNotAnAttributeClangWillEverImplementAttr(),
-              "MAKE_HAS_ATTR is broken");
-
-MAKE_HAS_ATTR(ObjCCompleteDefinition)
-
 #pragma mark Module loading
 
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
@@ -166,7 +140,9 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w", "-triple", targetTriple.str(),
     "-I", searchPathOpts.RuntimeResourcePath,
-    "-DSWIFT_PROTOCOL=__attribute__((annotate(\""
+    "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
+      SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+    "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "-fretain-comments-from-system-headers",
     "swift.m"
@@ -174,17 +150,6 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
-  }
-
-  // FIXME: Once we're all building with the internal Clang, remove this guard.
-  // It might also make more sense to put this in a header.
-  if (hasObjCCompleteDefinitionAttr()) {
-    invocationArgStrs.push_back("-DSWIFT_CLASS="
-      "__attribute__((objc_complete_definition)) "
-      "__attribute__((annotate(\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))");
-  } else {
-    invocationArgStrs.push_back("-DSWIFT_CLASS="
-      "__attribute__((annotate(\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))");
   }
 
   if (searchPathOpts.SDKPath.empty()) {

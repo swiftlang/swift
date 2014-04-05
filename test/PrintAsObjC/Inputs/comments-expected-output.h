@@ -1,3 +1,4 @@
+SWIFT_CLASS("A000")
 @interface A000
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
@@ -5,7 +6,7 @@
 
 
 /// Aaa.  A10.  Bbb.
-SWIFT_CLASS
+SWIFT_CLASS("A010")
 @interface A010
 
 - (void)f0;
@@ -55,7 +56,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A020_BulletList")
 @interface A020_BulletList
 
 /// <ul><li><p>Aaa.</p></li><li><p>Bbb.
@@ -65,7 +66,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A030_EnumeratedList")
 @interface A030_EnumeratedList
 
 /// <ol><li><p>Aaa.</p></li><li><p>Bbb.
@@ -75,7 +76,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A040_DefinitionList")
 @interface A040_DefinitionList
 
 /// <dl><dt>Aaa</dt><dd><p>Bbb.</p></dd><dt>Ccc</dt><dd><p>Ddd.</p></dd><dt>Eee : Fff</dt><dd><p>Ggg.</p></dd><dt>``Hhh``</dt><dd><p>Jjj.</p></dd></dl>
@@ -84,7 +85,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A050_FieldList")
 @interface A050_FieldList
 
 /// <dl><dt>unknown</dt><dd><p>Aaa.
@@ -94,7 +95,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A060_OptionList")
 @interface A060_OptionList
 
 /// -a   Aaa.
@@ -106,7 +107,7 @@ SWIFT_CLASS
 @end
 
 
-SWIFT_CLASS
+SWIFT_CLASS("A070_BlockQuote")
 @interface A070_BlockQuote
 
 /// Aaa.

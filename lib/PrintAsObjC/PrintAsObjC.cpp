@@ -331,7 +331,9 @@ private:
 
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
-    os << "SWIFT_CLASS\n@interface " << CD->getName();
+    llvm::SmallString<32> scratch;
+    os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
+       << "@interface " << CD->getName();
     if (Type superTy = CD->getSuperclass())
       os << " : " << superTy->getClassOrBoundGenericClass()->getName();
     printProtocols(CD->getProtocols());
@@ -350,7 +352,9 @@ private:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    os << "SWIFT_PROTOCOL\n@protocol " << PD->getName();
+    llvm::SmallString<32> scratch;
+    os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
+       << "@protocol " << PD->getName();
     printProtocols(PD->getProtocols());
     os << "\n";
     assert(!protocolMembersOptional && "protocols start @required");
@@ -1043,17 +1047,32 @@ public:
            "# define SWIFT_METATYPE(X) Class\n"
            "#endif\n"
            "\n"
+           "#if !defined(SWIFT_CLASS_EXTRA)\n"
+           "# define SWIFT_CLASS_EXTRA\n"
+           "#endif\n"
+           "#if !defined(SWIFT_PROTOCOL_EXTRA)\n"
+           "# define SWIFT_PROTOCOL_EXTRA\n"
+           "#endif\n"
            "#if !defined(SWIFT_CLASS)\n"
            "# if defined(__has_attribute) && "
-             "__has_attribute(objc_complete_definition)\n"
-           "#  define SWIFT_CLASS __attribute__((objc_complete_definition))\n"
+             "__has_attribute(objc_complete_definition) \n"
+           "#  if __has_attribute(objc_runtime_name) \n"
+           "#   define SWIFT_CLASS(SWIFT_NAME) __attribute__((objc_complete_definition)) __attribute__((objc_runtime_name(SWIFT_NAME))) SWIFT_CLASS_EXTRA\n"
+           "#  else\n"
+           "#   define SWIFT_CLASS(SWIFT_NAME) __attribute__((objc_complete_definition)) SWIFT_CLASS_EXTRA\n"
+           "#  endif\n"
            "# else\n"
-           "#  define SWIFT_CLASS\n"
+           "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_CLASS_EXTRA\n"
            "# endif\n"
            "#endif\n"
            "\n"
            "#if !defined(SWIFT_PROTOCOL)\n"
-           "# define SWIFT_PROTOCOL\n"
+           "# if defined(__has_attribute) && "
+             "__has_attribute(objc_runtime_name) \n"
+           "#   define SWIFT_PROTOCOL(SWIFT_NAME) __attribute__((objc_runtime_name(SWIFT_NAME))) SWIFT_PROTOCOL_EXTRA\n"
+           "# else\n"
+           "#  define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_PROTOCOL_EXTRA\n"
+           "# endif\n"
            "#endif\n"
            "\n"
            "#if !defined(OBJC_DESIGNATED_INITIALIZER)\n"
