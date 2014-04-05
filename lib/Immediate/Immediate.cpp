@@ -1033,7 +1033,8 @@ private:
 public:
   REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
-                  const ProcessCmdLine &CmdLine)
+                  const ProcessCmdLine &CmdLine,
+                  bool ParseStdlib)
     : CI(CI),
       REPLInputFile(CI.getMainModule()->
                       getMainSourceFile(SourceFileKind::REPL)),
@@ -1081,17 +1082,19 @@ public:
     IRGenOpts.UseJIT = true;
     IRGenOpts.DebugInfo = false;
 
+    if (!ParseStdlib) {
     // Force standard library to be loaded immediately.  This forces any errors
     // to appear upfront, and helps eliminate some nasty lag after the first
     // statement is typed into the REPL.
     static const char WarmUpStmt[] = "Void()\n";
 
-    swift::appendToREPLFile(
-        REPLInputFile, PersistentState, RC,
-        llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
-                                             "<REPL Initialization>"));
-    if (Ctx.hadError())
-      return;
+      swift::appendToREPLFile(
+          REPLInputFile, PersistentState, RC,
+          llvm::MemoryBuffer::getMemBufferCopy(WarmUpStmt,
+                                               "<REPL Initialization>"));
+      if (Ctx.hadError())
+        return;
+    }
     
     RC.CurElem = RC.CurIRGenElem = REPLInputFile.Decls.size();
     
@@ -1300,8 +1303,8 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine);
+void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine, ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
 
@@ -1313,8 +1316,8 @@ void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine) {
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine);
+void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine, ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   

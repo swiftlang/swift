@@ -54,8 +54,8 @@ namespace swift {
   void RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                       IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
-  void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
-  void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine);
+  void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);
+  void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);
 }  // end namespace swift
 
 #endif
