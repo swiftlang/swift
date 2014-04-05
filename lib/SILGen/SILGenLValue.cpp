@@ -544,10 +544,11 @@ LValue SILGenFunction::emitLValue(Expr *e) {
   LValue r = SILGenLValue(*this).visit(e);
   // If the final component is physical with an abstraction change, introduce a
   // reabstraction component.
-  if (r.isLastComponentPhysical()) {
-    if (r.getOrigFormalType().getAsType() != r.getSubstFormalType())
-      r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
-                                  r.getSubstFormalType());
+  if (r.isLastComponentPhysical()
+      && getTypeLowering(r.getSubstFormalType()).getLoweredType()
+            != r.getTypeOfRValue()) {
+    r.add<OrigToSubstComponent>(*this, r.getOrigFormalType(),
+                                r.getSubstFormalType());
   }
   return r;
 }
