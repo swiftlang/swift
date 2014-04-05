@@ -589,7 +589,7 @@ namespace {
         case AccessorKind::IsDidSet: OS << " didset"; break;
         }
 
-        OS << "_for=" << ASD->getName();
+        OS << "_for=" << ASD->getFullName();
       }
       
       for (auto VD: FD->getConformances()) {
