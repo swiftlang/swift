@@ -1315,12 +1315,12 @@ struct ASTNodeBase {};
       verifyParsedBase(CD);
     }
 
-    void verifyParsed(ProtocolDecl *PD) {
+    void verifyChecked(ProtocolDecl *PD) {
       if (PD->isObjC() && !PD->requiresClass()) {
         Out << "@objc protocols should be class protocols as well";
         abort();
       }
-      verifyParsedBase(PD);
+      verifyCheckedBase(PD);
     }
 
     void verifyChecked(ConstructorDecl *CD) {
