@@ -714,6 +714,7 @@ DeclName ClangImporter::Implementation::importName(clang::Selector selector,
       auto methodName = createMethodName ArgNames;                      \
       assert((ForMethod || ForInitializer) &&                           \
              "Must be for a method or initializer");                    \
+      assert(selector.getNumArgs() == methodName.getArgumentNames().size()); \
       if (ForMethod)                                                    \
         SelectorMappings[{selector, false}] = methodName;               \
       if (ForInitializer) {                                             \
