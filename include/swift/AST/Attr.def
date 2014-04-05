@@ -85,7 +85,7 @@ DECL_ATTR(availability, Availability,
           1)
 
 SIMPLE_DECL_ATTR(final, Final,
-                 OnFunc | OnVar | OnSubscript,
+                 OnClass | OnFunc | OnVar | OnSubscript,
                  2)
 
 DECL_ATTR(objc, ObjC,

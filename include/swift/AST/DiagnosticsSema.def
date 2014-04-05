@@ -603,10 +603,12 @@ ERROR(override_final,sema_tcd,none,
       "%0 overrides a 'final' %0", (DescriptiveDeclKind))
 
 ERROR(member_cannot_be_final,sema_tcd,none,
-      "only class member may be marked with the @final attribute", ())
+      "only classes and class members may be marked with the @final attribute",
+      ())
 
 ERROR(final_not_allowed_here,sema_tcd,none,
-      "@final may only be applied to properties, methods, and subscripts", ())
+      "@final may only be applied to classes, properties, methods, and "
+      "subscripts", ())
 
 ERROR(final_not_on_accessors,sema_tcd,none,
       "@final cannot be applied to accessors, it must be put on the "

@@ -2270,6 +2270,13 @@ public:
     }
     TC.addImplicitDestructor(CD);
 
+    // Mark all members of @final classes as @final.
+    if (CD->isFinal())
+      for (Decl *Member : CD->getMembers())
+        if (isa<FuncDecl>(Member) || isa<VarDecl>(Member) ||
+            isa<SubscriptDecl>(Member))
+          Member->getMutableAttrs().add(new (TC.Context) FinalAttr(true));
+
     for (Decl *Member : CD->getMembers())
       visit(Member);
     for (Decl *global : CD->getDerivedGlobalDecls())

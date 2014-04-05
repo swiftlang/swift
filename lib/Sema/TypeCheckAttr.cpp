@@ -46,6 +46,10 @@ public:
 } // end anonymous namespace
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
+  // @final on classes marks all members with @final.
+  if (isa<ClassDecl>(D))
+    return;
+
   // The @final attribute only makes sense in the context of a class
   // declaration.  Reject it on global functions, structs, enums, etc.
   auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
@@ -58,7 +62,6 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 
   // We currently only support @final on var/let, func and subscript
   // declarations.
-  // TODO: Support it on classes, which mark all members @final.
   if (!isa<VarDecl>(D) && !isa<FuncDecl>(D) && !isa<SubscriptDecl>(D)) {
     TC.diagnose(attr->getLocation(), diag::final_not_allowed_here);
     return;
