@@ -793,6 +793,74 @@ public:
 
   ParserResult<Pattern> parsePattern(bool isLet);
 
+  /// Describes a parsed parameter.
+  struct ParsedParameter {
+    /// The location of the 'inout' keyword, if present.
+    SourceLoc InOutLoc;
+
+    /// The location of the 'let' or 'var' keyword, if present.
+    ///
+    /// \p IsLet indicates whether this was 'let'.
+    SourceLoc LetVarLoc;
+
+    /// The location of the first name.
+    ///
+    /// \c FirstName is the name.
+    SourceLoc FirstNameLoc;
+
+    /// The location of the second name, if present.
+    ///
+    /// \p SecondName is the name.
+    SourceLoc SecondNameLoc;
+
+    /// The location of the ':', if present, indicating that a type is
+    /// provided.
+    SourceLoc ColonLoc;
+
+    /// The location of the '...', if present.
+    SourceLoc EllipsisLoc;
+
+    /// The location of the '=', if present, indicating that a default argument
+    /// is provided.
+    SourceLoc EqualLoc;
+
+    /// The first name.
+    Identifier FirstName;
+
+    /// The second name, the presence of which is indicated by \c SecondNameLoc.
+    Identifier SecondName;
+
+    /// The type following the ':'.
+    TypeRepr *Type = nullptr;
+
+    /// Whether this parameter is a 'let' parameter.
+    bool IsLet = true;
+
+    /// The default argument for this parameter.
+    ExprHandle *DefaultArg = nullptr;
+  };
+
+  /// Parse a parameter-clause.
+  ///
+  /// \verbatim
+  ///   parameter-clause:
+  ///     '(' ')'
+  ///     '(' parameter (',' parameter)* '...'? )'
+  ///
+  ///   parameter:
+  ///     'inout'? ('let' | 'var')? identifier-or-none identifier-or-none?
+  ///         (':' type)? ('...' | '=' expr)?
+  ///
+  ///   identifier-or-none:
+  ///     identifier
+  ///     '_'
+  /// \endverbatim
+  ParserStatus parseParameterClause(SourceLoc &leftParenLoc,
+                                    SmallVectorImpl<ParsedParameter> &params,
+                                    SourceLoc &rightParenLoc,
+                                    DefaultArgumentInfo &defaultArgs,
+                                    bool isClosure);
+
   /// \brief Determine whether the parser is in a state that can start a
   /// binding name, identifier or the special discard-value binding '_'.
   bool isAtStartOfBindingName();

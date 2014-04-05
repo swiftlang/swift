@@ -125,6 +125,11 @@ public:
     return isAnyOperator() && Text == ContextPunc;
   }
 
+  /// True if the token is an identifier or '_'.
+  bool isIdentifierOrNone() const {
+    return is(tok::identifier) || is(tok::kw__);
+  }
+
   /// True if the token is an l_paren token that does not start a new line.
   bool isFollowingLParen() const {
     return !isAtStartOfLine() && Kind == tok::l_paren;

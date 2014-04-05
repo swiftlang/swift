@@ -584,6 +584,12 @@ ERROR(implied_name_multiple_parameters,pattern_parsing,none,
       "no name specified for first parameter, name it '_' to ignore it", ())
 ERROR(expected_rparen_parameter,decl_parsing,none,
       "expected ')' in parameter", ())
+ERROR(expected_parameter_type,decl_parsing,PointsToFirstBadToken,
+      "expected parameter type following ':'", ())
+ERROR(parameter_ellipsis_not_at_end,decl_parsing,none,
+      "'...' must be on the last parameter", ())
+ERROR(parameter_vararg_default,decl_parsing,none,
+      "variadic parameter cannot have a default value", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics

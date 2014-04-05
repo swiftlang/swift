@@ -106,6 +106,130 @@ static ParserStatus parseDefaultArgument(Parser &P,
   return ParserStatus();
 }
 
+/// Determine whether we are at the start of a parameter name when
+/// parsing a parameter.
+static bool startsParameterName(Parser &parser, bool isClosure) {
+  // '_' cannot be a type, so it must be a parameter name.
+  if (parser.Tok.is(tok::kw__))
+    return true;
+
+  // To have a parameter name here, we need a name.
+  if (!parser.Tok.is(tok::identifier))
+    return false;
+
+  // If the next token is another identifier, '_', or ':', this is a name.
+  auto nextToken = parser.peekToken();
+  if (nextToken.isIdentifierOrNone() || nextToken.is(tok::colon))
+    return true;
+
+  // The identifier could be a name or it could be a type. In a closure, we
+  // assume it's a name, because the type can be inferred. Elsewhere, we
+  // assume it's a type.
+  return isClosure;
+}
+
+ParserStatus
+Parser::parseParameterClause(SourceLoc &leftParenLoc,
+                             SmallVectorImpl<ParsedParameter> &params,
+                             SourceLoc &rightParenLoc,
+                             DefaultArgumentInfo &defaultArgs,
+                             bool isClosure) {
+  assert(params.empty() && leftParenLoc.isInvalid() &&
+         rightParenLoc.isInvalid() && "Must start with empty state");
+
+  // Consume the starting '(';
+  leftParenLoc = consumeToken(tok::l_paren);
+
+  // Trivial case: empty parameter list.
+  if (Tok.is(tok::r_paren)) {
+    rightParenLoc = consumeToken(tok::r_paren);
+    return ParserStatus();
+  }
+
+  // Parse the parameter list.
+  return parseList(tok::r_paren, leftParenLoc, rightParenLoc, tok::comma,
+                      /*OptionalSep=*/false, /*AllowSepAfterLast=*/false,
+                      diag::expected_rparen_parameter,
+                      [&]() -> ParserStatus {
+    ParsedParameter param;
+    ParserStatus status;
+
+    unsigned defaultArgIndex = defaultArgs.NextIndex++;
+
+    // 'inout'?
+    if (Tok.isContextualKeyword("inout"))
+      param.InOutLoc = consumeToken();
+
+    // ('let' | 'var')?
+    if (Tok.is(tok::kw_let)) {
+      param.LetVarLoc = consumeToken();
+      param.IsLet = true;
+    } else if (Tok.is(tok::kw_var)) {
+      param.LetVarLoc = consumeToken();
+      param.IsLet = false;
+    }
+
+    if (startsParameterName(*this, isClosure)) {
+      // identifier-or-none for the first name
+      if (Tok.is(tok::identifier)) {
+        param.FirstName = Context.getIdentifier(Tok.getText());
+        param.FirstNameLoc = consumeToken();
+      } else if (Tok.is(tok::kw__)) {
+        param.FirstNameLoc = consumeToken();
+      }
+
+      // identifier-or-none? for the second name
+      if (Tok.is(tok::identifier)) {
+        param.SecondName = Context.getIdentifier(Tok.getText());
+        param.SecondNameLoc = consumeToken();
+      } else if (Tok.is(tok::kw__)) {
+        param.SecondNameLoc = consumeToken();
+      }
+
+      // (':' type)?
+      if (Tok.is(tok::colon)) {
+        param.ColonLoc = consumeToken();
+        auto type = parseType(diag::expected_parameter_type);
+        status |= type;
+        param.Type = type.getPtrOrNull();
+      }
+    } else {
+      auto type = parseType(diag::expected_parameter_type);
+      status |= type;
+      param.Type = type.getPtrOrNull();
+    }
+
+    // '...'?
+    if (Tok.isEllipsis()) {
+      param.EllipsisLoc = consumeToken();
+    }
+
+    // ('=' expr)?
+    if (Tok.is(tok::equal)) {
+      param.EqualLoc = Tok.getLoc();
+      status |= parseDefaultArgument(*this, &defaultArgs, defaultArgIndex,
+                                     param.DefaultArg);
+
+      if (param.EllipsisLoc.isValid()) {
+        // Thee range of the complete default argument.
+        SourceRange defaultArgRange;
+        if (param.DefaultArg) {
+          if (auto init = param.DefaultArg->getExpr()) {
+            defaultArgRange = SourceRange(param.EllipsisLoc, init->getEndLoc());
+          }
+        }
+
+        diagnose(param.EqualLoc, diag::parameter_vararg_default)
+          .highlight(param.EllipsisLoc)
+          .fixItRemove(defaultArgRange);
+      }
+    }
+
+    params.push_back(param);
+    return status;
+  });
+}
+
 /// Given a pattern "P" based on a pattern atom (either an identifer or _
 /// pattern), rebuild and return the nested pattern around another root that
 /// replaces the atom.
@@ -408,11 +532,123 @@ parseSelectorFunctionArguments(Parser &P,
   return Status;
 }
 
+/// Map parsed parameters to argument and body patterns.
+///
+/// \returns a pair (arg pattern, body pattern) describing the parsed
+/// parameters.
+static std::pair<Pattern *, Pattern *>
+mapParsedParameters(Parser &parser,
+                    SourceLoc leftParenLoc,
+                    MutableArrayRef<Parser::ParsedParameter> params,
+                    SourceLoc rightParenLoc,
+                    Parser::DefaultArgumentInfo &defaultArgs,
+                    bool isFirstParameterClause) {
+  auto &ctx = parser.Context;
+
+  // Local function to create a pattern for a single parameter.
+  auto createParamPattern = [&](SourceLoc &inOutLoc, bool isLet,
+                                SourceLoc letVarLoc,
+                                Identifier name, SourceLoc nameLoc,
+                                TypeRepr *type) -> Pattern * {
+    // Create the parameter based on the name.
+    Pattern *param;
+    if (name.empty()) {
+      param = new (ctx) AnyPattern(nameLoc);
+    } else {
+      // Create a variable to capture this.
+      VarDecl *var = new (ctx) VarDecl(/*IsStatic=*/false, isLet, nameLoc,
+                                       name, Type(), parser.CurDeclContext);
+      param = new (ctx) NamedPattern(var);
+    }
+
+    // If a type was provided, create the typed pattern.
+    if (type) {
+      // If 'inout' was specified, turn the type into an in-out type.
+      if (inOutLoc.isValid()) {
+        type = new (ctx) InOutTypeRepr(type, inOutLoc);
+      }
+
+      param = new (ctx) TypedPattern(param, type);
+    } else if (inOutLoc.isValid()) {
+      parser.diagnose(inOutLoc, diag::inout_must_have_type);
+      inOutLoc = SourceLoc();
+    }
+
+    // If 'var' or 'let' was specified explicitly, create a pattern for it.
+    if (letVarLoc.isValid()) {
+      if (inOutLoc.isValid()) {
+        parser.diagnose(inOutLoc, diag::inout_varpattern);
+        inOutLoc = SourceLoc();
+      } else {
+        param = new (ctx) VarPattern(letVarLoc, param);
+      }
+    }
+
+    return param;
+  };
+
+  // Collect the elements of the tuple patterns for argument and body
+  // parameters.
+  SmallVector<TuplePatternElt, 4> argElements;
+  SmallVector<TuplePatternElt, 4> bodyElements;
+  SourceLoc ellipsisLoc;
+  for (auto &param : params) {
+    // Create the argument pattern.
+    Pattern *arg = createParamPattern(param.InOutLoc,
+                                      param.IsLet, param.LetVarLoc,
+                                      param.FirstName, param.FirstNameLoc,
+                                      param.Type);
+
+    // Create the body pattern.
+    Pattern *body;
+    if (param.SecondNameLoc.isValid())
+      body = createParamPattern(param.InOutLoc,
+                                param.IsLet, param.LetVarLoc,
+                                param.SecondName, param.SecondNameLoc,
+                                param.Type);
+    else
+      body = createParamPattern(param.InOutLoc,
+                                param.IsLet, param.LetVarLoc,
+                                param.FirstName, param.FirstNameLoc,
+                                param.Type);
+
+    // If this parameter had an ellipsis, check whether it's the last parameter.
+    if (param.EllipsisLoc.isValid()) {
+      if (&param != &params.back()) {
+        parser.diagnose(param.EllipsisLoc, diag::parameter_ellipsis_not_at_end)
+          .fixItRemove(param.EllipsisLoc);
+        param.EllipsisLoc = SourceLoc();
+      } else {
+        ellipsisLoc = param.EllipsisLoc;
+      }
+    }
+
+    // Default arguments are only permitted on the first parameter clause.
+    if (param.DefaultArg && !isFirstParameterClause) {
+      parser.diagnose(param.EqualLoc, diag::non_func_decl_pattern_init)
+        .fixItRemove(SourceRange(param.EqualLoc,
+                                 param.DefaultArg->getExpr()->getEndLoc()));
+    }
+
+    // Create the tuple pattern elements.
+    auto defArgKind = getDefaultArgKind(param.DefaultArg);
+    argElements.push_back(TuplePatternElt(arg, param.DefaultArg, defArgKind));
+    bodyElements.push_back(TuplePatternElt(body, param.DefaultArg, defArgKind));
+  }
+
+  return { TuplePattern::createSimple(ctx, leftParenLoc, argElements,
+                                      rightParenLoc, ellipsisLoc.isValid(),
+                                      ellipsisLoc),
+           TuplePattern::createSimple(ctx, leftParenLoc, bodyElements,
+                                      rightParenLoc, ellipsisLoc.isValid(),
+                                      ellipsisLoc) };
+}
+
 /// Parse function arguments.
 ///   func-arguments:
 ///     curried-arguments | selector-arguments
 ///   curried-arguments:
-///     pattern-tuple+
+///     parameter-clause+
 ///   selector-arguments:
 ///     '(' selector-element ')' (identifier '(' selector-element ')')+
 ///   selector-element:
@@ -424,6 +660,45 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
                                bool &HasSelectorStyleSignature) {
+  // Figure out of we have a tuple-like declaration rather than a selector-style
+  // declaration.
+  HasSelectorStyleSignature = false;
+  {
+    BacktrackingScope BS(*this);
+    consumeToken(tok::l_paren);
+    while (!Tok.is(tok::eof) && !Tok.is(tok::r_paren))
+      skipSingle();
+
+    if (consumeIf(tok::r_paren))
+      HasSelectorStyleSignature = isAtStartOfBindingName();
+  }
+
+  // If we don't have a selector-style signature, parse parameter-clauses.
+  if (!HasSelectorStyleSignature) {
+    ParserStatus status;
+    bool isFirstParameterClause = true;
+    while (Tok.is(tok::l_paren)) {
+      SmallVector<ParsedParameter, 4> params;
+      SourceLoc leftParenLoc, rightParenLoc;
+
+      // Parse the parameter clause.
+      status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
+                                     DefaultArgs, /*isClosure=*/false);
+
+      // Turn the parameter clause into argument and body patterns.
+      auto mapped = mapParsedParameters(*this, leftParenLoc, params,
+                                        rightParenLoc, DefaultArgs,
+                                        isFirstParameterClause);
+      ArgPatterns.push_back(mapped.first);
+      BodyPatterns.push_back(mapped.second);
+
+      isFirstParameterClause = false;
+    }
+
+    return status;
+  }
+
+
   // Parse all of the selector arguments or curried argument pieces.
 
   // Parse the first function argument clause.

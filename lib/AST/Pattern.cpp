@@ -402,6 +402,10 @@ SourceRange TypedPattern::getSourceRange() const {
     // be explicit or implicit.
     return SubPattern->getSourceRange();
   }
+
+  if (SubPattern->isImplicit())
+    return PatType.getSourceRange();
+
   return { SubPattern->getSourceRange().Start, PatType.getSourceRange().End };
 }
 

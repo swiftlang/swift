@@ -649,7 +649,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
       if (Tok.is(RightK))
         break;
       if (Tok.is(tok::eof)) {
-        RightLoc = PreviousLoc;
+        RightLoc = PreviousLoc.isValid()? PreviousLoc : Tok.getLoc();
         IsInputIncomplete = true;
         Status.setIsParseError();
         return Status;
@@ -662,7 +662,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
-    RightLoc = PreviousLoc;
+    RightLoc = PreviousLoc.isValid()? PreviousLoc : Tok.getLoc();
   }
 
   return Status;
