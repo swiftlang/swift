@@ -1,3 +1,4 @@
+%# -*- mode: swift -*-
 //===--- Array.swift ------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -9,7 +10,10 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN-DISABLED: %target-run-simple-swift | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
+// RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NewArray.swift -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck %s
 
 var xCount = 0
 var xSerial = 0
@@ -255,6 +259,91 @@ func testSlice() {
 }
 testSlice()
 
+%for A in ['NativeArray', 'NewArray', 'Slice']:
+
+// FIXME: When <rdar://problem/16530674> is handled we can stop
+// gybbing and go back to using a generic function here
+func testReplace/*<
+  A: ArrayType
+  where A.GeneratorType.Element == X, A.Buffer.Element == X, A.IndexType == Int
+>*/(expectUnique: Bool, make: ()->${A}<X>) {
+
+  typealias A = ${A}<X>
+
+  // First make an independent copy of the array that we can use for
+  // comparison later.
+  var source = NativeArray<A.GeneratorType.Element>()
+  for x in make() {
+    source += x
+  }
+  
+  for i in indices(source) {
+    for j in i...source.count {
+
+      let oldCount = j - i
+      for newCount in 0...(2 * oldCount) {
+        let newValues = X(100)...X(100 + newCount)
+
+        func reportFailure(inout a: A, message: String) {
+          print("\(message) when replacing indices \(i)...\(j) in ")
+          printSequence(source)
+          print("  with ")
+          printSequence(newValues)
+          print(" yielding ")
+          printSequence(a)
+          println("====================================")
+        }
+
+        var a = make()
+        if (a.buffer.isUniquelyReferenced() != expectUnique) {
+          reportFailure(
+            &a, "unexpected "
+                + (expectUnique ? " multi-" : "single ") 
+                + "reference")
+        }
+     
+        replace(&a, i...j, newValues)
+        let growth = newCount - oldCount
+        
+        let expectedCount = source.count + growth
+        if a.count != expectedCount {
+          reportFailure(
+            &a, "\(a.count) != expected count \(expectedCount)")
+        }
+        
+        for k in 0...a.count {
+          let expectedValue = k < i ? source[k].value
+          : k < j + growth ? 100 + k - i
+          : source[k - growth].value
+
+          if a[k].value != expectedValue {
+            reportFailure(
+              &a, "a[\(k)] = \(a[k].value) != expected value \(expectedValue)")
+          }
+        }
+      }
+    }
+  }
+}
+
+func testReplace${A}() {
+  func make() -> ${A}<X> { return asArray(X(0)...X(7)) }
+  
+  testReplace(true, make)
+  
+  // Create one that will not be uniquely-referenced so we can test
+  // the other code paths.
+  let r = make()
+  testReplace(false, { r })
+  
+  // This test should ensure r's retain isn't dropped before we start testing.
+  if (r.count != 7) {
+    println("something bad happened!")
+  }
+}
+
+testReplace${A}()
+%end
 println("leaks = \(xCount)")
 // CHECK-NEXT: leaks = 0
 
