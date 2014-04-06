@@ -84,6 +84,10 @@ DECL_ATTR(availability, Availability,
           AllowMultipleAttributes,
           1)
 
+SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
+                 OnProtocol,
+                 5)
+
 SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript,
                  2)
@@ -96,7 +100,6 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
 
 ATTR(assignment)
-ATTR(class_protocol)
 ATTR(conversion)
 ATTR(exported)
 ATTR(infix)

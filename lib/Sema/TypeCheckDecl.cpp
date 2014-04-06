@@ -444,9 +444,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
 
   // Record the protocols to which this declaration conforms along with the
   // superclass.
-  if (allProtocols.empty() && !superclassTy)
-    return;
-
   auto allProtocolsCopy = Context.AllocateCopy(allProtocols);
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     assert(!superclassTy && "Extensions can't add superclasses");
@@ -3235,6 +3232,8 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *attr) { }
 
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(Required)
 
 #undef UNINTERESTING_ATTR
 
@@ -3295,7 +3294,6 @@ public:
       return;
     }
 
-    void visitRequiredAttr(RequiredAttr *attr) {}
   };
 
   /// Record that the \c overriding declarations overrides the \c
@@ -5266,13 +5264,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(Attrs.getLoc(K), diag::invalid_decl_attribute);
       D->getMutableAttrs().clearAttribute(K);
     }
-  }
-
-  // Only protocols can have the [class_protocol] attribute.
-  if (Attrs.isClassProtocol() && !isa<ProtocolDecl>(D)) {
-    TC.diagnose(Attrs.getLoc(AK_class_protocol),
-                diag::class_protocol_not_protocol);
-    D->getMutableAttrs().clearAttribute(AK_class_protocol);
   }
 
   // Only protocol members can be @optional.

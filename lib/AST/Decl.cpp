@@ -1544,12 +1544,11 @@ void ProtocolDecl::collectInherited(
 bool ProtocolDecl::requiresClassSlow() {
   ProtocolDeclBits.RequiresClass = false;
 
-  if (isProtocolsValid()) {
-    // Only cache the result if it can not change in future.
-    ProtocolDeclBits.RequiresClassValid = true;
-  }
+  // Ensure that the result can not change in future.
+  assert(isProtocolsValid());
 
-  if (getAttrs().isClassProtocol() || isObjC()) {
+  if (getAttrs().hasValidAttribute<ClassProtocolAttr>() ||
+      getAttrs().hasValidAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;
     return true;
   }

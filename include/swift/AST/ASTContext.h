@@ -237,6 +237,9 @@ public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
                  AllocationArena arena = AllocationArena::Permanent) const {
+    if (bytes == 0)
+      return nullptr;
+
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
     

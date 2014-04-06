@@ -754,7 +754,6 @@ public:
   bool isIBAction() const { return has(AK_IBAction); }
   bool isIBDesignable() const { return has(AK_IBDesignable); }
   bool isIBInspectable() const { return has(AK_IBInspectable); }
-  bool isClassProtocol() const { return has(AK_class_protocol); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isExported() const { return has(AK_exported); }
@@ -836,9 +835,9 @@ public:
 
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
-  const ATTR* getAttribute() const {
+  const ATTR *getAttribute() const {
     for (auto Attr : *this)
-      if (const ATTR* SpecificAttr = dyn_cast<ATTR>(Attr))
+      if (const ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
         return SpecificAttr;
     return nullptr;
   }

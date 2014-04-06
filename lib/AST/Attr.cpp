@@ -89,8 +89,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@IBOutlet ";
   if (isIBAction())
     Printer << "@IBAction ";
-  if (isClassProtocol())
-    Printer << "@class_protocol ";
   if (isExported())
     Printer << "@exported ";
   if (isOptional())
@@ -123,6 +121,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     Printer << ')';
     break;
   }
+  case DAK_class_protocol:
+    Printer << "@class_protocol";
+    break;
   case DAK_final:
     Printer << "@final";
     break;

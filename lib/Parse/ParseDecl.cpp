@@ -181,6 +181,7 @@ static StringRef getStringLiteralIfNotInterpolated(Parser &P,
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                    SourceLoc AtLoc,
+                                   SourceLoc InversionLoc,
                                    StringRef AttrName,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -194,6 +195,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // Delay issuing the diagnostic until we parse the attribute.
       DiscardAttribute = true;
     }
+
+  if (InversionLoc.isValid())
+    diagnose(InversionLoc, diag::invalid_attribute_inversion);
 
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
@@ -338,6 +342,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DAK_class_protocol:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ClassProtocolAttr(AtLoc, Loc));
+    break;
   case DAK_final:
     if (!DiscardAttribute)
       Attributes.add(new (Context) FinalAttr(AtLoc, Loc));
@@ -472,8 +480,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'requires_stored_property_inits'
 /// \endverbatim
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
-  SourceLoc InversionLoc = Tok.getLoc();
-  bool isInverted = consumeIf(tok::exclaim_postfix);
+  SourceLoc InversionLoc;
+  bool isInverted = false;
+  if (consumeIf(tok::exclaim_postfix)) {
+    InversionLoc = PreviousLoc;
+    isInverted = true;
+  }
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
@@ -502,7 +514,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     // over to the alternate parsing path.
     DeclAttrKind DK = getDeclAttrFromString(Tok.getText());
     if (DK != DAK_Count)
-      return parseNewDeclAttribute(Attributes, AtLoc, Tok.getText(), DK);
+      return parseNewDeclAttribute(Attributes, AtLoc, InversionLoc,
+                                   Tok.getText(), DK);
 
     if (getTypeAttrFromString(Tok.getText()) != TAK_Count)
       diagnose(Tok, diag::type_attribute_applied_to_decl);

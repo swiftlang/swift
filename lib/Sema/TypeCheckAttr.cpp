@@ -37,6 +37,8 @@ public:
     // one it overrides.
   }
 
+  void visitClassProtocolAttr(ClassProtocolAttr *attr);
+
   void visitFinalAttr(FinalAttr *attr);
 
   void visitObjCAttr(ObjCAttr *attr) {}
@@ -44,6 +46,15 @@ public:
   void visitRequiredAttr(RequiredAttr *attr);
 };
 } // end anonymous namespace
+
+void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
+  // Only protocols can have the @class_protocol attribute.
+  if (!isa<ProtocolDecl>(D)) {
+    TC.diagnose(attr->getLocation(),
+                diag::class_protocol_not_protocol);
+    attr->setInvalid();
+  }
+}
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   // @final on classes marks all members with @final.

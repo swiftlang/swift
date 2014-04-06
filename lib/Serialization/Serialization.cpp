@@ -1574,7 +1574,6 @@ void Serializer::writeDecl(const Decl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    checkAllowedAttributes<AK_class_protocol>(proto);
     verifyAttrSerializable(proto);
 
     const Decl *DC = getDeclForContext(proto->getDeclContext());
@@ -1588,7 +1587,6 @@ void Serializer::writeDecl(const Decl *D) {
                                addIdentifierRef(proto->getName()),
                                addDeclRef(DC),
                                proto->isImplicit(),
-                               proto->getAttrs().isClassProtocol(),
                                proto->isObjC(),
                                protocols);
 

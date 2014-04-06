@@ -1965,11 +1965,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   case decls_block::PROTOCOL_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isClassProtocol, isObjC;
+    bool isImplicit, isObjC;
     ArrayRef<uint64_t> protocolIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
-                                            isImplicit, isClassProtocol, isObjC,
+                                            isImplicit, isObjC,
                                             protocolIDs);
 
     auto DC = getDeclContext(contextID);
@@ -2004,8 +2004,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     if (isImplicit)
       proto->setImplicit();
-    if (isClassProtocol)
-      proto->getMutableAttrs().setAttr(AK_class_protocol, SourceLoc());
     proto->setIsObjC(isObjC);
     proto->computeType();
 
