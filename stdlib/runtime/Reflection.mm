@@ -87,7 +87,7 @@ struct String {
   
 struct Array {
   // Keep the details of Array's implementation opaque to the runtime.
-  const void *x, *y, *z;
+  const void *x;
 };
   
 struct QuickLookObject {
