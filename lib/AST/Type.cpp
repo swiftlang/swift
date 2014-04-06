@@ -2528,7 +2528,8 @@ Substitution Substitution::subst(Module *module,
   // When substituting a concrete type for an archetype, we need to fill in the
   // conformances.
   if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
-    if (!substReplacement->is<ArchetypeType>()) {
+    if (!substReplacement->is<ArchetypeType>()
+        && !substReplacement->isExistentialType()) {
       conformancesChanged = true;
       // Find the conformances mapped to the archetype.
       auto foundConformances = conformanceMap.find(replacementArch);
