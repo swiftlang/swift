@@ -2157,6 +2157,14 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
     mangledName += "S_";
   
   // Look up the symbol for the conformance everywhere.
+  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
+    return result;
+  }
+
+  // Otherwise, try looking in Foundation.
+  // FIXME: Egregious hack.
+  mangledName.erase(mangledName.end() - 2, mangledName.end());
+  mangledName += "10Foundation";
   return dlsym(RTLD_DEFAULT, mangledName.c_str());
 }
 
