@@ -37,6 +37,7 @@ class DeclarationName;
 class EnumDecl;
 class MacroInfo;
 class NamedDecl;
+class ObjCInterfaceDecl;
 class ObjCMethodDecl;
 class ParmVarDecl;
 class TypedefNameDecl;
@@ -150,7 +151,9 @@ enum class SpecialMethodKind {
 #define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
 /// \brief Implementation of the Clang importer.
-class ClangImporter::Implementation : public LazyMemberLoader {
+class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
+  : public LazyMemberLoader 
+{
   friend class ClangImporter;
 
 public:
@@ -226,6 +229,28 @@ public:
 
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<clang::Selector, char>, DeclName> SelectorMappings;
+
+  /// Mapping that describes the designated initializers of
+  /// Objective-C classes.
+  ///
+  /// This table, generated from DesignatedInits.def, describes the
+  /// designated initializers for a specific set of known
+  /// classes. When this information is available, and the class
+  llvm::StringMap<llvm::SmallVector<clang::Selector, 1> > 
+    KnownDesignatedInits;
+
+  /// Populate the table of known designated initializers from the
+  /// DesignatedInits.def file.
+  void populateKnownDesignatedInits();
+
+  /// Determine whether the given class has designated initializers,
+  /// consulting 
+  bool hasDesignatedInitializers(const clang::ObjCInterfaceDecl *classDecl);
+
+  /// Determine whether the given method is a designated initializer
+  /// of the given class.
+  bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
+                               const clang::ObjCMethodDecl *method);
 
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.

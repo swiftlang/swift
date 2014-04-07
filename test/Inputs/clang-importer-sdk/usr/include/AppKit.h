@@ -11,7 +11,7 @@
 @end
 
 @interface NSDocument : NSObject
-- (instancetype)init NS_DESIGNATED_INITIALIZER;
+- (instancetype)init;
 - (instancetype)initWithURL:(NSString*)url;
 
 - (void)copyDocumentFromURL:(NSURL*)fromURL toURL:(NSURL*)toURL;

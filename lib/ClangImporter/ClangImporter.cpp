@@ -28,6 +28,7 @@
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
+#include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
@@ -662,7 +663,7 @@ namespace {
   /// Function object used to create Clang selectors from strings.
   class CreateSelector {
     clang::ASTContext &Ctx;
-    
+      
   public:
     CreateSelector(clang::ASTContext &ctx) : Ctx(ctx){ }
 
@@ -671,7 +672,7 @@ namespace {
       clang::IdentifierInfo *pieces[sizeof...(Strings)] = {
         (strings[0]? &Ctx.Idents.get(strings) : nullptr)...
       };
-
+      
       assert((numParams == 0 && sizeof...(Strings) == 1) ||
              (numParams > 0 && sizeof...(Strings) == numParams));
       return Ctx.Selectors.getSelector(numParams, pieces);
@@ -738,6 +739,40 @@ DeclName ClangImporter::Implementation::importName(clang::Selector selector,
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
   return result;
+}
+
+void ClangImporter::Implementation::populateKnownDesignatedInits() {
+  if (!KnownDesignatedInits.empty())
+    return;
+
+  CreateSelector createSelector(getClangASTContext());
+#define DESIGNATED_INIT(ClassName, Selector)                            \
+  KnownDesignatedInits[#ClassName].push_back(createSelector Selector);
+#include "DesignatedInits.def"
+}
+
+bool ClangImporter::Implementation::hasDesignatedInitializers(
+       const clang::ObjCInterfaceDecl *classDecl) {
+  if (classDecl->hasDesignatedInitializers())
+    return true;
+
+  populateKnownDesignatedInits();
+  return KnownDesignatedInits.count(classDecl->getName());
+}
+
+bool ClangImporter::Implementation::isDesignatedInitializer(
+       const clang::ObjCInterfaceDecl *classDecl,
+       const clang::ObjCMethodDecl *method) {
+  // If the information is on the AST, use it.
+  if (classDecl->hasDesignatedInitializers())
+    return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
+
+  populateKnownDesignatedInits();
+  auto known = KnownDesignatedInits.find(classDecl->getName());
+  assert(known != KnownDesignatedInits.end() && 
+         "Check hasDesignatedInitializers() first!");
+  return std::find(known->second.begin(), known->second.end(),
+                   method->getSelector()) != known->second.end();
 }
 
 #pragma mark Name lookup

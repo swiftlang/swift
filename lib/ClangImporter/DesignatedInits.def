@@ -1,0 +1,37 @@
+//===--- DesignatedInits.def - Designated Initializers ----------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of the designated initializers for
+// various Objective-C classes. Eventually, all of this information
+// should migrate to the corresponding header using
+// OBJC_DESIGNATED_INITIALIZER or NS_DESIGNATED_INITIALIZER.
+// ===---------------------------------------------------------------------===//
+
+// DESIGNATED_INIT(ClassName, Selector)
+// 
+//   Describes a designated initializer with at least one argument.
+//
+//   ClassName: The name of the class.
+//
+//   Selector: A parenthesized sequence containing the # of selector
+//   pieces followed by strings containing the selector pieces.
+
+// ObjectiveC
+DESIGNATED_INIT(NSObject, (0, "init"))
+
+// AppKit
+DESIGNATED_INIT(NSDocument, (0, "init"))
+
+// UIKit
+DESIGNATED_INIT(UIDocument, (1, "initWithFileURL"))
+
+#undef DESIGNATED_INIT

@@ -2064,8 +2064,8 @@ namespace {
       // If the owning Objective-C class has designated initializers and this
       // is not one of them, treat it as a convenience initializer.
       if (isConvenienceInit ||
-          (interface && interface->hasDesignatedInitializers() &&
-           !objcMethod->hasAttr<clang::ObjCDesignatedInitializerAttr>())) {
+          (interface && Impl.hasDesignatedInitializers(interface) &&
+           !Impl.isDesignatedInitializer(interface, objcMethod))) {
         result->setCompleteObjectInit(true);
       }
 
@@ -2856,7 +2856,7 @@ namespace {
         // When we hit a class that does declare it's designated
         // initializers, any initializers above it are convenience
         // initializers.
-        if (curObjCClass->hasDesignatedInitializers())
+        if (Impl.hasDesignatedInitializers(curObjCClass))
           isConvenienceInit = true;
       }
     }
