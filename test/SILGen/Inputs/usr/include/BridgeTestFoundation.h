@@ -19,6 +19,9 @@ typedef signed char BOOL;
 
 @end
 
+@interface NSArray : NSObject
+@end
+
 @interface Foo
 
 - (NSString*) foo;

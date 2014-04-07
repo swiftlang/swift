@@ -211,3 +211,8 @@ typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
 
 @interface NSURL : NSObject
 @end
+
+typedef struct _NSRange {
+    NSUInteger location;
+    NSUInteger length;
+} NSRange;

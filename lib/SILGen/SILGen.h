@@ -81,6 +81,8 @@ public:
   
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
+  Optional<SILDeclRef> AnyObjectArrayToNSArrayFn;
+  Optional<SILDeclRef> NSArrayToAnyObjectArrayFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> CMutableVoidPointerToCOpaquePointerFn;
@@ -88,6 +90,7 @@ public:
   Optional<SILDeclRef> COpaquePointerToCMutableVoidPointerFn;
   Optional<SILDeclRef> COpaquePointerToCConstVoidPointerFn;
   Optional<SILDeclRef> StringDefaultInitFn;
+  Optional<SILDeclRef> ArrayDefaultInitFn;
   Optional<SILDeclRef> CConstPointerToUnsafePointerFn;
   Optional<SILDeclRef> CMutablePointerToUnsafePointerFn;
   Optional<SILDeclRef> ObjCMutablePointerToUnsafePointerFn;
@@ -255,9 +258,12 @@ public:
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
+  SILDeclRef getAnyObjectArrayToNSArrayFn();
+  SILDeclRef getNSArrayToAnyObjectArrayFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getStringDefaultInitFn();
+  SILDeclRef getAnyObjectArrayDefaultInitFn();
   SILDeclRef getObjCMutablePointerToUnsafePointerFn();
   SILDeclRef getCMutablePointerToUnsafePointerFn();
   SILDeclRef getCConstPointerToUnsafePointerFn();

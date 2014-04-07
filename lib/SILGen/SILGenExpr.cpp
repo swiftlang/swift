@@ -3597,6 +3597,37 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(str);
 }
 
+static ManagedValue emitBridgeAnyObjectArrayToNSArray(SILGenFunction &gen,
+                                                      SILLocation loc,
+                                                      ManagedValue arr) {
+  // func convertAnyObjectArrayToNSArray(inout AnyObjectArray) -> NSArray
+  SILValue arrayToNSArrayFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getAnyObjectArrayToNSArrayFn());
+  
+  SILValue nsarr = gen.B.createApply(loc, arrayToNSArrayFn,
+                                     arrayToNSArrayFn.getType(),
+                                     gen.getLoweredType(
+                                       gen.SGM.Types.getNSArrayType()),
+                                     {}, arr.getValue());
+  return gen.emitManagedRValueWithCleanup(nsarr);
+}
+
+static ManagedValue emitBridgeNSArrayToAnyObjectArray(SILGenFunction &gen,
+                                                      SILLocation loc,
+                                                      ManagedValue nsarr) {
+  // func convertNSArrayToAnyObjectArray(NSArray, [inout] AnyObjectArray) -> ()
+  SILValue nsarrayToAnyObjectArrayFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSArrayToAnyObjectArrayFn());
+  
+  SILValue arr = gen.B.createApply(loc, nsarrayToAnyObjectArrayFn,
+                                   nsarrayToAnyObjectArrayFn.getType(),
+                                   gen.SGM.getLoweredType(
+                                     gen.SGM.Types.getAnyObjectArrayType()),
+                                   {}, {nsarr.forward(gen)});
+  
+  return gen.emitManagedRValueWithCleanup(arr);
+}
+
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue swiftBool) {

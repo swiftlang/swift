@@ -153,32 +153,38 @@ SILDeclRef SILGenModule::getNSStringToStringFn() {
                        Types.getEmptyTupleType());
 }
 
+/// Find the default initializer for the given type.
+static ConstructorDecl *getDefaultInitFn(SILGenModule &sgm, CanType type) {
+  auto &C = sgm.getASTContext();
+  auto decl = type->getNominalOrBoundGenericNominal();
+  auto constructors = decl->lookupDirect(C.Id_init);
+  ConstructorDecl *defaultCtor = nullptr;
+  for (auto decl : constructors) {
+    auto ctor = dyn_cast<ConstructorDecl>(decl);
+    if (!ctor) continue;
+    auto argTy = ctor->getType()->castTo<AnyFunctionType>()
+      ->getResult()->castTo<AnyFunctionType>()->getInput();
+    if (!argTy->isEqual(C.TheEmptyTupleType))
+      continue;
+      
+    defaultCtor = ctor;
+    break;
+  }
+    
+  if (!defaultCtor) {
+    sgm.diagnose(SourceLoc(), diag::bridging_function_missing,
+                 STDLIB_NAME, type->getString() + ".init()");
+    exit(1);
+  }
+    
+  return defaultCtor;
+
+}
+
 SILDeclRef SILGenModule::getStringDefaultInitFn() {
   return StringDefaultInitFn.cache([&] {
-    auto &C = getASTContext();
-    auto stringDecl = Types.getStringType()->getNominalOrBoundGenericNominal();
-    auto constructors = stringDecl->lookupDirect(
-                          C.Id_init);
-    ConstructorDecl *defaultCtor = nullptr;
-    for (auto decl : constructors) {
-      auto ctor = dyn_cast<ConstructorDecl>(decl);
-      if (!ctor) continue;
-      auto argTy = ctor->getType()->castTo<AnyFunctionType>()
-        ->getResult()->castTo<AnyFunctionType>()->getInput();
-      if (!argTy->isEqual(C.TheEmptyTupleType))
-        continue;
-      
-      defaultCtor = ctor;
-      break;
-    }
-    
-    if (!defaultCtor) {
-      diagnose(SourceLoc(), diag::bridging_function_missing,
-               STDLIB_NAME, "String.init()");
-      exit(1);
-    }
-    
-    return SILDeclRef(defaultCtor, SILDeclRef::Kind::Allocator);
+      return SILDeclRef(getDefaultInitFn(*this, Types.getStringType()),
+                        SILDeclRef::Kind::Allocator); 
   });
 }
 
@@ -187,6 +193,28 @@ SILDeclRef SILGenModule::getStringToNSStringFn() {
                        FOUNDATION_MODULE_NAME, "convertStringToNSString",
                        {getInOutStringTy(*this)},
                        getNSStringTy(*this));
+}
+
+static SILType getNSArrayTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getNSArrayType());
+}
+
+static SILType getAnyObjectArrayTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getAnyObjectArrayType());
+}
+
+SILDeclRef SILGenModule::getAnyObjectArrayToNSArrayFn() {
+  return getBridgingFn(AnyObjectArrayToNSArrayFn, *this,
+                       FOUNDATION_MODULE_NAME, "convertAnyObjectArrayToNSArray",
+                       {getAnyObjectArrayTy(*this)},
+                       getNSArrayTy(*this));
+}
+
+SILDeclRef SILGenModule::getNSArrayToAnyObjectArrayFn() {
+  return getBridgingFn(NSArrayToAnyObjectArrayFn, *this,
+                       FOUNDATION_MODULE_NAME, "convertNSArrayToAnyObjectArray",
+                       {getNSArrayTy(*this)},
+                       getAnyObjectArrayTy(*this));
 }
 
 #define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
