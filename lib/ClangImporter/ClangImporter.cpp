@@ -49,19 +49,23 @@ using namespace swift;
 //===--------------------------------------------------------------------===//
 #define DEBUG_TYPE "Clang module importer"
 STATISTIC(NumNullaryMethodNames,
-          "nullary Objective-C method names imported");
+          "nullary selectors imported");
 STATISTIC(NumUnaryMethodNames,
-          "unary Objective-C method names imported");
+          "unary selectors imported");
 STATISTIC(NumNullaryInitMethodsMadeUnary,
           "nullary Objective-C init methods turned into unary initializers");
 STATISTIC(NumMultiMethodNames,
-          "multi-part Objective-C method names imported");
+          "multi-part selector method names imported");
 STATISTIC(NumPrepositionSplitMethodNames,
-          "Objective-C method names where the first selector piece was split");
+          "selectors where the first selector piece was split on a "
+          "preposition");
+STATISTIC(NumWordSplitMethodNames,
+          "selectors where the first selector piece was split on the last "
+          "word");
 STATISTIC(NumPrepositionTrailingFirstPiece,
-  "Objective-C method names where the first piece ends in a preposition");
+          "selectors where the first piece ends in a preposition");
 STATISTIC(NumMethodsMissingFirstArgName,
-          "Objective-C method names where the first argument name is missing");
+          "selectors where the first argument name is missing");
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -566,6 +570,17 @@ splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
                                   std::prev(lastPrep.base()).getPosition(),
                                   scratch);
     }
+  }
+
+  // We did not find a preposition.
+
+  // If there is more than one word, split off the last word.
+  auto last = words.rbegin();
+  if (std::next(last) != words.rend()) {
+    ++NumWordSplitMethodNames;
+    return splitSelectorPieceAt(selector,
+                                std::prev(last.base()).getPosition(),
+                                scratch);
   }
 
   // Nothing to split.
