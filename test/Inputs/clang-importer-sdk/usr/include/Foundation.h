@@ -216,3 +216,7 @@ typedef struct _NSRange {
     NSUInteger location;
     NSUInteger length;
 } NSRange;
+
+@interface NSAttributedString : NSString
+- (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
+@end

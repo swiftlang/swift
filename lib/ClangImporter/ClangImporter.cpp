@@ -62,6 +62,9 @@ STATISTIC(NumPrepositionSplitMethodNames,
 STATISTIC(NumWordSplitMethodNames,
           "selectors where the first selector piece was split on the last "
           "word");
+STATISTIC(NumMultiWordSplitMethodNames,
+          "selectors where the first slector piece was split on the last "
+          "multiword");
 STATISTIC(NumPrepositionTrailingFirstPiece,
           "selectors where the first piece ends in a preposition");
 STATISTIC(NumMethodsMissingFirstArgName,
@@ -531,7 +534,6 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
            camel_case::toLowercaseWord(selector.substr(index), buffer) };
 }
 
-  
 /// Split the first selector piece into a function name and first
 /// parameter name, if possible.
 ///
@@ -542,7 +544,9 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
 /// the split. If no split is possible, the function name will be \c
 /// selector and the parameter name will be empty.
 static std::pair<StringRef, StringRef> 
-splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
+splitFirstSelectorPiece(StringRef selector,
+                        const camel_case::MultiWordMap &multiWords,
+                        SmallVectorImpl<char> &scratch) {
   // Get the camelCase words in this selector.
   auto words = camel_case::getWords(selector);
   if (words.empty())
@@ -574,13 +578,21 @@ splitFirstSelectorPiece(StringRef selector,  SmallVectorImpl<char> &scratch) {
 
   // We did not find a preposition.
 
-  // If there is more than one word, split off the last word.
+  // If there is more than one word, split off the last word, taking care
+  // to avoid splitting in the middle of a multi-word.
   auto last = words.rbegin();
   if (std::next(last) != words.rend()) {
-    ++NumWordSplitMethodNames;
-    return splitSelectorPieceAt(selector,
-                                std::prev(last.base()).getPosition(),
-                                scratch);
+    auto splitPoint = multiWords.match(last, words.rend());
+    auto beforeSplitPoint = std::next(splitPoint);
+    if (beforeSplitPoint != words.rend()) {
+      if (splitPoint == last)
+        ++NumWordSplitMethodNames;
+      else
+        ++NumMultiWordSplitMethodNames;
+      return splitSelectorPieceAt(selector,
+                                  std::prev(splitPoint.base()).getPosition(),
+                                  scratch);
+    }
   }
 
   // Nothing to split.
@@ -614,7 +626,8 @@ static Identifier importArgName(ASTContext &ctx, StringRef name) {
 /// Map an Objective-C selector name to a Swift method name.
 static DeclName mapSelectorName(ASTContext &ctx,
                                 clang::Selector selector,
-                                bool isInitializer) {
+                                bool isInitializer,
+                                const camel_case::MultiWordMap &multiWords) {
   assert(!selector.isNull() && "Null selector?");
 
   // Zero-argument selectors.
@@ -649,6 +662,7 @@ static DeclName mapSelectorName(ASTContext &ctx,
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
     std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
+                                                               multiWords,
                                                                scratch);
     baseName = ctx.getIdentifier(funcName);
     argumentNames.push_back(importArgName(ctx, firstArgName));
@@ -749,11 +763,21 @@ DeclName ClangImporter::Implementation::importName(clang::Selector selector,
     return known->second;
 
   // Map the selector.
-  auto result = mapSelectorName(SwiftContext, selector, isInitializer);
+  populateMultiWords();
+  auto result = mapSelectorName(SwiftContext, selector, isInitializer,
+                                MultiWords);
 
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
   return result;
+}
+
+void ClangImporter::Implementation::populateMultiWords() {
+  if (!MultiWords.empty())
+    return;
+
+#define MULTI_WORD(...) MultiWords.insert(__VA_ARGS__);
+#include "MultiWords.def"
 }
 
 void ClangImporter::Implementation::populateKnownDesignatedInits() {

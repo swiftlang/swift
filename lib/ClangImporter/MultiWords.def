@@ -1,0 +1,27 @@
+//===--- MultiWords.def - Multiple Word Database ----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines multiple-word sequences that should not be split up 
+// as part of Objective-C selector splitting.
+// ===---------------------------------------------------------------------===//
+
+/// MULTI_WORD(Words)
+///   Words: A comma-separated sequence of words that make up
+///   the multi-word.
+
+#ifndef MULTI_WORD
+#  error define MULTI_WORD before including MultiWords.def
+#endif
+
+MULTI_WORD("attributed", "string")
+
+#undef MULTI_WORD

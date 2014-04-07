@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Optional.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendActions.h"
@@ -229,6 +230,12 @@ public:
 
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<clang::Selector, char>, DeclName> SelectorMappings;
+
+  /// Multiwords used for selector splitting.
+  camel_case::MultiWordMap MultiWords;
+
+  /// Populate the MultiWords map from \c MultiWords.def.
+  void populateMultiWords();
 
   /// Mapping that describes the designated initializers of
   /// Objective-C classes.
