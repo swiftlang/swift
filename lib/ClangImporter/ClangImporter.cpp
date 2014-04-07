@@ -63,7 +63,7 @@ STATISTIC(NumWordSplitMethodNames,
           "selectors where the first selector piece was split on the last "
           "word");
 STATISTIC(NumMultiWordSplitMethodNames,
-          "selectors where the first slector piece was split on the last "
+          "selectors where the first selector piece was split on the last "
           "multiword");
 STATISTIC(NumPrepositionTrailingFirstPiece,
           "selectors where the first piece ends in a preposition");

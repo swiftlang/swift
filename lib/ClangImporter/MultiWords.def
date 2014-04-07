@@ -22,6 +22,14 @@
 #  error define MULTI_WORD before including MultiWords.def
 #endif
 
+MULTI_WORD("apple", "event")
 MULTI_WORD("attributed", "string")
+MULTI_WORD("conditional", "object")
+MULTI_WORD("file", "manager")
+MULTI_WORD("hash", "table")
+MULTI_WORD("modal", "session")
+MULTI_WORD("root", "object")
+MULTI_WORD("table", "view")
+MULTI_WORD("user", "attention")
 
 #undef MULTI_WORD
