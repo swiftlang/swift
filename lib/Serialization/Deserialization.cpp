@@ -1387,14 +1387,33 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
       DeclAttribute *Attr = nullptr;
       switch (recordID) {
       case decls_block::Asmname_DECL_ATTR:
-        Attr = new (ctx) AsmnameAttr(blobData);
+        bool isImplicit;
+        serialization::decls_block::AsmnameDeclAttrLayout::readRecord(
+            scratch, isImplicit);
+        Attr = new (ctx) AsmnameAttr(blobData, isImplicit);
         break;
 
+      case decls_block::Availability_DECL_ATTR: {
+        bool isImplicit;
+        bool isUnavailable;
+        unsigned platformSize;
+        unsigned messageSize;
+        serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
+            scratch, isImplicit, isUnavailable, platformSize, messageSize);
+        StringRef platform = blobData.substr(0, platformSize);
+        blobData = blobData.drop_front(platformSize);
+        StringRef message = blobData;
+        Attr = new (ctx) AvailabilityAttr(SourceLoc(), SourceRange(), platform,
+                                          message, isUnavailable, isImplicit);
+        break;
+      }
+
       case decls_block::ObjC_DECL_ATTR: {
+        bool isImplicit;
         uint8_t kind;
         ArrayRef<uint64_t> rawNameIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-            scratch, kind, rawNameIDs);
+            scratch, isImplicit, kind, rawNameIDs);
 
         SmallVector<Identifier, 4> names;
         for (auto nameID : rawNameIDs)

@@ -109,14 +109,16 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
     if (!Attr->hasPlatform())
-      Printer << '*';
+      Printer << "*";
     else
       Printer << Attr->Platform;
 
+    Printer << ", unavailable";
+
     if (!Attr->Message.empty()) {
-      Printer << ", message=\""<< Attr->Message << "\"";
+      Printer << ", message=\"" << Attr->Message << "\"";
     }
-    Printer << ')';
+    Printer << ")";
     break;
   }
   case DAK_class_protocol:

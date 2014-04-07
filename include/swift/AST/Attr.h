@@ -467,7 +467,7 @@ public:
     : DeclAttribute(DAK_asmname, AtLoc, Range, Implicit),
       Name(Name) {}
 
-  AsmnameAttr(StringRef Name)
+  AsmnameAttr(StringRef Name, bool Implicit)
     : AsmnameAttr(Name, SourceLoc(), SourceRange(), /*Implicit=*/true) {}
 
   /// The symbol name.

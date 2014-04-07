@@ -29,6 +29,7 @@
 // This is a template-only header; eventually it should move to llvm/Support.
 #include "clang/Basic/OnDiskHashTable.h"
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Config/config.h"
@@ -1258,9 +1259,26 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 #include "swift/AST/Attr.def"
 
   case DAK_asmname: {
+    auto *theAttr = cast<AsmnameAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
     AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      cast<AsmnameAttr>(DA)->Name);
+                                      theAttr->isImplicit(),
+                                      theAttr->Name);
+    return;
+  }
+  case DAK_availability: {
+    auto *theAttr = cast<AvailabilityAttr>(DA);
+    llvm::SmallString<32> blob;
+    blob.append(theAttr->Platform);
+    blob.append(theAttr->Message);
+    auto abbrCode = DeclTypeAbbrCodes[AvailabilityDeclAttrLayout::Code];
+    AvailabilityDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode,
+        theAttr->isImplicit(),
+        theAttr->IsUnvailable,
+        theAttr->Platform.size(),
+        theAttr->Message.size(),
+        blob);
     return;
   }
   case DAK_objc: {
@@ -1272,11 +1290,10 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
     ObjCDeclAttrLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
+        theAttr->isImplicit(),
         getRawStableObjCDeclAttrKind(theAttr->getKind()), names);
     return;
   }
-  case DAK_availability:
-    llvm_unreachable("not yet serialized");
   }
 }
 
@@ -2378,10 +2395,8 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<DeclContextLayout>();
     registerDeclTypeAbbr<XRefLayout>();
 
-    registerDeclTypeAbbr<AsmnameDeclAttrLayout>();
-    registerDeclTypeAbbr<ObjCDeclAttrLayout>();
-#define SIMPLE_DECL_ATTR(X, NAME, ...)\
-registerDeclTypeAbbr<NAME##DeclAttrLayout>();
+#define DECL_ATTR(X, NAME, ...) \
+    registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/Attr.def"
   }
 

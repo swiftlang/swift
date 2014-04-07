@@ -964,11 +964,22 @@ namespace decls_block {
 
   using AsmnameDeclAttrLayout = BCRecordLayout<
     Asmname_DECL_ATTR,
-    BCBlob // asmname
+    BCFixed<1>, // implicit flag
+    BCBlob      // asmname
+  >;
+
+  using AvailabilityDeclAttrLayout = BCRecordLayout<
+    Availability_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<1>, // is unconditionally unavailable?
+    BCVBR<5>,   // number of bytes in platform string
+    BCVBR<5>,   // number of bytes in message string
+    BCBlob      // platform, followed by message
   >;
 
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
+    BCFixed<1>, // implicit flag
     ObjCDeclAttrKindField, // kind
     BCArray<IdentifierIDField>
   >;
