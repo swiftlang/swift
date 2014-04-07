@@ -13,6 +13,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SubstTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "clang/AST/Attr.h"
@@ -966,14 +967,32 @@ static CanType getBridgedInputType(TypeConverter &tc,
     return CanType(TupleType::get(bridgedFields, input->getASTContext()));
   }
   
-  return tc.getLoweredBridgedType(input, cc)->getCanonicalType();
+  auto loweredBridgedType = tc.getLoweredBridgedType(input, cc);
+  
+  if (!loweredBridgedType) {
+    tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
+                              input.getPointer()->getString());
+    
+    exit(1);
+  }
+  
+  return loweredBridgedType->getCanonicalType();
 }
 
 /// Bridge a result type.
 static CanType getBridgedResultType(TypeConverter &tc,
                                     AbstractCC cc,
                                     CanType result) {
-  return tc.getLoweredBridgedType(result, cc)->getCanonicalType();
+  auto loweredType = tc.getLoweredBridgedType(result, cc);
+  
+  if (!loweredType) {
+    tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
+                              result.getPointer()->getString());
+    
+    exit(1);
+  }
+  
+  return loweredType->getCanonicalType();
 }
 
 /// Fast path for bridging types in a function type without uncurrying.
