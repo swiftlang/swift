@@ -615,7 +615,7 @@ void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
     File = getOrCreateFile(IGM.Context.TheStdlibModule->getModuleFilename()
                            .data());
 
-  auto Import = DBuilder.createImportedModule(File, Namespace, L.Line, Name);
+  auto Import = DBuilder.createImportedModule(File, Namespace, L.Line);
 
   // Add all functions that belong to this namespace to it.
   //
