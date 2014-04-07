@@ -268,7 +268,7 @@ protected:
 
     unsigned Invalid : 1;
   };
-  enum { NumDeclAttrBits = 9 };
+  enum { NumDeclAttrBits = 10 };
   static_assert(NumDeclAttrBits <= 32, "fits in an unsigned");
 
   class ObjCAttrBitFields {
