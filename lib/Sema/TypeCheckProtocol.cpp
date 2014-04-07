@@ -475,8 +475,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
     /// If the requirement is @noreturn, the witness must also be @noreturn.
-    if (reqAttrs.hasValidAttribute<NoReturnAttr>() &&
-        !witnessAttrs.hasValidAttribute<NoReturnAttr>())
+    if (reqAttrs.hasAttribute<NoReturnAttr>() &&
+        !witnessAttrs.hasAttribute<NoReturnAttr>())
       return RequirementMatch(witness, MatchKind::NoReturnConflict);
 
     // We want to decompose the parameters to handle them separately.

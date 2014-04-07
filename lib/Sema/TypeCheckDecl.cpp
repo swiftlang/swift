@@ -2456,17 +2456,16 @@ public:
     return badType;
   }
 
-  /// \brief Validate and consume the attributes that are applicable to the
+  /// \brief Validate and apply the attributes that are applicable to the
   /// AnyFunctionType.
   ///
   /// Currently, we only allow 'noreturn' to be applied on a FuncDecl.
   AnyFunctionType::ExtInfo
-  validateAndConsumeFunctionTypeAttributes(FuncDecl *FD) {
+  validateAndApplyFunctionTypeAttributes(FuncDecl *FD) {
     auto Info = AnyFunctionType::ExtInfo();
 
     // 'noreturn' is allowed on a function declaration.
-    Info = Info.withIsNoReturn(
-        FD->getAttrs().hasValidAttribute<NoReturnAttr>());
+    Info = Info.withIsNoReturn(FD->getAttrs().hasAttribute<NoReturnAttr>());
 
     return Info;
   }
@@ -2548,7 +2547,7 @@ public:
       }
 
       // Validate and consume the function type attributes.
-      auto Info = validateAndConsumeFunctionTypeAttributes(FD);
+      auto Info = validateAndApplyFunctionTypeAttributes(FD);
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
@@ -3259,8 +3258,8 @@ public:
 
     void visitNoReturnAttr(NoReturnAttr *attr) {
       // Disallow overriding a @noreturn function with a returning one.
-      if (Base->getAttrs().hasValidAttribute<NoReturnAttr>() &&
-          !Override->getAttrs().hasValidAttribute<NoReturnAttr>()) {
+      if (Base->getAttrs().hasAttribute<NoReturnAttr>() &&
+          !Override->getAttrs().hasAttribute<NoReturnAttr>()) {
         TC.diagnose(Override, diag::override_noreturn_with_return);
         TC.diagnose(Base, diag::overridden_here);
       }
@@ -3715,7 +3714,7 @@ public:
     checkOverrides(CD);
 
     // Determine whether this constructor is required.
-    if (!CD->getAttrs().hasValidAttribute<RequiredAttr>()) {
+    if (!CD->getAttrs().hasAttribute<RequiredAttr>()) {
       if (CD->getOverriddenDecl() && CD->getOverriddenDecl()->isRequired())
         CD->getMutableAttrs().add(
             new (TC.Context) RequiredAttr(/*IsImplicit=*/true));

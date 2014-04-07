@@ -834,28 +834,25 @@ public:
 
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
-  const ATTR *getAttribute() const {
+  const ATTR *getAttribute(bool AllowInvalid = false) const {
     for (auto Attr : *this)
       if (const ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
-        return SpecificAttr;
+        if (SpecificAttr->isValid() || AllowInvalid)
+          return SpecificAttr;
     return nullptr;
   }
 
   /// Determine whether there is an attribute with the given attribute class.
   template <typename ATTR>
-  bool hasAttribute() const { return getAttribute<ATTR>() != nullptr; }
-
-  /// Determine whether there is an attribute with the given attribute class.
-  template <typename ATTR>
-  bool hasValidAttribute() const {
-    auto TheAttribute = getAttribute<ATTR>();
-    return TheAttribute && TheAttribute->isValid();
+  bool hasAttribute(bool AllowInvalid = false) const {
+    return getAttribute<ATTR>(AllowInvalid) != nullptr;
   }
 
   /// Retrieve the first attribute with the given kind.
-  const DeclAttribute *getAttribute(DeclAttrKind DK) const {
+  const DeclAttribute *getAttribute(DeclAttrKind DK,
+                                    bool AllowInvalid = false) const {
     for (auto Attr : *this)
-      if (Attr->getKind() == DK)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
         return Attr;
     return nullptr;
   }
@@ -884,7 +881,7 @@ public:
     DeclAttrs = Chain;
   }
 };
-  
+
 } // end namespace swift
 
 #endif

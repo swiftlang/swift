@@ -713,10 +713,10 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
         initArgTy = argTy;
     }
 
-    // Validate and consume the function type attributes.
-    // FIXME: Hacked up form of validateAndConsumeFunctionTypeAttributes().
+    // Validate and apply the function type attributes.
+    // FIXME: Hacked up form of validateAndApplyFunctionTypeAttributes().
     auto info = AnyFunctionType::ExtInfo().withIsNoReturn(
-        func->getAttrs().hasValidAttribute<NoReturnAttr>());
+        func->getAttrs().hasAttribute<NoReturnAttr>());
 
     // FIXME: We shouldn't even get here if the function isn't locally generic
     // to begin with, but fixing that requires a lot of reengineering for local

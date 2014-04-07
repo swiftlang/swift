@@ -1702,7 +1702,7 @@ public:
 
   /// Is this declaration marked with the @final attribute?
   bool isFinal() const {
-    return getAttrs().hasValidAttribute<FinalAttr>();
+    return getAttrs().hasAttribute<FinalAttr>();
   }
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
@@ -3971,7 +3971,7 @@ public:
 
   /// Whether this constructor is required.
   bool isRequired() const {
-    return getAttrs().hasValidAttribute<RequiredAttr>();
+    return getAttrs().hasAttribute<RequiredAttr>();
   }
 
   /// Whether this is a complete object initializer.
