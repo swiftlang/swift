@@ -105,6 +105,10 @@ def enable_dynamic_value_type_layout :
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
+def enable_objc_implicit_properties :
+  Flag<["-"], "enable-objc-implicit-properties">,
+  HelpText<"Import Objective-C \"implicit properties\" as properties">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

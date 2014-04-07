@@ -99,8 +99,9 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx, bool splitPrepositions)
-  : Impl(*new Implementation(ctx, splitPrepositions))
+ClangImporter::ClangImporter(ASTContext &ctx, bool splitPrepositions,
+                             bool implicitProperties)
+  : Impl(*new Implementation(ctx, splitPrepositions, implicitProperties))
 {
 }
 
@@ -121,7 +122,8 @@ void ClangImporter::clearTypeResolver() {
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, ctx.LangOpts.SplitPrepositions)
+    new ClangImporter(ctx, ctx.LangOpts.SplitPrepositions,
+                      clangImporterOpts.InferImplicitProperties)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.

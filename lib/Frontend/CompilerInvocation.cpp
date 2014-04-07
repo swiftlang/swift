@@ -560,6 +560,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
+  Opts.InferImplicitProperties =
+    Args.hasArg(OPT_enable_objc_implicit_properties);
+
   return false;
 }
 

@@ -2145,7 +2145,7 @@ namespace {
     /// indicates that we're generating a getter thunk for a property getter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildGetterThunk(FuncDecl *getter, DeclContext *dc,
+    FuncDecl *buildGetterThunk(const FuncDecl *getter, DeclContext *dc,
                                Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = getter->getLoc();
@@ -2217,7 +2217,7 @@ namespace {
     /// indicates that we're generating a setter thunk for a property setter.
     ///
     /// \returns The getter thunk.
-    FuncDecl *buildSetterThunk(FuncDecl *setter, DeclContext *dc,
+    FuncDecl *buildSetterThunk(const FuncDecl *setter, DeclContext *dc,
                                Pattern *indices) {
       auto &context = Impl.SwiftContext;
       auto loc = setter->getLoc();
@@ -2639,6 +2639,132 @@ namespace {
       }
     }
 
+    /// Finds the counterpart accessor method for \p MD, if one exists, in the
+    /// same lexical context.
+    const clang::ObjCMethodDecl *
+    findImplicitPropertyAccessor(const clang::ObjCMethodDecl *MD) {
+      // FIXME: Do we want to infer class properties?
+      if (!MD->isInstanceMethod())
+        return nullptr;
+
+      // First, collect information about the method we have.
+      clang::Selector sel = MD->getSelector();
+      llvm::SmallString<64> counterpartName;
+      auto numArgs = sel.getNumArgs();
+      clang::QualType propTy;
+
+      if (numArgs > 1)
+        return nullptr;
+
+      if (numArgs == 0) {
+        clang::IdentifierInfo *getterID = sel.getIdentifierInfoForSlot(0);
+        if (!getterID)
+          return nullptr;
+        counterpartName =
+          clang::SelectorTable::constructSetterName(getterID->getName());
+        propTy = MD->getReturnType();
+
+      } else {
+        if (!MD->getReturnType()->isVoidType())
+          return nullptr;
+
+        clang::IdentifierInfo *setterID = sel.getIdentifierInfoForSlot(0);
+        if (!setterID || !setterID->getName().startswith("set"))
+          return nullptr;
+        counterpartName = setterID->getName().substr(3);
+        counterpartName[0] = tolower(counterpartName[0]);
+        propTy = MD->parameters().front()->getType();
+      }
+
+      // Next, look for its counterpart.
+      const clang::ASTContext &clangCtx = Impl.getClangASTContext();
+      auto container = cast<clang::ObjCContainerDecl>(MD->getDeclContext());
+      for (auto method : make_range(container->instmeth_begin(),
+                                    container->instmeth_end())) {
+        // Condition 1: it must be a getter if we have a setter, and vice versa.
+        clang::Selector nextSel = method->getSelector();
+        if (nextSel.getNumArgs() != (1 - numArgs))
+          continue;
+
+        // Condition 2: it must have the name we expect.
+        clang::IdentifierInfo *nextID = nextSel.getIdentifierInfoForSlot(0);
+        if (!nextID)
+          continue;
+        if (nextID->getName() != counterpartName)
+          continue;
+
+        // Condition 3: it must have the right type signature.
+        if (numArgs == 0) {
+          if (!method->getReturnType()->isVoidType())
+            continue;
+          clang::QualType paramTy = method->parameters().front()->getType();
+          if (!clangCtx.hasSameUnqualifiedType(propTy, paramTy))
+            continue;
+        } else {
+          clang::QualType returnTy = method->getReturnType();
+          if (!clangCtx.hasSameUnqualifiedType(propTy, returnTy))
+            continue;
+        }
+
+        return method;
+      }
+
+      return nullptr;
+    }
+
+    /// Creates a computed property VarDecl from the given getter and setter.
+    Decl *makeImplicitPropertyDecl(const Decl *opaqueGetter,
+                                   const Decl *opaqueSetter,
+                                   DeclContext *dc) {
+      auto getter = cast<FuncDecl>(opaqueGetter);
+      auto setter = cast<FuncDecl>(opaqueSetter);
+      assert(setter->getResultType()->isVoid());
+
+      auto name = getter->getName();
+
+      // Check whether there is a function with the same name as this
+      // property. If so, suppress the property; the user will have to use
+      // the methods directly, to avoid ambiguities.
+      auto containerTy = dc->getDeclaredTypeInContext();
+      VarDecl *overridden = nullptr;
+      SmallVector<ValueDecl *, 2> lookup;
+      dc->lookupQualified(containerTy, name, NL_QualifiedDefault, nullptr,
+                          lookup);
+      for (auto result : lookup) {
+        if (isa<FuncDecl>(result))
+          return nullptr;
+
+        if (auto var = dyn_cast<VarDecl>(result))
+          overridden = var;
+      }
+
+      // Re-import the type as a property type.
+      auto clangGetter = cast<clang::ObjCMethodDecl>(getter->getClangDecl());
+      auto type = Impl.importType(clangGetter->getReturnType(),
+                                  ImportTypeKind::Property);
+      if (!type)
+        return nullptr;
+
+      auto result = new (Impl.SwiftContext) VarDecl(
+          /*static*/ false, /*IsLet*/ false,
+          Impl.importSourceLoc(clangGetter->getLocation()),
+          name, type, dc);
+
+      // Build thunks.
+      FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
+      FuncDecl *setterThunk = buildSetterThunk(setter, dc, nullptr);
+
+      // Turn this into a computed property.
+      // FIXME: Fake locations for '{' and '}'?
+      result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
+      result->setIsObjC(true);
+
+      if (overridden)
+        result->setOverriddenDecl(overridden);
+
+      return result;
+    }
+
     /// Import members of the given Objective-C container and add them to the
     /// list of corresponding Swift members.
     void importObjCMembers(const clang::ObjCContainerDecl *decl,
@@ -2661,11 +2787,6 @@ namespace {
         // property names and getter names (by choosing to only have a
         // variable).
         if (auto objcMethod = dyn_cast<clang::ObjCMethodDecl>(nd)) {
-          if (auto property = objcMethod->findPropertyDecl())
-            if (Impl.importDecl(
-                  const_cast<clang::ObjCPropertyDecl *>(property)))
-              continue;
-
           // If there is a special declaration associated with this member,
           // add it now.
           if (auto special = importSpecialMethod(member, swiftContext)) {
@@ -2692,8 +2813,37 @@ namespace {
                 members.push_back(classMember);
             }
           }
+
+          // Import explicit properties as instance properties, not as separate
+          // getter and setter methods.
+          if (auto prop = objcMethod->findPropertyDecl()) {
+            if (Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop)))
+              continue;
+          } else if (Impl.InferImplicitProperties) {
+            // Try to infer properties for matched getter/setter pairs.
+            // Be careful to only do this once per matched pair.
+            if (auto counterpart = findImplicitPropertyAccessor(objcMethod)) {
+              if (auto counterpartImported = Impl.importDecl(counterpart)) {
+                if (objcMethod->getReturnType()->isVoidType()) {
+                  if (auto prop = makeImplicitPropertyDecl(counterpartImported,
+                                                           member,
+                                                           swiftContext)) {
+                    members.push_back(prop);
+                  } else {
+                    // If we fail to import the implicit property, fall back to
+                    // adding the accessors as members. We have to add BOTH
+                    // accessors here because we already skipped over the other
+                    // one.
+                    members.push_back(member);
+                    members.push_back(counterpartImported);
+                  }
+                }
+                continue;
+              }
+            }
+          }
         }
-        
+
         members.push_back(member);
       }
     }

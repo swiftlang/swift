@@ -177,8 +177,10 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, bool splitPrepositions)
-    : SwiftContext(ctx), SplitPrepositions(splitPrepositions) { }
+  Implementation(ASTContext &ctx, bool splitPrepositions,
+                 bool implicitProperties)
+    : SwiftContext(ctx), SplitPrepositions(splitPrepositions),
+      InferImplicitProperties(implicitProperties) { }
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -188,6 +190,7 @@ public:
   ASTContext &SwiftContext;
 
   const bool SplitPrepositions;
+  const bool InferImplicitProperties;
 
 private:
   /// \brief A count of the number of load module operations.

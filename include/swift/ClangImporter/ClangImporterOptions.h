@@ -29,6 +29,10 @@ public:
 
   /// A directory for overriding Clang's resource directory.
   std::string OverrideResourceDir;
+
+  /// If true, matched getter-like and setter-like methods will be imported as
+  /// properties.
+  bool InferImplicitProperties = false;
 };
 
 } // end namespace swift
