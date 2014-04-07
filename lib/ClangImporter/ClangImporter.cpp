@@ -667,12 +667,14 @@ namespace {
     CreateSelector(clang::ASTContext &ctx) : Ctx(ctx){ }
 
     template<typename ...Strings>
-    clang::Selector operator()(Strings ...strings) const {
+    clang::Selector operator()(unsigned numParams, Strings ...strings) const {
       clang::IdentifierInfo *pieces[sizeof...(Strings)] = {
         (strings[0]? &Ctx.Idents.get(strings) : nullptr)...
       };
 
-      return Ctx.Selectors.getSelector(sizeof...(Strings), pieces);
+      assert((numParams == 0 && sizeof...(Strings) == 1) ||
+             (numParams > 0 && sizeof...(Strings) == numParams));
+      return Ctx.Selectors.getSelector(numParams, pieces);
     }
   };
 

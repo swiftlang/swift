@@ -17,8 +17,9 @@
 /// MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames)
 ///
 ///   Selector: The Objective-C selector that will be mapped into the
-///   given Swift method name, in the form of a comma-separated list of
-///   strings in parentheses.
+///   given Swift method name, in the form of a parenthesized,
+///   comma-separated list containing the # of method paramaters
+///   followed by the selector pieces in quotes.
 ///
 ///   ForMethod: Boolean flag indicating whether this split is valid
 ///   for a method.
@@ -37,7 +38,7 @@
 #  define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames)
 #endif
 
-MAP_SELECTOR(("colorWithDeviceRed", "green", "blue", "alpha"), true, false,
+MAP_SELECTOR((4, "colorWithDeviceRed", "green", "blue", "alpha"), true, false,
              "colorWithDevice",("red", "green", "blue", "alpha"))
 
 #undef MAP_SELECTOR
