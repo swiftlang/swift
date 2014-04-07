@@ -1640,10 +1640,6 @@ GenericParamList::getSubstitutionMap(ArrayRef<swift::Substitution> Subs) const {
     auto sub = Subs.front();
     Subs = Subs.slice(1);
     
-    // Only substitute primary archetypes.
-    if (!arch->isPrimary())
-      continue;
-    
     map.insert({arch, sub.Replacement});
   }
   
@@ -1757,15 +1753,24 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
     return subs;
   }
   
+  // Seed the type map with pre-existing substitutions.
+  for (auto sub : args) {
+    subs[sub.Archetype] = sub.Replacement;
+  }
+  
   for (auto depTy : getAllDependentTypes()) {
     auto replacement = args.front().Replacement;
     args = args.slice(1);
-    // FIXME: DependentMemberTypes aren't SubstitutableTypes.
-    if (auto subTy = depTy->getAs<SubstitutableType>())
+    
+    if (auto subTy = depTy->getAs<SubstitutableType>()) {
       subs[subTy] = replacement;
+    }
+    else if (auto dTy = depTy->getAs<DependentMemberType>()) {
+      subs[dTy] = replacement;
+    }
   }
   
-  assert(args.empty() && "did not use all substitutions?!");  
+  assert(args.empty() && "did not use all substitutions?!");
   return subs;
 }
 
@@ -1896,8 +1901,15 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
         .subst(module, substitutions, ignoreMissing, resolver);
       
       // Resolve the member relative to the substituted base.
-      if (Type r = depMemTy->substBaseType(module, newBase, resolver))
+      if (Type r = depMemTy->substBaseType(module, newBase, resolver)) {
+        
+        // Substitute archtypes for generic type parameters to prevent
+        // dependent types from leaking.
+        if (auto GTPT = r->getAs<GenericTypeParamType>()) {
+          return GTPT->getDecl()->getArchetype();
+        }
         return r;
+      }
       return failed(type);
     }
     

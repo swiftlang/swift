@@ -352,8 +352,8 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    DependentGenericTypeResolver resolver;
-        
+    PartialGenericTypeToArchetypeResolver resolver(TC);
+    
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
       return nullptr;

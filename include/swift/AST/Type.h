@@ -43,7 +43,7 @@ class TypeWalker;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
-typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
+typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
 
 /// Type - This is a simple value object that contains a pointer to a type
 /// class.  This is potentially sugared.  We use this throughout the codebase

@@ -566,8 +566,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             // Add a new constraint between these types. We consider the current
             // type-matching problem to the "solved" by this addition, because
             // this new constraint will be solved at a later point.
-            // Obviously, this must not happen at the top level, or the algorithm
-            // would not terminate.
+            // Obviously, this must not happen at the top level, or the
+            // algorithm would not terminate.
             addConstraint(getConstraintKind(kind), rep1, rep2,
                           getConstraintLocator(locator));
             return SolutionKind::Solved;

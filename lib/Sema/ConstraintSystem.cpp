@@ -1189,10 +1189,17 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // in the case of a conformance check against an associated type rooted off of
   // "Self"), we'll need to open the type up so as not to short-circuit the
   // binding constraint against the already bound overload type.
-  if ((choice.getKind() == OverloadChoiceKind::TypeDecl) &&
-      refType->getAs<DependentMemberType>()) {
+  if (refType->isDependentType()) {
+    openedFullType = openType(openedFullType,
+                              choice.getDecl()->
+                                        getPotentialGenericDeclContext());
     refType = openType(refType,
                          choice.getDecl()->getPotentialGenericDeclContext());
+    
+    if (auto FT = openedFullType->getAs<FunctionType>()) {
+      auto returnType = FT->getResult();
+      addConstraint(ConstraintKind::Bind, returnType, refType);
+    }
   }
 
   // Add the type binding constraint.

@@ -824,9 +824,11 @@ bool TypeChecker::checkSubstitutions(TypeSubstitutionMap &Substitutions,
   // Find all of the primary archetypes and enter them into the archetype
   // stack.
   for (const auto &sub : Substitutions) {
-    auto archetype = sub.first->getArchetype();
-    if (archetype->isPrimary() && knownArchetypes.insert(archetype))
-      archetypeStack.push_back(archetype);
+    if (auto subTy = sub.first->getAs<SubstitutableType>()) {
+      auto archetype = subTy->getArchetype();
+      if (archetype->isPrimary() && knownArchetypes.insert(archetype))
+        archetypeStack.push_back(archetype);
+    }
   }
 
   // Check that each of the replacements for the archetypes conform
