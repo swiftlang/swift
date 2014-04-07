@@ -743,7 +743,6 @@ public:
     }
   }
 
-  bool isNoReturn() const { return has(AK_noreturn); }
   bool isAssignment() const { return has(AK_assignment); }
   bool isConversion() const { return has(AK_conversion); }
   bool isTransparent() const {return has(AK_transparent);}

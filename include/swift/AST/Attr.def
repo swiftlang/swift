@@ -92,6 +92,10 @@ SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript,
                  2)
 
+SIMPLE_DECL_ATTR(noreturn, NoReturn,
+                 OnFunc,
+                 6)
+
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
           OnConstructor | OnDestructor,
@@ -104,7 +108,6 @@ ATTR(conversion)
 ATTR(exported)
 ATTR(infix)
 ATTR(mutating)
-ATTR(noreturn)
 ATTR(prefix)
 ATTR(postfix)
 ATTR(optional)

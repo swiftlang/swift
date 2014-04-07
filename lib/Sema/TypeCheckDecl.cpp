@@ -2461,21 +2461,17 @@ public:
   ///
   /// Currently, we only allow 'noreturn' to be applied on a FuncDecl.
   AnyFunctionType::ExtInfo
-  validateAndConsumeFunctionTypeAttributes(FuncDecl *FD,
-                                           bool consumeAttributes) {
-    DeclAttributes &Attrs = FD->getMutableAttrs();
+  validateAndConsumeFunctionTypeAttributes(FuncDecl *FD) {
     auto Info = AnyFunctionType::ExtInfo();
 
     // 'noreturn' is allowed on a function declaration.
-    Info = Info.withIsNoReturn(Attrs.isNoReturn());
-    if (consumeAttributes)
-      Attrs.clearAttribute(AK_noreturn);
+    Info = Info.withIsNoReturn(
+        FD->getAttrs().hasValidAttribute<NoReturnAttr>());
 
     return Info;
   }
 
-  void semaFuncDecl(FuncDecl *FD, bool consumeAttributes,
-                    GenericTypeResolver *resolver) {
+  void semaFuncDecl(FuncDecl *FD, GenericTypeResolver *resolver) {
     if (FD->hasType())
       return;
 
@@ -2552,8 +2548,7 @@ public:
       }
 
       // Validate and consume the function type attributes.
-      auto Info = validateAndConsumeFunctionTypeAttributes(FD,
-                                                           consumeAttributes);
+      auto Info = validateAndConsumeFunctionTypeAttributes(FD);
       if (params) {
         funcTy = PolymorphicFunctionType::get(argTy, funcTy, params, Info);
       } else {
@@ -2874,7 +2869,7 @@ public:
 
     // Type check the parameters and return type again, now with archetypes.
     GenericTypeToArchetypeResolver resolver;
-    semaFuncDecl(FD, /*consumeAttributes=*/true, &resolver);
+    semaFuncDecl(FD, &resolver);
 
     if (FD->isInvalid())
       return;
@@ -3020,8 +3015,10 @@ public:
     // Figure out the type of the declaration that we're using for comparisons.
     auto declTy = decl->getInterfaceType();
     auto uncurriedDeclTy = declTy;
-    if (method)
+    if (method) {
+      declTy = declTy->getWithoutNoReturn(2);
       uncurriedDeclTy = declTy->castTo<AnyFunctionType>()->getResult();
+    }
     if (decl->isObjC())
       uncurriedDeclTy = uncurriedDeclTy->getUnlabeledType(TC.Context);
 
@@ -3066,7 +3063,7 @@ public:
       assert(parentMethod || parentStorage);
 
       // If both are Objective-C, then match based on selectors or subscript
-      /// kind and check the types separately.
+      // kind and check the types separately.
       bool objCMatch = false;
       if (decl->isObjC() && parentDecl->isObjC()) {
         if (method) {
@@ -3084,7 +3081,7 @@ public:
 
           objCMatch = true;
         }
-        
+
         // Properties don't need anything here since they are always checked by
         // name.
       }
@@ -3094,6 +3091,7 @@ public:
       auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy);
       auto uncurriedParentDeclTy = parentDeclTy;
       if (method) {
+        parentDeclTy = parentDeclTy->getWithoutNoReturn(2);
         uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
                                   ->getResult();
       }
@@ -3257,6 +3255,15 @@ public:
       TC.diagnose(Override, diag::override_final, 
                   Override->getDescriptiveKind());
       TC.diagnose(Base, diag::overridden_here);
+    }
+
+    void visitNoReturnAttr(NoReturnAttr *attr) {
+      // Disallow overriding a @noreturn function with a returning one.
+      if (Base->getAttrs().hasValidAttribute<NoReturnAttr>() &&
+          !Override->getAttrs().hasValidAttribute<NoReturnAttr>()) {
+        TC.diagnose(Override, diag::override_noreturn_with_return);
+        TC.diagnose(Base, diag::overridden_here);
+      }
     }
 
     void visitObjCAttr(ObjCAttr *attr) {
@@ -5256,9 +5263,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   static const AttrKind InvalidAttrs[] = {
-    AK_exported, AK_noreturn
+    AK_exported
   };
-  
+
   for (AttrKind K : InvalidAttrs) {
     if (Attrs.has(K)) {
       TC.diagnose(Attrs.getLoc(K), diag::invalid_decl_attribute);

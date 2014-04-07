@@ -350,6 +350,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!DiscardAttribute)
       Attributes.add(new (Context) FinalAttr(AtLoc, Loc));
     break;
+  case DAK_noreturn:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) NoReturnAttr(AtLoc, Loc));
+    break;
   case DAK_objc: {
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {

@@ -490,6 +490,10 @@ public:
   Type replaceCovariantResultType(Type newResultType,
                                   unsigned uncurryLevel = 1);
 
+  /// Returns a function type that is not 'noreturn', but is otherwis the same
+  /// as this type.
+  Type getWithoutNoReturn(unsigned UncurryLevel);
+
   /// getRValueType - For an @lvalue type, retrieves the underlying object type.
   /// Otherwise, returns the type itself.
   Type getRValueType();
@@ -1836,7 +1840,7 @@ public:
   bool isBlock() const {
     return getExtInfo().isBlock();
   }
-  
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&

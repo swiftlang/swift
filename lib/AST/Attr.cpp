@@ -79,8 +79,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@transparent ";
   if (isInfix())
     Printer << "@infix ";
-  if (isNoReturn())
-    Printer << "@noreturn ";
   if (isPostfix())
     Printer << "@postfix ";
   if (requiresStoredPropertyInits())
@@ -126,6 +124,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     break;
   case DAK_final:
     Printer << "@final";
+    break;
+  case DAK_noreturn:
+    Printer << "@noreturn";
     break;
   case DAK_objc: {
     Printer << "@objc";

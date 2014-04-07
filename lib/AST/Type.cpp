@@ -512,6 +512,27 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
+Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
+  if (UncurryLevel == 0)
+    return this;
+
+  auto *FnType = this->castTo<AnyFunctionType>();
+  Type InputType = FnType->getInput();
+  Type ResultType = FnType->getResult()->getWithoutNoReturn(UncurryLevel - 1);
+  auto TheExtInfo = FnType->getExtInfo().withIsNoReturn(false);
+  if (auto *GFT = dyn_cast<GenericFunctionType>(FnType)) {
+    return GenericFunctionType::get(GFT->getGenericSignature(),
+                                    InputType, ResultType,
+                                    TheExtInfo);
+  }
+  if (auto *PFT = dyn_cast<PolymorphicFunctionType>(FnType)) {
+    return PolymorphicFunctionType::get(InputType, ResultType,
+                                        &PFT->getGenericParams(),
+                                        TheExtInfo);
+  }
+  return FunctionType::get(InputType, ResultType, TheExtInfo);
+}
+
 /// Retrieve the object type for a 'self' parameter, digging into one-element
 /// tuples, lvalue types, and metatypes.
 Type TypeBase::getRValueInstanceType() {

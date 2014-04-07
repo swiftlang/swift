@@ -398,6 +398,8 @@ NOTE(protocol_witness_mutating_conflict,sema_tcd,none,
      "candidate is marked 'mutating' but protocol does not allow it", ())
 NOTE(protocol_witness_settable_conflict,sema_tcd,none,
      "candidate is not settable, but protocol requires it", ())
+NOTE(protocol_witness_noreturn_conflict,sema_tcd,none,
+     "candidate is not 'noreturn', but protocol requires it", ())
 
 NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
@@ -615,6 +617,9 @@ ERROR(final_not_allowed_here,sema_tcd,none,
 ERROR(final_not_on_accessors,sema_tcd,none,
       "@final cannot be applied to accessors, it must be put on the "
       "%select{var|let|subscript}0", (unsigned))
+
+ERROR(override_noreturn_with_return,sema_tcd,none,
+      "an override of a 'noreturn' method should also be 'noreturn'", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

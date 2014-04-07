@@ -1651,7 +1651,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
       AK_assignment, AK_conversion, AK_IBAction, AK_infix,
-      AK_noreturn, AK_optional, AK_postfix, AK_prefix, AK_transparent,
+      AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
     verifyAttrSerializable(fn);

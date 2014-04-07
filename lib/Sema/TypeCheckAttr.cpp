@@ -41,6 +41,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
 
+  void visitNoReturnAttr(NoReturnAttr *attr);
+
   void visitObjCAttr(ObjCAttr *attr) {}
 
   void visitRequiredAttr(RequiredAttr *attr);
@@ -86,6 +88,15 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
       TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind);
       return;
     }
+  }
+}
+
+void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD) {
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute);
+    attr->setInvalid();
+    return;
   }
 }
 

@@ -209,7 +209,10 @@ namespace {
     PostfixNonPostfixConflict,
     
     /// \brief The witness did not match because of @mutating conflicts.
-    MutatingConflict
+    MutatingConflict,
+
+    /// The witness is not @noreturn, but the requirement is.
+    NoReturnConflict,
   };
 
   /// \brief Describes a match between a requirement and a witness.
@@ -246,6 +249,7 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NoReturnConflict:
         return false;
       }
     }
@@ -265,6 +269,7 @@ namespace {
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
       case MatchKind::MutatingConflict:
+      case MatchKind::NoReturnConflict:
         return false;
       }
     }
@@ -468,7 +473,12 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // protocol is declared mutating.
     if (funcWitness->isMutating() && !funcReq->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);
-    
+
+    /// If the requirement is @noreturn, the witness must also be @noreturn.
+    if (reqAttrs.hasValidAttribute<NoReturnAttr>() &&
+        !witnessAttrs.hasValidAttribute<NoReturnAttr>())
+      return RequirementMatch(witness, MatchKind::NoReturnConflict);
+
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
   } else if (isa<AbstractStorageDecl>(witness)) {
@@ -815,6 +825,10 @@ diagnoseMatch(TypeChecker &tc, Module *module,
   case MatchKind::MutatingConflict:
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_mutating_conflict);
+    break;
+  case MatchKind::NoReturnConflict:
+    // FIXME: Could emit a Fix-It here.
+    tc.diagnose(match.Witness, diag::protocol_witness_noreturn_conflict);
     break;
   }
 }
