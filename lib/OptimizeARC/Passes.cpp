@@ -192,13 +192,10 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   case RT_RetainNoResult:
   case RT_RetainAndReturnThree:
   case RT_ObjCRetain:
-      
-    // FIXME: release(x) *can* modify observable state, by freeing it.  This
-    // doesn't matter for any clients, but it is gross to model things this way.
-  case RT_Release:
-  case RT_ObjCRelease:
     // These entrypoints don't modify any compiler-visible state.
     return NoModRef;
+  case RT_Release:
+  case RT_ObjCRelease:
   case RT_Unknown:
     break;
   }
