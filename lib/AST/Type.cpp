@@ -1526,6 +1526,12 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   return Pos->second;
 }
 
+bool ArchetypeType::hasNestedType(Identifier Name) const {
+  auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
+                              OrderArchetypeByName());
+  return Pos != NestedTypes.end() && Pos->first == Name;
+}
+
 void
 ArchetypeType::
 setNestedTypes(ASTContext &Ctx,
@@ -1785,6 +1791,12 @@ static Type getMemberForBaseType(Module *module,
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
+    
+    if (!archetypeParent->hasNestedType(name) &&
+        archetypeParent->getParent()->isSelfDerived()) {
+      return archetypeParent->getParent()->getNestedTypeValue(name);
+    }
+    
     return archetypeParent->getNestedTypeValue(name);
   }
 

@@ -2841,6 +2841,9 @@ public:
   Type getNestedTypeValue(Identifier Name) const {
     return getNestedTypeValue(getNestedType(Name));
   }
+  
+  /// \brief Check if the archetype contains a nested type with the given name.
+  bool hasNestedType(Identifier Name) const;
 
   /// \brief Retrieve the nested types of this archetype.
   ArrayRef<std::pair<Identifier, NestedType>> getNestedTypes() const {

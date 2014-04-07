@@ -418,8 +418,17 @@ namespace {
         if (!implArchetype) {
           return baseTypeVar;
         }
-        auto nestedType = implArchetype->getNestedType(member->getName());
-        auto archetype = nestedType.dyn_cast<ArchetypeType*>();
+                                
+                                
+        ArchetypeType::NestedType nestedType;
+        ArchetypeType* archetype = nullptr;
+                                
+        if (implArchetype->hasNestedType(member->getName())) {
+          nestedType = implArchetype->getNestedType(member->getName());
+          archetype = nestedType.dyn_cast<ArchetypeType*>();
+        } else if (implArchetype->isSelfDerived()) {
+          archetype = implArchetype;
+        }
                                 
         // The nested type could be a type parameter type. If that's the case,
         // obtain the archetype from its decl.

@@ -86,10 +86,15 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
     return getRepresentative()->getNestedType(Name);
-
+    
   PotentialArchetype *&Result = NestedTypes[Name];
+    
   if (!Result) {
-    Result = new PotentialArchetype(this, Name);
+    if (Name.str().equals(this->Name.str())) {
+      Result = this;
+    } else {
+      Result = new PotentialArchetype(this, Name);
+    }
   }
 
   return Result;
@@ -399,10 +404,10 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam,
   return !PA;
 }
 
-bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
+bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto){
   // Add the requirement to the representative.
-  T = T->getRepresentative();
+  auto T = PAT->getRepresentative();
 
   // If we've already added this requirement, we're done.
   if (!T->ConformsTo.insert(Proto))
@@ -419,14 +424,15 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *T,
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName());
-      for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
-        if (Proto == InheritedProto) {
-          Diags.diagnose(Member->getLoc(),
-                         diag::recursive_requirement_reference);
-          return true;
+      
+      if (AssocPA != T) {
+        for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
+          if (Proto == InheritedProto)
+            continue;
+          
+          if (addConformanceRequirement(AssocPA, InheritedProto))
+            return true;
         }
-        if (addConformanceRequirement(AssocPA, InheritedProto))
-          return true;
       }
 
       continue;
