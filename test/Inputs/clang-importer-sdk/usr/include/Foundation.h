@@ -138,6 +138,12 @@ typedef NS_ENUM(NSUInteger, NSNumberFormatterBehavior) {
   NSNumberFormatterBehavior10_4 = 1040,
 };
 
+typedef NS_ENUM(NSUInteger, NSPostingStyle) {
+  NSPostWhenIdle = 1,
+  NSPostASAP = 2,
+  NSPostNow = 3
+};
+
 
 /// Aaa.  NSRuncingOptions.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {

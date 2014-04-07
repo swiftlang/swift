@@ -322,7 +322,10 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
     if (a[i] != b[i])
       return a.slice(0, prefixLength);
   }
-  if (b.size() == commonSize || clang::isIdentifierHead(b[commonSize]))
+
+  // If the two strings match exactly, or if we're at a word boundary in the
+  // longer string, the entire shorter string is the prefix.
+  if (b.size() == commonSize || clang::isUppercase(b[commonSize]))
     prefixLength = commonSize;
   return a.slice(0, prefixLength);
 }
@@ -913,7 +916,6 @@ namespace {
       }
 
       if (!commonPrefix.empty()) {
-        StringRef enumName = decl->getName();
         StringRef checkPrefix = commonPrefix;
 
         // Account for the 'kConstant' naming convention on enumerators.
@@ -925,7 +927,8 @@ namespace {
           }
         }
 
-        StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix, enumName);
+        StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
+                                                         enumName.str());
         commonPrefix = commonPrefix.slice(0, commonWithEnum.size()+dropKPrefix);
       }
       Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});
