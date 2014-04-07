@@ -81,19 +81,31 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-auto ArchetypeBuilder::PotentialArchetype::getNestedType(Identifier Name)
-                                             -> PotentialArchetype * {
+auto ArchetypeBuilder::
+     PotentialArchetype::
+        getNestedType(Identifier nestedName, Identifier *parentName) ->
+                                                          PotentialArchetype * {
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getNestedType(Name);
+    return getRepresentative()->getNestedType(nestedName);
     
-  PotentialArchetype *&Result = NestedTypes[Name];
+  PotentialArchetype *&Result = NestedTypes[nestedName];
     
   if (!Result) {
-    if (Name.str().equals(this->Name.str())) {
+    // FIXME: The fact that we've been checking for "new" nested archetypes on
+    // a purely lexical basis is both fragile and not-quite-correct. We need
+    // to move to a lazier model for adding conformance requirements that will
+    // allow us to deal with recursive dependencies without comparing identifier
+    // names.
+    if (parentName &&
+        this->Parent &&
+        (parentName->str().equals(this->Parent->Name.str()) ||
+         this->Parent->Name.str().equals(StringRef("Self")) ||
+         this->Parent->Name.str().equals(this->Name.str())) &&
+        nestedName.str().equals(this->Name.str())) {
       Result = this;
     } else {
-      Result = new PotentialArchetype(this, Name);
+      Result = new PotentialArchetype(this, nestedName);
     }
   }
 
@@ -423,7 +435,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName());
+      auto parentName = Proto->getName();
+      auto AssocPA = T->getNestedType(AssocType->getName(),
+                                      &parentName);
       
       if (AssocPA != T) {
         for (auto InheritedProto : Impl->getConformsTo(AssocType)) {

@@ -349,7 +349,8 @@ public:
   PotentialArchetype *getRepresentative();
 
   /// \brief Retrieve (or create) a nested type with the given name.
-  PotentialArchetype *getNestedType(Identifier Name);
+  PotentialArchetype *getNestedType(Identifier Name,
+                                    Identifier *parentName = nullptr);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
