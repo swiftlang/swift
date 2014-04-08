@@ -853,6 +853,9 @@ ERROR(assignment_to_self,sema_tcs,none,
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
+ERROR(assignment_unresolved_expr,sema_tcs,none,
+"cannot assign to %0 in %1", (Identifier, Identifier))
+
 ERROR(non_optional_in_conditional_binding,sema_tcs,none,
       "bound value in a conditional binding must be of Optional type", ())
 

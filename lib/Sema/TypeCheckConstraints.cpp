@@ -1002,6 +1002,16 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
         return Type();
       }
 
+    // Provide specific diagnostics for unresolved type expr.
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(dest))
+      if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase()))
+        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+          getTypeChecker().diagnose(equalLoc, diag::assignment_unresolved_expr,
+                                     UDE->getName(), VD->getName())
+          .highlight(dest->getSourceRange());
+          return Type();
+        }
+
     // Otherwise, emit an unhelpful message.
     getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
       .highlight(dest->getSourceRange());
