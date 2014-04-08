@@ -452,7 +452,8 @@ void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {
 
 void IRGenModule::fatal_unimplemented(SourceLoc loc, StringRef message) {
   Context.Diags.diagnose(loc, diag::irgen_unimplemented, message);
-  llvm::report_fatal_error("unimplemented IRGen feature!");
+  llvm::report_fatal_error(llvm::Twine("unimplemented IRGen feature! ") +
+                             message);
 }
 
 void IRGenModule::error(SourceLoc loc, const Twine &message) {
