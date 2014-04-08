@@ -708,38 +708,13 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
     return ArgPattern;
 
-  // If we've reached the end of the first argument, decide whether this is
-  // a curried argument list, a selector style argument list, or if we're
-  // done.
-  HasSelectorStyleSignature = isAtStartOfBindingName();
-
-  if (HasSelectorStyleSignature) {
-    // This looks like a selector-style argument.  Try to convert the first
-    // argument pattern into a single argument type and parse subsequent
-    // selector forms.
-    return ParserStatus(ArgPattern) |
-      parseSelectorFunctionArguments(*this, NamePieces,
-                                     ArgPatterns, BodyPatterns,
-                                     DefaultArgs, ArgPattern.get());
-  }
-
-  ParserStatus Result;
-  while (1) {
-    ArgPatterns.push_back(ArgPattern.get());
-    BodyPatterns.push_back(ArgPattern.get());
-    Result |= ArgPattern;
-
-    // If we're out of pieces, we're done.
-    if (Tok.isNot(tok::l_paren))
-      break;
-
-    ArgPattern = parsePatternTuple(/*IsLet*/true, /*IsArgList*/true, nullptr);
-
-    if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
-      return ArgPattern;
-  }
-
-  return Result;
+  // This looks like a selector-style argument.  Try to convert the first
+  // argument pattern into a single argument type and parse subsequent
+  // selector forms.
+  return ParserStatus(ArgPattern) |
+    parseSelectorFunctionArguments(*this, NamePieces,
+                                   ArgPatterns, BodyPatterns,
+                                   DefaultArgs, ArgPattern.get());
 }
 
 /// parseFunctionSignature - Parse a function definition signature.
