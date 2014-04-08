@@ -553,6 +553,9 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
       if (Options.SkipImplicit && member->isImplicit())
         continue;
 
+      if (Options.SkipUnavailable && member->getAttrs().isUnavailable())
+        continue;
+
       indent();
       visit(member);
       if (needComma && member != members.back())

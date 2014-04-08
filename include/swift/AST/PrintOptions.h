@@ -67,6 +67,9 @@ struct PrintOptions {
   /// \brief Whether to print implicit parts of the AST.
   bool SkipImplicit = false;
 
+  /// \brief Whether to print unavailable parts of the AST.
+  bool SkipUnavailable = false;
+
   bool PrintImplicitAttrs = true;
 
   /// \brief Whether to print documentation comments attached to declarations.

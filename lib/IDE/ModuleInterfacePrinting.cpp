@@ -131,6 +131,10 @@ void swift::ide::printSubmoduleInterface(
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
+    // If requested, skip unavailable declarations.
+    if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
+      continue;
+
     if (auto ID = dyn_cast<ImportDecl>(D)) {
       ImportDecls.push_back(ID);
       continue;
@@ -145,8 +149,9 @@ void swift::ide::printSubmoduleInterface(
 
       auto *OwningModule = Importer.getClangOwningModule(CN);
       auto I = ClangDecls.find(OwningModule);
-      if (I != ClangDecls.end())
+      if (I != ClangDecls.end()) {
         I->second.push_back({ D, Loc });
+      }
       continue;
     }
     SwiftDecls.push_back(D);
