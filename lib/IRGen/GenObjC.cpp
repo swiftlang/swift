@@ -53,7 +53,7 @@ using namespace swift;
 using namespace irgen;
 
 void IRGenFunction::emitObjCRelease(llvm::Value *value) {
-  // Get an appropriately-casted function pointer.
+  // Get an appropriately-cast function pointer.
   auto fn = IGM.getObjCReleaseFn();
   if (value->getType() != IGM.ObjCPtrTy) {
     auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
@@ -132,7 +132,9 @@ namespace {
     }
 
     /// Builtin.ObjCPointer requires ObjC reference-counting.
-    bool hasSwiftRefcount() const { return false; }
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::ObjC;
+    }
   };
 }
 
@@ -1281,4 +1283,29 @@ bool irgen::requiresObjCSubscriptDescriptor(SubscriptDecl *subscript) {
     return ft->isBlock();
   
   return true;
+}
+
+llvm::Value *IRGenFunction::emitBlockCopyCall(llvm::Value *value) {
+  // Get an appropriately-cast function pointer.
+  auto fn = IGM.getBlockCopyFn();
+  if (value->getType() != IGM.ObjCBlockPtrTy) {
+    auto fnTy = llvm::FunctionType::get(value->getType(), value->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+  }
+  
+  auto call = Builder.CreateCall(fn, value);
+  return call;
+}
+
+void IRGenFunction::emitBlockRelease(llvm::Value *value) {
+  // Get an appropriately-cast function pointer.
+  auto fn = IGM.getBlockReleaseFn();
+  if (value->getType() != IGM.ObjCBlockPtrTy) {
+    auto fnTy = llvm::FunctionType::get(IGM.VoidTy, value->getType(),
+                                        false)->getPointerTo();
+    fn = llvm::ConstantExpr::getBitCast(fn, fnTy);
+  }
+  auto call = Builder.CreateCall(fn, value);
+  call->setDoesNotThrow();
 }

@@ -581,8 +581,10 @@ namespace {
                                  Alignment align)
     : HeapTypeInfo(storage, size, spareBits, align) {}
 
-    /// Builtin.ObjectPointer uses Swift reference-counting.
-    bool hasSwiftRefcount() const { return true; }
+    /// Builtin.ObjectPointer uses Swift native reference-counting.
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::Native;
+    }
   };
 }
 

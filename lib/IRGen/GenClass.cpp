@@ -59,11 +59,14 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
   return theClass;
 }
 
-/// Does the given class have a Swift refcount?
-bool irgen::hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass) {
+/// What reference counting mechanism does a class have?
+ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
+                                                      ClassDecl *theClass) {
   // If the root class is implemented in swift, then we have a swift
-  // refcount.
-  return hasKnownSwiftImplementation(IGM, getRootClass(theClass));
+  // refcount; otherwise, we have an ObjC refcount.
+  if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+    return ReferenceCounting::Native;
+  return ReferenceCounting::ObjC;
 }
 
 /// Different policies for accessing a physical field.
@@ -113,19 +116,19 @@ namespace {
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
-    const bool HasSwiftRefcount;
+    const ReferenceCounting Refcount;
     
     void generateLayout(IRGenModule &IGM) const;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size,
                   llvm::BitVector spareBits, Alignment align,
-                  ClassDecl *D, bool hasSwiftRefcount)
+                  ClassDecl *D, ReferenceCounting refcount)
       : HeapTypeInfo(irType, size, std::move(spareBits), align), TheClass(D),
-        Layout(nullptr), HasSwiftRefcount(hasSwiftRefcount) {}
+        Layout(nullptr), Refcount(refcount) {}
 
-    bool hasSwiftRefcount() const {
-      return HasSwiftRefcount;
+    ReferenceCounting getReferenceCounting() const {
+      return Refcount;
     }
 
     ~ClassTypeInfo() {
@@ -1618,11 +1621,11 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
 const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(D);
   llvm::PointerType *irType = ST->getPointerTo();
-  bool hasSwiftRefcount = ::hasSwiftRefcount(IGM, D);
+  ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
                            IGM.getHeapObjectSpareBits(),
                            IGM.getPointerAlignment(),
-                           D, hasSwiftRefcount);
+                           D, refcount);
 }
 
 /// Lazily declare the Swift root-class, SwiftObject.

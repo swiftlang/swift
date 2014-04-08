@@ -56,13 +56,44 @@ void storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
 
 /// \group HeapTypeInfo
   
+/// The kind of reference counting implementation a heap object uses.
+enum class ReferenceCounting : unsigned char {
+  /// The object uses native Swift reference counting.
+  Native,
+  
+  /// The object uses ObjC reference counting.
+  ///
+  /// When ObjC interop is enabled, native Swift class objects are also ObjC
+  /// reference counting compatible. Swift non-class heap objects are never
+  /// ObjC reference counting compatible.
+  ///
+  /// Blocks are always ObjC reference counting compatible.
+  ObjC,
+  
+  /// The object uses _Block_copy/_Block_release reference counting.
+  ///
+  /// This is a strict subset of ObjC; all blocks are also ObjC reference
+  /// counting compatible. The block is assumed to have already been moved to
+  /// the heap so that _Block_copy returns the same object back.
+  Block,
+  
+  /// The object has an unknown reference counting implementation.
+  ///
+  /// This uses maximally-compatible reference counting entry points in the
+  /// runtime.
+  ///
+  /// FIXME: Those entry points are currently objc_retain/objc_release, which
+  /// are not compatible with non-class heap objects.
+  Unknown,
+};
+  
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
 ///
 /// Subclasses should implement the following method, returning true
 /// if it's known to be OK to use Swift reference-counting on values
 /// of this type:
-///   bool hasSwiftRefcount() const;
+///   ReferenceCounting getReferenceCounting() const;
 template <class Impl>
 class HeapTypeInfo : public SingleScalarTypeInfo<Impl, ReferenceTypeInfo> {
   typedef SingleScalarTypeInfo<Impl, ReferenceTypeInfo> super;
@@ -74,7 +105,14 @@ public:
     : super(storage, size, spareBits, align) {}
 
   bool isSingleSwiftRetainablePointer(ResilienceScope scope) const override {
-    return asDerived().hasSwiftRefcount();
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
+      return true;
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
+      return false;
+    }
   }
   
   bool isSingleUnknownRetainablePointer(ResilienceScope scope) const override {
@@ -84,42 +122,65 @@ public:
   static const bool IsScalarPOD = false;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().hasSwiftRefcount()) {
-      IGF.emitRelease(value);
-    } else {
-      IGF.emitObjCRelease(value);
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
+      return IGF.emitRelease(value);
+    case ReferenceCounting::ObjC:
+      return IGF.emitObjCRelease(value);
+    case ReferenceCounting::Block:
+      return IGF.emitBlockRelease(value);
+    case ReferenceCounting::Unknown:
+      return IGF.emitUnknownRelease(value);
     }
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().hasSwiftRefcount()) {
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
       IGF.emitRetainCall(value);
-    } else {
+      return;
+    case ReferenceCounting::ObjC:
       IGF.emitObjCRetainCall(value);
+      return;
+    case ReferenceCounting::Block:
+      IGF.emitBlockCopyCall(value);
+      return;
+    case ReferenceCounting::Unknown:
+      IGF.emitUnknownRetainCall(value);
+      return;
     }
   }
 
   void emitScalarRetainUnowned(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().hasSwiftRefcount()) {
-      IGF.emitRetainUnowned(value);
-    } else {
-      IGF.emitUnknownRetainUnowned(value);
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
+      return IGF.emitRetainUnowned(value);
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
+      return IGF.emitUnknownRetainUnowned(value);
     }
   }
 
   void emitScalarUnownedRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().hasSwiftRefcount()) {
-      IGF.emitUnownedRelease(value);
-    } else {
-      IGF.emitUnknownUnownedRelease(value);
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
+      return IGF.emitUnownedRelease(value);
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
+      return IGF.emitUnknownUnownedRelease(value);
     }
   }
 
   void emitScalarUnownedRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    if (asDerived().hasSwiftRefcount()) {
-      IGF.emitUnownedRetain(value);
-    } else {
-      IGF.emitUnknownUnownedRetain(value);
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
+      return IGF.emitUnownedRetain(value);
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
+      return IGF.emitUnknownUnownedRetain(value);
     }
   }
 
@@ -149,17 +210,23 @@ public:
   }
 
   const WeakTypeInfo *createWeakStorageType(TypeConverter &TC) const {
-    if (asDerived().hasSwiftRefcount()) {
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
       return TC.createSwiftWeakStorageType(this->getStorageType());
-    } else {
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
       return TC.createUnknownWeakStorageType(this->getStorageType());
     }
   }
 
   const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC) const {
-    if (asDerived().hasSwiftRefcount()) {
+    switch (asDerived().getReferenceCounting()) {
+    case ReferenceCounting::Native:
       return TC.createSwiftUnownedStorageType(this->getStorageType());
-    } else {
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+    case ReferenceCounting::Unknown:
       return TC.createUnknownUnownedStorageType(this->getStorageType());
     }
   }

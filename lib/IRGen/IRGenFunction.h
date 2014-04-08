@@ -192,6 +192,8 @@ public:
   void emitObjCRetain(llvm::Value *value, Explosion &explosion);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
   void emitObjCRelease(llvm::Value *value);
+  llvm::Value *emitBlockCopyCall(llvm::Value *value);
+  void emitBlockRelease(llvm::Value *value);
   
   /// Emit a retain of a class instance with unknown retain semantics.
   void emitUnknownRetain(llvm::Value *value, Explosion &explosion);

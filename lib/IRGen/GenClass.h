@@ -37,6 +37,8 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class OwnedAddress;
+  
+  enum class ReferenceCounting : unsigned char;
 
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
@@ -84,7 +86,8 @@ namespace irgen {
   bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
   
   /// Do instances of the given class have a Swift refcount?
-  bool hasSwiftRefcount(IRGenModule &IGM, ClassDecl *theClass);
+  ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
+                                                 ClassDecl *theClass);
 } // end namespace irgen
 } // end namespace swift
 

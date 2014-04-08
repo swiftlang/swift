@@ -683,7 +683,9 @@ namespace {
     {
     }
 
-    bool hasSwiftRefcount() const { return false; }
+    ReferenceCounting getReferenceCounting() const {
+      return ReferenceCounting::Block;
+    }
   };
 }
 

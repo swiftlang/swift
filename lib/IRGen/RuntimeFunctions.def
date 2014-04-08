@@ -547,6 +547,17 @@ FUNCTION(ClassAddProtocol, class_addProtocol, C_CC,
          ARGS(ObjCClassPtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+// void *_Block_copy(void *block);
+FUNCTION(BlockCopy, _Block_copy, C_CC,
+         RETURNS(ObjCBlockPtrTy),
+         ARGS(ObjCBlockPtrTy),
+         NO_ATTRS)
+// void _Block_release(void *block);
+FUNCTION(BlockRelease, _Block_release, C_CC,
+         RETURNS(VoidTy),
+         ARGS(ObjCBlockPtrTy),
+         ATTRS(NoUnwind))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

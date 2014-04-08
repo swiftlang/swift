@@ -1246,16 +1246,16 @@ namespace {
     : public HeapTypeInfo<ClassArchetypeTypeInfo>,
       public ArchetypeTypeInfoBase
   {
-    bool HasSwiftRefcount;
+    ReferenceCounting RefCount;
     
     ClassArchetypeTypeInfo(llvm::PointerType *storageType,
                            Size size, llvm::BitVector spareBits,
                            Alignment align,
                            ArrayRef<ProtocolEntry> protocols,
-                           bool hasSwiftRefcount)
+                           ReferenceCounting refCount)
       : HeapTypeInfo(storageType, size, spareBits, align),
         ArchetypeTypeInfoBase(this + 1, protocols),
-        HasSwiftRefcount(hasSwiftRefcount)
+        RefCount(refCount)
     {}
     
   public:
@@ -1263,16 +1263,16 @@ namespace {
                                            Size size, llvm::BitVector spareBits,
                                            Alignment align,
                                            ArrayRef<ProtocolEntry> protocols,
-                                           bool hasSwiftRefcount) {
+                                           ReferenceCounting refCount) {
       void *buffer = operator new(sizeof(ClassArchetypeTypeInfo)
                                     + protocols.size() * sizeof(ProtocolEntry));
       return ::new (buffer)
         ClassArchetypeTypeInfo(storageType, size, spareBits, align,
-                               protocols, hasSwiftRefcount);
+                               protocols, refCount);
     }
     
-    bool hasSwiftRefcount() const {
-      return HasSwiftRefcount;
+    ReferenceCounting getReferenceCounting() const {
+      return RefCount;
     }
   };
   
@@ -2834,8 +2834,9 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (archetype->requiresClass()) {
-    // Fully general archetypes can't be assumed to have a Swift refcount.
-    bool swiftRefcount = false;
+    // Fully general archetypes can't be assumed to have any particular
+    // refcounting scheme.
+    ReferenceCounting refcount = ReferenceCounting::Unknown;
     llvm::PointerType *reprTy = IGM.UnknownRefCountedPtrTy;
     
     // If the archetype has a superclass constraint, it has at least the
@@ -2843,7 +2844,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     // the supertype's pointer type.
     if (Type super = archetype->getSuperclass()) {
       ClassDecl *superClass = super->getClassOrBoundGenericClass();
-      swiftRefcount = hasSwiftRefcount(IGM, superClass);
+      refcount = getReferenceCountingForClass(IGM, superClass);
       
       auto &superTI = IGM.getTypeInfoForUnlowered(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
@@ -2853,7 +2854,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment(),
-                                      protocols, swiftRefcount);
+                                      protocols, refcount);
   }
   
   // Otherwise, for now, always use an opaque indirect type.
