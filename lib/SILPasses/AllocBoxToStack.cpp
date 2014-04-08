@@ -394,12 +394,6 @@ static SILInstruction* findUnexpectedBoxUse(SILValue Box,
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
                              llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
-  // Scan all of the uses of the address of the box's contained value
-  // to see if any of them cause address to escape, in which case we
-  // can't promote it to live on the stack.
-  if (canValueEscape(ABI->getAddressResult(), /* examineApply = */ false))
-    return false;
-
   // Scan all of the uses of the address of the box to see if any
   // disqualifies the box from being promoted tot he stack.
   if (auto *User = findUnexpectedBoxUse(ABI->getContainerResult(),
