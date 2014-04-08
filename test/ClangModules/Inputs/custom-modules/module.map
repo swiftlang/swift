@@ -55,3 +55,8 @@ module ObjCImplicitProperties {
   header "ObjCImplicitProperties.h"
   export *
 }
+
+module ProtoWithInitializer {
+  header "ProtoWithInitializer.h"
+  export *
+}

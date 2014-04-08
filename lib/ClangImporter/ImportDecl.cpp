@@ -2156,7 +2156,9 @@ namespace {
 
       // Figure out the curried 'self' type for the interface type. It's always
       // either the generic parameter type 'Self' or a metatype thereof.
-      auto interfaceInputTy = proto->getSelf()->getDeclaredType();
+      auto selfDecl = proto->getSelf();
+      auto selfTy = selfDecl->getDeclaredType();
+      auto interfaceInputTy = selfTy;
       auto inputTy = fnType->getInput();
       if (auto tupleTy = inputTy->getAs<TupleType>()) {
         if (tupleTy->getNumElements() == 1)
@@ -2165,11 +2167,11 @@ namespace {
       if (inputTy->is<MetatypeType>())
         interfaceInputTy = MetatypeType::get(interfaceInputTy);
 
+      auto selfArchetype = selfDecl->getArchetype();
       auto interfaceResultTy = fnType->getResult().transform(
         [&](Type type) -> Type {
-          if (type->is<DynamicSelfType>()) {
-            return DynamicSelfType::get(proto->getSelf()->getDeclaredType(),
-                                        Impl.SwiftContext);
+          if (type->is<DynamicSelfType>() || type->isEqual(selfArchetype)) {
+            return DynamicSelfType::get(selfTy, Impl.SwiftContext);
           }
 
           return type;
