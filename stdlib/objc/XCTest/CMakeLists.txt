@@ -13,7 +13,7 @@ set(SWIFTXCTEST_SOURCES
 # that's accomplished by adding the extra flag to target_link_libraries since
 # that will just pass through to the linker invocation.
 
-if (EXISTS "${MODULES_SDK}/../../../Developer/Library/Frameworks")
+if (EXISTS "${MODULES_SDK}/../../../Developer/Library/Frameworks/XCTest.framework/Headers")
   set(XCTEST_FRAMEWORK_LOCATION "${MODULES_SDK}/../../../Developer/Library/Frameworks")
 else()
   set(XCTEST_FRAMEWORK_LOCATION "${MODULES_SDK}/Developer/Library/Frameworks")
