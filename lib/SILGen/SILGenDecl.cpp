@@ -41,7 +41,7 @@ namespace {
     {}
     
     SILValue getAddressOrNull() const override { return SILValue(); }
-    ArrayRef<InitializationPtr> getSubInitializations() override {
+    ArrayRef<InitializationPtr> getSubInitializations() const override {
       return {};
     }
   };
@@ -60,6 +60,28 @@ namespace {
 
     void finishInitialization(SILGenFunction &gen) override {}
   };
+}
+
+bool Initialization::canForwardInBranch() const {
+  switch (kind) {
+  case Kind::Ignored:
+  case Kind::SingleBuffer:
+    return true;
+
+  // These initializations expect to be activated exactly once.
+  case Kind::AddressBinding:
+  case Kind::LetValue:
+  case Kind::Translating:
+    return false;
+
+  case Kind::Tuple:
+    for (auto &subinit : getSubInitializations()) {
+      if (!subinit->canForwardInBranch())
+        return false;
+    }
+    return true;
+  }
+  llvm_unreachable("bad initialization kind!");
 }
 
 ArrayRef<InitializationPtr>
@@ -139,7 +161,7 @@ void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
 }
 
 ArrayRef<InitializationPtr>
-SingleBufferInitialization::getSubInitializations() {
+SingleBufferInitialization::getSubInitializations() const {
   return {};
 }
 
@@ -167,7 +189,7 @@ public:
       return SILValue();
   }
   
-  ArrayRef<InitializationPtr> getSubInitializations() override {
+  ArrayRef<InitializationPtr> getSubInitializations() const override {
     return subInitializations;
   }
   
@@ -346,7 +368,7 @@ public:
     // We only have an address for address-only lets.
     return address;
   }
-  ArrayRef<InitializationPtr> getSubInitializations() override {
+  ArrayRef<InitializationPtr> getSubInitializations() const override {
     return {};
   }
   
@@ -415,7 +437,7 @@ public:
   SILValue getAddressOrNull() const override {
     llvm_unreachable("inout argument should be bound by bindAddress");
   }
-  ArrayRef<InitializationPtr> getSubInitializations() override {
+  ArrayRef<InitializationPtr> getSubInitializations() const override {
     return {};
   }
 
@@ -445,7 +467,7 @@ public:
     : Initialization(Initialization::Kind::Translating),
       VarInit(std::move(subInit)) {}
 
-  ArrayRef<InitializationPtr> getSubInitializations() override { return {}; }
+  ArrayRef<InitializationPtr> getSubInitializations() const override { return {}; }
   SILValue getAddressOrNull() const override { return SILValue(); }
 
   void translateValue(SILGenFunction &gen, SILLocation loc,

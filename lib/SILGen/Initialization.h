@@ -70,6 +70,10 @@ public:
   Initialization(Kind kind) : kind(kind) {}
   virtual ~Initialization() {}
 
+  /// Return true if this initialization can be forwarded down along
+  /// multiple branches of a conditional branch.
+  bool canForwardInBranch() const;
+
   /// Return true if we can get the addresses of elements with the
   /// 'getSubInitializationsForTuple' method.
   bool canSplitIntoSubelementAddresses() const {
@@ -114,7 +118,7 @@ public:
   /// return the sub-initializations. Once all the sub-initializations have been
   /// initialized and finalized with finishInitialization, finishInitialization
   /// must then be called on this aggregate initialization.
-  virtual ArrayRef<InitializationPtr> getSubInitializations() = 0;
+  virtual ArrayRef<InitializationPtr> getSubInitializations() const = 0;
   
   /// If this initialization represents an aggregation of sub-initializations,
   /// return the sub-initializations. If it represents a single
@@ -149,7 +153,7 @@ public:
     : Initialization(Initialization::Kind::SingleBuffer)
   {}
   
-  ArrayRef<InitializationPtr> getSubInitializations() override;
+  ArrayRef<InitializationPtr> getSubInitializations() const override;
 };
 
 /// Abstract base class for single-buffer initializations.

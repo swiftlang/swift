@@ -4162,7 +4162,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   std::unique_ptr<TemporaryInitialization> optTemp;
   Initialization *optInit = C.getEmitInto();
-  if (!optInit) {
+  bool usingProvidedContext = optInit && optInit->canForwardInBranch();
+  if (!usingProvidedContext) {
     optTemp = SGF.emitTemporary(E, optTL);
     optInit = optTemp.get();
   }
@@ -4208,8 +4209,8 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   // Emit the continuation block.
   SGF.B.emitBlock(contBB);
 
-  // If we had a destination address, we're done.
-  if (C.getEmitInto())
+  // If we emitted into the provided context, we're done.
+  if (usingProvidedContext)
     return RValue();
 
   assert(optTemp);
