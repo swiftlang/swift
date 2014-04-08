@@ -189,6 +189,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
   if (macro->isFunctionLike())
     return nullptr;
 
+  // Consult the blacklist of macros to suppress.
+  auto suppressMacro =
+    llvm::StringSwitch<bool>(name.str())
+#define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
+#include "SuppressedMacros.def"
+    .Default(false);
+
+  if (suppressMacro)
+    return nullptr;
+
   // FIXME: Ask Clang to try to parse and evaluate the expansion as a constant
   // expression instead of doing these special-case pattern matches.
   if (macro->getNumTokens() == 1) {
