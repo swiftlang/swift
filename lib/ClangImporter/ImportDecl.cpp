@@ -1662,6 +1662,50 @@ namespace {
       return VisitObjCMethodDecl(decl, dc);
     }
 
+    bool isAnimatorProxy(const clang::ObjCMethodDecl *decl) {
+      // Special case -animator.  We need to paper over
+      // the return type of 'instancetype' with 'id'.
+      // <rdar://problem/16020273>
+      if (!decl->isInstanceMethod())
+        return false;
+
+      auto DeclSel = decl->getSelector();
+      if (!(DeclSel.isUnarySelector() &&
+            DeclSel.getNameForSlot(0) == "animator"))
+        return false;
+
+      const clang::ASTContext &clangCtx = Impl.getClangASTContext();
+      auto ProtoIdent =
+        &clangCtx.Idents.get("NSAnimatablePropertyContainer");
+      auto clangDC = decl->getDeclContext();
+
+      if (auto Proto = dyn_cast<clang::ObjCProtocolDecl>(clangDC)) {
+        if (Proto->getIdentifier() == ProtoIdent)
+          return true;
+
+        return false;
+      }
+
+      if (auto ClassI = decl->getClassInterface()) {
+        for (auto I = ClassI->all_referenced_protocol_begin(),
+             E = ClassI->all_referenced_protocol_end();
+             I != E; ++I)
+          if ((*I)->getIdentifier() == ProtoIdent)
+            return true;
+      }
+
+      return false;
+    }
+
+    /// Returns a surrogate result type if one is desired for a specific API.
+    Optional<clang::QualType>
+    getSurrogateResultType(const clang::ObjCMethodDecl *decl) {
+      if (isAnimatorProxy(decl))
+        return decl->getASTContext().getObjCIdType();
+
+      return Optional<clang::QualType>();
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc, bool forceClassMethod = false) {
       DeclName name = Impl.importName(decl->getSelector(),
@@ -1693,40 +1737,9 @@ namespace {
       if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
-      auto RetTy = decl->getReturnType();
-      bool SuppressRelatedResultType = false;
-
-      // Special case -animator.  We need to paper over
-      // the return type of 'instancetype' with 'id'.
-      // <rdar://problem/16020273>
-      if (decl->isInstanceMethod()) {
-        auto DeclSel = decl->getSelector();
-        if (DeclSel.isUnarySelector() &&
-            DeclSel.getNameForSlot(0) == "animator") {
-          const clang::ASTContext &clangCtx =
-            Impl.getClangASTContext();
-          auto ProtoIdent =
-            &clangCtx.Idents.get("NSAnimatablePropertyContainer");
-          auto clangDC = decl->getDeclContext();
-          if (auto Proto = dyn_cast<clang::ObjCProtocolDecl>(clangDC)) {
-            if (Proto->getIdentifier() == ProtoIdent)
-              SuppressRelatedResultType = true;
-          }
-          else if (auto ClassI = decl->getClassInterface()) {
-            for (auto I = ClassI->all_referenced_protocol_begin(),
-                      E = ClassI->all_referenced_protocol_end();
-                 I != E; ++I) {
-              if ((*I)->getIdentifier() == ProtoIdent) {
-                SuppressRelatedResultType = true;
-                break;
-              }
-            }
-          }
-
-          if (SuppressRelatedResultType)
-            RetTy = decl->getASTContext().getObjCIdType();
-        }
-      }
+      auto SurrogateResultType = getSurrogateResultType(decl);
+      auto RetTy = SurrogateResultType.hasValue() ?
+        SurrogateResultType.getValue() :  decl->getReturnType();
 
       // Import the type that this method will have.
       auto type = Impl.importMethodType(RetTy,
@@ -1769,7 +1782,7 @@ namespace {
 
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
-      if (!SuppressRelatedResultType && decl->hasRelatedResultType()) {
+      if (!SurrogateResultType.hasValue() && decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
         resultTy = result->getDynamicSelf();
         assert(resultTy && "failed to get dynamic self");
