@@ -115,6 +115,16 @@ bool camel_case::sameWordIgnoreFirstCase(StringRef word1, StringRef word2) {
   return word1.substr(1) == word2.substr(1);
 }
 
+bool camel_case::startsWithIgnoreFirstCase(StringRef word1, StringRef word2) {
+  if (word1.size() < word2.size())
+    return false;
+
+  if (clang::toLowercase(word1[0]) != clang::toLowercase(word2[0]))
+    return false;
+
+  return word1.substr(1) == word2.substr(1, word1.size() - 1);
+}
+
 StringRef camel_case::toLowercaseWord(StringRef string,
                                       SmallVectorImpl<char> &scratch) {
   if (string.empty())
@@ -149,6 +159,27 @@ StringRef camel_case::toSentencecase(StringRef string,
   scratch.push_back(clang::toUppercase(string[0]));
   scratch.append(string.begin() + 1, string.end());
   return StringRef(scratch.data(), scratch.size());  
+}
+
+StringRef camel_case::dropPrefix(StringRef string) {
+
+  unsigned firstLower = 0, n = string.size();
+
+  if (n < 4)
+    return string;
+
+  for (; firstLower < n; ++firstLower) {
+    if (!clang::isUppercase(string[firstLower]))
+      break;
+  }
+
+  if (firstLower == n)
+    return string;
+
+  if (firstLower >= 3 && firstLower <= 4)
+    return string.substr(firstLower - 1);
+
+  return string;
 }
 
 Words::reverse_iterator MultiWordMap::match(Words::reverse_iterator first,

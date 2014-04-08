@@ -190,6 +190,10 @@ namespace swift {
     /// first letter.
     bool sameWordIgnoreFirstCase(StringRef word1, StringRef word2);
 
+    /// Check whether the first word starts with the second word, ignoring the
+    /// case of the first letter.
+    bool startsWithIgnoreFirstCase(StringRef word1, StringRef word2);
+
     /// Lowercase the first word within the given camelCase string.
     ///
     /// \param string The string to lowercase.
@@ -208,6 +212,15 @@ namespace swift {
     ///
     /// \returns the string in sentence case.
     StringRef toSentencecase(StringRef string, SmallVectorImpl<char> &scratch);
+
+    /// Drop the class prefix (i..e, a 2-3 character acronym) from the front
+    /// of the given string.
+    ///
+    /// \param string The string whose prefix will be dropped.
+    ///
+    /// \returns the result of dropping the prefix from \p string, or the
+    /// whole string if it has no prefix.
+    StringRef dropPrefix(StringRef string);
 
     /// Data structures that stores a set of multi-words, which are camelCase
     /// word sequences that should be kept together by an algorithm that splits
