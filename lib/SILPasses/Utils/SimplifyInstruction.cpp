@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 using namespace swift;
 
@@ -35,6 +36,7 @@ namespace {
     SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
+    SILValue visitApplyInst(ApplyInst *AI);
 
   };
 } // end anonymous namespace
@@ -228,6 +230,32 @@ visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
       return RTOPI->getOperand();
 
   return SILValue();
+}
+
+/// Simplify an apply of the builtin canBeObjCClass to either 0 or 1
+/// when we can statically determine the result.
+SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
+  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+  if (!BFRI || (BFRI->getBuiltinInfo().ID != BuiltinValueKind::CanBeObjCClass))
+    return SILValue();
+
+  assert(AI->hasSubstitutions() && "Expected substitutions for canBeObjCClass");
+
+  auto const &Subs = AI->getSubstitutions();
+  assert((Subs.size() == 1) &&
+         "Expected one substitution in call to canBeObjCClass");
+
+  SILBuilder Builder(AI);
+
+  auto Ty = Subs[0].Replacement->getCanonicalType();
+  switch (Ty->canBeObjCClass()) {
+  case TypeTraitResult::IsNot:
+    return Builder.createIntegerLiteral(AI->getLoc(), AI->getType(), 0);
+  case TypeTraitResult::Is:
+    return Builder.createIntegerLiteral(AI->getLoc(), AI->getType(), 1);
+  case TypeTraitResult::CanBe:
+    return SILValue();
+  }
 }
 
 /// \brief Try to simplify the specified instruction, performing local
