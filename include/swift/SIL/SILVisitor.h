@@ -29,52 +29,53 @@ namespace swift {
 template<typename ImplClass, typename ValueRetTy = void>
 class SILVisitor {
 public:
+  ImplClass &asImpl() { return static_cast<ImplClass &>(*this); }
+
   ValueRetTy visit(ValueBase *V) {
     switch (V->getKind()) {
-#define VALUE(CLASS, PARENT)                    \
-    case ValueKind::CLASS:                      \
-      return static_cast<ImplClass*>(this)      \
-        ->visit##CLASS(static_cast<CLASS*>(V));
+#define VALUE(CLASS, PARENT)                                \
+  case ValueKind::CLASS:                                    \
+    return asImpl().visit##CLASS(static_cast<CLASS*>(V));
 #include "swift/SIL/SILNodes.def"
     }
     llvm_unreachable("Not reachable, all cases handled");
   }
 
   ValueRetTy visit(SILValue V) {
-    return static_cast<ImplClass*>(this)->visit(V.getDef());
+    return asImpl().visit(V.getDef());
   }
 
   // Define default dispatcher implementations chain to parent nodes.
 #define VALUE(CLASS, PARENT)                                    \
   ValueRetTy visit##CLASS(CLASS *I) {                           \
-    return static_cast<ImplClass*>(this)->visit##PARENT(I);     \
+    return asImpl().visit##PARENT(I);                           \
   }
 #define ABSTRACT_VALUE(CLASS, PARENT) VALUE(CLASS, PARENT)
 #include "swift/SIL/SILNodes.def"
 
   void visitSILBasicBlock(SILBasicBlock *BB) {
-    static_cast<ImplClass*>(this)->visitBasicBlockArguments(BB);
+    asImpl().visitBasicBlockArguments(BB);
       
     for (auto &I : *BB)
-      static_cast<ImplClass*>(this)->visit(&I);
+      asImpl().visit(&I);
   }
   void visitSILBasicBlock(SILBasicBlock &BB) {
-    static_cast<ImplClass*>(this)->visitSILBasicBlock(&BB);
+    asImpl().visitSILBasicBlock(&BB);
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
     for (auto argI = BB->bbarg_begin(), argEnd = BB->bbarg_end();
          argI != argEnd;
          ++argI)
-      static_cast<ImplClass*>(this)->visit(*argI);
+      asImpl().visit(*argI);
   }
 
   void visitSILFunction(SILFunction *F) {
     for (auto &BB : *F)
-      static_cast<ImplClass*>(this)->visitSILBasicBlock(&BB);
+      asImpl().visitSILBasicBlock(&BB);
   }
   void visitSILFunction(SILFunction &F) {
-    static_cast<ImplClass*>(this)->visitSILFunction(&F);
+    asImpl().visitSILFunction(&F);
   }
 };
 
