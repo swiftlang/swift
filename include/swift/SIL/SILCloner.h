@@ -872,6 +872,14 @@ SILCloner<ImplClass>::visitUpcastExistentialRefInst(UpcastExistentialRefInst *In
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {
+  doPostProcess(Inst,
+    Builder.createStrongRetain(getOpLocation(Inst->getLoc()),
+                               getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {
   doPostProcess(Inst,
     Builder.createStrongRetain(getOpLocation(Inst->getLoc()),

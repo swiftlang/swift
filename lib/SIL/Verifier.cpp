@@ -576,7 +576,15 @@ public:
     require(I->getOperand().getType().isObject(),
             "Source value should be an object value");
   }
-
+  
+  void checkCopyBlockInst(CopyBlockInst *I) {
+    auto fnTy = I->getOperand().getType().getAs<SILFunctionType>();
+    require(fnTy && fnTy->isBlock(),
+            "operand of copy_block should be a block");
+    require(I->getOperand().getType() == I->getType(),
+            "result of copy_block should be same type as operand");
+  }
+  
   void checkStructInst(StructInst *SI) {
     auto *structDecl = SI->getType().getStructOrBoundGenericStruct();
     require(structDecl, "StructInst must return a struct");

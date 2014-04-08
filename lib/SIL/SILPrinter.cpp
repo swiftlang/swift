@@ -974,6 +974,9 @@ public:
   void visitFixLifetimeInst(FixLifetimeInst *RI) {
     OS << "fix_lifetime " << getIDAndType(RI->getOperand());
   }
+  void visitCopyBlockInst(CopyBlockInst *RI) {
+    OS << "copy_block " << getIDAndType(RI->getOperand());
+  }
   void visitStrongRetainInst(StrongRetainInst *RI) {
     OS << "strong_retain " << getIDAndType(RI->getOperand());
   }

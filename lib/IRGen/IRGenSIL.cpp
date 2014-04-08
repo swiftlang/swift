@@ -606,6 +606,7 @@ public:
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
 
   void visitFixLifetimeInst(FixLifetimeInst *i);
+  void visitCopyBlockInst(CopyBlockInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitStrongRetainAutoreleasedInst(StrongRetainAutoreleasedInst *i);
@@ -2233,6 +2234,14 @@ void IRGenSILFunction::visitStoreWeakInst(swift::StoreWeakInst *i) {
 
 void IRGenSILFunction::visitFixLifetimeInst(swift::FixLifetimeInst *i) {
   // TODO: Emit an intrinsic call as a signal to the LLVM ARC optimizer.
+}
+
+void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getOperand());
+  llvm::Value *copied = emitBlockCopyCall(lowered.claimNext());
+  Explosion result(ResilienceExpansion::Minimal);
+  result.add(copied);
+  setLoweredExplosion(SILValue(i, 0), result);
 }
 
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {

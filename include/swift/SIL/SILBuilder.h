@@ -648,6 +648,9 @@ public:
     return insert(new (F.getModule()) ExistentialMetatypeInst(Loc, Metatype,Base));
   }
   
+  CopyBlockInst *createCopyBlock(SILLocation Loc, SILValue Operand) {
+    return insert(new (F.getModule()) CopyBlockInst(Loc, Operand));
+  }
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand) {
     return insert(new (F.getModule()) StrongRetainInst(Loc, Operand));
   }

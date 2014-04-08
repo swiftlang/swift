@@ -165,6 +165,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::StoreInst:
   case ValueKind::StoreWeakInst:
   case ValueKind::StringLiteralInst:
+  case ValueKind::CopyBlockInst:
   case ValueKind::StrongReleaseInst:
   case ValueKind::StrongRetainAutoreleasedInst:
   case ValueKind::StrongRetainInst:

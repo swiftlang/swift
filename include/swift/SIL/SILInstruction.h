@@ -1978,6 +1978,17 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
   
+/// Promote an Objective-C block that is on the stack to the heap, or simply
+/// retain a block that is already on the heap.
+class CopyBlockInst :
+    public UnaryInstructionBase<ValueKind::CopyBlockInst,
+                                RefCountingInst, /*HAS_RESULT*/ true>
+{
+public:
+  CopyBlockInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
+};
+  
 //===----------------------------------------------------------------------===//
 // DeallocationInsts
 //===----------------------------------------------------------------------===//

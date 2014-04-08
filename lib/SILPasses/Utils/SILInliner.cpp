@@ -344,6 +344,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:
     case ValueKind::CondFailInst:
+    case ValueKind::CopyBlockInst:
     case ValueKind::CopyAddrInst:
     case ValueKind::RetainValueInst:
     case ValueKind::DeallocBoxInst:
