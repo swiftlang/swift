@@ -1419,9 +1419,12 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
     return nullptr;
 
   auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
-  if (Func)
+  if (Func) {
     DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
+    assert(InFunc->getName() == Func->getName());
+  }
+
   return Func;
 }
 
