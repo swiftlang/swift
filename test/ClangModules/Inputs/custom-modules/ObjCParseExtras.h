@@ -21,3 +21,13 @@ __attribute__((objc_root_class))
 @interface PropertyAndMethodReverseCollision : PropertyAndMethodReverseCollisionBase
 - (void)object:(id)obj doSomething:(SEL)selector;
 @end
+
+@protocol PropertyProto
+@property id protoProp;
+@property(readonly) id protoPropRO;
+@end
+
+@interface PropertyAndMethodCollision () <PropertyProto>
+- (id)protoProp;
+- (id)protoPropRO;
+@end

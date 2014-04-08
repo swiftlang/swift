@@ -2816,7 +2816,9 @@ namespace {
 
           // Import explicit properties as instance properties, not as separate
           // getter and setter methods.
-          if (auto prop = objcMethod->findPropertyDecl()) {
+          if (objcMethod->isPropertyAccessor()) {
+            auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
+            assert(prop);
             if (Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop)))
               continue;
           } else if (Impl.InferImplicitProperties) {
@@ -2906,6 +2908,8 @@ namespace {
 
             // We can't import a property if there's already a method with this
             // name. (This also covers other properties with that same name.)
+            // FIXME: We should still mirror the setter as a method if it's
+            // not already there.
             clang::Selector sel = objcProp->getGetterName();
             if (decl->getMethod(sel, /*instance=*/true))
               continue;
