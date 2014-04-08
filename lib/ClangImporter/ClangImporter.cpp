@@ -59,6 +59,9 @@ STATISTIC(NumMultiMethodNames,
 STATISTIC(NumPrepositionSplitMethodNames,
           "selectors where the first selector piece was split on a "
           "preposition");
+STATISTIC(NumSetSplitMethodNames,
+          "selectors where the first selector piece was split after the "
+          "leading 'set'");
 STATISTIC(NumWordSplitMethodNames,
           "selectors where the first selector piece was split on the last "
           "word");
@@ -579,6 +582,12 @@ splitFirstSelectorPiece(StringRef selector,
   }
 
   // We did not find a preposition.
+
+  // If the first word is "get" or "set", split after it.
+  if (*words.begin() == "set" || *words.begin() == "get") {
+    ++NumSetSplitMethodNames;
+    return splitSelectorPieceAt(selector, 3, scratch);
+  }
 
   // If there is more than one word, split off the last word, taking care
   // to avoid splitting in the middle of a multi-word.
