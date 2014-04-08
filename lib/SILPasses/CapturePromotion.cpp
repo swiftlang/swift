@@ -319,7 +319,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IndicesSet &PromotableIndices) {
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
          && "SILFunction missing DebugScope");
   // This inserts the new cloned function before the original function.
-  return SILFunction::create(M, SILLinkage::Private, ClonedName, ClonedTy,
+  return SILFunction::create(M, Orig->getLinkage(), ClonedName, ClonedTy,
                              Orig->getContextGenericParams(),
                              Orig->getLocation(), Orig->isBare(),
                              IsNotTransparent, Orig,
