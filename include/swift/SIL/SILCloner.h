@@ -34,7 +34,7 @@ namespace swift {
 template<typename ImplClass>
 class SILCloner : protected SILVisitor<ImplClass> {
   friend class SILVisitor<ImplClass, SILValue>;
-  using Base = SILVisitor<ImplClass>;
+  using SILVisitor<ImplClass>::asImpl;
 
 public:
   explicit SILCloner(SILFunction &F)
@@ -79,7 +79,7 @@ protected:
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
 
   SILLocation getOpLocation(SILLocation Loc) {
-    return Base::asImpl().remapLocation(Loc);
+    return asImpl().remapLocation(Loc);
   }
   SILType getOpType(SILType Ty) {
     // Substitute opened existential types, if we have any.
@@ -91,30 +91,30 @@ protected:
                               Ty);
     }
 
-    return Base::asImpl().remapType(Ty);
+    return asImpl().remapType(Ty);
   }
   ProtocolConformance *getOpConformance(SILType Ty,
                                         ProtocolConformance *Conformance) {
-    return Base::asImpl().remapConformance(Ty, Conformance);
+    return asImpl().remapConformance(Ty, Conformance);
   }
   SILValue getOpValue(SILValue Value) {
-    return Base::asImpl().remapValue(Value);
+    return asImpl().remapValue(Value);
   }
   template <size_t N, typename ArrayRefType>
   SmallVector<SILValue, N> getOpValueArray(ArrayRefType Values) {
     SmallVector<SILValue, N> Ret(Values.size());
     for (unsigned i = 0, e = Values.size(); i != e; ++i)
-      Ret[i] = Base::asImpl().remapValue(Values[i]);
+      Ret[i] = asImpl().remapValue(Values[i]);
     return Ret;
   }
   SILFunction *getOpFunction(SILFunction *Func) {
-    return Base::asImpl().remapFunction(Func);
+    return asImpl().remapFunction(Func);
   }
   SILBasicBlock *getOpBasicBlock(SILBasicBlock *BB) {
-    return Base::asImpl().remapBasicBlock(BB);
+    return asImpl().remapBasicBlock(BB);
   }
   void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    Base::asImpl().postProcess(Orig, Cloned);
+    asImpl().postProcess(Orig, Cloned);
   }
 
   SILBuilder Builder;
@@ -174,7 +174,7 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
   SILFunction &F = getBuilder().getFunction();
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
-    Base::asImpl().visit(I);
+    asImpl().visit(I);
   // Iterate over successors to do the depth-first search.
   for (auto &Succ : BB->getSuccs()) {
     auto BBI = BBMap.find(Succ);
