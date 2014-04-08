@@ -24,12 +24,15 @@
 
 MULTI_WORD("apple", "event")
 MULTI_WORD("attributed", "string")
+MULTI_WORD("bezier", "path")
 MULTI_WORD("conditional", "object")
 MULTI_WORD("file", "manager")
+MULTI_WORD("file", "presenter")
 MULTI_WORD("hash", "table")
 MULTI_WORD("modal", "session")
 MULTI_WORD("root", "object")
 MULTI_WORD("table", "view")
 MULTI_WORD("user", "attention")
+MULTI_WORD("view", "controller")
 
 #undef MULTI_WORD
