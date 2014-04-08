@@ -333,8 +333,8 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
 }
 
 void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
+  assert(size != 0); // pass '1' if you want a placeholder object
   size_t idx = SIZE_MAX;
-  if (size == 0) idx = 0;
   --size;
   // we could do a table based lookup if we think it worthwhile
 #ifdef __LP64__
