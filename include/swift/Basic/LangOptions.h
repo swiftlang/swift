@@ -65,6 +65,10 @@ namespace swift {
     /// Whether to split imported Objective-C selectors into Swift method names.
     bool SplitPrepositions = false;
     
+    /// Enable native bridging of Swift functions to Objective-C blocks.
+    /// FIXME: Will eventually default to 'true' and go away.
+    bool EnableBlockBridging = false;
+    
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)

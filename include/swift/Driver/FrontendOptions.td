@@ -108,6 +108,9 @@ def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
 def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;
+  
+def enable_block_bridging : Flag<["-"], "enable-block-bridging">,
+  HelpText<"Enable block bridging">;
 
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
