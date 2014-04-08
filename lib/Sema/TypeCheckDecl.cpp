@@ -1112,7 +1112,8 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
 }
 
 static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
-                                                VarDecl **ValueDecl) {
+                                                VarDecl **ValueDecl,
+                                                TypeChecker &TC) {
   auto &Context = VD->getASTContext();
   auto *Arg = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
                                     VD->getLoc(),Context.getIdentifier("value"),
@@ -1120,7 +1121,7 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
   *ValueDecl = Arg;
   Arg->setImplicit();
 
-  auto VDTy = VD->getType()->getReferenceStorageReferent();
+  auto VDTy = TC.getTypeOfRValue(VD, /*want interface type*/false);
 
   Pattern *ValuePattern
     = new (Context) TypedPattern(new (Context) NamedPattern(Arg),
@@ -1134,7 +1135,7 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
   return ValueParamsPattern;
 }
 
-static FuncDecl *createGetterPrototype(VarDecl *VD) {
+static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
 
@@ -1151,7 +1152,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD) {
   
   SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
 
-  auto Ty = VD->getType()->getReferenceStorageReferent();
+  auto Ty = TC.getTypeOfRValue(VD, /*want interface type*/false);
 
   auto Get = FuncDecl::create(
       Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
@@ -1161,7 +1162,8 @@ static FuncDecl *createGetterPrototype(VarDecl *VD) {
   return Get;
 }
 
-static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl) {
+static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
+                                       TypeChecker &TC) {
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
 
@@ -1171,7 +1173,7 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl) {
     buildImplicitSelfParameter(Loc, VD->getDeclContext()),
     
     // Add a "(value : T)" pattern.
-    buildSetterValueArgumentPattern(VD, &ValueDecl)
+    buildSetterValueArgumentPattern(VD, &ValueDecl, TC)
   };
   Type SetterRetTy = TupleType::getEmpty(Context);
   auto *Set = FuncDecl::create(
@@ -1187,8 +1189,8 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl) {
 }
 
 
-static void convertStoredVarInProtocolToComputed(VarDecl *VD) {
-  auto *Get = createGetterPrototype(VD);
+static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
+  auto *Get = createGetterPrototype(VD, TC);
   
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeComputed(VD->getLoc(), Get, nullptr, VD->getLoc());
@@ -1286,12 +1288,12 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
-static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
+static void addTrivialAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getStorageKind() == VarDecl::Stored && "Isn't a stored vardecl");
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
   
-  auto *Get = createGetterPrototype(VD);
+  auto *Get = createGetterPrototype(VD, TC);
   synthesizeTrivialGetter(Get, VD);
 
   FuncDecl *Set = nullptr;
@@ -1299,7 +1301,7 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
     // Okay, the getter is set up, create the setter next.
     VarDecl *ValueDecl = nullptr;
 
-    Set = createSetterPrototype(VD, ValueDecl);
+    Set = createSetterPrototype(VD, ValueDecl, TC);
 
     VarDecl *SelfDecl = Set->getImplicitSelfDecl();
 
@@ -1349,7 +1351,7 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD) {
 /// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
 /// variable, enabling the witness table to use those accessors.
 void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
-  addTrivialAccessorsToStoredVar(VD);
+  addTrivialAccessorsToStoredVar(VD, *this);
 
   // Type check the body of the getter and setter.
   validateDecl(VD->getGetter(), true);
@@ -1670,7 +1672,7 @@ public:
         !VD->isLet()) {
       TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
       
-      convertStoredVarInProtocolToComputed(VD);
+      convertStoredVarInProtocolToComputed(VD, TC);
 
       // Type check the getter declaration.
       TC.typeCheckDecl(VD->getGetter(), true);
@@ -1680,7 +1682,7 @@ public:
     // setter, then synthesize the accessors and change its storage kind.
     if (VD->getStorageKind() == VarDecl::Stored &&
         VD->usesObjCGetterAndSetter()) {
-      addTrivialAccessorsToStoredVar(VD);
+      addTrivialAccessorsToStoredVar(VD, TC);
 
       // Type check the body of the getter and setter.
       TC.typeCheckDecl(VD->getGetter(), true);
