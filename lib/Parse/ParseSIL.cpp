@@ -245,6 +245,12 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
   case tok::identifier:
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
+  case tok::string_literal: {
+    // Drop the double quotes.
+    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    Result = P.Context.getIdentifier(rawString);
+    break;
+  }
   case tok::oper_binary:
     // A binary operator can be part of a SILDeclRef.
     Result = P.Context.getIdentifier(P.Tok.getText());

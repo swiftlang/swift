@@ -234,7 +234,10 @@ void SILDeclRef::print(raw_ostream &OS) const {
     printFullContext(decl->getDeclContext(), OS);
     assert(decl->hasName());
 
-    OS << decl->getName() << Suffix;
+    if (decl->isOperator())
+      OS << '"' << decl->getName() << '"' << Suffix;
+    else
+      OS << decl->getName() << Suffix;
   } else {
     printFullContext(getDecl()->getDeclContext(), OS);
     OS << getDecl()->getName();

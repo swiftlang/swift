@@ -34,9 +34,9 @@ sil @_TF5test2oi2eeFTOS_1XS0__Sb : $@thin (X, X) -> Bool
 sil @_TFO5test21X9hashValuefS0_FT_Si : $@cc(method) @thin (X) -> Int
 
 // CHECK-LABEL: sil_witness_table X: Equatable module
-// CHECK: method #Equatable.==!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
+// CHECK: method #Equatable."=="!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
 sil_witness_table X: Equatable module test2 {
-  method #Equatable.==!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
+  method #Equatable."=="!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
 }
 
 // CHECK-LABEL: sil_witness_table X: Hashable module 
