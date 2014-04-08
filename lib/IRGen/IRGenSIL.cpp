@@ -988,7 +988,6 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     case clang::CodeGen::ABIArgInfo::Ignore:
     case clang::CodeGen::ABIArgInfo::InAlloca:
       llvm_unreachable("Need to handle InAlloca during signature expansion");
-      continue;
     }
   }
 }
