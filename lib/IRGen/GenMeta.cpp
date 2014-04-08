@@ -577,12 +577,12 @@ namespace {
     }
 
     llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for ref storage type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("reference storage type should have been converted by "
+                       "SILGen");
     }
     llvm::Value *visitSILFunctionType(CanSILFunctionType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for SIL function type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("should not be asking for metadata of a lowered SIL "
+                       "function type--SILGen should have used the AST type");
     }
 
     llvm::Value *visitArchetypeType(CanArchetypeType type) {
@@ -590,21 +590,18 @@ namespace {
     }
 
     llvm::Value *visitGenericTypeParamType(CanGenericTypeParamType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for generic type parameter");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
     }
 
     llvm::Value *visitDependentMemberType(CanDependentMemberType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for dependent member type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
     }
 
     llvm::Value *visitLValueType(CanLValueType type) {
-      llvm_unreachable("should have been lowered by SILGen");
+      llvm_unreachable("lvalue type should have been lowered by SILGen");
     }
     llvm::Value *visitInOutType(CanInOutType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for inout type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      llvm_unreachable("inout type should have been lowered by SILGen");
     }
 
     /// Try to find the metatype in local data.
