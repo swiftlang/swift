@@ -205,6 +205,8 @@ public:
   llvm::Type *getValueWitnessTy(ValueWitness index);
 
   void unimplemented(SourceLoc, StringRef Message);
+  LLVM_ATTRIBUTE_NORETURN
+  void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
 private:

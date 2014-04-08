@@ -973,7 +973,7 @@ static CanType getBridgedInputType(TypeConverter &tc,
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
                               input.getPointer()->getString());
     
-    exit(1);
+    llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }
   
   return loweredBridgedType->getCanonicalType();
@@ -989,7 +989,7 @@ static CanType getBridgedResultType(TypeConverter &tc,
     tc.Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
                               result.getPointer()->getString());
     
-    exit(1);
+    llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }
   
   return loweredType->getCanonicalType();

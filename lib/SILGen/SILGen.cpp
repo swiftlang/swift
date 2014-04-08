@@ -77,32 +77,32 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     if (!lookup) {
       SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     if (lookup->Results.size() == 0) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     // FIXME: Resolve overloads.
     if (lookup->Results.size() > 1) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_overloaded,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     auto &result = lookup->Results[0];
     // Check that the bridging function is actually a function.
     if (!result.hasValueDecl()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_not_function,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     FuncDecl *fd = dyn_cast<FuncDecl>(result.getValueDecl());
     if (!fd) {
       SGM.diagnose(result.getValueDecl()->getLoc(),
                    diag::bridging_function_not_function,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
     assert(fd->hasType() && "bridging functions must be type-checked");
@@ -118,13 +118,13 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                        inputTypes.begin())) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     
     if (funcInfo->getInterfaceResult().getSILType() != outputType) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     
     return c;
@@ -174,7 +174,7 @@ static ConstructorDecl *getDefaultInitFn(SILGenModule &sgm, CanType type) {
   if (!defaultCtor) {
     sgm.diagnose(SourceLoc(), diag::bridging_function_missing,
                  STDLIB_NAME, type->getString() + ".init()");
-    exit(1);
+    llvm::report_fatal_error("unable to set up the ObjC bridge!");
   }
     
   return defaultCtor;

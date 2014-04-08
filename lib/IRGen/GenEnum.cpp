@@ -3185,8 +3185,7 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
 
   // FIXME recursive enums
   if (!elementsWithRecursivePayload.empty()) {
-    TC.IGM.unimplemented(theEnum->getLoc(), "recursive enum layout");
-    exit(1);
+    TC.IGM.fatal_unimplemented(theEnum->getLoc(), "recursive enum layout");
   }
   
   assert(numElements == elementsWithPayload.size()
@@ -3628,9 +3627,8 @@ namespace {
                                                   llvm::StructType *enumTy) {
     // TODO Dynamic layout for multi-payload enums.
     if (!TC.IGM.Opts.EnableDynamicValueTypeLayout && TIK < Fixed) {
-      TC.IGM.unimplemented(theEnum->getLoc(),
-                           "non-fixed multi-payload enum layout");
-      exit(1);
+      TC.IGM.fatal_unimplemented(theEnum->getLoc(),
+                                 "non-fixed multi-payload enum layout");
     }
 
     // We need tags for each of the payload types, which we may be able to form

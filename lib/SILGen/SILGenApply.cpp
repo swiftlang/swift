@@ -2223,7 +2223,7 @@ namespace {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castToObjectPointer source must be a class");
       // FIXME: Recovery?
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     
     // Save the cleanup on the argument so we can forward it onto the cast
@@ -2267,7 +2267,7 @@ namespace {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
                        "castFromObjectPointer dest must be a class");
       // FIXME: Recovery?
-      exit(1);
+      llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     
     // Save the cleanup on the argument so we can forward it onto the cast

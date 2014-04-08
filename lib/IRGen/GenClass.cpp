@@ -353,8 +353,7 @@ namespace {
         // FIXME: Type-parameter-dependent field layout isn't fully
         // implemented yet.
         if (!eltType.isFixedSize() && !IGM.Opts.EnableDynamicValueTypeLayout) {
-          IGM.unimplemented(var->getLoc(), "non-fixed class layout");
-          exit(1);
+          IGM.fatal_unimplemented(var->getLoc(), "non-fixed class layout");
         }
         
         Elements.push_back(ElementLayout::getIncomplete(eltType));
