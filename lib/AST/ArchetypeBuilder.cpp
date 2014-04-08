@@ -81,10 +81,8 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
-auto ArchetypeBuilder::
-     PotentialArchetype::
-        getNestedType(Identifier nestedName, Identifier *parentName) ->
-                                                          PotentialArchetype * {
+auto ArchetypeBuilder::PotentialArchetype::getNestedType(
+    Identifier nestedName, Identifier *parentName) -> PotentialArchetype *{
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
     return getRepresentative()->getNestedType(nestedName);
@@ -99,10 +97,10 @@ auto ArchetypeBuilder::
     // names.
     if (parentName &&
         this->Parent &&
-        (parentName->str().equals(this->Parent->Name.str()) ||
-         this->Parent->Name.str().equals(StringRef("Self")) ||
-         this->Parent->Name.str().equals(this->Name.str())) &&
-        nestedName.str().equals(this->Name.str())) {
+        (*parentName == this->Parent->Name ||
+         this->Parent->Name.str().equals("Self") ||
+         this->Parent->Name == this->Name) &&
+        nestedName == this->Name) {
       Result = this;
     } else {
       Result = new PotentialArchetype(this, nestedName);
