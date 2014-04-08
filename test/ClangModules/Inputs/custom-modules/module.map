@@ -50,3 +50,8 @@ module ObjCParseExtras {
   header "ObjCParseExtras.h"
   export *
 }
+
+module ObjCImplicitProperties {
+  header "ObjCImplicitProperties.h"
+  export *
+}

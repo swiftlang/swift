@@ -48,12 +48,6 @@ NSString *NSStringToNSString(NSString *str);
 + (instancetype)hiveWithQueen:(B *)queen;
 
 - (instancetype)visit;
-
-- (id)implicitProperty;
-- (void)setImplicitProperty:(id)implicitProperty;
-
-- (void)setAnotherImplicitProperty:(int)implicitProperty;
-- (int)anotherImplicitProperty;
 @end
 
 BOOL BOOLtoBOOL(BOOL b);
@@ -82,27 +76,6 @@ typedef CGRect NSRect;
 
 @interface ReadOnlyCollectionChild : BadCollectionParent
 - (void)setObject:(id)object forKeyedSubscript:(id)key;
-@end
-
-@interface BadImplicitProperties
-- (int)nonVoidReturn;
-- (int)setNonVoidReturn:(int)val;
-
-- (void)setNonMatchingType:(id)val;
-- (int)nonMatchingType;
-
-- (int)wrongGetterArgs:(int)val;
-- (void)setWrongGetterArgs:(int)val;
-
-- (void)setWrongSetterArgs:(int)val extra:(int)another;
-- (int)wrongSetterArgs;
-
-- (int)wrongSetterArgs2;
-- (void)setWrongSetterArgs2;
-
-- (int)getterOnly;
-
-- (void)setSetterOnly:(int)val;
 @end
 
 //===---
