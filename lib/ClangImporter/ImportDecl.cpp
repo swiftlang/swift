@@ -1693,8 +1693,43 @@ namespace {
       if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
+      auto RetTy = decl->getReturnType();
+      bool SuppressRelatedResultType = false;
+
+      // Special case -animator.  We need to paper over
+      // the return type of 'instancetype' with 'id'.
+      // <rdar://problem/16020273>
+      if (decl->isInstanceMethod()) {
+        auto DeclSel = decl->getSelector();
+        if (DeclSel.isUnarySelector() &&
+            DeclSel.getNameForSlot(0) == "animator") {
+          const clang::ASTContext &clangCtx =
+            Impl.getClangASTContext();
+          auto ProtoIdent =
+            &clangCtx.Idents.get("NSAnimatablePropertyContainer");
+          auto clangDC = decl->getDeclContext();
+          if (auto Proto = dyn_cast<clang::ObjCProtocolDecl>(clangDC)) {
+            if (Proto->getIdentifier() == ProtoIdent)
+              SuppressRelatedResultType = true;
+          }
+          else if (auto ClassI = decl->getClassInterface()) {
+            for (auto I = ClassI->all_referenced_protocol_begin(),
+                      E = ClassI->all_referenced_protocol_end();
+                 I != E; ++I) {
+              if ((*I)->getIdentifier() == ProtoIdent) {
+                SuppressRelatedResultType = true;
+                break;
+              }
+            }
+          }
+
+          if (SuppressRelatedResultType)
+            RetTy = decl->getASTContext().getObjCIdType();
+        }
+      }
+
       // Import the type that this method will have.
-      auto type = Impl.importMethodType(decl->getReturnType(),
+      auto type = Impl.importMethodType(RetTy,
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -1734,7 +1769,7 @@ namespace {
 
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
-      if (decl->hasRelatedResultType()) {
+      if (!SuppressRelatedResultType && decl->hasRelatedResultType()) {
         result->setDynamicSelf(true);
         resultTy = result->getDynamicSelf();
         assert(resultTy && "failed to get dynamic self");

@@ -34,3 +34,12 @@
 @interface NSColor : NSObject
 + (instancetype)colorWithDeviceRed:(double)red green:(double)green blue:(double)blue alpha:(double)alpha;
 @end
+
+@protocol NSAnimatablePropertyContainer
+- (instancetype)animator __attribute__((availability(macosx,introduced=10.5)));
+@end
+
+@interface NSLayoutConstraint : NSObject <NSAnimatablePropertyContainer>
+@property double constant;
+@end
+
