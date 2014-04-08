@@ -233,8 +233,6 @@ void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
                                  void *pointer, size_t size) {
-  abort(); // nobody should call this
-  // but making it work is easy if we want:
   auto newPointer = swift::_swift_zone_malloc(zone, size);
   auto oldSize = swift::_swift_zone_size(zone, pointer);
   memcpy(newPointer, pointer, size < oldSize ? size : oldSize);
