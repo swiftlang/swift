@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "debug-info"
 #include "IRGenDebugInfo.h"
 #include "GenType.h"
 #include "Linking.h"
@@ -79,6 +80,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
     DBuilder(M),
     IGM(IGM),
     MetadataTypeDecl(nullptr),
+    InternalType(nullptr),
     LastLoc({}),
     LastScope(nullptr)
 {
@@ -1063,10 +1065,13 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   if (!BaseTy) {
     DEBUG(llvm::dbgs() << "Type without TypeBase: "; DbgTy.getType()->dump();
           llvm::dbgs() << "\n");
-    Name = "<null>";
-    return DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
-                                      Name, Scope, File, /*Line*/ 0,
-                                      DW_LANG_Swift, SizeInBits, AlignInBits);
+    if (!InternalType) {
+      Name = "<internal>";
+      InternalType = DBuilder.
+        createForwardDecl(llvm::dwarf::DW_TAG_structure_type, Name, Scope, File,
+                          /*Line*/ 0, DW_LANG_Swift, SizeInBits, AlignInBits);
+    }
+    return llvm::DIType(InternalType);
   }
 
   // Here goes!

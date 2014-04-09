@@ -95,6 +95,7 @@ class IRGenDebugInfo {
   llvm::DIFile MainFile;
   llvm::DIScope EntryPointFn; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
+  llvm::MDNode *InternalType; /// Catch-all type for upaque internal types.
 
   FullLocation LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
