@@ -75,208 +75,208 @@ void StreamPrinter::printText(StringRef Text) {
 }
 
 namespace {
-  /// \brief AST pretty-printer.
-  class PrintAST : public ASTVisitor<PrintAST> {
-    ASTPrinter &Printer;
-    const PrintOptions &Options;
-    unsigned IndentLevel = 0;
+/// \brief AST pretty-printer.
+class PrintAST : public ASTVisitor<PrintAST> {
+  ASTPrinter &Printer;
+  const PrintOptions &Options;
+  unsigned IndentLevel = 0;
 
-    friend DeclVisitor<PrintAST>;
+  friend DeclVisitor<PrintAST>;
 
-    /// \brief RAII object that increases the indentation level.
-    class IndentRAII {
-      PrintAST &Self;
-      bool DoIndent;
+  /// \brief RAII object that increases the indentation level.
+  class IndentRAII {
+    PrintAST &Self;
+    bool DoIndent;
 
-    public:
-      IndentRAII(PrintAST &self, bool DoIndent = true)
-          : Self(self), DoIndent(DoIndent) {
-        if (DoIndent)
-          Self.IndentLevel += Self.Options.Indent;
-      }
-
-      ~IndentRAII() {
-        if (DoIndent)
-          Self.IndentLevel -= Self.Options.Indent;
-      }
-    };
-
-    /// \brief Indent the current number of indentation spaces.
-    void indent() {
-      Printer.printIndent(IndentLevel);
+  public:
+    IndentRAII(PrintAST &self, bool DoIndent = true)
+        : Self(self), DoIndent(DoIndent) {
+      if (DoIndent)
+        Self.IndentLevel += Self.Options.Indent;
     }
 
-    /// \brief Record the location of this declaration, which is about to
-    /// be printed.
-    void recordDeclLoc(Decl *decl) {
-      Printer.callPrintDeclLoc(decl);
+    ~IndentRAII() {
+      if (DoIndent)
+        Self.IndentLevel -= Self.Options.Indent;
+    }
+  };
+
+  /// \brief Indent the current number of indentation spaces.
+  void indent() {
+    Printer.printIndent(IndentLevel);
+  }
+
+  /// \brief Record the location of this declaration, which is about to
+  /// be printed.
+  void recordDeclLoc(Decl *decl) {
+    Printer.callPrintDeclLoc(decl);
+  }
+
+  void printClangDocumentationComment(const clang::Decl *D) {
+    const auto &ClangContext = D->getASTContext();
+    const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
+    if (!RC)
+      return;
+
+    Printer.printNewline();
+    indent();
+
+    bool Invalid;
+    unsigned StartLocCol =
+        ClangContext.getSourceManager().getSpellingColumnNumber(
+            RC->getLocStart(), &Invalid);
+    if (Invalid)
+      StartLocCol = 0;
+
+    unsigned WhitespaceToTrim = StartLocCol - 1;
+    bool IsFirstLine = true;
+
+    SmallVector<StringRef, 8> Lines;
+
+    StringRef RawText =
+        RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
+    while (!RawText.empty()) {
+      size_t Pos = RawText.find_first_of("\n\r");
+      if (Pos == StringRef::npos)
+        Pos = RawText.size();
+
+      StringRef Line = RawText.substr(0, Pos);
+      Lines.push_back(Line);
+      if (!IsFirstLine) {
+        size_t NonWhitespacePos = RawText.find_first_not_of(' ');
+        if (NonWhitespacePos != StringRef::npos)
+          WhitespaceToTrim =
+              std::min(WhitespaceToTrim,
+                       static_cast<unsigned>(NonWhitespacePos));
+      }
+      IsFirstLine = false;
+
+      RawText = RawText.drop_front(Pos);
+      unsigned NewlineBytes = measureNewline(RawText);
+      RawText = RawText.drop_front(NewlineBytes);
     }
 
-    void printClangDocumentationComment(const clang::Decl *D) {
-      const auto &ClangContext = D->getASTContext();
-      const clang::RawComment *RC = ClangContext.getRawCommentForAnyRedecl(D);
-      if (!RC)
-        return;
-
+    IsFirstLine = true;
+    for (auto Line : Lines) {
+      if (!IsFirstLine) {
+        Line = Line.drop_front(WhitespaceToTrim);
+      }
+      IsFirstLine = false;
+      Printer << Line;
       Printer.printNewline();
-      indent();
+    }
+  }
 
-      bool Invalid;
-      unsigned StartLocCol =
-          ClangContext.getSourceManager().getSpellingColumnNumber(
-              RC->getLocStart(), &Invalid);
-      if (Invalid)
-        StartLocCol = 0;
+  void printDocumentationComment(Decl *D) {
+    if (!Options.PrintDocumentationComments)
+      return;
 
-      unsigned WhitespaceToTrim = StartLocCol - 1;
-      bool IsFirstLine = true;
-
-      SmallVector<StringRef, 8> Lines;
-
-      StringRef RawText =
-          RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
-      while (!RawText.empty()) {
-        size_t Pos = RawText.find_first_of("\n\r");
-        if (Pos == StringRef::npos)
-          Pos = RawText.size();
-
-        StringRef Line = RawText.substr(0, Pos);
-        Lines.push_back(Line);
-        if (!IsFirstLine) {
-          size_t NonWhitespacePos = RawText.find_first_not_of(' ');
-          if (NonWhitespacePos != StringRef::npos)
-            WhitespaceToTrim =
-                std::min(WhitespaceToTrim,
-                         static_cast<unsigned>(NonWhitespacePos));
-        }
-        IsFirstLine = false;
-
-        RawText = RawText.drop_front(Pos);
-        unsigned NewlineBytes = measureNewline(RawText);
-        RawText = RawText.drop_front(NewlineBytes);
-      }
-
-      IsFirstLine = true;
-      for (auto Line : Lines) {
-        if (!IsFirstLine) {
-          Line = Line.drop_front(WhitespaceToTrim);
-        }
-        IsFirstLine = false;
-        Printer << Line;
-        Printer.printNewline();
-      }
+    auto MaybeClangNode = D->getClangNode();
+    if (MaybeClangNode) {
+      if (auto *CD = MaybeClangNode.getAsDecl())
+        printClangDocumentationComment(CD);
+      return;
     }
 
-    void printDocumentationComment(Decl *D) {
-      if (!Options.PrintDocumentationComments)
-        return;
+    // FIXME: print native Swift documentation comments.
+  }
 
-      auto MaybeClangNode = D->getClangNode();
-      if (MaybeClangNode) {
-        if (auto *CD = MaybeClangNode.getAsDecl())
-          printClangDocumentationComment(CD);
-        return;
-      }
+  void printImplicitObjCNote(Decl *D) {
+    if (Options.SkipImplicit)
+      return;
 
-      // FIXME: print native Swift documentation comments.
+    if (auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>()) {
+      if (!objcAttr->isImplicit())
+        return;
     }
 
-    void printImplicitObjCNote(Decl *D) {
-      if (Options.SkipImplicit)
-        return;
+    auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return;
 
-      if (auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>()) {
-        if (!objcAttr->isImplicit())
-          return;
-      }
+    if (!VD->isObjC())
+      return;
 
-      auto *VD = dyn_cast<ValueDecl>(D);
-      if (!VD)
-        return;
-
-      if (!VD->isObjC())
-        return;
-
-      // When printing imported declarations, print an explicit @objc attribute
-      // only on top-level decls and imply that we infer it for members.
-      if (VD->hasClangNode()) {
-        if (VD->getDeclContext()->isModuleScopeContext())
-          Printer << "@objc ";
-        return;
-      }
-
-      Printer << "/* @objc(inferred) */ ";
+    // When printing imported declarations, print an explicit @objc attribute
+    // only on top-level decls and imply that we infer it for members.
+    if (VD->hasClangNode()) {
+      if (VD->getDeclContext()->isModuleScopeContext())
+        Printer << "@objc ";
+      return;
     }
 
-    void printStaticKeyword(StaticSpellingKind StaticSpelling) {
-      switch (StaticSpelling) {
-      case StaticSpellingKind::None:
-        llvm_unreachable("should not be called for non-static decls");
-      case StaticSpellingKind::KeywordStatic:
-        Printer << "static ";
-        break;
-      case StaticSpellingKind::KeywordClass:
-        Printer<< "class ";
-        break;
-      }
-    }
+    Printer << "/* @objc(inferred) */ ";
+  }
 
-    void printOverrideKeyword(Decl *D) {
-      if (D->getAttrs().hasAttribute<OverrideAttr>())
-        Printer << "override ";
+  void printStaticKeyword(StaticSpellingKind StaticSpelling) {
+    switch (StaticSpelling) {
+    case StaticSpellingKind::None:
+      llvm_unreachable("should not be called for non-static decls");
+    case StaticSpellingKind::KeywordStatic:
+      Printer << "static ";
+      break;
+    case StaticSpellingKind::KeywordClass:
+      Printer<< "class ";
+      break;
     }
+  }
 
-    void printTypeLoc(const TypeLoc &TL) {
-      // Print a TypeRepr if instructed to do so by options, or if the type
-      // is null.
-      if ((Options.PreferTypeRepr && TL.hasLocation()) ||
-          TL.getType().isNull()) {
-        TL.getTypeRepr()->print(Printer, Options);
-        return;
-      }
-      TL.getType().print(Printer, Options);
+  void printOverrideKeyword(Decl *D) {
+    if (D->getAttrs().hasAttribute<OverrideAttr>())
+      Printer << "override ";
+  }
+
+  void printTypeLoc(const TypeLoc &TL) {
+    // Print a TypeRepr if instructed to do so by options, or if the type
+    // is null.
+    if ((Options.PreferTypeRepr && TL.hasLocation()) ||
+        TL.getType().isNull()) {
+      TL.getTypeRepr()->print(Printer, Options);
+      return;
     }
+    TL.getType().print(Printer, Options);
+  }
 
-    void printAttributes(const DeclAttributes &attrs);
-    void printTypedPattern(const TypedPattern *TP,
-                           bool StripOuterSliceType = false);
+  void printAttributes(const DeclAttributes &attrs);
+  void printTypedPattern(const TypedPattern *TP,
+                         bool StripOuterSliceType = false);
 
-    void printName(Identifier name) {
-      if (name.empty())
-        Printer << "_";
-      else
-        Printer << name.str(); // FIXME: use backticks for keywords.
-    }
+  void printName(Identifier name) {
+    if (name.empty())
+      Printer << "_";
+    else
+      Printer << name.str(); // FIXME: use backticks for keywords.
+  }
 
 public:
-    void printPattern(const Pattern *pattern);
+  void printPattern(const Pattern *pattern);
 
-    void printGenericParams(GenericParamList *params);
+  void printGenericParams(GenericParamList *params);
 
 private:
-    void printAccessors(AbstractStorageDecl *ASD);
-    void printMembers(ArrayRef<Decl *> members, bool needComma = false);
-    void printNominalDeclName(NominalTypeDecl *decl);
-    void printInherited(const Decl *decl,
-                        ArrayRef<TypeLoc> inherited,
-                        ArrayRef<ProtocolDecl *> protos,
-                        Type superclass = {},
-                        bool PrintAsProtocolComposition = false);
+  void printAccessors(AbstractStorageDecl *ASD);
+  void printMembers(ArrayRef<Decl *> members, bool needComma = false);
+  void printNominalDeclName(NominalTypeDecl *decl);
+  void printInherited(const Decl *decl,
+                      ArrayRef<TypeLoc> inherited,
+                      ArrayRef<ProtocolDecl *> protos,
+                      Type superclass = {},
+                      bool PrintAsProtocolComposition = false);
 
-    template <typename DeclWithSuperclass>
-    void printInheritedWithSuperclass(DeclWithSuperclass *decl);
+  template <typename DeclWithSuperclass>
+  void printInheritedWithSuperclass(DeclWithSuperclass *decl);
 
-    void printInherited(const TypeDecl *decl);
-    void printInherited(const EnumDecl *D);
-    void printInherited(const ExtensionDecl *decl);
-    void printInherited(const GenericTypeParamDecl *D);
+  void printInherited(const TypeDecl *decl);
+  void printInherited(const EnumDecl *D);
+  void printInherited(const ExtensionDecl *decl);
+  void printInherited(const GenericTypeParamDecl *D);
 
-    /// \returns true if anything was printed.
-    bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
+  /// \returns true if anything was printed.
+  bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
-    /// \brief Print the function parameters in curried or selector style,
-    /// to match the original function declaration.
-    void printFunctionParameters(AbstractFunctionDecl *AFD);
+  /// \brief Print the function parameters in curried or selector style,
+  /// to match the original function declaration.
+  void printFunctionParameters(AbstractFunctionDecl *AFD);
 
 #define DECL(Name,Parent) void visit##Name##Decl(Name##Decl *decl);
 #define ABSTRACT_DECL(Name, Parent)
@@ -286,18 +286,18 @@ private:
 #define STMT(Name, Parent) void visit##Name##Stmt(Name##Stmt *stmt);
 #include "swift/AST/StmtNodes.def"
 
-  public:
-    PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
-      : Printer(Printer), Options(Options) { }
+public:
+  PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
+    : Printer(Printer), Options(Options) { }
 
-    using ASTVisitor::visit;
+  using ASTVisitor::visit;
 
-    void visit(Decl *D) {
-      Printer.callPrintDeclPre(D);
-      ASTVisitor::visit(D);
-      Printer.printDeclPost(D);
-    }
-  };
+  void visit(Decl *D) {
+    Printer.callPrintDeclPre(D);
+    ASTVisitor::visit(D);
+    Printer.printDeclPost(D);
+  }
+};
 } // unnamed namespace
 
 void PrintAST::printAttributes(const DeclAttributes &Attrs) {
