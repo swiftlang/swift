@@ -152,16 +152,17 @@ static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     // Local definitions in transparent contexts are forced public because
     // external references to them can be exposed by mandatory inlining.
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
       if (fn->isTransparent())
         return SILLinkage::Public;
-    }
     // Check that this local context is not itself in a local transparent
     // context.
     dc = dc->getParent();
   }
-  
-  return SILLinkage::Private;
+
+  // FIXME: Once we have access control at the AST level, we should not assume
+  // shared always, but rather base it off of the local decl context.
+  return SILLinkage::Shared;
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
