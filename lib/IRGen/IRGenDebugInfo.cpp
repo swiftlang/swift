@@ -26,6 +26,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -104,10 +105,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   unsigned Lang = DW_LANG_Swift;
 
-  std::string buf;
-  llvm::raw_string_ostream OS(buf);
-  OS << "Swift version ? (based on LLVM " << PACKAGE_VERSION << ")";
-  StringRef Producer = BumpAllocatedString(OS.str());
+  StringRef Producer = BumpAllocatedString(version::getSwiftFullVersion());
 
   bool IsOptimized = Opts.OptLevel > 0;
   StringRef Flags = Opts.DWARFDebugFlags;
