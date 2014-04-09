@@ -460,6 +460,16 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     if (!LI)
       continue;
 
+    // If this block has no predecessors then nothing dominates it and the load
+    // is dead code. Replace the load value with Undef and move on.
+    if (LI->getParent()->pred_empty()) {
+      SILValue Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
+      SILValue(LI, 0).replaceAllUsesWith(Def);
+      LI->eraseFromParent();
+      NumInstRemoved++;
+      continue;
+    }
+
     // First, check if there is a Phi value in the current block. We know that
     // our loads happen before stores, so we need to first check for Phi nodes
     // in the first block, but stores first in all other stores in the idom
@@ -558,8 +568,9 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
     SILInstruction *II = UI->getUser();
     // We need to place Phis for this block.
     if (isa<StoreInst>(II)) {
-      DomTreeNode *Node = DT->getNode(II->getParent());
-      PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
+      // If the block is in the dom tree (dominated by the entry block).
+      if (DomTreeNode *Node = DT->getNode(II->getParent()))
+        PQ.push(std::make_pair(Node, DomTreeLevels[Node]));
     }
   }
 
