@@ -9,6 +9,82 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+/// This is a ReST parser.
+///
+/// Specification:
+/// http://docutils.sourceforge.net/docs/ref/rst/restructuredtext.html
+///
+/// Level of feature support:
+///
+///   [ ] Unsupported
+///   [E] Unsupported now, but expected to be supported
+///   [P] Partial support
+///   [X] Fully supported
+///
+/// * Whitespace [X]
+///   - Blank Lines [X]
+///   - Indentation [X]
+/// * Escaping Mechanism [ ]
+/// * Reference Names [ ]
+/// * Document Structure
+///   - Document [P] (missing metadata)
+///   - Sections [ ]
+///   - Transitions [ ]
+/// * Body Elements
+///   - Paragraphs [X]
+///   - Bullet Lists [X]
+///   - Enumerated Lists [P] (missing checks that items have consecutive
+///     numbers)
+///   - Definition Lists [X]
+///   - Field Lists [X]
+///     + Bibliographic Fields [ ]
+///     + RCS Keywords [ ]
+///   - Option Lists [ ]
+///   - Literal Blocks [E] (will be implemented when inline markup is
+///     implemented, because recognizing literal blocks involves
+///     scanning paragraph text for "::" in a specific way, just like
+///     inline markup)
+///     + Indented Literal Blocks [E]
+///     + Quoted Literal Blocks [E]
+///   - Line Blocks [ ]
+///   - Block Quotes [X]
+///   - Doctest Blocks [ ]
+///   - Tables [ ]
+///     + Grid Tables [ ]
+///     + Simple Tables [ ]
+///   - Explicit Markup Blocks [ ]
+///     + Footnotes [ ]
+///       - Auto-Numbered Footnotes [ ]
+///       - Auto-Symbol Footnotes [ ]
+///       - Mixed Manual and Auto-Numbered Footnotes [ ]
+///     + Citations [ ]
+///     + Hyperlink Targets [ ]
+///     + Anonymous Hyperlinks [ ]
+///     + Directives [ ]
+///     + Substitution Definitions [ ]
+///     + Comments [ ]
+///     + Implicit Hyperlink Targets [ ]
+/// * Inline Markup [E]
+///   - Inline markup recognition rules [E]
+///   - Recognition order [E]
+///   - Character-Level Inline Markup [E]
+///   - Emphasis [E]
+///   - Strong Emphasis [E]
+///   - Interpreted Text [E]
+///   - Inline Literals [E]
+///   - Hyperlink References [E]
+///     + Embedded URIs and Aliases [E]
+///   - Inline Internal Targets [ ]
+///   - Footnote References [ ]
+///   - Citation References [ ]
+///   - Substitution References [ ]
+///   - Standalone Hyperlinks [ ]
+/// * Units [ ]
+///   - Length Units [ ]
+///   - Percentage Units [ ]
+//===----------------------------------------------------------------------===//
 
 #ifndef LLVM_REST_PARSER_H
 #define LLVM_REST_PARSER_H
