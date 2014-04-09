@@ -802,6 +802,14 @@ namespace {
                                           DeclName(),
                                           writebackConversionLocator));
       
+      auto writebackInout = InOutType::get(writebackTy);
+      auto writebackInoutArg = CS.createTypeVariable(writebackConversionLocator,
+                                                     /*options=*/0);
+      CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
+                                          writebackInout, writebackInoutArg,
+                                          DeclName(),
+                                          writebackConversionLocator));
+      
       CS.addConstraint(ConstraintKind::Subtype,
                        expr->getSubExpr()->getType(), bound,
                        locator);
@@ -814,6 +822,12 @@ namespace {
       // Form the constraints for the inout nonconversion case.
       // The result will be bound to the inout T type of the lvalue.
       auto inout = InOutType::get(lvalue);
+      auto inoutArg = CS.createTypeVariable(addrConversionLocator,
+                                            /*options=*/0);
+      CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
+                                          inout, inoutArg,
+                                          DeclName(),
+                                          writebackConversionLocator));
       
       SmallVector<Constraint*, 3> disjunctions;
       
@@ -838,9 +852,10 @@ namespace {
       //   ) -> $Result
       //
       auto &C = CS.getASTContext();
-      auto lvMeta = MetatypeType::get(lvalue);
       auto resultMeta = MetatypeType::get(result);
       
+      /// Create a member method constraint with the given argument and
+      /// result types.
       auto createMethodConstraint = [&](std::initializer_list<TupleTypeElt> argTys,
                                     Type resultTy,
                                     StringRef name,
@@ -855,7 +870,7 @@ namespace {
       };
       
       Constraint *addrConversionConstraints[] = {
-        createMethodConstraint({C.TheRawPointerType, lvMeta}, result,
+        createMethodConstraint({inoutArg}, result,
                                "__inout_conversion", addrConversionLocator),
         voidWriteback,
       };
@@ -868,10 +883,7 @@ namespace {
       // Form the constraints for the writeback conversion case.
       // The result will be of some type that has the following static methods:
       //
-      //   static func __writeback_conversion(
-      //     Builtin.RawPointer,
-      //     $LValue.Type
-      //   ) -> $Result
+      //   static func __writeback_conversion(inout $LValue) -> $Result
       //   static func __writeback_conversion_get($LValue) -> $Writeback
       //   static func __writeback_conversion_set($Writeback) -> $LValue
       auto getLocator = CS.getConstraintLocator(expr,
@@ -882,7 +894,7 @@ namespace {
       setLocator->setDiscardFailures(true);
       
       Constraint *writebackConversionRequirements[] = {
-        createMethodConstraint({C.TheRawPointerType, lvMeta}, result,
+        createMethodConstraint({writebackInoutArg}, result,
                                "__writeback_conversion",
                                writebackConversionLocator),
         createMethodConstraint({lvalueArgTy}, writebackTy,

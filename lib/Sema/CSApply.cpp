@@ -1890,10 +1890,10 @@ namespace {
       
       auto buildInOutConversionExpr = [&](const SelectedOverload &choice,
                                           Type resultTy,
-                                          Type abstractionTy,
                                           Expr *lvExpr) -> Expr * {
-        auto lvPointer = new (C) LValueToPointerExpr(lvExpr, C.TheRawPointerType,
-                                                     abstractionTy);
+        auto inout = new (C) InOutExpr(lvExpr->getLoc(), lvExpr,
+               InOutType::get(lvExpr->getType()->getLValueOrInOutObjectType()),
+               /*implicit*/ true);
         
         // Build up a call to the method.
         auto &C = cs.getASTContext();
@@ -1908,25 +1908,10 @@ namespace {
                                     ConstraintLocatorBuilder(locator),
                                     /*implicit*/ true,
                                     /*directPropertyAccess*/ false);
-        auto lvMeta = new (C) MetatypeExpr(nullptr,
-                           expr->getSubExpr()->getStartLoc(),
-                           MetatypeType::get(expr->getSubExpr()->getType()
-                                               ->getLValueOrInOutObjectType()));
-        Expr *tupleElts[] = {
-          lvPointer,
-          lvMeta,
-        };
-        auto tupleArgs = new (C) TupleExpr(expr->getSubExpr()->getStartLoc(),
-                                           C.AllocateCopy(tupleElts),
-                                           nullptr,
-                                           expr->getSubExpr()->getEndLoc(),
-                                           /*trailingClosure*/ false,
-                                           /*implicit*/ true);
         auto methodTy = memberRef->getType()->castTo<AnyFunctionType>();
-        tupleArgs->setType(methodTy->getInput());
         
         ApplyExpr *call
-          = new (C) CallExpr(memberRef, tupleArgs, /*implicit*/ true);
+          = new (C) CallExpr(memberRef, inout, /*implicit*/ true);
         call->setType(methodTy->getResult());
         Expr *conversion = finishApply(call, choice.openedType,
                                        ConstraintLocatorBuilder(locator));
@@ -1953,36 +1938,8 @@ namespace {
         // Find the conversion method we chose.
         auto choice = getOverloadChoice(locator);
         
-        // Get the address of the lvalue as a pointer, at the abstraction
-        // level the method expects.
-        auto choiceDecl = choice.choice.getDecl();
-        auto argType = choiceDecl->getType()
-          ->castTo<AnyFunctionType>()
-          ->getResult()
-          ->castTo<AnyFunctionType>()
-          ->getInput();
-        Type abstractionTy;
-        auto argTuple = argType->getAs<TupleType>();
-        // The type may have been a scalar archetype, T or (label: T).
-        if (argTuple && argTuple->getNumElements() != 1) {
-          assert(argTuple->getNumElements() == 2
-                 && "__inout_conversion choice doesn't take two arguments?!");
-          abstractionTy = argTuple->getElementType(1)
-            ->castTo<AnyMetatypeType>()->getInstanceType();
-        } else if (argTuple) {
-          assert(argTuple->getElementType(0)->is<ArchetypeType>()
-                 && "non-tuple inout conversion choice can't match a tuple "
-                    "type?!");
-          abstractionTy = argTuple->getElementType(0);
-        } else {
-          assert(argType->is<ArchetypeType>()
-                 && "non-tuple inout conversion choice can't match a tuple "
-                    "type?!");
-          abstractionTy = argType;
-        }
-        
         // Use it to convert the lvalue.
-        return buildInOutConversionExpr(choice, resultTy, abstractionTy,
+        return buildInOutConversionExpr(choice, resultTy,
                                         expr->getSubExpr());
       }
           
@@ -2028,18 +1985,8 @@ namespace {
                                                    getMemberRef,
                                                    setMemberRef);
         
-        // Use the abstraction level of the getter result as the abstraction
-        // level of the pointer conversion.
-        auto getChoiceDecl = getChoice.choice.getDecl();
-        auto abstractionTy = getChoiceDecl->getType()
-          ->castTo<AnyFunctionType>()
-          ->getResult()
-          ->castTo<AnyFunctionType>()
-          ->getResult();
-        
         // Convert the converted lvalue.
         return buildInOutConversionExpr(conversionChoice, resultTy,
-                                        abstractionTy,
                                         lvConversion);
       }
       }
