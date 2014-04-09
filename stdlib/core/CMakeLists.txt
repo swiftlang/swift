@@ -49,6 +49,7 @@ set(SWIFTLIB_ESSENTIAL
   NativeArrayBuffer.swift
   Nil.swift
   NSSwiftArray.swift
+  Map.swift
   OpaqueString.swift
   Optional.swift
   OutputStream.swift
