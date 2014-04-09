@@ -154,7 +154,10 @@ void swift::ide::printSubmoduleInterface(
       }
       continue;
     }
-    SwiftDecls.push_back(D);
+    if (FullModuleName.empty()) {
+      // Add Swift decls if we are printing the top-level module.
+      SwiftDecls.push_back(D);
+    }
   }
 
   auto &ClangSourceManager = Importer.getClangASTContext().getSourceManager();
@@ -163,8 +166,7 @@ void swift::ide::printSubmoduleInterface(
   for (auto &P : ClangDecls) {
     std::sort(P.second.begin(), P.second.end(),
               [&](std::pair<Decl *, clang::SourceLocation> LHS,
-                  std::pair<Decl *, clang::SourceLocation> RHS)
-              -> bool {
+                  std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
                 return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
                                                                     RHS.second);
               });
