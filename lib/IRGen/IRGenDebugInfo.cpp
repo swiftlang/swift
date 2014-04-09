@@ -128,6 +128,23 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 }
 
+static const char* getFilenameFromDC(const DeclContext *DC) {
+  if (auto LF = dyn_cast<LoadedFile>(DC)) {
+    // FIXME: Today, the subclasses of LoadedFile happen to return StringRefs
+    // that are backed by null-terminated strings, but that's certainly not
+    // guaranteed in the future.
+    StringRef Fn = LF->getFilename();
+    assert(((Fn.size() == 0) ||
+            (Fn.data()[Fn.size()] == '\0')) && "not a C string");
+    return Fn.data();
+  } if (auto SF = dyn_cast<SourceFile>(DC))
+    return SF->getFilename().data();
+  else if (auto M = dyn_cast<Module>(DC))
+    return M->getModuleFilename().data();
+  else
+    return nullptr;
+}
+
 
 Location getDeserializedLoc(Pattern*) { return {}; }
 Location getDeserializedLoc(Expr*)    { return {}; }
@@ -135,12 +152,8 @@ Location getDeserializedLoc(Stmt*)    { return {}; }
 Location getDeserializedLoc(Decl* D)  {
   Location L = {};
   const DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (auto LF = dyn_cast<LoadedFile>(DC)) {
-    // FIXME: Today, the subclasses of LoadedFile happen to return StringRefs
-    // that are backed by null-terminated strings, but that's certainly not
-    // guaranteed in the future.
-    L.Filename = LF->getFilename().data();
-    assert(L.Filename[LF->getFilename().size()] == '\0' && "not a C string");
+  if (const char* Filename = getFilenameFromDC(DC)) {
+    L.Filename = Filename;
     L.Line = 1;
   }
   return L;
@@ -571,9 +584,23 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
   return;
 }
 
+/// The DWARF output for import decls is similar to that of a using
+/// directive in C++:
+///   import Foundation
+///   -->
+///   0: DW_TAG_imported_module
+///        DW_AT_import(*1)
+///   1: DW_TAG_namespace
+///        DW_AT_name("Foundation")
+///
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   // Imports are visited after SILFunctions.
   llvm::DIScope Namespace = MainFile;
+  Module *M = IGM.Context.getModule(D->getFullAccessPath());
+  assert(M && "Could not find module for import decl.");
+  if (!M) return;
+  auto File = getOrCreateFile(getFilenameFromDC(M->getFiles().front()));
+
   std::string Printed, Mangled("_T");
   {
     llvm::raw_string_ostream MS(Mangled), PS(Printed);
@@ -586,7 +613,7 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
         MS << "S";
       else
         mangleIdent(MS, Component);
-      Namespace = getOrCreateNamespace(Namespace, Component, MainFile, 1);
+      Namespace = getOrCreateNamespace(Namespace, Component, File, 1);
 
       if (first) first = false;
       else PS << '.';
@@ -595,25 +622,25 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   }
 
   StringRef Name = BumpAllocatedString(Printed);
-  createImportedModule(Name, Mangled, llvm::DINameSpace(Namespace),
-                       getLoc(SM, D, false));
+  createImportedModule(Name, Mangled, llvm::DINameSpace(Namespace));
 }
 
 // Create an imported module and import declarations for all functions
 // from that module.
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
-                                          llvm::DINameSpace Namespace,
-                                          Location L) {
-  llvm::DIScope File(TheCU);
-  if (Name == IGM.Context.StdlibModuleName.str())
-    // FIXME: This is a hack to anchor a reference to the stdlib
-    // swiftmodule in the line table so LLDB can find it even if
-    // nothing in the CU references it.
-    // rdar://problem/15796201
-    File = getOrCreateFile(IGM.Context.TheStdlibModule->getModuleFilename()
-                           .data());
-
-  auto Import = DBuilder.createImportedModule(File, Namespace, L.Line);
+                                          llvm::DINameSpace Namespace) {
+  // This is bending the rules a little bit, but we are creating the
+  // imported module with the location of the imported module instead
+  // of the location of the import statement. Dsymustil elides
+  // namespaces without children, so all that's left is the
+  // DW_TAG_imported_module.
+  llvm::DIScope File;
+  {
+    llvm::SmallString<512> Path(Namespace.getDirectory());
+    llvm::sys::path::append(Path, Namespace.getFilename());
+    File = getOrCreateFile(Path.c_str());
+  } 
+  auto Import = DBuilder.createImportedModule(File, Namespace, 1);
 
   // Add all functions that belong to this namespace to it.
   //
@@ -631,7 +658,7 @@ void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
       Scope->replaceAllUsesWith(Namespace);
 
-    DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, L.Line);
+    DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, 1);
   }
 }
 
@@ -648,7 +675,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateNamespace(llvm::DIScope Namespace,
     if (llvm::Value *Val = CachedNS->second)
       return llvm::DINameSpace(cast<llvm::MDNode>(Val));
 
-  auto NS = DBuilder.createNameSpace(Namespace, MangledName, MainFile, Line);
+  auto NS = DBuilder.createNameSpace(Namespace, MangledName, File, Line);
   DINameSpaceCache[MangledName] = llvm::WeakVH(NS);
   return NS;
 }
@@ -1494,7 +1521,7 @@ void IRGenDebugInfo::finalize() {
     MS << "S";
   else
     mangleIdent(MS, Opts.ModuleName);
-  createImportedModule(Opts.ModuleName, MS.str(), Namespace, Location());
+  createImportedModule(Opts.ModuleName, MS.str(), Namespace);
 
   // The default for a function is to be in the file-level scope.
   for (auto FVH: Functions) {
