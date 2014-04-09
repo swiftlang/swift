@@ -22,12 +22,12 @@ set(SWIFTLIB_ESSENTIAL
   ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferType.swift
-  ArrayCore.swift
   ArrayType.swift
   AssertCommon.swift
   Bool.swift
   BridgeObjectiveC.swift
   Builtin.swift
+  CocoaArray.swift
   CString.swift
   CTypes.swift
   Character.swift
@@ -46,7 +46,9 @@ set(SWIFTLIB_ESSENTIAL
   LifetimeManager.swift
   LogicValue.swift
   Misc.swift
+  NativeArrayBuffer.swift
   Nil.swift
+  NSSwiftArray.swift
   OpaqueString.swift
   Optional.swift
   OutputStream.swift
