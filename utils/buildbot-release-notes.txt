@@ -11,7 +11,7 @@
     ;
   }
 
-* 'override' is now a keyword:
+* 'override' is now a context sensitive keyword, instead of an attribute:
 
   class Base {
     var property: Int { return 0 }
