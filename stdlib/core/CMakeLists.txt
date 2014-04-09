@@ -19,6 +19,7 @@ set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Algorithm.swift
   Arrays.swift.gyb
+  ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferType.swift
   ArrayCore.swift
