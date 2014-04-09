@@ -53,6 +53,7 @@ set(SWIFTLIB_ESSENTIAL
   Optional.swift
   OutputStream.swift
   Policy.swift
+  Repeat.swift
   REPL.swift
   Range.swift
   Reflection.swift
