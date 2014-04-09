@@ -101,7 +101,8 @@ public:
   static RValue emitBBArguments(CanType type,
                                 SILGenFunction &gen,
                                 SILBasicBlock *parent,
-                                SILLocation L);
+                                SILLocation L,
+                                bool functionArgs);
   
   /// True if the rvalue has been completely initialized by adding all its
   /// elements.

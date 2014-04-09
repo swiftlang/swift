@@ -894,8 +894,8 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCopyBlockInst(CopyBlockInst *Inst) {
   doPostProcess(Inst,
-    Builder.createStrongRetain(getOpLocation(Inst->getLoc()),
-                               getOpValue(Inst->getOperand())));
+    Builder.createCopyBlock(getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

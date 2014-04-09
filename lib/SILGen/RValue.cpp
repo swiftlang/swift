@@ -394,10 +394,11 @@ public:
   SILGenFunction &gen;
   SILBasicBlock *parent;
   SILLocation loc;
+  bool functionArgs;
   
   EmitBBArguments(SILGenFunction &gen, SILBasicBlock *parent,
-                  SILLocation l)
-    : gen(gen), parent(parent), loc(l) {}
+                  SILLocation l, bool functionArgs)
+    : gen(gen), parent(parent), loc(l), functionArgs(functionArgs) {}
   
   RValue visitType(CanType t) {
     SILValue arg = new (gen.SGM.M)
@@ -405,6 +406,18 @@ public:
     ManagedValue mv = isa<InOutType>(t)
       ? ManagedValue::forLValue(arg)
       : gen.emitManagedRValueWithCleanup(arg);
+    
+    // If the value is an ObjC block passed into the entry point of the
+    // function, copy it, so we can treat the value reliably
+    // as a heap object. Escape analysis can eliminate this copy if it's
+    // unneeded during optimization.
+    if (functionArgs
+        && isa<FunctionType>(t)
+        && cast<FunctionType>(t)->getRepresentation()
+              == FunctionType::Representation::Block) {
+      SILValue blockCopy = gen.B.createCopyBlock(loc, mv.getValue());
+      mv = gen.emitManagedRValueWithCleanup(blockCopy);
+    }
     return RValue(gen, loc, t, mv);
   }
   
@@ -480,8 +493,9 @@ RValue::RValue(CanType type)
 RValue RValue::emitBBArguments(CanType type,
                                SILGenFunction &gen,
                                SILBasicBlock *parent,
-                               SILLocation l) {
-  return EmitBBArguments(gen, parent, l).visit(type);
+                               SILLocation l,
+                               bool functionArgs) {
+  return EmitBBArguments(gen, parent, l, functionArgs).visit(type);
 }
 
 void RValue::addElement(RValue &&element) & {

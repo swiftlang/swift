@@ -690,10 +690,10 @@ struct ArgumentInitVisitor :
 
   RValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
     assert(ty && "no type?!");
-    return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l);
+    return RValue::emitBBArguments(ty->getCanonicalType(), gen, parent, l,
+                                   /*functionArgs*/ true);
   }
-
-
+  
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
   void makeArgumentInto(Type ty, SILBasicBlock *parent,

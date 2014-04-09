@@ -1982,11 +1982,11 @@ public:
 /// retain a block that is already on the heap.
 class CopyBlockInst :
     public UnaryInstructionBase<ValueKind::CopyBlockInst,
-                                RefCountingInst, /*HAS_RESULT*/ true>
+                                SILInstruction, /*HAS_RESULT*/ true>
 {
 public:
   CopyBlockInst(SILLocation loc, SILValue operand)
-    : UnaryInstructionBase(loc, operand) {}
+    : UnaryInstructionBase(loc, operand, operand.getType()) {}
 };
   
 //===----------------------------------------------------------------------===//
