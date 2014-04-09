@@ -1605,7 +1605,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), { }, genericParams, DC);
