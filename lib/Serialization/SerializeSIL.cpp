@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
 #include "swift/AST/Module.h"
@@ -185,8 +186,6 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
-  DEBUG(llvm::dbgs() << "Serialize SIL:\n";
-        F.dump());
   ValueIDs.clear();
   InstID = 0;
 
@@ -194,8 +193,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   Funcs.push_back(Out.GetCurrentBitNo());
   unsigned abbrCode = SILAbbrCodes[SILFunctionLayout::Code];
   TypeID FnID = S.addTypeRef(F.getLoweredType().getSwiftType());
-  DEBUG(llvm::dbgs() << "SILFunction @" << Out.GetCurrentBitNo() <<
-        " abbrCode " << abbrCode << " FnID " << FnID << "\n");
+  DEBUG(llvm::dbgs() << "SILFunction " << F.getName() << " @ BitNo "
+                     << Out.GetCurrentBitNo() << " abbrCode " << abbrCode
+                     << " FnID " << FnID << "\n");
+  DEBUG(llvm::dbgs() << "Serialized SIL:\n"; F.dump());
+
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
