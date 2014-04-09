@@ -160,17 +160,19 @@ namespace {
     void writeSILFunction(const SILFunction &F, bool DeclOnly = false);
     void writeSILBasicBlock(const SILBasicBlock &BB);
     void writeSILInstruction(const SILInstruction &SI);
-    void writeVTable(const SILVTable &vt);
-    void writeGlobalVar(const SILGlobalVariable &g);
-    void writeWitnessTable(const SILWitnessTable &wt);
-    void writeTables();
+    void writeSILVTable(const SILVTable &vt);
+    void writeSILGlobalVar(const SILGlobalVariable &g);
+    void writeSILWitnessTable(const SILWitnessTable &wt);
+
+    void writeSILBlock(const SILModule *SILMod);
+    void writeIndexTables();
 
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
                   llvm::BitstreamWriter &Out, bool serializeAll)
       : S(S), Ctx(Ctx), Out(Out), ShouldSerializeAll(serializeAll) {}
 
-    void writeModule(const SILModule *SILMod);
+    void writeSILModule(const SILModule *SILMod);
   };
 } // end anonymous namespace
 
@@ -1216,9 +1218,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
 /// Depending on the RecordKind, we write the SILFunction table, the global
 /// variable table, the table for SILVTable, or the table for SILWitnessTable.
-static void writeTable(const sil_index_block::ListLayout &List,
-                       sil_index_block::RecordKind kind,
-                       const SILSerializer::Table &table) {
+static void writeIndexTable(const sil_index_block::ListLayout &List,
+                            sil_index_block::RecordKind kind,
+                            const SILSerializer::Table &table) {
   assert((kind == sil_index_block::SIL_FUNC_NAMES ||
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
@@ -1240,34 +1242,36 @@ static void writeTable(const sil_index_block::ListLayout &List,
   List.emit(scratch, kind, tableOffset, hashTableBlob);
 }
 
-void SILSerializer::writeTables() {
+void SILSerializer::writeIndexTables() {
+  BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
+
   sil_index_block::ListLayout List(Out);
   sil_index_block::OffsetLayout Offset(Out);
   if (!FuncTable.empty()) {
-    writeTable(List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
+    writeIndexTable(List, sil_index_block::SIL_FUNC_NAMES, FuncTable);
     Offset.emit(ScratchRecord, sil_index_block::SIL_FUNC_OFFSETS, Funcs);
   }
 
   if (!VTableList.empty()) {
-    writeTable(List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
+    writeIndexTable(List, sil_index_block::SIL_VTABLE_NAMES, VTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_VTABLE_OFFSETS,
                 VTableOffset);
   }
 
   if (!GlobalVarList.empty()) {
-    writeTable(List, sil_index_block::SIL_GLOBALVAR_NAMES, GlobalVarList);
+    writeIndexTable(List, sil_index_block::SIL_GLOBALVAR_NAMES, GlobalVarList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_GLOBALVAR_OFFSETS,
                 GlobalVarOffset);
   }
 
   if (!WitnessTableList.empty()) {
-    writeTable(List, sil_index_block::SIL_WITNESSTABLE_NAMES, WitnessTableList);
+    writeIndexTable(List, sil_index_block::SIL_WITNESSTABLE_NAMES, WitnessTableList);
     Offset.emit(ScratchRecord, sil_index_block::SIL_WITNESSTABLE_OFFSETS,
                 WitnessTableOffset);
   }
 }
 
-void SILSerializer::writeGlobalVar(const SILGlobalVariable &g) {
+void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
   GlobalVarList[Ctx.getIdentifier(g.getName())] = GlobalVarID++;
   GlobalVarOffset.push_back(Out.GetCurrentBitNo());
   TypeID TyID = S.addTypeRef(g.getLoweredType().getSwiftType());
@@ -1277,7 +1281,7 @@ void SILSerializer::writeGlobalVar(const SILGlobalVariable &g) {
                               TyID);
 }
 
-void SILSerializer::writeVTable(const SILVTable &vt) {
+void SILSerializer::writeSILVTable(const SILVTable &vt) {
   VTableList[vt.getClass()->getName()] = VTableID++;
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
@@ -1296,7 +1300,7 @@ void SILSerializer::writeVTable(const SILVTable &vt) {
   }
 }
 
-void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
+void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
   WitnessTableList[wt.getIdentifier()] = WitnessTableID++;
   WitnessTableOffset.push_back(Out.GetCurrentBitNo());
   WitnessTableLayout::emitRecord(Out, ScratchRecord,
@@ -1392,114 +1396,114 @@ transitivelyReferencesPotentiallyUnserializableLinkage(const SILFunction &F) {
   return false;
 }
 
-void SILSerializer::writeModule(const SILModule *SILMod) {
-  {
-    BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 6);
-    registerSILAbbr<SILFunctionLayout>();
-    registerSILAbbr<SILBasicBlockLayout>();
-    registerSILAbbr<SILOneValueOneOperandLayout>();
-    registerSILAbbr<SILOneTypeLayout>();
-    registerSILAbbr<SILOneOperandLayout>();
-    registerSILAbbr<SILOneTypeOneOperandLayout>();
-    registerSILAbbr<SILInitExistentialLayout>();
-    registerSILAbbr<SILOneTypeValuesLayout>();
-    registerSILAbbr<SILTwoOperandsLayout>();
-    registerSILAbbr<SILInstApplyLayout>();
-    registerSILAbbr<SILInstNoOperandLayout>();
+void SILSerializer::writeSILBlock(const SILModule *SILMod) {
+  BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 6);
 
-    registerSILAbbr<VTableLayout>();
-    registerSILAbbr<VTableEntryLayout>();
-    registerSILAbbr<GlobalVarLayout>();
-    registerSILAbbr<WitnessTableLayout>();
-    registerSILAbbr<WitnessMethodEntryLayout>();
-    registerSILAbbr<WitnessBaseEntryLayout>();
-    registerSILAbbr<WitnessAssocProtocolLayout>();
-    registerSILAbbr<WitnessAssocEntryLayout>();
-    registerSILAbbr<SILGenericOuterParamsLayout>();
+  registerSILAbbr<SILFunctionLayout>();
+  registerSILAbbr<SILBasicBlockLayout>();
+  registerSILAbbr<SILOneValueOneOperandLayout>();
+  registerSILAbbr<SILOneTypeLayout>();
+  registerSILAbbr<SILOneOperandLayout>();
+  registerSILAbbr<SILOneTypeOneOperandLayout>();
+  registerSILAbbr<SILInitExistentialLayout>();
+  registerSILAbbr<SILOneTypeValuesLayout>();
+  registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILInstApplyLayout>();
+  registerSILAbbr<SILInstNoOperandLayout>();
 
-    registerSILAbbr<SILInstCastLayout>();
+  registerSILAbbr<VTableLayout>();
+  registerSILAbbr<VTableEntryLayout>();
+  registerSILAbbr<GlobalVarLayout>();
+  registerSILAbbr<WitnessTableLayout>();
+  registerSILAbbr<WitnessMethodEntryLayout>();
+  registerSILAbbr<WitnessBaseEntryLayout>();
+  registerSILAbbr<WitnessAssocProtocolLayout>();
+  registerSILAbbr<WitnessAssocEntryLayout>();
+  registerSILAbbr<SILGenericOuterParamsLayout>();
 
-    // Register the abbreviation codes so these layouts can exist in both
-    // decl blocks and sil blocks.
-    // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
-    // SIL-specific records.
-    registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
-    registerSILAbbr<decls_block::NoConformanceLayout>();
-    registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
-    registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
-    registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
-    registerSILAbbr<decls_block::GenericParamListLayout>();
-    registerSILAbbr<decls_block::GenericParamLayout>();
-    registerSILAbbr<decls_block::GenericRequirementLayout>();
-    registerSILAbbr<decls_block::LastGenericRequirementLayout>();
+  registerSILAbbr<SILInstCastLayout>();
 
-    for (const SILGlobalVariable &g : SILMod->getSILGlobals())
-      writeGlobalVar(g);
+  // Register the abbreviation codes so these layouts can exist in both
+  // decl blocks and sil blocks.
+  // We have to make sure BOUND_GENERIC_SUBSTITUTION does not overlap with
+  // SIL-specific records.
+  registerSILAbbr<decls_block::BoundGenericSubstitutionLayout>();
+  registerSILAbbr<decls_block::NoConformanceLayout>();
+  registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::GenericParamListLayout>();
+  registerSILAbbr<decls_block::GenericParamLayout>();
+  registerSILAbbr<decls_block::GenericRequirementLayout>();
+  registerSILAbbr<decls_block::LastGenericRequirementLayout>();
 
-    // Write out VTables first because it may require serializations of
-    // non-transparent SILFunctions (body is not needed).
-    // Go through all SILVTables in SILMod and write them if we should
+  for (const SILGlobalVariable &g : SILMod->getSILGlobals())
+    writeSILGlobalVar(g);
+
+  // Write out VTables first because it may require serializations of
+  // non-transparent SILFunctions (body is not needed).
+  // Go through all SILVTables in SILMod and write them if we should
+  // serialize everything.
+  // FIXME: Resilience: could write out vtable for fragile classes.
+  for (const SILVTable &vt : SILMod->getVTables()) {
+    if (ShouldSerializeAll)
+      writeSILVTable(vt);
+  }
+
+  // Write out WitnessTables. For now, write out only if EnableSerializeAll.
+  for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
+    if (ShouldSerializeAll)
+      writeSILWitnessTable(wt);
+  }
+
+  // Helper function for whether to emit a function body.
+  auto shouldEmitFunctionBody = [&](const SILFunction &F) {
+    // If F is a declaration, it has no body to emit...
+    if (F.empty())
+      return false;
+
+    // If F is transparent, we should always emit its body.
+    if (F.isTransparent())
+      return true;
+
+    // Emit the function body if F is a shared function referenced in this
+    // module. This is needed specifically to handle the bodies of closures.
+    // FIXME: This is order-dependent.
+    if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
+      return true;
+
+    // If F has private linkage or transitively references a global, function,
+    // vtable, or witnesstable with private linkage, do not serialize it.
+    //
+    // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
+    // but will at some point in the near future.
+    if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
+        transitivelyReferencesPotentiallyUnserializableLinkage(F))
+      return false;
+
+    // Otherwise serialize the body of the function only if we are asked to
     // serialize everything.
-    // FIXME: Resilience: could write out vtable for fragile classes.
-    for (const SILVTable &vt : SILMod->getVTables()) {
-      if (ShouldSerializeAll)
-        writeVTable(vt);
-    }
+    return ShouldSerializeAll;
+  };
 
-    // Write out WitnessTables. For now, write out only if EnableSerializeAll.
-    for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-      if (ShouldSerializeAll)
-        writeWitnessTable(wt);
-    }
-
-    // Helper function for whether to emit a function body.
-    auto shouldEmitFunctionBody = [&](const SILFunction &F) {
-      // If F is a declaration, it has no body to emit...
-      if (F.empty())
-        return false;
-
-      // If F is transparent, we should always emit its body.
-      if (F.isTransparent())
-        return true;
-
-      // Emit the function body if F is a shared function referenced in this
-      // module. This is needed specifically to handle the bodies of closures.
-      // FIXME: This is order-dependent.
-      if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
-        return true;
-
-      // If F has private linkage or transitively references a global, function,
-      // vtable, or witnesstable with private linkage, do not serialize it.
-      //
-      // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
-      // but will at some point in the near future.
-      if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
-          transitivelyReferencesPotentiallyUnserializableLinkage(F))
-        return false;
-
-      // Otherwise serialize the body of the function only if we are asked to
-      // serialize everything.
-      return ShouldSerializeAll;
-    };
-
-    // Go through all the SILFunctions in SILMod and write out any
-    // mandatory function bodies.
-    for (const SILFunction &F : *SILMod) {
-      if (shouldEmitFunctionBody(F))
-        writeSILFunction(F);
-    }
-
-    // Now write function declarations for every function we've
-    // emitted a reference to without emitting a function body for.
-    for (const SILFunction &F : *SILMod) {
-      if (!shouldEmitFunctionBody(F) && FuncsToDeclare.count(&F))
-        writeSILFunction(F, true);
-    }
+  // Go through all the SILFunctions in SILMod and write out any
+  // mandatory function bodies.
+  for (const SILFunction &F : *SILMod) {
+    if (shouldEmitFunctionBody(F))
+      writeSILFunction(F);
   }
-  {
-    BCBlockRAII restoreBlock(Out, SIL_INDEX_BLOCK_ID, 4);
-    writeTables();
+
+  // Now write function declarations for every function we've
+  // emitted a reference to without emitting a function body for.
+  for (const SILFunction &F : *SILMod) {
+    if (!shouldEmitFunctionBody(F) && FuncsToDeclare.count(&F))
+      writeSILFunction(F, true);
   }
+}
+
+void SILSerializer::writeSILModule(const SILModule *SILMod) {
+  writeSILBlock(SILMod);
+  writeIndexTables();
 }
 
 void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
@@ -1507,6 +1511,5 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
     return;
 
   SILSerializer SILSer(*this, M->Ctx, Out, serializeAllSIL);
-  SILSer.writeModule(SILMod);
-
+  SILSer.writeSILModule(SILMod);
 }
