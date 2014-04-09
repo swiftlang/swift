@@ -471,12 +471,8 @@ public:
   /// \param ForcedContext Optional override for the decl context of certain
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
-  /// \param DidRecord Optional callback, called at some point after the decl
-  ///                  has been recorded in the decl table (but not necessarily
-  ///                  completed).
   Decl *getDecl(serialization::DeclID DID,
-                Optional<DeclContext *> ForcedContext = {},
-                std::function<void(Decl*)> DidRecord = nullptr);
+                Optional<DeclContext *> ForcedContext = {});
 
   /// Returns the appropriate module for the given ID.
   Module *getModule(serialization::ModuleID MID);

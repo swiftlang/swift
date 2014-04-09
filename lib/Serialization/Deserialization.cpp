@@ -1341,19 +1341,15 @@ static bool isDeclAttrRecord(unsigned ID) {
   }
 }
 
-Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
-                          std::function<void(Decl*)> DidRecord) {
+Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
 
   assert(DID <= Decls.size() && "invalid decl ID");
   auto &declOrOffset = Decls[DID-1];
 
-  if (declOrOffset.isComplete()) {
-    if (DidRecord)
-      DidRecord(declOrOffset);
+  if (declOrOffset.isComplete())
     return declOrOffset;
-  }
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
@@ -1489,7 +1485,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto underlyingType = TypeLoc::withoutLoc(getType(underlyingTypeID));
 
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto alias = new (ctx) TypeAliasDecl(SourceLoc(), getIdentifier(nameID),
                                          SourceLoc(), underlyingType, DC);
@@ -1527,7 +1523,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto genericParam = new (ctx) GenericTypeParamDecl(DC,
                                                        getIdentifier(nameID),
@@ -1571,7 +1567,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto assocType = new (ctx) AssociatedTypeDecl(DC, SourceLoc(),
                                                   getIdentifier(nameID),
@@ -1605,7 +1601,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
     if (declOrOffset.isComplete())
@@ -1614,10 +1610,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto theStruct = new (ctx) StructDecl(SourceLoc(), getIdentifier(nameID),
                                           SourceLoc(), { }, genericParams, DC);
     declOrOffset = theStruct;
-    if (DidRecord) {
-      DidRecord(theStruct);
-      DidRecord = nullptr;
-    }
 
     if (isImplicit)
       theStruct->setImplicit();
@@ -1669,11 +1661,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
                                                overriddenID);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto genericParams = maybeReadGenericParams(parent, DeclTypeCursor);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
                                           /*argParams=*/nullptr, nullptr,
@@ -1763,11 +1755,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto type = getType(typeID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto var = new (ctx) VarDecl(isStatic, isLet, SourceLoc(),
                                  getIdentifier(nameID), type, DC);
@@ -1851,7 +1843,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     // Read generic params before reading the type, because the type may
     // reference generic parameters, and we want them to have a dummy
@@ -1865,7 +1857,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     }
 
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     DeclName name;
     if (!names.empty()) {
@@ -1993,16 +1985,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto proto = new (ctx) ProtocolDecl(DC, SourceLoc(), SourceLoc(),
                                         getIdentifier(nameID), { });
     declOrOffset = proto;
-
-    if (DidRecord) {
-      DidRecord(proto);
-      DidRecord = nullptr;
-    }
 
     if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
       proto->setGenericParams(genericParams);
@@ -2107,19 +2094,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto theClass = new (ctx) ClassDecl(SourceLoc(), getIdentifier(nameID),
                                         SourceLoc(), { }, genericParams, DC);
     declOrOffset = theClass;
-    if (DidRecord) {
-      DidRecord(theClass);
-      DidRecord = nullptr;
-    }
 
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
@@ -2179,20 +2162,16 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto theEnum = new (ctx) EnumDecl(SourceLoc(), getIdentifier(nameID),
                                       SourceLoc(), { }, genericParams, DC);
 
     declOrOffset = theEnum;
-    if (DidRecord) {
-      DidRecord(theEnum);
-      DidRecord = nullptr;
-    }
 
     if (isImplicit)
       theEnum->setImplicit();
@@ -2241,11 +2220,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto argTy = getType(argTypeID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     // FIXME: Deserialize the literal raw value, if any.
     auto elem = new (ctx) EnumElementDecl(SourceLoc(),
@@ -2282,14 +2261,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
     auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     Pattern *indices = maybeReadPattern();
     assert(indices);
 
     auto elemTy = TypeLoc::withoutLoc(getType(elemTypeID));
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
                                              SourceLoc(), indices, SourceLoc(),
@@ -2323,11 +2302,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto baseTy = TypeLoc::withoutLoc(getType(baseID));
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto extension = new (ctx) ExtensionDecl(SourceLoc(), baseTy, { }, DC);
     declOrOffset = extension;
@@ -2361,7 +2340,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
 
     DeclContext *parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
-      break;
+      return declOrOffset;
 
     auto dtor = new (ctx) DestructorDecl(ctx.Id_deinit, SourceLoc(),
                                          /*selfpat*/nullptr, parent);
@@ -2397,9 +2376,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext,
   // Record the attributes.
   if (DAttrs)
     declOrOffset.get()->getMutableAttrs().setRawAttributeChain(DAttrs);
-
-  if (DidRecord)
-    DidRecord(declOrOffset);
 
   return declOrOffset;
 }
@@ -2532,16 +2508,8 @@ Type ModuleFile::getType(TypeID TID) {
 
     // Record the type as soon as possible. Members of a nominal type often
     // try to refer back to the type.
-    getDecl(declID, Nothing, makeStackLambda([&](Decl *D) {
-      // FIXME: Hack for "typedef struct CGRect CGRect". In the long run we need
-      // something less brittle that would also handle pointer typedefs and
-      // typedefs that just /happen/ to match a tagged name but don't actually
-      // point to the tagged type.
-      if (auto alias = dyn_cast<TypeAliasDecl>(D))
-        D = alias->getUnderlyingType()->getAnyNominal();
-      auto nominal = cast<NominalTypeDecl>(D);
-      typeOrOffset = NominalType::get(nominal, parentTy, ctx);
-    }));
+    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    typeOrOffset = NominalType::get(nominal, parentTy, ctx);
 
     assert(typeOrOffset.isComplete());
     break;
