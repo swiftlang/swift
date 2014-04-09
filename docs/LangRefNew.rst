@@ -1250,7 +1250,9 @@ The 'continue' statement transfers control back to the start of the enclosing
 .. code-block:: none
 
   stmt-switch ::= 'switch' expr-basic '{' stmt-switch-case* '}'
+
   stmt-switch-case ::= (case-label | default-label) brace-item+
+  stmt-switch-case ::= (case-label | default-label) ';'
 
   case-label ::= 'case' pattern ('where' expr)? (',' pattern ('where' expr)?)* ':'
   default-label ::= 'default' ':'
@@ -1292,7 +1294,8 @@ transfer control among case blocks.  :ref:`break <langref.stmt.break>` and
 out of an enclosing 'while' or 'for' loop, not out of the 'switch' itself.
 
 At least one ``brace-item`` is required in every case or default block.  It is
-allowed to be a no-op.
+allowed to be a no-op.  Semicolon can be used as a single no-op statement in
+otherwise empty cases in switch statements.
 
 ::
 
@@ -1316,6 +1319,13 @@ allowed to be a no-op.
     case (var x, var y):
       println("length \(sqrt(x*x + y*y))")
     }
+  }
+
+  switch x {
+  case 1, 2, 3:
+    print("x is 1, 2 or 3")
+  default:
+    ;
   }
 
 .. _langref.stmt.fallthrough:

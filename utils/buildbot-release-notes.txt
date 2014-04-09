@@ -1,3 +1,16 @@
+2014-04-09
+----------
+
+* Semicolon can be used as a single no-op statement in otherwise empty cases in
+  switch statements:
+
+  switch x {
+  case 1, 2, 3:
+    print("x is 1, 2 or 3")
+  default:
+    ;
+  }
+
 2014-04-02
 ----------
 
