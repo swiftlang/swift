@@ -1355,6 +1355,7 @@ void SILSerializer::writeWitnessTable(const SILWitnessTable &wt) {
   }
 }
 
+/// Can we always serialize entities with the given linkage no matter what?
 static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public:
@@ -1362,16 +1363,21 @@ static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
     return true;
+  // We only serialize shared functions if they are in FuncsToDeclare.
   case SILLinkage::Shared:
+  // We never serialize anything with private linkage.
   case SILLinkage::Private:
     return false;
   }
 }
 
-// Check if F transitively references a global, function, vtable, or witness
-// table with private linkage.
-//
-// FIXME: When vtables/witness tables get linkage, update this.
+/// Check if F transitively references a global, function, vtable, or witness
+/// table with linkage that we can not always serialize (i.e. might be
+/// conditionally or even never serializable).
+///
+/// SILWitnessTables do not need to be checked here since WitnessMethodInst
+/// always looks up the relevant witness method indirectly from a table in the
+/// SILModule that maps ProtocolConformances to SILWitnessTables.
 static bool
 transitivelyReferencesPotentiallyUnserializableLinkage(const SILFunction &F) {
   for (auto &BB : F)
