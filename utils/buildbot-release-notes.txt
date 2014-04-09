@@ -1,6 +1,24 @@
 2014-04-09
 ----------
 
+* Dictionary changes:
+
+  - Elements are now tuples, so you can write
+
+    for (k, v) in d {
+      // ...
+    }
+
+  - "keys" and "values" properties, which are Collections projecting
+    the corresponding aspect of each element.  Dictionary indices are
+    usable with their keys and values properties, so:
+
+    for i in indices(d) {
+      let (k, v) = d[i]
+      assert(k == d.keys[i])
+      assert(v == d.values[i])
+    }
+
 * Semicolon can be used as a single no-op statement in otherwise empty cases in
   switch statements:
 
