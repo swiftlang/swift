@@ -26,7 +26,7 @@
 /// * Whitespace [X]
 ///   - Blank Lines [X]
 ///   - Indentation [X]
-/// * Escaping Mechanism [ ]
+/// * Escaping Mechanism [E]
 /// * Reference Names [ ]
 /// * Document Structure
 ///   - Document [P] (missing metadata)
